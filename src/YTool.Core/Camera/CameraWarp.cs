@@ -28,6 +28,26 @@ public static class CameraWarp
         return bmp;
     }
 
+    /// <summary>
+    /// Whether a photo is washed out: the cameras need a frame or two to settle
+    /// their exposure after the lights change, and the first one can be blown out.
+    /// </summary>
+    public static bool IsOverexposed(byte[] jpeg)
+    {
+        using var small = Decode(jpeg, 400);
+        var px = small.Pixels;
+        int clipped = 0;
+        double sum = 0;
+        foreach (var c in px)
+        {
+            int y = (c.Red * 77 + c.Green * 150 + c.Blue * 29) >> 8;
+            sum += y;
+            if (y >= 245) clipped++;
+        }
+        // Normal overview photos average ~80/255 with ~1 % clipped (measured on the user's F2 Ultra).
+        return clipped > px.Length * 0.2 || sum / px.Length > 185;
+    }
+
     public static GrayImage ToGray(SKBitmap bmp)
     {
         var px = bmp.Pixels;

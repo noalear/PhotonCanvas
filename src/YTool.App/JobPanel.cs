@@ -38,6 +38,19 @@ public sealed class JobPanel : UserControl
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 6 };
     readonly TextBlock _sendState = Hint();
 
+    // running job
+    readonly Border _runCard;
+    readonly TextBlock _runState = new() { FontWeight = FontWeight.SemiBold };
+    readonly ProgressBar _runProgress = new() { Minimum = 0, Maximum = 1, Height = 8 };
+    readonly TextBlock _runTimes = Hint();
+    readonly Button _pause = new() { Content = "Pause", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Button _stop = new() { Content = "Stop job", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    DateTime? _startedAt;
+    double? _sentEstimate;
+    double _pausedFor;
+    DateTime? _pausedAt;
+    readonly DispatcherTimer _runTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+
     BuiltJob? _job;
     string? _error;
     int _version;
@@ -71,6 +84,16 @@ public sealed class JobPanel : UserControl
         _preview.IsCheckedChanged += (_, _) => _canvas.Preview = _preview.IsChecked == true ? _job : null;
         _send.Click += async (_, _) => await Send();
         _machine.ConnectionChanged += UpdateSend;
+        _stop.Background = Brush("Danger");
+        _stop.Foreground = Brushes.White;
+        ToolTip.SetTip(_stop, "Cancel the job now. It can't be resumed.");
+        ToolTip.SetTip(_pause, "Pause or continue. The machine's button also pauses (short press) and cancels (long press while paused).");
+        _pause.Click += async (_, _) => await PauseOrResume();
+        _stop.Click += async (_, _) => await StopJob();
+        _runCard = Card("Running job", _runState, _runProgress, _runTimes, Row(_pause, _stop));
+        _runCard.IsVisible = false;
+        _machine.ModeChanged += OnModeChanged;
+        _runTimer.Tick += async (_, _) => await TickRun();
         _doc.Changed += content => { if (content) Schedule(); };
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
 
@@ -80,6 +103,7 @@ public sealed class JobPanel : UserControl
             {
                 Children =
                 {
+                    _runCard,
                     Card("Passes",
                         Field("Run passes", _passMode, tip: "Whole job: every layer's first pass, then every layer's second pass, and so on (layers with fewer passes drop out). Stock: each path repeats all its passes before moving on."),
                         _delayRow),
@@ -176,6 +200,90 @@ public sealed class JobPanel : UserControl
                 : _job is null ? "Fix the problem above to send." : "Ready to send.";
     }
 
+    void OnModeChanged(string mode)
+    {
+        switch (mode)
+        {
+            case "P_WORK":
+                _runCard.IsVisible = true;
+                _runState.Text = "Loaded – press the start button on the machine.";
+                _pause.IsEnabled = false;
+                _stop.IsEnabled = true;
+                _runProgress.Value = 0;
+                _runTimes.Text = _sentEstimate is { } est ? $"About {Duration(est)} once started." : "";
+                break;
+            case "P_WORKING":
+                _runCard.IsVisible = true;
+                if (_pausedAt is { } p) _pausedFor += (DateTime.Now - p).TotalSeconds;
+                _pausedAt = null;
+                _startedAt ??= DateTime.Now;
+                _runState.Text = "Running";
+                _pause.Content = "Pause";
+                _pause.IsEnabled = _stop.IsEnabled = true;
+                _runTimer.Start();
+                break;
+            case "P_PAUSE":
+                _runCard.IsVisible = true;
+                _pausedAt ??= DateTime.Now;
+                _runState.Text = "Paused";
+                _pause.Content = "Continue";
+                _pause.IsEnabled = _stop.IsEnabled = true;
+                break;
+            default:
+                // Finished, cancelled or idle: show the outcome briefly, then hide.
+                if (_runCard.IsVisible && _startedAt is not null)
+                {
+                    _runState.Text = mode is "P_WORK_DONE" or "P_FINISH" ? "Finished" : "Ended";
+                    _runProgress.Value = mode is "P_WORK_DONE" or "P_FINISH" ? 1 : _runProgress.Value;
+                    _pause.IsEnabled = _stop.IsEnabled = false;
+                }
+                else _runCard.IsVisible = false;
+                _runTimer.Stop();
+                _startedAt = null;
+                _pausedAt = null;
+                _pausedFor = 0;
+                break;
+        }
+    }
+
+    async Task TickRun()
+    {
+        if (_startedAt is not { } start) return;
+        double elapsed = (DateTime.Now - start).TotalSeconds - _pausedFor - (_pausedAt is { } p ? (DateTime.Now - p).TotalSeconds : 0);
+        double? fraction = null;
+        try
+        {
+            if (await _machine.GetJobProgressAsync() is { } prog)
+            {
+                fraction = prog.Fraction;
+                if (prog.ElapsedS is { } e && e > 0) elapsed = e;
+            }
+        }
+        catch (DeviceException) { }
+        // Remaining: from the machine's progress when it gives one, else from our estimate.
+        double? remaining = null;
+        if (fraction is { } f && f > 0.02) remaining = elapsed / f * (1 - f);
+        else if (_sentEstimate is { } est) remaining = Math.Max(0, est - elapsed);
+        _runProgress.Value = fraction ?? (_sentEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / e2) : 0);
+        _runTimes.Text = $"Elapsed {Duration(elapsed)}" + (remaining is { } r ? $" · about {Duration(r)} left" : "");
+    }
+
+    async Task PauseOrResume()
+    {
+        try
+        {
+            if (_machine.Mode == "P_PAUSE") await _machine.ResumeJobAsync();
+            else await _machine.PauseJobAsync();
+        }
+        catch (DeviceException e) { _runState.Text = e.Message; }
+    }
+
+    async Task StopJob()
+    {
+        try { await _machine.StopJobAsync(); }
+        catch (DeviceException e) { _runState.Text = e.Message; }
+    }
+
     public async Task Export(bool xf)
     {
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
@@ -237,6 +345,7 @@ public sealed class JobPanel : UserControl
         {
             var progress = new Progress<double>(f => _progress.Value = f);
             await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None);
+            _sentEstimate = job.EstimateS;
             _sendState.Text = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }
         catch (DeviceException e)

@@ -35,7 +35,12 @@
         <ToggleButton x:Name="ToolSelect" Classes="tool" ToolTip.Tip="Select / move (V)"><PathIcon Data="{StaticResource IcCursor}" /></ToggleButton>
         <ToggleButton x:Name="ToolRect" Classes="tool" ToolTip.Tip="Rectangle (R) · Shift = square · Alt = from centre"><PathIcon Data="{StaticResource IcRect}" /></ToggleButton>
         <ToggleButton x:Name="ToolEllipse" Classes="tool" ToolTip.Tip="Ellipse (E) · Shift = circle · Alt = from centre"><PathIcon Data="{StaticResource IcEllipse}" /></ToggleButton>
+        <ToggleButton x:Name="ToolPolygon" Classes="tool" ToolTip.Tip="Polygon (O) · Shift = even · Alt = from centre"><PathIcon Data="{StaticResource IcPolygon}" /></ToggleButton>
+        <ToggleButton x:Name="ToolStar" Classes="tool" ToolTip.Tip="Star (S) · Shift = even · Alt = from centre"><PathIcon Data="{StaticResource IcStar}" /></ToggleButton>
         <ToggleButton x:Name="ToolLine" Classes="tool" ToolTip.Tip="Line (L) · Shift = 45° steps"><PathIcon Data="{StaticResource IcLine}" /></ToggleButton>
+        <ToggleButton x:Name="ToolPen" Classes="tool" ToolTip.Tip="Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish"><PathIcon Data="{StaticResource IcPen}" /></ToggleButton>
+        <ToggleButton x:Name="ToolText" Classes="tool" ToolTip.Tip="Text (T) · click where the text should go"><PathIcon Data="{StaticResource IcText}" /></ToggleButton>
+        <ToggleButton x:Name="ToolNodes" Classes="tool" ToolTip.Tip="Edit points (N, or double-click a shape) · drag points and handles · double-click an edge to add · Delete removes · S = smooth/sharp"><PathIcon Data="{StaticResource IcNodes}" /></ToggleButton>
         <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>
         <Separator Margin="0,6" />
         <Button x:Name="FitButton" Classes="icon" ToolTip.Tip="Fit work area (Home) · F fits the selection"><PathIcon Data="{StaticResource IcFit}" /></Button>
@@ -50,7 +55,18 @@
       <GridSplitter Grid.Column="1" Background="{StaticResource Line}" ResizeDirection="Columns" />
 
       <!-- Canvas -->
-      <app:CanvasView x:Name="Canvas" Grid.Column="2" />
+      <DockPanel Grid.Column="2">
+        <Border x:Name="ToolOptions" DockPanel.Dock="Top" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="False">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <TextBlock x:Name="ToolOptionsLabel" VerticalAlignment="Center" Classes="muted" />
+            <NumericUpDown x:Name="ToolCorners" Minimum="3" Maximum="64" Increment="1" FormatString="0" Width="110" />
+            <TextBlock x:Name="ToolInnerLabel" Text="Inner size %" VerticalAlignment="Center" Classes="muted" />
+            <NumericUpDown x:Name="ToolInner" Minimum="5" Maximum="95" Increment="5" FormatString="0" Width="110" />
+            <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
+          </StackPanel>
+        </Border>
+        <app:CanvasView x:Name="Canvas" />
+      </DockPanel>
 
       <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
       <!-- Right column: properties / job / machine -->

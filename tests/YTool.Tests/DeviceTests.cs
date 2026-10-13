@@ -405,6 +405,35 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task JobControlAndFillLights()
+    {
+        await using var client = await Connected();
+        await client.PauseJobAsync();
+        await client.ResumeJobAsync();
+        await client.StopJobAsync();
+        Assert.Equal(["pause", "start", "stop"], _fake.States);
+
+        await client.SetFillLightsAsync(50, 100);
+        var cfg = _fake.Requests.Last(r => Url(r) == "/v1/device/configs");
+        Assert.Equal(136, cfg["data"]!["kv"]!["fillLightBrightFront"]!.GetValue<int>()); // 50 % is what the user's machine reports as 136
+        Assert.Equal(255, cfg["data"]!["kv"]!["fillLightBrightBack"]!.GetValue<int>());
+        var light = Assert.Single(_fake.Lights);
+        Assert.Equal("fill_light", light["params"]!["type"]!.GetValue<string>());
+        Assert.Equal("set_bri", light["data"]!["action"]!.GetValue<string>());
+        Assert.Equal(0, DeviceClient.PercentToLight(0));
+        Assert.Equal(50, DeviceClient.LightToPercent(136));
+    }
+
+    [Fact]
+    public void ParsesProgressShapes()
+    {
+        Assert.Equal(0.25, JobProgress.Parse(JsonNode.Parse("""{"curr_progress":"25","total_progress":"100"}""")!.AsObject()).Fraction);
+        Assert.Equal(0.4, JobProgress.Parse(JsonNode.Parse("""{"progress":40,"time":12}""")!.AsObject()).Fraction);
+        Assert.Equal(12, JobProgress.Parse(JsonNode.Parse("""{"progress":40,"time":12}""")!.AsObject()).ElapsedS);
+        Assert.Null(JobProgress.Parse(null).Fraction);
+    }
+
+    [Fact]
     public async Task ButtonPairing()
     {
         _fake.ParityCode = 406;
@@ -612,6 +641,8 @@ sealed class FakeDevice : IAsyncDisposable
     /// <summary>Event the fake sends after auto_start (null = never answers).</summary>
     public string? FocusOutcome = "FOCUS_FINISHED";
     public readonly System.Collections.Concurrent.ConcurrentQueue<string> Modes = new();
+    public readonly System.Collections.Concurrent.ConcurrentQueue<string> States = new();
+    public readonly System.Collections.Concurrent.ConcurrentQueue<JsonObject> Lights = new();
     bool _beep = true;
 
     public IReadOnlyList<JsonObject> Requests => [.. _requests];
@@ -741,6 +772,14 @@ sealed class FakeDevice : IAsyncDisposable
                 break;
             case "/v1/laser-head/focus/parameter":
                 await Reply(req, 0, new JsonObject { ["value"] = HeadZ });
+                break;
+            case "/v1/processing/state":
+                States.Enqueue(req["params"]!["action"]!.GetValue<string>());
+                await Reply(req, 0);
+                break;
+            case "/v1/peripheral/param":
+                Lights.Enqueue(req);
+                await Reply(req, 0);
                 break;
             case "/v1/device/mode":
                 Modes.Enqueue(data!["mode"]!.GetValue<string>());

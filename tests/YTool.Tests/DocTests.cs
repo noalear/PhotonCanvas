@@ -289,6 +289,44 @@ public class DocumentTests
     }
 
     [Fact]
+    public void AngleIsAbsoluteAndZeroRestoresTheOriginal()
+    {
+        var s = DocState.New();
+        var sq = Sq(s.Layers[0].Id, 10, 10, 20);
+        s = Ops.AddShapes(s, [sq]);
+        var ids = new HashSet<Guid> { sq.Id };
+        var at45 = Ops.SetRotation(s, ids, 45);
+        Assert.Equal(45, at45.Shapes[0].Transform.RotationDeg, 9);
+        var at30 = Ops.SetRotation(at45, ids, 30); // absolute, not +30
+        Assert.Equal(30, at30.Shapes[0].Transform.RotationDeg, 9);
+        var back = Ops.SetRotation(at30, ids, 0);
+        Assert.Equal(0, back.Shapes[0].Transform.RotationDeg, 9);
+        Assert.Equal(sq.Bounds.MinX, back.Shapes[0].Bounds.MinX, 6);
+        Assert.Equal(sq.Bounds.MinY, back.Shapes[0].Bounds.MinY, 6);
+        Assert.Same(back, Ops.SetRotation(back, ids, 0)); // no-op isn't an undo step
+    }
+
+    [Fact]
+    public void ScaleIsRelativeToTheOriginalAndKeepsTheCentre()
+    {
+        var s = DocState.New();
+        var sq = Sq(s.Layers[0].Id, 10, 10, 20);
+        s = Ops.AddShapes(s, [sq]);
+        var ids = new HashSet<Guid> { sq.Id };
+        var half = Ops.SetScale(s, ids, 0.5, 0.5);
+        Assert.Equal(10, half.Shapes[0].Bounds.Width, 6);
+        Assert.Equal(sq.Bounds.Center, half.Shapes[0].Bounds.Center);
+        // Rotated shapes scale along their own axes: no skew, angle unchanged.
+        var turned = Ops.SetRotation(s, ids, 30);
+        var wide = Ops.SetScale(turned, ids, 2, 1);
+        var t = wide.Shapes[0].Transform;
+        Assert.Equal(30, t.RotationDeg, 9);
+        Assert.Equal(2, t.ScaleX, 9);
+        Assert.Equal(1, t.ScaleY, 9);
+        Assert.Equal(0, t.A * t.C + t.B * t.D, 9); // axes stay perpendicular
+    }
+
+    [Fact]
     public void HitTestStrokeAndInside()
     {
         var sq = Sq(Guid.Empty, 10, 10);

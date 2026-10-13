@@ -5,6 +5,26 @@ using System.Text.Json.Nodes;
 namespace YTool.Device;
 
 /// <summary>A reply on the instruction channel: <c>{"type":"response","transactionId","code","data","message"}</c>.</summary>
+/// <summary>Where a running job is.</summary>
+/// <param name="Fraction">0–1 when the machine reports it.</param>
+/// <param name="ElapsedS">Seconds the job has been running, when reported.</param>
+public sealed record JobProgress(double? Fraction, double? ElapsedS, JsonNode? Raw)
+{
+    /// <summary>Accepts the shapes seen in xTool firmware: {curr_progress,total_progress}, {progress}, {time}.</summary>
+    public static JobProgress Parse(JsonNode? data)
+    {
+        if (data is not JsonObject o) return new(null, null, data);
+        double? Num(string k) => Json.Number(o[k]);
+        double? fraction = null;
+        if (Num("curr_progress") is { } cur && Num("total_progress") is { } tot && tot > 0) fraction = cur / tot;
+        else if (Num("progress") is { } p) fraction = p > 1 ? p / 100 : p;
+        else if (Num("percent") is { } pc) fraction = pc / 100;
+        if (fraction is { } f) fraction = Math.Clamp(f, 0, 1);
+        double? elapsed = Num("time") ?? Num("timeUse") ?? Num("workTime");
+        return new(fraction, elapsed, data);
+    }
+}
+
 public sealed record DeviceResponse(int TransactionId, int Code, string? Message, JsonNode? Data, JsonObject Raw)
 {
     public bool IsSuccess => Code == 0;

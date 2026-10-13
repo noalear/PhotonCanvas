@@ -25,7 +25,8 @@ public sealed class PropertiesPanel : UserControl
     readonly Border _selCard;
     readonly NumericUpDown _x = Number(-1000, 1000, 1, "0.###"), _y = Number(-1000, 1000, 1, "0.###");
     readonly NumericUpDown _w = Number(0.01m, 2000, 1, "0.###"), _h = Number(0.01m, 2000, 1, "0.###");
-    readonly NumericUpDown _rot = Number(-360, 360, 15, "0.#");
+    readonly NumericUpDown _rot = Number(-180, 180, 15, "0.#");
+    readonly NumericUpDown _scaleX = Number(0.1m, 100000, 5, "0.#"), _scaleY = Number(0.1m, 100000, 5, "0.#");
     readonly CheckBox _lockRatio = new() { Content = "Keep proportions", IsChecked = true };
     readonly ComboBox _shapeLayer = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock _selInfo = Hint();
@@ -36,7 +37,7 @@ public sealed class PropertiesPanel : UserControl
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
     readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
     readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth, default)", "Floyd–Steinberg", "Stucki", "Atkinson (high contrast)", "Bayer (regular pattern)", "Threshold (line art)" } };
-    readonly TextBlock _dpiHint = Hint(), _dotHint = Hint();
+    readonly TextBlock _dpiHint = Hint();
     readonly Control _dpiRow, _dotRow, _ditherRow;
 
     // picture
@@ -48,6 +49,36 @@ public sealed class PropertiesPanel : UserControl
 
     /// <summary>The user asked to trace a picture.</summary>
     public event Action<ImageShape>? TraceRequested;
+
+    // text
+    readonly Border _textCard;
+    readonly TextBox _textBox = new() { AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 60 };
+    readonly ComboBox _font = new() { HorizontalAlignment = HorizontalAlignment.Stretch, MaxDropDownHeight = 420 };
+    readonly NumericUpDown _textSize = Number(0.5m, 500, 1, "0.##");
+    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" };
+    readonly NumericUpDown _letter = Number(-50, 200, 0.1m, "0.##"), _lineSp = Number(0.5m, 5, 0.1m, "0.##");
+    readonly ComboBox _align = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Left", "Centre", "Right" } };
+    readonly NumericUpDown _bend = Number(-360, 360, 5, "0.#");
+    IReadOnlyList<string> _fonts = [];
+
+    // cut / fill / image extras
+    readonly NumericUpDown _kerf = Number(-1, 1, 0.01m, "0.###"), _tabs = Number(0, 100, 1, "0"), _tabWidth = Number(0.1m, 10, 0.1m, "0.##");
+    readonly NumericUpDown _overcut = Number(0, 10, 0.1m, "0.##"), _leadIn = Number(0, 10, 0.5m, "0.##");
+    readonly NumericUpDown _fillAngle = Number(-180, 180, 15, "0.#"), _overscan = Number(0, 20, 0.5m, "0.##");
+    readonly CheckBox _crosshatch = new() { Content = "Crosshatch (second pass at 90°)" };
+    readonly ComboBox _imageMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots (dithered)", "Greyscale (experimental)" } };
+    readonly NumericUpDown _grayMin = Number(0, 100, 1, "0.#");
+    readonly Control _cutExtras, _fillExtras, _imageExtras, _grayRow;
+
+    /// <summary>Put the cursor in the text box (after creating or double-clicking text).</summary>
+    public void FocusText(bool selectAll = false)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _textBox.Focus();
+            if (selectAll) _textBox.SelectAll();
+        });
+    }
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Blue diode 455 nm", "Red fiber 1064 nm" } };
     readonly NumericUpDown _power = Number(0, 100, 1, "0.#");
     readonly NumericUpDown _speed = Number(2, 15000, 5, "0.#");
@@ -55,7 +86,7 @@ public sealed class PropertiesPanel : UserControl
     readonly NumericUpDown _lpcm = Number(1, 1000, 10, "0.#");
     readonly ComboBox _pulse = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _freq = Number(1, 4000, 5, "0");
-    readonly TextBlock _powerHint = Hint(), _speedHint = Hint(), _passHint = Hint(), _lpcmHint = Hint(), _freqHint = Hint();
+    readonly TextBlock _passHint = Hint(), _lpcmHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _pulseRow, _freqRow;
     readonly ComboBox _presets = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Apply a saved preset…" };
 
@@ -67,28 +98,32 @@ public sealed class PropertiesPanel : UserControl
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
 
         // ---- selection card ----
-        var apply = Button("Apply rotation", tip: "Rotate the selection about its centre by this many degrees (clockwise).");
-        apply.Click += (_, _) => RotateSelection();
         var center = Button("Centre in work area", tip: "Move the selection so it sits in the middle of the 220 × 220 mm field.");
         center.Click += (_, _) => CenterInField();
         _selCard = Card("Selection",
             Row(Field2("X", _x), Field2("Y", _y)),
             Row(Field2("W", _w), Field2("H", _h)),
+            Row(Field2("Scale %", _scaleX), Field2("", _scaleY)),
             _lockRatio,
-            Row(Field2("Angle", _rot), apply),
+            Field("Angle °", _rot, tip: "The shape's own rotation, clockwise. 0 = as drawn or imported. Changes apply straight away."),
             Field("Layer", _shapeLayer, tip: "Move the selected shapes to another layer (Ctrl+1…9 also works)."),
             center,
             _selInfo);
         _x.ValueChanged += (_, _) => MoveTo();
         _y.ValueChanged += (_, _) => MoveTo();
         _w.ValueChanged += (_, _) => Resize(true);
+        _scaleX.ValueChanged += (_, _) => Rescale(true);
+        _scaleY.ValueChanged += (_, _) => Rescale(false);
+        _rot.ValueChanged += (_, _) => RotateTo();
+        ToolTip.SetTip(_scaleX, "Size relative to the original, horizontally (in the shape's own direction).");
+        ToolTip.SetTip(_scaleY, "Size relative to the original, vertically.");
         _h.ValueChanged += (_, _) => Resize(false);
         _shapeLayer.SelectionChanged += (_, _) => ChangeShapeLayer();
 
         // ---- layer settings card ----
         _lpcmRow = Field("Lines / cm", _lpcm, _lpcmHint, "How densely a fill is scanned. More lines = darker, smoother, slower.");
         _dpiRow = Field("Resolution", _dpi, _dpiHint, "Dots per inch. Higher = finer detail, slower. 150–300 suits most wood.");
-        _dotRow = Field("Dot time", _dotUs, _dotHint, "How long each dot fires, in microseconds. Longer = darker dots.");
+        _dotRow = Field("Dot time", _dotUs, tip: "How long each dot fires, in microseconds. Longer = darker dots.");
         _ditherRow = Field("Dithering", _dither, tip: "How grey tones become dots. Jarvis suits photos; Threshold suits logos and line art.");
         _dpi.ValueChanged += (_, _) => EditLayers("Resolution", l => l with { Dpi = (double)_dpi.Value!.Value }, _dpi.Value.HasValue, "dpi");
         _dotUs.ValueChanged += (_, _) => EditLayers("Dot time", l => l with { DotUs = (int)(Math.Round(_dotUs.Value!.Value / 10) * 10) }, _dotUs.Value.HasValue, "dot");
@@ -106,6 +141,77 @@ public sealed class PropertiesPanel : UserControl
         _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
         _invertPic.IsCheckedChanged += (_, _) => EditPicture("Invert picture", t => t with { Invert = _invertPic.IsChecked == true });
+        _cutExtras = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Field("Kerf (mm)", _kerf, tip: "Width of the cut line. Outlines move out by half of it so parts come out at their drawn size (holes stay true too). 0 = off."),
+                Field("Tabs", _tabs, tip: "Small uncut bridges in each closed outline so parts stay in the sheet. 0 = none."),
+                Field("Tab width (mm)", _tabWidth),
+                Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
+                Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
+            },
+        };
+        _fillExtras = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Field("Scan angle (°)", _fillAngle, tip: "Direction of the fill lines. 0 = left to right."),
+                _crosshatch,
+                Field("Overscan (mm)", _overscan, tip: "Each line starts and ends this far outside the shape with the laser off, so edges burn evenly."),
+            },
+        };
+        _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
+        _imageExtras = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Field("Picture mode", _imageMode, tip: "Dots: every dot at full power, tone from dot spacing (proven). Greyscale: each dot's power follows the picture (not yet tested on your machine — try it on scrap)."),
+                _grayRow,
+            },
+        };
+        _kerf.ValueChanged += (_, _) => EditLayers("Kerf", l => l with { KerfMm = (double)_kerf.Value!.Value }, _kerf.Value.HasValue, "kerf");
+        _tabs.ValueChanged += (_, _) => EditLayers("Tabs", l => l with { TabCount = (int)_tabs.Value!.Value }, _tabs.Value.HasValue, "tabs");
+        _tabWidth.ValueChanged += (_, _) => EditLayers("Tab width", l => l with { TabWidthMm = (double)_tabWidth.Value!.Value }, _tabWidth.Value.HasValue, "tabw");
+        _overcut.ValueChanged += (_, _) => EditLayers("Overcut", l => l with { OvercutMm = (double)_overcut.Value!.Value }, _overcut.Value.HasValue, "overcut");
+        _leadIn.ValueChanged += (_, _) => EditLayers("Lead-in", l => l with { LeadInMm = (double)_leadIn.Value!.Value }, _leadIn.Value.HasValue, "leadin");
+        _fillAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_fillAngle.Value!.Value }, _fillAngle.Value.HasValue, "fangle");
+        _overscan.ValueChanged += (_, _) => EditLayers("Overscan", l => l with { OverscanMm = (double)_overscan.Value!.Value }, _overscan.Value.HasValue, "overscan");
+        _crosshatch.IsCheckedChanged += (_, _) => EditLayers("Crosshatch", l => l with { Crosshatch = _crosshatch.IsChecked == true }, _crosshatch.IsChecked.HasValue);
+        _imageMode.SelectionChanged += (_, _) => EditLayers("Picture mode", l => l with { ImageMode = (ImageEngraveMode)Math.Max(0, _imageMode.SelectedIndex) }, _imageMode.SelectedIndex >= 0);
+        _grayMin.ValueChanged += (_, _) => EditLayers("Lightest power", l => l with { GrayMinPower = (double)_grayMin.Value!.Value }, _grayMin.Value.HasValue, "graymin");
+
+        // ---- text card ----
+        _fonts = TextLayout.FontFamilies();
+        _font.ItemsSource = _fonts;
+        var toPaths = Button("Convert to paths", tip: "Turn the text into ordinary shapes (no longer editable as text).");
+        toPaths.Click += (_, _) =>
+        {
+            if (SelectedText() is { } t)
+                _doc.Commit("Convert to paths", Ops.Replace(_doc.State, new PathShape { Id = t.Id, Name = t.Name, LayerId = t.LayerId, GroupId = t.GroupId, Transform = t.Transform, Geometry = t.Geometry }));
+        };
+        _textCard = Card("Text",
+            _textBox,
+            Field("Font", _font),
+            Row(Field2("Size mm", _textSize), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _bold, _italic } }),
+            Field("Letter spacing", _letter, tip: "Extra space between letters, mm (negative tightens)."),
+            Field("Line spacing", _lineSp, tip: "Line height as a multiple of the size."),
+            Field("Align", _align),
+            Field("Curve (°)", _bend, tip: "Bend each line along an arc: how many degrees of a circle it covers. Positive arches up, negative curves down, 0 straight."),
+            toPaths);
+        _textBox.TextChanged += (_, _) => EditText(t => (_textBox.Text ?? "", t.Style), "text");
+        _font.SelectionChanged += (_, _) => { if (_font.SelectedItem is string f) EditText(t => (t.Text, t.Style with { FontFamily = f }), null); };
+        _textSize.ValueChanged += (_, _) => { if (_textSize.Value is { } v) EditText(t => (t.Text, t.Style with { SizeMm = (double)v }), "tsize"); };
+        _bold.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Bold = _bold.IsChecked == true }), null);
+        _italic.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Italic = _italic.IsChecked == true }), null);
+        _letter.ValueChanged += (_, _) => { if (_letter.Value is { } v) EditText(t => (t.Text, t.Style with { LetterSpacingMm = (double)v }), "letter"); };
+        _lineSp.ValueChanged += (_, _) => { if (_lineSp.Value is { } v) EditText(t => (t.Text, t.Style with { LineSpacing = (double)v }), "line"); };
+        _align.SelectionChanged += (_, _) => { if (_align.SelectedIndex >= 0) EditText(t => (t.Text, t.Style with { Align = (TextAlign)_align.SelectedIndex }), null); };
+        _bend.ValueChanged += (_, _) => { if (_bend.Value is { } v) EditText(t => (t.Text, t.Style with { BendDeg = (double)v }), "bend"); };
+
         _pulseRow = Field("Pulse width", _pulse, tip: "Fiber only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "Fiber only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var savePreset = Button("Save as preset…", tip: "Remember these settings under a name, e.g. \"3 mm basswood – cut\".");
@@ -123,10 +229,11 @@ public sealed class PropertiesPanel : UserControl
                     _layerTitle,
                     Field("Mode", _mode, tip: "Cut and Score both follow the outline (Score usually lighter, and run first). Fill scans back and forth to engrave the inside of closed shapes."),
                     Field("Laser", _light, tip: "Blue: 40 W diode. Red: 60 W MOPA fiber. Blue diode for wood, leather, acrylic, paper. Red fiber for metals and some plastics."),
-                    Field("Power", _power, _powerHint, "Percent of the laser's full power."),
-                    Field("Speed", _speed, _speedHint, "How fast the beam moves while firing. Slower = deeper/darker."),
+                    Field("Power", _power, tip: "Percent of the laser's full power."),
+                    Field("Speed", _speed, tip: "How fast the beam moves while firing, mm/s. Slower = deeper/darker."),
                     Field("Passes", _passes, _passHint, "How many times this layer is processed."),
                     _lpcmRow, _dpiRow, _dotRow, _ditherRow, _pulseRow, _freqRow,
+                    _cutExtras, _fillExtras, _imageExtras,
                     new Separator { Margin = new(0, 4) },
                     _presets,
                     Row(savePreset, delPreset),
@@ -149,7 +256,7 @@ public sealed class PropertiesPanel : UserControl
         _freq.ValueChanged += (_, _) => EditLayers("Frequency", l => l with { Laser = l.Laser with { FrequencyKhz = (int)_freq.Value!.Value } }, _freq.Value.HasValue, "freq");
         _presets.SelectionChanged += (_, _) => ApplyPreset();
 
-        Content = new ScrollViewer { Content = new StackPanel { Children = { _selCard, _picCard, layerCard } } };
+        Content = new ScrollViewer { Content = new StackPanel { Children = { _selCard, _textCard, _picCard, layerCard } } };
         _doc.Changed += _ => Refresh();
         _layers.SelectionChanged += Refresh;
         RefreshPresets();
@@ -158,6 +265,8 @@ public sealed class PropertiesPanel : UserControl
 
     static Control Field2(string label, Control editor)
     {
+        // Half-width boxes: no spinner buttons, so the number itself has room (arrow keys and the wheel still step it).
+        if (editor is NumericUpDown n) n.ShowButtonSpinner = false;
         var g = new Grid { ColumnDefinitions = new("Auto,*"), ColumnSpacing = 6 };
         g.Children.Add(new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" }, MinWidth = 14 });
         Grid.SetColumn(editor, 1);
@@ -194,6 +303,19 @@ public sealed class PropertiesPanel : UserControl
         Children = { new TextBlock { Text = label, Classes = { "muted" } }, s },
     };
 
+    TextShape? SelectedText() =>
+        _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is TextShape t ? t : null;
+
+    void EditText(Func<TextShape, (string Text, TextStyle Style)> edit, string? coalesce)
+    {
+        if (_updating || SelectedText() is not { } t) return;
+        var (text, style) = edit(t);
+        if (text == t.Text && style == t.Style) return;
+        _settings.TextFont = style.FontFamily;
+        _settings.TextSizeMm = style.SizeMm;
+        _doc.Commit("Edit text", Ops.Replace(_doc.State, t.Edit(text, style)), coalesceKey: coalesce is null ? null : $"{coalesce}:{t.Id}");
+    }
+
     ImageShape? SelectedPicture() =>
         _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ImageShape im ? im : null;
 
@@ -210,6 +332,21 @@ public sealed class PropertiesPanel : UserControl
         var sel = _doc.Selection;
         var pic = SelectedPicture();
         _picCard.IsVisible = pic is not null;
+        var txt = SelectedText();
+        _textCard.IsVisible = txt is not null;
+        if (txt is not null)
+        {
+            if (_textBox.Text != txt.Text) _textBox.Text = txt.Text;
+            _font.SelectedItem = _fonts.FirstOrDefault(f => f.Equals(txt.Style.FontFamily, StringComparison.OrdinalIgnoreCase));
+            _font.PlaceholderText = txt.Style.FontFamily;
+            _textSize.Value = (decimal)txt.Style.SizeMm;
+            _bold.IsChecked = txt.Style.Bold;
+            _italic.IsChecked = txt.Style.Italic;
+            _letter.Value = (decimal)txt.Style.LetterSpacingMm;
+            _lineSp.Value = (decimal)txt.Style.LineSpacing;
+            _align.SelectedIndex = (int)txt.Style.Align;
+            _bend.Value = (decimal)txt.Style.BendDeg;
+        }
         if (pic is not null)
         {
             _bright.Value = pic.Tone.Brightness;
@@ -227,7 +364,21 @@ public sealed class PropertiesPanel : UserControl
         Set(_h, Math.Max(0.01, b.Height));
         _w.IsEnabled = b.Width > 1e-6;
         _h.IsEnabled = b.Height > 1e-6;
-        _rot.Value ??= 0;
+        var picked = _doc.State.Shapes.Where(s => sel.Contains(s.Id)).ToList();
+        double? Common(Func<Shape, double> f, double tol)
+        {
+            double v0 = f(picked[0]);
+            return picked.All(p => Math.Abs(f(p) - v0) < tol) ? v0 : null;
+        }
+        var rot = Common(p => p.Transform.RotationDeg, 0.01);
+        _rot.Value = rot is { } r ? (decimal)Math.Round(Math.Abs(r) < 0.005 ? 0 : r, 2) : null;
+        _rot.Watermark = rot is null ? "mixed" : null;
+        var sx = Common(p => p.Transform.ScaleX, 1e-6);
+        var sy = Common(p => Math.Abs(p.Transform.ScaleY), 1e-6);
+        _scaleX.Value = sx is { } a ? (decimal)Math.Round(a * 100, 2) : null;
+        _scaleY.Value = sy is { } b2 ? (decimal)Math.Round(b2 * 100, 2) : null;
+        _scaleX.Watermark = sx is null ? "mixed" : null;
+        _scaleY.Watermark = sy is null ? "mixed" : null;
 
         var layers = _doc.State.Layers;
         _shapeLayer.ItemsSource = layers.Select(l => l.Name).ToList();
@@ -279,13 +430,27 @@ public sealed class PropertiesPanel : UserControl
         bool anyImage = ls.Any(l => l.Mode == LayerMode.Image);
         _lpcmRow.IsVisible = anyFill;
         _dpiRow.IsVisible = _dotRow.IsVisible = _ditherRow.IsVisible = anyImage;
+        _cutExtras.IsVisible = ls.Any(l => l.Mode is LayerMode.Cut or LayerMode.Score);
+        _fillExtras.IsVisible = anyFill;
+        _imageExtras.IsVisible = anyImage;
+        Num(_kerf, Same(l => l.KerfMm));
+        Num(_tabs, Same(l => (double)l.TabCount));
+        Num(_tabWidth, Same(l => l.TabWidthMm));
+        Num(_overcut, Same(l => l.OvercutMm));
+        Num(_leadIn, Same(l => l.LeadInMm));
+        Num(_fillAngle, Same(l => l.FillAngleDeg));
+        Num(_overscan, Same(l => l.OverscanMm));
+        _crosshatch.IsChecked = Same(l => l.Crosshatch);
+        var im = Same(l => l.ImageMode);
+        _imageMode.SelectedIndex = im is { } imv ? (int)imv : -1;
+        _grayRow.IsVisible = ls.Any(l => l.ImageMode == ImageEngraveMode.Grayscale);
+        Num(_grayMin, Same(l => l.GrayMinPower));
         Num(_dpi, Same(l => l.Dpi));
         Num(_dotUs, Same(l => (double)l.DotUs));
         var dith = Same(l => l.Dither);
         _dither.SelectedIndex = dith is { } dm ? (int)dm : -1;
         _dither.PlaceholderText = dith is null ? "mixed" : "";
         _dpiHint.Text = Same(l => l.Dpi) is { } dpi ? $"Dots {25.4 / dpi:0.###} mm apart." : "";
-        _dotHint.Text = Same(l => l.DotUs) is { } us ? $"Sent as G25T{us / 10}." : "";
         _pulseRow.IsVisible = _freqRow.IsVisible = anyRed;
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;
@@ -295,8 +460,6 @@ public sealed class PropertiesPanel : UserControl
         _freq.Maximum = lim?.MaxKhz ?? 4000;
 
         // Plain-language hints with the exact values sent.
-        _powerHint.Text = Same(l => l.Laser.Power) is { } pow ? $"Sent as S{(long)Math.Round(pow * 10)} (per-mille of full power)." : "Each layer keeps its own value.";
-        _speedHint.Text = Same(l => l.Laser.Speed) is { } sp ? $"Sent as F{(long)Math.Round(sp * 60)} (mm per minute)." : "Each layer keeps its own value.";
         _passHint.Text = _settings.WholeJobPasses
             ? "Passes run over the whole job, one round at a time (set in Job)."
             : "Each path repeats all its passes before the next one (stock xTool behaviour).";
@@ -330,11 +493,26 @@ public sealed class PropertiesPanel : UserControl
         _doc.Commit("Resize", Ops.Transform(_doc.State, _doc.Selection, Affine.ScaleAbout(b.TopLeft, sx, sy)), coalesceKey: "size");
     }
 
-    void RotateSelection()
+    void RotateTo()
     {
-        if (_doc.Selection.Count == 0 || _rot.Value is not { } deg || deg == 0) return;
-        var c = _doc.State.Bounds(_doc.Selection).Center;
-        _doc.Commit("Rotate", Ops.Transform(_doc.State, _doc.Selection, Affine.RotateAbout(c, (double)deg)));
+        if (_updating || _doc.Selection.Count == 0 || _rot.Value is not { } deg) return;
+        _doc.Commit("Rotate", Ops.SetRotation(_doc.State, _doc.Selection, (double)deg), coalesceKey: "angle");
+    }
+
+    void Rescale(bool xChanged)
+    {
+        if (_updating || _doc.Selection.Count == 0) return;
+        var pics = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
+        double curX = pics[0].Transform.ScaleX * 100, curY = Math.Abs(pics[0].Transform.ScaleY) * 100;
+        double x = (double)(_scaleX.Value ?? (decimal)curX), y = (double)(_scaleY.Value ?? (decimal)curY);
+        if (_lockRatio.IsChecked == true)
+        {
+            // Keep the shape's proportions: both axes change by the same factor.
+            double f = xChanged ? x / Math.Max(1e-9, curX) : y / Math.Max(1e-9, curY);
+            x = curX * f;
+            y = curY * f;
+        }
+        _doc.Commit("Scale", Ops.SetScale(_doc.State, _doc.Selection, x / 100, y / 100), coalesceKey: "scale");
     }
 
     void CenterInField()

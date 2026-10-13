@@ -935,6 +935,56 @@ public sealed class DeviceClient : IAsyncDisposable
         }
     }
 
+    // ---- running job ---------------------------------------------------------------
+
+    /// <summary>Pause the running job (the machine keeps it; resume with the button or <see cref="ResumeJobAsync"/>).</summary>
+    public Task PauseJobAsync(CancellationToken cancellationToken = default) => ProcessingState("pause", cancellationToken);
+
+    /// <summary>Continue a paused job.</summary>
+    public Task ResumeJobAsync(CancellationToken cancellationToken = default) => ProcessingState("start", cancellationToken);
+
+    /// <summary>Stop (cancel) the running or paused job.</summary>
+    public Task StopJobAsync(CancellationToken cancellationToken = default) => ProcessingState("stop", cancellationToken);
+
+    Task ProcessingState(string action, CancellationToken ct) =>
+        RequestAsync("PUT", "/v1/processing/state", parameters: new JsonObject { ["action"] = action }, cancellationToken: ct);
+
+    public async Task<JobProgress> GetJobProgressAsync(CancellationToken cancellationToken = default) =>
+        JobProgress.Parse(await GetAsync("/v1/processing/progress", cancellationToken: cancellationToken).ConfigureAwait(false));
+
+    // ---- camera fill lights ----------------------------------------------------------
+
+    /// <summary>Machine brightness value (0, or 20–255) ↔ percent (0–100), as the stock app shows it.</summary>
+    public static int LightToPercent(double raw) => raw <= 0 ? 0 : (int)Math.Clamp(Math.Round((raw - 20) * 99 / 235 + 1), 0, 100);
+    public static int PercentToLight(int percent) => percent <= 0 ? 0 : (int)Math.Round((Math.Clamp(percent, 1, 100) - 1) * 235.0 / 99 + 20);
+
+    /// <summary>Front and back fill-light brightness, percent.</summary>
+    public async Task<(int Front, int Back)> GetFillLightsAsync(CancellationToken cancellationToken = default)
+    {
+        const string url = "/v1/device/configs";
+        var data = AsObject(await GetAsync(url, new JsonObject
+        {
+            ["alias"] = "config",
+            ["type"] = "user",
+            ["kv"] = new JsonArray("fillLightBrightFront", "fillLightBrightBack"),
+        }, cancellationToken: cancellationToken).ConfigureAwait(false), url);
+        return (LightToPercent(Json.Number(data["fillLightBrightFront"]) ?? 0), LightToPercent(Json.Number(data["fillLightBrightBack"]) ?? 0));
+    }
+
+    /// <summary>Set the fill lights (percent; null leaves one unchanged). Saved on the machine and applied at once.</summary>
+    public async Task SetFillLightsAsync(int? frontPercent, int? backPercent, CancellationToken cancellationToken = default)
+    {
+        var kv = new JsonObject();
+        var now = new JsonObject { ["action"] = "set_bri" };
+        if (frontPercent is { } f) { kv["fillLightBrightFront"] = PercentToLight(f); now["front"] = PercentToLight(f); }
+        if (backPercent is { } b) { kv["fillLightBrightBack"] = PercentToLight(b); now["back"] = PercentToLight(b); }
+        if (kv.Count == 0) return;
+        await RequestAsync("PUT", "/v1/device/configs", new JsonObject { ["alias"] = "config", ["type"] = "user", ["kv"] = kv },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        await RequestAsync("PUT", "/v1/peripheral/param", now, new JsonObject { ["type"] = "fill_light" },
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Whether the machine's beeper sounds (button presses, job start/end). Stored on the machine.</summary>
     public async Task<bool> GetBeeperEnabledAsync(CancellationToken cancellationToken = default)
     {

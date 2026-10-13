@@ -10,13 +10,13 @@ using PathGeometry = YTool.Doc.PathGeometry;
 
 namespace YTool.App;
 
-public enum Tool { Select, Rect, Ellipse, Line, Pan }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
 /// with zoom/pan, selection, move/scale/rotate, drawing tools and the job preview.
 /// </summary>
-public sealed class CanvasView : Control
+public sealed partial class CanvasView : Control
 {
     // ---- appearance -----------------------------------------------------------
     static readonly IBrush BgBrush = new SolidColorBrush(Color.Parse("#0E1014"));
@@ -54,7 +54,7 @@ public sealed class CanvasView : Control
     readonly ConditionalWeakTable<PathShape, StreamGeometry> _geoms = new();
     readonly ConditionalWeakTable<ImageSource, Avalonia.Media.Imaging.Bitmap> _pictures = new();
 
-    enum Drag { None, Pan, Box, Move, Scale, Rotate, Create }
+    enum Drag { None, Pan, Box, Move, Scale, Rotate, Create, PenHandle, NodeAnchor, NodeHandle }
     Drag _drag;
     Point _pressScreen, _lastScreen;
     Vec2 _pressWorld;
@@ -100,6 +100,9 @@ public sealed class CanvasView : Control
         set
         {
             if (_tool == value) return;
+            if (_tool == Tool.Pen && _pen.Count >= 2) FinishPen(closed: false);
+            _pen.Clear();
+            _node = null;
             _tool = value;
             CancelDrag();
             UpdateCursor(null);
@@ -139,6 +142,17 @@ public sealed class CanvasView : Control
     }
 
     public event Action<Vec2?>? CursorMoved;
+    /// <summary>The text tool clicked here (world mm): make a text object.</summary>
+    public event Action<Vec2>? TextRequested;
+    /// <summary>A text object was double-clicked: edit its words.</summary>
+    public event Action<Guid>? TextEditRequested;
+
+    /// <summary>Polygon tool: number of sides.</summary>
+    public int PolygonSides { get; set; } = 6;
+    /// <summary>Star tool: number of points.</summary>
+    public int StarPoints { get; set; } = 5;
+    /// <summary>Star tool: inner radius as a fraction of the outer.</summary>
+    public double StarInner { get; set; } = 0.5;
     public event Action<Tool>? ToolChanged;
     public event Action<double>? ZoomChanged;
 
@@ -246,8 +260,10 @@ public sealed class CanvasView : Control
                 DrawShapes(ctx, doc);
                 if (_preview is not null) DrawPreview(ctx, _preview);
                 if (_drag == Drag.Create) DrawCreatePreview(ctx);
+                if (_tool == Tool.Pen) DrawPen(ctx);
             }
-            DrawSelection(ctx, doc);
+            if (_tool == Tool.Nodes) DrawNodes(ctx);
+            else DrawSelection(ctx, doc);
             if (_drag == Drag.Box) DrawBox(ctx);
         }
         DrawRulers(ctx);
@@ -497,7 +513,8 @@ public sealed class CanvasView : Control
     {
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
-        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Line) c = StandardCursorType.Cross;
+        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen) c = StandardCursorType.Cross;
+        else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
         else if (screen is { } p && _drag == Drag.None)
         {
             int h = HitHandle(p);
@@ -538,10 +555,37 @@ public sealed class CanvasView : Control
         if (!pt.Properties.IsLeftButtonPressed) return;
         e.Pointer.Capture(this);
 
-        if (_tool is Tool.Rect or Tool.Ellipse or Tool.Line)
+        if (_tool == Tool.Text)
+        {
+            TextRequested?.Invoke(_pressWorld);
+            return;
+        }
+        if (_tool == Tool.Pen)
+        {
+            PenPressed(e);
+            return;
+        }
+        if (_tool == Tool.Nodes)
+        {
+            NodesPressed(e, p);
+            return;
+        }
+        if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;
             _createEnd = _pressWorld;
+            return;
+        }
+
+        // Double-click: edit a path's points, or a text's words.
+        if (e.ClickCount >= 2 && HitShape(p) is { } dbl)
+        {
+            if (dbl is TextShape) TextEditRequested?.Invoke(dbl.Id);
+            else if (dbl is PathShape)
+            {
+                _doc.Select([dbl.Id]);
+                Tool = Tool.Nodes;
+            }
             return;
         }
 
@@ -559,13 +603,16 @@ public sealed class CanvasView : Control
         var hit = HitShape(p);
         if (hit is not null)
         {
+            // A grouped shape brings its whole group, unless Alt picks just that one.
+            var unit = mods.HasFlag(KeyModifiers.Alt) ? [hit.Id] : Ops.WithGroups(_doc.State, [hit.Id]);
             if (mods.HasFlag(KeyModifiers.Shift))
             {
-                _doc.Select(_doc.Selection.Contains(hit.Id) ? _doc.Selection.Remove(hit.Id) : _doc.Selection.Add(hit.Id));
-                if (!_doc.Selection.Contains(hit.Id)) { _drag = Drag.None; return; }
+                bool remove = _doc.Selection.Contains(hit.Id);
+                _doc.Select(remove ? _doc.Selection.Except(unit) : _doc.Selection.Union(unit));
+                if (remove) { _drag = Drag.None; return; }
             }
             else if (!_doc.Selection.Contains(hit.Id))
-                _doc.Select([hit.Id]);
+                _doc.Select(unit);
             _drag = Drag.Move;
             _dragIds = [.. _doc.Selection];
             _base = _doc.State;
@@ -588,7 +635,8 @@ public sealed class CanvasView : Control
         switch (_drag)
         {
             case Drag.None:
-                var hov = _tool == Tool.Select ? HitShape(p)?.Id : null;
+                if (_tool == Tool.Pen && _pen.Count > 0) InvalidateVisual();
+                var hov = _tool is Tool.Select or Tool.Nodes ? HitShape(p)?.Id : null;
                 if (hov != _hover) _hover = hov;
                 UpdateCursor(p);
                 InvalidateVisual();
@@ -603,6 +651,12 @@ public sealed class CanvasView : Control
             case Drag.Create:
                 _createEnd = w;
                 InvalidateVisual();
+                break;
+            case Drag.PenHandle:
+                PenMoved(w);
+                break;
+            case Drag.NodeAnchor or Drag.NodeHandle:
+                NodesMoved(p, w);
                 break;
             case Drag.Move when _doc is not null && _base is not null:
                 if (!StartEditIfMoved(p)) break;
@@ -674,6 +728,7 @@ public sealed class CanvasView : Control
             case Drag.Rotate when _editStarted: _doc.EndEdit("Rotate"); break;
             case Drag.Box: FinishBox(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); break;
             case Drag.Create: FinishCreate(); break;
+            case Drag.NodeAnchor or Drag.NodeHandle when _editStarted: _doc.EndEdit("Edit points"); break;
         }
         _editStarted = false;
         _base = null;
@@ -716,9 +771,9 @@ public sealed class CanvasView : Control
         var r = Rect2.FromPoints(ToWorld(_pressScreen), ToWorld(p));
         bool crossing = p.X < _pressScreen.X;
         // Left→right selects what is fully inside; right→left also what it touches (CAD convention).
-        var picked = _doc.State.Editable()
+        var picked = Ops.WithGroups(_doc.State, _doc.State.Editable()
             .Where(s => r.Contains(s.Bounds) || (crossing && s.Touches(r)))
-            .Select(s => s.Id);
+            .Select(s => s.Id));
         _doc.Select(additive ? _doc.Selection.Union(picked) : picked);
     }
 
@@ -749,9 +804,30 @@ public sealed class CanvasView : Control
             ? new Rect2(a.X - Math.Abs(w), a.Y - Math.Abs(h), a.X + Math.Abs(w), a.Y + Math.Abs(h))
             : Rect2.FromPoints(a, a + new Vec2(w, h));
         if (r.Width < 1e-6 || r.Height < 1e-6) return null;
-        return _tool == Tool.Ellipse
-            ? PathGeometry.Ellipse(r.Center.X, r.Center.Y, r.Width / 2, r.Height / 2)
-            : PathGeometry.Rect(r.MinX, r.MinY, r.Width, r.Height);
+        return _tool switch
+        {
+            Tool.Ellipse => PathGeometry.Ellipse(r.Center.X, r.Center.Y, r.Width / 2, r.Height / 2),
+            Tool.Polygon => RegularShape(r, Math.Clamp(PolygonSides, 3, 64), 1),
+            Tool.Star => RegularShape(r, Math.Clamp(StarPoints, 3, 64), Math.Clamp(StarInner, 0.05, 0.95)),
+            _ => PathGeometry.Rect(r.MinX, r.MinY, r.Width, r.Height),
+        };
+    }
+
+    /// <summary>Regular polygon (inner = 1) or star (inner &lt; 1) filling the box, pointing up.</summary>
+    static PathGeometry RegularShape(Rect2 box, int corners, double inner)
+    {
+        var pts = new List<Vec2>();
+        int n = inner < 1 ? corners * 2 : corners;
+        for (int i = 0; i < n; i++)
+        {
+            double a = -Math.PI / 2 + i * 2 * Math.PI / n;
+            double k = inner < 1 && i % 2 == 1 ? inner : 1;
+            pts.Add(new Vec2(Math.Cos(a) * k, Math.Sin(a) * k));
+        }
+        // Scale the unit shape so its own bounds fill the dragged box.
+        var b = Rect2.Bounds(pts);
+        var fitted = pts.Select(p => new Vec2(box.MinX + (p.X - b.MinX) / b.Width * box.Width, box.MinY + (p.Y - b.MinY) / b.Height * box.Height)).ToList();
+        return PathGeometry.Polyline(fitted, true);
     }
 
     KeyModifiers _lastMods;
@@ -762,14 +838,8 @@ public sealed class CanvasView : Control
         var g = CreateGeometry();
         var bounds = g?.Bounds();
         if (g is null || bounds is not { } bb || Math.Max(bb.Width, bb.Height) < 0.05) return;
-        var layer = _doc.ActiveLayer;
-        var lay = _doc.State.FindLayer(layer);
-        if (lay is null || lay.Locked || !lay.Visible)
-        {
-            lay = _doc.State.Layers.FirstOrDefault(l => l.Visible && !l.Locked);
-            if (lay is null) return;
-        }
-        var name = _tool switch { Tool.Rect => "Rectangle", Tool.Ellipse => "Ellipse", _ => "Line" };
+        if (DrawLayer() is not { } lay) return;
+        var name = _tool switch { Tool.Rect => "Rectangle", Tool.Ellipse => "Ellipse", Tool.Polygon => "Polygon", Tool.Star => "Star", _ => "Line" };
         var shape = new PathShape { Name = name, LayerId = lay.Id, Geometry = g };
         _doc.Commit($"Draw {name.ToLowerInvariant()}", Ops.AddShapes(_doc.State, [shape]), [shape.Id]);
         Tool = Tool.Select;
@@ -806,6 +876,8 @@ public sealed class CanvasView : Control
             return;
         }
         if (_drag == Drag.Create) { InvalidateVisual(); }
+        if (_tool == Tool.Pen && PenKey(e)) { e.Handled = true; return; }
+        if (_tool == Tool.Nodes && NodesKey(e)) { e.Handled = true; return; }
         if (e.Key == Key.Escape)
         {
             if (_drag != Drag.None) CancelDrag();

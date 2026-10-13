@@ -124,24 +124,72 @@ public sealed class CameraCalibration : IImageMap
     }
 }
 
-/// <summary>Linear blend of two calibrations, for a distance between them.</summary>
-sealed class BlendedMap(IImageMap a, IImageMap b, double t) : IImageMap
+/// <summary>
+/// The camera picture at any material distance, from calibrations made at a
+/// few distances. Every machine point's picture position is followed across
+/// the calibrated distances: a straight line through two of them, or a smooth
+/// (quadratic) curve through three or more, since the view shifts slightly
+/// non-linearly with height. Outside the calibrated range the trend of the
+/// nearest two is continued in a straight line.
+/// </summary>
+sealed class DistanceModel(IReadOnlyList<CameraCalibration> sorted, double distance) : IImageMap
 {
-    public Vec2 ToImage(Vec2 mm) => Vec2.Lerp(a.ToImage(mm), b.ToImage(mm), t);
+    public Vec2 ToImage(Vec2 mm)
+    {
+        int n = sorted.Count;
+        double lo = sorted[0].DistanceMm, hi = sorted[^1].DistanceMm, d = distance;
+        if (n == 2 || d <= lo || d >= hi)
+        {
+            // Two nearest (the end pair when extrapolating).
+            int a = d <= lo ? 0 : d >= hi ? n - 2 : Math.Max(0, sorted.Count(c => c.DistanceMm < d) - 1);
+            var ca = sorted[a];
+            var cb = sorted[a + 1];
+            double t = (d - ca.DistanceMm) / (cb.DistanceMm - ca.DistanceMm);
+            return Vec2.Lerp(ca.ToImage(mm), cb.ToImage(mm), t);
+        }
+        // Inside the range with ≥ 3 calibrations: least-squares quadratic in distance.
+        double s0 = n, s1 = 0, s2 = 0, s3 = 0, s4 = 0;
+        Vec2 t0 = default, t1 = default, t2 = default;
+        double mid = (lo + hi) / 2, half = Math.Max(1e-9, (hi - lo) / 2);
+        foreach (var c in sorted)
+        {
+            double x = (c.DistanceMm - mid) / half;
+            var y = c.ToImage(mm);
+            s1 += x; s2 += x * x; s3 += x * x * x; s4 += x * x * x * x;
+            t0 += y; t1 += y * x; t2 += y * (x * x);
+        }
+        // Solve [[s0 s1 s2][s1 s2 s3][s2 s3 s4]] · [c0 c1 c2] = t for each axis (Cramer's rule).
+        double det = s0 * (s2 * s4 - s3 * s3) - s1 * (s1 * s4 - s3 * s2) + s2 * (s1 * s3 - s2 * s2);
+        if (Math.Abs(det) < 1e-12) return Vec2.Lerp(sorted[0].ToImage(mm), sorted[^1].ToImage(mm), (d - lo) / (hi - lo));
+        double Solve(double r0, double r1, double r2, int k)
+        {
+            double[,] m = { { s0, s1, s2 }, { s1, s2, s3 }, { s2, s3, s4 } };
+            double[] r = [r0, r1, r2];
+            for (int row = 0; row < 3; row++) m[row, k] = r[row];
+            return (m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1]) - m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0]) + m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])) / det;
+        }
+        double q = (d - mid) / half;
+        double X(int k) => Solve(t0.X, t1.X, t2.X, k);
+        double Y(int k) => Solve(t0.Y, t1.Y, t2.Y, k);
+        return new(X(0) + X(1) * q + X(2) * q * q, Y(0) + Y(1) * q + Y(2) * q * q);
+    }
 }
 
 /// <summary>The calibration to use for a material distance.</summary>
 /// <param name="Map">Mapping to use.</param>
 /// <param name="Description">Plain-language note, e.g. "calibrated at 21 mm".</param>
-/// <param name="Exact">False when the nearest calibration is more than 1 mm away.</param>
+/// <param name="Exact">False when the distance is well outside what was calibrated.</param>
 public sealed record ImageMapChoice(IImageMap Map, string Description, bool Exact);
 
 public static class CalibrationSet
 {
+    /// <summary>How far beyond the calibrated distances the trend is trusted (mm).</summary>
+    public const double TrustedExtrapolationMm = 5;
+
     /// <summary>
-    /// Pick or blend calibrations for <paramref name="distanceMm"/> (null =
-    /// unknown → most recent). Between two saved distances the maps are
-    /// interpolated; outside them the nearest is used.
+    /// The picture mapping for <paramref name="distanceMm"/> (null = unknown →
+    /// most recent calibration). With calibrations at two or three distances,
+    /// any distance in between (or a little beyond) is calculated.
     /// </summary>
     public static ImageMapChoice? For(IReadOnlyList<CameraCalibration> cals, double? distanceMm)
     {
@@ -154,14 +202,18 @@ public static class CalibrationSet
         var sorted = cals.OrderBy(c => c.DistanceMm).ToList();
         var nearest = sorted.MinBy(c => Math.Abs(c.DistanceMm - d))!;
         if (Math.Abs(nearest.DistanceMm - d) <= 0.25) return new(nearest, $"calibrated at {nearest.DistanceMm:0.#} mm", true);
-        var below = sorted.LastOrDefault(c => c.DistanceMm < d);
-        var above = sorted.FirstOrDefault(c => c.DistanceMm > d);
-        if (below is not null && above is not null)
+        if (sorted.Count == 1)
         {
-            double t = (d - below.DistanceMm) / (above.DistanceMm - below.DistanceMm);
-            return new(new BlendedMap(below, above, t), $"blended from {below.DistanceMm:0.#} and {above.DistanceMm:0.#} mm", true);
+            bool close = Math.Abs(nearest.DistanceMm - d) <= 1;
+            return new(nearest, $"calibrated at {nearest.DistanceMm:0.#} mm" +
+                (close ? "" : $"; material is at {d:0.#} mm. Calibrate a second height so other heights can be calculated"), close);
         }
-        bool close = Math.Abs(nearest.DistanceMm - d) <= 1;
-        return new(nearest, $"calibrated at {nearest.DistanceMm:0.#} mm" + (close ? "" : $"; material is at {d:0.#} mm, so the picture may be off"), close);
+        double lo = sorted[0].DistanceMm, hi = sorted[^1].DistanceMm;
+        string list = string.Join(", ", sorted.Select(c => $"{c.DistanceMm:0.#}"));
+        bool inside = d >= lo && d <= hi;
+        bool trusted = d >= lo - TrustedExtrapolationMm && d <= hi + TrustedExtrapolationMm;
+        string how = inside ? "calculated" : "extended";
+        return new(new DistanceModel(sorted, d), $"{how} for {d:0.#} mm from calibrations at {list} mm" +
+            (trusted ? "" : ". That's well outside them: calibrate nearer this height for accuracy"), trusted);
     }
 }

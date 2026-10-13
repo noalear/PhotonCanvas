@@ -56,7 +56,13 @@ public sealed class MachinePanel : UserControl
     readonly ToggleSwitch _onCanvas = new() { OnContent = "Camera on work area", OffContent = "Camera on work area" };
     readonly Slider _opacity = new() { Minimum = 0.15, Maximum = 1, SmallChange = 0.05, LargeChange = 0.1 };
     readonly TextBlock _calState = Hint();
+    readonly Slider _frontLight = new() { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10, IsEnabled = false };
+    readonly Slider _backLight = new() { Minimum = 0, Maximum = 100, SmallChange = 1, LargeChange = 10, IsEnabled = false };
+    readonly TextBlock _frontText = Hint(), _backText = Hint();
+    bool _updatingLights;
+    int _lightTicket;
     int _warping;
+    bool _needsWarmup = true;
     // Read by the live-view thread; mirrors the toggle.
     volatile bool _overlayWanted;
 
@@ -87,6 +93,8 @@ public sealed class MachinePanel : UserControl
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
+        _frontLight.ValueChanged += async (_, _) => await LightsChanged();
+        _backLight.ValueChanged += async (_, _) => await LightsChanged();
         _focus.Click += async (_, _) => await AutoFocus();
         ToolTip.SetTip(_focus, "The machine measures the material under the head and moves to the right focus height. Place your material first.");
         ToolTip.SetTip(_beeper, "The machine's beeps for button presses and jobs. Stored on the machine. The firmware only offers on or off, not a volume.");
@@ -141,6 +149,8 @@ public sealed class MachinePanel : UserControl
                     Card("Connection", _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
                     Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
+                    Card("Camera lights", LightRow("Front", _frontLight, _frontText), LightRow("Back", _backLight, _backText),
+                        Hint("Brightness of the machine's fill lights for the cameras. Saved on the machine.")),
                     Card("Camera", Row(_live, _stream), imgBorder, _straightenRow, snap, _camInfo),
                     Card("Machine events", _log),
                 },
@@ -151,6 +161,83 @@ public sealed class MachinePanel : UserControl
     }
 
     public double OverlayOpacity => _opacity.Value;
+
+    static Control LightRow(string label, Slider s, TextBlock value)
+    {
+        var g = new Grid { ColumnDefinitions = new("60,*,44") };
+        g.Children.Add(new TextBlock { Text = label, Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center });
+        Grid.SetColumn(s, 1);
+        g.Children.Add(s);
+        value.VerticalAlignment = VerticalAlignment.Center;
+        value.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(value, 2);
+        g.Children.Add(value);
+        return g;
+    }
+
+    void ShowLights(int front, int back)
+    {
+        _updatingLights = true;
+        _frontLight.Value = front;
+        _backLight.Value = back;
+        _frontText.Text = front == 0 ? "off" : $"{front}%";
+        _backText.Text = back == 0 ? "off" : $"{back}%";
+        _updatingLights = false;
+    }
+
+    /// <summary>Send the slider values once they stop moving.</summary>
+    async Task LightsChanged()
+    {
+        _frontText.Text = _frontLight.Value < 0.5 ? "off" : $"{_frontLight.Value:0}%";
+        _backText.Text = _backLight.Value < 0.5 ? "off" : $"{_backLight.Value:0}%";
+        if (_updatingLights || _client is not { } c) return;
+        int ticket = ++_lightTicket;
+        await Task.Delay(250);
+        if (ticket != _lightTicket) return;
+        try
+        {
+            await c.SetFillLightsAsync((int)Math.Round(_frontLight.Value), (int)Math.Round(_backLight.Value));
+            if (_onCanvas.IsChecked == true && _live.IsChecked != true)
+            {
+                await Task.Delay(600); // let the camera adjust to the new light
+                await RefreshOverlay();
+            }
+        }
+        catch (DeviceException e) { Log($"Couldn't change the lights: {e.Message}"); }
+    }
+
+    async Task RefreshLights()
+    {
+        if (_client is not { } c) return;
+        try
+        {
+            var (f, b) = await c.GetFillLightsAsync();
+            ShowLights(f, b);
+        }
+        catch (DeviceException e) { Log($"Couldn't read the light settings: {e.Message}"); }
+    }
+
+    // ---- running job (used by the Job tab) -------------------------------------------
+
+    /// <summary>Machine mode changed (P_IDLE, P_WORK, P_WORKING, P_PAUSE…). On the UI thread.</summary>
+    public event Action<string>? ModeChanged;
+
+    public Task PauseJobAsync() => _client?.PauseJobAsync() ?? Task.CompletedTask;
+    public Task ResumeJobAsync() => _client?.ResumeJobAsync() ?? Task.CompletedTask;
+    public Task StopJobAsync() => _client?.StopJobAsync() ?? Task.CompletedTask;
+
+    bool _loggedProgress;
+    public async Task<JobProgress?> GetJobProgressAsync()
+    {
+        if (_client is not { } c) return null;
+        var p = await c.GetJobProgressAsync();
+        if (!_loggedProgress)
+        {
+            _loggedProgress = true;
+            AppLog.Write("progress", p.Raw?.ToJsonString() ?? "null"); // shape not yet documented
+        }
+        return p;
+    }
 
     void UpdateCalState()
     {
@@ -208,10 +295,23 @@ public sealed class MachinePanel : UserControl
         }
         try
         {
+            if (_needsWarmup)
+            {
+                // The first frame after connecting is usually blown out while exposure settles.
+                _needsWarmup = false;
+                await SnapshotAsync(0);
+            }
             var jpg = await SnapshotAsync(0);
+            // Still too bright? Retake until it settles.
+            for (int retry = 0; retry < 3 && await Task.Run(() => CameraWarp.IsOverexposed(jpg)); retry++)
+            {
+                await Task.Delay(400);
+                jpg = await SnapshotAsync(0);
+            }
             await WarpForCanvas(jpg);
         }
         catch (DeviceException e) { Log($"Photo failed: {e.Message}"); }
+        catch (FormatException e) { Log($"Couldn't read the camera picture: {e.Message}"); }
     }
 
     /// <summary>Straighten a photo onto the 220 × 220 mm field and hand it to the canvas. Skips if one is already in progress.</summary>
@@ -383,6 +483,9 @@ public sealed class MachinePanel : UserControl
             _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = _focus.IsEnabled = true;
             await RefreshLid();
             await RefreshBeeper();
+            await RefreshLights();
+            _frontLight.IsEnabled = _backLight.IsEnabled = true;
+            _needsWarmup = true;
             Log(auto ? $"Connected automatically to {ip}." : "Connected.");
             StartPolling();
             ConnectionChanged?.Invoke();
@@ -437,6 +540,7 @@ public sealed class MachinePanel : UserControl
         _lidOpen.IsEnabled = false;
         _beeper.IsEnabled = false;
         _focus.IsEnabled = false;
+        _frontLight.IsEnabled = _backLight.IsEnabled = false;
         _focusState.Text = "";
         _updatingLid = false;
         _live.IsChecked = false;
@@ -494,7 +598,9 @@ public sealed class MachinePanel : UserControl
 
     void ShowStatus(string mode, double? dist)
     {
+        bool changed = mode != Mode;
         Mode = mode;
+        if (changed) ModeChanged?.Invoke(mode);
         Distance = dist;
         _mode.Text = Describe(mode);
         _distance.Text = dist is { } d ? $"Focus distance {d:0.0} mm (head Z {d + _machine.ZOffset:0.00}). Set it on the machine or in its focus menu." : "";
@@ -549,6 +655,9 @@ public sealed class MachinePanel : UserControl
                     _beeper.IsChecked = cfg["beepEnable"]!.GetValue<bool>();
                 if (cfg["gapCheckWithKey"]?.GetValueKind() is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
                     _lidOpen.IsChecked = !cfg["gapCheckWithKey"]!.GetValue<bool>();
+                if (cfg["fillLightBrightFront"] is System.Text.Json.Nodes.JsonValue fl && cfg["fillLightBrightBack"] is System.Text.Json.Nodes.JsonValue bl
+                    && fl.TryGetValue<double>(out var fr) && bl.TryGetValue<double>(out var br))
+                    ShowLights(DeviceClient.LightToPercent(fr), DeviceClient.LightToPercent(br));
             }
             finally { _updatingLid = false; }
             DeviceEventReceived?.Invoke(ev);

@@ -8,6 +8,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using YTool.Core;
 using YTool.Doc;
+using YTool.Doc.Geometry;
+using YTool.Doc.Import;
 
 namespace YTool.App;
 
@@ -27,7 +29,11 @@ public partial class MainWindow : Window
     public string? OpenPathOnStartup { get; set; }
 
     static readonly FilePickerFileType ProjectType = new("YTool project") { Patterns = ["*.ytool"] };
-    static readonly FilePickerFileType SvgType = new("SVG drawing") { Patterns = ["*.svg"] };
+    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs"] };
+    static readonly FilePickerFileType AnyImportable = new("Everything YTool can import")
+    {
+        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
+    };
 
     public MainWindow()
     {
@@ -104,8 +110,48 @@ public partial class MainWindow : Window
     {
         var map = new (ToggleButton Button, Tool Tool)[]
         {
-            (ToolSelect, Tool.Select), (ToolRect, Tool.Rect), (ToolEllipse, Tool.Ellipse), (ToolLine, Tool.Line), (ToolPan, Tool.Pan),
+            (ToolSelect, Tool.Select), (ToolRect, Tool.Rect), (ToolEllipse, Tool.Ellipse), (ToolPolygon, Tool.Polygon), (ToolStar, Tool.Star),
+            (ToolLine, Tool.Line), (ToolPen, Tool.Pen), (ToolText, Tool.Text), (ToolNodes, Tool.Nodes), (ToolPan, Tool.Pan),
         };
+        Canvas.PolygonSides = _settings.PolygonSides;
+        Canvas.StarPoints = _settings.StarPoints;
+        Canvas.StarInner = _settings.StarInnerPercent / 100;
+        ToolCorners.ValueChanged += (_, _) =>
+        {
+            if (ToolCorners.Value is not { } v) return;
+            if (Canvas.Tool == Tool.Star) Canvas.StarPoints = _settings.StarPoints = (int)v;
+            else Canvas.PolygonSides = _settings.PolygonSides = (int)v;
+            _settings.Save();
+        };
+        ToolInner.ValueChanged += (_, _) =>
+        {
+            if (ToolInner.Value is not { } v) return;
+            _settings.StarInnerPercent = (double)v;
+            Canvas.StarInner = (double)v / 100;
+            _settings.Save();
+        };
+        void Options(Tool t)
+        {
+            bool poly = t is Tool.Polygon or Tool.Star;
+            ToolCorners.IsVisible = poly;
+            ToolInner.IsVisible = ToolInnerLabel.IsVisible = t == Tool.Star;
+            ToolOptionsLabel.Text = t switch { Tool.Polygon => "Sides", Tool.Star => "Points", _ => "" };
+            ToolOptionsLabel.IsVisible = poly;
+            if (t == Tool.Polygon) ToolCorners.Value = Canvas.PolygonSides;
+            if (t == Tool.Star) { ToolCorners.Value = Canvas.StarPoints; ToolInner.Value = (decimal)(Canvas.StarInner * 100); }
+            ToolHint.Text = t switch
+            {
+                Tool.Pen => "Click for corners, drag for curves. Click the first point to close; Enter or double-click to finish an open line; Backspace removes the last point.",
+                Tool.Text => "Click where the text should start, then type in the Text panel.",
+                Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S makes it smooth or sharp. Alt-drag a handle to break a smooth point. Esc to finish.",
+                _ => "",
+            };
+            ToolOptions.IsVisible = poly || ToolHint.Text.Length > 0;
+            Canvas.Focus();
+        }
+        Canvas.ToolChanged += Options;
+        Canvas.TextRequested += at => CreateText(at);
+        Canvas.TextEditRequested += id => { _doc.Select([id]); RightTabs.SelectedIndex = 0; _props.FocusText(); };
         foreach (var (b, t) in map) b.Click += (_, _) => { Canvas.Tool = t; Canvas.Focus(); };
         void Sync(Tool t) { foreach (var (b, tool) in map) b.IsChecked = tool == t; }
         Canvas.ToolChanged += Sync;
@@ -145,8 +191,8 @@ public partial class MainWindow : Window
                 AsyncItem("Save", () => Save(false), "Ctrl+S"),
                 AsyncItem("Save as…", () => Save(true), "Ctrl+Shift+S"),
                 new Separator(),
-                AsyncItem("Import SVG…", () => ImportSvg(byColour: false), "Ctrl+I"),
-                AsyncItem("Import SVG, one layer per colour…", () => ImportSvg(byColour: true), "Ctrl+Shift+I"),
+                AsyncItem("Import…", () => ImportAny(byColour: false), "Ctrl+I"),
+                AsyncItem("Import, one layer per colour…", () => ImportAny(byColour: true), "Ctrl+Shift+I"),
                 AsyncItem("Import picture…", ImportImage, "Ctrl+J"),
                 new Separator(),
                 AsyncItem("Export job package (.xf)…", () => _job.Export(xf: true)),
@@ -180,8 +226,22 @@ public partial class MainWindow : Window
             Header = "_Arrange",
             Items =
             {
-                Item("Combine into one shape", Combine, "Ctrl+G", () => _doc.Selection.Count > 1),
-                Item("Break apart", BreakApart, "Ctrl+Shift+G", HasSel),
+                Item("Group", GroupSel, "Ctrl+G", () => _doc.Selection.Count > 1),
+                Item("Ungroup", UngroupSel, "Ctrl+Shift+G", HasSel),
+                Item("Combine into one shape", Combine, "Ctrl+K", () => _doc.Selection.Count > 1),
+                Item("Break apart", BreakApart, "Ctrl+Shift+K", HasSel),
+                Item("Convert to paths", ConvertToPaths, "Ctrl+Shift+C", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape)),
+                new Separator(),
+                AsyncItem("Offset…", OffsetSel, "Ctrl+Shift+O", () => SelectedPaths().Count > 0),
+                Item("Weld (union)", () => BooleanSel(BoolOp.Union), "Ctrl+Shift+U", () => SelectedPaths().Count > 1),
+                Item("Subtract (bottom minus the rest)", () => BooleanSel(BoolOp.Subtract), "Ctrl+Shift+M", () => SelectedPaths().Count > 1),
+                Item("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), null, () => SelectedPaths().Count > 1),
+                Item("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), null, () => SelectedPaths().Count > 1),
+                new Separator(),
+                AsyncItem("Grid array…", () => ArraySel(circular: false), null, HasSel),
+                AsyncItem("Circular array…", () => ArraySel(circular: true), null, HasSel),
+                Item("Distribute horizontally (equal gaps)", () => DistributeSel(true), null, () => _doc.Selection.Count > 2),
+                Item("Distribute vertically (equal gaps)", () => DistributeSel(false), null, () => _doc.Selection.Count > 2),
                 AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, "Ctrl+T", () => SelectedPicture() is not null),
                 new Separator(),
                 Item("Align left", () => AlignSel(Align.Left), null, () => _doc.Selection.Count > 1),
@@ -271,8 +331,8 @@ public partial class MainWindow : Window
             (true, true, Key.S) => () => Save(true),
             (true, false, Key.O) => OpenDoc,
             (true, false, Key.N) => NewDoc,
-            (true, false, Key.I) => () => ImportSvg(false),
-            (true, true, Key.I) => () => ImportSvg(true),
+            (true, false, Key.I) => () => ImportAny(false),
+            (true, true, Key.I) => () => ImportAny(true),
             (true, false, Key.J) => ImportImage,
             (false, false, Key.F1) => ShowShortcuts,
             _ => null,
@@ -284,6 +344,8 @@ public partial class MainWindow : Window
             return;
         }
         if (typing) return; // let text boxes keep Ctrl+Z, Ctrl+A, Delete, arrows, letters
+        // Pen and point editing use these keys themselves.
+        if (Canvas.Tool is Tool.Pen or Tool.Nodes && !ctrl && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S) return;
 
         Action? action = (ctrl, shift, e.Key) switch
         {
@@ -296,8 +358,14 @@ public partial class MainWindow : Window
             (true, false, Key.D) => DuplicateSel,
             (true, false, Key.A) => SelectAll,
             (true, true, Key.A) => () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)),
-            (true, false, Key.G) => Combine,
-            (true, true, Key.G) => BreakApart,
+            (true, false, Key.G) => GroupSel,
+            (true, true, Key.G) => UngroupSel,
+            (true, false, Key.K) => Combine,
+            (true, true, Key.K) => BreakApart,
+            (true, true, Key.C) => ConvertToPaths,
+            (true, true, Key.U) => () => BooleanSel(BoolOp.Union),
+            (true, true, Key.M) => () => BooleanSel(BoolOp.Subtract),
+            (true, true, Key.O) => () => { _ = Guard(OffsetSel); },
             (true, false, Key.T) => () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); },
             (true, false, Key.L) => _layers.AddLayer,
             (true, false, Key.M) => () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)),
@@ -311,6 +379,11 @@ public partial class MainWindow : Window
             (false, false, Key.R) => () => Canvas.Tool = Tool.Rect,
             (false, false, Key.E) => () => Canvas.Tool = Tool.Ellipse,
             (false, false, Key.L) => () => Canvas.Tool = Tool.Line,
+            (false, false, Key.O) => () => Canvas.Tool = Tool.Polygon,
+            (false, false, Key.S) => () => Canvas.Tool = Tool.Star,
+            (false, false, Key.P) => () => Canvas.Tool = Tool.Pen,
+            (false, false, Key.T) => () => Canvas.Tool = Tool.Text,
+            (false, false, Key.N) => () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; },
             (false, false, Key.H) => () => Canvas.Tool = Tool.Pan,
             _ => null,
         };
@@ -355,10 +428,9 @@ public partial class MainWindow : Window
         _pasteCount++;
         double off = 5 * _pasteCount;
         var layers = _doc.State.Layers.Select(l => l.Id).ToHashSet();
-        var copies = _clipboard.Select(s => s.With(
-            id: Guid.NewGuid(),
-            layerId: layers.Contains(s.LayerId) ? s.LayerId : _doc.ActiveLayer,
-            transform: s.Transform.Then(Affine.Translate(off, off)))).ToList();
+        // Pasted groups become new groups, not members of the originals' group.
+        var copies = Ops.CopyAsUnit(_clipboard, Affine.Translate(off, off))
+            .Select(s => layers.Contains(s.LayerId) ? s : s.With(layerId: _doc.ActiveLayer)).ToList();
         _doc.Commit("Paste", Ops.AddShapes(_doc.State, copies), copies.Select(c => c.Id));
     }
 
@@ -486,16 +558,19 @@ public partial class MainWindow : Window
         return true;
     }
 
-    async Task ImportSvg(bool byColour)
+    async Task ImportAny(bool byColour)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = byColour ? "Import SVG (one layer per colour)" : "Import SVG",
+            Title = byColour ? "Import (one layer per colour)" : "Import",
             AllowMultiple = true,
-            FileTypeFilter = [SvgType],
+            FileTypeFilter = [AnyImportable, VectorTypes],
         });
         var paths = files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
-        if (paths.Count > 0) await ImportPaths(paths, byColour);
+        var pictures = paths.Where(IsPicture).ToList();
+        var drawings = paths.Where(p => !IsPicture(p)).ToList();
+        if (pictures.Count > 0) await ImportPictures(pictures);
+        if (drawings.Count > 0) await ImportPaths(drawings, byColour);
     }
 
     async Task ImportPaths(IReadOnlyList<string> paths, bool byColour)
@@ -507,20 +582,24 @@ public partial class MainWindow : Window
             : state.Layers.FirstOrDefault(l => l.Visible && !l.Locked)?.Id;
         if (target is null && !byColour)
         {
-            await Dialogs.Message(this, "Import SVG", "Every layer is hidden or locked. Show or unlock a layer to import into it.");
+            await Dialogs.Message(this, "Import", "Every layer is hidden or locked. Show or unlock a layer to import into it.");
             return;
         }
         foreach (var path in paths)
         {
-            SvgImportResult r;
-            try { r = SvgImport.Load(path, new SvgImportOptions { PxPerInch = _settings.SvgPxPerInch }); }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or System.Xml.XmlException)
+            ImportResult r;
+            try
+            {
+                var px = _settings.SvgPxPerInch;
+                r = await Task.Run(() => Importer.Load(path, px));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or InvalidDataException or System.Xml.XmlException)
             {
                 warnings.Add($"{Path.GetFileName(path)}: {e.Message}");
                 continue;
             }
             warnings.AddRange(r.Warnings.Select(w => $"{Path.GetFileName(path)}: {w}"));
-            if (r.Paths.Count == 0) continue;
+            if (r.Paths.Count == 0 && r.Images.Count == 0) continue;
 
             // Keep the drawing's position when it fits the work area; otherwise centre it.
             var b = r.Bounds;
@@ -530,16 +609,19 @@ public partial class MainWindow : Window
             if (b.Width > field.Width || b.Height > field.Height)
                 warnings.Add($"{Path.GetFileName(path)} is {b.Width:0.#} × {b.Height:0.#} mm, larger than the {field.Width:0} × {field.Height:0} mm work area. Scale it down before sending.");
 
+            // xTool projects name their colour layers; keep those names.
+            bool named = r.LayerNames.Count > 0;
             foreach (var ip in r.Paths)
             {
                 Guid layerId;
-                if (byColour)
+                if (byColour || named)
                 {
                     var colour = ip.Color ?? 0x000000;
-                    var existing = state.Layers.FirstOrDefault(l => l.Name == ColourLayerName(colour));
+                    var layerName = r.LayerNames.TryGetValue(colour, out var nm) && !string.IsNullOrWhiteSpace(nm) ? nm : ColourLayerName(colour);
+                    var existing = state.Layers.FirstOrDefault(l => l.Name == layerName && l.Mode != LayerMode.Image);
                     if (existing is null)
                     {
-                        existing = Layer.Default(state.Layers.Count) with { Name = ColourLayerName(colour), Color = DisplayColour(colour, state) };
+                        existing = Layer.Default(state.Layers.Count) with { Name = layerName, Color = DisplayColour(colour, state) };
                         state = Ops.AddLayer(state, existing);
                     }
                     layerId = existing.Id;
@@ -548,6 +630,21 @@ public partial class MainWindow : Window
                 var shape = new PathShape { Name = ip.Name, LayerId = layerId, Geometry = ip.Geometry.Transform(move) };
                 state = Ops.AddShapes(state, [shape]);
                 newIds.Add(shape.Id);
+            }
+            foreach (var im in r.Images)
+            {
+                ImageSource src;
+                try { src = ImageSource.FromEncoded(im.Encoded); }
+                catch (FormatException) { warnings.Add($"{Path.GetFileName(path)}: a picture in the file couldn't be read."); continue; }
+                var picLayer = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Image && l.Visible && !l.Locked);
+                if (picLayer is null)
+                {
+                    picLayer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = "Pictures" };
+                    state = Ops.AddLayer(state, picLayer, 0);
+                }
+                var pic = new ImageShape { Name = im.Name, LayerId = picLayer.Id, Source = src, SizeMm = im.SizeMm, Transform = im.Transform.Then(move) };
+                state = Ops.AddShapes(state, [pic]);
+                newIds.Add(pic.Id);
             }
         }
         if (newIds.Count > 0)
@@ -560,6 +657,80 @@ public partial class MainWindow : Window
     }
 
     static string ColourLayerName(uint c) => $"Colour #{c:X6}";
+
+    // ---- text, groups, shape operations ----------------------------------------------
+
+    void CreateText(Vec2 at)
+    {
+        var layer = _doc.State.FindLayer(_doc.ActiveLayer) is { Visible: true, Locked: false } l && l.Mode != LayerMode.Image ? l
+            : _doc.State.Layers.FirstOrDefault(x => x.Visible && !x.Locked && x.Mode != LayerMode.Image);
+        if (layer is null) return;
+        var style = new TextStyle(_settings.TextFont, _settings.TextSizeMm);
+        var text = TextShape.Create("Text", style, layer.Id, Affine.Identity);
+        // Place the text's top-left where the user clicked.
+        var b = text.Bounds;
+        var placed = (TextShape)text.With(transform: Affine.Translate(at.X - (b.IsEmpty ? 0 : b.MinX), at.Y - (b.IsEmpty ? 0 : b.MinY)));
+        _doc.Commit("Add text", Ops.AddShapes(_doc.State, [placed]), [placed.Id]);
+        Canvas.Tool = Tool.Select;
+        RightTabs.SelectedIndex = 0;
+        _props.FocusText(selectAll: true);
+    }
+
+    void GroupSel()
+    {
+        var (s, g) = Ops.Group(_doc.State, _doc.Selection);
+        if (g != Guid.Empty) _doc.Commit("Group", s, _doc.Selection);
+    }
+
+    void UngroupSel() => _doc.Commit("Ungroup", Ops.Ungroup(_doc.State, _doc.Selection));
+
+    void ConvertToPaths()
+    {
+        var state = _doc.State;
+        foreach (var t in state.Shapes.OfType<TextShape>().Where(t => _doc.Selection.Contains(t.Id)).ToList())
+            state = Ops.Replace(state, new PathShape { Id = t.Id, Name = t.Name, LayerId = t.LayerId, GroupId = t.GroupId, Transform = t.Transform, Geometry = t.Geometry });
+        _doc.Commit("Convert to paths", state);
+    }
+
+    /// <summary>Selected vector shapes (text included), in drawing order.</summary>
+    List<PathShape> SelectedPaths() => _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList();
+
+    void BooleanSel(BoolOp op)
+    {
+        var parts = SelectedPaths();
+        if (parts.Count < 2) return;
+        // The bottom shape is the base: Subtract takes everything above away from it.
+        var result = op switch
+        {
+            BoolOp.Union => ShapeGeometry.Union(parts.Select(p => p.World)),
+            BoolOp.Subtract => ShapeGeometry.Boolean(parts[0].World, ShapeGeometry.Union(parts.Skip(1).Select(p => p.World)), BoolOp.Subtract),
+            _ => parts.Skip(1).Aggregate(parts[0].World, (acc, p) => ShapeGeometry.Boolean(acc, p.World, op)),
+        };
+        if (result.IsEmpty)
+        {
+            _ = Dialogs.Message(this, "Nothing left", op == BoolOp.Intersect ? "The shapes don't overlap, so there's nothing in common." : "The operation removed everything.");
+            return;
+        }
+        string label = op switch { BoolOp.Union => "Weld", BoolOp.Subtract => "Subtract", BoolOp.Intersect => "Intersect", _ => "Exclude" };
+        var shape = new PathShape { Name = label, LayerId = parts[0].LayerId, Geometry = result };
+        var state = Ops.Delete(_doc.State, parts.Select(p => p.Id).ToHashSet());
+        _doc.Commit(label, Ops.AddShapes(state, [shape]), [shape.Id]);
+    }
+
+    async Task OffsetSel()
+    {
+        if (SelectedPaths().Count == 0) return;
+        await new OffsetWindow(_doc, _settings).ShowDialog(this);
+    }
+
+    async Task ArraySel(bool circular)
+    {
+        if (_doc.Selection.Count == 0) return;
+        await new ArrayWindow(_doc, circular, Canvas.Machine).ShowDialog(this);
+    }
+
+    void DistributeSel(bool horizontal) =>
+        _doc.Commit(horizontal ? "Distribute horizontally" : "Distribute vertically", Ops.Distribute(_doc.State, _doc.Selection, horizontal));
 
     // ---- pictures ------------------------------------------------------------------------
 
@@ -676,7 +847,8 @@ public partial class MainWindow : Window
     void OnDrop(object? sender, DragEventArgs e)
     {
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
-        var svgs = files.Where(f => f.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
+        string[] drawingTypes = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs"];
+        var svgs = files.Where(f => drawingTypes.Contains(Path.GetExtension(f).ToLowerInvariant())).ToList();
         var pictures = files.Where(IsPicture).ToList();
         var project = files.FirstOrDefault(f => f.EndsWith(DocFile.Extension, StringComparison.OrdinalIgnoreCase));
         if (pictures.Count > 0) _ = Guard(() => ImportPictures(pictures));

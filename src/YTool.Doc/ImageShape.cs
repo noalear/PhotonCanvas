@@ -77,21 +77,15 @@ public sealed class ImageShape : Shape
         return new(w * s, h * s);
     }
 
-    public override Shape With(Guid? layerId = null, Affine? transform = null, string? name = null, Guid? id = null) =>
-        new ImageShape
-        {
-            Id = id ?? Id,
-            Name = name ?? Name,
-            LayerId = layerId ?? LayerId,
-            Transform = transform ?? Transform,
-            Source = Source,
-            SizeMm = SizeMm,
-            Tone = Tone,
-        };
+    protected override void ResetCaches()
+    {
+        _corners = null;
+        _bounds = null;
+    }
 
     public ImageShape WithTone(ToneAdjust tone) => new()
     {
-        Id = Id, Name = Name, LayerId = LayerId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone,
+        Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone,
     };
 
     /// <summary>Local mm → pixel coordinates.</summary>

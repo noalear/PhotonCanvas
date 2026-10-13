@@ -58,4 +58,13 @@ public readonly record struct Affine(double A, double B, double C, double D, dou
     public double MeanScale => Math.Sqrt(Math.Abs(Determinant));
 
     public bool IsIdentity => this == Identity;
+
+    /// <summary>Rotation of the local X axis, degrees clockwise on screen (−180 … 180].</summary>
+    public double RotationDeg => Math.Atan2(B, A) * 180 / Math.PI;
+
+    /// <summary>Length of the local X axis (how much the shape is stretched horizontally in its own frame).</summary>
+    public double ScaleX => Math.Sqrt(A * A + B * B);
+
+    /// <summary>Local Y scale; negative when the shape is mirrored.</summary>
+    public double ScaleY => ScaleX < 1e-12 ? 0 : Determinant / ScaleX;
 }

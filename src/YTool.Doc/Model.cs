@@ -17,6 +17,14 @@ public enum LayerMode
     Image,
 }
 
+public enum ImageEngraveMode
+{
+    /// <summary>Every dot at the same power; tone comes from dot density.</summary>
+    Dither,
+    /// <summary>Each dot's power follows the picture's brightness (experimental on this machine).</summary>
+    Grayscale,
+}
+
 /// <summary>
 /// A named group of shapes with one set of laser settings. Layers are real
 /// objects, not colours: a shape belongs to exactly one layer, and the
@@ -44,6 +52,27 @@ public sealed record Layer
     public int DotUs { get; init; } = 200;
     /// <summary>Image only: how grey tones become dots.</summary>
     public DitherMethod Dither { get; init; } = DitherMethod.Jarvis;
+    /// <summary>Image only: dithered dots, or grey levels as varying power (experimental).</summary>
+    public ImageEngraveMode ImageMode { get; init; } = ImageEngraveMode.Dither;
+    /// <summary>Image grayscale only: power (%) used for the lightest burned tone.</summary>
+    public double GrayMinPower { get; init; } = 10;
+
+    /// <summary>Cut/Score: beam width (mm). Outlines move out by half of it so parts keep their size; holes shrink to keep theirs.</summary>
+    public double KerfMm { get; init; }
+    /// <summary>Cut: uncut bridges left in each closed outline so parts stay in the sheet (0 = none).</summary>
+    public int TabCount { get; init; }
+    /// <summary>Cut: width of each bridge (mm).</summary>
+    public double TabWidthMm { get; init; } = 0.5;
+    /// <summary>Cut: keep cutting this far past the start of a closed outline so it fully closes (mm).</summary>
+    public double OvercutMm { get; init; }
+    /// <summary>Cut: start each closed outline with a short entry line of this length, outside the part (mm).</summary>
+    public double LeadInMm { get; init; }
+    /// <summary>Fill: scan-line direction in degrees (0 = left–right).</summary>
+    public double FillAngleDeg { get; init; }
+    /// <summary>Fill: add a second pass at 90° to the first.</summary>
+    public bool Crosshatch { get; init; }
+    /// <summary>Fill: extend each scan line this far beyond the shape with the laser off, so the beam is at speed when it burns (mm).</summary>
+    public double OverscanMm { get; init; }
 
     /// <summary>A palette that stays distinguishable on dark and light canvases.</summary>
     public static readonly IReadOnlyList<uint> Palette =
@@ -69,15 +98,44 @@ public sealed record Layer
 /// </summary>
 public abstract class Shape
 {
-    public Guid Id { get; init; } = Guid.NewGuid();
-    public string Name { get; init; } = "";
-    public Guid LayerId { get; init; }
+    Guid _id = Guid.NewGuid();
+    string _name = "";
+    Guid _layerId;
+    Affine _transform = Affine.Identity;
+    Guid? _groupId;
+
+    public Guid Id { get => _id; init => _id = value; }
+    public string Name { get => _name; init => _name = value; }
+    public Guid LayerId { get => _layerId; init => _layerId = value; }
     /// <summary>Local → world (machine mm).</summary>
-    public Affine Transform { get; init; } = Affine.Identity;
+    public Affine Transform { get => _transform; init => _transform = value; }
+    /// <summary>Shapes with the same group id are selected and moved together.</summary>
+    public Guid? GroupId { get => _groupId; init => _groupId = value; }
 
     public abstract Rect2 Bounds { get; }
 
-    public abstract Shape With(Guid? layerId = null, Affine? transform = null, string? name = null, Guid? id = null);
+    /// <summary>A copy with some common properties changed (everything else is kept).</summary>
+    public Shape With(Guid? layerId = null, Affine? transform = null, string? name = null, Guid? id = null)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._id = id ?? _id;
+        c._name = name ?? _name;
+        c._layerId = layerId ?? _layerId;
+        c._transform = transform ?? _transform;
+        if (transform is not null) c.ResetCaches();
+        return c;
+    }
+
+    /// <summary>A copy in group <paramref name="groupId"/> (null = ungrouped).</summary>
+    public Shape WithGroup(Guid? groupId)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._groupId = groupId;
+        return c;
+    }
+
+    /// <summary>Forget anything computed from the transform (called on copies).</summary>
+    protected abstract void ResetCaches();
 
     /// <summary>True if <paramref name="p"/> (world mm) is within <paramref name="tol"/> of the shape.</summary>
     public abstract bool HitTest(Vec2 p, double tol, bool insideCounts);
@@ -87,7 +145,7 @@ public abstract class Shape
 }
 
 /// <summary>A vector shape: any number of line/curve subpaths.</summary>
-public sealed class PathShape : Shape
+public class PathShape : Shape
 {
     /// <summary>Tolerance used for hit testing and bounds.</summary>
     public const double HitTol = 0.02;
@@ -108,18 +166,15 @@ public sealed class PathShape : Shape
 
     public bool HasOpenSubpaths => Geometry.Subpaths.Any(s => !s.Closed);
 
-    public override Shape With(Guid? layerId = null, Affine? transform = null, string? name = null, Guid? id = null) =>
-        new PathShape
-        {
-            Id = id ?? Id,
-            Name = name ?? Name,
-            LayerId = layerId ?? LayerId,
-            Transform = transform ?? Transform,
-            Geometry = Geometry,
-        };
+    protected override void ResetCaches()
+    {
+        _world = null;
+        _flat = null;
+        _bounds = null;
+    }
 
-    /// <summary>Bake the transform into the geometry (used by flatten-style ops).</summary>
-    public PathShape Baked() => new() { Id = Id, Name = Name, LayerId = LayerId, Geometry = World };
+    /// <summary>Bake the transform into the geometry (used by flatten-style ops). Text becomes plain paths.</summary>
+    public PathShape Baked() => new() { Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Geometry = World };
 
     public override bool HitTest(Vec2 p, double tol, bool insideCounts)
     {

@@ -2,7 +2,7 @@
 
 Neither format is encrypted. `.xs` is a ZIP of pretty-printed JSON; `.xcs` is one JSON document. The default save format is v2 `.xs`. `.txs` and `.txcs` are the template variants.
 
-Real samples to test against: `reference/exts/<MODEL>/assets/Tutorial-*.xs` (23 files). The v1 description below comes from reading code only; no `.xcs` sample has been found yet.
+Real samples to test against: `reference/exts/<MODEL>/assets/Tutorial-*.xs` (23 files). A real v1 `.xcs` (an F2 Ultra colour test grid) has also been imported successfully.
 
 ## Detecting the format
 
@@ -118,6 +118,15 @@ Both are defined in `exts/ext-runtime/*/xcs-ext-base.js`.
 
 ## Open questions
 
-- No real v1 sample yet.
 - The `power: [..]` array on the device record is unclear.
 - The full key set of the G-code `manifest.json` input is not yet known.
+
+## Placement convention (verified)
+
+Implemented in `src/YTool.Doc/Import/XsImport.cs` and checked against all 1408 PATHs in 20 tutorial projects (stored `x/y` within 0.005 mm, `width/height` exact, including 231 paths rotated −90°):
+
+- An object's own coordinates are scaled by `scale`, rotated by `angle` (degrees, clockwise on screen), then moved by `offsetX/offsetY`. A `transform` array, when present, is the same matrix.
+- Stored `x/y` is where the object's own top-left lands; `width/height` are its size after scaling, before rotation.
+- RECT/CIRCLE: own size = `width / scale`. BITMAP: own space is pixels, 0…`originWidth` × 0…`originHeight`.
+- TEXT: the glyph PATHs in `charJSONs` carry absolute canvas placements.
+- Unconfirmed: skew/pivot (always zero in samples), RECT `radius` under scaling, `vectorRef` out-of-line paths.

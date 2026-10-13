@@ -41,7 +41,8 @@ public sealed class TraceWindow : Window
     readonly CheckBox _invert = new() { Content = "Trace the light parts instead" };
     readonly Slider _tolerance = new() { Minimum = 1, Maximum = 100, Value = 25 };
     readonly Slider _maxColours = new() { Minimum = 2, Maximum = 16, Value = 8, IsSnapToTickEnabled = true, TickFrequency = 1 };
-    readonly WrapPanel _swatches = new();
+    readonly StackPanel _swatches = new() { Spacing = 4 };
+    readonly List<TextBlock> _swatchInfo = [];
     readonly Slider _smooth = new() { Minimum = 0, Maximum = 10, Value = 2 };
     readonly Slider _corners = new() { Minimum = 0, Maximum = 180, Value = 40 };
     readonly Slider _specks = new() { Minimum = 0, Maximum = 400, Value = 12 };
@@ -96,7 +97,7 @@ public sealed class TraceWindow : Window
             {
                 Slide("Colour tolerance", _tolerance, _toleranceText),
                 Slide("Most colours", _maxColours, _maxText),
-                Hint("Tick the colours to trace. Each becomes its own layer. The background is unticked."),
+                Hint("Ticked colours are traced, each onto its own layer. Unticked colours are left out (the background starts unticked)."),
                 _swatches,
             },
         };
@@ -115,7 +116,7 @@ public sealed class TraceWindow : Window
         _targetRow = Field("Put on layer", _target);
         _pickTol.ValueChanged += (_, _) => Schedule(false);
         _connected.IsCheckedChanged += (_, _) => Schedule(false);
-        _pick.IsCheckedChanged += (_, _) => ModeChanged();
+        _pick.IsCheckedChanged += (_, _) => { _preview.FaintPicture = _colour.IsChecked == true || _pick.IsChecked == true; ModeChanged(); };
         _preview.Clicked += OnPreviewClick;
 
         foreach (var s in new[] { _threshold, _smooth, _corners, _specks }) s.ValueChanged += (_, _) => Schedule(false);
@@ -123,6 +124,7 @@ public sealed class TraceWindow : Window
         _invert.IsCheckedChanged += (_, _) => Schedule(false);
         _bw.IsCheckedChanged += (_, _) => ModeChanged();
         _showPicture.IsCheckedChanged += (_, _) => _preview.ShowPicture = _showPicture.IsChecked == true;
+        _colour.IsCheckedChanged += (_, _) => _preview.FaintPicture = _colour.IsChecked == true || _pick.IsChecked == true;
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 100 };
         cancel.Click += (_, _) => Close();
         _ok.Click += (_, _) => Accept();
@@ -270,6 +272,7 @@ public sealed class TraceWindow : Window
             if (v != _version) return;
             _result = result;
             _preview.Result = result;
+            UpdateSwatchInfo(result);
             _stats.Text = result.Paths == 0 ? (pick ? "Nothing selected: raise the tolerance or click another spot." : "Nothing traced: try another threshold, or tick more colours.")
                 : $"{result.Paths} outline{(result.Paths == 1 ? "" : "s")}, {result.Nodes} segments.";
             _ok.IsEnabled = result.Paths > 0;
@@ -281,26 +284,45 @@ public sealed class TraceWindow : Window
         }
     }
 
+    /// <summary>After each trace, say per colour what happened to it.</summary>
+    void UpdateSwatchInfo(TraceResult result)
+    {
+        for (int k = 0; k < _swatchInfo.Count && k < _palette.Count; k++)
+        {
+            var p = _palette[k];
+            string share = $"{100.0 * p.Pixels / Math.Max(1, _labels?.Length ?? 1):0.#}% of picture";
+            if (!_include.Contains(k))
+            {
+                _swatchInfo[k].Text = $"{(p.IsBackground ? "background · " : "")}{share} · left out";
+                continue;
+            }
+            int outlines = result.Parts.Where(x => x.Rgb == p.Rgb).Sum(x => x.Geometry.Subpaths.Length);
+            _swatchInfo[k].Text = $"{share} · {outlines} outline{(outlines == 1 ? "" : "s")} → own layer";
+        }
+    }
+
     void BuildSwatches()
     {
         _swatches.Children.Clear();
+        _swatchInfo.Clear();
         for (int i = 0; i < _palette.Count; i++)
         {
             int k = i;
             var p = _palette[i];
+            var info = new TextBlock { Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+            _swatchInfo.Add(info);
             var box = new CheckBox
             {
                 IsChecked = _include.Contains(k),
-                Margin = new(0, 0, 8, 4),
                 Content = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
-                    Spacing = 6,
+                    Spacing = 8,
                     Children =
                     {
-                        new Border { Width = 18, Height = 18, CornerRadius = new(3), BorderBrush = Brushes.Gray, BorderThickness = new(1),
+                        new Border { Width = 22, Height = 22, CornerRadius = new(4), BorderBrush = Brushes.Gray, BorderThickness = new(1),
                             Background = new SolidColorBrush(Color.FromRgb((byte)(p.Rgb >> 16), (byte)(p.Rgb >> 8), (byte)p.Rgb)) },
-                        new TextBlock { Text = p.IsBackground ? "background" : $"{100.0 * p.Pixels / Math.Max(1, _labels!.Length):0.#}%", Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center },
+                        info,
                     },
                 },
             };
@@ -341,6 +363,9 @@ sealed class TracePreview : Control
     public double PixelScale { get; set; } = 1;
     public TraceResult? Result { get => _result; set { _result = value; InvalidateVisual(); } }
     public bool ShowPicture { get => _showPicture; set { _showPicture = value; InvalidateVisual(); } }
+    bool _faint;
+    /// <summary>Show the picture very faintly, so the traced colours stand out (colour modes).</summary>
+    public bool FaintPicture { get => _faint; set { _faint = value; InvalidateVisual(); } }
 
     /// <summary>A click (not a drag) on the picture, in preview-bitmap pixels.</summary>
     public event Action<Vec2>? Clicked;
@@ -375,7 +400,7 @@ sealed class TracePreview : Control
         using (ctx.PushTransform(view))
         {
             if (_showPicture)
-                using (ctx.PushOpacity(0.35))
+                using (ctx.PushOpacity(_faint ? 0.12 : 0.35))
                     ctx.DrawImage(_picture, new Rect(0, 0, s.Width, s.Height), new Rect(0, 0, s.Width, s.Height));
             if (_result is null) return;
             // Outlines are in original pixels; the preview bitmap may be smaller.

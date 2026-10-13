@@ -89,9 +89,38 @@ public class CameraTests
         var mid = CalibrationSet.For([a, b], 20)!;
         var p = new Vec2(200, 200);
         Assert.True(mid.Map.ToImage(p).Dist(Vec2.Lerp(a.ToImage(p), b.ToImage(p), 0.5)) < 1e-12);
+        // Beyond the range the trend continues (linear extrapolation).
         var far = CalibrationSet.For([a, b], 40)!;
-        Assert.Same(b, far.Map);
+        Assert.True(far.Map.ToImage(p).Dist(Vec2.Lerp(a.ToImage(p), b.ToImage(p), 1.5)) < 1e-12);
         Assert.False(far.Exact);
+        Assert.True(CalibrationSet.For([a, b], 33)!.Exact); // within the trusted margin
+        Assert.False(CalibrationSet.For([a], 20)!.Exact);
+    }
+
+    [Fact]
+    public void ThreeHeightsFollowACurvedTrendExactly()
+    {
+        // A camera whose picture position moves quadratically with height.
+        IImageMap Cam(double h) => new FakeCamera(-0.08 - 0.0004 * h * h);
+        var cals = new[] { 5.0, 20, 40 }.Select(h => CameraCalibration.Fit(Points(Cam(h)), h)).ToList();
+        var mid = CalibrationSet.For(cals, 12)!;
+        Assert.True(mid.Exact);
+        // Quadratic data → the 3-point fit reproduces the calibration fits' trend at any height in range.
+        foreach (var mm in new Vec2[] { new(10, 10), new(110, 110), new(210, 200) })
+        {
+            var expect = Quadratic(cals, 12, mm);
+            Assert.True(mid.Map.ToImage(mm).Dist(expect) < 1e-9);
+        }
+    }
+
+    static Vec2 Quadratic(IReadOnlyList<CameraCalibration> c, double d, Vec2 mm)
+    {
+        // Lagrange through the three calibrations (same as a least-squares quadratic for 3 points).
+        double d0 = c[0].DistanceMm, d1 = c[1].DistanceMm, d2 = c[2].DistanceMm;
+        double l0 = (d - d1) * (d - d2) / ((d0 - d1) * (d0 - d2));
+        double l1 = (d - d0) * (d - d2) / ((d1 - d0) * (d1 - d2));
+        double l2 = (d - d0) * (d - d1) / ((d2 - d0) * (d2 - d1));
+        return c[0].ToImage(mm) * l0 + c[1].ToImage(mm) * l1 + c[2].ToImage(mm) * l2;
     }
 
     [Fact]

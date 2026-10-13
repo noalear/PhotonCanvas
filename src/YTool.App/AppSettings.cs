@@ -28,6 +28,15 @@ public sealed class AppSettings
     public YTool.Core.Camera.MarkStyle CalibMarkStyle { get; set; } = YTool.Core.Camera.MarkStyle.Dot;
     public double CalibMarkSizeMm { get; set; } = 2;
     public List<string> RecentFiles { get; set; } = [];
+    public double OffsetDistanceMm { get; set; } = 2;
+    public int OffsetDirection { get; set; }
+    public int OffsetCorners { get; set; } = 1;
+    public int OffsetEnds { get; set; } = 1;
+    public string TextFont { get; set; } = "Arial";
+    public double TextSizeMm { get; set; } = 10;
+    public int PolygonSides { get; set; } = 6;
+    public int StarPoints { get; set; } = 5;
+    public double StarInnerPercent { get; set; } = 50;
 
     static readonly JsonSerializerOptions Json = new()
     {
