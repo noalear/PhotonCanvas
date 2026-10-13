@@ -21,6 +21,7 @@ public sealed class AppSettings
     public double SvgPxPerInch { get; set; } = 96;
     /// <summary>Clockwise display rotation for the close-up camera (measured on the user's F2 Ultra).</summary>
     public double CloseUpRotationDeg { get; set; } = 31.2;
+    public double CameraOpacity { get; set; } = 0.85;
     public List<string> RecentFiles { get; set; } = [];
 
     static readonly JsonSerializerOptions Json = new()

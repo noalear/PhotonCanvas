@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Bitmap = Avalonia.Media.Imaging.Bitmap;
 using Avalonia.Threading;
 using YTool.Core;
+using YTool.Core.Camera;
 using YTool.Device;
 using static YTool.App.UiKit;
 
@@ -46,6 +47,15 @@ public sealed class MachinePanel : UserControl
     readonly List<string> _logLines = [];
     bool _updatingLid;
 
+    // Camera on the work area
+    List<CameraCalibration> _calibrations = CalibrationStore.Load(CalibrationStore.DefaultPath);
+    readonly ToggleSwitch _onCanvas = new() { OnContent = "Camera on work area", OffContent = "Camera on work area" };
+    readonly Slider _opacity = new() { Minimum = 0.15, Maximum = 1, SmallChange = 0.05, LargeChange = 0.1 };
+    readonly TextBlock _calState = Hint();
+    int _warping;
+    // Read by the live-view thread; mirrors the toggle.
+    volatile bool _overlayWanted;
+
     public bool IsConnected => _client?.IsConnected == true;
     /// <summary>Material distance from the head's Z (mm), when known.</summary>
     public double? Distance { get; private set; }
@@ -56,6 +66,9 @@ public sealed class MachinePanel : UserControl
     public event Action? ConnectionChanged;
     /// <summary>A device event (on the UI thread).</summary>
     public event Action<DeviceEvent>? DeviceEventReceived;
+    /// <summary>New straightened camera picture of the work area (null = hide). On the UI thread.</summary>
+    public event Action<Bitmap?>? OverlayChanged;
+    public event Action<double>? OverlayOpacityChanged;
 
     public MachinePanel(AppSettings settings)
     {
@@ -90,6 +103,15 @@ public sealed class MachinePanel : UserControl
             if (_live.IsChecked == true) { ToggleLive(); ToggleLive(); }
         };
 
+        var refresh = Button("Update photo", "IcCamera", "Take a new overview photo and lay it over the work area.");
+        refresh.Click += async (_, _) => await RefreshOverlay();
+        var calibrate = Button("Calibrate camera…", tip: "Burn a dot grid and measure it, so the camera picture lines up with where the laser marks.");
+        calibrate.Click += async (_, _) => await OpenCalibration();
+        _opacity.Value = _settings.CameraOpacity;
+        _opacity.ValueChanged += (_, _) => { _settings.CameraOpacity = _opacity.Value; _settings.Save(); OverlayOpacityChanged?.Invoke(_opacity.Value); };
+        _onCanvas.IsCheckedChanged += async (_, _) => { _overlayWanted = _onCanvas.IsChecked == true; await ToggleOverlay(); };
+        ToolTip.SetTip(_onCanvas, "Lays the overview camera, straightened and to scale, under your design. With live view on (Overview), it updates continuously.");
+
         Content = new ScrollViewer
         {
             Content = new StackPanel
@@ -98,12 +120,113 @@ public sealed class MachinePanel : UserControl
                 {
                     Card("Connection", _ip, _found, Row(_find, _connect), _connState, _info),
                     Card("Status", _mode, _distance, _lidOpen),
+                    Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera", Row(_live, _stream), imgBorder, _straightenRow, snap, _camInfo),
                     Card("Machine events", _log),
                 },
             },
         };
         SetDisconnectedUi("Not connected.");
+        UpdateCalState();
+    }
+
+    public double OverlayOpacity => _opacity.Value;
+
+    void UpdateCalState()
+    {
+        if (_calibrations.Count == 0)
+        {
+            _calState.Text = "Not calibrated yet. Calibrate once per material distance you use (about 5 minutes and a scrap sheet).";
+            return;
+        }
+        var list = string.Join(", ", _calibrations.OrderBy(c => c.DistanceMm).Select(c => $"{c.DistanceMm:0.#} mm (±{c.RmsMm:0.00})"));
+        var choice = CalibrationSet.For(_calibrations, Distance);
+        _calState.Text = $"Calibrated at {list}." + (choice is null ? "" : $"\nNow using: {choice.Description}.");
+        _calState.Foreground = choice is { Exact: false } && Distance is not null ? Brush("Warn") : Brush("TextMuted");
+    }
+
+    async Task OpenCalibration()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        var w = new CalibrationWindow(this, Distance);
+        w.Saved += cal =>
+        {
+            _calibrations = CalibrationStore.With(_calibrations, cal);
+            try { CalibrationStore.Save(CalibrationStore.DefaultPath, _calibrations); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log($"Couldn't save the calibration: {e.Message}"); }
+            UpdateCalState();
+            Log($"Camera calibrated at {cal.DistanceMm:0.#} mm (average error {cal.RmsMm:0.00} mm).");
+        };
+        await w.ShowDialog(owner);
+        if (_onCanvas.IsChecked == true) await RefreshOverlay();
+    }
+
+    async Task ToggleOverlay()
+    {
+        if (_onCanvas.IsChecked != true)
+        {
+            OverlayChanged?.Invoke(null);
+            return;
+        }
+        if (_calibrations.Count == 0)
+        {
+            _onCanvas.IsChecked = false;
+            if (TopLevel.GetTopLevel(this) is Window owner)
+                await Dialogs.Message(owner, "Calibrate first", "The camera needs calibrating before its picture can be placed accurately on the work area. Click Calibrate camera.");
+            return;
+        }
+        await RefreshOverlay();
+    }
+
+    async Task RefreshOverlay()
+    {
+        if (_onCanvas.IsChecked != true) return;
+        if (!IsConnected)
+        {
+            _calState.Text = "Connect to the machine to take a photo.";
+            return;
+        }
+        try
+        {
+            var jpg = await SnapshotAsync(0);
+            await WarpForCanvas(jpg);
+        }
+        catch (DeviceException e) { Log($"Photo failed: {e.Message}"); }
+    }
+
+    /// <summary>Straighten a photo onto the 220 × 220 mm field and hand it to the canvas. Skips if one is already in progress.</summary>
+    async Task WarpForCanvas(byte[] jpg)
+    {
+        if (Interlocked.Exchange(ref _warping, 1) == 1) return;
+        try
+        {
+            var choice = CalibrationSet.For(_calibrations, Distance);
+            if (choice is null) return;
+            var area = new Rect2(0, 0, _machine.FieldW, _machine.FieldH);
+            var bmp = await Task.Run(() =>
+            {
+                using var src = CameraWarp.Decode(jpg, 2400);
+                using var warped = CameraWarp.Warp(src, choice.Map, area, 0.2);
+                return CameraImaging.ToAvalonia(warped);
+            });
+            Ui(() =>
+            {
+                if (_onCanvas.IsChecked == true) OverlayChanged?.Invoke(bmp);
+                else bmp.Dispose();
+                UpdateCalState();
+            });
+        }
+        catch (FormatException e) { Ui(() => Log($"Couldn't read the camera picture: {e.Message}")); }
+        finally { Interlocked.Exchange(ref _warping, 0); }
+    }
+
+    /// <summary>One camera photo (0 = overview, 1 = close-up), pausing live view around it.</summary>
+    public async Task<byte[]> SnapshotAsync(int stream)
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        var resume = await PauseLive();
+        try { return await c.SnapshotAsync(stream); }
+        finally { resume(); }
     }
 
     void Ui(Action a) => Dispatcher.UIThread.Post(a);
@@ -355,6 +478,7 @@ public sealed class MachinePanel : UserControl
                     var bmp = Bitmap.DecodeToWidth(ms, 1000);
                     var fps = 1 / Math.Max(0.05, (DateTime.UtcNow - t0).TotalSeconds);
                     failures = 0;
+                    if (stream == 0 && _overlayWanted) _ = WarpForCanvas(jpg);
                     Ui(() =>
                     {
                         if (cts.IsCancellationRequested) { bmp.Dispose(); return; }

@@ -52,6 +52,14 @@ public partial class MainWindow : Window
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
         _machine.StatusChanged += s => MachineStatus.Text = s;
+        Canvas.CameraOpacity = _machine.OverlayOpacity;
+        _machine.OverlayOpacityChanged += o => Canvas.CameraOpacity = o;
+        _machine.OverlayChanged += b =>
+        {
+            var old = Canvas.CameraImage;
+            Canvas.CameraImage = b;
+            if (!ReferenceEquals(old, b)) old?.Dispose();
+        };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);

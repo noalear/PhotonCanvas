@@ -24,6 +24,9 @@ public sealed class CanvasView : Control
     static readonly IPen FieldPen = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
     static readonly IPen GridMinor = new Pen(new SolidColorBrush(Color.Parse("#1D2129")), 1);
     static readonly IPen GridMajor = new Pen(new SolidColorBrush(Color.Parse("#262B35")), 1);
+    // Over a camera picture the grid must stay readable without hiding the photo.
+    static readonly IPen GridMinorPhoto = new Pen(new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)), 1);
+    static readonly IPen GridMajorPhoto = new Pen(new SolidColorBrush(Color.FromArgb(70, 255, 255, 255)), 1);
     static readonly IBrush RulerBrush = new SolidColorBrush(Color.Parse("#15181E"));
     static readonly IBrush RulerText = new SolidColorBrush(Color.Parse("#7D8694"));
     static readonly IPen RulerTick = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
@@ -109,6 +112,21 @@ public sealed class CanvasView : Control
     {
         get => _preview;
         set { _preview = value; InvalidateVisual(); }
+    }
+
+    Avalonia.Media.Imaging.Bitmap? _camera;
+    /// <summary>Straightened camera picture covering exactly the work area (0–FieldW × 0–FieldH mm).</summary>
+    public Avalonia.Media.Imaging.Bitmap? CameraImage
+    {
+        get => _camera;
+        set { _camera = value; InvalidateVisual(); }
+    }
+
+    double _cameraOpacity = 0.85;
+    public double CameraOpacity
+    {
+        get => _cameraOpacity;
+        set { _cameraOpacity = value; InvalidateVisual(); }
     }
 
     bool _showGrid = true;
@@ -212,6 +230,9 @@ public sealed class CanvasView : Control
         ctx.FillRectangle(BgBrush, b);
         var field = ToScreen(new Rect2(0, 0, _machine.FieldW, _machine.FieldH));
         ctx.FillRectangle(FieldBrush, field);
+        if (_camera is { } cam)
+            using (ctx.PushOpacity(_cameraOpacity))
+                ctx.DrawImage(cam, new Rect(0, 0, cam.PixelSize.Width, cam.PixelSize.Height), field);
         if (_showGrid) DrawGrid(ctx, field);
         ctx.DrawRectangle(FieldPen, field.Deflate(0.5));
 
@@ -255,8 +276,9 @@ public sealed class CanvasView : Control
                 ctx.DrawLine(pen, new(clip.Left, sy), new(clip.Right, sy));
             }
         }
-        Lines(minor, GridMinor);
-        Lines(major, GridMajor);
+        bool photo = _camera is not null;
+        Lines(minor, photo ? GridMinorPhoto : GridMinor);
+        Lines(major, photo ? GridMajorPhoto : GridMajor);
     }
 
     void DrawShapes(DrawingContext ctx, Document doc)
