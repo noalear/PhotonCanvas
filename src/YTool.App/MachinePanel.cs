@@ -233,6 +233,7 @@ public sealed class MachinePanel : UserControl
 
     void Log(string line)
     {
+        AppLog.Write("machine", line);
         _logLines.Add($"{DateTime.Now:HH:mm:ss}  {line}");
         if (_logLines.Count > 200) _logLines.RemoveRange(0, _logLines.Count - 200);
         _log.Text = string.Join("\n", _logLines);
@@ -417,13 +418,35 @@ public sealed class MachinePanel : UserControl
 
     void OnDeviceEvent(DeviceEvent ev)
     {
+        // Keep the raw message: the firmware's event shapes vary and are only partly documented.
+        AppLog.Write("event", ev.Raw.ToJsonString());
+        try { DescribeEvent(ev); }
+        catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException)
+        {
+            AppLog.Error("device event", e);
+            Log($"{ev.Module} {ev.Type} (unrecognised details)".Trim());
+        }
+    }
+
+    /// <summary>
+    /// "failed" means the job was cancelled. The machine has been seen sending
+    /// the result both as an object ({"result":"failed",...}) and as plain text.
+    /// </summary>
+    static bool WasCancelled(DeviceEvent ev) => ev.Info switch
+    {
+        System.Text.Json.Nodes.JsonObject o => o.TryGetPropertyValue("result", out var r) && r?.ToString() == "failed",
+        _ => ev.InfoText?.Contains("fail", StringComparison.OrdinalIgnoreCase) == true,
+    };
+
+    void DescribeEvent(DeviceEvent ev)
+    {
         var text = ev.Type switch
         {
             "WORK_PREPARED" => "Job loaded. Press the start button on the machine.",
             "WORK_STARTED" => "Job started.",
             "WORK_PAUSED" => "Job paused.",
             "WORK_STOPED" => "Job stopped.",
-            "WORK_FINISHED" => ev.Info?["result"]?.ToString() is "failed" ? "Job cancelled." : "Job finished.",
+            "WORK_FINISHED" => WasCancelled(ev) ? "Job cancelled." : "Job finished.",
             _ => $"{ev.Module} {ev.Type} {ev.InfoText}".Trim(),
         };
         if (ev.Module == "GAP") text = $"Lid {(ev.Type == "OPEN" ? "opened" : ev.Type == "CLOSE" ? "closed" : ev.Type)}.";
