@@ -7,7 +7,34 @@ Supporting sources:
 - Discovery: `app/.vite/build/discover-worker.*.cjs` (unminified)
 - File channel: `app/.vite/renderer/editor/static/js/src.DzJfpp3_.js`
 
-**Status: everything here was read from code and is untested on hardware.** Items marked (?) are inferred.
+**Status:** the section "Verified on hardware" below was tested on the user's F2 Ultra (firmware 40.54.021). Everything else was read from code. Items marked (?) are inferred.
+
+## Verified on hardware (2026-10-12, F2 Ultra, fw 40.54.021.00.ht6)
+
+Implemented in `src/ytool/`.
+
+- **Discovery:** V2 encrypted multicast works. The device answers with `deviceCode: GS004-CLASS-4`, `platformVersion: 1.5`, `netType: wlan`.
+- **Framing:** framing and CRC16 work as documented below. Device JSON responses are pretty-printed with tabs.
+- **Pairing:** `/v1/user/parity` with `userID: "mk-guest"` returns `code 0, "user auth success"` and **no** sessionToken. No button press is needed, and every read endpoint works afterwards.
+  - **A random UUID as userID makes the device drop the connection (1006).** The stock app's logged-in userUuid must have some other format.
+- **All channels share one id:** the instruction, file and media sockets must all use the **same** `?id=`, because the device pairs them by it. With different ids, file requests are silently ignored.
+- **`machineInfo`:**
+  - `laserType: ["RED","BLUE"]`, `laserPower: [60,40]`: RED = 60 W fiber, BLUE = 40 W diode.
+  - `workSize 231.98 × 231.98` mm.
+  - `gcodeFormat: ["txt","bin"]`, so **plain-text G-code is accepted**.
+  - `packageFormat: ["xf"]`.
+- **Snapshot:** `GET /v1/camera/snap` needs `params: {name: "main"|"deep", stream: "0"|"1"}`. The params must go in `params`, not `data`; otherwise the device returns `-1 "name is not string"`. It returns `{filename: "/tmp/main_<ts>.jpg"}`, which is then downloaded over the file channel.
+  - Images are 4000×3000 JPEGs: about 630 KB for the overview, about 1 MB for the close-up.
+  - The file request packet is sent with no body CRC (type 33 | 0x80), the same as the stock app.
+- **Snapshot polling rate:** **3.9 fps** for the overview and 2.8 fps for the close-up, in a sequential loop on WiFi.
+- **Live stream: not available on this firmware.**
+  - `POST /v1/platform/camera/live {name, stream, action:"start"}` returns success.
+  - The media_stream socket answers pings (`0x02` → `0x82`) but sends no frames.
+  - `/v1/platform/camera/list` fails with "getCameraList failed".
+  - `/v1/camera/live` returns 404.
+
+  The live view is therefore built on snapshot polling (`ytool view`).
+- **Not found (404):** `/v1/camera`, `/v1/camera/resolution`, `/v1/platform/camera/resolution`.
 
 ## Two protocol generations
 
@@ -38,7 +65,7 @@ Supporting sources:
    ```json
    {"type":"deviceFind","method":"request","data":{"version":"1.0","clientType":"atomnClient","requestId":<uint32>,"key":"<discovery-reply-key>"}}
    ```
-2. Encrypt it with AES-256-CBC, key `<discovery-request-key>`. The wire format is the 16-byte IV followed by the ciphertext.
+2. Encrypt it with AES-256-CBC (PKCS7 padding) using the **primary** key `<discovery-request-key>`. The wire format is the 16-byte IV followed by the ciphertext.
 3. Send it to all of these:
    - `224.0.0.251:5353` (ttl 1)
    - `224.0.0.252:5354` (ttl 1)
@@ -46,7 +73,7 @@ Supporting sources:
    - `239.0.1.252:25354` (ttl 4)
 
    Over USB, send it unicast to the same ports instead.
-4. The reply is encrypted with the same scheme and contains `deviceIp, deviceName, deviceCode, deviceId, deviceSn, firmwareVersion, ...`.
+4. The reply is decrypted with the **common** key `<discovery-reply-key>` (the same key is sent inside the request). It contains `deviceIp, deviceName, deviceCode, deviceId, deviceSn, firmwareVersion, ...`.
 
 ### HTTP probes (V1)
 

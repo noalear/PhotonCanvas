@@ -9,3 +9,6 @@ __pycache__/
 # Node
 node_modules/
 dist/
+
+# Machine captures (camera images, exports)
+/captures/

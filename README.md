@@ -11,6 +11,20 @@ An independent, open replacement for xTool Studio (xTool laser cutter/engraver s
 | `tools/` | Helper scripts (e.g. `extract_asar.py`) | yes |
 | `reference/` | Extracted xTool Studio install, for local study only | **no** (gitignored) |
 
+## Quick start (device probe)
+
+```bash
+python -m venv .venv && .venv/Scripts/pip install websockets cryptography pillow
+cd src
+../.venv/Scripts/python -m ytool discover
+../.venv/Scripts/python -m ytool info <ip>
+../.venv/Scripts/python -m ytool view <ip>            # live camera window (~4 fps)
+../.venv/Scripts/python -m ytool snap <ip> --stream 1  # close-up camera still
+../.venv/Scripts/python -m ytool watch <ip> --poll 5   # device events + progress
+```
+
+The probe is read-only. Nothing in it moves the head or fires the laser.
+
 ## Ground rules
 
 `reference/` holds xTool/Makeblock's proprietary code. Study it to learn protocols
