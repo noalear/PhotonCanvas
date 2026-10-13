@@ -332,6 +332,8 @@ public sealed class JobPanel : UserControl
         sb.AppendLine($"Size {job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm · about {Duration(job.EstimateS)}.");
         if (_machine.Distance is { } d) sb.AppendLine($"Machine focus distance: {d:0.0} mm. Make sure this matches your material.");
         foreach (var w in job.Warnings) sb.AppendLine($"⚠ {w}");
+        if (_machine.Mode == "P_WORK")
+            sb.AppendLine("ⓘ A job is already loaded on the machine (not started). It will be replaced by this one.");
         sb.AppendLine();
         sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button.");
         if (!await Dialogs.Confirm(owner, "Send job to machine", sb.ToString(), "Upload", "Cancel")) return;
@@ -344,7 +346,8 @@ public sealed class JobPanel : UserControl
         try
         {
             var progress = new Progress<double>(f => _progress.Value = f);
-            await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None);
+            // Sending again replaces a job that's loaded but not started (never one that's running).
+            await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None, replaceLoadedJob: true);
             _sentEstimate = job.EstimateS;
             _sendState.Text = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }

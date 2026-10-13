@@ -871,13 +871,13 @@ public sealed class MachinePanel : UserControl
     }
 
     /// <summary>Upload a job. The machine then waits for its start button.</summary>
-    public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct)
+    public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false)
     {
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         var resume = await PauseLive();
         try
         {
-            await c.UploadJobAsync(xf, progress, ct);
+            await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob);
             Log("Job uploaded. Press the start button on the machine.");
         }
         finally { resume(); }

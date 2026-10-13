@@ -521,9 +521,34 @@ public sealed class DeviceClientTests : IAsyncLifetime
         await using var client = await Connected();
         var e = await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1, 2, 3]));
         Assert.Equal(DeviceException.BusyCode, e.Code);
-        Assert.Equal("machine is busy (P_WORKING); not uploading", e.Message);
+        Assert.Equal(DeviceClient.BusyMessage("P_WORKING"), e.Message);
         Assert.DoesNotContain(_fake.Requests, r => Url(r) == "/v1/filetransfer/upload");
         await Assert.ThrowsAsync<ArgumentException>(() => client.UploadFileAsync([1], "fw.bin", fileType: 2));
+    }
+
+    [Fact]
+    public async Task ReplacesAJobThatIsLoadedButNotStarted()
+    {
+        _fake.Mode = "P_WORK";
+        await using var client = await Connected();
+        // Without permission: refused, and the loaded job is left alone.
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1, 2, 3]));
+        Assert.Contains("already loaded", e.Message);
+        Assert.Empty(_fake.States);
+
+        _fake.OnStateAction = a => { if (a == "stop") _fake.Mode = "P_IDLE"; };
+        await client.UploadJobAsync([1, 2, 3], replaceLoadedJob: true);
+        Assert.Equal(["stop"], _fake.States);
+        Assert.Equal([1, 2, 3], _fake.Uploaded);
+    }
+
+    [Fact]
+    public async Task NeverCancelsARunningJobToUpload()
+    {
+        _fake.Mode = "P_WORKING";
+        await using var client = await Connected();
+        await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1, 2, 3], replaceLoadedJob: true));
+        Assert.Empty(_fake.States);
     }
 
     [Fact]
@@ -627,6 +652,7 @@ sealed class FakeDevice : IAsyncDisposable
     public int ParityCode { get; set; }
     public int AuthStatusPending { get; set; }
     public string Mode { get; set; } = "P_IDLE";
+    public Action<string>? OnStateAction { get; set; }
     public volatile bool AnswerPings = true;
     public byte[] DownloadFile { get; set; } = [];
     public bool CorruptDigest { get; set; }
@@ -774,6 +800,7 @@ sealed class FakeDevice : IAsyncDisposable
                 break;
             case "/v1/processing/state":
                 States.Enqueue(req["params"]!["action"]!.GetValue<string>());
+                OnStateAction?.Invoke(req["params"]!["action"]!.GetValue<string>());
                 await Reply(req, 0);
                 break;
             case "/v1/peripheral/param":

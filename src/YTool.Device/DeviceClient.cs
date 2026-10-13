@@ -20,6 +20,8 @@ public sealed record DeviceClientOptions
     /// <summary>How long to wait for the machine's button during pairing.</summary>
     public TimeSpan ButtonTimeout { get; init; } = TimeSpan.FromSeconds(90);
     public TimeSpan ButtonPollInterval { get; init; } = TimeSpan.FromSeconds(1);
+    /// <summary>How often to re-check the machine's mode while waiting for it to change.</summary>
+    public TimeSpan ModePollInterval { get; init; } = TimeSpan.FromMilliseconds(300);
     /// <summary>A file transfer fails when the device goes quiet for this long.</summary>
     public TimeSpan TransferTimeout { get; init; } = TimeSpan.FromSeconds(30);
     public TimeSpan SnapshotTimeout { get; init; } = TimeSpan.FromSeconds(60);
@@ -1025,16 +1027,24 @@ public sealed class DeviceClient : IAsyncDisposable
 
     /// <summary>
     /// Uploads an .xf job as <c>tmp.xf</c> and arms it with <c>autoStart: 0</c>: the machine then waits
-    /// for its physical button. Refuses unless the machine is <c>P_IDLE</c>. Returns the task id.
+    /// for its physical button. Refuses unless the machine is <c>P_IDLE</c>, except that with
+    /// <paramref name="replaceLoadedJob"/> a job that is loaded but not started (<c>P_WORK</c>) is
+    /// cancelled first (the same request xTool Studio sends; nothing moves). Returns the task id.
     /// </summary>
-    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
+    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default, bool replaceLoadedJob = false)
     {
         ArgumentNullException.ThrowIfNull(xf);
         if (xf.Length == 0)
             throw new ArgumentException("The job file is empty.", nameof(xf));
         string mode = await GetRuntimeModeAsync(cancellationToken).ConfigureAwait(false);
+        if (mode == "P_WORK" && replaceLoadedJob)
+        {
+            Log("A job is already loaded and not started: cancelling it to make room.");
+            await StopJobAsync(cancellationToken).ConfigureAwait(false);
+            mode = await WaitForModeAsync("P_IDLE", TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
+        }
         if (mode != "P_IDLE")
-            throw new DeviceException(DeviceException.BusyCode, $"machine is busy ({mode}); not uploading");
+            throw new DeviceException(DeviceException.BusyCode, BusyMessage(mode));
         await UploadFileAsync(xf, "tmp.xf", JobFileType, 1, progress, cancellationToken).ConfigureAwait(false);
         string taskId = Guid.NewGuid().ToString();
         await RequestAsync("PUT", "/v1/processing/upload/config", new JsonObject
@@ -1045,6 +1055,30 @@ public sealed class DeviceClient : IAsyncDisposable
         }, cancellationToken: cancellationToken).ConfigureAwait(false);
         return taskId;
     }
+
+    /// <summary>Polls the runtime mode until it is <paramref name="wanted"/> or the time runs out; returns the last mode seen.</summary>
+    async Task<string> WaitForModeAsync(string wanted, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var until = DateTime.UtcNow + timeout;
+        while (true)
+        {
+            string mode = await GetRuntimeModeAsync(cancellationToken).ConfigureAwait(false);
+            if (mode == wanted || DateTime.UtcNow >= until) return mode;
+            await Task.Delay(_options.ModePollInterval, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Why an upload was refused, in plain words.</summary>
+    public static string BusyMessage(string mode) => mode switch
+    {
+        "P_WORK" => "A job is already loaded on the machine, waiting for its start button. Start it, or cancel it (Stop on the Job tab, or long-press the machine's button), then send again.",
+        "P_WORKING" => "The machine is running a job. Wait for it to finish, or stop it, then send again.",
+        "P_PAUSE" => "A job is paused on the machine. Continue or stop it, then send again.",
+        "P_SLEEP" => "The machine is asleep. Press its button to wake it, then send again.",
+        "P_AUTOFOCUS" or "P_MEASURE" => "The machine is measuring or focusing. Wait for it to finish, then send again.",
+        "P_ERROR" => "The machine is reporting an error. Check it (the light or the Machine tab), then send again.",
+        _ => $"The machine isn't ready for a new job (it reports \"{mode}\"). Wait a moment and try again.",
+    };
 
     /// <summary>Camera still as JPEG bytes. Stream 0 = overview ("main"), 1 = close-up ("deep").</summary>
     public async Task<byte[]> SnapshotAsync(int stream = 0, CancellationToken cancellationToken = default)
