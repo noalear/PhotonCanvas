@@ -75,7 +75,9 @@ public sealed record MachineInfo(
 
     public static MachineInfo Parse(JsonObject raw) => new(
         Sn: Json.Str(raw, "sn") ?? Json.Str(raw, "deviceSn") ?? Json.Str(raw, "sncode"),
-        Firmware: Json.Str(raw, "firmware") ?? Json.Str(raw, "firmwareVersion") ?? Json.Str(raw, "version"),
+        // Firmware 40.54 nests it: "firmware": {"package_version": "40.54.021.00.ht6", ...}.
+        Firmware: Json.Str(raw, "firmware") ?? Json.Str(raw["firmware"] as JsonObject, "package_version")
+                  ?? Json.Str(raw, "firmwareVersion") ?? Json.Str(raw, "version"),
         LaserType: Json.Strings(raw["laserType"]),
         LaserPower: Json.Numbers(raw["laserPower"]),
         GcodeFormat: Json.Strings(raw["gcodeFormat"]),

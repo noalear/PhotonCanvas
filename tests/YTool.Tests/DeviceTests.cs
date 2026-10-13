@@ -277,6 +277,8 @@ public class DeviceMessageTests
     [Fact]
     public void ParsesMachineInfo()
     {
+        var nested = MachineInfo.Parse(Obj("""{"sn":"S2","hardwareVersion":"HW9","firmware":{"package_version":"40.54.021.00.ht6","version":{"display_app":"40.54.003"}}}"""));
+        Assert.Equal("40.54.021.00.ht6", nested.Firmware); // as reported by the user's F2 Ultra
         var info = MachineInfo.Parse(Obj("""{"sn":"S1","laserType":["RED","BLUE"],"laserPower":[60,40],"gcodeFormat":["txt","bin"],"packageFormat":["xf"]}"""));
         Assert.Equal(["RED", "BLUE"], info.LaserType);
         Assert.Equal([60.0, 40.0], info.LaserPower);

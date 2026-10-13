@@ -369,7 +369,7 @@ public sealed class MachinePanel : UserControl
             _settings.Save();
             var info = await client.GetMachineInfoAsync();
             AppLog.Write("machine-info", info.Raw.ToJsonString());
-            _info.Text = $"Serial {info.Sn ?? "?"} · firmware {info.Firmware ?? FindVersion(info.Raw) ?? "?"}";
+            _info.Text = $"Serial {info.Sn ?? "?"} · firmware {info.Firmware ?? "?"}";
             if (!info.AcceptsTextGcode)
                 _info.Text += "\n⚠ This firmware does not list text G-code support; sending may fail.";
             _connState.Text = $"Connected to {ip}.";
@@ -417,24 +417,6 @@ public sealed class MachinePanel : UserControl
         Log(why);
         ConnectionChanged?.Invoke();
         await c.DisposeAsync();
-    }
-
-    /// <summary>
-    /// The firmware's name for its version field isn't documented; take the
-    /// first text field whose name mentions firmware or version.
-    /// </summary>
-    static string? FindVersion(System.Text.Json.Nodes.JsonNode? node)
-    {
-        if (node is not System.Text.Json.Nodes.JsonObject o) return null;
-        foreach (var (key, value) in o)
-        {
-            var k = key.ToLowerInvariant();
-            if ((k.Contains("firmware") || k.Contains("version")) && value is System.Text.Json.Nodes.JsonValue v && v.ToString() is { Length: > 0 } text)
-                return text;
-        }
-        foreach (var (_, value) in o)
-            if (FindVersion(value) is { } nested) return nested;
-        return null;
     }
 
     void SetDisconnectedUi(string why)
@@ -534,8 +516,37 @@ public sealed class MachinePanel : UserControl
         _ => ev.InfoText?.Contains("fail", StringComparison.OrdinalIgnoreCase) == true,
     };
 
+    /// <summary>Mode from a MODE_CHANGE event: plain text, or {"mode":"P_IDLE",...} on firmware 40.54.</summary>
+    static string? ModeOf(DeviceEvent ev) =>
+        ev.Info is System.Text.Json.Nodes.JsonObject o ? o["mode"]?.ToString() : ev.InfoText;
+
     void DescribeEvent(DeviceEvent ev)
     {
+        if (ev.Type == "MODE_CHANGE")
+        {
+            if (ModeOf(ev) is { Length: > 0 } mode && mode != Mode)
+            {
+                ShowStatus(mode, Distance);
+                Log($"Machine: {Describe(mode)}.");
+            }
+            DeviceEventReceived?.Invoke(ev);
+            return;
+        }
+        if (ev.Module == "DEVICE_CONFIG" && ev.Info is System.Text.Json.Nodes.JsonObject cfg)
+        {
+            // The machine pushes its settings after any change (ours or on its own screen).
+            _updatingLid = true;
+            try
+            {
+                if (cfg["beepEnable"]?.GetValueKind() is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                    _beeper.IsChecked = cfg["beepEnable"]!.GetValue<bool>();
+                if (cfg["gapCheckWithKey"]?.GetValueKind() is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False)
+                    _lidOpen.IsChecked = !cfg["gapCheckWithKey"]!.GetValue<bool>();
+            }
+            finally { _updatingLid = false; }
+            DeviceEventReceived?.Invoke(ev);
+            return;
+        }
         var text = ev.Type switch
         {
             "WORK_PREPARED" => "Job loaded. Press the start button on the machine.",
@@ -547,7 +558,6 @@ public sealed class MachinePanel : UserControl
         };
         if (ev.Module == "GAP") text = $"Lid {(ev.Type == "OPEN" ? "opened" : ev.Type == "CLOSE" ? "closed" : ev.Type)}.";
         Log(text);
-        if (ev.Type == "MODE_CHANGE" && ev.InfoText is { } m) ShowStatus(m, Distance);
         DeviceEventReceived?.Invoke(ev);
     }
 
