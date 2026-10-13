@@ -1,0 +1,817 @@
+using System.Collections.Concurrent;
+using System.Net;
+using System.Net.Sockets;
+using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json.Nodes;
+using YTool.Device;
+using ProtocolType = YTool.Device.ProtocolType;
+
+namespace YTool.Tests;
+
+// Nothing here touches the network except loopback (127.0.0.1) sockets to an in-process fake device.
+
+public class DeviceFrameTests
+{
+    static byte[] Hex(string s) => Convert.FromHexString(s);
+
+    [Fact]
+    public void Crc16KnownVectors()
+    {
+        Assert.Equal(0xBB3D, Crc16.Compute("123456789"u8));
+        Assert.Equal(0x0000, Crc16.Compute([]));
+        // Values below come from the verified Python implementation (src/ytool/frame.py).
+        Assert.Equal(0x30C0, Crc16.Compute("A"u8));
+        Assert.Equal(0xBAD3, Crc16.Compute([.. Enumerable.Range(0, 256).Select(i => (byte)i)]));
+    }
+
+    [Fact]
+    public void EncodeMatchesPythonReference()
+    {
+        Assert.Equal(Hex("babe00000704898f81b37b2261223a317d"), Frame.Encode("{\"a\":1}"));
+        // File request packet, sent with no body CRC (type 33 | 0x80).
+        byte[] req = [1, 1, 0, 0, 0, 0, 0, 0, 0x10, 0];
+        Assert.Equal(Hex("babe00000aa100003a8701010000000000001000"), Frame.Encode(req, ProtocolType.FileTransfer, bodyCrc: false));
+    }
+
+    [Fact]
+    public void RoundTripSeveralFramesInOneChunk()
+    {
+        var a = Frame.Encode("{\"x\":1}");
+        var b = Frame.Encode([1, 2, 3], ProtocolType.FileTransfer, bodyCrc: false);
+        var c = Frame.Encode([], ProtocolType.Buffer);
+        var dec = new FrameDecoder();
+        var frames = dec.Feed([.. a, .. b, .. c]);
+        Assert.Equal(3, frames.Count);
+        Assert.Equal(ProtocolType.Json, frames[0].Type);
+        Assert.Equal("{\"x\":1}", Encoding.UTF8.GetString(frames[0].Payload));
+        Assert.Equal(ProtocolType.FileTransfer, frames[1].Type); // bit 7 stripped
+        Assert.Equal([1, 2, 3], frames[1].Payload);
+        Assert.Equal(ProtocolType.Buffer, frames[2].Type);
+        Assert.Empty(frames[2].Payload);
+        Assert.Equal(0, dec.BufferedBytes);
+    }
+
+    [Fact]
+    public void SplitFramesByteByByte()
+    {
+        var payload = new byte[5000];
+        new Random(1).NextBytes(payload);
+        byte[] stream = [.. Frame.Encode(payload, ProtocolType.Buffer), .. Frame.Encode("{}")];
+        var dec = new FrameDecoder();
+        var got = new List<DecodedFrame>();
+        foreach (byte x in stream)
+            got.AddRange(dec.Feed([x]));
+        Assert.Equal(2, got.Count);
+        Assert.Equal(payload, got[0].Payload);
+        Assert.Equal("{}", Encoding.UTF8.GetString(got[1].Payload));
+    }
+
+    [Fact]
+    public void ResyncsAfterGarbageAndBadCrc()
+    {
+        var good1 = Frame.Encode("{\"n\":1}");
+        var good2 = Frame.Encode("{\"n\":2}");
+        var badBody = Frame.Encode("{\"n\":3}");
+        badBody[^1] ^= 0xFF; // corrupt payload: body CRC no longer matches
+        var badHeader = Frame.Encode("{\"n\":4}");
+        badHeader[9] ^= 0xFF; // corrupt header CRC
+        byte[] garbage = [0x00, 0xBA, 0x11, 0xBE, 0xBA];
+        var dec = new FrameDecoder();
+        var frames = dec.Feed([.. garbage, .. good1, .. badBody, .. garbage, .. badHeader, .. good2]);
+        Assert.Equal(["{\"n\":1}", "{\"n\":2}"], frames.Select(f => Encoding.UTF8.GetString(f.Payload)));
+    }
+
+    [Fact]
+    public void BogusHeaderWithHugeLengthDoesNotStall()
+    {
+        // Magic followed by a huge length but a wrong header CRC must not make the decoder wait for 16 MB.
+        byte[] bogus = [0xBA, 0xBE, 0xFF, 0xFF, 0xFF, 0x04, 0, 0, 0, 0];
+        var dec = new FrameDecoder();
+        var frames = dec.Feed([.. bogus, .. Frame.Encode("{}")]);
+        Assert.Single(frames);
+    }
+
+    [Fact]
+    public void SkipBodyCrcForConfiguredTypes()
+    {
+        var media = Frame.Encode([9, 9, 9], ProtocolType.MediaStream);
+        media[^1] = 7; // payload no longer matches the body CRC (flag bit not set); header still valid
+        Assert.Empty(new FrameDecoder().Feed(media));
+        var frames = new FrameDecoder([ProtocolType.MediaStream]).Feed(media);
+        Assert.Equal([9, 9, 7], Assert.Single(frames).Payload);
+    }
+
+    [Fact]
+    public void RejectsOversizedPayload()
+    {
+        Assert.Throws<ArgumentException>(() => Frame.Encode(new byte[Frame.MaxPayloadLength + 1], ProtocolType.Buffer));
+    }
+}
+
+public class DeviceDiscoveryTests
+{
+    // Encrypted with the common key and IV 00..0f by the Python reference (cryptography package).
+    const string PythonV2Reply =
+        "000102030405060708090a0b0c0d0e0fe9dd84fbbdebfa0194fd6d849fe21c65f1aed839d99e856f4c1ad421c7574476bad20fe16c3b09594fec3b5d31c62fd618" +
+        "b3fdc3ccb017f9fe474f023d2a561b74b7c8c1aef423bf66574828f6edacc8f7680a7d5b8136605bb0e0d88ded88aff6ca41a5aedf1efd83fa18f20212d824";
+
+    [Fact]
+    public void AesRoundTrip()
+    {
+        var plain = "{\"hello\":\"world\"}"u8.ToArray();
+        var blob = Discovery.Encrypt(plain, Discovery.PrimaryKey);
+        Assert.Equal(16 + 32, blob.Length); // IV + 17 bytes padded to 32
+        Assert.Equal(plain, Discovery.Decrypt(blob, Discovery.PrimaryKey));
+        Assert.NotEqual(blob, Discovery.Encrypt(plain, Discovery.PrimaryKey)); // random IV
+        Assert.False(Discovery.TryDecrypt([1, 2, 3], Discovery.CommonKey, out _));
+    }
+
+    [Fact]
+    public void DecryptsPythonVector()
+    {
+        var plain = Encoding.UTF8.GetString(Discovery.Decrypt(Convert.FromHexString(PythonV2Reply), Discovery.CommonKey));
+        Assert.Contains("\"deviceName\":\"F2 Ultra\"", plain);
+    }
+
+    [Fact]
+    public void ParsesV2Reply()
+    {
+        var d = Discovery.ParseReply(Convert.FromHexString(PythonV2Reply), IPAddress.Parse("10.0.0.7"));
+        Assert.NotNull(d);
+        Assert.Equal(("10.0.0.7", "F2 Ultra", "V2"), (d.Ip, d.Name, d.Protocol));
+        Assert.True(d.IsV2);
+
+        var full = new JsonObject
+        {
+            ["type"] = "deviceFind",
+            ["method"] = "response",
+            ["data"] = new JsonObject
+            {
+                ["deviceIp"] = "192.0.2.5",
+                ["deviceName"] = "xTool F2 Ultra",
+                ["deviceCode"] = "GS004-CLASS-4",
+                ["deviceSn"] = "SN123",
+                ["firmwareVersion"] = "40.54.021",
+                ["platformVersion"] = "1.5",
+            },
+        };
+        var blob = Discovery.Encrypt(Encoding.UTF8.GetBytes(full.ToJsonString()), Discovery.CommonKey);
+        d = Discovery.ParseReply(blob, IPAddress.Parse("192.0.2.99"));
+        Assert.NotNull(d);
+        Assert.Equal("192.0.2.5", d.Ip); // deviceIp wins over the datagram source
+        Assert.Equal("192.0.2.99", d.From);
+        Assert.Equal(("GS004-CLASS-4", "SN123", "40.54.021"), (d.DeviceCode, d.Sn, d.Firmware));
+        Assert.Equal("1.5", d.Raw["platformVersion"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void IgnoresRequestsIncludingOurOwn()
+    {
+        // Our own request echoed back: encrypted with the primary key, so the common key can't read it.
+        var ours = Discovery.Encrypt(Discovery.BuildV2Request(42), Discovery.PrimaryKey);
+        Assert.Null(Discovery.ParseReply(ours));
+        // Another client's request readable with the common key: still a request, not a device.
+        var other = Discovery.Encrypt(Discovery.BuildV2Request(43), Discovery.CommonKey);
+        Assert.Null(Discovery.ParseReply(other));
+        // Our V1 request {ip, port, requestId}.
+        Assert.Null(Discovery.ParseReply(Discovery.BuildV1Request(IPAddress.Parse("192.0.2.1"), 5000, 1)));
+        Assert.Null(Discovery.ParseReply("not json"u8));
+        Assert.Null(Discovery.ParseReply([]));
+    }
+
+    [Fact]
+    public void V2RequestContent()
+    {
+        var plain = Discovery.Decrypt(Discovery.Encrypt(Discovery.BuildV2Request(7), Discovery.PrimaryKey), Discovery.PrimaryKey);
+        var msg = JsonNode.Parse(plain)!.AsObject();
+        Assert.Equal("deviceFind", msg["type"]!.GetValue<string>());
+        Assert.Equal("request", msg["method"]!.GetValue<string>());
+        Assert.Equal("atomnClient", msg["data"]!["clientType"]!.GetValue<string>());
+        Assert.Equal(7u, msg["data"]!["requestId"]!.GetValue<uint>());
+        Assert.Equal("<discovery-reply-key>", msg["data"]!["key"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ParsesV1Reply()
+    {
+        var d = Discovery.ParseReply("""{"ip":"192.0.2.8","name":"F1","version":"V40.31","sncode":"MXF1","requestId":1700000000000}"""u8, IPAddress.Parse("192.0.2.8"));
+        Assert.NotNull(d);
+        Assert.Equal(("192.0.2.8", "F1", "MXF1", "V40.31", "V1"), (d.Ip, d.Name, d.Sn, d.Firmware, d.Protocol));
+        Assert.Null(d.DeviceCode);
+
+        // No ip in the reply: fall back to the datagram's source.
+        d = Discovery.ParseReply("""{"name":"F1","requestId":1}"""u8, IPAddress.Parse("192.0.2.9"));
+        Assert.Equal("192.0.2.9", d?.Ip);
+    }
+}
+
+public class DeviceMessageTests
+{
+    static JsonObject Obj(string json) => JsonNode.Parse(json)!.AsObject();
+
+    [Fact]
+    public void ParsesNestedEvent()
+    {
+        var ev = DeviceEvent.Parse(Obj("""{"type":"request","method":"REPORT","url":"/v1/device/event","data":{"module":"WORK_RESULT","type":"WORK_FINISHED","info":{"result":"failed","timeUse":10},"level":1}}"""));
+        Assert.Equal(("WORK_RESULT", "WORK_FINISHED", "1", "/v1/device/event", "REPORT"), (ev.Module, ev.Type, ev.Level, ev.Url, ev.Method));
+        Assert.Equal("failed", ev.Info!["result"]!.GetValue<string>());
+
+        var button = DeviceEvent.TryParse("""{"type":"request","method":"NOTIFY","url":"/x","data":{"module":"BUTTON","type":"SHOERT_PRESS","info":"1","level":"info"}}"""u8);
+        Assert.NotNull(button);
+        Assert.Equal(("BUTTON", "SHOERT_PRESS", "1", "info"), (button.Module, button.Type, button.InfoText, button.Level));
+        Assert.Null(DeviceEvent.TryParse("[1,2]"u8));
+    }
+
+    [Fact]
+    public void ParsesFlatEventAndEnvelopeWithoutEvent()
+    {
+        var flat = DeviceEvent.Parse(Obj("""{"module":"MODE_CHANGE","type":"P_IDLE","info":2,"level":0}"""));
+        Assert.Equal(("MODE_CHANGE", "P_IDLE", "2"), (flat.Module, flat.Type, flat.InfoText));
+
+        var bare = DeviceEvent.Parse(Obj("""{"type":"request","method":"REPORT","url":"/v1/x","data":{"foo":1}}"""));
+        Assert.Null(bare.Type); // "request" is the envelope type, not an event type
+        Assert.Null(bare.Module);
+        Assert.Equal("/v1/x", bare.Url);
+    }
+
+    [Fact]
+    public void ParsesResponses()
+    {
+        // The device pretty-prints with tabs.
+        var r = DeviceResponse.TryParse(Obj("{\n\t\"type\":\t\"response\",\n\t\"transactionId\":\t3,\n\t\"code\":\t0,\n\t\"message\":\t\"user auth success\",\n\t\"data\":\t{}\n}"));
+        Assert.NotNull(r);
+        Assert.True(r.IsSuccess);
+        Assert.Equal((3, "user auth success"), (r.TransactionId, r.Message));
+
+        r = DeviceResponse.TryParse(Obj("""{"type":"response","transactionId":4,"code":-1,"message":"name is not string"}"""));
+        Assert.Equal(-1, r?.Code);
+        Assert.Null(DeviceResponse.TryParse(Obj("""{"type":"request","transactionId":4}""")));
+        Assert.Equal(DeviceException.ProtocolErrorCode, DeviceResponse.TryParse(Obj("""{"type":"response","transactionId":5}"""))?.Code);
+    }
+
+    [Fact]
+    public void BuildsRequests()
+    {
+        var json = DeviceClient.BuildRequest("GET", "/v1/camera/snap", null, new JsonObject { ["name"] = "main" }, 12, null, 1000);
+        var msg = Obj(json);
+        Assert.Equal(["type", "method", "url", "params", "data", "timestamp", "transactionId"], msg.Select(kv => kv.Key));
+        Assert.Equal("main", msg["params"]!["name"]!.GetValue<string>());
+        Assert.Empty(msg["data"]!.AsObject());
+        Assert.Equal(12, msg["transactionId"]!.GetValue<int>());
+        Assert.Equal("tok", Obj(DeviceClient.BuildRequest("GET", "/u", null, null, 1, "tok", 0))["sessionToken"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ReadableErrors()
+    {
+        var e = DeviceException.FromResponse(-1, "name is not string", "/v1/camera/snap");
+        Assert.Equal(-1, e.Code);
+        Assert.Contains("/v1/camera/snap", e.Message);
+        Assert.Contains("name is not string", e.Message);
+        Assert.Contains("expired", DeviceException.FromResponse(403, null, "/v1/x").Message);
+        Assert.True(DeviceException.FromResponse(403, null, "/v1/x").IsConnectionProblem);
+    }
+
+    [Fact]
+    public void ParsesMachineInfo()
+    {
+        var info = MachineInfo.Parse(Obj("""{"sn":"S1","laserType":["RED","BLUE"],"laserPower":[60,40],"gcodeFormat":["txt","bin"],"packageFormat":["xf"]}"""));
+        Assert.Equal(["RED", "BLUE"], info.LaserType);
+        Assert.Equal([60.0, 40.0], info.LaserPower);
+        Assert.True(info.AcceptsTextGcode);
+        Assert.Equal("S1", info.Sn);
+    }
+
+    [Fact]
+    public void TokenStoreRoundTrip()
+    {
+        string path = Path.Combine(Path.GetTempPath(), "ytool-test-" + Guid.NewGuid().ToString("N"), "state.json");
+        try
+        {
+            Assert.Null(TokenStore.GetToken(path, "192.0.2.1"));
+            TokenStore.SaveToken(path, "192.0.2.1", "abc");
+            TokenStore.SaveToken(path, "192.0.2.2", "def");
+            Assert.Equal("abc", TokenStore.GetToken(path, "192.0.2.1"));
+            Assert.Equal("def", TokenStore.GetToken(path, "192.0.2.2"));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+        }
+    }
+}
+
+/// <summary>End-to-end tests of <see cref="DeviceClient"/> against an in-process fake device over loopback sockets.</summary>
+public sealed class DeviceClientTests : IAsyncLifetime
+{
+    readonly string _stateDir = Path.Combine(Path.GetTempPath(), "ytool-test-" + Guid.NewGuid().ToString("N"));
+    readonly FakeDevice _fake = new();
+
+    string StatePath => Path.Combine(_stateDir, "state.json");
+
+    DeviceClientOptions Options() => new()
+    {
+        StatePath = StatePath,
+        TimeZoneName = "UTC",
+        WebSocketFactory = _fake.ConnectAsync,
+        RequestTimeout = TimeSpan.FromSeconds(5),
+        ButtonPollInterval = TimeSpan.FromMilliseconds(20),
+        TransferTimeout = TimeSpan.FromSeconds(5),
+    };
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        await _fake.DisposeAsync();
+        if (Directory.Exists(_stateDir))
+            Directory.Delete(_stateDir, recursive: true);
+    }
+
+    async Task<DeviceClient> Connected(DeviceClientOptions? options = null)
+    {
+        var client = new DeviceClient("192.0.2.10", options ?? Options());
+        await client.ConnectAsync();
+        return client;
+    }
+
+    [Fact]
+    public async Task PairsAsGuestAndReadsState()
+    {
+        TokenStore.SaveToken(StatePath, "192.0.2.10", "cached-token");
+        await using var client = await Connected();
+        Assert.True(client.IsConnected);
+
+        var parity = _fake.Requests.Single(r => Url(r) == "/v1/user/parity");
+        Assert.Equal("mk-guest", parity["data"]!["userID"]!.GetValue<string>());
+        Assert.Equal(DeviceClient.UserKey, parity["data"]!["userKey"]!.GetValue<string>());
+        Assert.Equal("cached-token", parity["data"]!["token"]!.GetValue<string>());
+        Assert.Equal(1, parity["transactionId"]!.GetValue<int>());
+        Assert.Equal("new-token", TokenStore.GetToken(StatePath, "192.0.2.10"));
+
+        Assert.Equal("P_IDLE", await client.GetRuntimeModeAsync());
+        Assert.Equal(27.058, await client.GetHeadZAsync());
+        Assert.Equal("coord", _fake.Requests.Last(r => Url(r) == "/v1/laser-head/focus/parameter")["data"]!["action"]!.GetValue<string>());
+        Assert.True((await client.GetMachineInfoAsync()).AcceptsTextGcode);
+        Assert.Equal(2, ((JsonObject)(await client.GetProgressAsync())!)["progress"]!.GetValue<int>());
+
+        // Lid-open processing is gapCheckWithKey inverted.
+        Assert.True(await client.GetLidOpenProcessingAsync());
+        await client.SetLidOpenProcessingAsync(false);
+        var put = _fake.Requests.Last(r => Url(r) == "/v1/device/configs");
+        Assert.Equal("PUT", put["method"]!.GetValue<string>());
+        Assert.True(put["data"]!["kv"]!["gapCheckWithKey"]!.GetValue<bool>());
+        Assert.False(await client.GetLidOpenProcessingAsync());
+    }
+
+    [Fact]
+    public async Task ButtonPairing()
+    {
+        _fake.ParityCode = 406;
+        _fake.AuthStatusPending = 3;
+        int prompts = 0;
+        await using var client = new DeviceClient("192.0.2.10", Options());
+        await client.ConnectAsync(onButtonPressRequired: () => prompts++);
+        Assert.Equal(1, prompts);
+        Assert.Equal(4, _fake.Requests.Count(r => Url(r) == "/v1/user/auth-status"));
+        Assert.Equal("session-1", client.SessionToken);
+        Assert.Equal("button-token", TokenStore.GetToken(StatePath, "192.0.2.10"));
+    }
+
+    [Fact]
+    public async Task PairingRefusedThrowsAndCloses()
+    {
+        _fake.ParityCode = 409;
+        await using var client = new DeviceClient("192.0.2.10", Options());
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.ConnectAsync());
+        Assert.Equal(409, e.Code);
+        Assert.False(client.IsConnected);
+    }
+
+    [Fact]
+    public async Task ErrorsAndTimeouts()
+    {
+        await using var client = await Connected();
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.GetAsync("/v1/nope"));
+        Assert.Equal(404, e.Code);
+        e = await Assert.ThrowsAsync<DeviceException>(() => client.GetAsync("/v1/test/silent", timeout: TimeSpan.FromMilliseconds(200)));
+        Assert.Equal(DeviceException.TimeoutCode, e.Code);
+        var raw = await client.SendRequestAsync("GET", "/v1/nope");
+        Assert.Equal(404, raw.Code);
+        Assert.True(client.IsConnected);
+    }
+
+    [Fact]
+    public async Task RaisesEvents()
+    {
+        await using var client = await Connected();
+        var got = new TaskCompletionSource<DeviceEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.EventReceived += ev =>
+        {
+            if (ev.Type == "WORK_PREPARED")
+                got.TrySetResult(ev);
+        };
+        await _fake.PushAsync("""{"type":"request","method":"REPORT","url":"/v1/device/report","data":{"module":"MODE_CHANGE","type":"P_WORK","info":"","level":0}}""");
+        await _fake.PushAsync("""{"type":"request","method":"REPORT","url":"/v1/device/report","data":{"module":"WORK","type":"WORK_PREPARED","info":"","level":0}}""");
+        var ev = await got.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("WORK", ev.Module);
+    }
+
+    [Fact]
+    public async Task UploadsJobWithoutAutoStart()
+    {
+        await using var client = await Connected();
+        var xf = new byte[150_000];
+        new Random(7).NextBytes(xf);
+        var progress = new List<double>();
+        var reporter = new SyncProgress(progress.Add);
+
+        string taskId = await client.UploadJobAsync(xf, reporter);
+
+        Assert.Equal(xf, _fake.Uploaded);
+        var announce = _fake.Requests.Single(r => Url(r) == "/v1/filetransfer/upload")["data"]!;
+        Assert.Equal("tmp.xf", announce["filename"]!.GetValue<string>());
+        Assert.Equal(1, announce["filetype"]!.GetValue<int>());
+        Assert.Equal(Convert.ToHexStringLower(MD5.HashData(xf)), announce["digestdata"]!.GetValue<string>());
+        var config = _fake.Requests.Single(r => Url(r) == "/v1/processing/upload/config")["data"]!;
+        Assert.Equal(0, config["autoStart"]!.GetValue<int>());
+        Assert.Equal("xf", config["fileType"]!.GetValue<string>());
+        Assert.Equal(taskId, config["taskId"]!.GetValue<string>());
+        Assert.Equal(1.0, progress[^1]);
+        Assert.True(progress.Count > 2);
+        // Every packet respected the device's packet size.
+        Assert.All(_fake.UploadPacketSizes, n => Assert.True(n <= FakeDevice.DevicePacketSize));
+        // File and instruction sockets share one connection id.
+        Assert.Equal([client.ConnectionId], _fake.ConnectionIds.Distinct());
+        Assert.Contains("file_stream", _fake.Functions);
+    }
+
+    [Fact]
+    public async Task RefusesUploadWhenBusy()
+    {
+        _fake.Mode = "P_WORKING";
+        await using var client = await Connected();
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1, 2, 3]));
+        Assert.Equal(DeviceException.BusyCode, e.Code);
+        Assert.Equal("machine is busy (P_WORKING); not uploading", e.Message);
+        Assert.DoesNotContain(_fake.Requests, r => Url(r) == "/v1/filetransfer/upload");
+        await Assert.ThrowsAsync<ArgumentException>(() => client.UploadFileAsync([1], "fw.bin", fileType: 2));
+    }
+
+    [Fact]
+    public async Task SnapshotDownloadsInWindows()
+    {
+        var jpeg = new byte[6 * 1024 * 1024 + 123]; // more than one 5 MB window
+        new Random(3).NextBytes(jpeg);
+        _fake.DownloadFile = jpeg;
+        await using var client = await Connected();
+
+        Assert.Equal(jpeg, await client.SnapshotAsync(1));
+
+        var snap = _fake.Requests.Single(r => Url(r) == "/v1/camera/snap");
+        Assert.Equal("deep", snap["params"]!["name"]!.GetValue<string>());
+        Assert.Equal("1", snap["params"]!["stream"]!.GetValue<string>());
+        Assert.Equal(5, _fake.Requests.Single(r => Url(r) == "/v1/filetransfer/download")["data"]!["filetype"]!.GetValue<int>());
+        Assert.Equal(2, _fake.WindowRequests);
+        var finish = _fake.Requests.Single(r => Url(r) == "/v1/filetransfer/finish")["data"]!;
+        Assert.Equal(0, finish["code"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task DownloadChecksMd5()
+    {
+        _fake.DownloadFile = new byte[1000];
+        _fake.CorruptDigest = true;
+        await using var client = await Connected();
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.SnapshotAsync(0));
+        Assert.Equal(DeviceException.ChecksumMismatchCode, e.Code);
+        var finish = _fake.Requests.Single(r => Url(r) == "/v1/filetransfer/finish")["data"]!;
+        Assert.Equal(-9, finish["code"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task DetectsDeadLink()
+    {
+        var options = Options() with { HeartbeatInterval = TimeSpan.FromMilliseconds(50), DeadLinkTimeout = TimeSpan.FromMilliseconds(500) };
+        await using var client = await Connected(options);
+        var lost = new TaskCompletionSource<DeviceException>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.Disconnected += e => lost.TrySetResult(e);
+
+        // While pings are answered, the link stays up.
+        await Task.Delay(800);
+        Assert.True(client.IsConnected);
+        Assert.Contains(_fake.Requests, r => Url(r) == "/v1/user/ping" && r["transactionId"]!.GetValue<int>() == DeviceClient.PingTransactionId);
+
+        _fake.AnswerPings = false;
+        var pending = client.GetAsync("/v1/test/silent", timeout: TimeSpan.FromSeconds(30));
+        var reason = await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(DeviceException.DisconnectedCode, reason.Code);
+        Assert.False(client.IsConnected);
+        var e = await Assert.ThrowsAsync<DeviceException>(() => pending);
+        Assert.Equal(DeviceException.DisconnectedCode, e.Code);
+        e = await Assert.ThrowsAsync<DeviceException>(() => client.GetAsync("/v1/device/runtime-infos"));
+        Assert.Equal(DeviceException.NotConnectedCode, e.Code);
+    }
+
+    [Fact]
+    public async Task DetectsClosedSocket()
+    {
+        await using var client = await Connected();
+        var lost = new TaskCompletionSource<DeviceException>(TaskCreationOptions.RunContinuationsAsynchronously);
+        client.Disconnected += e => lost.TrySetResult(e);
+        await _fake.CloseMainAsync();
+        await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.False(client.IsConnected);
+    }
+
+    static string? Url(JsonObject r) => r["url"]?.GetValue<string>();
+
+    sealed class SyncProgress(Action<double> report) : IProgress<double>
+    {
+        readonly Lock _gate = new();
+        public void Report(double value)
+        {
+            lock (_gate)
+                report(value);
+        }
+    }
+}
+
+/// <summary>
+/// A minimal in-process imitation of the F2 Ultra's V2 endpoints, served over loopback TCP with
+/// raw (non-TLS) WebSockets. Behaviour follows docs/protocol-f2-ultra.md.
+/// </summary>
+sealed class FakeDevice : IAsyncDisposable
+{
+    public const int DevicePacketSize = 7000;
+    const int UploadWindow = 40_000;
+
+    readonly ConcurrentQueue<JsonObject> _requests = new();
+    readonly List<(WebSocket Ws, SemaphoreSlim Lock, TcpClient A, TcpClient B)> _sockets = [];
+    readonly System.Threading.Channels.Channel<byte[]> _uploadPackets = System.Threading.Channels.Channel.CreateUnbounded<byte[]>();
+    readonly CancellationTokenSource _cts = new();
+    readonly List<Task> _loops = [];
+    WebSocket? _main;
+    SemaphoreSlim? _mainLock;
+    WebSocket? _file;
+    SemaphoreSlim? _fileLock;
+
+    public int ParityCode { get; set; }
+    public int AuthStatusPending { get; set; }
+    public string Mode { get; set; } = "P_IDLE";
+    public volatile bool AnswerPings = true;
+    public byte[] DownloadFile { get; set; } = [];
+    public bool CorruptDigest { get; set; }
+    public byte[]? Uploaded { get; private set; }
+    public ConcurrentQueue<int> UploadPacketSizes { get; } = new();
+    public ConcurrentQueue<string> ConnectionIds { get; } = new();
+    public ConcurrentQueue<string> Functions { get; } = new();
+    public int WindowRequests;
+    bool _gapCheck;
+
+    public IReadOnlyList<JsonObject> Requests => [.. _requests];
+
+    public async Task<WebSocket> ConnectAsync(Uri uri, CancellationToken ct)
+    {
+        Assert.Equal("wss", uri.Scheme);
+        Assert.Equal(DeviceClient.Port, uri.Port);
+        Assert.Equal("/websocket", uri.AbsolutePath);
+        var query = uri.Query.TrimStart('?').Split('&').Select(p => p.Split('=')).ToDictionary(p => p[0], p => p[1]);
+        ConnectionIds.Enqueue(query["id"]);
+        string function = query["function"];
+        Functions.Enqueue(function);
+
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var client = new TcpClient();
+        var connect = client.ConnectAsync(IPAddress.Loopback, ((IPEndPoint)listener.LocalEndpoint).Port, ct).AsTask();
+        var server = await listener.AcceptTcpClientAsync(ct);
+        await connect;
+        listener.Stop();
+        var clientWs = WebSocket.CreateFromStream(client.GetStream(), new WebSocketCreationOptions { IsServer = false, KeepAliveInterval = TimeSpan.Zero });
+        var serverWs = WebSocket.CreateFromStream(server.GetStream(), new WebSocketCreationOptions { IsServer = true, KeepAliveInterval = TimeSpan.Zero });
+        var sendLock = new SemaphoreSlim(1, 1);
+        lock (_sockets)
+            _sockets.Add((serverWs, sendLock, client, server));
+        if (function == "instruction")
+        {
+            _main = serverWs;
+            _mainLock = sendLock;
+            _loops.Add(Task.Run(() => ServeAsync(serverWs, OnMainFrame)));
+        }
+        else
+        {
+            _file = serverWs;
+            _fileLock = sendLock;
+            _loops.Add(Task.Run(() => ServeAsync(serverWs, OnFileFrame)));
+        }
+        return clientWs;
+    }
+
+    async Task ServeAsync(WebSocket ws, Func<DecodedFrame, Task> onFrame)
+    {
+        var decoder = new FrameDecoder();
+        var buf = new byte[128 * 1024];
+        try
+        {
+            while (!_cts.IsCancellationRequested)
+            {
+                var r = await ws.ReceiveAsync(buf.AsMemory(), _cts.Token);
+                if (r.MessageType == WebSocketMessageType.Close)
+                    return;
+                foreach (var f in decoder.Feed(buf.AsSpan(0, r.Count)))
+                    await onFrame(f);
+            }
+        }
+        catch (Exception e) when (e is OperationCanceledException or WebSocketException or IOException or ObjectDisposedException)
+        {
+        }
+    }
+
+    static async Task SendAsync(WebSocket? ws, SemaphoreSlim? gate, byte[] frame)
+    {
+        if (ws is null || gate is null)
+            return;
+        await gate.WaitAsync();
+        try
+        {
+            await ws.SendAsync(frame, WebSocketMessageType.Binary, true, CancellationToken.None);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    public Task PushAsync(string json) => SendAsync(_main, _mainLock, Frame.Encode(json));
+
+    public async Task CloseMainAsync()
+    {
+        if (_main is not null)
+            await _main.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "bye", CancellationToken.None);
+    }
+
+    Task Reply(JsonObject req, int code, JsonNode? data = null, string message = "") =>
+        SendAsync(_main, _mainLock, Frame.Encode(new JsonObject
+        {
+            ["type"] = "response",
+            ["transactionId"] = req["transactionId"]!.GetValue<int>(),
+            ["code"] = code,
+            ["message"] = message,
+            ["data"] = data ?? new JsonObject(),
+        }.ToJsonString()));
+
+    async Task OnMainFrame(DecodedFrame f)
+    {
+        var req = JsonNode.Parse(f.Payload)!.AsObject();
+        _requests.Enqueue(req);
+        string url = req["url"]!.GetValue<string>();
+        var data = req["data"] as JsonObject;
+        switch (url)
+        {
+            case "/v1/user/ping":
+                if (AnswerPings)
+                    await Reply(req, 0);
+                break;
+            case "/v1/user/parity":
+                if (ParityCode == 0)
+                    await Reply(req, 0, new JsonObject { ["token"] = "new-token" }, "user auth success");
+                else
+                    await Reply(req, ParityCode, null, "need button");
+                break;
+            case "/v1/user/auth-status":
+                if (AuthStatusPending-- > 0)
+                    await Reply(req, 406);
+                else
+                    await Reply(req, 0, new JsonObject { ["sessionToken"] = "session-1", ["token"] = "button-token" });
+                break;
+            case "/v1/device/runtime-infos":
+                await Reply(req, 0, new JsonObject { ["curMode"] = new JsonObject { ["mode"] = Mode, ["desc"] = "", ["subMode"] = "" } });
+                break;
+            case "/v1/device/machineInfo":
+                await Reply(req, 0, JsonNode.Parse("""{"sn":"S1","gcodeFormat":["txt","bin"],"laserType":["RED","BLUE"],"laserPower":[60,40]}"""));
+                break;
+            case "/v1/processing/progress":
+                await Reply(req, 0, new JsonObject { ["progress"] = 2 });
+                break;
+            case "/v1/laser-head/focus/parameter":
+                await Reply(req, 0, new JsonObject { ["value"] = 27.058 });
+                break;
+            case "/v1/device/configs":
+                if (req["method"]!.GetValue<string>() == "PUT")
+                {
+                    _gapCheck = data!["kv"]!["gapCheckWithKey"]!.GetValue<bool>();
+                    await Reply(req, 0);
+                }
+                else
+                {
+                    await Reply(req, 0, new JsonObject { ["gapCheckWithKey"] = _gapCheck });
+                }
+                break;
+            case "/v1/filetransfer/upload":
+                await Reply(req, 0, new JsonObject { ["packetsize"] = DevicePacketSize });
+                _ = Task.Run(() => PullUploadAsync(data!));
+                break;
+            case "/v1/processing/upload/config":
+                await Reply(req, 0);
+                break;
+            case "/v1/camera/snap":
+                await Reply(req, 0, new JsonObject { ["filename"] = "/tmp/main_1.jpg" });
+                break;
+            case "/v1/filetransfer/download":
+                string md5 = Convert.ToHexStringLower(MD5.HashData(DownloadFile));
+                await Reply(req, 0, new JsonObject { ["filesize"] = DownloadFile.Length, ["digestdata"] = CorruptDigest ? new string('0', 32) : md5.ToUpperInvariant() });
+                break;
+            case "/v1/filetransfer/finish":
+                await Reply(req, 0);
+                break;
+            case "/v1/test/silent":
+                break;
+            default:
+                await Reply(req, 404, null, "not found");
+                break;
+        }
+    }
+
+    // Device side of an upload: request windows, collect 0x81 packets, then report finish on the main channel.
+    async Task PullUploadAsync(JsonObject announce)
+    {
+        int size = announce["filesize"]!.GetValue<int>();
+        int ch = announce["channel"]!.GetValue<int>();
+        var file = new byte[size];
+        for (int offset = 0; offset < size;)
+        {
+            int window = Math.Min(UploadWindow, size - offset);
+            byte[] req = [0x01, (byte)ch, 0, (byte)(offset >> 24), (byte)(offset >> 16), (byte)(offset >> 8), (byte)offset, (byte)(window >> 16), (byte)(window >> 8), (byte)window];
+            await SendAsync(_file, _fileLock, Frame.Encode(req, ProtocolType.FileTransfer, bodyCrc: false));
+            for (int got = 0; got < window;)
+            {
+                var pkt = await _uploadPackets.Reader.ReadAsync(_cts.Token);
+                Assert.Equal(0x81, pkt[0]);
+                Assert.Equal(ch, pkt[1]);
+                long pos = ((long)pkt[2] << 32) | ((long)pkt[3] << 24) | ((long)pkt[4] << 16) | ((long)pkt[5] << 8) | pkt[6];
+                pkt.AsSpan(7).CopyTo(file.AsSpan((int)pos));
+                UploadPacketSizes.Enqueue(pkt.Length - 7);
+                got += pkt.Length - 7;
+            }
+            offset += window;
+        }
+        bool ok = Convert.ToHexStringLower(MD5.HashData(file)) == announce["digestdata"]!.GetValue<string>();
+        Uploaded = file;
+        await PushAsync(new JsonObject
+        {
+            ["type"] = "request",
+            ["method"] = "PUT",
+            ["url"] = "/v1/filetransfer/finish",
+            ["data"] = new JsonObject { ["code"] = ok ? 0 : -8, ["message"] = ok ? "ok" : "md5", ["channel"] = ch },
+        }.ToJsonString());
+    }
+
+    async Task OnFileFrame(DecodedFrame f)
+    {
+        Assert.Equal(ProtocolType.FileTransfer, f.Type);
+        var p = f.Payload;
+        if (p[0] == 0x81)
+        {
+            await _uploadPackets.Writer.WriteAsync(p);
+            return;
+        }
+        Assert.Equal(0x01, p[0]);
+        Interlocked.Increment(ref WindowRequests);
+        int ch = p[1];
+        long offset = ((long)p[2] << 32) | ((long)p[3] << 24) | ((long)p[4] << 16) | ((long)p[5] << 8) | p[6];
+        int window = (p[7] << 16) | (p[8] << 8) | p[9];
+        const int chunk = 100_000;
+        for (long pos = offset; pos < offset + window; pos += chunk)
+        {
+            int n = (int)Math.Min(chunk, offset + window - pos);
+            var pkt = new byte[7 + n];
+            pkt[0] = 0x81;
+            pkt[1] = (byte)ch;
+            pkt[2] = (byte)(pos >> 32);
+            pkt[3] = (byte)(pos >> 24);
+            pkt[4] = (byte)(pos >> 16);
+            pkt[5] = (byte)(pos >> 8);
+            pkt[6] = (byte)pos;
+            DownloadFile.AsSpan((int)pos, n).CopyTo(pkt.AsSpan(7));
+            await SendAsync(_file, _fileLock, Frame.Encode(pkt, ProtocolType.FileTransfer, bodyCrc: false));
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _cts.Cancel();
+        lock (_sockets)
+        {
+            foreach (var (ws, _, a, b) in _sockets)
+            {
+                ws.Abort();
+                a.Dispose();
+                b.Dispose();
+            }
+        }
+        await Task.WhenAll(_loops).WaitAsync(TimeSpan.FromSeconds(5));
+    }
+}

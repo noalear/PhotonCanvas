@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:app="using:YTool.App"
+        x:Class="YTool.App.MainWindow"
+        Title="YTool Studio"
+        Width="1500" Height="920" MinWidth="1000" MinHeight="640"
+        WindowStartupLocation="CenterScreen">
+  <DockPanel>
+    <!-- Menu -->
+    <Border DockPanel.Dock="Top" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
+      <DockPanel>
+        <Menu x:Name="MainMenu" DockPanel.Dock="Left" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" Margin="0,0,8,0">
+          <Button x:Name="UndoButton" Classes="icon"><PathIcon Data="{StaticResource IcUndo}" /></Button>
+          <Button x:Name="RedoButton" Classes="icon"><PathIcon Data="{StaticResource IcRedo}" /></Button>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Status bar -->
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="12,4">
+      <DockPanel>
+        <TextBlock x:Name="MachineStatus" DockPanel.Dock="Right" Classes="muted" />
+        <StackPanel Orientation="Horizontal" Spacing="18">
+          <TextBlock x:Name="CursorText" Classes="muted" MinWidth="150" />
+          <TextBlock x:Name="ZoomText" Classes="muted" MinWidth="70" />
+          <TextBlock x:Name="StatusText" Classes="muted" />
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Tool strip -->
+    <Border DockPanel.Dock="Left" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0" Padding="6,8">
+      <StackPanel>
+        <ToggleButton x:Name="ToolSelect" Classes="tool" ToolTip.Tip="Select / move (V)"><PathIcon Data="{StaticResource IcCursor}" /></ToggleButton>
+        <ToggleButton x:Name="ToolRect" Classes="tool" ToolTip.Tip="Rectangle (R) · Shift = square · Alt = from centre"><PathIcon Data="{StaticResource IcRect}" /></ToggleButton>
+        <ToggleButton x:Name="ToolEllipse" Classes="tool" ToolTip.Tip="Ellipse (E) · Shift = circle · Alt = from centre"><PathIcon Data="{StaticResource IcEllipse}" /></ToggleButton>
+        <ToggleButton x:Name="ToolLine" Classes="tool" ToolTip.Tip="Line (L) · Shift = 45° steps"><PathIcon Data="{StaticResource IcLine}" /></ToggleButton>
+        <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>
+        <Separator Margin="0,6" />
+        <Button x:Name="FitButton" Classes="icon" ToolTip.Tip="Fit work area (Home) · F fits the selection"><PathIcon Data="{StaticResource IcFit}" /></Button>
+      </StackPanel>
+    </Border>
+
+    <Grid ColumnDefinitions="300,4,*,4,340">
+      <!-- Layers -->
+      <Border Grid.Column="0" Background="{StaticResource Bg1}" Padding="12">
+        <ContentControl x:Name="LayersHost" />
+      </Border>
+      <GridSplitter Grid.Column="1" Background="{StaticResource Line}" ResizeDirection="Columns" />
+
+      <!-- Canvas -->
+      <app:CanvasView x:Name="Canvas" Grid.Column="2" />
+
+      <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
+      <!-- Right column: properties / job / machine -->
+      <Border Grid.Column="4" Background="{StaticResource Bg1}">
+        <TabControl x:Name="RightTabs" Padding="12,4,12,12">
+          <TabItem Header="Design">
+            <ContentControl x:Name="PropertiesHost" />
+          </TabItem>
+          <TabItem Header="Job">
+            <ContentControl x:Name="JobHost" />
+          </TabItem>
+          <TabItem Header="Machine">
+            <ContentControl x:Name="MachineHost" />
+          </TabItem>
+        </TabControl>
+      </Border>
+    </Grid>
+  </DockPanel>
+</Window>

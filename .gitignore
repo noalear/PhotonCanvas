@@ -13,5 +13,9 @@ dist/
 # Machine captures (camera images, exports)
 /captures/
 
-# Rust
-/target/
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
