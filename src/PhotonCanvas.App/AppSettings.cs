@@ -54,6 +54,8 @@ public sealed class AppSettings
     public bool ShowAdvanced { get; set; }
     /// <summary>The last jobs uploaded from this computer (newest first).</summary>
     public List<SentJob> SentJobs { get; set; } = [];
+    /// <summary>Frame with a tight outline instead of the rectangle.</summary>
+    public bool FrameOutline { get; set; }
 
     static readonly JsonSerializerOptions Json = new()
     {

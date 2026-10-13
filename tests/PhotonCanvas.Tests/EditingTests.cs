@@ -206,3 +206,66 @@ public class MaterialTestTests
         Assert.Equal([25.0], MaterialTest.Steps(25, 80, 1));
     }
 }
+
+public class FrameTests
+{
+    static DocState Design(params Shape[] shapes)
+    {
+        var s = DocState.New();
+        return Ops.AddShapes(s, shapes.Select(x => (Shape)((PathShape)x).With(layerId: s.Layers[0].Id)));
+    }
+
+    [Fact]
+    public void RectangleFrameIsTheJobBorder()
+    {
+        var job = JobBuilder.Build(Design(new PathShape { Geometry = PathGeometry.Ellipse(100, 100, 20, 10) }), new JobOptions());
+        Assert.Equal(job.Border, JobBuilder.FrameGcode(job, FrameShape.Rectangle));
+    }
+
+    [Fact]
+    public void OutlineFrameHugsTheDesign()
+    {
+        // A diamond: its outline frame should touch the four tips, not the box corners.
+        var diamond = PathGeometry.FromSvgPathData("M100 80 L120 100 L100 120 L80 100 Z");
+        var job = JobBuilder.Build(Design(new PathShape { Geometry = diamond }), new JobOptions());
+        var g = JobBuilder.FrameGcode(job, FrameShape.Outline);
+        Assert.Contains("X100Y80", g);
+        Assert.Contains("X120Y100", g);
+        Assert.DoesNotContain("X120Y80", g); // a box corner
+        Assert.StartsWith("# GS004-4 HEAD", g);
+        Assert.Contains("S64F960000", g); // same faint framing power as the job border
+    }
+
+    [Fact]
+    public void ConvexHullDropsInnerPoints()
+    {
+        var hull = JobBuilder.ConvexHull([new(0, 0), new(10, 0), new(10, 10), new(0, 10), new(5, 5), new(5, 0)]);
+        Assert.Equal(4, hull.Count);
+        Assert.DoesNotContain(new Vec2(5, 5), hull);
+    }
+
+    [Fact]
+    public void WarnsAboutShapesStackedOnTopOfEachOther()
+    {
+        var a = new PathShape { Name = "Combined", Geometry = PathGeometry.Rect(10, 10, 50, 20) };
+        var b = new PathShape { Name = "Traced", Geometry = PathGeometry.Rect(10, 10, 50, 20) };
+        var c = new PathShape { Name = "Other", Geometry = PathGeometry.Rect(100, 10, 50, 20) };
+        var job = JobBuilder.Build(Design(a, b, c), new JobOptions());
+        var w = Assert.Single(job.Warnings, x => x.Contains("same place"));
+        Assert.Contains("Combined", w);
+        Assert.Contains("Traced", w);
+        Assert.DoesNotContain(job.Warnings, x => x.Contains("Other"));
+    }
+
+    [Fact]
+    public void PreviewIsCentred()
+    {
+        // A wide, short design: equal white space above and below.
+        var jpg = XfPackage.PreviewJpeg([[new Vec2(0, 100), new Vec2(200, 100), new Vec2(200, 120), new Vec2(0, 120), new Vec2(0, 100)]]);
+        using var bmp = SkiaSharp.SKBitmap.Decode(jpg);
+        int Dark(int y) => Enumerable.Range(0, bmp.Width).Count(x => bmp.GetPixel(x, y).Red < 128);
+        int top = Enumerable.Range(0, bmp.Height).First(y => Dark(y) > 0);
+        int bottom = Enumerable.Range(0, bmp.Height).Last(y => Dark(y) > 0);
+        Assert.InRange(top + bottom, bmp.Height - 6, bmp.Height + 4);
+    }
+}

@@ -40,7 +40,13 @@ public sealed class JobPanel : UserControl
 
     // running job
     readonly Border _runCard;
-    readonly TextBlock _runState = new() { FontWeight = FontWeight.SemiBold };
+    readonly TextBlock _runState = new() { FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+
+    // framing
+    readonly ComboBox _frameShape = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Rectangle", "Outline" } };
+    readonly Button _frame = new() { HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly TextBlock _frameState = Hint();
+    bool _frameConfirmed, _frameUpdating, _frameDirty;
     readonly ProgressBar _runProgress = new() { Minimum = 0, Maximum = 1, Height = 8 };
     readonly TextBlock _runTimes = Hint();
     readonly Button _pause = new() { Content = "Pause", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
@@ -91,6 +97,12 @@ public sealed class JobPanel : UserControl
         _pause.Click += async (_, _) => await PauseOrResume();
         _stop.Click += async (_, _) => await StopJob();
         _runCard = Card("Running job", _runState, _runProgress, _runTimes, Row(_pause, _stop));
+        _frameShape.SelectedIndex = _settings.FrameOutline ? 1 : 0;
+        ToolTip.SetTip(_frameShape, "Rectangle: the box around everything. Outline: a snug outline around the design, better for round or angled designs.");
+        _frameShape.SelectionChanged += (_, _) => { _settings.FrameOutline = _frameShape.SelectedIndex == 1; _settings.Save(); _ = UpdateFrame(); };
+        _frame.Click += async (_, _) => await ToggleFrame();
+        _machine.FramingChanged += UpdateFrameButton;
+        UpdateFrameButton();
         _runCard.IsVisible = false;
         _machine.ModeChanged += OnModeChanged;
         _machine.LoadedJobChanged += () => { if (_machine.Mode == "P_WORK") _runState.Text = LoadedText(); };
@@ -110,6 +122,9 @@ public sealed class JobPanel : UserControl
                         _delayRow),
                     Card("Estimate", _estimate, _summary, _preview),
                     Card("Checks", _messages),
+                    Card("Frame",
+                        Hint("Shows where the job will land: the head traces around it with a faint laser dot, over and over, until you stop it. Move the design and the frame follows."),
+                        Row(_frameShape, _frame), _frameState),
                     Card("Output", _send, _progress, _sendState, Row(exportXf, exportGc)),
                 },
             },
@@ -159,6 +174,7 @@ public sealed class JobPanel : UserControl
         _job = job;
         _error = error;
         Show();
+        if (_machine.IsFraming) _ = UpdateFrame();
     }
 
     void Show()
@@ -196,6 +212,7 @@ public sealed class JobPanel : UserControl
     void UpdateSend()
     {
         _send.IsEnabled = !_sending && _job is not null && _machine.IsConnected;
+        UpdateFrameButton();
         if (!_sending)
             _sendState.Text = !_machine.IsConnected ? "Connect to the machine on the Machine tab to send."
                 : _job is null ? "Fix the problem above to send." : "Ready to send.";
@@ -206,6 +223,11 @@ public sealed class JobPanel : UserControl
 
     void OnModeChanged(string mode)
     {
+        if (_machine.IsFraming)
+        {
+            _runCard.IsVisible = false; // framing isn't a job
+            return;
+        }
         switch (mode)
         {
             case "P_WORK":
@@ -309,6 +331,77 @@ public sealed class JobPanel : UserControl
         if (file?.TryGetLocalPath() is not { } path) return;
         if (xf) await File.WriteAllBytesAsync(path, job.Xf);
         else await File.WriteAllTextAsync(path, job.Motion, new UTF8Encoding(false));
+    }
+
+    FrameShape CurrentFrameShape => _frameShape.SelectedIndex == 1 ? FrameShape.Outline : FrameShape.Rectangle;
+
+    void UpdateFrameButton()
+    {
+        bool on = _machine.IsFraming;
+        _frame.Content = on ? "Stop framing" : "Frame";
+        _frame.Background = on ? Brush("Danger") : null;
+        _frame.Foreground = on ? Brushes.White : null;
+        _frame.IsEnabled = on || (!_sending && _job is not null && _machine.IsConnected);
+        if (!on && _frameState.Text?.StartsWith("Framing", StringComparison.Ordinal) == true) _frameState.Text = "Framing stopped.";
+    }
+
+    async Task ToggleFrame()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        if (_machine.IsFraming)
+        {
+            try { await _machine.StopFrameAsync(); }
+            catch (DeviceException e) { _frameState.Text = $"Couldn't stop framing: {e.Message} The machine's button also stops it."; }
+            return;
+        }
+        BuiltJob job;
+        try { job = await BuildNow(); }
+        catch (JobException e)
+        {
+            await Dialogs.Message(owner, "Can't frame", e.Message);
+            return;
+        }
+        bool loaded = _machine.Mode == "P_WORK";
+        if (!_frameConfirmed || loaded)
+        {
+            var text = "Framing starts straight away, without the machine's button: the head moves and a faint laser dot traces " +
+                       $"around the design ({job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm), over and over, until you click Stop framing." +
+                       (loaded ? "\n\nThe job waiting on the machine will be cleared. Send it again when you're done framing." : "") +
+                       "\n\nDon't look into the beam. If the lid is open, wear your safety glasses.";
+            if (!await Dialogs.Confirm(owner, "Start framing?", text, "Start framing", "Cancel")) return;
+            _frameConfirmed = true;
+        }
+        _frame.IsEnabled = false;
+        _frameState.Text = "Starting…";
+        try
+        {
+            await _machine.StartFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape));
+            _frameState.Text = "Framing. Move the design to adjust; click Stop framing when it's where you want it.";
+        }
+        catch (DeviceException e)
+        {
+            _frameState.Text = e.Message;
+        }
+        finally { UpdateFrameButton(); }
+    }
+
+    /// <summary>Re-trace after the design or the frame shape changed (one update at a time, newest wins).</summary>
+    async Task UpdateFrame()
+    {
+        if (!_machine.IsFraming) return;
+        if (_frameUpdating) { _frameDirty = true; return; }
+        _frameUpdating = true;
+        try
+        {
+            do
+            {
+                _frameDirty = false;
+                if (_job is not { } job) break;
+                try { await _machine.UpdateFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape)); }
+                catch (DeviceException e) { _frameState.Text = $"Couldn't move the frame: {e.Message}"; break; }
+            } while (_frameDirty && _machine.IsFraming);
+        }
+        finally { _frameUpdating = false; }
     }
 
     async Task Send()

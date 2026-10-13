@@ -34,7 +34,7 @@ public sealed class MachinePanel : UserControl
     readonly TextBlock _connState = Hint();
     readonly CheckBox _autoConnect = new() { Content = "Connect automatically when the program starts" };
     readonly TextBlock _info = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
-    readonly TextBlock _mode = new() { FontWeight = FontWeight.SemiBold };
+    readonly TextBlock _mode = new() { FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
     readonly TextBlock _distance = Hint();
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
     readonly CheckBox _beeper = new() { Content = "Beeper on", IsEnabled = false };
@@ -558,6 +558,7 @@ public sealed class MachinePanel : UserControl
         _poll?.Cancel();
         _camera?.Cancel();
         SetDisconnectedUi(why);
+        SetFraming(false);
         Log(why);
         ConnectionChanged?.Invoke();
         await c.DisposeAsync();
@@ -621,6 +622,7 @@ public sealed class MachinePanel : UserControl
     {
         "P_IDLE" => "Ready",
         "P_WORK" => "Job loaded – waiting for the start button",
+        "P_FRAMING" => "Framing",
         "P_WORKING" => "Running a job",
         "P_PAUSE" => "Paused",
         "P_WORK_DONE" => "Job finished",
@@ -635,6 +637,12 @@ public sealed class MachinePanel : UserControl
     void ShowStatus(string mode, double? dist)
     {
         bool changed = mode != Mode;
+        // A frame is over once the machine has been busy with it and is idle again.
+        if (_framing)
+        {
+            if (mode != "P_IDLE") _frameActive = true;
+            else if (_frameActive) SetFraming(false);
+        }
         Mode = mode;
         if (changed) ModeChanged?.Invoke(mode);
         Distance = dist;
@@ -892,6 +900,63 @@ public sealed class MachinePanel : UserControl
         finally { resume(); }
     }
 
+    // ---- framing ------------------------------------------------------------------------
+
+    bool _framing, _frameActive;
+
+    /// <summary>A frame started from here is tracing (until stopped).</summary>
+    public bool IsFraming => _framing;
+
+    /// <summary>Framing started or stopped. On the UI thread.</summary>
+    public event Action? FramingChanged;
+
+    void SetFraming(bool on)
+    {
+        if (_framing == on) return;
+        _framing = on;
+        _frameActive = false;
+        FramingChanged?.Invoke();
+    }
+
+    /// <summary>Start framing now: the head moves and traces the outline with a faint laser.</summary>
+    public async Task StartFrameAsync(string borderGcode)
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        var resume = await PauseLive();
+        SetFraming(true); // before the request: the machine reports the mode change before it replies
+        try
+        {
+            await c.StartFrameAsync(borderGcode, replaceLoadedJob: true);
+            Log("Framing started.");
+        }
+        catch (Exception e) when (e is DeviceException or OperationCanceledException)
+        {
+            SetFraming(false);
+            Log($"Framing failed: {e.Message}");
+            throw;
+        }
+        finally { resume(); }
+    }
+
+    /// <summary>The design moved while framing: trace the new outline.</summary>
+    public async Task UpdateFrameAsync(string borderGcode)
+    {
+        if (!_framing || _client is not { } c || !c.IsConnected) return;
+        var resume = await PauseLive();
+        try { await c.ReplaceFrameAsync(borderGcode); }
+        finally { resume(); }
+    }
+
+    public async Task StopFrameAsync()
+    {
+        if (_client is { } c && c.IsConnected)
+        {
+            await c.StopFrameAsync();
+            Log("Framing stopped.");
+        }
+        SetFraming(false);
+    }
+
     /// <summary>Upload a job. The machine then waits for its start button.</summary>
     public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job")
     {
@@ -903,6 +968,7 @@ public sealed class MachinePanel : UserControl
             // this id) arrives just before the upload call returns.
             string taskId = Guid.NewGuid().ToString();
             var sent = new SentJob(taskId, name, DateTime.Now);
+            SetFraming(false); // the upload stops a frame that is tracing
             _settings.SentJobs.Insert(0, sent);
             if (_settings.SentJobs.Count > 50) _settings.SentJobs.RemoveRange(50, _settings.SentJobs.Count - 50);
             try { await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob, taskId); }

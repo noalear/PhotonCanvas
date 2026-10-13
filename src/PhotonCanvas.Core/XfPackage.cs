@@ -109,7 +109,10 @@ public static class XfPackage
         var b = Rect2.Bounds(list.SelectMany(p => p));
         if (!b.IsEmpty)
         {
+            // Zoomed to fit and centred, like xTool Studio's previews (the picture shows the
+            // shapes, not where they sit on the bed).
             double scale = (Size - 20) / Math.Max(1e-6, Math.Max(b.Width, b.Height));
+            double ox = (Size - b.Width * scale) / 2, oy = (Size - b.Height * scale) / 2;
             using var paint = new SKPaint { Color = SKColors.Black, StrokeWidth = 2, IsAntialias = true, Style = SKPaintStyle.Stroke };
             foreach (var path in list)
             {
@@ -117,7 +120,7 @@ public static class XfPackage
                 using var sk = new SKPath();
                 for (int i = 0; i < path.Count; i++)
                 {
-                    float x = (float)((path[i].X - b.MinX) * scale + 10), y = (float)((path[i].Y - b.MinY) * scale + 10);
+                    float x = (float)((path[i].X - b.MinX) * scale + ox), y = (float)((path[i].Y - b.MinY) * scale + oy);
                     if (i == 0) sk.MoveTo(x, y); else sk.LineTo(x, y);
                 }
                 canvas.DrawPath(sk, paint);

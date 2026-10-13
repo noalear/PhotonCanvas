@@ -34,8 +34,67 @@ public sealed record BuiltJob(
     public sealed record Step(Guid LayerId, List<Vec2> Points, bool Closed, bool Fill);
 }
 
+/// <summary>What framing traces.</summary>
+public enum FrameShape
+{
+    /// <summary>The rectangle around everything in the job.</summary>
+    Rectangle,
+    /// <summary>A tight outline around everything (convex hull): shows angled or round designs better.</summary>
+    Outline,
+}
+
 public static class JobBuilder
 {
+    /// <summary>
+    /// G-code for framing <paramref name="job"/>: the same border format as inside the job
+    /// package (which is what xTool Studio frames with), around the rectangle or the outline.
+    /// </summary>
+    public static string FrameGcode(BuiltJob job, FrameShape shape)
+    {
+        if (shape == FrameShape.Rectangle) return job.Border;
+        var hull = ConvexHull(job.Steps.SelectMany(st => st.Points));
+        if (hull.Count < 3) return job.Border;
+        return job.Job.Border([.. hull, hull[0]]);
+    }
+
+    /// <summary>Convex hull (monotone chain), counter-clockwise, without repeating the first point.</summary>
+    public static List<Vec2> ConvexHull(IEnumerable<Vec2> points)
+    {
+        var p = points.Distinct().OrderBy(v => v.X).ThenBy(v => v.Y).ToList();
+        if (p.Count < 3) return p;
+        static double Cross(Vec2 o, Vec2 a, Vec2 b) => (a.X - o.X) * (b.Y - o.Y) - (a.Y - o.Y) * (b.X - o.X);
+        var h = new List<Vec2>(p.Count * 2);
+        foreach (var v in p)
+        {
+            while (h.Count >= 2 && Cross(h[^2], h[^1], v) <= 0) h.RemoveAt(h.Count - 1);
+            h.Add(v);
+        }
+        int lower = h.Count + 1;
+        for (int i = p.Count - 2; i >= 0; i--)
+        {
+            while (h.Count >= lower && Cross(h[^2], h[^1], p[i]) <= 0) h.RemoveAt(h.Count - 1);
+            h.Add(p[i]);
+        }
+        h.RemoveAt(h.Count - 1);
+        return h;
+    }
+
+    /// <summary>
+    /// Pairs of processed shapes that sit exactly on top of each other (same size and place),
+    /// e.g. an original and an edited copy: both get processed, usually by mistake.
+    /// </summary>
+    public static IEnumerable<(Shape A, Shape B)> StackedShapes(DocState s)
+    {
+        var shapes = OutputLayers(s).SelectMany(l => s.ShapesOn(l.Id)).Where(sh => !sh.Bounds.IsEmpty).ToList();
+        static (long, long, long, long) Key(Rect2 b) =>
+            ((long)Math.Round(b.MinX * 20), (long)Math.Round(b.MinY * 20), (long)Math.Round(b.MaxX * 20), (long)Math.Round(b.MaxY * 20));
+        foreach (var g in shapes.GroupBy(sh => Key(sh.Bounds)).Where(g => g.Count() > 1))
+        {
+            var list = g.ToList();
+            for (int i = 1; i < list.Count; i++) yield return (list[0], list[i]);
+        }
+    }
+
     /// <summary>Layers that will be processed, in order.</summary>
     public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible);
 
@@ -48,6 +107,9 @@ public static class JobBuilder
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
         var layers = OutputLayers(s).ToList();
+
+        foreach (var (a, b) in StackedShapes(s).Take(3))
+            warnings.Add($"\"{Label(a)}\" and \"{Label(b)}\" are the same size and in the same place, so both will be processed. If one is an old copy, delete it (ungroup first if they're grouped).");
 
         foreach (var hidden in s.Layers.Where(l => l.Output && !l.Visible && s.ShapesOn(l.Id).Any()))
             warnings.Add($"Layer \"{hidden.Name}\" is hidden, so it will not be processed.");
@@ -179,6 +241,8 @@ public static class JobBuilder
         });
         return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps);
     }
+
+    static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
 
     /// <summary>Most dots a single image may produce (keeps files and memory sane).</summary>
     const long MaxImageCells = 40_000_000;

@@ -567,6 +567,49 @@ public sealed class DeviceClientTests : IAsyncLifetime
         Assert.Equal(expected, DeviceClient.NormalizeMode(mode, sub, desc));
 
     [Fact]
+    public async Task FramesLikeXToolStudio()
+    {
+        await using var client = await Connected();
+        await client.StartFrameAsync("G0X1Y1\nG1X2Y1S64F960000");
+        var announce = _fake.Requests.Single(r => Url(r) == "/v1/filetransfer/upload")["data"]!;
+        Assert.Equal("tmpFrame.gcode", announce["filename"]!.GetValue<string>());
+        Assert.Equal("G0X1Y1\nG1X2Y1S64F960000"u8.ToArray(), _fake.Uploaded);
+        var config = _fake.Requests.Single(r => Url(r) == "/v1/processing/upload/config")["data"]!;
+        Assert.Equal(("txt", 1, 1, "frame"), (config["fileType"]!.GetValue<string>(), config["autoStart"]!.GetValue<int>(),
+            config["loopPrint"]!.GetValue<int>(), config["gcodeType"]!.GetValue<string>()));
+
+        await client.ReplaceFrameAsync("G0X5Y5");
+        Assert.Contains(_fake.Requests, r => Url(r) == "/v1/filetransfer/upload" && r["data"]!["filename"]!.GetValue<string>() == "tmpFrameNew.gcode");
+        Assert.Equal(1, _fake.Requests.Single(r => Url(r) == "/v1/processing/frame/replace")["data"]!["loopPrint"]!.GetValue<int>());
+
+        await client.StopFrameAsync();
+        Assert.Equal(["stop"], _fake.States);
+    }
+
+    [Fact]
+    public async Task SendingAJobStopsAFrameFirst()
+    {
+        (_fake.Mode, _fake.SubMode, _fake.Desc) = ("Work", "working", "frame");
+        await using var client = await Connected();
+        Assert.Equal("P_FRAMING", await client.GetRuntimeModeAsync());
+        // Without permission it's refused; with it, the frame is stopped and the job goes up.
+        await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1]));
+        _fake.OnStateAction = a => { if (a == "stop") (_fake.Mode, _fake.SubMode, _fake.Desc) = ("P_IDLE", "", "normal"); };
+        await client.UploadJobAsync([1], replaceLoadedJob: true);
+        Assert.Equal(["stop"], _fake.States);
+    }
+
+    [Fact]
+    public async Task NeverFramesOverARunningJob()
+    {
+        (_fake.Mode, _fake.SubMode) = ("Work", "working");
+        await using var client = await Connected();
+        await Assert.ThrowsAsync<DeviceException>(() => client.StartFrameAsync("G0X1Y1", replaceLoadedJob: true));
+        Assert.Empty(_fake.States);
+        Assert.DoesNotContain(_fake.Requests, r => Url(r) == "/v1/filetransfer/upload");
+    }
+
+    [Fact]
     public async Task UsesTheCallersTaskId()
     {
         await using var client = await Connected();
@@ -884,6 +927,7 @@ sealed class FakeDevice : IAsyncDisposable
                 _ = Task.Run(() => PullUploadAsync(data!));
                 break;
             case "/v1/processing/upload/config":
+            case "/v1/processing/frame/replace":
                 await Reply(req, 0);
                 break;
             case "/v1/camera/snap":

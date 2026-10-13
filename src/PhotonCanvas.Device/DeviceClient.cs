@@ -1067,13 +1067,7 @@ public sealed class DeviceClient : IAsyncDisposable
             throw new ArgumentException("The job file is empty.", nameof(xf));
         var state = await GetRuntimeStateAsync(cancellationToken).ConfigureAwait(false);
         Log($"Before upload the machine reports {state.RawMode}/{state.SubMode} (task {state.TaskId ?? "none"}).");
-        string mode = state.Mode;
-        if (mode == "P_WORK" && replaceLoadedJob)
-        {
-            Log("A job is already loaded and not started: cancelling it to make room.");
-            await StopJobAsync(cancellationToken).ConfigureAwait(false);
-            mode = await WaitForModeAsync("P_IDLE", TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
-        }
+        string mode = await MakeRoomAsync(state.Mode, replaceLoadedJob, cancellationToken).ConfigureAwait(false);
         if (mode != "P_IDLE")
             throw new DeviceException(DeviceException.BusyCode, BusyMessage(mode));
         await UploadFileAsync(xf, "tmp.xf", JobFileType, 1, progress, cancellationToken).ConfigureAwait(false);
@@ -1088,6 +1082,61 @@ public sealed class DeviceClient : IAsyncDisposable
         }, cancellationToken: cancellationToken).ConfigureAwait(false);
         return taskId;
     }
+
+    /// <summary>
+    /// With <paramref name="allowed"/>, clears a job that is loaded but not started, or a frame
+    /// that is tracing, and waits for the machine to be idle. Returns the mode afterwards.
+    /// A running or paused job is never touched.
+    /// </summary>
+    async Task<string> MakeRoomAsync(string mode, bool allowed, CancellationToken cancellationToken)
+    {
+        if (!allowed || mode is not ("P_WORK" or "P_FRAMING")) return mode;
+        Log(mode == "P_WORK" ? "A job is loaded and not started: cancelling it to make room." : "Stopping the frame to make room.");
+        await StopJobAsync(cancellationToken).ConfigureAwait(false);
+        return await WaitForModeAsync("P_IDLE", TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
+    }
+
+    // ---- framing ------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Starts framing: the head traces <paramref name="borderGcode"/> (the job's border
+    /// G-code) with a faint laser, over and over until <see cref="StopFrameAsync"/>.
+    /// This is how xTool Studio frames on the F2 Ultra: the border is uploaded as
+    /// <c>tmpFrame.gcode</c> and started at once (<c>gcodeType: frame</c>, <c>autoStart: 1</c>,
+    /// <c>loopPrint: 1</c>). Unlike jobs, it starts without the machine's button.
+    /// With <paramref name="replaceLoadedJob"/>, a job waiting for the button (or an earlier
+    /// frame) is cleared first.
+    /// </summary>
+    public async Task StartFrameAsync(string borderGcode, bool replaceLoadedJob = false, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(borderGcode);
+        var state = await GetRuntimeStateAsync(cancellationToken).ConfigureAwait(false);
+        string mode = await MakeRoomAsync(state.Mode, replaceLoadedJob, cancellationToken).ConfigureAwait(false);
+        if (mode != "P_IDLE")
+            throw new DeviceException(DeviceException.BusyCode, BusyMessage(mode));
+        await UploadFileAsync(Encoding.UTF8.GetBytes(borderGcode), "tmpFrame.gcode", JobFileType, 1, null, cancellationToken).ConfigureAwait(false);
+        await RequestAsync("PUT", "/v1/processing/upload/config", new JsonObject
+        {
+            ["fileType"] = "txt",
+            ["autoStart"] = 1,
+            ["loopPrint"] = 1,
+            ["gcodeType"] = "frame",
+        }, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Swaps the outline of a frame that is already tracing (after the design moved), as
+    /// xTool Studio does: uploads <c>tmpFrameNew.gcode</c>, then <c>PUT /v1/processing/frame/replace</c>.
+    /// </summary>
+    public async Task ReplaceFrameAsync(string borderGcode, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(borderGcode);
+        await UploadFileAsync(Encoding.UTF8.GetBytes(borderGcode), "tmpFrameNew.gcode", JobFileType, 1, null, cancellationToken).ConfigureAwait(false);
+        await RequestAsync("PUT", "/v1/processing/frame/replace", new JsonObject { ["loopPrint"] = 1 }, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Stops framing (the same stop request as for a job).</summary>
+    public Task StopFrameAsync(CancellationToken cancellationToken = default) => StopJobAsync(cancellationToken);
 
     /// <summary>Polls the runtime mode until it is <paramref name="wanted"/> or the time runs out; returns the last mode seen.</summary>
     async Task<string> WaitForModeAsync(string wanted, TimeSpan timeout, CancellationToken cancellationToken)
@@ -1109,7 +1158,7 @@ public sealed class DeviceClient : IAsyncDisposable
         "P_PAUSE" => "A job is paused on the machine. Continue or stop it, then send again.",
         "P_SLEEP" => "The machine is asleep. Press its button to wake it, then send again.",
         "P_AUTOFOCUS" or "P_MEASURE" => "The machine is measuring or focusing. Wait for it to finish, then send again.",
-        "P_FRAMING" => "The machine is tracing the outline (framing). Wait for it to finish or stop it, then send again.",
+        "P_FRAMING" => "The machine is framing (tracing the outline). Stop framing, then try again.",
         "P_ERROR" => "The machine is reporting an error. Check it (the light or the Machine tab), then send again.",
         _ => $"The machine isn't ready for a new job (it reports \"{mode}\"). Wait a moment and try again.",
     };
