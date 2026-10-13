@@ -199,6 +199,63 @@ async def cmd_smiley(args):
         await dev.close()
 
 
+async def cmd_lid_open(args):
+    """Enclosure-opened processing: let the machine button start jobs with the lid open."""
+    dev = await _connected(args)
+    try:
+        cfg = {"alias": "config", "type": "user"}
+        if args.state in ("on", "off"):
+            await dev.request("PUT", "/v1/device/configs", data={**cfg, "kv": {"gapCheckWithKey": args.state == "off"}})
+        cur = await dev.request("GET", "/v1/device/configs", data={**cfg, "kv": ["gapCheckWithKey"]})
+        print("lid-open processing:", "ON" if not cur["gapCheckWithKey"] else "OFF")
+    finally:
+        await dev.close()
+
+
+async def send_and_watch(dev, xf, label):
+    """Upload an .xf with autoStart off, then report events until the job finishes."""
+    import uuid
+    mode = (await dev.get("/v1/device/runtime-infos"))["curMode"]["mode"]
+    if mode != "P_IDLE":
+        sys.exit(f"machine is busy ({mode}); not uploading")
+    await dev.upload(xf, "tmp.xf", 1)
+    await dev.request("PUT", "/v1/processing/upload/config",
+                      data={"fileType": "xf", "autoStart": 0, "taskId": str(uuid.uuid4())})
+    print(f"{label} uploaded. >>> Press the start button on the machine. <<<", flush=True)
+    started = None
+    while True:
+        ev = await dev.events.get()
+        body = ev.get("data") if isinstance(ev, dict) else None
+        if not isinstance(body, dict):
+            continue
+        t = body.get("type")
+        if t in ("WORK_STARTED", "WORK_PAUSED", "WORK_STOPED", "WORK_FINISHED"):
+            now = time.time()
+            if t == "WORK_STARTED":
+                started = now
+            took = f" (+{now - started:.1f}s since start)" if started else ""
+            print(time.strftime("%H:%M:%S"), t, json.dumps(body.get("info")), took, flush=True)
+            if t == "WORK_FINISHED":
+                return body.get("info") or {}
+
+
+async def cmd_timing(args):
+    """Measure the between-pass dwell: tiny square at 0% power."""
+    from .gcode import BLUE, Job, Laser, VectorPath
+    from .xf import build_xf, preview_jpg
+    sq = [(108, 108), (113, 108), (113, 113), (108, 113), (108, 108)]
+    job = Job([VectorPath(sq, Laser(BLUE, 0, 200, 1))], passes=args.passes, pass_delay=args.delay)
+    xf = build_xf(job.render(), job.border(sq), preview_jpg([sq]), BLUE, [])
+    expect = (args.passes - 1) * args.delay
+    print(f"{args.passes} passes at 0% power, {args.delay}s pause -> expect about {expect:.0f}s if G4 P is milliseconds")
+    dev = await _connected(args)
+    try:
+        info = await send_and_watch(dev, xf, "Timing test")
+        print(f"machine-reported timeUse: {info.get('timeUse')}s (expected ~{expect:.0f}s)")
+    finally:
+        await dev.close()
+
+
 async def cmd_get(args):
     if not args.url.startswith("/v1/"):
         sys.exit("only GET /v1/... URLs are allowed here")
@@ -228,6 +285,10 @@ def main(argv=None):
     s.add_argument("--distance", type=float, required=True, help="material distance in mm (head z = distance + 6)")
     s.add_argument("--size", type=float, default=40); s.add_argument("--x", type=float, default=110); s.add_argument("--y", type=float, default=110)
     s.add_argument("-o", "--out", default="captures/out/smiley"); s.add_argument("--send", action="store_true")
+    s = sub.add_parser("lid-open", help="enclosure-opened processing on/off (stored on the machine)")
+    s.add_argument("ip"); s.add_argument("state", nargs="?", choices=("on", "off"))
+    s = sub.add_parser("timing", help="measure the pause between passes (0% power)")
+    s.add_argument("ip"); s.add_argument("--passes", type=int, default=2); s.add_argument("--delay", type=float, default=10)
     s = sub.add_parser("capture"); s.add_argument("ip"); s.add_argument("-o", "--out", default="captures/jobs"); s.add_argument("--save-existing", action="store_true")
 
     args = p.parse_args(argv)
@@ -239,6 +300,6 @@ def main(argv=None):
         Viewer(args.ip, args.stream).run()
         return
     try:
-        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture, "smiley": cmd_smiley}[args.cmd](args))
+        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture, "smiley": cmd_smiley, "lid-open": cmd_lid_open, "timing": cmd_timing}[args.cmd](args))
     except KeyboardInterrupt:
         pass

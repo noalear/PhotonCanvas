@@ -260,3 +260,5 @@ The stock app can't do this. Passes are a device-side loop in one file, and resu
   - Cancel (long press while paused): `WORK_STOPED`, then `WORK_RESULT WORK_FINISHED {result:"failed", timeUse}`, then `P_IDLE`.
 - **Head Z** reads within about 0.06 mm of the commanded value (27.058 for 27). Distance = z − 6.
 - **Cameras** are black while a job runs, because the fill lights are off.
+- **`G4 P` is milliseconds (verified).** A 2-pass job at 0% power with `G4P10000` between passes reported `timeUse: 10`, and the job finished 11.3 s after `WORK_STARTED`.
+- **Lid-open processing:** `PUT /v1/device/configs {alias:"config", type:"user", kv:{gapCheckWithKey:false}}` turns on xTool's "Enclosure-opened processing", which lets the button start jobs with the lid open. The setting is stored on the machine. Read it back with `GET` and `kv:["gapCheckWithKey"]`. It was turned ON for the user on 2026-10-12, at their request (`ytool lid-open <ip> on|off`).
