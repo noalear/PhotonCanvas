@@ -42,7 +42,7 @@ public partial class MainWindow : Window
         Canvas.Doc = _doc;
         _layers = new LayersPanel(_doc);
         _layers.ShapeHovered += id => Canvas.HighlightShape = id;
-        _layers.ZoomToSelectionRequested += () => Canvas.FitSelection();
+        _layers.ShapeActions = ShapeActions;
         _props = new PropertiesPanel(_doc, _layers, _settings);
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
@@ -78,6 +78,7 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(old, b)) old?.Dispose();
         };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+        Canvas.ContextRequested += (_, e) => { e.Handled = true; OpenCanvasMenu(); };
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
         Opened += async (_, _) =>
@@ -513,6 +514,139 @@ public partial class MainWindow : Window
         if (action is null) return;
         e.Handled = true;
         action();
+    }
+
+    // ---- right-click menus ----------------------------------------------------
+
+    /// <summary>
+    /// Common tasks for a set of shapes. Each action selects <paramref name="ids"/> first, so the
+    /// same menu works for a right-clicked shape, the selection, or everything on a layer.
+    /// </summary>
+    List<Control> ShapeActions(IReadOnlySet<Guid> ids)
+    {
+        var shapes = _doc.State.Shapes.Where(s => ids.Contains(s.Id)).ToList();
+        int n = shapes.Count;
+        var paths = shapes.OfType<PathShape>().ToList();
+        bool anyGrouped = shapes.Any(s => s.GroupId is not null);
+        bool anyText = shapes.Any(s => s is TextShape);
+        bool compound = paths.Any(p => p.Geometry.Subpaths.Length > 1);
+        var picture = shapes.OfType<ImageShape>().FirstOrDefault();
+        string what = n == 1 ? "it" : $"these {n}";
+
+        MenuItem Do(string header, Action action, bool enabled = true, string? gesture = null)
+        {
+            var m = new MenuItem { Header = header, IsEnabled = enabled && n > 0 };
+            if (gesture is not null) m.InputGesture = KeyGesture.Parse(gesture);
+            m.Click += (_, _) => { _doc.Select(ids); action(); };
+            return m;
+        }
+        MenuItem DoAsync(string header, Func<Task> action, bool enabled = true, string? gesture = null) =>
+            Do(header, () => _ = Guard(action), enabled, gesture);
+        MenuItem Sub(string header, params Control[] items)
+        {
+            var m = new MenuItem { Header = header, IsEnabled = n > 0 };
+            foreach (var i in items) m.Items.Add(i);
+            return m;
+        }
+
+        var toLayer = Sub("Move to layer");
+        foreach (var layer in _doc.State.Layers)
+        {
+            var target = layer;
+            toLayer.Items.Add(Do(target.Name, () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, ids, target.Id)),
+                shapes.Any(s => s.LayerId != target.Id)));
+        }
+
+        return
+        [
+            Do("Cut", CutSel, gesture: "Ctrl+X"),
+            Do("Copy", CopySel, gesture: "Ctrl+C"),
+            new MenuItem { Header = "Paste", IsEnabled = _clipboard.Count > 0, InputGesture = KeyGesture.Parse("Ctrl+V"), Command = null }.With(m => m.Click += (_, _) => Paste()),
+            Do("Duplicate", DuplicateSel, gesture: "Ctrl+D"),
+            Do($"Delete {what}", DeleteSel, gesture: "Delete"),
+            new Separator(),
+            Do("Group", GroupSel, n > 1, "Ctrl+G"),
+            Do("Ungroup", UngroupSel, anyGrouped, "Ctrl+Shift+G"),
+            Do("Combine into one shape (compound)", Combine, paths.Count > 1, "Ctrl+K"),
+            Do("Break apart", BreakApart, compound, "Ctrl+Shift+K"),
+            Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
+            Sub("Shape operations",
+                DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
+                new Separator(),
+                Do("Weld (union)", () => BooleanSel(BoolOp.Union), paths.Count > 1),
+                Do("Subtract (bottom minus the rest)", () => BooleanSel(BoolOp.Subtract), paths.Count > 1),
+                Do("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), paths.Count > 1),
+                Do("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), paths.Count > 1)),
+            Sub("Array",
+                DoAsync("Grid array…", () => ArraySel(circular: false)),
+                DoAsync("Circular array…", () => ArraySel(circular: true))),
+            Sub("Align and distribute",
+                Do("Align left", () => AlignSel(Align.Left), n > 1),
+                Do("Align centres horizontally", () => AlignSel(Align.CenterX), n > 1),
+                Do("Align right", () => AlignSel(Align.Right), n > 1),
+                Do("Align top", () => AlignSel(Align.Top), n > 1),
+                Do("Align centres vertically", () => AlignSel(Align.CenterY), n > 1),
+                Do("Align bottom", () => AlignSel(Align.Bottom), n > 1),
+                new Separator(),
+                Do("Distribute horizontally", () => DistributeSel(true), n > 2),
+                Do("Distribute vertically", () => DistributeSel(false), n > 2),
+                new Separator(),
+                Do("Centre in work area", CenterSelInField)),
+            Sub("Flip and rotate",
+                Do("Flip horizontally", () => FlipSel(true)),
+                Do("Flip vertically", () => FlipSel(false)),
+                Do("Rotate 90° clockwise", () => RotateSel(90)),
+                Do("Rotate 90° counter-clockwise", () => RotateSel(-90))),
+            Sub("Order",
+                Do("Bring to front", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection))),
+                Do("Send to back", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)))),
+            toLayer,
+            new Separator(),
+            DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
+            DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
+            Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
+            DoAsync("Rename…", RenameSel, n == 1),
+        ];
+    }
+
+    void CenterSelInField()
+    {
+        var b = _doc.State.Bounds(_doc.Selection);
+        if (b.IsEmpty) return;
+        var m = MachineProfile.F2Ultra;
+        _doc.Commit("Centre in work area", Ops.Move(_doc.State, _doc.Selection, m.FieldW / 2 - b.Center.X, m.FieldH / 2 - b.Center.Y));
+    }
+
+    async Task RenameSel()
+    {
+        if (_doc.Selection.Count != 1 || _doc.State.FindShape(_doc.Selection.First()) is not { } s) return;
+        if (await Dialogs.Prompt(this, "Rename", "Name:", s.Name) is { } name && name.Trim() != s.Name)
+            _doc.Commit("Rename shape", Ops.Replace(_doc.State, s.With(name: name.Trim())));
+    }
+
+    /// <summary>Right-click on the canvas: tasks for what was clicked (or the selection), or general ones on empty space.</summary>
+    void OpenCanvasMenu()
+    {
+        var menu = new ContextMenu();
+        if (_doc.Selection.Count > 0)
+            foreach (var c in ShapeActions(_doc.Selection)) menu.Items.Add(c);
+        else
+        {
+            var paste = new MenuItem { Header = "Paste", IsEnabled = _clipboard.Count > 0, InputGesture = KeyGesture.Parse("Ctrl+V") };
+            paste.Click += (_, _) => Paste();
+            var all = new MenuItem { Header = "Select all", InputGesture = KeyGesture.Parse("Ctrl+A") };
+            all.Click += (_, _) => SelectAll();
+            var fit = new MenuItem { Header = "Fit work area", InputGesture = KeyGesture.Parse("Home") };
+            fit.Click += (_, _) => Canvas.FitField();
+            var grid = new MenuItem { Header = "Grid & snapping…" };
+            grid.Click += (_, _) => _ = Guard(ShowGridSettings);
+            menu.Items.Add(paste);
+            menu.Items.Add(all);
+            menu.Items.Add(new Separator());
+            menu.Items.Add(fit);
+            menu.Items.Add(grid);
+        }
+        menu.Open(Canvas);
     }
 
     // ---- edit commands --------------------------------------------------------

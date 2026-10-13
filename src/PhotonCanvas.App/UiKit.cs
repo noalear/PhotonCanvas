@@ -85,4 +85,11 @@ static class UiKit
         var t = TimeSpan.FromSeconds(Math.Round(seconds));
         return t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes:00} min" : t.TotalMinutes >= 1 ? $"{t.Minutes} min {t.Seconds:00} s" : $"{t.Seconds} s";
     }
+
+    /// <summary>Configure an object inline and return it (for building menus in one expression).</summary>
+    public static T With<T>(this T o, Action<T> setup)
+    {
+        setup(o);
+        return o;
+    }
 }

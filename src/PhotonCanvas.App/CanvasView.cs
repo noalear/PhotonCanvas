@@ -535,6 +535,17 @@ public sealed partial class CanvasView : Control
             UpdateCursor(p);
             return;
         }
+        if (pt.Properties.IsRightButtonPressed && _tool is Tool.Select or Tool.Nodes && _drag == Drag.None)
+        {
+            // Right-click acts on what's under the mouse: select it (with its group) unless it's already selected.
+            if (HitShape(p) is { } under)
+            {
+                if (!_doc.Selection.Contains(under.Id))
+                    _doc.Select(mods.HasFlag(KeyModifiers.Alt) ? [under.Id] : Ops.WithGroups(_doc.State, [under.Id]));
+            }
+            else _doc.Select([]);
+            return; // the menu opens on release (ContextRequested)
+        }
         if (!pt.Properties.IsLeftButtonPressed) return;
         e.Pointer.Capture(this);
 

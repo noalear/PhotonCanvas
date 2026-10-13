@@ -33,8 +33,9 @@ public sealed class LayersPanel : UserControl
 
     /// <summary>The mouse is over a shape's row (null when it leaves): highlight it on the canvas.</summary>
     public event Action<Guid?>? ShapeHovered;
-    /// <summary>Zoom the canvas to the selection.</summary>
-    public event Action? ZoomToSelectionRequested;
+
+    /// <summary>Common shape tasks (cut, group, array…) for a set of shapes; supplied by the main window.</summary>
+    public Func<IReadOnlySet<Guid>, List<Control>>? ShapeActions { get; set; }
 
     // drag-to-reorder
     Guid? _dragLayer;
@@ -242,7 +243,7 @@ public sealed class LayersPanel : UserControl
         };
         // Buttons and the swatch handle their own presses, so this only fires on the row itself.
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
-        row.ContextMenu = RowMenu(l);
+        row.ContextRequested += (_, e) => { e.Handled = true; RowMenu(l).Open(row); };
         return row;
     }
 
@@ -376,7 +377,8 @@ public sealed class LayersPanel : UserControl
         row.PointerEntered += (_, _) => ShapeHovered?.Invoke(s.Id);
         row.PointerExited += (_, _) => ShapeHovered?.Invoke(null);
         row.PointerPressed += (_, e) => OnShapePressed(s, l, e);
-        row.ContextMenu = ShapeMenu(s);
+        // Built when opened, so it reflects the selection at that moment.
+        row.ContextRequested += (_, e) => { e.Handled = true; ShapeMenu(s).Open(row); };
         return row;
     }
 
@@ -423,25 +425,15 @@ public sealed class LayersPanel : UserControl
             m.Click += (_, _) => a();
             return m;
         }
-        IReadOnlySet<Guid> Targets() => _doc.Selection.Contains(s.Id) ? _doc.Selection : new HashSet<Guid> { s.Id };
-        var move = new MenuItem { Header = "Move to layer" };
-        foreach (var layer in _doc.State.Layers)
-        {
-            var target = layer;
-            move.Items.Add(Item(target.Name, () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, Targets(), target.Id)), target.Id != s.LayerId));
-        }
-        return new ContextMenu
-        {
-            Items =
-            {
-                Item("Rename", () => { _renamingShape = s.Id; Rebuild(); }),
-                Item("Zoom to it", () => { if (!_doc.Selection.Contains(s.Id)) _doc.Select([s.Id]); ZoomToSelectionRequested?.Invoke(); }),
-                Item("Select its whole group", () => _doc.Select(_doc.State.Shapes.Where(x => x.GroupId == s.GroupId).Select(x => x.Id)), s.GroupId is not null),
-                move,
-                new Separator(),
-                Item("Delete", () => _doc.Commit("Delete", Ops.Delete(_doc.State, Targets()))),
-            },
-        };
+        // Right-clicking a selected shape acts on the whole selection; otherwise on that shape.
+        IReadOnlySet<Guid> targets = _doc.Selection.Contains(s.Id) ? _doc.Selection : new HashSet<Guid> { s.Id };
+        if (!_doc.Selection.Contains(s.Id)) _doc.Select([s.Id]);
+        var menu = new ContextMenu();
+        menu.Items.Add(Item("Rename", () => { _renamingShape = s.Id; Rebuild(); }, targets.Count == 1));
+        menu.Items.Add(Item("Select its whole group", () => _doc.Select(_doc.State.Shapes.Where(x => x.GroupId == s.GroupId).Select(x => x.Id)), s.GroupId is not null));
+        menu.Items.Add(new Separator());
+        foreach (var c in ShapeActions?.Invoke(targets) ?? []) menu.Items.Add(c);
+        return menu;
     }
 
     static string Summary(Layer l, int count)
@@ -563,10 +555,16 @@ public sealed class LayersPanel : UserControl
             return m;
         }
         var sel = _doc.Selection;
+        // The same shape tasks, applied to everything on this layer.
+        var onLayer = _doc.State.ShapesOn(l.Id).Select(s => s.Id).ToHashSet();
+        var shapesMenu = new MenuItem { Header = $"Its shapes ({onLayer.Count})", IsEnabled = onLayer.Count > 0 };
+        foreach (var c in ShapeActions?.Invoke(onLayer) ?? []) shapesMenu.Items.Add(c);
         return new ContextMenu
         {
             Items =
             {
+                shapesMenu,
+                new Separator(),
                 Item("Select all shapes on this layer", () => _doc.Select(_doc.State.ShapesOn(l.Id).Select(s => s.Id))),
                 Item("Show all layers' shapes", () => { foreach (var x in _doc.State.Layers) _expanded.Add(x.Id); Rebuild(); }),
                 Item("Hide all layers' shapes", () => { _expanded.Clear(); Rebuild(); }),
