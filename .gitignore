@@ -12,3 +12,6 @@ dist/
 
 # Machine captures (camera images, exports)
 /captures/
+
+# Rust
+/target/
