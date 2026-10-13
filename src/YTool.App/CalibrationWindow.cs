@@ -212,13 +212,17 @@ public sealed class CalibrationWindow : Window
             return (CameraImaging.ToAvalonia(small), g, full.Width, full.Height);
         });
         _jpeg = jpg;
-        _display?.Dispose();
+        var oldDisplay = _display;
         _display = display;
         _gray = gray;
         _imgW = w;
         _imgH = h;
         _photoState.Text = $"Photo {w} × {h}.";
+        var oldCheck = _checkImage;
+        _checkImage = null; // belongs to the previous photo
         ResetMarks();
+        oldDisplay?.Dispose();
+        oldCheck?.Dispose();
     }
 
     // ---- 3: locate ---------------------------------------------------------------------
@@ -386,12 +390,17 @@ public sealed class CalibrationWindow : Window
             return CameraImaging.ToAvalonia(warped);
         }).ContinueWith(t =>
         {
-            if (t.IsCompletedSuccessfully && ReferenceEquals(fit, _fit))
+            if (t.Exception is { } e) AppLog.Error("calibration check image", e);
+            if (!t.IsCompletedSuccessfully) return;
+            if (!ReferenceEquals(fit, _fit))
             {
-                _checkImage?.Dispose();
-                _checkImage = t.Result;
-                UpdateView();
+                t.Result.Dispose(); // a newer fit superseded this one
+                return;
             }
+            var old = _checkImage;
+            _checkImage = t.Result;
+            UpdateView();
+            old?.Dispose();
         }, TaskScheduler.FromCurrentSynchronizationContext());
     }
 

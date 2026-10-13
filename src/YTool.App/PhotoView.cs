@@ -19,6 +19,7 @@ public sealed record PhotoMarker(Vec2 At, string Label, Color Color, bool Select
 public sealed class PhotoView : Control
 {
     Bitmap? _image;
+    PixelSize? _imageSize;
     IReadOnlyList<PhotoMarker> _markers = [];
     double _zoom = 1;          // screen px per image px
     Point _offset;             // screen position of image (0, 0)
@@ -31,8 +32,10 @@ public sealed class PhotoView : Control
         get => _image;
         set
         {
-            bool sizeChanged = value?.PixelSize != _image?.PixelSize;
+            var size = value?.PixelSize;
+            bool sizeChanged = size != _imageSize;
             _image = value;
+            _imageSize = size;
             if (sizeChanged) _fitted = false;
             InvalidateArrange();
             InvalidateVisual();
@@ -58,8 +61,7 @@ public sealed class PhotoView : Control
 
     public void Fit()
     {
-        if (_image is null || Bounds.Width < 10) return;
-        var s = _image.PixelSize;
+        if (_imageSize is not { } s || Bounds.Width < 10) return;
         _zoom = Math.Min(Bounds.Width / s.Width, Bounds.Height / s.Height);
         _offset = new((Bounds.Width - s.Width * _zoom) / 2, (Bounds.Height - s.Height * _zoom) / 2);
         _fitted = true;
@@ -73,11 +75,11 @@ public sealed class PhotoView : Control
         return r;
     }
 
-    Point ToScreen(Vec2 n) => _image is null ? default
-        : new(_offset.X + n.X * _image.PixelSize.Width * _zoom, _offset.Y + n.Y * _image.PixelSize.Height * _zoom);
+    Point ToScreen(Vec2 n) => _imageSize is not { } s ? default
+        : new(_offset.X + n.X * s.Width * _zoom, _offset.Y + n.Y * s.Height * _zoom);
 
-    Vec2 ToNorm(Point p) => _image is null ? default
-        : new((p.X - _offset.X) / _zoom / _image.PixelSize.Width, (p.Y - _offset.Y) / _zoom / _image.PixelSize.Height);
+    Vec2 ToNorm(Point p) => _imageSize is not { } s ? default
+        : new((p.X - _offset.X) / _zoom / s.Width, (p.Y - _offset.Y) / _zoom / s.Height);
 
     /// <summary>Distance in screen pixels between a normalised point and a screen point.</summary>
     public double ScreenDistance(Vec2 n, Vec2 other) => Dist(ToScreen(n), ToScreen(other));
@@ -87,13 +89,12 @@ public sealed class PhotoView : Control
     public override void Render(DrawingContext ctx)
     {
         ctx.FillRectangle(new SolidColorBrush(Color.Parse("#0E1014")), new Rect(Bounds.Size));
-        if (_image is null)
+        if (_image is null || _imageSize is not { } s)
         {
             var t = new FormattedText("No photo yet", CultureInfo.InvariantCulture, FlowDirection.LeftToRight, Typeface.Default, 14, Brushes.Gray);
             ctx.DrawText(t, new Point((Bounds.Width - t.Width) / 2, (Bounds.Height - t.Height) / 2));
             return;
         }
-        var s = _image.PixelSize;
         ctx.DrawImage(_image, new Rect(0, 0, s.Width, s.Height), new Rect(_offset.X, _offset.Y, s.Width * _zoom, s.Height * _zoom));
         foreach (var m in _markers)
         {
@@ -118,12 +119,12 @@ public sealed class PhotoView : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        if (_image is null) return;
+        if (_imageSize is not { } s) return;
         var p = e.GetPosition(this);
         var n = ToNorm(p);
-        double fit = Math.Min(Bounds.Width / _image.PixelSize.Width, Bounds.Height / _image.PixelSize.Height);
+        double fit = Math.Min(Bounds.Width / s.Width, Bounds.Height / s.Height);
         _zoom = Math.Clamp(_zoom * Math.Pow(1.2, e.Delta.Y), fit * 0.5, 8);
-        _offset = new(p.X - n.X * _image.PixelSize.Width * _zoom, p.Y - n.Y * _image.PixelSize.Height * _zoom);
+        _offset = new(p.X - n.X * s.Width * _zoom, p.Y - n.Y * s.Height * _zoom);
         InvalidateVisual();
         e.Handled = true;
     }
