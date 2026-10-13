@@ -378,6 +378,33 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task AutoFocusWaitsForTheMachineAndReturnsTheNewZ()
+    {
+        await using var client = await Connected();
+        Assert.Equal(9.5, await client.AutoFocusAsync());
+        Assert.Equal(["P_AUTOFOCUS"], _fake.Modes);
+        var start = _fake.Requests.Single(r => Url(r) == "/v1/laser-head/focus/control");
+        Assert.Equal("POST", start["method"]!.GetValue<string>());
+        Assert.Equal("auto_start", start["data"]!["action"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task AutoFocusStoppedOrSilentReturnsToIdleWithAReadableError()
+    {
+        await using var client = await Connected();
+        _fake.FocusOutcome = "FOCUS_STOPED";
+        var e = await Assert.ThrowsAsync<DeviceException>(() => client.AutoFocusAsync());
+        Assert.Contains("button", e.Message);
+        Assert.Equal(["P_AUTOFOCUS", "P_IDLE"], _fake.Modes);
+
+        _fake.FocusOutcome = null;
+        var t = await Assert.ThrowsAsync<DeviceException>(() => client.AutoFocusAsync(TimeSpan.FromMilliseconds(200)));
+        Assert.Contains("didn't finish", t.Message);
+        Assert.Equal("P_IDLE", _fake.Modes.Last());
+        Assert.Equal(27.058, _fake.HeadZ); // never moved
+    }
+
+    [Fact]
     public async Task ButtonPairing()
     {
         _fake.ParityCode = 406;
@@ -581,6 +608,10 @@ sealed class FakeDevice : IAsyncDisposable
     public ConcurrentQueue<string> Functions { get; } = new();
     public int WindowRequests;
     bool _gapCheck;
+    public double HeadZ = 27.058;
+    /// <summary>Event the fake sends after auto_start (null = never answers).</summary>
+    public string? FocusOutcome = "FOCUS_FINISHED";
+    public readonly System.Collections.Concurrent.ConcurrentQueue<string> Modes = new();
     bool _beep = true;
 
     public IReadOnlyList<JsonObject> Requests => [.. _requests];
@@ -709,7 +740,25 @@ sealed class FakeDevice : IAsyncDisposable
                 await Reply(req, 0, new JsonObject { ["progress"] = 2 });
                 break;
             case "/v1/laser-head/focus/parameter":
-                await Reply(req, 0, new JsonObject { ["value"] = 27.058 });
+                await Reply(req, 0, new JsonObject { ["value"] = HeadZ });
+                break;
+            case "/v1/device/mode":
+                Modes.Enqueue(data!["mode"]!.GetValue<string>());
+                await Reply(req, 0);
+                break;
+            case "/v1/laser-head/focus/control":
+                await Reply(req, 0);
+                if (data!["action"]!.GetValue<string>() == "auto_start" && FocusOutcome is { } outcome)
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(50);
+                        if (outcome == "FOCUS_FINISHED") HeadZ = 9.5;
+                        await PushAsync(new JsonObject
+                        {
+                            ["type"] = "request", ["method"] = "REPORT", ["url"] = "/v1/device/report",
+                            ["data"] = new JsonObject { ["module"] = "STATUS_CONTROLLER", ["type"] = outcome, ["info"] = outcome == "FOCUS_STOPED" ? "Button" : "" },
+                        }.ToJsonString());
+                    });
                 break;
             case "/v1/device/configs":
                 if (req["method"]!.GetValue<string>() == "PUT")

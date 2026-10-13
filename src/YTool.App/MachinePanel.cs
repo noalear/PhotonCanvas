@@ -116,7 +116,8 @@ public sealed class MachinePanel : UserControl
         calibrate.Click += async (_, _) => await OpenCalibration();
         _opacity.Value = _settings.CameraOpacity;
         _opacity.ValueChanged += (_, _) => { _settings.CameraOpacity = _opacity.Value; _settings.Save(); OverlayOpacityChanged?.Invoke(_opacity.Value); };
-        _onCanvas.IsChecked = _settings.CameraOnWorkArea && _calibrations.Count > 0;
+        // Always start with the camera on the work area when it is calibrated; a photo is taken once connected.
+        _onCanvas.IsChecked = _calibrations.Count > 0;
         _overlayWanted = _onCanvas.IsChecked == true;
         _onCanvas.IsCheckedChanged += async (_, _) =>
         {

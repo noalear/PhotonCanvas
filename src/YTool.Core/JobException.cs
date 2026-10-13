@@ -8,7 +8,8 @@ namespace YTool.Core;
 /// </summary>
 public class JobException(string message) : Exception(message)
 {
-    internal static void CheckRange(string what, double value, double min, double max, string unit)
+    /// <summary>Throws a readable error when <paramref name="value"/> is outside min–max.</summary>
+    public static void CheckRange(string what, double value, double min, double max, string unit)
     {
         if (!double.IsFinite(value))
             throw new JobException($"{what} is not a valid number");

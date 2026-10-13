@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using YTool.Core;
+using YTool.Core.Imaging;
 
 namespace YTool.Doc;
 
@@ -12,6 +13,8 @@ public enum LayerMode
     Score,
     /// <summary>Zigzag-fill the inside of closed shapes (holes respected).</summary>
     Fill,
+    /// <summary>Engrave pictures as dots (dithered), one laser pulse per dot.</summary>
+    Image,
 }
 
 /// <summary>
@@ -35,6 +38,12 @@ public sealed record Layer
     public LaserSettings Laser { get; init; } = LaserSettings.Blue(70, 40);
     /// <summary>Fill only: scan lines per centimetre.</summary>
     public double LinesPerCm { get; init; } = 100;
+    /// <summary>Image only: dots per inch (pitch = 25.4 / dpi mm).</summary>
+    public double Dpi { get; init; } = 180;
+    /// <summary>Image only: how long each dot fires, µs (multiple of 10).</summary>
+    public int DotUs { get; init; } = 200;
+    /// <summary>Image only: how grey tones become dots.</summary>
+    public DitherMethod Dither { get; init; } = DitherMethod.Jarvis;
 
     /// <summary>A palette that stays distinguishable on dark and light canvases.</summary>
     public static readonly IReadOnlyList<uint> Palette =
@@ -48,7 +57,8 @@ public sealed record Layer
         Name = $"Layer {index + 1}",
         Color = Palette[index % Palette.Count],
         Mode = mode,
-        Laser = mode == LayerMode.Fill ? LaserSettings.Blue(30, 400) :
+        Laser = mode == LayerMode.Image ? LaserSettings.Blue(90, 80) :
+            mode == LayerMode.Fill ? LaserSettings.Blue(30, 400) :
             mode == LayerMode.Score ? LaserSettings.Blue(20, 200) : LaserSettings.Blue(70, 40),
     };
 }

@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using YTool.Core;
+using YTool.Core.Imaging;
 
 namespace YTool.Doc;
 
@@ -58,10 +59,30 @@ public static class JobBuilder
 
         foreach (var layer in layers)
         {
-            var shapes = s.ShapesOn(layer.Id).OfType<PathShape>().ToList();
-            if (shapes.Count == 0) continue;
+            var onLayer = s.ShapesOn(layer.Id).ToList();
+            if (onLayer.Count == 0) continue;
             try { layer.Laser.Validate(opt.Machine); }
             catch (JobException e) { throw new JobException($"Layer \"{layer.Name}\": {e.Message}"); }
+
+            var images = onLayer.OfType<ImageShape>().ToList();
+            var shapes = onLayer.OfType<PathShape>().ToList();
+            if (layer.Mode == LayerMode.Image)
+            {
+                if (shapes.Count > 0)
+                    warnings.Add($"Layer \"{layer.Name}\" is an Image layer, so its {shapes.Count} vector shape(s) were skipped. Move them to a Cut, Score or Fill layer.");
+                foreach (var img in images)
+                {
+                    var (block, area) = Rasterize(img, layer);
+                    if (block is null) continue;
+                    blocks.Add(block);
+                    steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));
+                    bounds = bounds.Union(area);
+                }
+                continue;
+            }
+            if (images.Count > 0)
+                warnings.Add($"Layer \"{layer.Name}\" is a {layer.Mode} layer, so its {images.Count} image(s) were skipped. Put images on an Image layer to engrave them, or trace them into vectors.");
+            if (shapes.Count == 0) continue;
 
             if (layer.Mode == LayerMode.Fill)
             {
@@ -117,7 +138,13 @@ public static class JobBuilder
         foreach (var l in layers.Where(l => s.ShapesOn(l.Id).Any()))
             prms.Add(new JsonObject
             {
-                ["processingType"] = l.Mode == LayerMode.Fill ? "FILL_VECTOR_ENGRAVING" : l.Mode == LayerMode.Score ? "VECTOR_ENGRAVING" : "VECTOR_CUTTING",
+                ["processingType"] = l.Mode switch
+                {
+                    LayerMode.Fill => "FILL_VECTOR_ENGRAVING",
+                    LayerMode.Score => "VECTOR_ENGRAVING",
+                    LayerMode.Image => "BITMAP_ENGRAVING",
+                    _ => "VECTOR_CUTTING",
+                },
                 ["processingLightSource"] = l.Laser.Light.Wire(),
                 ["power"] = l.Laser.Power,
                 ["speed"] = l.Laser.Speed,
@@ -134,6 +161,53 @@ public static class JobBuilder
             Created = now ?? DateTimeOffset.Now,
         });
         return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps);
+    }
+
+    /// <summary>Most dots a single image may produce (keeps files and memory sane).</summary>
+    const long MaxImageCells = 40_000_000;
+
+    /// <summary>
+    /// Resample an image onto the machine's dot grid (axis-aligned, so rotated
+    /// images work), apply its tone settings and dither it. Returns the dot
+    /// block and the area it covers, or null when nothing would burn.
+    /// </summary>
+    public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer)
+    {
+        JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
+        double pitch = 25.4 / layer.Dpi;
+        var b = img.Bounds;
+        int cols = Math.Max(1, (int)Math.Floor(b.Width / pitch + 1e-9));
+        int rows = Math.Max(1, (int)Math.Floor(b.Height / pitch + 1e-9));
+        if ((long)cols * rows > MaxImageCells)
+            throw new JobException($"Image \"{img.Name}\" at {layer.Dpi:0} dpi needs {(long)cols * rows / 1e6:0.#} million dots. Lower the resolution or make it smaller.");
+        if (!img.Transform.IsInvertible) return (null, b);
+        var toLocal = img.Transform.Invert();
+        var origin = new Vec2(b.MinX + pitch / 2, b.MinY + pitch / 2);
+        var tone = img.Tone;
+        var grey = new float[cols * rows];
+        Parallel.For(0, rows, r =>
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                var local = toLocal.Apply(new Vec2(origin.X + c * pitch, origin.Y + r * pitch));
+                float v;
+                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y) v = 1f; // outside the picture
+                else
+                {
+                    var px = img.LocalToPixel(local);
+                    v = (float)tone.Apply(img.Source.SampleLuminance(px.X, px.Y));
+                }
+                grey[r * cols + c] = v;
+            }
+        });
+        var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither);
+        if (!dots.Any(d => d)) return (null, b);
+        var bitmap = new Bitmap(cols, rows);
+        Array.Copy(dots, bitmap.Bits, dots.Length);
+        var block = new DotBlock(bitmap, origin, layer.Laser, layer.Dpi, layer.DotUs,
+            Math.Min(1, layer.Laser.Power), Core.Imaging.Dither.WireName(layer.Dither));
+        var area = new Rect2(origin.X, origin.Y, origin.X + (cols - 1) * pitch, origin.Y + (rows - 1) * pitch);
+        return (block, area);
     }
 
     /// <summary>

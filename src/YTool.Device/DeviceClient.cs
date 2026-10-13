@@ -875,6 +875,66 @@ public sealed class DeviceClient : IAsyncDisposable
         return !gapCheck;
     }
 
+    /// <summary>
+    /// Auto-focus. On V2 firmware the machine measures the material and moves
+    /// the head itself; we switch it to focus mode, start it, and wait for
+    /// FOCUS_FINISHED (or FOCUS_STOPED, e.g. its button). Returns the new head Z.
+    /// On any failure the machine is put back to idle.
+    /// </summary>
+    public async Task<double> AutoFocusAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        var outcome = new TaskCompletionSource<DeviceEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnEvent(DeviceEvent ev)
+        {
+            if (ev.Type is "FOCUS_FINISHED" or "FOCUS_STOPED" or "AXIS_HOME_STARTED") outcome.TrySetResult(ev);
+        }
+        EventReceived += OnEvent;
+        try
+        {
+            await RequestAsync("PUT", "/v1/device/mode", new JsonObject { ["mode"] = "P_AUTOFOCUS" }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            await RequestAsync("POST", "/v1/laser-head/focus/control", new JsonObject { ["action"] = "auto_start" },
+                timeout: TimeSpan.FromSeconds(60), cancellationToken: cancellationToken).ConfigureAwait(false);
+            DeviceEvent ev;
+            try
+            {
+                ev = await outcome.Task.WaitAsync(timeout ?? TimeSpan.FromMinutes(2), cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new DeviceException(DeviceException.FocusFailedCode, "Auto-focus didn't finish within 2 minutes.");
+            }
+            if (ev.Type != "FOCUS_FINISHED")
+                throw new DeviceException(DeviceException.FocusFailedCode,
+                    ev.Type == "AXIS_HOME_STARTED" ? "Auto-focus was interrupted: the machine started homing its Z axis."
+                    : ev.InfoText == "Button" ? "Auto-focus was stopped with the machine's button."
+                    : $"Auto-focus stopped{(string.IsNullOrEmpty(ev.InfoText) ? "" : $" ({ev.InfoText})")}.");
+            return await GetHeadZAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is DeviceException or OperationCanceledException)
+        {
+            await ReturnToIdleAsync().ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            EventReceived -= OnEvent;
+        }
+    }
+
+    /// <summary>Put the machine back to idle (how the stock app abandons focusing). Never throws.</summary>
+    public async Task ReturnToIdleAsync()
+    {
+        if (!IsConnected) return;
+        try
+        {
+            await SendRequestAsync("PUT", "/v1/device/mode", new JsonObject { ["mode"] = "P_IDLE" }, null, TimeSpan.FromSeconds(10), CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is DeviceException or OperationCanceledException or IOException or System.Net.WebSockets.WebSocketException)
+        {
+            // Best effort: the machine also returns to idle on its own after a stop.
+        }
+    }
+
     /// <summary>Whether the machine's beeper sounds (button presses, job start/end). Stored on the machine.</summary>
     public async Task<bool> GetBeeperEnabledAsync(CancellationToken cancellationToken = default)
     {

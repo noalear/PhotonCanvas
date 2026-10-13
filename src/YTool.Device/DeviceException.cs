@@ -21,6 +21,8 @@ public class DeviceException : Exception
     public const int ChecksumMismatchCode = -1005;
     /// <summary>The device is not idle, so a job can't be uploaded.</summary>
     public const int BusyCode = -1006;
+    /// <summary>Auto-focus ended without a result (stopped, failed or timed out).</summary>
+    public const int FocusFailedCode = -1007;
 
     public DeviceException(int code, string message, JsonNode? data = null, Exception? inner = null)
         : base(message, inner)

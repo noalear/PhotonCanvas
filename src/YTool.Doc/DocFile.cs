@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using YTool.Core;
+using YTool.Core.Imaging;
 
 namespace YTool.Doc;
 
@@ -37,20 +38,45 @@ public static class DocFile
                     ["frequencyKhz"] = l.Laser.FrequencyKhz,
                 },
                 ["linesPerCm"] = l.LinesPerCm,
+                ["dpi"] = l.Dpi,
+                ["dotUs"] = l.DotUs,
+                ["dither"] = l.Dither.ToString(),
             });
         var shapes = new JsonArray();
-        foreach (var sh in s.Shapes.OfType<PathShape>())
+        foreach (var sh in s.Shapes)
         {
             var t = sh.Transform;
-            shapes.Add(new JsonObject
+            var o = new JsonObject
             {
                 ["id"] = sh.Id.ToString(),
                 ["name"] = sh.Name,
                 ["layer"] = sh.LayerId.ToString(),
-                ["type"] = "path",
-                ["d"] = sh.Geometry.ToSvgPathData(),
                 ["transform"] = new JsonArray(t.A, t.B, t.C, t.D, t.E, t.F),
-            });
+            };
+            switch (sh)
+            {
+                case PathShape p:
+                    o["type"] = "path";
+                    o["d"] = p.Geometry.ToSvgPathData();
+                    break;
+                case ImageShape im:
+                    o["type"] = "image";
+                    o["width"] = im.SizeMm.X;
+                    o["height"] = im.SizeMm.Y;
+                    o["tone"] = new JsonObject
+                    {
+                        ["brightness"] = im.Tone.Brightness,
+                        ["contrast"] = im.Tone.Contrast,
+                        ["gamma"] = im.Tone.Gamma,
+                        ["invert"] = im.Tone.Invert,
+                    };
+                    // The original file, so nothing is lost by saving.
+                    o["data"] = Convert.ToBase64String(im.Source.Encoded);
+                    break;
+                default:
+                    continue;
+            }
+            shapes.Add(o);
         }
         var root = new JsonObject
         {
@@ -100,6 +126,9 @@ public static class DocFile
                     Mode = Enum.TryParse<LayerMode>(n["mode"]?.GetValue<string>(), true, out var m) ? m : LayerMode.Cut,
                     Laser = laser,
                     LinesPerCm = n["linesPerCm"]?.GetValue<double>() ?? 100,
+                    Dpi = n["dpi"]?.GetValue<double>() ?? 180,
+                    DotUs = n["dotUs"]?.GetValue<int>() ?? 200,
+                    Dither = Enum.TryParse<DitherMethod>(n["dither"]?.GetValue<string>(), true, out var dm) ? dm : DitherMethod.Jarvis,
                 });
             }
             if (layers.Count == 0) layers.Add(Layer.Default(0));
@@ -108,16 +137,33 @@ public static class DocFile
             var shapes = ImmutableList.CreateBuilder<Shape>();
             foreach (var n in root["shapes"]?.AsArray() ?? [])
             {
-                if (n?["type"]?.GetValue<string>() != "path") continue;
+                var type = n?["type"]?.GetValue<string>();
+                if (n is null || type is not ("path" or "image")) continue;
                 var t = n["transform"]?.AsArray().Select(v => v!.GetValue<double>()).ToArray();
                 var layer = Guid.TryParse(n["layer"]?.GetValue<string>(), out var lid) && layerIds.Contains(lid) ? lid : layers[0].Id;
-                shapes.Add(new PathShape
+                var id = Guid.TryParse(n["id"]?.GetValue<string>(), out var gid) ? gid : Guid.NewGuid();
+                var name = n["name"]?.GetValue<string>() ?? "";
+                var transform = t is { Length: 6 } ? new Affine(t[0], t[1], t[2], t[3], t[4], t[5]) : Affine.Identity;
+                if (type == "path")
                 {
-                    Id = Guid.TryParse(n["id"]?.GetValue<string>(), out var id) ? id : Guid.NewGuid(),
-                    Name = n["name"]?.GetValue<string>() ?? "",
-                    LayerId = layer,
-                    Geometry = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? ""),
-                    Transform = t is { Length: 6 } ? new Affine(t[0], t[1], t[2], t[3], t[4], t[5]) : Affine.Identity,
+                    shapes.Add(new PathShape
+                    {
+                        Id = id, Name = name, LayerId = layer, Transform = transform,
+                        Geometry = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? ""),
+                    });
+                    continue;
+                }
+                var tone = n["tone"];
+                shapes.Add(new ImageShape
+                {
+                    Id = id, Name = name, LayerId = layer, Transform = transform,
+                    Source = ImageSource.FromEncoded(Convert.FromBase64String(n["data"]!.GetValue<string>())),
+                    SizeMm = new Vec2(n["width"]!.GetValue<double>(), n["height"]!.GetValue<double>()),
+                    Tone = new ToneAdjust(
+                        tone?["brightness"]?.GetValue<double>() ?? 0,
+                        tone?["contrast"]?.GetValue<double>() ?? 0,
+                        tone?["gamma"]?.GetValue<double>() ?? 1,
+                        tone?["invert"]?.GetValue<bool>() ?? false),
                 });
             }
             return new DocState(layers.ToImmutable(), shapes.ToImmutable());
