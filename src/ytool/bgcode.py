@@ -4,7 +4,7 @@ Format, worked out from real files (see docs/protocol-f2-ultra.md):
 - lines end with 0x0A
 - 0xC3 starts a comment; the rest of the line is ASCII ("# ...")
 - 0xE1..0xFA are the letters A..Z
-- 0xC0 is a space, 0xCE a decimal point, 0xCD a minus sign
+- 0xC0 is a space, 0xCE a decimal point, 0xCD a minus sign, 0xC2 a double quote
 - other bytes are packed BCD digit pairs (0x43 -> "43")
 
 Unknown bytes are printed as <xx> so new tokens stand out.
@@ -13,7 +13,7 @@ Usage: python -m ytool.bgcode motion.bgcode [out.gcode]
 """
 import sys
 
-SPECIAL = {0xC0: " ", 0xCE: ".", 0xCD: "-", 0xC2: ""}
+SPECIAL = {0xC0: " ", 0xCE: ".", 0xCD: "-", 0xC2: "\""}
 
 
 def decode(data: bytes) -> str:
