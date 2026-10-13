@@ -1018,6 +1018,40 @@ public sealed class DeviceClient : IAsyncDisposable
             cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
+    // ---- pointer lights (kept out of camera photos) --------------------------------------------
+
+    /// <summary>
+    /// Brightness the machine uses for its centre pointer (config <c>focusPower</c>), or null if
+    /// it doesn't say. Needed to put the pointer back after <see cref="SetPointerPowerAsync"/>(0).
+    /// </summary>
+    public async Task<double?> GetFocusPowerAsync(CancellationToken cancellationToken = default)
+    {
+        const string url = "/v1/device/configs";
+        var data = AsObject(await GetAsync(url, new JsonObject
+        {
+            ["alias"] = "config",
+            ["type"] = "user",
+            ["kv"] = new JsonArray("focusPower"),
+        }, cancellationToken: cancellationToken).ConfigureAwait(false), url);
+        return data["focusPower"] is JsonValue v && v.TryGetValue<double>(out var p) ? p : null;
+    }
+
+    /// <summary>
+    /// The auto-focus IR light on or off (<c>PUT /v1/peripheral/param?type=ir_led</c>), as xTool
+    /// Studio does around camera photos so it doesn't show in them.
+    /// </summary>
+    public Task SetIrLedAsync(bool on, CancellationToken cancellationToken = default) =>
+        RequestAsync("PUT", "/v1/peripheral/param", new JsonObject { ["action"] = on ? "on" : "off", ["index"] = 0 },
+            new JsonObject { ["type"] = "ir_led" }, cancellationToken: cancellationToken);
+
+    /// <summary>
+    /// Brightness of the centre pointer dot (<c>PUT /v1/laser-head/parameter {action: power}</c>);
+    /// 0 turns it off for photos, <see cref="GetFocusPowerAsync"/> puts it back. Not the cutting laser.
+    /// </summary>
+    public Task SetPointerPowerAsync(double value, CancellationToken cancellationToken = default) =>
+        RequestAsync("PUT", "/v1/laser-head/parameter", new JsonObject { ["action"] = "power", ["ctrl"] = "set", ["value"] = value },
+            cancellationToken: cancellationToken);
+
     /// <summary>Whether the machine's beeper sounds (button presses, job start/end). Stored on the machine.</summary>
     public async Task<bool> GetBeeperEnabledAsync(CancellationToken cancellationToken = default)
     {

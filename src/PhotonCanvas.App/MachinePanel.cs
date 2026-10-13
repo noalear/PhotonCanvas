@@ -50,6 +50,7 @@ public sealed class MachinePanel : UserControl
     readonly TextBox _log = new() { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Mono,Consolas,monospace"), FontSize = 11, Height = 160 };
     readonly List<string> _logLines = [];
     bool _updatingLid;
+    bool _liveHoldsPointers;
     MachineKeys _keys = MachineKeys.Load();
     readonly TextBlock _keysState = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _keysButton = Button("Set up connection keys…", tip: "One-time setup: reads the codes xTool machines expect from your own xTool Studio.");
@@ -325,6 +326,7 @@ public sealed class MachinePanel : UserControl
             _calState.Text = "Connect to the machine to take a photo.";
             return;
         }
+        await PointersOffAsync(); // once for the warm-up shot and any retakes
         try
         {
             if (_needsWarmup)
@@ -344,6 +346,7 @@ public sealed class MachinePanel : UserControl
         }
         catch (DeviceException e) { Log($"Photo failed: {e.Message}"); }
         catch (FormatException e) { Log($"Couldn't read the camera picture: {e.Message}"); }
+        finally { await PointersOnAsync(); }
     }
 
     /// <summary>Straighten a photo onto the 220 × 220 mm field and hand it to the canvas. Skips if one is already in progress.</summary>
@@ -389,17 +392,23 @@ public sealed class MachinePanel : UserControl
     {
         var choice = CalibrationSet.For(_calibrations, distanceMm)
             ?? throw new InvalidOperationException("The camera isn't calibrated yet (Machine tab → Calibrate camera).");
-        if (_needsWarmup)
+        byte[] jpg;
+        await PointersOffAsync();
+        try
         {
-            _needsWarmup = false;
-            await SnapshotAsync(0);
-        }
-        var jpg = await SnapshotAsync(0);
-        for (int retry = 0; retry < 3 && await Task.Run(() => CameraWarp.IsOverexposed(jpg)); retry++)
-        {
-            await Task.Delay(400);
+            if (_needsWarmup)
+            {
+                _needsWarmup = false;
+                await SnapshotAsync(0);
+            }
             jpg = await SnapshotAsync(0);
+            for (int retry = 0; retry < 3 && await Task.Run(() => CameraWarp.IsOverexposed(jpg)); retry++)
+            {
+                await Task.Delay(400);
+                jpg = await SnapshotAsync(0);
+            }
         }
+        finally { await PointersOnAsync(); }
         _ = WarpForCanvas(jpg); // freshen the work-area picture too
         return await Task.Run(() =>
         {
@@ -415,13 +424,58 @@ public sealed class MachinePanel : UserControl
         return Distance;
     }
 
-    /// <summary>One camera photo (0 = overview, 1 = close-up), pausing live view around it.</summary>
+    /// <summary>One camera photo (0 = overview, 1 = close-up), pausing live view and the pointer lights around it.</summary>
     public async Task<byte[]> SnapshotAsync(int stream)
     {
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         var resume = await PauseLive();
+        await PointersOffAsync();
         try { return await c.SnapshotAsync(stream); }
-        finally { resume(); }
+        finally
+        {
+            await PointersOnAsync();
+            resume();
+        }
+    }
+
+    // ---- pointer lights out of photos ------------------------------------------------------
+
+    int _pointersOff;          // how many photo sessions want them off (nested calls count once)
+    bool _pointersAreOff;      // what we did on the machine
+    double? _focusPower;       // the centre pointer's own brightness, to put back
+
+    /// <summary>
+    /// Turn off the centre pointer and the auto-focus IR light so they don't show in photos
+    /// (as xTool Studio does). Only while the machine is idle or waiting with a job; never
+    /// during a job, frame or focus. Pair every call with <see cref="PointersOnAsync"/>.
+    /// </summary>
+    async Task PointersOffAsync()
+    {
+        if (++_pointersOff > 1 || _pointersAreOff || _client is not { } c || !c.IsConnected) return;
+        if (Mode is not ("P_IDLE" or "P_WORK" or "")) return;
+        try
+        {
+            _focusPower ??= await c.GetFocusPowerAsync();
+            await c.SetIrLedAsync(false);
+            // Without knowing its brightness we couldn't put the pointer back, so leave it alone.
+            if (_focusPower is not null) await c.SetPointerPowerAsync(0);
+            _pointersAreOff = true;
+            await Task.Delay(100); // let them go dark before the shutter
+        }
+        catch (DeviceException e) { AppLog.Write("machine", $"Couldn't turn the pointer lights off for a photo: {e.Message}"); }
+    }
+
+    async Task PointersOnAsync()
+    {
+        if (_pointersOff > 0 && --_pointersOff > 0) return;
+        if (!_pointersAreOff || _client is not { } c || !c.IsConnected) return;
+        _pointersAreOff = false;
+        try
+        {
+            await c.SetIrLedAsync(true);
+            if (_focusPower is { } p) await c.SetPointerPowerAsync(p);
+        }
+        catch (DeviceException e) { Log($"Couldn't turn the pointer lights back on: {e.Message}"); }
     }
 
     void Ui(Action a) => Dispatcher.UIThread.Post(a);
@@ -605,6 +659,9 @@ public sealed class MachinePanel : UserControl
         _camera?.Cancel();
         SetDisconnectedUi(why);
         SetFraming(false);
+        _pointersOff = 0;
+        _pointersAreOff = false;
+        _focusPower = null;
         Log(why);
         ConnectionChanged?.Invoke();
         await c.DisposeAsync();
@@ -886,7 +943,12 @@ public sealed class MachinePanel : UserControl
     {
         _camera?.Cancel();
         _camera = null;
-        if (_live.IsChecked != true || _client is null) return;
+        // Pointer lights stay off for the whole live view (not toggled every frame, nor when
+        // live view merely pauses for a single photo).
+        bool wantLive = _live.IsChecked == true && _client is not null;
+        if (wantLive && !_liveHoldsPointers) { _liveHoldsPointers = true; _ = PointersOffAsync(); }
+        else if (!wantLive && _liveHoldsPointers) { _liveHoldsPointers = false; _ = PointersOnAsync(); }
+        if (!wantLive) return;
         var cts = _camera = new CancellationTokenSource();
         int stream = Math.Max(0, _stream.SelectedIndex);
         _cameraTask = Task.Run(async () =>

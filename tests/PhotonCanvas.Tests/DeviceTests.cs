@@ -610,6 +610,23 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TurnsThePointerLightsOffAndBackLikeXToolStudio()
+    {
+        await using var client = await Connected();
+        Assert.Equal(21, await client.GetFocusPowerAsync());
+        await client.SetIrLedAsync(false);
+        await client.SetPointerPowerAsync(0);
+        await client.SetIrLedAsync(true);
+        await client.SetPointerPowerAsync(21);
+        var ir = _fake.Requests.Where(r => Url(r) == "/v1/peripheral/param" && r["params"]?["type"]?.GetValue<string>() == "ir_led").ToList();
+        Assert.Equal(["off", "on"], ir.Select(r => r["data"]!["action"]!.GetValue<string>()));
+        Assert.All(ir, r => Assert.Equal(0, r["data"]!["index"]!.GetValue<int>()));
+        var head = _fake.Requests.Where(r => Url(r) == "/v1/laser-head/parameter").Select(r => r["data"]!).ToList();
+        Assert.Equal([0.0, 21.0], head.Select(d => d["value"]!.GetValue<double>()));
+        Assert.All(head, d => Assert.Equal(("power", "set"), (d["action"]!.GetValue<string>(), d["ctrl"]!.GetValue<string>())));
+    }
+
+    [Fact]
     public async Task UsesTheCallersTaskId()
     {
         await using var client = await Connected();
@@ -918,7 +935,7 @@ sealed class FakeDevice : IAsyncDisposable
                     // Reply with only the keys asked for, like the firmware.
                     var reply = new JsonObject();
                     foreach (var key in data!["kv"]!.AsArray().Select(k => k!.GetValue<string>()))
-                        reply[key] = key == "beepEnable" ? _beep : _gapCheck;
+                        reply[key] = key switch { "beepEnable" => _beep, "focusPower" => 21, _ => _gapCheck };
                     await Reply(req, 0, reply);
                 }
                 break;
@@ -928,6 +945,7 @@ sealed class FakeDevice : IAsyncDisposable
                 break;
             case "/v1/processing/upload/config":
             case "/v1/processing/frame/replace":
+            case "/v1/laser-head/parameter":
                 await Reply(req, 0);
                 break;
             case "/v1/camera/snap":
