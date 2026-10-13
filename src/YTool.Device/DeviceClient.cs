@@ -842,13 +842,42 @@ public sealed class DeviceClient : IAsyncDisposable
         return MachineInfo.Parse(AsObject(await GetAsync(url, cancellationToken: cancellationToken).ConfigureAwait(false), url));
     }
 
-    /// <summary><c>curMode.mode</c> of <c>/v1/device/runtime-infos</c>, e.g. <c>P_IDLE</c>, <c>P_WORK</c>, <c>P_WORKING</c>.</summary>
-    public async Task<string> GetRuntimeModeAsync(CancellationToken cancellationToken = default)
+    /// <summary>
+    /// The machine's state, with the mode in the same words its MODE_CHANGE events use
+    /// (<c>P_IDLE</c>, <c>P_WORK</c>, <c>P_WORKING</c>, <c>P_PAUSE</c>…; see <see cref="NormalizeMode"/>).
+    /// </summary>
+    public async Task<RuntimeState> GetRuntimeStateAsync(CancellationToken cancellationToken = default)
     {
         const string url = "/v1/device/runtime-infos";
         var data = AsObject(await GetAsync(url, cancellationToken: cancellationToken).ConfigureAwait(false), url);
-        return Json.Str(data["curMode"] as JsonObject, "mode")
+        var cur = data["curMode"] as JsonObject;
+        string raw = Json.Str(cur, "mode")
             ?? throw new DeviceException(DeviceException.ProtocolErrorCode, $"{url}: the reply had no curMode.mode.", data);
+        string? sub = Json.Str(cur, "subMode"), desc = Json.Str(cur, "desc");
+        return new RuntimeState(NormalizeMode(raw, sub, desc), raw, sub, desc, Json.Str(cur, "taskId"));
+    }
+
+    /// <summary>The machine's mode, e.g. <c>P_IDLE</c>, <c>P_WORK</c>, <c>P_WORKING</c>.</summary>
+    public async Task<string> GetRuntimeModeAsync(CancellationToken cancellationToken = default) =>
+        (await GetRuntimeStateAsync(cancellationToken).ConfigureAwait(false)).Mode;
+
+    /// <summary>
+    /// runtime-infos reports a job as mode <c>Work</c> with a sub-mode (firmware 40.54:
+    /// <c>{"mode":"Work","subMode":"workReady"}</c> while waiting for the button), where
+    /// the events say <c>P_WORK</c>. This maps it to the event words, as xTool Studio does:
+    /// workReady → P_WORK, working → P_WORKING, workPause → P_PAUSE, framing → P_FRAMING.
+    /// </summary>
+    public static string NormalizeMode(string mode, string? subMode, string? desc)
+    {
+        if (mode != "Work") return mode;
+        if (desc is "frame" or "frameExt") return "P_FRAMING";
+        return subMode switch
+        {
+            "workReady" => "P_WORK",
+            "working" => "P_WORKING",
+            "workPause" => "P_PAUSE",
+            _ => $"Work/{subMode}", // unknown: treated as busy, never replaced
+        };
     }
 
     /// <summary>Raw data of <c>/v1/processing/progress</c> (shape not yet documented).</summary>
@@ -1036,7 +1065,9 @@ public sealed class DeviceClient : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(xf);
         if (xf.Length == 0)
             throw new ArgumentException("The job file is empty.", nameof(xf));
-        string mode = await GetRuntimeModeAsync(cancellationToken).ConfigureAwait(false);
+        var state = await GetRuntimeStateAsync(cancellationToken).ConfigureAwait(false);
+        Log($"Before upload the machine reports {state.RawMode}/{state.SubMode} (task {state.TaskId ?? "none"}).");
+        string mode = state.Mode;
         if (mode == "P_WORK" && replaceLoadedJob)
         {
             Log("A job is already loaded and not started: cancelling it to make room.");
@@ -1076,6 +1107,7 @@ public sealed class DeviceClient : IAsyncDisposable
         "P_PAUSE" => "A job is paused on the machine. Continue or stop it, then send again.",
         "P_SLEEP" => "The machine is asleep. Press its button to wake it, then send again.",
         "P_AUTOFOCUS" or "P_MEASURE" => "The machine is measuring or focusing. Wait for it to finish, then send again.",
+        "P_FRAMING" => "The machine is tracing the outline (framing). Wait for it to finish or stop it, then send again.",
         "P_ERROR" => "The machine is reporting an error. Check it (the light or the Machine tab), then send again.",
         _ => $"The machine isn't ready for a new job (it reports \"{mode}\"). Wait a moment and try again.",
     };
@@ -1323,3 +1355,9 @@ internal sealed class FramedSocket(
         ws.Dispose();
     }
 }
+
+/// <summary>What the machine is doing (from <c>/v1/device/runtime-infos</c>).</summary>
+/// <param name="Mode">Normalised to the event words: P_IDLE, P_WORK (loaded, waiting for the button), P_WORKING, P_PAUSE…</param>
+/// <param name="RawMode">As reported, e.g. <c>Work</c>.</param>
+/// <param name="TaskId">The loaded or running job's task id, if any.</param>
+public sealed record RuntimeState(string Mode, string RawMode, string? SubMode, string? Desc, string? TaskId);

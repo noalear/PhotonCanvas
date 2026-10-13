@@ -5,6 +5,9 @@ using YTool.Doc;
 
 namespace YTool.App;
 
+/// <summary>A job this computer uploaded, so a loaded job can be recognised later.</summary>
+public sealed record SentJob(string TaskId, string Name, DateTime At);
+
 /// <summary>A saved set of layer settings, e.g. "3 mm basswood – cut".</summary>
 public sealed record Preset(string Name, LayerMode Mode, LaserSettings Laser, double LinesPerCm);
 
@@ -49,6 +52,8 @@ public sealed class AppSettings
     public int AcceptedTermsVersion { get; set; }
     /// <summary>Show the less common layer settings (kerf, tabs, overscan, fiber pulse…).</summary>
     public bool ShowAdvanced { get; set; }
+    /// <summary>The last jobs uploaded from this computer (newest first).</summary>
+    public List<SentJob> SentJobs { get; set; } = [];
 
     static readonly JsonSerializerOptions Json = new()
     {

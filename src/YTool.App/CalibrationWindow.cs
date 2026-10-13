@@ -159,12 +159,13 @@ public sealed class CalibrationWindow : Window
         var dist = _machine.Distance is { } d ? $"Machine focus distance: {d:0.0} mm.\n" : "";
         if (!await Dialogs.Confirm(this, "Burn calibration marks",
                 $"25 {(Spec.Style == MarkStyle.Cross ? "crosshairs" : "dots")} ({Spec.SizeMm:0.#} mm) plus 3 orientation dots across the whole 220 × 220 mm area, blue diode {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
-                "Make sure scrap material covers the whole area. After upload the machine waits; nothing fires until you press its start button.",
+                "Make sure scrap material covers the whole area. After upload the machine waits; nothing fires until you press its start button." +
+                (_machine.Mode == "P_WORK" ? "\n\nA job that's loaded on the machine but not started will be replaced." : ""),
                 "Upload", "Cancel")) return;
         try
         {
             _burnState.Text = "Uploading…";
-            await _machine.UploadJobAsync(xf, null, CancellationToken.None);
+            await _machine.UploadJobAsync(xf, null, CancellationToken.None, replaceLoadedJob: true, name: "Camera calibration marks");
             _burnState.Text = "Uploaded. Press the start button on the machine. When it finishes, take the photo (step 2).";
             if (_machine.Distance is { } md) _distance.Value = (decimal)Math.Round(md, 1);
         }

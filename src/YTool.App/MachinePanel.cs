@@ -604,11 +604,11 @@ public sealed class MachinePanel : UserControl
             {
                 try
                 {
-                    var mode = await c.GetRuntimeModeAsync(cts.Token);
+                    var state = await c.GetRuntimeStateAsync(cts.Token);
                     double? dist = null;
                     try { dist = await c.GetHeadZAsync(cts.Token) - _machine.ZOffset; }
                     catch (DeviceException) { }
-                    Ui(() => ShowStatus(mode, dist));
+                    Ui(() => { LoadedTaskId = state.TaskId; ShowStatus(state.Mode, dist); });
                 }
                 catch (DeviceException) { }
                 catch (OperationCanceledException) { break; }
@@ -639,6 +639,7 @@ public sealed class MachinePanel : UserControl
         if (changed) ModeChanged?.Invoke(mode);
         Distance = dist;
         _mode.Text = Describe(mode);
+        if (mode == "P_WORK" && LoadedJobDescription() is { } who) _mode.Text += $"\n{who}";
         _distance.Text = dist is { } d ? $"Focus distance {d:0.0} mm (head Z {d + _machine.ZOffset:0.00}). Set it on the machine or in its focus menu." : "";
         StatusChanged?.Invoke($"Machine: {Describe(mode)}" + (dist is { } dd ? $" · distance {dd:0.0} mm" : ""));
     }
@@ -669,10 +670,28 @@ public sealed class MachinePanel : UserControl
     static string? ModeOf(DeviceEvent ev) =>
         ev.Info is System.Text.Json.Nodes.JsonObject o ? o["mode"]?.ToString() : ev.InfoText;
 
+    /// <summary>Task id of the job on the machine (from the last status check or event).</summary>
+    public string? LoadedTaskId { get; private set; }
+
+    /// <summary>
+    /// Whose job is loaded: one sent from this computer (by name and time), or one
+    /// that came from somewhere else (xTool Studio, the phone app, another computer).
+    /// </summary>
+    public string? LoadedJobDescription()
+    {
+        if (LoadedTaskId is not { Length: > 0 } id) return null;
+        var sent = _settings.SentJobs.FirstOrDefault(j => j.TaskId == id);
+        return sent is not null
+            ? $"Loaded: \"{sent.Name}\", sent from this computer at {sent.At:HH:mm}."
+            : "Loaded: a job that wasn't sent from this program (e.g. xTool Studio, the phone app, or another computer).";
+    }
+
     void DescribeEvent(DeviceEvent ev)
     {
         if (ev.Type == "MODE_CHANGE")
         {
+            if (ev.Info is System.Text.Json.Nodes.JsonObject mo && mo["taskId"]?.ToString() is { Length: > 0 } tid)
+                LoadedTaskId = tid;
             if (ModeOf(ev) is { Length: > 0 } mode && mode != Mode)
             {
                 ShowStatus(mode, Distance);
@@ -871,14 +890,25 @@ public sealed class MachinePanel : UserControl
     }
 
     /// <summary>Upload a job. The machine then waits for its start button.</summary>
-    public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false)
+    public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job")
     {
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         var resume = await PauseLive();
         try
         {
-            await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob);
-            Log("Job uploaded. Press the start button on the machine.");
+            string taskId;
+            try { taskId = await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob); }
+            catch (DeviceException e)
+            {
+                Log($"Upload refused or failed: {e.Message}");
+                throw;
+            }
+            _settings.SentJobs.RemoveAll(j => j.TaskId == taskId);
+            _settings.SentJobs.Insert(0, new SentJob(taskId, name, DateTime.Now));
+            if (_settings.SentJobs.Count > 50) _settings.SentJobs.RemoveRange(50, _settings.SentJobs.Count - 50);
+            _settings.Save();
+            LoadedTaskId = taskId;
+            Log($"Job \"{name}\" uploaded. Press the start button on the machine.");
         }
         finally { resume(); }
     }

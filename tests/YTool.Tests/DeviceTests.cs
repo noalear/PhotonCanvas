@@ -543,9 +543,33 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReplacesALoadedJobAsReportedByFirmware4054()
+    {
+        // What the F2 Ultra actually reports while a job waits for its button.
+        (_fake.Mode, _fake.SubMode, _fake.Desc, _fake.TaskId) = ("Work", "workReady", "normal", "c2d7c087-caf9-4113-920d-0ae7c984aebf");
+        await using var client = await Connected();
+        var st = await client.GetRuntimeStateAsync();
+        Assert.Equal(("P_WORK", "c2d7c087-caf9-4113-920d-0ae7c984aebf"), (st.Mode, st.TaskId));
+        _fake.OnStateAction = a => { if (a == "stop") (_fake.Mode, _fake.SubMode, _fake.Desc) = ("P_IDLE", "", "normal"); };
+        await client.UploadJobAsync([4, 5, 6], replaceLoadedJob: true);
+        Assert.Equal(["stop"], _fake.States);
+    }
+
+    [Theory]
+    [InlineData("Work", "workReady", "normal", "P_WORK")]
+    [InlineData("Work", "working", "normal", "P_WORKING")]
+    [InlineData("Work", "workPause", "normal", "P_PAUSE")]
+    [InlineData("Work", "working", "frame", "P_FRAMING")]
+    [InlineData("Work", "somethingNew", "normal", "Work/somethingNew")]
+    [InlineData("P_IDLE", "", "normal", "P_IDLE")]
+    [InlineData("P_SLEEP", null, null, "P_SLEEP")]
+    public void NormalizesRuntimeModes(string mode, string? sub, string? desc, string expected) =>
+        Assert.Equal(expected, DeviceClient.NormalizeMode(mode, sub, desc));
+
+    [Fact]
     public async Task NeverCancelsARunningJobToUpload()
     {
-        _fake.Mode = "P_WORKING";
+        (_fake.Mode, _fake.SubMode) = ("Work", "working");
         await using var client = await Connected();
         await Assert.ThrowsAsync<DeviceException>(() => client.UploadJobAsync([1, 2, 3], replaceLoadedJob: true));
         Assert.Empty(_fake.States);
@@ -652,6 +676,9 @@ sealed class FakeDevice : IAsyncDisposable
     public int ParityCode { get; set; }
     public int AuthStatusPending { get; set; }
     public string Mode { get; set; } = "P_IDLE";
+    public string SubMode { get; set; } = "";
+    public string Desc { get; set; } = "";
+    public string? TaskId { get; set; }
     public Action<string>? OnStateAction { get; set; }
     public volatile bool AnswerPings = true;
     public byte[] DownloadFile { get; set; } = [];
@@ -787,7 +814,7 @@ sealed class FakeDevice : IAsyncDisposable
                     await Reply(req, 0, new JsonObject { ["sessionToken"] = "session-1", ["token"] = "button-token" });
                 break;
             case "/v1/device/runtime-infos":
-                await Reply(req, 0, new JsonObject { ["curMode"] = new JsonObject { ["mode"] = Mode, ["desc"] = "", ["subMode"] = "" } });
+                await Reply(req, 0, new JsonObject { ["curMode"] = new JsonObject { ["mode"] = Mode, ["desc"] = Desc, ["subMode"] = SubMode, ["taskId"] = TaskId } });
                 break;
             case "/v1/device/machineInfo":
                 await Reply(req, 0, JsonNode.Parse("""{"sn":"S1","gcodeFormat":["txt","bin"],"laserType":["RED","BLUE"],"laserPower":[60,40]}"""));
