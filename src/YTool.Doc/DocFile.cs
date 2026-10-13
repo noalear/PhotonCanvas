@@ -125,7 +125,7 @@ public static class DocFile
         catch (JsonException e) { throw new FormatException($"The project file is damaged ({e.Message})."); }
         if (root?["format"]?.GetValue<string>() != "ytool") throw new FormatException("This is not a YTool project file.");
         int version = root["version"]?.GetValue<int>() ?? 0;
-        if (version > Version) throw new FormatException("This project was saved by a newer version of YTool Studio.");
+        if (version > Version) throw new FormatException($"This project was saved by a newer version of {AppIdentity.ProductName}.");
 
         try
         {

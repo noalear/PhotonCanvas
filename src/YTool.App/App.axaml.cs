@@ -40,7 +40,7 @@ public partial class App : Application
                 try
                 {
                     await Dialogs.Message(owner, "Something went wrong",
-                        $"YTool Studio hit an unexpected problem but is still running; your design is untouched.\n\n" +
+                        $"{YTool.Core.AppIdentity.ProductName} hit an unexpected problem but is still running; your design is untouched.\n\n" +
                         $"{e.Exception.GetType().Name}: {e.Exception.Message}\n\nDetails were saved to {AppLog.CurrentFile}");
                 }
                 finally { _showingError = false; }

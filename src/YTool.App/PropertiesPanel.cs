@@ -33,7 +33,8 @@ public sealed class PropertiesPanel : UserControl
 
     // layer settings
     readonly TextBlock _layerTitle = new() { Classes = { "h" } };
-    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut (outline)", "Score (light outline)", "Fill (engrave inside)", "Image (engrave picture)" } };
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut through", "Score a line", "Engrave area (fill)", "Engrave picture" } };
+    readonly CheckBox _advanced = new() { Content = "Show advanced settings" };
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
     readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
     readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth, default)", "Floyd–Steinberg", "Stucki", "Atkinson (high contrast)", "Bayer (regular pattern)", "Threshold (line art)" } };
@@ -227,19 +228,23 @@ public sealed class PropertiesPanel : UserControl
                 Children =
                 {
                     _layerTitle,
-                    Field("Mode", _mode, tip: "Cut and Score both follow the outline (Score usually lighter, and run first). Fill scans back and forth to engrave the inside of closed shapes."),
+                    Field("What to do", _mode, tip: "Cut and Score both follow the outline (Score is lighter, and runs first). Engrave the area scans back and forth to burn the inside of closed shapes. Pictures engrave as fine dots."),
                     Field("Laser", _light, tip: "Blue: 40 W diode. Red: 60 W MOPA fiber. Blue diode for wood, leather, acrylic, paper. Red fiber for metals and some plastics."),
-                    Field("Power", _power, tip: "Percent of the laser's full power."),
-                    Field("Speed", _speed, tip: "How fast the beam moves while firing, mm/s. Slower = deeper/darker."),
+                    Field("Power %", _power, tip: "Percent of the laser's full power."),
+                    Field("Speed mm/s", _speed, tip: "How fast the beam moves while firing, mm/s. Slower = deeper/darker."),
                     Field("Passes", _passes, _passHint, "How many times this layer is processed."),
                     _lpcmRow, _dpiRow, _dotRow, _ditherRow, _pulseRow, _freqRow,
                     _cutExtras, _fillExtras, _imageExtras,
+                    _advanced,
                     new Separator { Margin = new(0, 4) },
                     _presets,
                     Row(savePreset, delPreset),
                 },
             },
         };
+        _advanced.IsChecked = _settings.ShowAdvanced;
+        ToolTip.SetTip(_advanced, "Kerf, tabs, overcut, lead-in, scan angle, overscan, dot time and fiber pulse settings. The defaults work for most jobs.");
+        _advanced.IsCheckedChanged += (_, _) => { _settings.ShowAdvanced = _advanced.IsChecked == true; _settings.Save(); RefreshLayer(); };
         _mode.SelectionChanged += (_, _) => EditLayers("Layer mode", l => l with { Mode = (LayerMode)Math.Max(0, _mode.SelectedIndex) }, _mode.SelectedIndex >= 0);
         _light.SelectionChanged += (_, _) => EditLayers("Laser source", l => l with { Laser = l.Laser with { Light = _light.SelectedIndex == 1 ? LightSource.Red : LightSource.Blue } }, _light.SelectedIndex >= 0);
         _power.ValueChanged += (_, _) => EditLayers("Power", l => l with { Laser = l.Laser with { Power = (double)_power.Value!.Value } }, _power.Value.HasValue, "power");
@@ -429,10 +434,12 @@ public sealed class PropertiesPanel : UserControl
         bool anyFill = ls.Any(l => l.Mode == LayerMode.Fill), anyRed = ls.Any(l => l.Laser.Light == LightSource.Red);
         bool anyImage = ls.Any(l => l.Mode == LayerMode.Image);
         _lpcmRow.IsVisible = anyFill;
-        _dpiRow.IsVisible = _dotRow.IsVisible = _ditherRow.IsVisible = anyImage;
-        _cutExtras.IsVisible = ls.Any(l => l.Mode is LayerMode.Cut or LayerMode.Score);
-        _fillExtras.IsVisible = anyFill;
-        _imageExtras.IsVisible = anyImage;
+        bool adv = _settings.ShowAdvanced;
+        _dpiRow.IsVisible = _ditherRow.IsVisible = anyImage;
+        _dotRow.IsVisible = anyImage && adv;
+        _cutExtras.IsVisible = adv && ls.Any(l => l.Mode is LayerMode.Cut or LayerMode.Score);
+        _fillExtras.IsVisible = adv && anyFill;
+        _imageExtras.IsVisible = adv && anyImage;
         Num(_kerf, Same(l => l.KerfMm));
         Num(_tabs, Same(l => (double)l.TabCount));
         Num(_tabWidth, Same(l => l.TabWidthMm));
@@ -451,7 +458,7 @@ public sealed class PropertiesPanel : UserControl
         _dither.SelectedIndex = dith is { } dm ? (int)dm : -1;
         _dither.PlaceholderText = dith is null ? "mixed" : "";
         _dpiHint.Text = Same(l => l.Dpi) is { } dpi ? $"Dots {25.4 / dpi:0.###} mm apart." : "";
-        _pulseRow.IsVisible = _freqRow.IsVisible = anyRed;
+        _pulseRow.IsVisible = _freqRow.IsVisible = anyRed && adv;
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;
         _pulse.PlaceholderText = pw is null ? "mixed" : "";

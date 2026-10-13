@@ -4,7 +4,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from ytool.discovery import COMMON_KEY, PRIMARY_KEY, decrypt, encrypt
+from ytool.discovery import decrypt, encrypt
+
+# Stand-in keys: the tests never contain or need the real ones.
+REQUEST_KEY = b"test-request-key-0123456789abcde"
+REPLY_KEY = b"test-reply-key-0123456789abcdefg"
 from ytool.frame import FrameDecoder, ProtocolType, crc16, encode
 
 
@@ -28,9 +32,9 @@ def test_decoder_skips_garbage_and_bad_crc():
 
 
 def test_discovery_crypto_roundtrip():
-    blob = encrypt(b'{"a":1}', PRIMARY_KEY)
-    assert len(blob) == 32 and decrypt(blob, PRIMARY_KEY) == b'{"a":1}'
-    assert decrypt(encrypt(b"x" * 40, COMMON_KEY), COMMON_KEY) == b"x" * 40
+    blob = encrypt(b'{"a":1}', REQUEST_KEY)
+    assert len(blob) == 32 and decrypt(blob, REQUEST_KEY) == b'{"a":1}'
+    assert decrypt(encrypt(b"x" * 40, REPLY_KEY), REPLY_KEY) == b"x" * 40
 
 
 def test_bgcode_decode():

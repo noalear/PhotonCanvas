@@ -34,11 +34,9 @@ public static class Discovery
     public const string ProtocolV1 = "V1";
     public const string ProtocolV2 = "V2";
 
-    /// <summary>Requests are encrypted with this key.</summary>
-    public static ReadOnlySpan<byte> PrimaryKey => "<discovery-request-key>"u8;
-
-    /// <summary>Replies are decrypted with this key; it is also sent inside the request.</summary>
-    public static ReadOnlySpan<byte> CommonKey => "<discovery-reply-key>"u8;
+    // The request is encrypted with MachineKeys.DiscoveryRequest; replies are decrypted
+    // with MachineKeys.DiscoveryReply, which is also sent inside the request. The keys
+    // come from the user's own xTool Studio (see KeyFinder), not from this program.
 
     static readonly (string Group, int Port, int Ttl)[] V2Groups =
     [
@@ -103,7 +101,7 @@ public static class Discovery
     // ---- request / reply ------------------------------------------------------------------
 
     /// <summary>The V2 request JSON (before encryption).</summary>
-    public static byte[] BuildV2Request(uint requestId)
+    public static byte[] BuildV2Request(uint requestId, string replyKey)
     {
         var msg = new JsonObject
         {
@@ -114,7 +112,7 @@ public static class Discovery
                 ["version"] = "1.0",
                 ["clientType"] = "atomnClient",
                 ["requestId"] = requestId,
-                ["key"] = Encoding.ASCII.GetString(CommonKey),
+                ["key"] = replyKey,
             },
         };
         return Encoding.UTF8.GetBytes(msg.ToJsonString());
@@ -133,23 +131,23 @@ public static class Discovery
     }
 
     /// <summary>
-    /// Parses one reply datagram. V2: AES-decrypted with <see cref="CommonKey"/>, must be
+    /// Parses one reply datagram. V2: AES-decrypted with the reply key, must be
     /// <c>{"type":"deviceFind","method":"response","data":{...}}</c>. V1: plain JSON with
     /// <c>requestId</c> and <c>sncode</c> or <c>name</c>. Returns null for anything else,
     /// including our own (or another client's) requests.
     /// </summary>
-    public static DiscoveredDevice? ParseReply(ReadOnlySpan<byte> datagram, IPAddress? from = null)
+    public static DiscoveredDevice? ParseReply(ReadOnlySpan<byte> datagram, string replyKey, IPAddress? from = null)
     {
-        JsonObject? raw = ParseReplyObject(datagram);
+        JsonObject? raw = ParseReplyObject(datagram, replyKey);
         if (raw is null)
             return null;
         string fromText = from?.ToString() ?? "";
         return FromRaw(raw, fromText);
     }
 
-    static JsonObject? ParseReplyObject(ReadOnlySpan<byte> datagram)
+    static JsonObject? ParseReplyObject(ReadOnlySpan<byte> datagram, string replyKey)
     {
-        if (TryDecrypt(datagram, CommonKey, out byte[] plain))
+        if (TryDecrypt(datagram, Encoding.ASCII.GetBytes(replyKey), out byte[] plain))
         {
             JsonObject? msg = Json.TryParseObject(plain);
             if (msg is not null)
@@ -236,11 +234,14 @@ public static class Discovery
     /// Throws <see cref="OperationCanceledException"/> if <paramref name="cancellationToken"/> fires.
     /// </summary>
     public static async Task<IReadOnlyList<DiscoveredDevice>> DiscoverAsync(
+        MachineKeys keys,
         TimeSpan? timeout = null,
         IPAddress? targetIp = null,
         Action<string>? log = null,
         CancellationToken cancellationToken = default)
     {
+        if (!keys.RequestValid || !keys.ReplyValid)
+            throw new InvalidOperationException("The machine keys haven't been set up yet (Machine tab → Connection keys).");
         var duration = timeout ?? TimeSpan.FromSeconds(4);
         if (duration <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive.");
@@ -278,8 +279,8 @@ public static class Discovery
 
             var loops = new List<Task>();
             foreach (var s in senders.Select(x => x.Socket).Concat(receivers))
-                loops.Add(ReceiveLoop(s, ownAddresses, found, log, cts.Token));
-            loops.Add(SendLoop(senders, targetIp, log, cts.Token));
+                loops.Add(ReceiveLoop(s, ownAddresses, found, keys.DiscoveryReply, log, cts.Token));
+            loops.Add(SendLoop(senders, targetIp, keys, log, cts.Token));
             await Task.WhenAll(loops).ConfigureAwait(false);
         }
         finally
@@ -350,13 +351,13 @@ public static class Discovery
         return s;
     }
 
-    static async Task SendLoop(List<(Socket Socket, IPAddress Ip)> senders, IPAddress? targetIp, Action<string>? log, CancellationToken ct)
+    static async Task SendLoop(List<(Socket Socket, IPAddress Ip)> senders, IPAddress? targetIp, MachineKeys keys, Action<string>? log, CancellationToken ct)
     {
         try
         {
             while (!ct.IsCancellationRequested)
             {
-                SendAll(senders, targetIp, log);
+                SendAll(senders, targetIp, keys, log);
                 await Task.Delay(ResendInterval, ct).ConfigureAwait(false);
             }
         }
@@ -366,9 +367,10 @@ public static class Discovery
         }
     }
 
-    static void SendAll(List<(Socket Socket, IPAddress Ip)> senders, IPAddress? targetIp, Action<string>? log)
+    static void SendAll(List<(Socket Socket, IPAddress Ip)> senders, IPAddress? targetIp, MachineKeys keys, Action<string>? log)
     {
-        byte[] v2 = BuildV2Request(BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4)));
+        byte[] v2 = BuildV2Request(BitConverter.ToUInt32(RandomNumberGenerator.GetBytes(4)), keys.DiscoveryReply);
+        byte[] requestKey = Encoding.ASCII.GetBytes(keys.DiscoveryRequest);
         foreach (var (s, ip) in senders)
         {
             try
@@ -378,7 +380,7 @@ public static class Discovery
                 if (targetIp is not null)
                 {
                     foreach (var (_, port, _) in V2Groups)
-                        s.SendTo(Encrypt(v2, PrimaryKey), new IPEndPoint(targetIp, port));
+                        s.SendTo(Encrypt(v2, requestKey), new IPEndPoint(targetIp, port));
                     s.SendTo(v1, new IPEndPoint(targetIp, V1Group.Port));
                 }
                 else
@@ -386,7 +388,7 @@ public static class Discovery
                     foreach (var (group, port, ttl) in V2Groups)
                     {
                         s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, ttl);
-                        s.SendTo(Encrypt(v2, PrimaryKey), new IPEndPoint(IPAddress.Parse(group), port));
+                        s.SendTo(Encrypt(v2, requestKey), new IPEndPoint(IPAddress.Parse(group), port));
                     }
                     s.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 4);
                     s.SendTo(v1, V1Group);
@@ -403,6 +405,7 @@ public static class Discovery
         Socket s,
         HashSet<IPAddress> ownAddresses,
         Dictionary<string, (JsonObject Raw, string From)> found,
+        string replyKey,
         Action<string>? log,
         CancellationToken ct)
     {
@@ -436,7 +439,7 @@ public static class Discovery
             }
             if (r.RemoteEndPoint is not IPEndPoint from || ownAddresses.Contains(from.Address))
                 continue; // our own request echoed back
-            JsonObject? raw = ParseReplyObject(buffer.AsSpan(0, r.ReceivedBytes));
+            JsonObject? raw = ParseReplyObject(buffer.AsSpan(0, r.ReceivedBytes), replyKey);
             if (raw is null)
             {
                 log?.Invoke($"[discover] unparsed {r.ReceivedBytes} B from {from}");

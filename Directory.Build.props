@@ -6,5 +6,8 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
     <Deterministic>true</Deterministic>
+    <Product>YTool Studio</Product>
+    <Copyright>Copyright © 2026 the YTool Studio contributors. GPL-3.0-or-later.</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

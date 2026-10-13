@@ -48,7 +48,7 @@ public sealed class TraceWindow : Window
     readonly Slider _specks = new() { Minimum = 0, Maximum = 400, Value = 12 };
     readonly CheckBox _showPicture = new() { Content = "Show picture underneath", IsChecked = true };
     readonly ComboBox _target = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
-    readonly ComboBox _newMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut", "Score", "Fill" }, SelectedIndex = 0 };
+    readonly ComboBox _newMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut", "Score", "Engrave (fill)" }, SelectedIndex = 0 };
     readonly CheckBox _removePicture = new() { Content = "Remove the picture after tracing" };
     readonly TextBlock _stats = Hint();
     readonly TextBlock _thresholdText = Hint(), _toleranceText = Hint(), _smoothText = Hint(), _cornersText = Hint(), _specksText = Hint(), _maxText = Hint();

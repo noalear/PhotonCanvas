@@ -22,3 +22,11 @@ obj/
 
 # Your own designs saved in the project folder
 /*.ytool
+
+# Personal files that end up in the project folder (camera snapshots, exports, keys)
+/*.jpg
+/*.jpeg
+/*.png
+/*.gcode
+/*.xf
+keys.json

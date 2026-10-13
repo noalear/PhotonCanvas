@@ -45,6 +45,10 @@ public sealed class AppSettings
     public bool SnapToObjects { get; set; } = true;
     public bool SnapToGrid { get; set; }
     public double SnapDistancePx { get; set; } = 8;
+    /// <summary>Version of the safety notice and terms the user accepted (0 = never).</summary>
+    public int AcceptedTermsVersion { get; set; }
+    /// <summary>Show the less common layer settings (kerf, tabs, overscan, fiber pulse…).</summary>
+    public bool ShowAdvanced { get; set; }
 
     static readonly JsonSerializerOptions Json = new()
     {
@@ -52,7 +56,7 @@ public sealed class AppSettings
         Converters = { new JsonStringEnumConverter() },
     };
 
-    static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YTool");
+    static string Dir => AppIdentity.DataDir;
     static string FilePath => Path.Combine(Dir, "app.json");
 
     public static AppSettings Load()

@@ -10,7 +10,7 @@ namespace YTool.App;
 static class AppLog
 {
     static readonly object Gate = new();
-    public static string Dir { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YTool", "logs");
+    public static string Dir { get; } = Path.Combine(YTool.Core.AppIdentity.DataDir, "logs");
     static bool _pruned;
 
     public static string CurrentFile => Path.Combine(Dir, $"ytool-{DateTime.Now:yyyyMMdd}.log");

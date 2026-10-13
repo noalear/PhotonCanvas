@@ -28,7 +28,7 @@ public sealed class RasterImage
     /// <exception cref="FormatException">Not a readable image.</exception>
     public static RasterImage Decode(byte[] encoded)
     {
-        using var codec = SKCodec.Create(new SKMemoryStream(encoded)) ?? throw new FormatException("This file isn't an image YTool can read.");
+        using var codec = SKCodec.Create(new SKMemoryStream(encoded)) ?? throw new FormatException("This file isn't an image this program can read.");
         var size = codec.Info.Size;
         if (size.Width <= 0 || size.Height <= 0) throw new FormatException("The image is empty.");
         var info = new SKImageInfo(size.Width, size.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);

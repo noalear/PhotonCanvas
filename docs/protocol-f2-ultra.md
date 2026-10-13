@@ -63,9 +63,9 @@ Implemented in `src/ytool/`.
 
 1. Build the payload:
    ```json
-   {"type":"deviceFind","method":"request","data":{"version":"1.0","clientType":"atomnClient","requestId":<uint32>,"key":"<discovery-reply-key>"}}
+   {"type":"deviceFind","method":"request","data":{"version":"1.0","clientType":"atomnClient","requestId":<uint32>,"key":"<discovery reply key>"}}
    ```
-2. Encrypt it with AES-256-CBC (PKCS7 padding) using the **primary** key `<discovery-request-key>`. The wire format is the 16-byte IV followed by the ciphertext.
+2. Encrypt it with AES-256-CBC (PKCS7 padding) using the **discovery request key** (32 characters; see *Machine keys* below). The wire format is the 16-byte IV followed by the ciphertext.
 3. Send it to all of these:
    - `224.0.0.251:5353` (ttl 1)
    - `224.0.0.252:5354` (ttl 1)
@@ -73,7 +73,11 @@ Implemented in `src/ytool/`.
    - `239.0.1.252:25354` (ttl 4)
 
    Over USB, send it unicast to the same ports instead.
-4. The reply is decrypted with the **common** key `<discovery-reply-key>` (the same key is sent inside the request). It contains `deviceIp, deviceName, deviceCode, deviceId, deviceSn, firmwareVersion, ...`.
+4. The reply is decrypted with the **discovery reply key** (32 characters; the same key is sent inside the request). It contains `deviceIp, deviceName, deviceCode, deviceId, deviceSn, firmwareVersion, ...`.
+
+### Machine keys
+
+Three fixed strings are needed: the discovery request key, the discovery reply key and the pairing key. They are not published here or built into the program. The desktop app's **Machine tab → Connection keys** finds them in the user's own installed xTool Studio (`resourcespp.asar`) by matching SHA-256 fingerprints, or the user can paste them in; they are saved to `%APPDATA%\YTool\keys.json`.
 
 ### HTTP probes (V1)
 
@@ -110,7 +114,7 @@ Implemented in `src/ytool/`.
 
 ### Pairing (V2)
 
-1. Send `GET /v1/user/parity` with `data: {userID: "<uuid>"|"mk-guest", userKey: "<pairing-key>", timezone, token: "<cached or empty>"}`.
+1. Send `GET /v1/user/parity` with `data: {userID: "<uuid>"|"mk-guest", userKey: "<pairing key>", timezone, token: "<cached or empty>"}`.
 2. Handle the response code:
    - `0`: success. It returns `{sessionToken, token}`. Cache `token` per serial number.
    - `406`: the user must press the machine's button. Poll `GET /v1/user/auth-status` every 1 s until it returns 0. A `410` means the wait timed out.

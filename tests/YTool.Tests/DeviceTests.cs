@@ -112,36 +112,32 @@ public class DeviceFrameTests
 
 public class DeviceDiscoveryTests
 {
-    // Encrypted with the common key and IV 00..0f by the Python reference (cryptography package).
-    const string PythonV2Reply =
-        "000102030405060708090a0b0c0d0e0fe9dd84fbbdebfa0194fd6d849fe21c65f1aed839d99e856f4c1ad421c7574476bad20fe16c3b09594fec3b5d31c62fd618" +
-        "b3fdc3ccb017f9fe474f023d2a561b74b7c8c1aef423bf66574828f6edacc8f7680a7d5b8136605bb0e0d88ded88aff6ca41a5aedf1efd83fa18f20212d824";
+    // Stand-in keys: tests never contain or need the real machine keys.
+    const string TestRequestKey = "test-request-key-0123456789abcde";
+    const string TestReplyKey = "test-reply-key-0123456789abcdefg";
+    static byte[] Req => Encoding.ASCII.GetBytes(TestRequestKey);
+    static byte[] Rep => Encoding.ASCII.GetBytes(TestReplyKey);
 
     [Fact]
     public void AesRoundTrip()
     {
         var plain = "{\"hello\":\"world\"}"u8.ToArray();
-        var blob = Discovery.Encrypt(plain, Discovery.PrimaryKey);
+        var blob = Discovery.Encrypt(plain, Req);
         Assert.Equal(16 + 32, blob.Length); // IV + 17 bytes padded to 32
-        Assert.Equal(plain, Discovery.Decrypt(blob, Discovery.PrimaryKey));
-        Assert.NotEqual(blob, Discovery.Encrypt(plain, Discovery.PrimaryKey)); // random IV
-        Assert.False(Discovery.TryDecrypt([1, 2, 3], Discovery.CommonKey, out _));
-    }
-
-    [Fact]
-    public void DecryptsPythonVector()
-    {
-        var plain = Encoding.UTF8.GetString(Discovery.Decrypt(Convert.FromHexString(PythonV2Reply), Discovery.CommonKey));
-        Assert.Contains("\"deviceName\":\"F2 Ultra\"", plain);
+        Assert.Equal(plain, Discovery.Decrypt(blob, Req));
+        Assert.NotEqual(blob, Discovery.Encrypt(plain, Req)); // random IV
+        Assert.False(Discovery.TryDecrypt([1, 2, 3], Rep, out _));
     }
 
     [Fact]
     public void ParsesV2Reply()
     {
-        var d = Discovery.ParseReply(Convert.FromHexString(PythonV2Reply), IPAddress.Parse("10.0.0.7"));
+        var small = Discovery.Encrypt("""{"type":"deviceFind","method":"response","data":{"deviceName":"F2 Ultra"}}"""u8.ToArray(), Rep);
+        var d = Discovery.ParseReply(small, TestReplyKey, IPAddress.Parse("10.0.0.7"));
         Assert.NotNull(d);
         Assert.Equal(("10.0.0.7", "F2 Ultra", "V2"), (d.Ip, d.Name, d.Protocol));
         Assert.True(d.IsV2);
+        Assert.Null(Discovery.ParseReply(small, TestRequestKey)); // wrong key: unreadable
 
         var full = new JsonObject
         {
@@ -157,8 +153,8 @@ public class DeviceDiscoveryTests
                 ["platformVersion"] = "1.5",
             },
         };
-        var blob = Discovery.Encrypt(Encoding.UTF8.GetBytes(full.ToJsonString()), Discovery.CommonKey);
-        d = Discovery.ParseReply(blob, IPAddress.Parse("192.0.2.99"));
+        var blob = Discovery.Encrypt(Encoding.UTF8.GetBytes(full.ToJsonString()), Rep);
+        d = Discovery.ParseReply(blob, TestReplyKey, IPAddress.Parse("192.0.2.99"));
         Assert.NotNull(d);
         Assert.Equal("192.0.2.5", d.Ip); // deviceIp wins over the datagram source
         Assert.Equal("192.0.2.99", d.From);
@@ -170,39 +166,39 @@ public class DeviceDiscoveryTests
     public void IgnoresRequestsIncludingOurOwn()
     {
         // Our own request echoed back: encrypted with the primary key, so the common key can't read it.
-        var ours = Discovery.Encrypt(Discovery.BuildV2Request(42), Discovery.PrimaryKey);
-        Assert.Null(Discovery.ParseReply(ours));
+        var ours = Discovery.Encrypt(Discovery.BuildV2Request(42, TestReplyKey), Req);
+        Assert.Null(Discovery.ParseReply(ours, TestReplyKey));
         // Another client's request readable with the common key: still a request, not a device.
-        var other = Discovery.Encrypt(Discovery.BuildV2Request(43), Discovery.CommonKey);
-        Assert.Null(Discovery.ParseReply(other));
+        var other = Discovery.Encrypt(Discovery.BuildV2Request(43, TestReplyKey), Rep);
+        Assert.Null(Discovery.ParseReply(other, TestReplyKey));
         // Our V1 request {ip, port, requestId}.
-        Assert.Null(Discovery.ParseReply(Discovery.BuildV1Request(IPAddress.Parse("192.0.2.1"), 5000, 1)));
-        Assert.Null(Discovery.ParseReply("not json"u8));
-        Assert.Null(Discovery.ParseReply([]));
+        Assert.Null(Discovery.ParseReply(Discovery.BuildV1Request(IPAddress.Parse("192.0.2.1"), 5000, 1), TestReplyKey));
+        Assert.Null(Discovery.ParseReply("not json"u8, TestReplyKey));
+        Assert.Null(Discovery.ParseReply([], TestReplyKey));
     }
 
     [Fact]
     public void V2RequestContent()
     {
-        var plain = Discovery.Decrypt(Discovery.Encrypt(Discovery.BuildV2Request(7), Discovery.PrimaryKey), Discovery.PrimaryKey);
+        var plain = Discovery.Decrypt(Discovery.Encrypt(Discovery.BuildV2Request(7, TestReplyKey), Req), Req);
         var msg = JsonNode.Parse(plain)!.AsObject();
         Assert.Equal("deviceFind", msg["type"]!.GetValue<string>());
         Assert.Equal("request", msg["method"]!.GetValue<string>());
         Assert.Equal("atomnClient", msg["data"]!["clientType"]!.GetValue<string>());
         Assert.Equal(7u, msg["data"]!["requestId"]!.GetValue<uint>());
-        Assert.Equal("<discovery-reply-key>", msg["data"]!["key"]!.GetValue<string>());
+        Assert.Equal(TestReplyKey, msg["data"]!["key"]!.GetValue<string>());
     }
 
     [Fact]
     public void ParsesV1Reply()
     {
-        var d = Discovery.ParseReply("""{"ip":"192.0.2.8","name":"F1","version":"V40.31","sncode":"MXF1","requestId":1700000000000}"""u8, IPAddress.Parse("192.0.2.8"));
+        var d = Discovery.ParseReply("""{"ip":"192.0.2.8","name":"F1","version":"V40.31","sncode":"MXF1","requestId":1700000000000}"""u8, TestReplyKey, IPAddress.Parse("192.0.2.8"));
         Assert.NotNull(d);
         Assert.Equal(("192.0.2.8", "F1", "MXF1", "V40.31", "V1"), (d.Ip, d.Name, d.Sn, d.Firmware, d.Protocol));
         Assert.Null(d.DeviceCode);
 
         // No ip in the reply: fall back to the datagram's source.
-        d = Discovery.ParseReply("""{"name":"F1","requestId":1}"""u8, IPAddress.Parse("192.0.2.9"));
+        d = Discovery.ParseReply("""{"name":"F1","requestId":1}"""u8, TestReplyKey, IPAddress.Parse("192.0.2.9"));
         Assert.Equal("192.0.2.9", d?.Ip);
     }
 }
@@ -313,8 +309,11 @@ public sealed class DeviceClientTests : IAsyncLifetime
 
     string StatePath => Path.Combine(_stateDir, "state.json");
 
+    const string TestPairingKey = "test-pairing-key-012";
+
     DeviceClientOptions Options() => new()
     {
+        PairingKey = TestPairingKey,
         StatePath = StatePath,
         TimeZoneName = "UTC",
         WebSocketFactory = _fake.ConnectAsync,
@@ -348,7 +347,7 @@ public sealed class DeviceClientTests : IAsyncLifetime
 
         var parity = _fake.Requests.Single(r => Url(r) == "/v1/user/parity");
         Assert.Equal("mk-guest", parity["data"]!["userID"]!.GetValue<string>());
-        Assert.Equal(DeviceClient.UserKey, parity["data"]!["userKey"]!.GetValue<string>());
+        Assert.Equal(TestPairingKey, parity["data"]!["userKey"]!.GetValue<string>());
         Assert.Equal("cached-token", parity["data"]!["token"]!.GetValue<string>());
         Assert.Equal(1, parity["transactionId"]!.GetValue<int>());
         Assert.Equal("new-token", TokenStore.GetToken(StatePath, "192.0.2.10"));
@@ -919,5 +918,47 @@ sealed class FakeDevice : IAsyncDisposable
             }
         }
         await Task.WhenAll(_loops).WaitAsync(TimeSpan.FromSeconds(5));
+    }
+}
+
+public class MachineKeyTests
+{
+    [Fact]
+    public void FindsKeysByFingerprintWithoutKnowingThem()
+    {
+        // A fake "program file": the keys are just quoted strings among lots of others.
+        string a = "aaaaaaaabbbbbbbbccccccccdddddddd", b = "0123456789abcdef0123456789ABCDEF", c = "cGFpcmluZy1rZXktMTIz";
+        var filler = string.Concat(Enumerable.Range(0, 200_000).Select(i => $"x{i},\"tok{i:D27}\";"));
+        var text = filler + $"k=\"{a}\";" + filler + $"q='{c}';" + $"r=`{b}`" + filler;
+        var wanted = new[] { (32, MachineKeys.Fingerprint(a)), (32, MachineKeys.Fingerprint(b)), (20, MachineKeys.Fingerprint(c)) };
+        var found = KeyFinder.Scan(new MemoryStream(Encoding.ASCII.GetBytes(text)), wanted, null, default);
+        Assert.Equal((a, b, c), (found.DiscoveryRequest, found.DiscoveryReply, found.Pairing));
+    }
+
+    [Fact]
+    public void KeysAcrossChunkBoundariesAreFound()
+    {
+        string a = "aaaaaaaabbbbbbbbccccccccdddddddd";
+        var wanted = new[] { (32, MachineKeys.Fingerprint(a)), (32, "none"), (20, "none") };
+        // Place the key so it straddles the 4 MB read boundary.
+        int at = (4 << 20) - 10;
+        var bytes = Enumerable.Repeat((byte)' ', at).Concat(Encoding.ASCII.GetBytes($"\"{a}\"")).Concat(Enumerable.Repeat((byte)' ', 100)).ToArray();
+        Assert.Equal(a, KeyFinder.Scan(new MemoryStream(bytes), wanted, null, default).DiscoveryRequest);
+    }
+
+    [Fact]
+    public void ValidatesAgainstFingerprintsAndRoundTrips()
+    {
+        Assert.False(MachineKeys.Empty.IsComplete);
+        Assert.False(new MachineKeys("wrong", "wrong", "wrong").RequestValid);
+        var dir = Path.Combine(Path.GetTempPath(), "ytool-keys-" + Guid.NewGuid());
+        try
+        {
+            var path = Path.Combine(dir, "keys.json");
+            new MachineKeys("1", "2", "3").Save(path);
+            Assert.Equal(new MachineKeys("1", "2", "3"), MachineKeys.Load(path));
+            Assert.Equal(MachineKeys.Empty, MachineKeys.Load(Path.Combine(dir, "missing.json")));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
 }

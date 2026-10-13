@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:app="using:YTool.App"
         x:Class="YTool.App.MainWindow"
-        Title="YTool Studio"
+        Title="YTool"
         Width="1500" Height="920" MinWidth="1000" MinHeight="640"
         WindowStartupLocation="CenterScreen">
   <DockPanel>
@@ -68,7 +68,14 @@
             <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
           </StackPanel>
         </Border>
-        <app:CanvasView x:Name="Canvas" />
+        <Panel>
+          <app:CanvasView x:Name="Canvas" />
+          <Border x:Name="EmptyHint" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,28"
+                  Background="{StaticResource Bg2}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16,10">
+            <TextBlock TextAlignment="Center" Classes="muted" LineHeight="20"
+                       Text="Draw with the tools on the left, or drag a file in (SVG, DXF, PDF, pictures).&#10;New material? Tools → Material test finds the right power and speed.  ·  Help → Getting started" />
+          </Border>
+        </Panel>
       </DockPanel>
 
       <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />

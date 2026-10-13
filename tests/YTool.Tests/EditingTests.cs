@@ -174,3 +174,35 @@ public class TextTests
         Assert.IsNotType<TextShape>(edited.Baked()); // convert to paths
     }
 }
+
+public class MaterialTestTests
+{
+    [Fact]
+    public void OneLayerPerSquareWithItsSettings()
+    {
+        var s0 = DocState.New();
+        var o = new MaterialTestOptions { PowerMin = 10, PowerMax = 90, PowerSteps = 3, SpeedMin = 100, SpeedMax = 300, SpeedSteps = 2 };
+        var (s, added) = MaterialTest.Add(s0, o);
+        var squares = s.Layers.Skip(s0.Layers.Count).Where(l => l.Name.StartsWith("Test ") && l.Name != "Test labels").ToList();
+        Assert.Equal(6, squares.Count);
+        Assert.All(squares, l => Assert.Equal(LayerMode.Fill, l.Mode));
+        Assert.Equal([10.0, 50.0, 90.0], squares.Take(3).Select(l => l.Laser.Power));
+        Assert.Equal([100.0, 300.0], squares.Where(l => l.Laser.Power == 10).Select(l => l.Laser.Speed));
+        // Each square layer holds exactly one square, power increasing left to right.
+        var firstRow = squares.Take(3).Select(l => s.Shapes.Single(x => x.LayerId == l.Id).Bounds.MinX).ToList();
+        Assert.True(firstRow[0] < firstRow[1] && firstRow[1] < firstRow[2]);
+        // Labels: 3 power values + 2 speed values + 2 axis names.
+        var labels = s.Layers.Single(l => l.Name == "Test labels");
+        Assert.Equal(7, s.Shapes.Count(x => x.LayerId == labels.Id));
+        Assert.Equal(6 + 7, added.Count);
+        var b = MaterialTest.Bounds(s0, o);
+        Assert.True(b.MinX >= 10 && b.MinY >= 10 && b.MaxX < 100 && b.MaxY < 100);
+    }
+
+    [Fact]
+    public void StepsAreEvenAndInclusive()
+    {
+        Assert.Equal([10.0, 30.0, 50.0], MaterialTest.Steps(10, 50, 3));
+        Assert.Equal([25.0], MaterialTest.Steps(25, 80, 1));
+    }
+}

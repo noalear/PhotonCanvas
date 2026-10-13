@@ -29,10 +29,10 @@ public sealed class MachinePanel : UserControl
 
     readonly TextBox _ip = new() { Watermark = "Machine IP address, e.g. 192.168.1.50" };
     readonly ComboBox _found = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Machines found on the network", IsVisible = false };
-    readonly Button _find = Button("Find machines", tip: "Search the local network (needs Windows Firewall to allow YTool Studio).");
+    readonly Button _find = Button("Find machines", tip: $"Search the local network (needs Windows Firewall to allow {AppIdentity.ProductName}).");
     readonly Button _connect = new() { Classes = { "primary" }, Content = "Connect" };
     readonly TextBlock _connState = Hint();
-    readonly CheckBox _autoConnect = new() { Content = "Connect automatically when YTool starts" };
+    readonly CheckBox _autoConnect = new() { Content = "Connect automatically when the program starts" };
     readonly TextBlock _info = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     readonly TextBlock _mode = new() { FontWeight = FontWeight.SemiBold };
     readonly TextBlock _distance = Hint();
@@ -50,6 +50,9 @@ public sealed class MachinePanel : UserControl
     readonly TextBox _log = new() { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Mono,Consolas,monospace"), FontSize = 11, Height = 160 };
     readonly List<string> _logLines = [];
     bool _updatingLid;
+    MachineKeys _keys = MachineKeys.Load();
+    readonly TextBlock _keysState = new() { TextWrapping = TextWrapping.Wrap };
+    readonly Button _keysButton = Button("Set up connection keys…", tip: "One-time setup: reads the codes xTool machines expect from your own xTool Studio.");
 
     // Camera on the work area
     List<CameraCalibration> _calibrations = CalibrationStore.Load(CalibrationStore.DefaultPath);
@@ -90,6 +93,7 @@ public sealed class MachinePanel : UserControl
         _find.Click += async (_, _) => await Find();
         _found.SelectionChanged += (_, _) => { if (_found.SelectedItem is ComboBoxItem { Tag: string ip }) _ip.Text = ip; };
         _connect.Click += async (_, _) => await ToggleConnect();
+        _keysButton.Click += async (_, _) => await SetUpKeys();
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
@@ -113,7 +117,7 @@ public sealed class MachinePanel : UserControl
             _settings.Save();
             if (_shownStream == 1) _imageRotation.Angle = _settings.CloseUpRotationDeg;
         };
-        _straightenRow = Field("Straighten", _straighten, Hint("Degrees clockwise. The close-up camera is mounted at an angle; 31.2° was measured from your bed slats."),
+        _straightenRow = Field("Straighten", _straighten, Hint("Degrees clockwise. The close-up camera is mounted at an angle; about 31° on the F2 Ultra."),
             "Rotates the close-up picture for display only. Saved snapshots stay as the camera took them.");
         _straightenRow.IsVisible = false;
         _stream.SelectionChanged += (_, _) =>
@@ -146,7 +150,7 @@ public sealed class MachinePanel : UserControl
             {
                 Children =
                 {
-                    Card("Connection", _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
+                    Card("Connection", _keysState, _keysButton, _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
                     Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera lights", LightRow("Front", _frontLight, _frontText), LightRow("Back", _backLight, _backText),
@@ -158,7 +162,32 @@ public sealed class MachinePanel : UserControl
         };
         SetDisconnectedUi("Not connected.");
         UpdateCalState();
+        UpdateKeysState();
     }
+
+    void UpdateKeysState()
+    {
+        bool ok = _keys.IsComplete;
+        _keysState.Text = ok ? "" : "⚠ Before the first connection, " + AppIdentity.ProductName + " needs its connection keys (a one-time setup).";
+        _keysState.IsVisible = !ok;
+        _keysButton.IsVisible = !ok;
+    }
+
+    /// <summary>Open the connection-keys setup. True when valid keys are in place afterwards.</summary>
+    public async Task<bool> SetUpKeys()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner) return false;
+        var w = new KeysWindow();
+        await w.ShowDialog(owner);
+        _keys = MachineKeys.Load();
+        UpdateKeysState();
+        return _keys.IsComplete;
+    }
+
+    /// <summary>Keys present, or the user is walked through setting them up.</summary>
+    async Task<bool> EnsureKeys() => _keys.IsComplete || await SetUpKeys();
+
+    public bool HasKeys => _keys.IsComplete;
 
     public double OverlayOpacity => _opacity.Value;
 
@@ -374,6 +403,7 @@ public sealed class MachinePanel : UserControl
 
     async Task Find()
     {
+        if (!await EnsureKeys()) return;
         _find.IsEnabled = false;
         try { await FindDevices(); }
         finally { _find.IsEnabled = true; }
@@ -385,7 +415,7 @@ public sealed class MachinePanel : UserControl
         _connState.Text = "Searching the network…";
         try
         {
-            var found = await Discovery.DiscoverAsync(TimeSpan.FromSeconds(4));
+            var found = await Discovery.DiscoverAsync(_keys, TimeSpan.FromSeconds(4));
             var items = found.Select(d => new ComboBoxItem
             {
                 Content = $"{d.Name ?? "xTool"} · {d.DeviceCode ?? "?"} · {d.Ip}",
@@ -396,7 +426,7 @@ public sealed class MachinePanel : UserControl
             if (items.Count > 0) _found.SelectedIndex = 0;
             _connState.Text = items.Count switch
             {
-                0 => "No machines answered. Check the machine is on and on this network, and that Windows Firewall allows YTool Studio. You can also type the IP address.",
+                0 => $"No machines answered. Check the machine is on and on this network, and that Windows Firewall allows {AppIdentity.ProductName}. You can also type the IP address.",
                 1 => "Found 1 machine.",
                 _ => $"Found {items.Count} machines.",
             };
@@ -424,6 +454,7 @@ public sealed class MachinePanel : UserControl
             _connState.Text = "Enter the machine's IP address (or use Find machines).";
             return;
         }
+        if (!await EnsureKeys()) return;
         await ConnectTo(ip);
     }
 
@@ -434,6 +465,11 @@ public sealed class MachinePanel : UserControl
     public async Task AutoConnectAsync()
     {
         if (!_settings.AutoConnect || _client is not null || _connecting) return;
+        if (!_keys.IsComplete)
+        {
+            _connState.Text = "Set up the connection keys to connect (button above).";
+            return;
+        }
         var tried = new HashSet<string>();
         if (_settings.LastMachineIp is { } last && IPAddress.TryParse(last, out _))
         {
@@ -463,7 +499,7 @@ public sealed class MachinePanel : UserControl
         _connect.IsEnabled = false;
         _ip.Text = ip;
         _connState.Text = auto ? $"Connecting automatically to {ip}…" : $"Connecting to {ip}…";
-        var client = new DeviceClient(ip);
+        var client = new DeviceClient(ip, new DeviceClientOptions { PairingKey = _keys.Pairing });
         client.EventReceived += ev => Ui(() => OnDeviceEvent(ev));
         client.Disconnected += ex => Ui(() => _ = Disconnect($"Connection lost: {ex.Message}"));
         try
@@ -719,6 +755,14 @@ public sealed class MachinePanel : UserControl
         finally { _focus.IsEnabled = IsConnected; }
     }
 
+    public const string LidOpenWarning =
+        "With this on, the machine will run with its lid open. The lid is what blocks the laser's light, smoke and sparks. " +
+        "With it open:\n\n" +
+        "• Direct or reflected laser light can permanently blind you or anyone nearby in a fraction of a second. Everyone in the room must wear safety glasses rated for this laser's wavelengths (455 nm blue and 1064 nm infrared).\n" +
+        "• Smoke and fumes escape into the room, and fires can start or spread faster. Never leave the machine running unattended.\n" +
+        "• Keep children and pets away.\n\n" +
+        "This setting is stored on the machine and stays on until you turn it off. You use it entirely at your own risk; this software comes with no warranty.";
+
     async Task RefreshBeeper()
     {
         if (_client is not { } c) return;
@@ -747,6 +791,12 @@ public sealed class MachinePanel : UserControl
     async Task SetLidOpen()
     {
         if (_updatingLid || _client is not { } c || _lidOpen.IsChecked is not bool on) return;
+        if (on && TopLevel.GetTopLevel(this) is Window owner &&
+            !await Dialogs.Confirm(owner, "Allow starting with the lid open?", LidOpenWarning, "I understand, allow it", "Keep it off"))
+        {
+            await RefreshLid();
+            return;
+        }
         try
         {
             await c.SetLidOpenProcessingAsync(on);

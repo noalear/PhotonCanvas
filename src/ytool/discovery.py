@@ -8,10 +8,11 @@ import time
 from cryptography.hazmat.primitives import padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-# Requests are encrypted with PRIMARY_KEY; replies are decrypted with COMMON_KEY,
-# which is also sent inside the request body.
-PRIMARY_KEY = b"<discovery-request-key>"
-COMMON_KEY = b"<discovery-reply-key>"
+from .keys import load_keys
+
+# Requests are encrypted with the discovery request key; replies are decrypted with
+# the reply key, which is also sent inside the request body. Neither is built in:
+# they are read from the keys file the desktop app saves (see keys.py).
 
 V2_GROUPS = [
     ("224.0.0.251", 5353, 1),
@@ -71,6 +72,7 @@ def _bind_group_receiver(group, port, iface_ip):
 
 def discover(timeout=4.0, target_ip=None, verbose=False):
     """Return a dict keyed by device IP with whatever each device reported."""
+    keys = load_keys()
     found = {}
     socks = []
     ifaces = local_ipv4s()
@@ -98,7 +100,7 @@ def discover(timeout=4.0, target_ip=None, verbose=False):
         req_id = int.from_bytes(os.urandom(4), "big")
         v2 = json.dumps({"type": "deviceFind", "method": "request", "data": {
             "version": "1.0", "clientType": "atomnClient", "requestId": req_id,
-            "key": COMMON_KEY.decode()}}).encode()
+            "key": keys.discovery_reply}}).encode()
         for s, ip, kind in socks:
             if kind != "send":
                 continue
@@ -107,12 +109,12 @@ def discover(timeout=4.0, target_ip=None, verbose=False):
             try:
                 if target_ip:
                     for _, port, _ in V2_GROUPS:
-                        s.sendto(encrypt(v2, PRIMARY_KEY), (target_ip, port))
+                        s.sendto(encrypt(v2, keys.request_bytes), (target_ip, port))
                     s.sendto(v1, (target_ip, V1_GROUP[1]))
                 else:
                     for group, port, ttl in V2_GROUPS:
                         s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-                        s.sendto(encrypt(v2, PRIMARY_KEY), (group, port))
+                        s.sendto(encrypt(v2, keys.request_bytes), (group, port))
                     s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 4)
                     s.sendto(v1, V1_GROUP)
             except OSError as e:
@@ -134,7 +136,7 @@ def discover(timeout=4.0, target_ip=None, verbose=False):
                 continue
             if addr[0] in ifaces:
                 continue
-            info = _parse_reply(data)
+            info = _parse_reply(data, keys.reply_bytes)
             if info is None:
                 if verbose:
                     print(f"[discover] unparsed {len(data)}B from {addr}")
@@ -148,10 +150,10 @@ def discover(timeout=4.0, target_ip=None, verbose=False):
     return found
 
 
-def _parse_reply(data: bytes):
+def _parse_reply(data: bytes, reply_key: bytes):
     # V2: encrypted JSON
     try:
-        msg = json.loads(decrypt(data, COMMON_KEY))
+        msg = json.loads(decrypt(data, reply_key))
         if msg.get("type") == "deviceFind" and msg.get("method") == "response":
             return {"protocol": "V2", **msg.get("data", {})}
         return None  # our own request echoed back, or another client's

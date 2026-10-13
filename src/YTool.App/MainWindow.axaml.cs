@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using YTool.Core;
+using YTool.Device;
 using YTool.Doc;
 using YTool.Doc.Geometry;
 using YTool.Doc.Import;
@@ -30,7 +31,7 @@ public partial class MainWindow : Window
 
     static readonly FilePickerFileType ProjectType = new("YTool project") { Patterns = ["*.ytool"] };
     static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs"] };
-    static readonly FilePickerFileType AnyImportable = new("Everything YTool can import")
+    static readonly FilePickerFileType AnyImportable = new("Everything that can be imported")
     {
         Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
     };
@@ -77,6 +78,19 @@ public partial class MainWindow : Window
         Opened += async (_, _) =>
         {
             Canvas.Focus();
+            if (_settings.AcceptedTermsVersion < WelcomeWindow.TermsVersion)
+            {
+                var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys);
+                await welcome.ShowDialog(this);
+                if (!welcome.Accepted)
+                {
+                    _closeConfirmed = true;
+                    Close();
+                    return;
+                }
+                _settings.AcceptedTermsVersion = WelcomeWindow.TermsVersion;
+                _settings.Save();
+            }
             _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
         };
@@ -89,7 +103,8 @@ public partial class MainWindow : Window
     void UpdateChrome()
     {
         var name = _doc.FilePath is { } p ? Path.GetFileNameWithoutExtension(p) : "Untitled";
-        Title = $"{name}{(_doc.Dirty ? " •" : "")} — YTool Studio";
+        Title = $"{name}{(_doc.Dirty ? " •" : "")} — {AppIdentity.ProductName}";
+        EmptyHint.IsVisible = _doc.State.Shapes.Count == 0;
         UndoButton.IsEnabled = _doc.CanUndo;
         RedoButton.IsEnabled = _doc.CanRedo;
         ToolTip.SetTip(UndoButton, _doc.UndoLabel is { } u ? $"Undo {u} (Ctrl+Z)" : "Undo (Ctrl+Z)");
@@ -319,12 +334,31 @@ public partial class MainWindow : Window
                 Item("Move selection to active layer", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)), "Ctrl+M", HasSel),
             },
         };
+        var tools = new MenuItem
+        {
+            Header = "_Tools",
+            Items =
+            {
+                AsyncItem("Material test…", AddMaterialTest),
+                AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, null, () => SelectedPicture() is not null),
+                new Separator(),
+                AsyncItem("Connection keys…", async () => await _machine.SetUpKeys()),
+                AsyncItem("Grid & snapping…", ShowGridSettings),
+            },
+        };
         var help = new MenuItem
         {
             Header = "_Help",
-            Items = { AsyncItem("Keyboard shortcuts", ShowShortcuts, "F1"), AsyncItem("About YTool Studio", ShowAbout) },
+            Items =
+            {
+                AsyncItem("Getting started", ShowGettingStarted),
+                AsyncItem("Keyboard shortcuts", ShowShortcuts, "F1"),
+                AsyncItem("Safety and disclaimer", ShowSafety),
+                new Separator(),
+                AsyncItem($"About {AppIdentity.ProductName}", ShowAbout),
+            },
         };
-        MainMenu.ItemsSource = new[] { file, edit, arrange, view, layer, help };
+        MainMenu.ItemsSource = new[] { file, edit, arrange, view, layer, tools, help };
         MainMenu.Opened += (_, _) => RefreshMenuState();
         RefreshRecent();
     }
@@ -907,18 +941,34 @@ public partial class MainWindow : Window
     }
 
     Task ShowShortcuts() => Dialogs.Message(this, "Keyboard shortcuts", string.Join("\n",
-        "V select · R rectangle · E ellipse · L line · H pan",
+        "V select · R rectangle · E ellipse · O polygon · S star · L line · P pen · T text · N edit points · H pan",
         "Space or middle mouse: pan · wheel: zoom · Shift+wheel: scroll sideways",
         "Home: fit work area · F: fit selection",
         "Arrows: nudge 1 mm (Shift 10 mm, Ctrl 0.1 mm)",
         "Drag left→right: select inside · right→left: select touching",
         "Corner handles keep proportions (Shift = free) · Alt = from centre",
-        "Rotate handle: Shift snaps to 15°",
-        "Ctrl+D duplicate · Ctrl+G combine · Ctrl+Shift+G break apart",
+        "Rotate handle: Shift snaps to 15° · hold Ctrl while dragging to turn snapping off",
+        "Ctrl+D duplicate · Ctrl+G group · Ctrl+Shift+G ungroup · Ctrl+K combine · Ctrl+Shift+K break apart",
         "Ctrl+1…9 move selection to layer 1…9 · Ctrl+M to the active layer",
         "Ctrl+Z / Ctrl+Y undo / redo · Esc cancel / deselect"));
 
-    Task ShowAbout() => Dialogs.Message(this, "About YTool Studio",
-        "YTool Studio – an offline, no-telemetry laser workspace for the xTool F2 Ultra.\n\n" +
-        "Jobs are generated locally in the same G-code dialect as the stock software, verified line for line against real exports.");
+    Task ShowGettingStarted() => new WelcomeWindow(firstRun: false, _machine.SetUpKeys, () => _machine.HasKeys).ShowDialog(this);
+
+    Task ShowSafety() => Dialogs.Message(this, "Safety and disclaimer", WelcomeWindow.SafetyText + "\n\n" + WelcomeWindow.DisclaimerText);
+
+    Task ShowAbout() => Dialogs.Message(this, $"About {AppIdentity.ProductName}",
+        $"{AppIdentity.ProductName} – an offline, no-telemetry laser workspace for the xTool F2 Ultra.\n\n" +
+        "Jobs are generated locally in the same G-code dialect as the stock software, verified line for line against real exports.\n\n" +
+        "Free software under the GNU General Public License v3 (see LICENSE and THIRD-PARTY-NOTICES). No warranty. " +
+        "Not affiliated with, endorsed by or supported by xTool or Makeblock. \"xTool\" is their trademark, used only to say which machines this works with.");
+
+    async Task AddMaterialTest()
+    {
+        var w = new MaterialTestWindow(_doc.State, _settings.TextFont);
+        await w.ShowDialog(this);
+        if (w.Result is not { } o) return;
+        var (state, added) = MaterialTest.Add(_doc.State, o);
+        _doc.Commit("Material test", state, added);
+        Canvas.FitField();
+    }
 }

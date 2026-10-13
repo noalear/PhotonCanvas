@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using YTool.Core;
 
 namespace YTool.Device;
 
@@ -13,7 +14,7 @@ public static class TokenStore
     static readonly Lock Gate = new();
 
     public static string DefaultPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YTool", "state.json");
+        Path.Combine(AppIdentity.DataDir, "state.json");
 
     public static string? GetToken(string path, string ip)
     {

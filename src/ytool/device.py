@@ -13,9 +13,9 @@ from pathlib import Path
 from websockets.asyncio.client import connect
 
 from .frame import FrameDecoder, ProtocolType, encode
+from .keys import load_keys
 
 PORT = 28900
-USER_KEY = "<pairing-key>"  # base64("<pairing-key-text>"), sent as userKey
 PING_TXID = 65510
 FILE_REQUEST, FILE_DATA = 0x01, 0x81
 WINDOW = 5 * 1024 * 1024
@@ -186,7 +186,7 @@ class Device:
         token = tokens.get(self.ip, "")
         tz = time.strftime("%Z")
         resp = await self.request("GET", "/v1/user/parity", raise_on_error=False, data={
-            "userID": self.user_id, "userKey": USER_KEY, "timezone": tz, "token": token})
+            "userID": self.user_id, "userKey": load_keys().pairing, "timezone": tz, "token": token})
         code = resp.get("code")
         if code == 406:
             if on_button:

@@ -28,6 +28,8 @@ public sealed record DeviceClientOptions
     /// so the stock app's guest id is the default.
     /// </summary>
     public string UserId { get; init; } = "mk-guest";
+    /// <summary>Pairing key from <see cref="MachineKeys"/> (supplied by the user, not built in).</summary>
+    public string PairingKey { get; init; } = "";
     /// <summary>Token cache file; null means <see cref="TokenStore.DefaultPath"/>.</summary>
     public string? StatePath { get; init; }
     /// <summary>Timezone name sent when pairing; null means the local zone's current name.</summary>
@@ -61,8 +63,6 @@ public sealed class DeviceClient : IAsyncDisposable
     public const int Port = 28900;
     public const int PingTransactionId = 65510;
     public const int MaxTransactionId = 65500;
-    /// <summary>base64("<pairing-key-text>"), sent as <c>userKey</c>.</summary>
-    public const string UserKey = "<pairing-key>";
 
     const byte FileRequest = 0x01;
     const byte FileData = 0x81;
@@ -608,11 +608,13 @@ public sealed class DeviceClient : IAsyncDisposable
     public async Task<JsonObject> PairAsync(Action? onButtonPressRequired = null, CancellationToken cancellationToken = default)
     {
         const string url = "/v1/user/parity";
+        if (string.IsNullOrEmpty(_options.PairingKey))
+            throw new DeviceException(DeviceException.NotConnectedCode, "The machine keys haven't been set up yet (Machine tab → Connection keys).");
         string token = TokenStore.GetToken(StatePath, Ip) ?? "";
         var resp = await SendRequestAsync("GET", url, new JsonObject
         {
             ["userID"] = _options.UserId,
-            ["userKey"] = UserKey,
+            ["userKey"] = _options.PairingKey,
             ["timezone"] = _options.TimeZoneName ?? LocalTimeZoneName(),
             ["token"] = token,
         }, cancellationToken: cancellationToken).ConfigureAwait(false);

@@ -11,7 +11,7 @@ namespace YTool.Core.Camera;
 public static class CalibrationStore
 {
     public static string DefaultPath =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "YTool", "camera.json");
+        Path.Combine(AppIdentity.DataDir, "camera.json");
 
     public static List<CameraCalibration> Load(string path)
     {
