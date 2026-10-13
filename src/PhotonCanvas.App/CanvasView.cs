@@ -60,6 +60,14 @@ public sealed partial class CanvasView : Control
     bool _editStarted;
     bool _spaceHeld;
     Guid? _hover;
+    Guid? _highlight;
+
+    /// <summary>A shape to point out (e.g. the one under the mouse in the layer list); null for none.</summary>
+    public Guid? HighlightShape
+    {
+        get => _highlight;
+        set { if (_highlight == value) return; _highlight = value; InvalidateVisual(); }
+    }
     Vec2? _cursor;
     Vec2 _createEnd;
 
@@ -283,7 +291,7 @@ public sealed partial class CanvasView : Control
             if (!layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
             if (shape is ImageShape im)
             {
-                if (im.Bounds.Intersects(viewWorld)) DrawPicture(ctx, im, layer, selected.Contains(im.Id), _hover == im.Id, px);
+                if (im.Bounds.Intersects(viewWorld)) DrawPicture(ctx, im, layer, selected.Contains(im.Id), _hover == im.Id || _highlight == im.Id, px);
                 continue;
             }
             if (shape is not PathShape ps) continue;
@@ -294,6 +302,8 @@ public sealed partial class CanvasView : Control
             bool sel = selected.Contains(shape.Id);
             bool hov = _hover == shape.Id && !sel;
             double w = sel ? 2.2 : hov ? 2 : 1.25;
+            if (_highlight == shape.Id)
+                ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, AccentColor.R, AccentColor.G, AccentColor.B)), 5 * px), geom);
             ctx.DrawGeometry(fill, new Pen(new SolidColorBrush(LayerColor(layer, alpha)), w * px), geom);
             if (sel)
                 ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 0.8 * px, new DashStyle([3, 3], 0)), geom);

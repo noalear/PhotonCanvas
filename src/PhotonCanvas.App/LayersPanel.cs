@@ -10,10 +10,11 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// The layer list. Click to make a layer active, Ctrl/Shift-click to select
-/// several for bulk editing, drag to reorder (top runs first), double-click
-/// to rename. Rows are rebuilt from the document on every change, so the
-/// list can never drift out of sync with it.
+/// The layer list, with each layer's shapes underneath (expand with the arrow).
+/// Click a layer to make it active, Ctrl/Shift-click to select several for bulk
+/// editing, drag to reorder (top runs first), double-click to rename. Click a
+/// shape to select it on the canvas. Rows are rebuilt from the document on every
+/// change, so the list can never drift out of sync with it.
 /// </summary>
 public sealed class LayersPanel : UserControl
 {
@@ -22,6 +23,18 @@ public sealed class LayersPanel : UserControl
     ImmutableHashSet<Guid> _selected = [];
     Guid _anchor;
     Guid? _renaming;
+
+    // shapes under each layer
+    readonly HashSet<Guid> _expanded = [];
+    Guid? _renamingShape;
+    Guid? _shapeAnchor;
+    ImmutableHashSet<Guid> _lastSelection = [];
+    const int MaxShapeRows = 300;
+
+    /// <summary>The mouse is over a shape's row (null when it leaves): highlight it on the canvas.</summary>
+    public event Action<Guid?>? ShapeHovered;
+    /// <summary>Zoom the canvas to the selection.</summary>
+    public event Action? ZoomToSelectionRequested;
 
     // drag-to-reorder
     Guid? _dragLayer;
@@ -36,7 +49,8 @@ public sealed class LayersPanel : UserControl
     public LayersPanel(Document doc)
     {
         _doc = doc;
-        _doc.Changed += _ => Rebuild();
+        // Not on every mouse move of a drag on the canvas: once it's done is enough.
+        _doc.Changed += _ => { if (!_doc.InEdit) Rebuild(); };
         _rows.PointerMoved += (_, e) => OnRowMoved(e);
         _rows.PointerReleased += (_, e) => OnRowReleased(e);
         _rows.PointerCaptureLost += (_, _) => { if (_dragging) { _dragLayer = null; _dragging = false; _dropIndex = -1; Rebuild(); } };
@@ -63,7 +77,7 @@ public sealed class LayersPanel : UserControl
         var hint = new TextBlock
         {
             Classes = { "hint" },
-            Text = "Top layer runs first. Ctrl/Shift-click to edit several at once. Ctrl+1…9 moves selected shapes to a layer.",
+            Text = "Top layer runs first. ▸ shows a layer's shapes: click one to select it, double-click to rename, right-click for more. Ctrl/Shift-click to edit several layers at once.",
             Margin = new(0, 8, 0, 0),
         };
         var scroll = new ScrollViewer { Content = _rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -111,10 +125,27 @@ public sealed class LayersPanel : UserControl
         bool changed = !sel.SetEquals(_selected);
         _selected = sel;
 
+        // Shapes selected on the canvas: open their layers so they can be seen in the list.
+        bool newSelection = !_doc.Selection.SetEquals(_lastSelection);
+        _lastSelection = _doc.Selection;
+        if (newSelection)
+            foreach (var s in state.Shapes)
+                if (_doc.Selection.Contains(s.Id)) _expanded.Add(s.LayerId);
+
         _rows.Children.Clear();
         var counts = state.Shapes.GroupBy(s => s.LayerId).ToDictionary(g => g.Key, g => g.Count());
+        Control? firstSelected = null;
         for (int i = 0; i < state.Layers.Count; i++)
-            _rows.Children.Add(Row(state.Layers[i], i, counts.GetValueOrDefault(state.Layers[i].Id)));
+        {
+            var l = state.Layers[i];
+            int count = counts.GetValueOrDefault(l.Id);
+            var block = new StackPanel { Spacing = 1, Tag = l.Id };
+            block.Children.Add(Row(l, i, count));
+            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(block, l, ref firstSelected);
+            _rows.Children.Add(block);
+        }
+        if (newSelection && firstSelected is { } target)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => target.BringIntoView());
         if (changed) SelectionChanged?.Invoke();
     }
 
@@ -177,8 +208,21 @@ public sealed class LayersPanel : UserControl
         var outp = Toggle("IcBolt", l.Output, l.Output ? "Output on: this layer is sent to the laser" : "Output off: shown as a guide, never sent");
         outp.Click += (_, _) => ToggleOn(l, x => x with { Output = !x.Output }, l.Output ? "Disable layer output" : "Enable layer output");
 
-        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto,Auto,Auto"), Margin = new(8, 4, 4, 4) };
-        grid.Children.Add(swatch);
+        bool open = _expanded.Contains(l.Id);
+        var chevron = new Button
+        {
+            Classes = { "icon" }, MinWidth = 18, MinHeight = 22, Padding = new(0), Margin = new(0, 0, 4, 0),
+            Content = new TextBlock { Text = count == 0 ? "" : open ? "▾" : "▸", FontSize = 13, VerticalAlignment = VerticalAlignment.Center },
+            IsEnabled = count > 0, VerticalAlignment = VerticalAlignment.Center,
+        };
+        ToolTip.SetTip(chevron, open ? "Hide this layer's shapes" : "Show this layer's shapes");
+        chevron.Click += (_, _) => { if (!_expanded.Remove(l.Id)) _expanded.Add(l.Id); Rebuild(); };
+        // Empty layers get a blank spacer so names still line up.
+        Control toggle = count > 0 ? chevron : new Border { Width = 18, Margin = new(0, 0, 4, 0) };
+        var lead = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { toggle, swatch } };
+
+        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto,Auto,Auto"), Margin = new(2, 4, 4, 4) };
+        grid.Children.Add(lead);
         Grid.SetColumn(name, 1);
         name.Margin = new(10, 0, 4, 0);
         grid.Children.Add(name);
@@ -200,6 +244,206 @@ public sealed class LayersPanel : UserControl
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
         row.ContextMenu = RowMenu(l);
         return row;
+    }
+
+    // ---- shapes under a layer ------------------------------------------------------------
+
+    void AddShapeRows(StackPanel block, Layer l, ref Control? firstSelected)
+    {
+        var shapes = _doc.State.ShapesOn(l.Id).ToList();
+        var emittedGroups = new HashSet<Guid>();
+        int shown = 0;
+        foreach (var s in shapes)
+        {
+            if (shown >= MaxShapeRows) break;
+            if (s.GroupId is { } g)
+            {
+                if (!emittedGroups.Add(g)) continue;
+                var members = shapes.Where(x => x.GroupId == g).ToList();
+                block.Children.Add(GroupRow(members));
+                foreach (var m in members)
+                {
+                    var row = ShapeRow(m, l, indent: 1);
+                    if (firstSelected is null && _doc.Selection.Contains(m.Id)) firstSelected = row;
+                    block.Children.Add(row);
+                    shown++;
+                }
+                continue;
+            }
+            var r = ShapeRow(s, l, indent: 0);
+            if (firstSelected is null && _doc.Selection.Contains(s.Id)) firstSelected = r;
+            block.Children.Add(r);
+            shown++;
+        }
+        if (shapes.Count > shown)
+            block.Children.Add(new TextBlock { Classes = { "hint" }, Margin = new(34, 2, 0, 4), Text = $"… and {shapes.Count - shown} more (use Select all shapes on this layer)" });
+    }
+
+    /// <summary>What a shape is called in the list.</summary>
+    static string Label(Shape s) => s switch
+    {
+        TextShape t => $"Text “{Trim(t.Text.Replace('\n', ' '), 28)}”",
+        ImageShape => string.IsNullOrWhiteSpace(s.Name) ? "Picture" : Trim(s.Name, 34),
+        _ => string.IsNullOrWhiteSpace(s.Name) ? "Shape" : Trim(s.Name, 34),
+    };
+
+    static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";
+
+    static string IconFor(Shape s) => s switch { TextShape => "IcText", ImageShape => "IcCamera", _ => "IcPen" };
+
+    Control GroupRow(List<Shape> members)
+    {
+        bool all = members.All(m => _doc.Selection.Contains(m.Id));
+        var row = new Border
+        {
+            Background = all ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent,
+            CornerRadius = new(4),
+            Margin = new(30, 0, 0, 0),
+            Padding = new(6, 2),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal, Spacing = 6,
+                Children =
+                {
+                    new PathIcon { Data = (Geometry)Application.Current!.FindResource("IcCopy")!, Width = 11, Height = 11, Opacity = 0.7 },
+                    new TextBlock { Text = $"Group of {members.Count}", FontSize = 12, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center },
+                },
+            },
+        };
+        ToolTip.SetTip(row, "Click to select the whole group");
+        row.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
+            _doc.Select(members.Select(m => m.Id));
+            e.Handled = true;
+        };
+        return row;
+    }
+
+    Control ShapeRow(Shape s, Layer l, int indent)
+    {
+        bool sel = _doc.Selection.Contains(s.Id);
+        var b = s.Bounds;
+        Control name;
+        if (_renamingShape == s.Id)
+        {
+            var tb = new TextBox { Text = s.Name, MinHeight = 22, Padding = new(4, 1), FontSize = 12 };
+            void Done(bool keep)
+            {
+                if (_renamingShape != s.Id) return;
+                _renamingShape = null;
+                var text = tb.Text?.Trim() ?? "";
+                if (keep && text != s.Name && _doc.State.FindShape(s.Id) is { } cur)
+                    _doc.Commit("Rename shape", Ops.Replace(_doc.State, cur.With(name: text)));
+                else Rebuild();
+            }
+            tb.KeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Enter) { Done(true); e.Handled = true; }
+                else if (e.Key == Key.Escape) { Done(false); e.Handled = true; }
+            };
+            tb.LostFocus += (_, _) => Done(true);
+            tb.AttachedToVisualTree += (_, _) => { tb.Focus(); tb.SelectAll(); };
+            name = tb;
+        }
+        else
+            name = new TextBlock { Text = Label(s), FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
+
+        var size = new TextBlock
+        {
+            Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0),
+            Text = b.IsEmpty ? "" : $"{b.Width:0.#} × {b.Height:0.#}",
+        };
+        var icon = new PathIcon
+        {
+            Data = (Geometry)Application.Current!.FindResource(IconFor(s))!, Width = 11, Height = 11, Margin = new(0, 0, 6, 0),
+            Foreground = new SolidColorBrush(Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color)),
+        };
+        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto") };
+        grid.Children.Add(icon);
+        Grid.SetColumn(name, 1); grid.Children.Add(name);
+        Grid.SetColumn(size, 2); grid.Children.Add(size);
+        var row = new Border
+        {
+            Background = sel ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent,
+            BorderBrush = sel ? Res("Accent") : Brushes.Transparent,
+            BorderThickness = new(2, 0, 0, 0),
+            CornerRadius = new(4),
+            Margin = new(30 + indent * 14, 0, 2, 0),
+            Padding = new(6, 3),
+            Child = grid,
+            Opacity = l.Visible ? 1 : 0.55,
+        };
+        ToolTip.SetTip(row, b.IsEmpty ? Label(s) : $"{Label(s)}\n{b.Width:0.##} × {b.Height:0.##} mm at X {b.MinX:0.##}, Y {b.MinY:0.##}");
+        row.PointerEntered += (_, _) => ShapeHovered?.Invoke(s.Id);
+        row.PointerExited += (_, _) => ShapeHovered?.Invoke(null);
+        row.PointerPressed += (_, e) => OnShapePressed(s, l, e);
+        row.ContextMenu = ShapeMenu(s);
+        return row;
+    }
+
+    void OnShapePressed(Shape s, Layer l, PointerPressedEventArgs e)
+    {
+        var props = e.GetCurrentPoint(this).Properties;
+        if (props.IsRightButtonPressed)
+        {
+            if (!_doc.Selection.Contains(s.Id)) _doc.Select([s.Id]);
+            return;
+        }
+        if (!props.IsLeftButtonPressed) return;
+        var mods = e.KeyModifiers;
+        if (e.ClickCount >= 2 && mods == KeyModifiers.None)
+        {
+            _renamingShape = s.Id;
+            Rebuild();
+        }
+        else if (mods.HasFlag(KeyModifiers.Control))
+        {
+            _doc.Select(_doc.Selection.Contains(s.Id) ? _doc.Selection.Remove(s.Id) : _doc.Selection.Add(s.Id));
+            _shapeAnchor = s.Id;
+        }
+        else if (mods.HasFlag(KeyModifiers.Shift) && _shapeAnchor is { } anchor)
+        {
+            var list = _doc.State.ShapesOn(l.Id).Select(x => x.Id).ToList();
+            int a = list.IndexOf(anchor), b = list.IndexOf(s.Id);
+            if (a < 0) a = b;
+            _doc.Select(list.Skip(Math.Min(a, b)).Take(Math.Abs(a - b) + 1));
+        }
+        else
+        {
+            _doc.Select([s.Id]);
+            _shapeAnchor = s.Id;
+        }
+        e.Handled = true;
+    }
+
+    ContextMenu ShapeMenu(Shape s)
+    {
+        MenuItem Item(string header, Action a, bool enabled = true)
+        {
+            var m = new MenuItem { Header = header, IsEnabled = enabled };
+            m.Click += (_, _) => a();
+            return m;
+        }
+        IReadOnlySet<Guid> Targets() => _doc.Selection.Contains(s.Id) ? _doc.Selection : new HashSet<Guid> { s.Id };
+        var move = new MenuItem { Header = "Move to layer" };
+        foreach (var layer in _doc.State.Layers)
+        {
+            var target = layer;
+            move.Items.Add(Item(target.Name, () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, Targets(), target.Id)), target.Id != s.LayerId));
+        }
+        return new ContextMenu
+        {
+            Items =
+            {
+                Item("Rename", () => { _renamingShape = s.Id; Rebuild(); }),
+                Item("Zoom to it", () => { if (!_doc.Selection.Contains(s.Id)) _doc.Select([s.Id]); ZoomToSelectionRequested?.Invoke(); }),
+                Item("Select its whole group", () => _doc.Select(_doc.State.Shapes.Where(x => x.GroupId == s.GroupId).Select(x => x.Id)), s.GroupId is not null),
+                move,
+                new Separator(),
+                Item("Delete", () => _doc.Commit("Delete", Ops.Delete(_doc.State, Targets()))),
+            },
+        };
     }
 
     static string Summary(Layer l, int count)
@@ -326,6 +570,8 @@ public sealed class LayersPanel : UserControl
             Items =
             {
                 Item("Select all shapes on this layer", () => _doc.Select(_doc.State.ShapesOn(l.Id).Select(s => s.Id))),
+                Item("Show all layers' shapes", () => { foreach (var x in _doc.State.Layers) _expanded.Add(x.Id); Rebuild(); }),
+                Item("Hide all layers' shapes", () => { _expanded.Clear(); Rebuild(); }),
                 Item($"Move selected shapes here ({sel.Count})", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, sel, l.Id)), sel.Count > 0),
                 new Separator(),
                 Item("Rename", () => { _renaming = l.Id; Rebuild(); }),

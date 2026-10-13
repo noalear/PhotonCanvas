@@ -41,6 +41,8 @@ public partial class MainWindow : Window
         InitializeComponent();
         Canvas.Doc = _doc;
         _layers = new LayersPanel(_doc);
+        _layers.ShapeHovered += id => Canvas.HighlightShape = id;
+        _layers.ZoomToSelectionRequested += () => Canvas.FitSelection();
         _props = new PropertiesPanel(_doc, _layers, _settings);
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
