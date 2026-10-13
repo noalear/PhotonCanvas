@@ -289,8 +289,6 @@ public sealed class LayersPanel : UserControl
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";
 
-    static string IconFor(Shape s) => s switch { TextShape => "IcText", ImageShape => "IcCamera", _ => "IcPen" };
-
     Control GroupRow(List<Shape> members)
     {
         bool all = members.All(m => _doc.Selection.Contains(m.Id));
@@ -354,10 +352,10 @@ public sealed class LayersPanel : UserControl
             Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0),
             Text = b.IsEmpty ? "" : $"{b.Width:0.#} × {b.Height:0.#}",
         };
-        var icon = new PathIcon
+        var icon = new ShapeThumb(s, Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color), l.Mode == LayerMode.Fill)
         {
-            Data = (Geometry)Application.Current!.FindResource(IconFor(s))!, Width = 11, Height = 11, Margin = new(0, 0, 6, 0),
-            Foreground = new SolidColorBrush(Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color)),
+            Margin = new(0, 0, 8, 0),
+            VerticalAlignment = VerticalAlignment.Center,
         };
         var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto") };
         grid.Children.Add(icon);
@@ -370,7 +368,7 @@ public sealed class LayersPanel : UserControl
             BorderThickness = new(2, 0, 0, 0),
             CornerRadius = new(4),
             Margin = new(30 + indent * 14, 0, 2, 0),
-            Padding = new(6, 3),
+            Padding = new(4, 2),
             Child = grid,
             Opacity = l.Visible ? 1 : 0.55,
         };
