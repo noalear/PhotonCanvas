@@ -1060,7 +1060,7 @@ public sealed class DeviceClient : IAsyncDisposable
     /// <paramref name="replaceLoadedJob"/> a job that is loaded but not started (<c>P_WORK</c>) is
     /// cancelled first (the same request xTool Studio sends; nothing moves). Returns the task id.
     /// </summary>
-    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default, bool replaceLoadedJob = false)
+    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default, bool replaceLoadedJob = false, string? taskId = null)
     {
         ArgumentNullException.ThrowIfNull(xf);
         if (xf.Length == 0)
@@ -1077,7 +1077,9 @@ public sealed class DeviceClient : IAsyncDisposable
         if (mode != "P_IDLE")
             throw new DeviceException(DeviceException.BusyCode, BusyMessage(mode));
         await UploadFileAsync(xf, "tmp.xf", JobFileType, 1, progress, cancellationToken).ConfigureAwait(false);
-        string taskId = Guid.NewGuid().ToString();
+        // The caller may choose the id up front: the machine announces the loaded job
+        // (with this id) a moment before this call returns.
+        taskId ??= Guid.NewGuid().ToString();
         await RequestAsync("PUT", "/v1/processing/upload/config", new JsonObject
         {
             ["fileType"] = "xf",

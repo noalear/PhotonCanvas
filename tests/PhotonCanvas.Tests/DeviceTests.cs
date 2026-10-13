@@ -567,6 +567,16 @@ public sealed class DeviceClientTests : IAsyncLifetime
         Assert.Equal(expected, DeviceClient.NormalizeMode(mode, sub, desc));
 
     [Fact]
+    public async Task UsesTheCallersTaskId()
+    {
+        await using var client = await Connected();
+        var id = await client.UploadJobAsync([7, 8, 9], taskId: "chosen-up-front");
+        Assert.Equal("chosen-up-front", id);
+        var config = _fake.Requests.Single(r => Url(r) == "/v1/processing/upload/config")["data"]!;
+        Assert.Equal("chosen-up-front", config["taskId"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task NeverCancelsARunningJobToUpload()
     {
         (_fake.Mode, _fake.SubMode) = ("Work", "working");

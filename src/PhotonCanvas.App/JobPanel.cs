@@ -93,6 +93,7 @@ public sealed class JobPanel : UserControl
         _runCard = Card("Running job", _runState, _runProgress, _runTimes, Row(_pause, _stop));
         _runCard.IsVisible = false;
         _machine.ModeChanged += OnModeChanged;
+        _machine.LoadedJobChanged += () => { if (_machine.Mode == "P_WORK") _runState.Text = LoadedText(); };
         _runTimer.Tick += async (_, _) => await TickRun();
         _doc.Changed += content => { if (content) Schedule(); };
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
@@ -200,14 +201,16 @@ public sealed class JobPanel : UserControl
                 : _job is null ? "Fix the problem above to send." : "Ready to send.";
     }
 
+    string LoadedText() => "Loaded – press the start button on the machine." +
+        (_machine.LoadedJobDescription() is { } who ? $"\n{who} Stop cancels it." : "");
+
     void OnModeChanged(string mode)
     {
         switch (mode)
         {
             case "P_WORK":
                 _runCard.IsVisible = true;
-                _runState.Text = "Loaded – press the start button on the machine." +
-                    (_machine.LoadedJobDescription() is { } who ? $"\n{who} Stop cancels it." : "");
+                _runState.Text = LoadedText();
                 _pause.IsEnabled = false;
                 _stop.IsEnabled = true;
                 _runProgress.Value = 0;

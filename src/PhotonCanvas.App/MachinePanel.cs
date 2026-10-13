@@ -673,6 +673,9 @@ public sealed class MachinePanel : UserControl
     /// <summary>Task id of the job on the machine (from the last status check or event).</summary>
     public string? LoadedTaskId { get; private set; }
 
+    /// <summary>The loaded job, or what's known about it, changed. On the UI thread.</summary>
+    public event Action? LoadedJobChanged;
+
     /// <summary>
     /// Whose job is loaded: one sent from this computer (by name and time), or one
     /// that came from somewhere else (xTool Studio, the phone app, another computer).
@@ -896,18 +899,23 @@ public sealed class MachinePanel : UserControl
         var resume = await PauseLive();
         try
         {
-            string taskId;
-            try { taskId = await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob); }
-            catch (DeviceException e)
+            // Remember the job before uploading: the machine's "job loaded" event (carrying
+            // this id) arrives just before the upload call returns.
+            string taskId = Guid.NewGuid().ToString();
+            var sent = new SentJob(taskId, name, DateTime.Now);
+            _settings.SentJobs.Insert(0, sent);
+            if (_settings.SentJobs.Count > 50) _settings.SentJobs.RemoveRange(50, _settings.SentJobs.Count - 50);
+            try { await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob, taskId); }
+            catch (Exception e) when (e is DeviceException or OperationCanceledException)
             {
+                _settings.SentJobs.Remove(sent);
                 Log($"Upload refused or failed: {e.Message}");
                 throw;
             }
-            _settings.SentJobs.RemoveAll(j => j.TaskId == taskId);
-            _settings.SentJobs.Insert(0, new SentJob(taskId, name, DateTime.Now));
-            if (_settings.SentJobs.Count > 50) _settings.SentJobs.RemoveRange(50, _settings.SentJobs.Count - 50);
             _settings.Save();
             LoadedTaskId = taskId;
+            if (Mode == "P_WORK") ShowStatus(Mode, Distance);
+            LoadedJobChanged?.Invoke();
             Log($"Job \"{name}\" uploaded. Press the start button on the machine.");
         }
         finally { resume(); }
