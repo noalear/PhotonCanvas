@@ -10,7 +10,7 @@ using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
 namespace PhotonCanvas.App;
 
-public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
@@ -97,8 +97,13 @@ public sealed partial class CanvasView : Control
             if (_tool == value) return;
             if (_tool == Tool.Pen && _pen.Count >= 2) FinishPen(closed: false);
             _pen.Clear();
+            if (_tool == Tool.Magnetic && _magAnchors.Count >= 2) FinishMagnetic(closed: false);
+            ClearMagnetic();
+            _wandPreview = null;
+            _wandTicket++;
             _node = null;
             _tool = value;
+            if (value is Tool.Wand or Tool.Magnetic) PreparePhoto();
             CancelDrag();
             UpdateCursor(null);
             ToolChanged?.Invoke(value);
@@ -256,6 +261,8 @@ public sealed partial class CanvasView : Control
                 if (_preview is not null) DrawPreview(ctx, _preview);
                 if (_drag == Drag.Create) DrawCreatePreview(ctx);
                 if (_tool == Tool.Pen) DrawPen(ctx);
+                if (_tool == Tool.Wand) DrawWand(ctx);
+                if (_tool == Tool.Magnetic) DrawMagnetic(ctx);
             }
             if (_tool == Tool.Nodes) DrawNodes(ctx);
             else DrawSelection(ctx, doc);
@@ -479,7 +486,7 @@ public sealed partial class CanvasView : Control
     {
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
-        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen) c = StandardCursorType.Cross;
+        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic) c = StandardCursorType.Cross;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
         else if (screen is { } p && _drag == Drag.None)
         {
@@ -529,6 +536,16 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Pen)
         {
             PenPressed(e);
+            return;
+        }
+        if (_tool == Tool.Wand)
+        {
+            WandPressed();
+            return;
+        }
+        if (_tool == Tool.Magnetic)
+        {
+            MagneticPressed(e);
             return;
         }
         if (_tool == Tool.Nodes)
@@ -608,6 +625,7 @@ public sealed partial class CanvasView : Control
         {
             case Drag.None:
                 if (_tool == Tool.Pen && _pen.Count > 0) InvalidateVisual();
+                if (_tool == Tool.Wand) ScheduleWandPreview(w);
                 var hov = _tool is Tool.Select or Tool.Nodes ? HitShape(p)?.Id : null;
                 if (hov != _hover) _hover = hov;
                 UpdateCursor(p);
@@ -723,6 +741,8 @@ public sealed partial class CanvasView : Control
         base.OnPointerExited(e);
         _cursor = null;
         _hover = null;
+        _wandPreview = null;
+        _wandTicket++;
         CursorMoved?.Invoke(null);
         InvalidateVisual();
     }
@@ -862,6 +882,7 @@ public sealed partial class CanvasView : Control
         }
         if (_drag == Drag.Create) { InvalidateVisual(); }
         if (_tool == Tool.Pen && PenKey(e)) { e.Handled = true; return; }
+        if (_tool == Tool.Magnetic && MagneticKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Nodes && NodesKey(e)) { e.Handled = true; return; }
         if (e.Key == Key.Escape)
         {

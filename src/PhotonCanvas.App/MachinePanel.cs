@@ -82,6 +82,8 @@ public sealed class MachinePanel : UserControl
     /// <summary>New straightened camera picture of the work area (null = hide). On the UI thread.</summary>
     public event Action<Bitmap?>? OverlayChanged;
     public event Action<double>? OverlayOpacityChanged;
+    /// <summary>New straightened work-area photo for the drawing tools (null = none). On the UI thread.</summary>
+    public event Action<CameraPhoto?>? PhotoChanged;
 
     public MachinePanel(AppSettings settings)
     {
@@ -302,6 +304,7 @@ public sealed class MachinePanel : UserControl
         if (_onCanvas.IsChecked != true)
         {
             OverlayChanged?.Invoke(null);
+            PhotoChanged?.Invoke(null);
             return;
         }
         if (_calibrations.Count == 0)
@@ -352,15 +355,21 @@ public sealed class MachinePanel : UserControl
             var choice = CalibrationSet.For(_calibrations, Distance);
             if (choice is null) return;
             var area = new Rect2(0, 0, _machine.FieldW, _machine.FieldH);
-            var bmp = await Task.Run(() =>
+            const double mmPerPx = 0.2;
+            double? distance = Distance;
+            var (bmp, photo) = await Task.Run(() =>
             {
                 using var src = CameraWarp.Decode(jpg, 2400);
-                using var warped = CameraWarp.Warp(src, choice.Map, area, 0.2);
-                return CameraImaging.ToAvalonia(warped);
+                using var warped = CameraWarp.Warp(src, choice.Map, area, mmPerPx);
+                return (CameraImaging.ToAvalonia(warped), new CameraPhoto(CameraImaging.ToRaster(warped), area, mmPerPx, distance));
             });
             Ui(() =>
             {
-                if (_onCanvas.IsChecked == true) OverlayChanged?.Invoke(bmp);
+                if (_onCanvas.IsChecked == true)
+                {
+                    OverlayChanged?.Invoke(bmp);
+                    PhotoChanged?.Invoke(photo);
+                }
                 else bmp.Dispose();
                 UpdateCalState();
             });

@@ -65,6 +65,8 @@ public partial class MainWindow : Window
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
         _machine.StatusChanged += s => MachineStatus.Text = s;
+        _machine.PhotoChanged += p => Canvas.Photo = p;
+        Canvas.Hint += h => StatusText.Text = h;
         Canvas.CameraOpacity = _machine.OverlayOpacity;
         _machine.OverlayOpacityChanged += o => Canvas.CameraOpacity = o;
         _machine.OverlayChanged += b =>
@@ -132,6 +134,7 @@ public partial class MainWindow : Window
         {
             (ToolSelect, Tool.Select), (ToolRect, Tool.Rect), (ToolEllipse, Tool.Ellipse), (ToolPolygon, Tool.Polygon), (ToolStar, Tool.Star),
             (ToolLine, Tool.Line), (ToolPen, Tool.Pen), (ToolText, Tool.Text), (ToolNodes, Tool.Nodes), (ToolPan, Tool.Pan),
+            (ToolWand, Tool.Wand), (ToolMagnetic, Tool.Magnetic),
         };
         Canvas.PolygonSides = _settings.PolygonSides;
         Canvas.StarPoints = _settings.StarPoints;
@@ -163,19 +166,56 @@ public partial class MainWindow : Window
             {
                 Tool.Pen => "Click for corners, drag for curves. Click the first point to close; Enter or double-click to finish an open line; Backspace removes the last point.",
                 Tool.Text => "Click where the text should start, then type in the Text panel.",
+                Tool.Wand => "Click inside a piece on the camera picture to outline it. The sliders refine the last pick.",
+                Tool.Magnetic => "Click along an edge on the camera picture. Click the first point to close; Enter or double-click to finish; Backspace undoes a point.",
                 Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S makes it smooth or sharp. Alt-drag a handle to break a smooth point. Esc to finish.",
                 _ => "",
             };
+            WandPanel.IsVisible = t is Tool.Wand or Tool.Magnetic;
+            WandTolGroup.IsVisible = WandIgnoreGroup.IsVisible = t == Tool.Wand;
             ToolOptions.IsVisible = poly || ToolHint.Text.Length > 0;
             Canvas.Focus();
         }
         Canvas.ToolChanged += Options;
+        WireWand();
         Canvas.TextRequested += at => CreateText(at);
         Canvas.TextEditRequested += id => { _doc.Select([id]); RightTabs.SelectedIndex = 0; _props.FocusText(); };
         foreach (var (b, t) in map) b.Click += (_, _) => { Canvas.Tool = t; Canvas.Focus(); };
         void Sync(Tool t) { foreach (var (b, tool) in map) b.IsChecked = tool == t; }
         Canvas.ToolChanged += Sync;
         Sync(Canvas.Tool);
+    }
+
+    /// <summary>Magic wand / magnetic pen sliders: remembered, and applied live.</summary>
+    void WireWand()
+    {
+        WandTolerance.Value = _settings.WandTolerance;
+        WandSmoothness.Value = _settings.WandSmoothness;
+        WandCorners.Value = _settings.WandCorners;
+        WandIgnore.Value = _settings.WandIgnoreMm2;
+        void Apply(bool save)
+        {
+            WandToleranceText.Text = $"{WandTolerance.Value:0}";
+            WandSmoothnessText.Text = $"{WandSmoothness.Value:0.#}";
+            WandCornersText.Text = $"{WandCorners.Value:0}°";
+            WandIgnoreText.Text = $"{WandIgnore.Value:0.#} mm²";
+            Canvas.WandOptions = new Doc.Tracing.PickOptions
+            {
+                Tolerance = WandTolerance.Value,
+                Smoothness = WandSmoothness.Value,
+                CornerAngle = WandCorners.Value,
+                IgnoreBelowMm2 = WandIgnore.Value,
+            };
+            if (!save) return;
+            _settings.WandTolerance = WandTolerance.Value;
+            _settings.WandSmoothness = WandSmoothness.Value;
+            _settings.WandCorners = WandCorners.Value;
+            _settings.WandIgnoreMm2 = WandIgnore.Value;
+            _settings.Save();
+        }
+        foreach (var s in new[] { WandTolerance, WandSmoothness, WandCorners, WandIgnore })
+            s.ValueChanged += (_, _) => Apply(save: true);
+        Apply(save: false);
     }
 
     // ---- menu ----------------------------------------------------------------
@@ -457,6 +497,8 @@ public partial class MainWindow : Window
             (false, false, Key.T) => () => Canvas.Tool = Tool.Text,
             (false, false, Key.N) => () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; },
             (false, false, Key.H) => () => Canvas.Tool = Tool.Pan,
+            (false, false, Key.W) => () => Canvas.Tool = Tool.Wand,
+            (false, false, Key.M) => () => Canvas.Tool = Tool.Magnetic,
             _ => null,
         };
         // Ctrl+1…9: move the selection to layer N.

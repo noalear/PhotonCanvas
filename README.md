@@ -27,6 +27,7 @@ straight to the machine over your own network.
 - Layers that cut, score, engrave areas, or engrave pictures (dithered), with blue diode and red fiber settings
 - Material test generator (power × speed grid)
 - Calibrated overview camera laid over the work area, at any material height
+- Draw from the camera: fit a design onto a real piece (move/turn/resize), pick a piece's outline with a magic wand (tolerance, smoothness, corners, speck filter), or trace edges with a magnetic pen
 - Auto-focus, camera lights, beeper, job pause/resume/stop and progress
 - Jobs are generated locally in the same G-code dialect as the stock software, checked line for line against real exports
 

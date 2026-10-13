@@ -56,6 +56,11 @@ public sealed class AppSettings
     public List<SentJob> SentJobs { get; set; } = [];
     /// <summary>Frame with a tight outline instead of the rectangle.</summary>
     public bool FrameOutline { get; set; }
+    // Magic wand and magnetic pen (camera drawing tools).
+    public double WandTolerance { get; set; } = 25;
+    public double WandSmoothness { get; set; } = 3;
+    public double WandCorners { get; set; } = 40;
+    public double WandIgnoreMm2 { get; set; } = 2;
 
     static readonly JsonSerializerOptions Json = new()
     {

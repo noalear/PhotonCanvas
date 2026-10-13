@@ -41,6 +41,8 @@
         <ToggleButton x:Name="ToolPen" Classes="tool" ToolTip.Tip="Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish"><PathIcon Data="{StaticResource IcPen}" /></ToggleButton>
         <ToggleButton x:Name="ToolText" Classes="tool" ToolTip.Tip="Text (T) · click where the text should go"><PathIcon Data="{StaticResource IcText}" /></ToggleButton>
         <ToggleButton x:Name="ToolNodes" Classes="tool" ToolTip.Tip="Edit points (N, or double-click a shape) · drag points and handles · double-click an edge to add · Delete removes · S = smooth/sharp"><PathIcon Data="{StaticResource IcNodes}" /></ToggleButton>
+        <ToggleButton x:Name="ToolWand" Classes="tool" ToolTip.Tip="Pick piece from camera (W) · click inside a piece on the camera picture to outline it"><PathIcon Data="{StaticResource IcWand}" /></ToggleButton>
+        <ToggleButton x:Name="ToolMagnetic" Classes="tool" ToolTip.Tip="Magnetic pen (M) · click along an edge on the camera picture; the line hugs the edge between clicks"><PathIcon Data="{StaticResource IcLasso}" /></ToggleButton>
         <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>
         <Separator Margin="0,6" />
         <Button x:Name="FitButton" Classes="icon" ToolTip.Tip="Fit work area (Home) · F fits the selection"><PathIcon Data="{StaticResource IcFit}" /></Button>
@@ -65,6 +67,28 @@
             <NumericUpDown x:Name="ToolCorners" Minimum="3" Maximum="64" Increment="1" FormatString="0" Width="110" />
             <TextBlock x:Name="ToolInnerLabel" Text="Inner size %" VerticalAlignment="Center" Classes="muted" />
             <NumericUpDown x:Name="ToolInner" Minimum="5" Maximum="95" Increment="5" FormatString="0" Width="110" />
+            <StackPanel x:Name="WandPanel" Orientation="Horizontal" Spacing="6" IsVisible="False">
+              <StackPanel x:Name="WandTolGroup" Orientation="Horizontal" Spacing="6" ToolTip.Tip="How different a colour can be and still count as the piece. Raise it if the outline stops short; lower it if it spills onto the bed.">
+                <TextBlock Text="Tolerance" VerticalAlignment="Center" Classes="muted" />
+                <Slider x:Name="WandTolerance" Minimum="1" Maximum="100" Width="90" VerticalAlignment="Center" />
+                <TextBlock x:Name="WandToleranceText" MinWidth="22" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="0 follows every step of the edge; higher values give smoother, simpler outlines.">
+                <TextBlock Text="Smoothness" VerticalAlignment="Center" Classes="muted" />
+                <Slider x:Name="WandSmoothness" Minimum="0" Maximum="10" Width="80" VerticalAlignment="Center" />
+                <TextBlock x:Name="WandSmoothnessText" MinWidth="22" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="Bends sharper than this stay as corners; gentler ones become curves. 0 = straight lines only.">
+                <TextBlock Text="Corners" VerticalAlignment="Center" Classes="muted" />
+                <Slider x:Name="WandCorners" Minimum="0" Maximum="180" Width="80" VerticalAlignment="Center" />
+                <TextBlock x:Name="WandCornersText" MinWidth="30" VerticalAlignment="Center" />
+              </StackPanel>
+              <StackPanel x:Name="WandIgnoreGroup" Orientation="Horizontal" Spacing="6" ToolTip.Tip="Specks and holes smaller than this (mm²) are left out: knots, burn marks, dust.">
+                <TextBlock Text="Ignore under" VerticalAlignment="Center" Classes="muted" />
+                <Slider x:Name="WandIgnore" Minimum="0" Maximum="50" Width="80" VerticalAlignment="Center" />
+                <TextBlock x:Name="WandIgnoreText" MinWidth="44" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
             <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
           </StackPanel>
         </Border>

@@ -1,6 +1,8 @@
 using SkiaSharp;
 using PhotonCanvas.Core;
 using PhotonCanvas.Core.Camera;
+using PhotonCanvas.Core.Imaging;
+using PhotonCanvas.Doc.Tracing;
 
 namespace PhotonCanvas.Tests;
 
@@ -339,5 +341,112 @@ public class ShapeFitTests
                 Assert.True(edge[n]);
                 Assert.Equal(best, Math.Sqrt(Math.Pow(n % w - x, 2) + Math.Pow(n / w - y, 2)), 4);
             }
+    }
+}
+
+public class CameraDrawingTests
+{
+    static readonly Rect2 Area = new(0, 0, 100, 80);
+    const double Mpp = 0.2;
+
+    /// <summary>A straightened "photo": dark noisy bed, with whatever <paramref name="draw"/> paints (in mm).</summary>
+    static SKBitmap Photo(Action<SKCanvas> draw, int seed = 3)
+    {
+        int w = (int)(Area.Width / Mpp), h = (int)(Area.Height / Mpp);
+        var bmp = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul));
+        using (var c = new SKCanvas(bmp))
+        {
+            c.Clear(new SKColor(60, 62, 66));
+            c.Scale((float)(1 / Mpp));
+            draw(c);
+        }
+        var rng = new Random(seed);
+        var px = bmp.Pixels;
+        for (int i = 0; i < px.Length; i++)
+        {
+            int n = rng.Next(-10, 11);
+            var p = px[i];
+            px[i] = new SKColor((byte)Math.Clamp(p.Red + n, 0, 255), (byte)Math.Clamp(p.Green + n, 0, 255), (byte)Math.Clamp(p.Blue + n, 0, 255), 255);
+        }
+        bmp.Pixels = px;
+        return bmp;
+    }
+
+    static readonly SKPaint Wood = new() { Color = new SKColor(205, 178, 140), IsAntialias = true };
+
+    [Fact]
+    public void MagneticPathHugsTheEdge()
+    {
+        using var bmp = Photo(c => c.DrawRect(20, 20, 50, 30, Wood)); // top edge at y = 20
+        var wire = LiveWire.Build(CameraWarp.ToGray(bmp), Area, Mpp);
+        // A click just off the edge snaps onto the edge, close by.
+        var a = wire.Snap(new Vec2(20.6, 19.3), 1.5);
+        Assert.True(Math.Abs(a.Y - 20) < 0.4 && a.Dist(new Vec2(20.6, 19.3)) < 1.2, $"{a}");
+        var tree = wire.Grow(a, 60);
+        // Cursor near the far corner: the path follows the top edge, not a wandering line.
+        var path = tree.PathTo(wire.Snap(new Vec2(69.5, 20.7), 1.5))!;
+        Assert.NotNull(path);
+        Assert.All(path, p => Assert.True(Math.Abs(p.Y - 20) < 0.5 || Math.Abs(p.X - 70) < 0.5, $"{p} is off the top edge"));
+        // To the opposite corner it goes round the edges rather than across the middle.
+        var round = tree.PathTo(new Vec2(70, 50))!;
+        Assert.All(round, p => Assert.True(
+            Math.Abs(p.Y - 20) < 0.6 || Math.Abs(p.Y - 50) < 0.6 || Math.Abs(p.X - 20) < 0.6 || Math.Abs(p.X - 70) < 0.6, $"{p} is inside the piece"));
+        Assert.True(LiveWire.Simplify(path, 0.25).Count <= 4, $"{LiveWire.Simplify(path, 0.25).Count} points");
+    }
+
+    static RasterImage ToRaster(SKBitmap bmp)
+    {
+        var rgba = new byte[bmp.Width * bmp.Height * 4];
+        var px = bmp.Pixels;
+        for (int i = 0; i < px.Length; i++) { rgba[i * 4] = px[i].Red; rgba[i * 4 + 1] = px[i].Green; rgba[i * 4 + 2] = px[i].Blue; rgba[i * 4 + 3] = 255; }
+        return new RasterImage(bmp.Width, bmp.Height, rgba);
+    }
+
+    [Fact]
+    public void WandOutlinesAPieceWithItsHole()
+    {
+        // An "O": a 40 mm ring with a 20 mm hole, plus a small dark speck (≈1 mm²) on the wood.
+        using var bmp = Photo(c =>
+        {
+            using var ring = new SKPath { FillType = SKPathFillType.EvenOdd };
+            ring.AddCircle(50, 40, 20);
+            ring.AddCircle(50, 40, 10);
+            c.DrawPath(ring, Wood);
+            using var speck = new SKPaint { Color = new SKColor(70, 50, 40) };
+            c.DrawRect(64, 39.5f, 1, 1, speck);
+        });
+        var w = CameraPick.Prepare(ToRaster(bmp));
+        var click = new Vec2(50, 25); // on the ring
+        var g = CameraPick.Outline(w, Area, Mpp, click, new PickOptions());
+        Assert.Equal(2, g.Subpaths.Length); // outside + hole; the speck is ignored
+        var b = g.Bounds(0.05);
+        Assert.InRange(b.Width, 39.4, 40.6);
+        Assert.InRange(b.Center.X, 49.7, 50.3);
+        Assert.InRange(b.Center.Y, 39.7, 40.3);
+        // Keep specks: the speck becomes a third outline.
+        var detailed = CameraPick.Outline(w, Area, Mpp, click, new PickOptions { IgnoreBelowMm2 = 0.2, Smoothness = 0 });
+        Assert.Equal(3, detailed.Subpaths.Length);
+        // Clicking the bed picks the bed, not the ring.
+        Assert.True(CameraPick.Outline(w, Area, Mpp, new Vec2(5, 5), new PickOptions()).Bounds(0.05).Width > 90);
+    }
+
+    [Fact]
+    public void SmoothnessSimplifiesTheOutline()
+    {
+        using var bmp = Photo(c => c.DrawCircle(50, 40, 20, Wood));
+        var w = CameraPick.Prepare(ToRaster(bmp));
+        int Segs(double smooth) => CameraPick.Outline(w, Area, Mpp, new Vec2(50, 40), new PickOptions { Smoothness = smooth, CornerAngle = 40 }).Subpaths.Sum(s => s.Segs.Length);
+        Assert.True(Segs(8) < Segs(0), $"{Segs(8)} vs {Segs(0)}");
+    }
+
+    [Fact]
+    public void ClosedMagneticLoopBecomesASmoothShape()
+    {
+        var loop = new List<Vec2>();
+        for (int i = 0; i <= 200; i++) loop.Add(new Vec2(50 + 15 * Math.Cos(i * Math.PI / 100), 40 + 15 * Math.Sin(i * Math.PI / 100)));
+        var g = CameraPick.FitLoop(loop, Area, Mpp);
+        Assert.True(g.Subpaths[0].Closed);
+        Assert.InRange(g.Bounds(0.05).Width, 29.6, 30.4);
+        Assert.True(g.Subpaths[0].Segs.Length < 20);
     }
 }
