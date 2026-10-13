@@ -55,9 +55,18 @@ class Laser:
 
 @dataclass
 class Job:
+    """A complete motion file.
+
+    passes=None reproduces xTool's behaviour: each block loops its own
+    laser.passes before the next block starts. passes=N runs the WHOLE job
+    once per pass (every shape gets pass 1, then every shape gets pass 2, ...),
+    with pass_delay seconds of dwell between passes.
+    """
     blocks: list = field(default_factory=list)
     air: int = AIR_CUT
     created: float = None
+    passes: int = None
+    pass_delay: float = 0.0
 
     def header(self):
         t = time.localtime(self.created or time.time())
@@ -96,9 +105,26 @@ class Job:
 
     def render(self):
         lines = self.header()
-        for b in self.blocks:
-            lines += b.render() + [""]
+        if self.passes is None:
+            for b in self.blocks:
+                lines += b.render() + [""]
+        else:
+            for p in range(self.passes):
+                if p and self.pass_delay > 0:
+                    lines += [f"# pass {p + 1} of {self.passes}", f"G4P{int(round(self.pass_delay * 1000))}", ""]
+                for b in self.blocks:
+                    lines += b.render(passes=1) + [""]
         return "\n".join(lines + self.tail())
+
+    def border(self, outline, power_s=64, speed_f=960000):
+        """Framing file traced by the machine's frame button (low power, very fast)."""
+        lines = ["# GS004-4 HEAD", "G0 F180000", "M4 S0", "G1 F180000", "M114 S1", "", "",
+                 "# GS004-4 VECTOR HEAD", "# motion_start", "", "G21", "G90", "", "", "", "",
+                 '# blockConfig={"powerFactor":0.064,"isVector":true,"crossDot":false}',
+                 f"G0X{_num(outline[0][0])}Y{_num(outline[0][1])}"]
+        for i, (x, y) in enumerate(outline[1:]):
+            lines.append(f"G1X{_num(x)}Y{_num(y)}" + (f"S{power_s}F{speed_f}" if i == 0 else ""))
+        return "\n".join(lines + ["", "# GS004-4 VECTOR TAIL", "# motion_end"] + self.tail())
 
 
 def _loop(passes, body):
@@ -113,8 +139,9 @@ class VectorPath:
     points: list                 # [(x, y), ...]; repeat the first point to close
     laser: Laser
 
-    def render(self):
+    def render(self, passes=None):
         L = self.laser
+        passes = L.passes if passes is None else passes
         cfg = _cfg({"powerFactor": round(L.power / 100, 6), "isVector": True, "crossDot": False})
         body = [f"# blockConfig={cfg}", f"G0X{_num(self.points[0][0])}Y{_num(self.points[0][1])}"]
         for i, (x, y) in enumerate(self.points[1:]):
@@ -123,7 +150,7 @@ class VectorPath:
                 line += f"S{_power(L.power)}F{_speed(L.speed)}"
             body.append(line)
         return (["# GS004-4 VECTOR HEAD", "# motion_start"] + L.source_lines() + ["M523P40", "", ""]
-                + _loop(L.passes, body) + ["", "# GS004-4 VECTOR TAIL", "# motion_end"])
+                + _loop(passes, body) + ["", "# GS004-4 VECTOR TAIL", "# motion_end"])
 
 
 def _scan_spans(polygons, y):
@@ -148,8 +175,9 @@ class Fill:
     overscan: float = 0.0
     accel: int = 5000
 
-    def render(self):
+    def render(self, passes=None):
         L = self.laser
+        passes = L.passes if passes is None else passes
         step = 10.0 / self.lines_per_cm
         ys = [p[1] for poly in self.polygons for p in poly]
         y0, y1 = min(ys), max(ys)
@@ -177,7 +205,7 @@ class Fill:
                 last_x = _f3(b)
             forward = not forward
         return (["# GS004-4 BITMAP HEAD", "# motion_start", "", "", ""] + L.source_lines(vector=False) + ["M523P40", "", ""]
-                + _loop(L.passes, body) + ["", "# GS004-4 BITMAP TAIL", "# motion_end", ""])
+                + _loop(passes, body) + ["", "# GS004-4 BITMAP TAIL", "# motion_end", ""])
 
 
 @dataclass
@@ -191,8 +219,9 @@ class DotBitmap:
     min_power: float = 1.0
     mode: str = "Jarvis"
 
-    def render(self):
+    def render(self, passes=None):
         L = self.laser
+        passes = L.passes if passes is None else passes
         pitch = 25.4 / self.dpi
         cfg = {"powerFactor": round(L.power / 100, 6), "overDist": 0, "accel": 5000,
                "density": round(self.dpi / 25.4, 4), "power": [_power(self.min_power), _power(L.power)],
@@ -220,4 +249,4 @@ class DotBitmap:
                 last_x = x
             forward = not forward
         return (["# GS004-4 BITMAP HEAD", "# motion_start", "", "", ""] + L.source_lines(vector=False) + ["M523P10", "", ""]
-                + _loop(L.passes, body) + ["", "# GS004-4 BITMAP TAIL", "# motion_end", ""])
+                + _loop(passes, body) + ["", "# GS004-4 BITMAP TAIL", "# motion_end", ""])

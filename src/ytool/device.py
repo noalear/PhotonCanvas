@@ -110,6 +110,7 @@ class Device:
         self.main = Channel(ip, self.conn_id, "instruction", self._on_main, trace)
         self.file = None
         self._downloads = {}
+        self._uploads = {}
         self.media_frames = asyncio.Queue(maxsize=8)
         self.media = None
 
@@ -144,6 +145,9 @@ class Device:
         try:
             msg = json.loads(body)
         except ValueError:
+            return
+        if isinstance(msg, dict) and msg.get("url") == "/v1/filetransfer/finish":
+            self._on_transfer_finish(msg)
             return
         if isinstance(msg, dict) and msg.get("type") == "response":
             txid = msg.get("transactionId")
@@ -209,8 +213,39 @@ class Device:
             self.file = Channel(self.ip, self.conn_id, "file_stream", self._on_file, self.trace)
             await self.file.open()
 
+    def _on_transfer_finish(self, msg):
+        data = msg.get("data") or {}
+        up = self._uploads.get(data.get("channel"))
+        if up and not up["done"].done():
+            up["done"].set_result(data)
+
     async def _on_file(self, ptype, body):
+        if ptype == ProtocolType.JSON:
+            try:
+                msg = json.loads(body)
+            except ValueError:
+                return
+            if isinstance(msg, dict) and msg.get("url") == "/v1/filetransfer/finish":
+                self._on_transfer_finish(msg)
+            return
         if ptype != ProtocolType.FILE_TRANSFER or not body:
+            return
+        if body[0] == FILE_REQUEST and len(body) >= 10:
+            ch = body[1]
+            offset = int.from_bytes(body[2:7], "big")
+            window = int.from_bytes(body[7:10], "big")
+            up = self._uploads.get(ch)
+            if up:
+                end = min(offset + window, len(up["data"]))
+                pos = offset
+                while pos < end:
+                    n = min(up["packet"], end - pos)
+                    pkt = bytes([FILE_DATA, ch]) + pos.to_bytes(5, "big") + up["data"][pos:pos + n]
+                    await self.file.send(pkt, ProtocolType.FILE_TRANSFER, body_crc=False)
+                    pos += n
+                up["sent"] = max(up["sent"], end)
+                if up.get("progress"):
+                    up["progress"](up["sent"], len(up["data"]))
             return
         if body[0] == FILE_DATA and len(body) >= 7:
             ch = body[1]
@@ -254,6 +289,25 @@ class Device:
         await self.request("PUT", "/v1/filetransfer/finish", raise_on_error=False,
                            data={"code": 0, "message": "file transfer finish", "channel": channel})
         return data
+
+    async def upload(self, data: bytes, filename: str, filetype: int = 1, channel: int = 1,
+                     timeout: float = 60, progress=None):
+        """Device-driven upload: we announce the file, the device pulls windows of it."""
+        await self._ensure_file_channel()
+        done = asyncio.get_running_loop().create_future()
+        self._uploads[channel] = {"data": data, "packet": 1024 * 1024, "sent": 0, "done": done,
+                                  "progress": progress}
+        try:
+            info = await self.request("PUT", "/v1/filetransfer/upload", data={
+                "filetype": filetype, "filename": filename, "filesize": len(data), "digesttype": 1,
+                "digestdata": hashlib.md5(data).hexdigest(), "channel": channel, "packetsize": 1024 * 1024})
+            self._uploads[channel]["packet"] = min(1024 * 1024, int((info or {}).get("packetsize") or 1024 * 1024))
+            result = await asyncio.wait_for(done, timeout)
+        finally:
+            self._uploads.pop(channel, None)
+        if result.get("code") != 0:
+            raise DeviceError(result.get("code"), result.get("message") or "upload failed", result)
+        return result
 
     # ---- camera -----------------------------------------------------------
     async def snapshot(self, stream=0):

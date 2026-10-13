@@ -130,6 +130,73 @@ async def cmd_capture(args):
     await capture(args.ip, args.out, save_existing=args.save_existing)
 
 
+def build_smiley(args):
+    from .gcode import BLUE, RED, Job, Laser, VectorPath
+    from .shapes import smiley
+    paths = smiley(args.x, args.y, args.size)
+    laser = Laser(args.light, args.power, args.speed, args.passes)
+    job = Job([VectorPath(p, laser) for p in paths], passes=args.passes, pass_delay=args.pass_delay)
+    return paths, job
+
+
+async def cmd_smiley(args):
+    """Cut a smiley. Dry run unless --send; with --send the machine waits for its button."""
+    import uuid
+    from .xf import build_xf, preview_jpg
+    paths, job = build_smiley(args)
+    motion = job.render()
+    border = job.border(paths[-1])
+    params = [{"processingType": "VECTOR_CUTTING", "processingLightSource": args.light, "power": args.power,
+               "speed": args.speed, "repeat": args.passes, "isFill": False}]
+    xf = build_xf(motion, border, preview_jpg(paths), args.light, params)
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "motion.gcode").write_text(motion, encoding="utf-8")
+    (out / "border.gcode").write_text(border, encoding="utf-8")
+    (out / "job.xf").write_bytes(xf)
+    from PIL import Image, ImageDraw
+    img = Image.new("RGB", (800, 800), "white")
+    d = ImageDraw.Draw(img)
+    s_ = 800 / 220
+    d.rectangle([0, 0, 799, 799], outline="#999")
+    for i, p in enumerate(paths):
+        d.line([(x * s_, y * s_) for x, y in p], fill="red" if i < len(paths) - 1 else "black", width=2)
+    img.save(out / "preview.png")
+    n_g1 = motion.count("G1X")
+    print(f"wrote {out}/motion.gcode ({n_g1} moves, {len(paths)} paths), border.gcode, job.xf ({len(xf)} B), preview.png")
+    print(f"settings: {args.light} {args.power}% {args.speed} mm/s, {args.passes} pass(es)"
+          + (f", {args.pass_delay}s pause between whole-shape passes" if args.passes > 1 else "")
+          + f", {args.size} mm at ({args.x}, {args.y}), distance {args.distance} mm")
+    if not args.send:
+        print("dry run only (add --send to upload; the machine will then wait for its button)")
+        return
+
+    dev = await _connected(args)
+    try:
+        z = (await dev.request("GET", "/v1/laser-head/focus/parameter", data={"action": "coord"}))["value"]
+        want = args.distance + 6
+        if abs(z - want) > 0.05:
+            sys.exit(f"laser head is at z={z} (distance {z - 6:.2f} mm), expected {want} for {args.distance} mm. "
+                     f"Set the distance in xTool Studio or on the machine first.")
+        mode = (await dev.get("/v1/device/runtime-infos"))["curMode"]["mode"]
+        if mode != "P_IDLE":
+            sys.exit(f"machine is busy ({mode}); not uploading")
+        print(f"z={z} OK (distance {args.distance} mm), machine idle. Uploading...")
+        await dev.upload(xf, "tmp.xf", 1, progress=lambda a, b: print(f"  sent {a}/{b}"))
+        task = str(uuid.uuid4())
+        await dev.request("PUT", "/v1/processing/upload/config",
+                          data={"fileType": "xf", "autoStart": 0, "taskId": task})
+        print("Uploaded. >>> Press the button on the machine to start (or cancel on the machine). <<<")
+        print("Watching machine events (Ctrl+C to stop watching; this does not stop the job):")
+        while True:
+            ev = await dev.events.get()
+            print(time.strftime("%H:%M:%S"), json.dumps(ev, ensure_ascii=False))
+            if isinstance(ev, dict) and str(ev.get("info", "")).upper() in ("WORK_FINISHED", "WORK_STOPED"):
+                break
+    finally:
+        await dev.close()
+
+
 async def cmd_get(args):
     if not args.url.startswith("/v1/"):
         sys.exit("only GET /v1/... URLs are allowed here")
@@ -152,6 +219,13 @@ def main(argv=None):
     s = sub.add_parser("snap"); s.add_argument("ip"); s.add_argument("-o", "--output"); s.add_argument("--stream", type=int, default=0, choices=(0, 1)); s.add_argument("--v1", action="store_true")
     s = sub.add_parser("view"); s.add_argument("ip"); s.add_argument("--stream", type=int, default=0, choices=(0, 1))
     s = sub.add_parser("get"); s.add_argument("ip"); s.add_argument("url")
+    s = sub.add_parser("smiley", help="cut a smiley face (dry run unless --send)")
+    s.add_argument("ip"); s.add_argument("--power", type=float, required=True); s.add_argument("--speed", type=float, required=True)
+    s.add_argument("--light", choices=("blue", "red"), default="blue"); s.add_argument("--passes", type=int, default=1)
+    s.add_argument("--pass-delay", type=float, default=0, help="seconds to pause between whole-shape passes")
+    s.add_argument("--distance", type=float, required=True, help="material distance in mm (head z = distance + 6)")
+    s.add_argument("--size", type=float, default=40); s.add_argument("--x", type=float, default=110); s.add_argument("--y", type=float, default=110)
+    s.add_argument("-o", "--out", default="captures/out/smiley"); s.add_argument("--send", action="store_true")
     s = sub.add_parser("capture"); s.add_argument("ip"); s.add_argument("-o", "--out", default="captures/jobs"); s.add_argument("--save-existing", action="store_true")
 
     args = p.parse_args(argv)
@@ -163,6 +237,6 @@ def main(argv=None):
         Viewer(args.ip, args.stream).run()
         return
     try:
-        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture}[args.cmd](args))
+        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture, "smiley": cmd_smiley}[args.cmd](args))
     except KeyboardInterrupt:
         pass
