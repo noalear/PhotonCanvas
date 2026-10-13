@@ -120,6 +120,25 @@ public class ImageTests
     }
 
     [Fact]
+    public void PickColourSelectsByToleranceAndConnection()
+    {
+        var src = ImageSource.FromEncoded(Png(150, 50, c =>
+        {
+            c.DrawRect(5, 5, 40, 40, new SKPaint { Color = new SKColor(200, 30, 30) });   // clicked
+            c.DrawRect(55, 5, 40, 40, new SKPaint { Color = new SKColor(200, 30, 30) });  // same colour, separate
+            c.DrawRect(105, 5, 40, 40, new SKPaint { Color = new SKColor(200, 80, 60) }); // similar shade
+        }));
+        var w = ImageTrace.Prepare(src.Pixels);
+        var red = ImageTrace.SampleColour(w, 20, 20);
+        int Count(double tol, bool connected) =>
+            ImageTrace.PickColour(w, red, 20, 20, tol, connected, new TraceOptions()).Paths;
+        Assert.Equal(1, Count(10, connected: true));   // just the clicked square
+        Assert.Equal(2, Count(10, connected: false));  // every exact match
+        Assert.Equal(3, Count(45, connected: false));  // tolerance high enough for the similar shade
+        Assert.Equal(0, ImageTrace.PickColour(w, red, 148, 48, 10, true, new TraceOptions()).Paths); // clicked the background
+    }
+
+    [Fact]
     public void LargePicturesAreTracedAtWorkingSizeButReturnedInOriginalPixels()
     {
         var src = ImageSource.FromEncoded(Png(4000, 1000, c => c.DrawRect(1000, 200, 2000, 600, new SKPaint { Color = SKColors.Black })));

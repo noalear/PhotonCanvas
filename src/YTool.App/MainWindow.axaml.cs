@@ -35,6 +35,7 @@ public partial class MainWindow : Window
         Canvas.Doc = _doc;
         _layers = new LayersPanel(_doc);
         _props = new PropertiesPanel(_doc, _layers, _settings);
+        _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _machine = new MachinePanel(_settings);
         _job = new JobPanel(_doc, _settings, Canvas, _machine);
         LayersHost.Content = _layers;
@@ -146,6 +147,7 @@ public partial class MainWindow : Window
                 new Separator(),
                 AsyncItem("Import SVG…", () => ImportSvg(byColour: false), "Ctrl+I"),
                 AsyncItem("Import SVG, one layer per colour…", () => ImportSvg(byColour: true), "Ctrl+Shift+I"),
+                AsyncItem("Import picture…", ImportImage, "Ctrl+J"),
                 new Separator(),
                 AsyncItem("Export job package (.xf)…", () => _job.Export(xf: true)),
                 AsyncItem("Export G-code (.gcode)…", () => _job.Export(xf: false)),
@@ -180,6 +182,7 @@ public partial class MainWindow : Window
             {
                 Item("Combine into one shape", Combine, "Ctrl+G", () => _doc.Selection.Count > 1),
                 Item("Break apart", BreakApart, "Ctrl+Shift+G", HasSel),
+                AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, "Ctrl+T", () => SelectedPicture() is not null),
                 new Separator(),
                 Item("Align left", () => AlignSel(Align.Left), null, () => _doc.Selection.Count > 1),
                 Item("Align centres horizontally", () => AlignSel(Align.CenterX), null, () => _doc.Selection.Count > 1),
@@ -270,6 +273,7 @@ public partial class MainWindow : Window
             (true, false, Key.N) => NewDoc,
             (true, false, Key.I) => () => ImportSvg(false),
             (true, true, Key.I) => () => ImportSvg(true),
+            (true, false, Key.J) => ImportImage,
             (false, false, Key.F1) => ShowShortcuts,
             _ => null,
         };
@@ -294,6 +298,7 @@ public partial class MainWindow : Window
             (true, true, Key.A) => () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)),
             (true, false, Key.G) => Combine,
             (true, true, Key.G) => BreakApart,
+            (true, false, Key.T) => () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); },
             (true, false, Key.L) => _layers.AddLayer,
             (true, false, Key.M) => () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)),
             (true, false, Key.OemPlus or Key.Add) => () => Canvas.ZoomBy(1.25),
@@ -556,6 +561,109 @@ public partial class MainWindow : Window
 
     static string ColourLayerName(uint c) => $"Colour #{c:X6}";
 
+    // ---- pictures ------------------------------------------------------------------------
+
+    static readonly string[] PictureExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"];
+    static bool IsPicture(string path) => PictureExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
+
+    ImageShape? SelectedPicture() =>
+        _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ImageShape im ? im : null;
+
+    async Task ImportImage()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Import picture",
+            AllowMultiple = true,
+            FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = [.. PictureExtensions.Select(e => "*" + e)] }],
+        });
+        var paths = files.Select(f => f.TryGetLocalPath()).OfType<string>().ToList();
+        if (paths.Count > 0) await ImportPictures(paths);
+    }
+
+    /// <summary>Pictures go onto an Image layer (made if needed), centred in the work area, up to 100 mm across.</summary>
+    async Task ImportPictures(IReadOnlyList<string> paths)
+    {
+        var state = _doc.State;
+        var layer = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Image && l.Visible && !l.Locked);
+        if (layer is null)
+        {
+            layer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = "Pictures" };
+            state = Ops.AddLayer(state, layer, 0);
+        }
+        var ids = new List<Guid>();
+        var problems = new List<string>();
+        var field = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH);
+        double offset = 0;
+        foreach (var path in paths)
+        {
+            ImageSource src;
+            try
+            {
+                var bytes = await File.ReadAllBytesAsync(path);
+                src = await Task.Run(() => ImageSource.FromEncoded(bytes));
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException)
+            {
+                problems.Add($"{Path.GetFileName(path)}: {e.Message}");
+                continue;
+            }
+            var size = ImageShape.DefaultSize(src, 100);
+            var at = field.Center - size / 2 + new Vec2(offset, offset);
+            offset += 5;
+            var shape = new ImageShape
+            {
+                Name = Path.GetFileNameWithoutExtension(path),
+                LayerId = layer.Id,
+                Source = src,
+                SizeMm = size,
+                Transform = Affine.Translate(at),
+            };
+            state = Ops.AddShapes(state, [shape]);
+            ids.Add(shape.Id);
+        }
+        if (ids.Count > 0)
+        {
+            _doc.Commit(ids.Count == 1 ? "Import picture" : $"Import {ids.Count} pictures", state, ids);
+            Canvas.FitSelection();
+        }
+        if (problems.Count > 0) await Dialogs.Message(this, "Some pictures couldn't be imported", string.Join("\n", problems));
+    }
+
+    async Task Trace(ImageShape im)
+    {
+        var w = new TraceWindow(im, _doc.State.Layers, _doc.ActiveLayer);
+        await w.ShowDialog(this);
+        if (w.Choice is not { } choice) return;
+
+        var state = _doc.State;
+        var ids = new List<Guid>();
+        var toWorld = im.PixelToWorld;
+        Layer NewLayer(string name, uint? colour)
+        {
+            var l = Layer.Default(state.Layers.Count, choice.NewLayerMode) with { Name = name };
+            if (colour is { } c) l = l with { Color = DisplayColour(c, state) };
+            state = Ops.AddLayer(state, l);
+            return l;
+        }
+        Guid? bwLayer = choice.TargetLayer;
+        foreach (var part in choice.Parts)
+        {
+            Guid layerId;
+            if (part.Rgb is { } rgb)
+            {
+                var name = ColourLayerName(rgb);
+                layerId = (state.Layers.FirstOrDefault(l => l.Name == name && l.Mode != LayerMode.Image) ?? NewLayer(name, rgb)).Id;
+            }
+            else layerId = bwLayer ??= NewLayer($"Traced {im.Name}".Trim(), null).Id;
+            var shape = new PathShape { Name = $"Traced {im.Name}".Trim(), LayerId = layerId, Geometry = part.Geometry.Transform(toWorld) };
+            state = Ops.AddShapes(state, [shape]);
+            ids.Add(shape.Id);
+        }
+        if (choice.RemovePicture) state = Ops.Delete(state, new HashSet<Guid> { im.Id });
+        _doc.Commit("Trace picture", state, ids);
+    }
+
     /// <summary>The SVG colour, unless it would vanish on the dark canvas.</summary>
     static uint DisplayColour(uint c, DocState s)
     {
@@ -569,7 +677,9 @@ public partial class MainWindow : Window
     {
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
         var svgs = files.Where(f => f.EndsWith(".svg", StringComparison.OrdinalIgnoreCase)).ToList();
+        var pictures = files.Where(IsPicture).ToList();
         var project = files.FirstOrDefault(f => f.EndsWith(DocFile.Extension, StringComparison.OrdinalIgnoreCase));
+        if (pictures.Count > 0) _ = Guard(() => ImportPictures(pictures));
         if (svgs.Count > 0) _ = Guard(() => ImportPaths(svgs, e.KeyModifiers.HasFlag(KeyModifiers.Shift)));
         else if (project is not null) _ = Guard(async () => { if (await ConfirmDiscard()) await OpenPath(project); });
     }

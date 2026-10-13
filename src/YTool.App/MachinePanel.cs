@@ -38,6 +38,8 @@ public sealed class MachinePanel : UserControl
     readonly TextBlock _distance = Hint();
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
     readonly CheckBox _beeper = new() { Content = "Beeper on", IsEnabled = false };
+    readonly Button _focus = new() { Content = "Auto-focus", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly TextBlock _focusState = Hint();
     readonly ToggleSwitch _live = new() { OnContent = "Live view on", OffContent = "Live view off", IsEnabled = false };
     readonly ComboBox _stream = new() { ItemsSource = new[] { "Overview", "Close-up" }, SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly Image _image = new() { Stretch = Stretch.Uniform };
@@ -85,6 +87,8 @@ public sealed class MachinePanel : UserControl
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
+        _focus.Click += async (_, _) => await AutoFocus();
+        ToolTip.SetTip(_focus, "The machine measures the material under the head and moves to the right focus height. Place your material first.");
         ToolTip.SetTip(_beeper, "The machine's beeps for button presses and jobs. Stored on the machine. The firmware only offers on or off, not a volume.");
         _live.IsCheckedChanged += (_, _) => ToggleLive();
         ToolTip.SetTip(_lidOpen, "Stored on the machine (xTool calls it \"Enclosure-opened processing\"). When on, the start button works with the lid up. Wear laser safety glasses.");
@@ -135,7 +139,7 @@ public sealed class MachinePanel : UserControl
                 Children =
                 {
                     Card("Connection", _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
-                    Card("Status", _mode, _distance, _lidOpen, _beeper),
+                    Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera", Row(_live, _stream), imgBorder, _straightenRow, snap, _camInfo),
                     Card("Machine events", _log),
@@ -376,7 +380,7 @@ public sealed class MachinePanel : UserControl
             _connState.Text = $"Connected to {ip}.";
             _connect.Content = "Disconnect";
             _connect.Classes.Remove("primary");
-            _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = true;
+            _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = _focus.IsEnabled = true;
             await RefreshLid();
             await RefreshBeeper();
             Log(auto ? $"Connected automatically to {ip}." : "Connected.");
@@ -432,6 +436,8 @@ public sealed class MachinePanel : UserControl
         _updatingLid = true;
         _lidOpen.IsEnabled = false;
         _beeper.IsEnabled = false;
+        _focus.IsEnabled = false;
+        _focusState.Text = "";
         _updatingLid = false;
         _live.IsChecked = false;
         _live.IsEnabled = false;
@@ -573,6 +579,35 @@ public sealed class MachinePanel : UserControl
         }
         catch (DeviceException e) { Log($"Couldn't read the lid setting: {e.Message}"); }
         finally { _updatingLid = false; }
+    }
+
+    async Task AutoFocus()
+    {
+        if (_client is not { } c) return;
+        if (Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or ""))
+        {
+            _focusState.Text = $"The machine is busy ({Describe(Mode)}). Try again when it's ready.";
+            return;
+        }
+        _focus.IsEnabled = false;
+        _focusState.Text = "Focusing… the head will move. Press the machine's button to stop.";
+        Log("Auto-focus started.");
+        try
+        {
+            double z = await c.AutoFocusAsync();
+            double dist = z - _machine.ZOffset;
+            ShowStatus("P_IDLE", dist);
+            _focusState.Text = $"Focused: material distance {dist:0.0} mm.";
+            Log($"Auto-focus finished: distance {dist:0.0} mm (head Z {z:0.00}).");
+            UpdateCalState();
+            if (_onCanvas.IsChecked == true) await RefreshOverlay(); // the camera view depends on the distance
+        }
+        catch (DeviceException e)
+        {
+            _focusState.Text = e.Message;
+            Log($"Auto-focus: {e.Message}");
+        }
+        finally { _focus.IsEnabled = IsConnected; }
     }
 
     async Task RefreshBeeper()

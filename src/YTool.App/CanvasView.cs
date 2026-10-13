@@ -52,6 +52,7 @@ public sealed class CanvasView : Control
     Point _offset = new(60, 60);  // screen position of machine (0, 0)
     bool _fitted;
     readonly ConditionalWeakTable<PathShape, StreamGeometry> _geoms = new();
+    readonly ConditionalWeakTable<ImageSource, Avalonia.Media.Imaging.Bitmap> _pictures = new();
 
     enum Drag { None, Pan, Box, Move, Scale, Rotate, Create }
     Drag _drag;
@@ -71,6 +72,7 @@ public sealed class CanvasView : Control
     {
         Focusable = true;
         ClipToBounds = true;
+        RenderOptions.SetBitmapInterpolationMode(this, Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
     }
 
     public Document? Doc
@@ -289,7 +291,13 @@ public sealed class CanvasView : Control
         var viewWorld = new Rect2(ToWorld(new Point(0, 0)).X, ToWorld(new Point(0, 0)).Y, ToWorld(new Point(Bounds.Width, Bounds.Height)).X, ToWorld(new Point(Bounds.Width, Bounds.Height)).Y);
         foreach (var shape in doc.State.Shapes)
         {
-            if (shape is not PathShape ps || !layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
+            if (!layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
+            if (shape is ImageShape im)
+            {
+                if (im.Bounds.Intersects(viewWorld)) DrawPicture(ctx, im, layer, selected.Contains(im.Id), _hover == im.Id, px);
+                continue;
+            }
+            if (shape is not PathShape ps) continue;
             if (!ps.Bounds.Inflate(1).Intersects(viewWorld)) continue;
             var geom = GeometryFor(ps);
             byte alpha = layer.Output ? (byte)255 : (byte)110;
@@ -301,6 +309,25 @@ public sealed class CanvasView : Control
             if (sel)
                 ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 0.8 * px, new DashStyle([3, 3], 0)), geom);
         }
+    }
+
+    void DrawPicture(DrawingContext ctx, ImageShape im, Layer layer, bool sel, bool hov, double px)
+    {
+        var bmp = _pictures.GetValue(im.Source, s => CameraImaging.ToAvaloniaRgba(s.Pixels));
+        var t = im.Transform;
+        using (ctx.PushTransform(new Matrix(t.A, t.B, t.C, t.D, t.E, t.F)))
+        using (ctx.PushOpacity(layer.Output ? 1 : 0.5))
+            ctx.DrawImage(bmp, new Rect(0, 0, bmp.PixelSize.Width, bmp.PixelSize.Height), new Rect(0, 0, im.SizeMm.X, im.SizeMm.Y));
+        var c = im.Corners;
+        var g = new StreamGeometry();
+        using (var gc = g.Open())
+        {
+            gc.BeginFigure(P(c[0]), false);
+            for (int i = 1; i < 4; i++) gc.LineTo(P(c[i]));
+            gc.EndFigure(true);
+        }
+        ctx.DrawGeometry(null, new Pen(new SolidColorBrush(LayerColor(layer)), (sel ? 2.2 : hov ? 2 : 1) * px), g);
+        if (sel) ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 0.8 * px, new DashStyle([3, 3], 0)), g);
     }
 
     void DrawPreview(DrawingContext ctx, BuiltJob job)

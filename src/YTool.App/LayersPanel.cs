@@ -204,7 +204,7 @@ public sealed class LayersPanel : UserControl
 
     static string Summary(Layer l, int count)
     {
-        string mode = l.Mode switch { LayerMode.Cut => "Cut", LayerMode.Score => "Score", _ => "Fill" };
+        string mode = l.Mode switch { LayerMode.Cut => "Cut", LayerMode.Score => "Score", LayerMode.Fill => "Fill", _ => $"Image {l.Dpi:0} dpi" };
         string light = l.Laser.Light == Core.LightSource.Red ? "fiber" : "diode";
         string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
         string shapes = count == 1 ? "1 shape" : $"{count} shapes";

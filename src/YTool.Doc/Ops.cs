@@ -17,6 +17,13 @@ public static class Ops
         return list.Count == 0 ? s : s with { Shapes = s.Shapes.AddRange(list) };
     }
 
+    /// <summary>Swap in a new version of a shape (same id).</summary>
+    public static DocState Replace(DocState s, Shape shape)
+    {
+        int i = s.Shapes.FindIndex(x => x.Id == shape.Id);
+        return i < 0 || ReferenceEquals(s.Shapes[i], shape) ? s : s with { Shapes = s.Shapes.SetItem(i, shape) };
+    }
+
     public static DocState Delete(DocState s, IReadOnlySet<Guid> ids)
     {
         var next = s.Shapes.RemoveAll(x => ids.Contains(x.Id));

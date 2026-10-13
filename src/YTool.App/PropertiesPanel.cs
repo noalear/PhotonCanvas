@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using YTool.Core;
+using YTool.Core.Imaging;
 using YTool.Doc;
 using static YTool.App.UiKit;
 
@@ -31,7 +32,22 @@ public sealed class PropertiesPanel : UserControl
 
     // layer settings
     readonly TextBlock _layerTitle = new() { Classes = { "h" } };
-    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut (outline)", "Score (light outline)", "Fill (engrave inside)" } };
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cut (outline)", "Score (light outline)", "Fill (engrave inside)", "Image (engrave picture)" } };
+    readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
+    readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
+    readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth, default)", "Floyd–Steinberg", "Stucki", "Atkinson (high contrast)", "Bayer (regular pattern)", "Threshold (line art)" } };
+    readonly TextBlock _dpiHint = Hint(), _dotHint = Hint();
+    readonly Control _dpiRow, _dotRow, _ditherRow;
+
+    // picture
+    readonly Border _picCard;
+    readonly Slider _bright = new() { Minimum = -1, Maximum = 1 };
+    readonly Slider _contrast = new() { Minimum = -1, Maximum = 1 };
+    readonly Slider _gamma = new() { Minimum = 0.2, Maximum = 3, Value = 1 };
+    readonly CheckBox _invertPic = new() { Content = "Invert (for dark materials)" };
+
+    /// <summary>The user asked to trace a picture.</summary>
+    public event Action<ImageShape>? TraceRequested;
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Blue diode 455 nm", "Red fiber 1064 nm" } };
     readonly NumericUpDown _power = Number(0, 100, 1, "0.#");
     readonly NumericUpDown _speed = Number(2, 15000, 5, "0.#");
@@ -71,6 +87,25 @@ public sealed class PropertiesPanel : UserControl
 
         // ---- layer settings card ----
         _lpcmRow = Field("Lines / cm", _lpcm, _lpcmHint, "How densely a fill is scanned. More lines = darker, smoother, slower.");
+        _dpiRow = Field("Resolution", _dpi, _dpiHint, "Dots per inch. Higher = finer detail, slower. 150–300 suits most wood.");
+        _dotRow = Field("Dot time", _dotUs, _dotHint, "How long each dot fires, in microseconds. Longer = darker dots.");
+        _ditherRow = Field("Dithering", _dither, tip: "How grey tones become dots. Jarvis suits photos; Threshold suits logos and line art.");
+        _dpi.ValueChanged += (_, _) => EditLayers("Resolution", l => l with { Dpi = (double)_dpi.Value!.Value }, _dpi.Value.HasValue, "dpi");
+        _dotUs.ValueChanged += (_, _) => EditLayers("Dot time", l => l with { DotUs = (int)(Math.Round(_dotUs.Value!.Value / 10) * 10) }, _dotUs.Value.HasValue, "dot");
+        _dither.SelectionChanged += (_, _) => EditLayers("Dithering", l => l with { Dither = (DitherMethod)Math.Max(0, _dither.SelectedIndex) }, _dither.SelectedIndex >= 0);
+
+        var trace = Button("Trace into vectors…", tip: "Turn the picture into cut/engrave outlines (Ctrl+T).");
+        trace.Click += (_, _) => { if (SelectedPicture() is { } im) TraceRequested?.Invoke(im); };
+        var resetTone = Button("Reset");
+        resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
+        _picCard = Card("Picture",
+            Slider("Brightness", _bright), Slider("Contrast", _contrast), Slider("Gamma", _gamma), _invertPic,
+            Hint("These change how the picture engraves (Image layers), not the file."),
+            Row(trace, resetTone));
+        _bright.ValueChanged += (_, _) => EditPicture("Picture brightness", t => t with { Brightness = _bright.Value }, "bright");
+        _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
+        _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
+        _invertPic.IsCheckedChanged += (_, _) => EditPicture("Invert picture", t => t with { Invert = _invertPic.IsChecked == true });
         _pulseRow = Field("Pulse width", _pulse, tip: "Fiber only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "Fiber only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var savePreset = Button("Save as preset…", tip: "Remember these settings under a name, e.g. \"3 mm basswood – cut\".");
@@ -91,7 +126,7 @@ public sealed class PropertiesPanel : UserControl
                     Field("Power", _power, _powerHint, "Percent of the laser's full power."),
                     Field("Speed", _speed, _speedHint, "How fast the beam moves while firing. Slower = deeper/darker."),
                     Field("Passes", _passes, _passHint, "How many times this layer is processed."),
-                    _lpcmRow, _pulseRow, _freqRow,
+                    _lpcmRow, _dpiRow, _dotRow, _ditherRow, _pulseRow, _freqRow,
                     new Separator { Margin = new(0, 4) },
                     _presets,
                     Row(savePreset, delPreset),
@@ -114,7 +149,7 @@ public sealed class PropertiesPanel : UserControl
         _freq.ValueChanged += (_, _) => EditLayers("Frequency", l => l with { Laser = l.Laser with { FrequencyKhz = (int)_freq.Value!.Value } }, _freq.Value.HasValue, "freq");
         _presets.SelectionChanged += (_, _) => ApplyPreset();
 
-        Content = new ScrollViewer { Content = new StackPanel { Children = { _selCard, layerCard } } };
+        Content = new ScrollViewer { Content = new StackPanel { Children = { _selCard, _picCard, layerCard } } };
         _doc.Changed += _ => Refresh();
         _layers.SelectionChanged += Refresh;
         RefreshPresets();
@@ -154,9 +189,34 @@ public sealed class PropertiesPanel : UserControl
         finally { _updating = false; }
     }
 
+    static Control Slider(string label, Slider s) => new StackPanel
+    {
+        Children = { new TextBlock { Text = label, Classes = { "muted" } }, s },
+    };
+
+    ImageShape? SelectedPicture() =>
+        _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ImageShape im ? im : null;
+
+    void EditPicture(string label, Func<ToneAdjust, ToneAdjust> edit, string? coalesce = null)
+    {
+        if (_updating || SelectedPicture() is not { } im) return;
+        var tone = edit(im.Tone);
+        if (tone == im.Tone) return;
+        _doc.Commit(label, Ops.Replace(_doc.State, im.WithTone(tone)), coalesceKey: coalesce is null ? null : $"{coalesce}:{im.Id}");
+    }
+
     void RefreshSelection()
     {
         var sel = _doc.Selection;
+        var pic = SelectedPicture();
+        _picCard.IsVisible = pic is not null;
+        if (pic is not null)
+        {
+            _bright.Value = pic.Tone.Brightness;
+            _contrast.Value = pic.Tone.Contrast;
+            _gamma.Value = pic.Tone.Gamma;
+            _invertPic.IsChecked = pic.Tone.Invert;
+        }
         _selCard.IsVisible = sel.Count > 0;
         if (sel.Count == 0) return;
         var b = _doc.State.Bounds(sel);
@@ -216,7 +276,16 @@ public sealed class PropertiesPanel : UserControl
         Num(_lpcm, Same(l => l.LinesPerCm));
 
         bool anyFill = ls.Any(l => l.Mode == LayerMode.Fill), anyRed = ls.Any(l => l.Laser.Light == LightSource.Red);
+        bool anyImage = ls.Any(l => l.Mode == LayerMode.Image);
         _lpcmRow.IsVisible = anyFill;
+        _dpiRow.IsVisible = _dotRow.IsVisible = _ditherRow.IsVisible = anyImage;
+        Num(_dpi, Same(l => l.Dpi));
+        Num(_dotUs, Same(l => (double)l.DotUs));
+        var dith = Same(l => l.Dither);
+        _dither.SelectedIndex = dith is { } dm ? (int)dm : -1;
+        _dither.PlaceholderText = dith is null ? "mixed" : "";
+        _dpiHint.Text = Same(l => l.Dpi) is { } dpi ? $"Dots {25.4 / dpi:0.###} mm apart." : "";
+        _dotHint.Text = Same(l => l.DotUs) is { } us ? $"Sent as G25T{us / 10}." : "";
         _pulseRow.IsVisible = _freqRow.IsVisible = anyRed;
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;

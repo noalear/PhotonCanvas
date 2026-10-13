@@ -96,6 +96,9 @@ public static class ImageTrace
                     }
         }
         means = means.OrderByDescending(m => m[3]).Take(Math.Max(1, maxColours)).ToList();
+        // Colours covering under 0.5 % are mostly soft-edge fringes; their pixels join the nearest real colour.
+        double sampled = means.Sum(m => m[3]);
+        means = means.Where((m, idx) => idx == 0 || m[3] / sampled >= 0.005).ToList();
 
         var counts = new int[means.Count];
         var border = new int[means.Count];
@@ -109,6 +112,7 @@ public static class ImageTrace
             int x = i % img.Width, y = i / img.Width;
             if (x == 0 || y == 0 || x == img.Width - 1 || y == img.Height - 1) border[k]++;
         }
+        CleanThinFringes(labels, img.Width, img.Height, counts);
         int bg = border.Length == 0 ? -1 : Array.IndexOf(border, border.Max());
         var palette = means.Select((m, k) => new PaletteEntry(
             (uint)Math.Round(m[0]) << 16 | (uint)Math.Round(m[1]) << 8 | (uint)Math.Round(m[2]), counts[k], k == bg)).ToList();
@@ -127,6 +131,102 @@ public static class ImageTrace
             if (!g.IsEmpty) parts.Add(new TracePart(palette[k].Rgb, ToOriginal(g, w.Scale)));
         }
         return new(parts);
+    }
+
+    /// <summary>
+    /// Soft edges between two colours produce in-between pixels that can land
+    /// on a third colour as one-pixel slivers. A pixel whose colour hardly
+    /// appears around it takes the most common colour of its 3 × 3 neighbourhood.
+    /// </summary>
+    static void CleanThinFringes(int[] labels, int w, int h, int[] counts)
+    {
+        var src = (int[])labels.Clone();
+        Span<int> seen = stackalloc int[9];
+        Span<int> tally = stackalloc int[9];
+        for (int y = 1; y < h - 1; y++)
+            for (int x = 1; x < w - 1; x++)
+            {
+                int i = y * w + x, own = src[i], distinct = 0, ownCount = 0;
+                for (int dy = -1; dy <= 1; dy++)
+                    for (int dx = -1; dx <= 1; dx++)
+                    {
+                        int l = src[i + dy * w + dx];
+                        if (l == own) ownCount++;
+                        int k = 0;
+                        while (k < distinct && seen[k] != l) k++;
+                        if (k == distinct) { seen[k] = l; tally[k] = 0; distinct++; }
+                        tally[k]++;
+                    }
+                if (ownCount > 2 || own < 0) continue;
+                int best = 0;
+                for (int k = 1; k < distinct; k++) if (tally[k] > tally[best]) best = k;
+                if (seen[best] < 0 || seen[best] == own) continue;
+                labels[i] = seen[best];
+                counts[own]--;
+                counts[seen[best]]++;
+            }
+    }
+
+    /// <summary>Average colour around a working-image pixel (3 × 3), 0xRRGGBB.</summary>
+    public static uint SampleColour(Working w, int x, int y)
+    {
+        var img = w.Image;
+        double r = 0, g = 0, b = 0;
+        int n = 0;
+        for (int dy = -1; dy <= 1; dy++)
+            for (int dx = -1; dx <= 1; dx++)
+            {
+                int xx = Math.Clamp(x + dx, 0, img.Width - 1), yy = Math.Clamp(y + dy, 0, img.Height - 1);
+                int p = (yy * img.Width + xx) * 4;
+                r += img.Rgba[p]; g += img.Rgba[p + 1]; b += img.Rgba[p + 2];
+                n++;
+            }
+        return (uint)Math.Round(r / n) << 16 | (uint)Math.Round(g / n) << 8 | (uint)Math.Round(b / n);
+    }
+
+    /// <summary>
+    /// "Magic wand": trace the pixels within <paramref name="tolerance"/> (0–100)
+    /// of <paramref name="colour"/>. With <paramref name="connected"/>, only the
+    /// region joined to the clicked pixel (<paramref name="seedX"/>, <paramref name="seedY"/>, working pixels).
+    /// </summary>
+    public static TraceResult PickColour(Working w, uint colour, int seedX, int seedY, double tolerance, bool connected, TraceOptions o)
+    {
+        var img = w.Image;
+        int width = img.Width, height = img.Height, n = width * height;
+        double tol = Math.Clamp(tolerance, 0, 100) / 100 * 160;
+        double[] c = [colour >> 16 & 0xFF, colour >> 8 & 0xFF, colour & 0xFF, 1];
+        var within = new bool[n];
+        Parallel.For(0, height, y =>
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int i = y * width + x, p = i * 4;
+                within[i] = img.Rgba[p + 3] >= 128 && Dist(c, img.Rgba[p], img.Rgba[p + 1], img.Rgba[p + 2]) <= tol;
+            }
+        });
+        bool[] mask = within;
+        if (connected)
+        {
+            mask = new bool[n];
+            int seed = Math.Clamp(seedY, 0, height - 1) * width + Math.Clamp(seedX, 0, width - 1);
+            if (within[seed])
+            {
+                var stack = new Stack<int>();
+                stack.Push(seed);
+                mask[seed] = true;
+                while (stack.Count > 0)
+                {
+                    int i = stack.Pop(), x = i % width, y = i / width;
+                    void Visit(int j) { if (within[j] && !mask[j]) { mask[j] = true; stack.Push(j); } }
+                    if (x > 0) Visit(i - 1);
+                    if (x < width - 1) Visit(i + 1);
+                    if (y > 0) Visit(i - width);
+                    if (y < height - 1) Visit(i + width);
+                }
+            }
+        }
+        var g = Tracer.TraceMask(mask, width, height, o);
+        return new(g.IsEmpty ? [] : [new TracePart(colour, ToOriginal(g, w.Scale))]);
     }
 
     static PathGeometry ToOriginal(PathGeometry g, double scale) =>
