@@ -19,3 +19,6 @@ bin/
 obj/
 *.user
 .vs/
+
+# Your own designs saved in the project folder
+/*.ytool

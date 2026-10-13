@@ -102,6 +102,18 @@ public sealed class JobPanel : UserControl
         PassDelayS = (double)(_delay.Value ?? 0),
     };
 
+    /// <summary>
+    /// Build the current design off the UI thread. The document state and the
+    /// options are read here, on the UI thread: Avalonia controls may only be
+    /// touched from it.
+    /// </summary>
+    Task<BuiltJob> BuildNow()
+    {
+        var state = _doc.State;
+        var opt = Options;
+        return Task.Run(() => JobBuilder.Build(state, opt));
+    }
+
     void Schedule()
     {
         _debounce.Stop();
@@ -168,7 +180,7 @@ public sealed class JobPanel : UserControl
     {
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
         BuiltJob job;
-        try { job = await Task.Run(() => JobBuilder.Build(_doc.State, Options)); }
+        try { job = await BuildNow(); }
         catch (JobException e)
         {
             await Dialogs.Message(owner, "Can't export", e.Message);
@@ -191,7 +203,7 @@ public sealed class JobPanel : UserControl
     {
         if (TopLevel.GetTopLevel(this) is not Window owner || _sending) return;
         BuiltJob job;
-        try { job = await Task.Run(() => JobBuilder.Build(_doc.State, Options)); }
+        try { job = await BuildNow(); }
         catch (JobException e)
         {
             await Dialogs.Message(owner, "Can't send", e.Message);
