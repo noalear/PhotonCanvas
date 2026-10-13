@@ -51,6 +51,9 @@ public sealed class PropertiesPanel : UserControl
     /// <summary>The user asked to trace a picture.</summary>
     public event Action<ImageShape>? TraceRequested;
 
+    /// <summary>The user asked to snap the selection onto a piece seen by the camera.</summary>
+    public event Action? FitToCameraRequested;
+
     // text
     readonly Border _textCard;
     readonly TextBox _textBox = new() { AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 60 };
@@ -100,6 +103,8 @@ public sealed class PropertiesPanel : UserControl
 
         // ---- selection card ----
         var center = Button("Centre in work area", tip: "Move the selection so it sits in the middle of the 220 × 220 mm field.");
+        var fitCam = Button("Fit to piece in camera…", "IcCamera", "Snap the selection onto the real piece the camera sees: moves, turns and (optionally) resizes it to match (Ctrl+Shift+F).");
+        fitCam.Click += (_, _) => FitToCameraRequested?.Invoke();
         center.Click += (_, _) => CenterInField();
         _selCard = Card("Selection",
             Row(Field2("X", _x), Field2("Y", _y)),
@@ -109,6 +114,7 @@ public sealed class PropertiesPanel : UserControl
             Field("Angle °", _rot, tip: "The shape's own rotation, clockwise. 0 = as drawn or imported. Changes apply straight away."),
             Field("Layer", _shapeLayer, tip: "Move the selected shapes to another layer (Ctrl+1…9 also works)."),
             center,
+            fitCam,
             _selInfo);
         _x.ValueChanged += (_, _) => MoveTo();
         _y.ValueChanged += (_, _) => MoveTo();

@@ -369,6 +369,43 @@ public sealed class MachinePanel : UserControl
         finally { Interlocked.Exchange(ref _warping, 0); }
     }
 
+    /// <summary>How the camera maps onto the bed at <paramref name="distanceMm"/>, or null when it isn't calibrated.</summary>
+    public ImageMapChoice? CameraMapFor(double distanceMm) => CalibrationSet.For(_calibrations, distanceMm);
+
+    /// <summary>
+    /// A fresh overview photo, straightened onto <paramref name="area"/> (mm) for material at
+    /// <paramref name="distanceMm"/>. Retakes while the exposure is still settling.
+    /// </summary>
+    public async Task<SkiaSharp.SKBitmap> CaptureAreaAsync(Rect2 area, double mmPerPx, double distanceMm)
+    {
+        var choice = CalibrationSet.For(_calibrations, distanceMm)
+            ?? throw new InvalidOperationException("The camera isn't calibrated yet (Machine tab → Calibrate camera).");
+        if (_needsWarmup)
+        {
+            _needsWarmup = false;
+            await SnapshotAsync(0);
+        }
+        var jpg = await SnapshotAsync(0);
+        for (int retry = 0; retry < 3 && await Task.Run(() => CameraWarp.IsOverexposed(jpg)); retry++)
+        {
+            await Task.Delay(400);
+            jpg = await SnapshotAsync(0);
+        }
+        _ = WarpForCanvas(jpg); // freshen the work-area picture too
+        return await Task.Run(() =>
+        {
+            using var src = CameraWarp.Decode(jpg);
+            return CameraWarp.Warp(src, choice.Map, area, mmPerPx);
+        });
+    }
+
+    /// <summary>Run auto-focus (as the button does) and return the new distance.</summary>
+    public async Task<double?> AutoFocusNowAsync()
+    {
+        await AutoFocus();
+        return Distance;
+    }
+
     /// <summary>One camera photo (0 = overview, 1 = close-up), pausing live view around it.</summary>
     public async Task<byte[]> SnapshotAsync(int stream)
     {

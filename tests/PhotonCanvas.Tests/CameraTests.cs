@@ -243,3 +243,101 @@ public class CameraTests
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
 }
+
+public class ShapeFitTests
+{
+    // An "F": not symmetric, so a wrong turn or flip can't score well.
+    static readonly Vec2[] F =
+    [
+        new(80, 60), new(112, 60), new(112, 68), new(90, 68), new(90, 76), new(106, 76),
+        new(106, 84), new(90, 84), new(90, 100), new(80, 100), new(80, 60),
+    ];
+
+    /// <summary>A straightened "photo": dark noisy bed with slats, and the light piece placed by <paramref name="truth"/>.</summary>
+    static (GrayImage Img, Rect2 Area, double MmPerPx) Photo(FitResult truth, int seed = 1)
+    {
+        var area = new Rect2(40, 30, 160, 130);
+        const double mmPerPx = 0.15;
+        int w = (int)Math.Round(area.Width / mmPerPx), h = (int)Math.Round(area.Height / mmPerPx);
+        using var bmp = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul));
+        using (var c = new SKCanvas(bmp))
+        {
+            c.Clear(new SKColor(70, 70, 70));
+            using var slat = new SKPaint { Color = new SKColor(35, 35, 35), IsAntialias = true };
+            for (double x = area.MinX; x < area.MaxX; x += 7)
+                c.DrawRect((float)((x - area.MinX) / mmPerPx), 0, (float)(1 / mmPerPx), h, slat);
+            using var path = new SKPath();
+            for (int i = 0; i < F.Length; i++)
+            {
+                var p = truth.Apply(F[i]);
+                float px = (float)((p.X - area.MinX) / mmPerPx), py = (float)((p.Y - area.MinY) / mmPerPx);
+                if (i == 0) path.MoveTo(px, py); else path.LineTo(px, py);
+            }
+            path.Close();
+            using var wood = new SKPaint { Color = new SKColor(200, 175, 140), IsAntialias = true };
+            c.DrawPath(path, wood);
+        }
+        var g = CameraWarp.ToGray(bmp);
+        var rng = new Random(seed);
+        for (int i = 0; i < g.Pixels.Length; i++) g.Pixels[i] = (byte)Math.Clamp(g.Pixels[i] + rng.Next(-12, 13), 0, 255);
+        return (g, area, mmPerPx);
+    }
+
+    static Vec2 Center => new(96, 80);
+
+    [Fact]
+    public void FindsAPieceThatWasMovedTurnedAndResized()
+    {
+        var truth = new FitResult(Center, new Vec2(5.5, -3.2), 12, 1.06, 1, 0);
+        var (img, area, mpp) = Photo(truth);
+        var fit = ShapeFit.Fit(img, area, mpp, [F], new FitOptions { MaxRotationDeg = 30, MaxScaleChange = 0.15, SearchMm = 20 });
+        Assert.InRange(fit.AngleDeg, 11.5, 12.5);
+        Assert.InRange(fit.Scale, 1.05, 1.07);
+        // Every corner of the outline lands within 0.25 mm of the real piece's corner.
+        Assert.All(F, p => Assert.True(fit.Apply(p).Dist(truth.Apply(p)) < 0.25, $"{p}: {fit.Apply(p)} vs {truth.Apply(p)}"));
+        Assert.True(fit.OnEdge > 0.8, $"on edge {fit.OnEdge:P0}");
+    }
+
+    [Fact]
+    public void AnyAngleFindsAPieceTurnedRoundWithoutResizing()
+    {
+        var truth = new FitResult(Center, new Vec2(-4, 6), 137, 1, 1, 0);
+        var (img, area, mpp) = Photo(truth, seed: 2);
+        var fit = ShapeFit.Fit(img, area, mpp, [F], new FitOptions { MaxRotationDeg = 180, MaxScaleChange = 0, SearchMm = 20 });
+        Assert.InRange(fit.AngleDeg, 136, 138);
+        Assert.Equal(1, fit.Scale, 3);
+        Assert.All(F, p => Assert.True(fit.Apply(p).Dist(truth.Apply(p)) < 0.3));
+    }
+
+    [Fact]
+    public void ReportsAPoorMatchWhenThePieceIsntThere()
+    {
+        var (img, area, mpp) = Photo(new FitResult(Center, new Vec2(0, 0), 0, 1, 1, 0));
+        // A circle outline doesn't match the F's straight edges.
+        var circle = Enumerable.Range(0, 73).Select(i => new Vec2(96 + 18 * Math.Cos(i * Math.PI / 36), 80 + 18 * Math.Sin(i * Math.PI / 36))).ToList();
+        var fit = ShapeFit.Fit(img, area, mpp, [circle], new FitOptions { MaxRotationDeg = 0, MaxScaleChange = 0 });
+        Assert.True(fit.OnEdge < 0.5, $"on edge {fit.OnEdge:P0}");
+    }
+
+    [Fact]
+    public void DistanceFieldMatchesBruteForce()
+    {
+        int w = 23, h = 17;
+        var rng = new Random(5);
+        var edge = new bool[w * h];
+        for (int i = 0; i < 12; i++) edge[rng.Next(w * h)] = true;
+        var df = DistanceField.Build(edge, w, h);
+        var area = new Rect2(0, 0, w, h);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                double best = double.MaxValue;
+                for (int j = 0; j < w * h; j++)
+                    if (edge[j]) best = Math.Min(best, Math.Sqrt(Math.Pow(j % w - x, 2) + Math.Pow(j / w - y, 2)));
+                Assert.Equal(best, df.DistanceMm(x + 0.5, y + 0.5, area, 1), 4);
+                int n = df.NearestEdge(x + 0.5, y + 0.5, area, 1);
+                Assert.True(edge[n]);
+                Assert.Equal(best, Math.Sqrt(Math.Pow(n % w - x, 2) + Math.Pow(n / w - y, 2)), 4);
+            }
+    }
+}

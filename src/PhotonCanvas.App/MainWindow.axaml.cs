@@ -43,6 +43,7 @@ public partial class MainWindow : Window
         _layers = new LayersPanel(_doc);
         _props = new PropertiesPanel(_doc, _layers, _settings);
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
+        _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
         _machine = new MachinePanel(_settings);
         _job = new JobPanel(_doc, _settings, Canvas, _machine);
         LayersHost.Content = _layers;
@@ -286,6 +287,7 @@ public partial class MainWindow : Window
                 Item("Distribute horizontally (equal gaps)", () => DistributeSel(true), null, () => _doc.Selection.Count > 2),
                 Item("Distribute vertically (equal gaps)", () => DistributeSel(false), null, () => _doc.Selection.Count > 2),
                 AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, "Ctrl+T", () => SelectedPicture() is not null),
+                AsyncItem("Fit to piece in camera…", FitToCamera, "Ctrl+Shift+F", () => SelectedOutline().Count > 0),
                 new Separator(),
                 Item("Align left", () => AlignSel(Align.Left), null, () => _doc.Selection.Count > 1),
                 Item("Align centres horizontally", () => AlignSel(Align.CenterX), null, () => _doc.Selection.Count > 1),
@@ -340,6 +342,7 @@ public partial class MainWindow : Window
             Items =
             {
                 AsyncItem("Material test…", AddMaterialTest),
+                AsyncItem("Fit to piece in camera…", FitToCamera, null, () => SelectedOutline().Count > 0),
                 AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, null, () => SelectedPicture() is not null),
                 new Separator(),
                 AsyncItem("Connection keys…", async () => await _machine.SetUpKeys()),
@@ -961,6 +964,38 @@ public partial class MainWindow : Window
         "Jobs are generated locally in the same G-code dialect as the stock software, verified line for line against real exports.\n\n" +
         "Free software under the GNU General Public License v3 (see LICENSE and THIRD-PARTY-NOTICES). No warranty. " +
         "Not affiliated with, endorsed by or supported by xTool or Makeblock. \"xTool\" is their trademark, used only to say which machines this works with.");
+
+    /// <summary>Outlines (world mm) of the selected vector shapes; pictures don't count.</summary>
+    List<IReadOnlyList<Vec2>> SelectedOutline() =>
+        _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id) && s is not ImageShape).OfType<PathShape>()
+            .SelectMany(s => s.World.Flatten(0.05))
+            .Where(f => f.Points.Count > 1)
+            .Select(f => (IReadOnlyList<Vec2>)(f.Closed ? [.. f.Points, f.Points[0]] : f.Points))
+            .ToList();
+
+    async Task FitToCamera()
+    {
+        var outline = SelectedOutline();
+        if (outline.Count == 0)
+        {
+            await Dialogs.Message(this, "Fit to piece in camera", "Select the design (text or shapes) you want to snap onto the piece first.");
+            return;
+        }
+        if (!_machine.IsConnected)
+        {
+            await Dialogs.Message(this, "Fit to piece in camera", "Connect to the machine first: the fit needs a fresh camera photo.");
+            return;
+        }
+        var ids = _doc.Selection;
+        var w = new FitToCameraWindow(_machine, outline, fit =>
+        {
+            var move = Affine.ScaleAbout(fit.Center, fit.Scale, fit.Scale)
+                .Then(Affine.RotateAbout(fit.Center, fit.AngleDeg))
+                .Then(Affine.Translate(fit.Offset));
+            _doc.Commit("Fit to camera", Ops.Transform(_doc.State, ids, move), ids);
+        });
+        await w.ShowDialog(this);
+    }
 
     async Task AddMaterialTest()
     {
