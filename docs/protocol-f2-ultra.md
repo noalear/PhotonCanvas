@@ -240,3 +240,23 @@ The stock app can't do this. Passes are a device-side loop in one file, and resu
 - The `.bgcode` binary format, if this firmware reports `gcodeFormat: bin`.
 - The calibration JSON schema.
 - Whether live camera works.
+
+## Verified on hardware: first job (2026-10-12, smiley, 30 mm, blue 70% 40 mm/s, 8 whole-shape passes, 1 s pause)
+
+- **Upload** works as documented:
+  1. Send `PUT /v1/filetransfer/upload` with the MD5.
+  2. The device sends `0x01` window requests on file_stream.
+  3. We reply with `0x81` data packets (no body CRC).
+  4. The device sends `/v1/filetransfer/finish` with code 0.
+  5. Send `PUT /v1/processing/upload/config {fileType:"xf", autoStart:0, taskId}`.
+- **Text G-code inside `.xf`:** a `motion.gcode` member is accepted in place of `motion.bgcode`. The tar is ustar, mode 0666. `description.json` was minimal (mode, light, create_time, axis, processingParams), and the device accepted it.
+- **Whole-shape pass mode works**, with `G4P1000` between passes. The user judged the cut "looks great"; the eyes and mouth dropped cleanly out of 3 mm basswood.
+- **Events** arrive as requests: `{"type":"request","method":"REPORT|NOTIFY","url":...,"data":{"module","type","info","level"}}`.
+  - After upload: `MODE_CHANGE P_WORK` then `WORK_PREPARED`. The machine is armed and waiting for the button.
+  - `BUTTON SHOERT_PRESS info "1"` is the start/pause button. `"2"` is the other button; it did not start the job.
+  - `GAP OPEN/CLOSE` is the lid. The job only started after the lid was closed.
+  - Start: `MODE_CHANGE P_WORKING` + `WORK_STARTED`.
+  - Pause (short press during the job): `P_PAUSE` + `WORK_PAUSED`.
+  - Cancel (long press while paused): `WORK_STOPED`, then `WORK_RESULT WORK_FINISHED {result:"failed", timeUse}`, then `P_IDLE`.
+- **Head Z** reads within about 0.06 mm of the commanded value (27.058 for 27). Distance = z − 6.
+- **Cameras** are black while a job runs, because the fill lights are off.
