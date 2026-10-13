@@ -31,3 +31,14 @@ def test_discovery_crypto_roundtrip():
     blob = encrypt(b'{"a":1}', PRIMARY_KEY)
     assert len(blob) == 32 and decrypt(blob, PRIMARY_KEY) == b'{"a":1}'
     assert decrypt(encrypt(b"x" * 40, COMMON_KEY), COMMON_KEY) == b"x" * 40
+
+
+def test_bgcode_decode():
+    from ytool.bgcode import decode, tidy_numbers
+    raw = (b"\xc3 GS004-4 HEAD\n"
+           b"\xe7\x00\xf8\x01\x43\xce\x67\x40\xf9\x01\x04\xce\x87\x40\n"   # G0X0143.6740Y0104.8740
+           b"\xe7\x01\xf3\x07\x00\xe6\x24\x00\n"                              # G1S0700F2400
+           b"\xed\x05\x23\xf0\x40\n"                                          # M523P40
+           b"\xe7\x04\xf0\x05\n")                                             # G4P5
+    assert tidy_numbers(decode(raw)).splitlines() == [
+        "# GS004-4 HEAD", "G0X143.674Y104.874", "G1S700F2400", "M523P40", "G4P5"]

@@ -6,6 +6,7 @@
     python -m ytool snap <ip> [-o out.jpg] [--stream 0|1]
     python -m ytool view <ip> [--stream 0|1]     live camera window
     python -m ytool get <ip> /v1/some/url
+    python -m ytool capture <ip> [-o captures/jobs]     save every job sent by the stock app
 
 Nothing here moves the head or fires the laser.
 """
@@ -124,6 +125,11 @@ async def cmd_snap(args):
     print(f"saved {out} ({len(data)} bytes)")
 
 
+async def cmd_capture(args):
+    from .capture import capture
+    await capture(args.ip, args.out, save_existing=args.save_existing)
+
+
 async def cmd_get(args):
     if not args.url.startswith("/v1/"):
         sys.exit("only GET /v1/... URLs are allowed here")
@@ -146,6 +152,7 @@ def main(argv=None):
     s = sub.add_parser("snap"); s.add_argument("ip"); s.add_argument("-o", "--output"); s.add_argument("--stream", type=int, default=0, choices=(0, 1)); s.add_argument("--v1", action="store_true")
     s = sub.add_parser("view"); s.add_argument("ip"); s.add_argument("--stream", type=int, default=0, choices=(0, 1))
     s = sub.add_parser("get"); s.add_argument("ip"); s.add_argument("url")
+    s = sub.add_parser("capture"); s.add_argument("ip"); s.add_argument("-o", "--out", default="captures/jobs"); s.add_argument("--save-existing", action="store_true")
 
     args = p.parse_args(argv)
     if args.cmd == "discover":
@@ -156,6 +163,6 @@ def main(argv=None):
         Viewer(args.ip, args.stream).run()
         return
     try:
-        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get}[args.cmd](args))
+        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture}[args.cmd](args))
     except KeyboardInterrupt:
         pass
