@@ -21,6 +21,10 @@ namespace YTool.App;
 public sealed class CalibrationWindow : Window
 {
     readonly MachinePanel _machine;
+    readonly AppSettings _settings;
+    readonly ComboBox _markStyle = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots", "Crosshairs" } };
+    readonly ComboBox _markSize = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SizeChoices.Select(s => $"{s:0.#} mm").ToList() };
+    static readonly double[] SizeChoices = [1, 2, 4];
     readonly MachineProfile _profile = MachineProfile.F2Ultra;
     readonly IReadOnlyList<Vec2> _grid;
 
@@ -52,9 +56,15 @@ public sealed class CalibrationWindow : Window
     /// <summary>Raised when a calibration is saved.</summary>
     public event Action<CameraCalibration>? Saved;
 
-    public CalibrationWindow(MachinePanel machine, double? defaultDistance)
+    public CalibrationWindow(MachinePanel machine, AppSettings settings, double? defaultDistance)
     {
         _machine = machine;
+        _settings = settings;
+        _markStyle.SelectedIndex = settings.CalibMarkStyle == MarkStyle.Cross ? 1 : 0;
+        int sizeIdx = Array.FindIndex(SizeChoices, s => Math.Abs(s - settings.CalibMarkSizeMm) < 1e-9);
+        _markSize.SelectedIndex = sizeIdx >= 0 ? sizeIdx : 1;
+        _markStyle.SelectionChanged += (_, _) => SaveMarkChoice();
+        _markSize.SelectionChanged += (_, _) => SaveMarkChoice();
         _grid = CalibrationMarks.Grid(_profile);
         _found = new Vec2?[_grid.Count];
         _ignored = new bool[_grid.Count];
@@ -89,13 +99,15 @@ public sealed class CalibrationWindow : Window
             Children =
             {
                 Card("1 · Burn marks",
-                    Hint("Lay a flat scrap sheet (wood or card) over the whole 220 × 220 mm area and set the focus distance on the machine as you would for real work. YTool burns 25 small dots in a grid, plus one extra dot beside the top-left dot and two beside the top-right dot."),
+                    Hint("Lay a flat scrap sheet (wood or card) over the whole 220 × 220 mm area and set the focus distance on the machine as you would for real work. YTool burns 25 marks in a grid, plus one small dot beside the top-left mark and two beside the top-right mark."),
+                    Field("Marks", _markStyle, tip: "Dots are easiest to spot; crosshairs make the centre easiest to judge by eye. Either way YTool finds the exact centre itself."),
+                    Field("Mark size", _markSize, Hint("Smaller marks are easier to judge but fainter. Use the same choice when you take the photo."), "Dot diameter, or crosshair width."),
                     Field("Power", _power, tip: "Blue diode power for the dots."),
-                    Field("Speed", _speed, tip: "Slower = darker dots."),
+                    Field("Speed", _speed, tip: "Slower = darker marks."),
                     send, _burnState),
                 Card("2 · Photo", Row(take, open), _photoState),
-                Card("3 · Locate the dots", _instruction, restart,
-                    Hint("Scroll to zoom, right-drag to pan. To fix a dot: click its marker, then click the dot's centre. Right-click a marker to ignore that dot.")),
+                Card("3 · Locate the marks", _instruction, restart,
+                    Hint("You don't need to click the exact centre: YTool snaps to the middle of the nearest mark. Scroll to zoom, right-drag to pan. To fix a mark: click its marker, then click the mark. Right-click a marker to ignore that mark.")),
                 Card("4 · Check and save",
                     Field("Distance", _distance, Hint("Material distance (mm) the marks were burned at. Saved calibrations are matched to the machine's distance."), "Focus distance when the marks were burned."),
                     _result, _check, _save),
@@ -133,7 +145,7 @@ public sealed class CalibrationWindow : Window
         try
         {
             laser.Validate(_profile);
-            var job = CalibrationMarks.Build(_profile, laser);
+            var job = CalibrationMarks.Build(_profile, laser, Spec);
             var motion = job.Render();
             var corners = new Vec2[] { new(5, 5), new(215, 5), new(215, 215), new(5, 215), new(5, 5) };
             var preview = _grid.Select(p => (IReadOnlyList<Vec2>)Geom.Arc(p.X, p.Y, 2, 2, 0, 360, 0.5)).ToList();
@@ -146,7 +158,7 @@ public sealed class CalibrationWindow : Window
         }
         var dist = _machine.Distance is { } d ? $"Machine focus distance: {d:0.0} mm.\n" : "";
         if (!await Dialogs.Confirm(this, "Burn calibration marks",
-                $"28 small dots across the whole 220 × 220 mm area, blue diode {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
+                $"25 {(Spec.Style == MarkStyle.Cross ? "crosshairs" : "dots")} ({Spec.SizeMm:0.#} mm) plus 3 orientation dots across the whole 220 × 220 mm area, blue diode {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
                 "Make sure scrap material covers the whole area. After upload the machine waits; nothing fires until you press its start button.",
                 "Upload", "Cancel")) return;
         try
@@ -229,10 +241,10 @@ public sealed class CalibrationWindow : Window
 
     static readonly string[] CornerPrompts =
     [
-        "Click the corner dot that has ONE small dot beside it (top-left of the work area).",
-        "Click the corner dot that has TWO small dots beside it (top-right).",
-        "Click the corner dot diagonally opposite the first one (bottom-right).",
-        "Click the last corner dot (bottom-left).",
+        "Click the corner mark that has ONE small dot beside it (top-left of the work area).",
+        "Click the corner mark that has TWO small dots beside it (top-right).",
+        "Click the corner mark diagonally opposite the first one (bottom-right).",
+        "Click the last corner mark (bottom-left).",
     ];
 
     void ResetMarks()
@@ -254,6 +266,16 @@ public sealed class CalibrationWindow : Window
     Vec2 Norm(Vec2 px) => new(px.X / _imgW, px.Y / _imgH);
 
     /// <summary>Rough pixels per mm, from the corner clicks.</summary>
+    MarkSpec Spec => new(_markStyle.SelectedIndex == 1 ? MarkStyle.Cross : MarkStyle.Dot, SizeChoices[Math.Max(0, _markSize.SelectedIndex)]);
+
+    void SaveMarkChoice()
+    {
+        if (_markStyle.SelectedIndex < 0 || _markSize.SelectedIndex < 0) return;
+        _settings.CalibMarkStyle = Spec.Style;
+        _settings.CalibMarkSizeMm = Spec.SizeMm;
+        _settings.Save();
+    }
+
     double PxPerMm()
     {
         var tl = _found[CalibrationMarks.Corners[0]];
@@ -270,7 +292,7 @@ public sealed class CalibrationWindow : Window
         {
             _cornerClicks.Add(px);
             int idx = CalibrationMarks.Corners[_cornerClicks.Count - 1];
-            _found[idx] = MarkFinder.Find(_gray, px, 6 * PxPerMm()) ?? px;
+            _found[idx] = MarkFinder.Find(_gray, px, (Spec.SearchRadiusMm + 1.5) * PxPerMm()) ?? px;
             if (_cornerClicks.Count < 4) _instruction.Text = CornerPrompts[_cornerClicks.Count];
             else LocateAll();
             UpdateView();
@@ -285,7 +307,7 @@ public sealed class CalibrationWindow : Window
         }
         else if (_selected is { } sel)
         {
-            _found[sel] = MarkFinder.Find(_gray, px, 3 * PxPerMm()) ?? px;
+            _found[sel] = MarkFinder.Find(_gray, px, Math.Max(2, Spec.SearchRadiusMm * 0.7) * PxPerMm()) ?? px;
             _ignored[sel] = false;
             _selected = null;
             Refit();
@@ -324,7 +346,7 @@ public sealed class CalibrationWindow : Window
     void LocateAll()
     {
         if (_gray is null) return;
-        double r = 5 * PxPerMm();
+        double r = Spec.SearchRadiusMm * PxPerMm();
         for (int pass = 0; pass < 2; pass++)
         {
             var known = Enumerable.Range(0, _grid.Count).Where(i => _found[i] is not null && !_ignored[i])
@@ -346,8 +368,8 @@ public sealed class CalibrationWindow : Window
         }
         int n = _found.Count(f => f is not null);
         _instruction.Text = n == _grid.Count
-            ? "All 25 dots found. Check that every marker sits on its dot, then look at the result below."
-            : $"Found {n} of {_grid.Count} dots. Missing ones are shown in orange at their predicted spot: click one, then click its dot.";
+            ? "All 25 marks found. Check that every marker sits on its mark, then look at the result below."
+            : $"Found {n} of {_grid.Count} marks. Missing ones are shown in orange at their predicted spot: click one, then click its mark.";
         // Show predictions for missing dots so they can be placed by hand.
         Refit();
     }
@@ -369,9 +391,9 @@ public sealed class CalibrationWindow : Window
             UpdateView();
             return;
         }
-        string quality = _fit.MaxMm <= 0.3 ? "Excellent." : _fit.MaxMm <= 0.6 ? "Good." : _fit.MaxMm <= 1.2 ? "Usable, but check the worst dots." : "Poor: a marker is probably on the wrong dot.";
-        _result.Text = $"{pts.Count} dots used. Average error {_fit.RmsMm:0.00} mm, worst {_fit.MaxMm:0.00} mm. {quality}" +
-                       (pts.Count < 16 ? "\nUse at least 16 dots for full lens correction." : "");
+        string quality = _fit.MaxMm <= 0.3 ? "Excellent." : _fit.MaxMm <= 0.6 ? "Good." : _fit.MaxMm <= 1.2 ? "Usable, but check the worst marks." : "Poor: a marker is probably on the wrong mark.";
+        _result.Text = $"{pts.Count} marks used. Average error {_fit.RmsMm:0.00} mm, worst {_fit.MaxMm:0.00} mm. {quality}" +
+                       (pts.Count < 16 ? "\nUse at least 16 marks for full lens correction." : "");
         _save.IsEnabled = pts.Count >= 4;
         _check.IsEnabled = _jpeg is not null;
         UpdateCheckImage();

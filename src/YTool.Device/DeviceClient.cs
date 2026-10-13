@@ -875,6 +875,31 @@ public sealed class DeviceClient : IAsyncDisposable
         return !gapCheck;
     }
 
+    /// <summary>Whether the machine's beeper sounds (button presses, job start/end). Stored on the machine.</summary>
+    public async Task<bool> GetBeeperEnabledAsync(CancellationToken cancellationToken = default)
+    {
+        const string url = "/v1/device/configs";
+        var data = AsObject(await GetAsync(url, new JsonObject
+        {
+            ["alias"] = "config",
+            ["type"] = "user",
+            ["kv"] = new JsonArray("beepEnable"),
+        }, cancellationToken: cancellationToken).ConfigureAwait(false), url);
+        return Json.Bool(data["beepEnable"])
+            ?? throw new DeviceException(DeviceException.ProtocolErrorCode, $"{url}: the reply had no beepEnable.", data);
+    }
+
+    /// <summary>Turns the machine's beeper on or off (the firmware has no volume setting). Stored on the machine.</summary>
+    public async Task SetBeeperEnabledAsync(bool enabled, CancellationToken cancellationToken = default)
+    {
+        await RequestAsync("PUT", "/v1/device/configs", new JsonObject
+        {
+            ["alias"] = "config",
+            ["type"] = "user",
+            ["kv"] = new JsonObject { ["beepEnable"] = enabled },
+        }, cancellationToken: cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Turns "Enclosure-opened processing" on or off. Stored on the machine.</summary>
     public async Task SetLidOpenProcessingAsync(bool enabled, CancellationToken cancellationToken = default)
     {

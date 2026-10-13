@@ -32,10 +32,12 @@ public sealed class MachinePanel : UserControl
     readonly Button _find = Button("Find machines", tip: "Search the local network (needs Windows Firewall to allow YTool Studio).");
     readonly Button _connect = new() { Classes = { "primary" }, Content = "Connect" };
     readonly TextBlock _connState = Hint();
+    readonly CheckBox _autoConnect = new() { Content = "Connect automatically when YTool starts" };
     readonly TextBlock _info = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     readonly TextBlock _mode = new() { FontWeight = FontWeight.SemiBold };
     readonly TextBlock _distance = Hint();
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
+    readonly CheckBox _beeper = new() { Content = "Beeper on", IsEnabled = false };
     readonly ToggleSwitch _live = new() { OnContent = "Live view on", OffContent = "Live view off", IsEnabled = false };
     readonly ComboBox _stream = new() { ItemsSource = new[] { "Overview", "Close-up" }, SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly Image _image = new() { Stretch = Stretch.Uniform };
@@ -74,11 +76,16 @@ public sealed class MachinePanel : UserControl
     {
         _settings = settings;
         _ip.Text = settings.LastMachineIp;
+        _autoConnect.IsChecked = settings.AutoConnect;
+        _autoConnect.IsCheckedChanged += (_, _) => { _settings.AutoConnect = _autoConnect.IsChecked == true; _settings.Save(); };
+        ToolTip.SetTip(_autoConnect, "Tries the last machine first, then searches the network.");
         _find.Click += async (_, _) => await Find();
         _found.SelectionChanged += (_, _) => { if (_found.SelectedItem is ComboBoxItem { Tag: string ip }) _ip.Text = ip; };
         _connect.Click += async (_, _) => await ToggleConnect();
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
+        _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
+        ToolTip.SetTip(_beeper, "The machine's beeps for button presses and jobs. Stored on the machine. The firmware only offers on or off, not a volume.");
         _live.IsCheckedChanged += (_, _) => ToggleLive();
         ToolTip.SetTip(_lidOpen, "Stored on the machine (xTool calls it \"Enclosure-opened processing\"). When on, the start button works with the lid up. Wear laser safety glasses.");
 
@@ -109,7 +116,15 @@ public sealed class MachinePanel : UserControl
         calibrate.Click += async (_, _) => await OpenCalibration();
         _opacity.Value = _settings.CameraOpacity;
         _opacity.ValueChanged += (_, _) => { _settings.CameraOpacity = _opacity.Value; _settings.Save(); OverlayOpacityChanged?.Invoke(_opacity.Value); };
-        _onCanvas.IsCheckedChanged += async (_, _) => { _overlayWanted = _onCanvas.IsChecked == true; await ToggleOverlay(); };
+        _onCanvas.IsChecked = _settings.CameraOnWorkArea && _calibrations.Count > 0;
+        _overlayWanted = _onCanvas.IsChecked == true;
+        _onCanvas.IsCheckedChanged += async (_, _) =>
+        {
+            _overlayWanted = _onCanvas.IsChecked == true;
+            _settings.CameraOnWorkArea = _overlayWanted;
+            _settings.Save();
+            await ToggleOverlay();
+        };
         ToolTip.SetTip(_onCanvas, "Lays the overview camera, straightened and to scale, under your design. With live view on (Overview), it updates continuously.");
 
         Content = new ScrollViewer
@@ -118,8 +133,8 @@ public sealed class MachinePanel : UserControl
             {
                 Children =
                 {
-                    Card("Connection", _ip, _found, Row(_find, _connect), _connState, _info),
-                    Card("Status", _mode, _distance, _lidOpen),
+                    Card("Connection", _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
+                    Card("Status", _mode, _distance, _lidOpen, _beeper),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera", Row(_live, _stream), imgBorder, _straightenRow, snap, _camInfo),
                     Card("Machine events", _log),
@@ -148,7 +163,7 @@ public sealed class MachinePanel : UserControl
     async Task OpenCalibration()
     {
         if (TopLevel.GetTopLevel(this) is not Window owner) return;
-        var w = new CalibrationWindow(this, Distance);
+        var w = new CalibrationWindow(this, _settings, Distance);
         w.Saved += cal =>
         {
             _calibrations = CalibrationStore.With(_calibrations, cal);
@@ -255,6 +270,13 @@ public sealed class MachinePanel : UserControl
     async Task Find()
     {
         _find.IsEnabled = false;
+        try { await FindDevices(); }
+        finally { _find.IsEnabled = true; }
+    }
+
+    /// <summary>Search the network, list what answered, and return it.</summary>
+    async Task<IReadOnlyList<DiscoveredDevice>> FindDevices()
+    {
         _connState.Text = "Searching the network…";
         try
         {
@@ -273,16 +295,19 @@ public sealed class MachinePanel : UserControl
                 1 => "Found 1 machine.",
                 _ => $"Found {items.Count} machines.",
             };
+            return found;
         }
         catch (Exception e) when (e is System.Net.Sockets.SocketException or IOException or InvalidOperationException)
         {
             _connState.Text = $"Search failed: {e.Message}";
+            AppLog.Error("discovery", e);
+            return [];
         }
-        finally { _find.IsEnabled = true; }
     }
 
     async Task ToggleConnect()
     {
+        if (_connecting) return;
         if (_client is not null)
         {
             await Disconnect("Disconnected.");
@@ -294,8 +319,45 @@ public sealed class MachinePanel : UserControl
             _connState.Text = "Enter the machine's IP address (or use Find machines).";
             return;
         }
+        await ConnectTo(ip);
+    }
+
+    /// <summary>
+    /// On startup: the last machine first, then whatever answers on the network
+    /// (F2 Ultras first). Quietly gives up if nothing is there.
+    /// </summary>
+    public async Task AutoConnectAsync()
+    {
+        if (!_settings.AutoConnect || _client is not null || _connecting) return;
+        var tried = new HashSet<string>();
+        if (_settings.LastMachineIp is { } last && IPAddress.TryParse(last, out _))
+        {
+            tried.Add(last);
+            if (await ConnectTo(last, auto: true)) return;
+        }
+        if (_client is not null) return; // connected by hand meanwhile
+        var found = await FindDevices();
+        foreach (var d in found.OrderByDescending(d => d.DeviceCode == _machine.DeviceCode))
+        {
+            if (_client is not null || !tried.Add(d.Ip)) continue;
+            if (await ConnectTo(d.Ip, auto: true)) return;
+        }
+        if (_client is null)
+            _connState.Text = found.Count == 0 && tried.Count == 0
+                ? "No machine found yet. Turn it on, then click Find machines or Connect."
+                : "Couldn't connect automatically. Check the machine is on, then click Connect.";
+    }
+
+    bool _connecting;
+
+    /// <summary>Connect and pair. Returns false (with the reason shown) on failure.</summary>
+    async Task<bool> ConnectTo(string ip, bool auto = false)
+    {
+        if (_connecting || _client is not null) return _client is not null;
+        _connecting = true;
         _connect.IsEnabled = false;
-        _connState.Text = $"Connecting to {ip}…";
+        _ip.Text = ip;
+        _connState.Text = auto ? $"Connecting automatically to {ip}…" : $"Connecting to {ip}…";
         var client = new DeviceClient(ip);
         client.EventReceived += ev => Ui(() => OnDeviceEvent(ev));
         client.Disconnected += ex => Ui(() => _ = Disconnect($"Connection lost: {ex.Message}"));
@@ -306,29 +368,42 @@ public sealed class MachinePanel : UserControl
             _settings.LastMachineIp = ip;
             _settings.Save();
             var info = await client.GetMachineInfoAsync();
-            _info.Text = $"Serial {info.Sn ?? "?"} · firmware {info.Firmware ?? "?"}";
+            AppLog.Write("machine-info", info.Raw.ToJsonString());
+            _info.Text = $"Serial {info.Sn ?? "?"} · firmware {info.Firmware ?? FindVersion(info.Raw) ?? "?"}";
             if (!info.AcceptsTextGcode)
                 _info.Text += "\n⚠ This firmware does not list text G-code support; sending may fail.";
             _connState.Text = $"Connected to {ip}.";
             _connect.Content = "Disconnect";
             _connect.Classes.Remove("primary");
-            _lidOpen.IsEnabled = _live.IsEnabled = true;
+            _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = true;
             await RefreshLid();
-            Log("Connected.");
+            await RefreshBeeper();
+            Log(auto ? $"Connected automatically to {ip}." : "Connected.");
             StartPolling();
             ConnectionChanged?.Invoke();
+            if (_onCanvas.IsChecked == true) _ = RefreshOverlay(); // camera was on last time
+            return true;
         }
         catch (DeviceException e)
         {
             await client.DisposeAsync();
+            _client = null;
             _connState.Text = e.Message;
+            AppLog.Write("machine", $"Connect to {ip} failed: {e.Message}");
         }
         catch (Exception e) when (e is IOException or System.Net.WebSockets.WebSocketException or OperationCanceledException or System.Net.Sockets.SocketException)
         {
             await client.DisposeAsync();
+            _client = null;
             _connState.Text = $"Couldn't connect to {ip}: {e.Message}";
+            AppLog.Write("machine", $"Connect to {ip} failed: {e.Message}");
         }
-        finally { _connect.IsEnabled = true; }
+        finally
+        {
+            _connecting = false;
+            _connect.IsEnabled = true;
+        }
+        return false;
     }
 
     async Task Disconnect(string why)
@@ -344,6 +419,24 @@ public sealed class MachinePanel : UserControl
         await c.DisposeAsync();
     }
 
+    /// <summary>
+    /// The firmware's name for its version field isn't documented; take the
+    /// first text field whose name mentions firmware or version.
+    /// </summary>
+    static string? FindVersion(System.Text.Json.Nodes.JsonNode? node)
+    {
+        if (node is not System.Text.Json.Nodes.JsonObject o) return null;
+        foreach (var (key, value) in o)
+        {
+            var k = key.ToLowerInvariant();
+            if ((k.Contains("firmware") || k.Contains("version")) && value is System.Text.Json.Nodes.JsonValue v && v.ToString() is { Length: > 0 } text)
+                return text;
+        }
+        foreach (var (_, value) in o)
+            if (FindVersion(value) is { } nested) return nested;
+        return null;
+    }
+
     void SetDisconnectedUi(string why)
     {
         _connState.Text = why;
@@ -355,6 +448,7 @@ public sealed class MachinePanel : UserControl
         Mode = "";
         _updatingLid = true;
         _lidOpen.IsEnabled = false;
+        _beeper.IsEnabled = false;
         _updatingLid = false;
         _live.IsChecked = false;
         _live.IsEnabled = false;
@@ -400,6 +494,8 @@ public sealed class MachinePanel : UserControl
         "P_WORK" => "Job loaded – waiting for the start button",
         "P_WORKING" => "Running a job",
         "P_PAUSE" => "Paused",
+        "P_WORK_DONE" => "Job finished",
+        "P_FINISH" => "Job finished",
         "P_SLEEP" => "Asleep",
         "P_AUTOFOCUS" => "Auto-focusing",
         "P_MEASURE" => "Measuring",
@@ -466,6 +562,31 @@ public sealed class MachinePanel : UserControl
         }
         catch (DeviceException e) { Log($"Couldn't read the lid setting: {e.Message}"); }
         finally { _updatingLid = false; }
+    }
+
+    async Task RefreshBeeper()
+    {
+        if (_client is not { } c) return;
+        try
+        {
+            var on = await c.GetBeeperEnabledAsync();
+            _updatingLid = true;
+            _beeper.IsChecked = on;
+        }
+        catch (DeviceException e) { Log($"Couldn't read the beeper setting: {e.Message}"); }
+        finally { _updatingLid = false; }
+    }
+
+    async Task SetBeeper()
+    {
+        if (_updatingLid || _client is not { } c || _beeper.IsChecked is not bool on) return;
+        try
+        {
+            await c.SetBeeperEnabledAsync(on);
+            Log(on ? "Beeper turned on." : "Beeper turned off.");
+        }
+        catch (DeviceException e) { Log($"Couldn't change the beeper setting: {e.Message}"); }
+        await RefreshBeeper();
     }
 
     async Task SetLidOpen()

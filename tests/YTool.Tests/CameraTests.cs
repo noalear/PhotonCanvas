@@ -136,11 +136,60 @@ public class CameraTests
     [Fact]
     public void CalibrationJobIsValidAndCoversTheField()
     {
-        var job = CalibrationMarks.Build(M, LaserSettings.Blue(30, 150));
-        var g = job.Render();
-        Assert.Contains("G0X12Y10", g); // outer ring of the top-left dot starts at (10 + 2, 10)
+        var big = CalibrationMarks.Build(M, LaserSettings.Blue(30, 150), new MarkSpec(MarkStyle.Dot, 4)).Render();
+        Assert.Contains("G0X12Y10", big); // outer ring of the top-left 4 mm dot starts at (10 + 2, 10)
+        var small = CalibrationMarks.Build(M, LaserSettings.Blue(30, 150), new MarkSpec(MarkStyle.Dot, 1)).Render();
+        Assert.Contains("G0X10.5Y10", small);
+        var cross = CalibrationMarks.Build(M, LaserSettings.Blue(30, 150), new MarkSpec(MarkStyle.Cross, 4)).Render();
+        Assert.Contains("G0X8Y10", cross);      // middle stroke of the horizontal arm
+        Assert.Contains("G0X10Y8", cross);      // middle stroke of the vertical arm
+        Assert.Contains("G0X8Y9.85", cross);    // a neighbouring stroke, 0.15 mm off
         Assert.Equal(25, CalibrationMarks.Grid(M).Count);
         Assert.Equal(new Vec2(210, 210), CalibrationMarks.Grid(M)[CalibrationMarks.Corners[2]]);
+    }
+
+    /// <summary>Render marks as the camera would see them: ~6.5 px/mm, blurred, noisy wood.</summary>
+    static (GrayImage Img, Vec2 Centre) Photo(MarkSpec spec, Vec2 centrePx)
+    {
+        const double PxPerMm = 6.5;
+        int w = 160, h = 160;
+        var px = new byte[w * h];
+        var rng = new Random(9);
+        var lines = CalibrationMarks.Mark(new Vec2(0, 0), spec).ToList();
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var mm = new Vec2((x - centrePx.X) / PxPerMm, (y - centrePx.Y) / PxPerMm);
+                // Burn width ~0.2 mm, softened by the lens.
+                double d = lines.Min(l => DistToPath(mm, l));
+                double ink = Math.Clamp(1 - (d - 0.1) / 0.12, 0, 1);
+                px[y * w + x] = (byte)Math.Clamp(205 + rng.Next(-14, 14) - 130 * ink, 0, 255);
+            }
+        return (new GrayImage(w, h, px), centrePx);
+    }
+
+    static double DistToPath(Vec2 p, Polyline l)
+    {
+        var e = l.EmittedPoints();
+        double best = double.PositiveInfinity;
+        for (int i = 1; i < e.Count; i++) best = Math.Min(best, Geom.SegmentDistance(p, e[i - 1], e[i]));
+        return best;
+    }
+
+    [Theory]
+    [InlineData(MarkStyle.Dot, 4)]
+    [InlineData(MarkStyle.Dot, 2)]
+    [InlineData(MarkStyle.Dot, 1)]
+    [InlineData(MarkStyle.Cross, 4)]
+    [InlineData(MarkStyle.Cross, 2)]
+    public void FindsEveryMarkStyleFromASloppyClick(MarkStyle style, double size)
+    {
+        var spec = new MarkSpec(style, size);
+        var (img, centre) = Photo(spec, new Vec2(80.3, 77.6));
+        // A click 1.5 mm off, searched over the radius the app uses.
+        var found = MarkFinder.Find(img, centre + new Vec2(1.5 * 6.5 * 0.7, -1.5 * 6.5 * 0.7), spec.SearchRadiusMm * 6.5);
+        Assert.NotNull(found);
+        Assert.True(found!.Value.Dist(centre) < 0.5, $"{style} {size} mm: off by {found.Value.Dist(centre):0.##} px");
     }
 
     [Fact]

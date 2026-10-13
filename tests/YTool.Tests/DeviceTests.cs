@@ -364,6 +364,15 @@ public sealed class DeviceClientTests : IAsyncLifetime
         Assert.Equal("PUT", put["method"]!.GetValue<string>());
         Assert.True(put["data"]!["kv"]!["gapCheckWithKey"]!.GetValue<bool>());
         Assert.False(await client.GetLidOpenProcessingAsync());
+
+        // Beeper: beepEnable, not inverted, and it must not touch the lid setting.
+        Assert.True(await client.GetBeeperEnabledAsync());
+        await client.SetBeeperEnabledAsync(false);
+        var beepPut = _fake.Requests.Last(r => Url(r) == "/v1/device/configs");
+        Assert.False(beepPut["data"]!["kv"]!["beepEnable"]!.GetValue<bool>());
+        Assert.Null(beepPut["data"]!["kv"]!["gapCheckWithKey"]);
+        Assert.False(await client.GetBeeperEnabledAsync());
+        Assert.False(await client.GetLidOpenProcessingAsync());
     }
 
     [Fact]
@@ -570,6 +579,7 @@ sealed class FakeDevice : IAsyncDisposable
     public ConcurrentQueue<string> Functions { get; } = new();
     public int WindowRequests;
     bool _gapCheck;
+    bool _beep = true;
 
     public IReadOnlyList<JsonObject> Requests => [.. _requests];
 
@@ -702,12 +712,18 @@ sealed class FakeDevice : IAsyncDisposable
             case "/v1/device/configs":
                 if (req["method"]!.GetValue<string>() == "PUT")
                 {
-                    _gapCheck = data!["kv"]!["gapCheckWithKey"]!.GetValue<bool>();
+                    var kv = data!["kv"]!.AsObject();
+                    if (kv["gapCheckWithKey"] is { } g) _gapCheck = g.GetValue<bool>();
+                    if (kv["beepEnable"] is { } b) _beep = b.GetValue<bool>();
                     await Reply(req, 0);
                 }
                 else
                 {
-                    await Reply(req, 0, new JsonObject { ["gapCheckWithKey"] = _gapCheck });
+                    // Reply with only the keys asked for, like the firmware.
+                    var reply = new JsonObject();
+                    foreach (var key in data!["kv"]!.AsArray().Select(k => k!.GetValue<string>()))
+                        reply[key] = key == "beepEnable" ? _beep : _gapCheck;
+                    await Reply(req, 0, reply);
                 }
                 break;
             case "/v1/filetransfer/upload":

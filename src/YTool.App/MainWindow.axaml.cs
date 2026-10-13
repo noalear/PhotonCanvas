@@ -66,6 +66,7 @@ public partial class MainWindow : Window
         Opened += async (_, _) =>
         {
             Canvas.Focus();
+            _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
         };
         Closing += OnClosing;

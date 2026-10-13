@@ -16,12 +16,17 @@ public sealed class AppSettings
 {
     public List<Preset> Presets { get; set; } = [];
     public string? LastMachineIp { get; set; }
+    public bool AutoConnect { get; set; } = true;
     public double PassDelayS { get; set; } = 1;
     public bool WholeJobPasses { get; set; } = true;
     public double SvgPxPerInch { get; set; } = 96;
     /// <summary>Clockwise display rotation for the close-up camera (measured on the user's F2 Ultra).</summary>
     public double CloseUpRotationDeg { get; set; } = 31.2;
     public double CameraOpacity { get; set; } = 0.85;
+    /// <summary>Show the calibrated camera on the work area (restored on startup).</summary>
+    public bool CameraOnWorkArea { get; set; }
+    public YTool.Core.Camera.MarkStyle CalibMarkStyle { get; set; } = YTool.Core.Camera.MarkStyle.Dot;
+    public double CalibMarkSizeMm { get; set; } = 2;
     public List<string> RecentFiles { get; set; } = [];
 
     static readonly JsonSerializerOptions Json = new()
