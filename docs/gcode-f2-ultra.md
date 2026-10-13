@@ -109,7 +109,7 @@ G1X100.000S900                 burn line 2 right→left (zigzag = bitmapScanMode
 - **Line count:** a 20 mm square gets exactly 200 lines. The last line is at Y+19.9, not Y+20.
 - **Overscan:** `overDist: 0`, so lines start and stop exactly at the shape edge. Overscan presumably extends each X line beyond the edge with S0.
 - **Coordinates** are written with 3 decimals here, unlike vector moves.
-- **Preamble difference:** fill jobs end the preamble with `G198 P76 "M9043 H1 I1 J1 K1 L1 M1"`, where vector cuts use `H11 … M11`. This is probably the air-assist level (low for engraving, high for cutting) (?).
+- **Preamble difference:** fill jobs end the preamble with `G198 P76 "M9043 H1 I1 J1 K1 L1 M1"`, where vector cuts use `H11 … M11`. **Not air assist** (the user has none). It may be a flame-sensor sensitivity setting per processing type (?). We copy it as-is: H11 for cuts, H1 for fills and bitmaps.
 
 ## Bitmap engraving, dot mode (verified)
 
@@ -142,3 +142,10 @@ G25X147.366                   rows alternate direction (zigzag)
 - Grayscale bitmap mode (variable S per dot or per segment?) and a different dot duration, to confirm the T units.
 - Overscan on fill, crosshatch (`crossDot`/`crossAngle`), and the meaning of the `G198`/`M9043` preamble.
 
+
+## Generator status
+
+`src/ytool/gcode.py` reproduces all four text exports **line for line** (ignoring blank lines and the date). See `tests/test_gcode_samples.py`, which runs only where `captures/gc/` is present.
+
+- Vector blue 1 pass ✓, vector red 8 passes ✓, fill ✓.
+- Dot bitmap ✓. This test checks the G-code emission from the same dot pattern. Our own Jarvis dithering is not verified yet.
