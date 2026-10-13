@@ -175,7 +175,7 @@ async def cmd_smiley(args):
     try:
         z = (await dev.request("GET", "/v1/laser-head/focus/parameter", data={"action": "coord"}))["value"]
         want = args.distance + 6
-        if abs(z - want) > 0.05:
+        if abs(z - want) > 0.2:  # encoder reads within ~0.06 mm of target
             sys.exit(f"laser head is at z={z} (distance {z - 6:.2f} mm), expected {want} for {args.distance} mm. "
                      f"Set the distance in xTool Studio or on the machine first.")
         mode = (await dev.get("/v1/device/runtime-infos"))["curMode"]["mode"]
@@ -191,7 +191,9 @@ async def cmd_smiley(args):
         while True:
             ev = await dev.events.get()
             print(time.strftime("%H:%M:%S"), json.dumps(ev, ensure_ascii=False))
-            if isinstance(ev, dict) and str(ev.get("info", "")).upper() in ("WORK_FINISHED", "WORK_STOPED"):
+            body = ev.get("data") if isinstance(ev, dict) else None
+            if isinstance(body, dict) and body.get("type") == "WORK_FINISHED":
+                print("job result:", (body.get("info") or {}).get("result"))  # "failed" = cancelled
                 break
     finally:
         await dev.close()
