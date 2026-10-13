@@ -37,7 +37,10 @@ public sealed class MachinePanel : UserControl
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
     readonly ToggleSwitch _live = new() { OnContent = "Live view on", OffContent = "Live view off", IsEnabled = false };
     readonly ComboBox _stream = new() { ItemsSource = new[] { "Overview", "Close-up" }, SelectedIndex = 0, HorizontalAlignment = HorizontalAlignment.Stretch };
-    readonly Image _image = new() { Stretch = Stretch.Uniform, MaxHeight = 260 };
+    readonly Image _image = new() { Stretch = Stretch.Uniform };
+    readonly RotateTransform _imageRotation = new();
+    readonly NumericUpDown _straighten = Number(-180, 180, 0.5m, "0.#");
+    readonly Control _straightenRow;
     readonly TextBlock _camInfo = Hint("Live view refreshes as fast as the machine allows (about 3–4 frames a second). Cameras are dark while a job runs because the lights are off.");
     readonly TextBox _log = new() { IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Mono,Consolas,monospace"), FontSize = 11, Height = 160 };
     readonly List<string> _logLines = [];
@@ -64,12 +67,28 @@ public sealed class MachinePanel : UserControl
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _live.IsCheckedChanged += (_, _) => ToggleLive();
-        _stream.SelectionChanged += (_, _) => { if (_live.IsChecked == true) { ToggleLive(); ToggleLive(); } };
         ToolTip.SetTip(_lidOpen, "Stored on the machine (xTool calls it \"Enclosure-opened processing\"). When on, the start button works with the lid up. Wear laser safety glasses.");
 
         var snap = Button("Save snapshot…", "IcCamera");
         snap.Click += async (_, _) => await SaveSnapshot();
-        var imgBorder = new Border { Background = Brush("Bg0"), CornerRadius = new(6), MinHeight = 120, Child = _image, ClipToBounds = true };
+        // The close-up camera sits rotated in the head; straighten it for display.
+        var rotated = new LayoutTransformControl { LayoutTransform = _imageRotation, Child = _image, MaxHeight = 300 };
+        var imgBorder = new Border { Background = Brush("Bg0"), CornerRadius = new(6), MinHeight = 120, Child = rotated, ClipToBounds = true };
+        _straighten.Value = (decimal)_settings.CloseUpRotationDeg;
+        _straighten.ValueChanged += (_, _) =>
+        {
+            _settings.CloseUpRotationDeg = (double)(_straighten.Value ?? 0);
+            _settings.Save();
+            if (_shownStream == 1) _imageRotation.Angle = _settings.CloseUpRotationDeg;
+        };
+        _straightenRow = Field("Straighten", _straighten, Hint("Degrees clockwise. The close-up camera is mounted at an angle; 31.2° was measured from your bed slats."),
+            "Rotates the close-up picture for display only. Saved snapshots stay as the camera took them.");
+        _straightenRow.IsVisible = false;
+        _stream.SelectionChanged += (_, _) =>
+        {
+            _straightenRow.IsVisible = _stream.SelectedIndex == 1;
+            if (_live.IsChecked == true) { ToggleLive(); ToggleLive(); }
+        };
 
         Content = new ScrollViewer
         {
@@ -79,7 +98,7 @@ public sealed class MachinePanel : UserControl
                 {
                     Card("Connection", _ip, _found, Row(_find, _connect), _connState, _info),
                     Card("Status", _mode, _distance, _lidOpen),
-                    Card("Camera", Row(_live, _stream), imgBorder, snap, _camInfo),
+                    Card("Camera", Row(_live, _stream), imgBorder, _straightenRow, snap, _camInfo),
                     Card("Machine events", _log),
                 },
             },
@@ -95,6 +114,18 @@ public sealed class MachinePanel : UserControl
         if (_logLines.Count > 200) _logLines.RemoveRange(0, _logLines.Count - 200);
         _log.Text = string.Join("\n", _logLines);
         _log.CaretIndex = _log.Text.Length;
+    }
+
+    int _shownStream = -1;
+
+    /// <summary>Display a camera frame, straightened if it came from the close-up camera.</summary>
+    void ShowFrame(Bitmap bmp, int stream)
+    {
+        var old = _image.Source as Bitmap;
+        _image.Source = bmp;
+        old?.Dispose();
+        _shownStream = stream;
+        _imageRotation.Angle = stream == 1 ? _settings.CloseUpRotationDeg : 0;
     }
 
     async Task Find()
@@ -327,9 +358,7 @@ public sealed class MachinePanel : UserControl
                     Ui(() =>
                     {
                         if (cts.IsCancellationRequested) { bmp.Dispose(); return; }
-                        var old = _image.Source as Bitmap;
-                        _image.Source = bmp;
-                        old?.Dispose();
+                        ShowFrame(bmp, stream);
                         _camInfo.Text = $"{(stream == 0 ? "Overview" : "Close-up")} · {fps:0.0} frames/s";
                     });
                 }
