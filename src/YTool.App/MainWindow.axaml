@@ -44,6 +44,9 @@
         <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>
         <Separator Margin="0,6" />
         <Button x:Name="FitButton" Classes="icon" ToolTip.Tip="Fit work area (Home) · F fits the selection"><PathIcon Data="{StaticResource IcFit}" /></Button>
+        <Separator Margin="0,6" />
+        <ToggleButton x:Name="SnapObjectsButton" Classes="tool" ToolTip.Tip="Snap to shapes and the work area: edges, centres and centrelines (hold Ctrl to drag freely)"><PathIcon Data="{StaticResource IcMagnet}" /></ToggleButton>
+        <ToggleButton x:Name="SnapGridButton" Classes="tool" ToolTip.Tip="Snap to grid · right-click for grid &amp; snapping settings"><PathIcon Data="{StaticResource IcGrid}" /></ToggleButton>
       </StackPanel>
     </Border>
 

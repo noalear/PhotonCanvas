@@ -21,7 +21,9 @@ public sealed partial class CanvasView
 
     void PenPressed(PointerPressedEventArgs e)
     {
-        var w = _pressWorld;
+        PrepareSnap(new HashSet<Guid>());
+        var w = SnapPoint(_pressWorld);
+        _guides.Clear();
         // Click the first point to close the shape.
         if (_pen.Count >= 2 && Dist(ToScreen(_pen[0].At), _pressScreen) <= PenSnapPx)
         {
@@ -194,6 +196,7 @@ public sealed partial class CanvasView
                     _node = n;
                     _drag = Drag.NodeAnchor;
                     _base = _doc.State;
+                    PrepareSnap(new HashSet<Guid> { target.Id });
                     InvalidateVisual();
                     return;
                 }
@@ -228,7 +231,7 @@ public sealed partial class CanvasView
     {
         if (_doc is null || _base is null || _node is not { } n || !StartEditIfMoved(p)) return;
         if (_base.FindShape(_doc.Selection.FirstOrDefault()) is not PathShape target) return;
-        var local = LocalOf(target, w);
+        var local = LocalOf(target, _drag == Drag.NodeAnchor ? SnapPoint(w) : w);
         var g = _drag == Drag.NodeAnchor
             ? NodeEdit.MoveAnchor(target.Geometry, n, local)
             : NodeEdit.MoveHandle(target.Geometry, n, _dragHandle, local, _mirrorHandle);

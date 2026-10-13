@@ -37,6 +37,14 @@ public sealed class AppSettings
     public int PolygonSides { get; set; } = 6;
     public int StarPoints { get; set; } = 5;
     public double StarInnerPercent { get; set; } = 50;
+    public double GridMajorMm { get; set; } = 10;
+    public double GridMinorMm { get; set; } = 1;
+    public string GridMajorColor { get; set; } = "#2A303B";
+    public string GridMinorColor { get; set; } = "#1D2129";
+    public bool ShowGrid { get; set; } = true;
+    public bool SnapToObjects { get; set; } = true;
+    public bool SnapToGrid { get; set; }
+    public double SnapDistancePx { get; set; } = 8;
 
     static readonly JsonSerializerOptions Json = new()
     {

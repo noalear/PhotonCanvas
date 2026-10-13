@@ -22,11 +22,6 @@ public sealed partial class CanvasView : Control
     static readonly IBrush BgBrush = new SolidColorBrush(Color.Parse("#0E1014"));
     static readonly IBrush FieldBrush = new SolidColorBrush(Color.Parse("#161920"));
     static readonly IPen FieldPen = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
-    static readonly IPen GridMinor = new Pen(new SolidColorBrush(Color.Parse("#1D2129")), 1);
-    static readonly IPen GridMajor = new Pen(new SolidColorBrush(Color.Parse("#262B35")), 1);
-    // Over a camera picture the grid must stay readable without hiding the photo.
-    static readonly IPen GridMinorPhoto = new Pen(new SolidColorBrush(Color.FromArgb(28, 255, 255, 255)), 1);
-    static readonly IPen GridMajorPhoto = new Pen(new SolidColorBrush(Color.FromArgb(70, 255, 255, 255)), 1);
     static readonly IBrush RulerBrush = new SolidColorBrush(Color.Parse("#15181E"));
     static readonly IBrush RulerText = new SolidColorBrush(Color.Parse("#7D8694"));
     static readonly IPen RulerTick = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
@@ -265,38 +260,9 @@ public sealed partial class CanvasView : Control
             if (_tool == Tool.Nodes) DrawNodes(ctx);
             else DrawSelection(ctx, doc);
             if (_drag == Drag.Box) DrawBox(ctx);
+            if (_drag != Drag.None) DrawGuides(ctx);
         }
         DrawRulers(ctx);
-    }
-
-    void DrawGrid(DrawingContext ctx, Rect field)
-    {
-        // Pick the finest spacing that stays at least 8 px apart.
-        double[] steps = [0.5, 1, 2, 5, 10, 20, 50, 100];
-        double minor = steps.FirstOrDefault(s => s * _scale >= 8, 100);
-        double major = minor < 1 ? 5 : minor <= 2 ? 10 : minor <= 5 ? 50 : 100;
-        if (major == minor) major = minor * 5;
-        var clip = field.Intersect(new Rect(Bounds.Size));
-        if (clip.Width <= 0 || clip.Height <= 0) return;
-        using var _ = ctx.PushClip(clip);
-        void Lines(double step, IPen pen)
-        {
-            for (double x = 0; x <= _machine.FieldW + 1e-9; x += step)
-            {
-                double sx = Math.Round(ToScreen(new Vec2(x, 0)).X) + 0.5;
-                if (sx < clip.Left - 1 || sx > clip.Right + 1) continue;
-                ctx.DrawLine(pen, new(sx, clip.Top), new(sx, clip.Bottom));
-            }
-            for (double y = 0; y <= _machine.FieldH + 1e-9; y += step)
-            {
-                double sy = Math.Round(ToScreen(new Vec2(0, y)).Y) + 0.5;
-                if (sy < clip.Top - 1 || sy > clip.Bottom + 1) continue;
-                ctx.DrawLine(pen, new(clip.Left, sy), new(clip.Right, sy));
-            }
-        }
-        bool photo = _camera is not null;
-        Lines(minor, photo ? GridMinorPhoto : GridMinor);
-        Lines(major, photo ? GridMajorPhoto : GridMajor);
     }
 
     void DrawShapes(DrawingContext ctx, Document doc)
@@ -573,6 +539,9 @@ public sealed partial class CanvasView : Control
         if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;
+            PrepareSnap(new HashSet<Guid>());
+            _pressWorld = SnapPoint(_pressWorld);
+            _guides.Clear();
             _createEnd = _pressWorld;
             return;
         }
@@ -597,6 +566,7 @@ public sealed partial class CanvasView : Control
             _dragIds = [.. _doc.Selection];
             _dragBounds = SelectionBounds(_doc);
             _base = _doc.State;
+            PrepareSnap(_dragIds);
             return;
         }
 
@@ -615,7 +585,9 @@ public sealed partial class CanvasView : Control
                 _doc.Select(unit);
             _drag = Drag.Move;
             _dragIds = [.. _doc.Selection];
+            _dragBounds = SelectionBounds(_doc);
             _base = _doc.State;
+            PrepareSnap(_dragIds);
             return;
         }
 
@@ -649,7 +621,7 @@ public sealed partial class CanvasView : Control
                 InvalidateVisual();
                 break;
             case Drag.Create:
-                _createEnd = w;
+                _createEnd = SnapPoint(w);
                 InvalidateVisual();
                 break;
             case Drag.PenHandle:
@@ -662,11 +634,14 @@ public sealed partial class CanvasView : Control
                 if (!StartEditIfMoved(p)) break;
                 var d = w - _pressWorld;
                 if (mods.HasFlag(KeyModifiers.Shift)) d = Math.Abs(d.X) >= Math.Abs(d.Y) ? new(d.X, 0) : new(0, d.Y);
+                bool lockY = mods.HasFlag(KeyModifiers.Shift) && d.Y == 0, lockX = mods.HasFlag(KeyModifiers.Shift) && d.X == 0;
+                var moved = new Rect2(_dragBounds.MinX + d.X, _dragBounds.MinY + d.Y, _dragBounds.MaxX + d.X, _dragBounds.MaxY + d.Y);
+                d += SnapBox(moved, allowX: !lockX, allowY: !lockY);
                 _doc.UpdateEdit(Ops.Move(_base, _dragIds, d.X, d.Y));
                 break;
             case Drag.Scale when _doc is not null && _base is not null:
                 if (!StartEditIfMoved(p)) break;
-                _doc.UpdateEdit(Ops.Transform(_base, _dragIds, ScaleTransform(w, mods)));
+                _doc.UpdateEdit(Ops.Transform(_base, _dragIds, ScaleTransform(SnapHandle(w), mods)));
                 break;
             case Drag.Rotate when _doc is not null && _base is not null:
                 if (!StartEditIfMoved(p)) break;
@@ -719,6 +694,7 @@ public sealed partial class CanvasView : Control
         _lastScreen = p;
         var drag = _drag;
         _drag = Drag.None;
+        _guides.Clear();
         e.Pointer.Capture(null);
         if (_doc is null) return;
         switch (drag)
@@ -751,8 +727,17 @@ public sealed partial class CanvasView : Control
         InvalidateVisual();
     }
 
+    /// <summary>Snap the dragged scale handle along the axes it changes.</summary>
+    Vec2 SnapHandle(Vec2 w)
+    {
+        int hx = _handle switch { 0 or 6 or 7 => -1, 2 or 3 or 4 => 1, _ => 0 };
+        int hy = _handle switch { 0 or 1 or 2 => -1, 4 or 5 or 6 => 1, _ => 0 };
+        return SnapPoint(w, hx != 0, hy != 0);
+    }
+
     void CancelDrag()
     {
+        _guides.Clear();
         if (_editStarted) _doc?.CancelEdit();
         _editStarted = false;
         _drag = Drag.None;

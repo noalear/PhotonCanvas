@@ -51,6 +51,10 @@ public partial class MainWindow : Window
 
         BuildMenu();
         WireTools();
+        ApplyGrid();
+        SnapObjectsButton.Click += (_, _) => { _settings.SnapToObjects = SnapObjectsButton.IsChecked == true; SaveAndApplyGrid(); };
+        SnapGridButton.Click += (_, _) => { _settings.SnapToGrid = SnapGridButton.IsChecked == true; SaveAndApplyGrid(); };
+        SnapGridButton.ContextRequested += (_, e) => { e.Handled = true; _ = Guard(ShowGridSettings); };
         UndoButton.Click += (_, _) => _doc.Undo();
         RedoButton.Click += (_, _) => _doc.Redo();
         FitButton.Click += (_, _) => Canvas.FitField();
@@ -161,6 +165,30 @@ public partial class MainWindow : Window
     // ---- menu ----------------------------------------------------------------
 
     MenuItem? _undoItem, _redoItem, _recentMenu;
+    MenuItem _showGridItem = null!, _snapObjectsItem = null!, _snapGridItem = null!;
+
+    /// <summary>Push the grid and snap settings to the canvas and every toggle that shows them.</summary>
+    void ApplyGrid()
+    {
+        Canvas.Grid = GridWindow.From(_settings);
+        Canvas.ShowGrid = _settings.ShowGrid;
+        Canvas.SnapToObjects = _settings.SnapToObjects;
+        Canvas.SnapToGrid = _settings.SnapToGrid;
+        Canvas.SnapDistancePx = _settings.SnapDistancePx;
+        _showGridItem.IsChecked = _settings.ShowGrid;
+        _snapObjectsItem.IsChecked = _settings.SnapToObjects;
+        _snapGridItem.IsChecked = _settings.SnapToGrid;
+        SnapObjectsButton.IsChecked = _settings.SnapToObjects;
+        SnapGridButton.IsChecked = _settings.SnapToGrid;
+    }
+
+    void SaveAndApplyGrid()
+    {
+        _settings.Save();
+        ApplyGrid();
+    }
+
+    Task ShowGridSettings() => new GridWindow(_settings, ApplyGrid).ShowDialog(this);
     readonly List<(MenuItem Item, Func<bool> Enabled)> _conditional = [];
 
     MenuItem Item(string header, Action action, string? gesture = null, Func<bool>? enabled = null)
@@ -260,8 +288,12 @@ public partial class MainWindow : Window
                 Item("Send to back", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), null, HasSel),
             },
         };
-        var gridItem = new MenuItem { Header = "Show grid", ToggleType = MenuItemToggleType.CheckBox, IsChecked = true };
-        gridItem.Click += (_, _) => Canvas.ShowGrid = gridItem.IsChecked;
+        _showGridItem = new MenuItem { Header = "Show grid", ToggleType = MenuItemToggleType.CheckBox };
+        _showGridItem.Click += (_, _) => { _settings.ShowGrid = _showGridItem.IsChecked; SaveAndApplyGrid(); };
+        _snapObjectsItem = new MenuItem { Header = "Snap to shapes & centrelines", ToggleType = MenuItemToggleType.CheckBox };
+        _snapObjectsItem.Click += (_, _) => { _settings.SnapToObjects = _snapObjectsItem.IsChecked; SaveAndApplyGrid(); };
+        _snapGridItem = new MenuItem { Header = "Snap to grid", ToggleType = MenuItemToggleType.CheckBox };
+        _snapGridItem.Click += (_, _) => { _settings.SnapToGrid = _snapGridItem.IsChecked; SaveAndApplyGrid(); };
         var view = new MenuItem
         {
             Header = "_View",
@@ -272,7 +304,10 @@ public partial class MainWindow : Window
                 Item("Zoom in", () => Canvas.ZoomBy(1.25), "Ctrl+OemPlus"),
                 Item("Zoom out", () => Canvas.ZoomBy(0.8), "Ctrl+OemMinus"),
                 new Separator(),
-                gridItem,
+                _showGridItem,
+                _snapObjectsItem,
+                _snapGridItem,
+                AsyncItem("Grid & snapping…", ShowGridSettings, "Ctrl+OemQuotes"),
             },
         };
         var layer = new MenuItem
