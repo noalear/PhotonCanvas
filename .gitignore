@@ -22,6 +22,7 @@ obj/
 
 # Your own designs saved in the project folder
 /*.ytool
+/*.pcanvas
 
 # Personal files that end up in the project folder (camera snapshots, exports, keys)
 /*.jpg

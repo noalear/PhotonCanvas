@@ -1,8 +1,8 @@
 """Machine keys, supplied by the user (the desktop app's Machine tab finds them in
-the user's own xTool Studio and saves them to %APPDATA%/YTool/keys.json).
+the user's own xTool Studio and saves them to %APPDATA%/PhotonCanvas/keys.json).
 
-Environment variables override the file: YTOOL_DISCOVERY_REQUEST_KEY,
-YTOOL_DISCOVERY_REPLY_KEY, YTOOL_PAIRING_KEY.
+Environment variables override the file: PHOTONCANVAS_DISCOVERY_REQUEST_KEY,
+PHOTONCANVAS_DISCOVERY_REPLY_KEY, PHOTONCANVAS_PAIRING_KEY.
 """
 import json
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 
 def _default_path() -> Path:
     base = os.environ.get("APPDATA") or str(Path.home() / ".config")
-    return Path(base) / "YTool" / "keys.json"
+    return Path(base) / "PhotonCanvas" / "keys.json"
 
 
 @dataclass(frozen=True)
@@ -36,9 +36,9 @@ def load_keys(path: Path | None = None) -> MachineKeys:
     if p.exists():
         data = json.loads(p.read_text(encoding="utf-8"))
     keys = MachineKeys(
-        os.environ.get("YTOOL_DISCOVERY_REQUEST_KEY", data.get("DiscoveryRequest", "")),
-        os.environ.get("YTOOL_DISCOVERY_REPLY_KEY", data.get("DiscoveryReply", "")),
-        os.environ.get("YTOOL_PAIRING_KEY", data.get("Pairing", "")),
+        os.environ.get("PHOTONCANVAS_DISCOVERY_REQUEST_KEY", data.get("DiscoveryRequest", "")),
+        os.environ.get("PHOTONCANVAS_DISCOVERY_REPLY_KEY", data.get("DiscoveryReply", "")),
+        os.environ.get("PHOTONCANVAS_PAIRING_KEY", data.get("Pairing", "")),
     )
     if not (keys.discovery_request and keys.discovery_reply and keys.pairing):
         raise RuntimeError(f"Machine keys not set up: run the desktop app's Machine tab -> Connection keys (or create {p}).")

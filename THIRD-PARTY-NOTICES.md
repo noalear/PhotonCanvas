@@ -1,6 +1,6 @@
 # Third-party notices
 
-YTool Studio is licensed under the GNU General Public License v3 or later (see `LICENSE`).
+PhotonCanvas is licensed under the GNU General Public License v3 or later (see `LICENSE`).
 It uses the following open-source components, each under its own licence. Their
 licence texts ship inside their NuGet packages and are linked below.
 

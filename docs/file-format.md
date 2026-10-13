@@ -123,7 +123,7 @@ Both are defined in `exts/ext-runtime/*/xcs-ext-base.js`.
 
 ## Placement convention (verified)
 
-Implemented in `src/YTool.Doc/Import/XsImport.cs` and checked against all 1408 PATHs in 20 tutorial projects (stored `x/y` within 0.005 mm, `width/height` exact, including 231 paths rotated −90°):
+Implemented in `src/PhotonCanvas.Doc/Import/XsImport.cs` and checked against all 1408 PATHs in 20 tutorial projects (stored `x/y` within 0.005 mm, `width/height` exact, including 231 paths rotated −90°):
 
 - An object's own coordinates are scaled by `scale`, rotated by `angle` (degrees, clockwise on screen), then moved by `offsetX/offsetY`. A `transform` array, when present, is the same matrix.
 - Stored `x/y` is where the object's own top-left lands; `width/height` are its size after scaling, before rotation.

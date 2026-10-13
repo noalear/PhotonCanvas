@@ -1,0 +1,19 @@
+using Avalonia;
+
+namespace PhotonCanvas.App;
+
+static class Program
+{
+    [STAThread]
+    public static void Main(string[] args)
+    {
+        PhotonCanvas.Core.AppIdentity.MigrateLegacyData();
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
+
+    public static AppBuilder BuildAvaloniaApp() =>
+        AppBuilder.Configure<App>()
+            .UsePlatformDetect()
+            .WithInterFont()
+            .LogToTrace();
+}

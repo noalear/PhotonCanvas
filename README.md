@@ -1,4 +1,4 @@
-# YTool Studio
+# PhotonCanvas
 
 A free, offline, open replacement for xTool Studio for the **xTool F2 Ultra** laser.
 No account, no cloud, no telemetry: designs and jobs stay on your computer and go
@@ -37,14 +37,14 @@ machine's start button.
 
 1. Install the [.NET 10 SDK](https://dotnet.microsoft.com/download), then run:
    ```bash
-   dotnet run --project src/YTool.App -c Release
+   dotnet run --project src/PhotonCanvas.App -c Release
    ```
 2. On first start, read and accept the safety notice.
 3. **Connection keys (one-time).** xTool machines expect three fixed codes when a
    program searches for them and pairs with them. They are not included in this
    project. If xTool Studio is installed on your computer, click **Find them in my
    xTool Studio** (Machine tab or the welcome screen) and they are read from your own
-   copy in a few seconds and saved to `%APPDATA%\YTool\keys.json`. You can also point
+   copy in a few seconds and saved to `%APPDATA%\PhotonCanvas\keys.json`. You can also point
    it at xTool Studio's `resources\app.asar`, or paste them in; each one is checked
    against a fingerprint. Don't have xTool Studio? Install it, run the setup once, then
    uninstall it.
@@ -55,21 +55,21 @@ Help → Getting started shows the short tour again.
 
 ## Where things are kept
 
-Everything lives in `%APPDATA%\YTool`: `app.json` (settings and presets),
+Everything lives in `%APPDATA%\PhotonCanvas`: `app.json` (settings and presets),
 `camera.json` (camera calibration), `keys.json` (connection keys), `state.json`
 (pairing token) and `logs\`.
 
 ## For developers
 
 ```
-YTool.slnx
-src/YTool.Core     G-code engine, settings/limits, .xf packaging, camera calibration, picture processing
-src/YTool.Device   F2 Ultra link: discovery, V2 WebSocket protocol, pairing, upload, camera, connection keys
-src/YTool.Doc      document model: shapes, layers, undo/redo, imports, tracing, job builder, .ytool files
-src/YTool.App      desktop editor (Avalonia)
-tests/YTool.Tests  xUnit; sample tests compare against captures/gc when present
-src/ytool          Python protocol prototype (read-only probe; reads the same keys.json)
-docs/              protocol, G-code and file-format notes
+PhotonCanvas.slnx
+src/PhotonCanvas.Core     G-code engine, settings/limits, .xf packaging, camera calibration, picture processing
+src/PhotonCanvas.Device   F2 Ultra link: discovery, V2 WebSocket protocol, pairing, upload, camera, connection keys
+src/PhotonCanvas.Doc      document model: shapes, layers, undo/redo, imports, tracing, job builder, .pcanvas files
+src/PhotonCanvas.App      desktop editor (Avalonia)
+tests/PhotonCanvas.Tests  xUnit; sample tests compare against captures/gc when present
+src/ytool                 Python protocol prototype (read-only probe; reads the same keys.json)
+docs/                     protocol, G-code and file-format notes
 ```
 
 ```bash
