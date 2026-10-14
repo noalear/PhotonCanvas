@@ -46,6 +46,7 @@ public partial class MainWindow : Window
         _props = new PropertiesPanel(_doc, _layers, _settings);
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
+        _props.DepthmapRequested += im => _ = Guard(() => MakeDepthmap(im));
         _machine = new MachinePanel(_settings);
         _job = new JobPanel(_doc, _settings, Canvas, _machine);
         LayersHost.Content = _layers;
@@ -385,6 +386,7 @@ public partial class MainWindow : Window
             Items =
             {
                 AsyncItem("Material test…", AddMaterialTest),
+                AsyncItem("Depthmap with DepthCharge…", () => MakeDepthmap(SelectedPicture())),
                 AsyncItem("Fit to piece in camera…", FitToCamera, null, () => SelectedOutline().Count > 0),
                 AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, null, () => SelectedPicture() is not null),
                 new Separator(),
@@ -604,9 +606,69 @@ public partial class MainWindow : Window
             new Separator(),
             DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
             DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
+            DoAsync("Depthmap with DepthCharge…", () => MakeDepthmap(picture), picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
         ];
+    }
+
+    readonly DepthChargeService _depthCharge = new();
+
+    /// <summary>
+    /// Depthmap of a picture (or a picture file) via DepthCharge. The result goes over the
+    /// original, same place and size, on its own greyscale Image layer.
+    /// </summary>
+    async Task MakeDepthmap(ImageShape? picture)
+    {
+        byte[] bytes;
+        string name;
+        if (picture is not null)
+        {
+            bytes = picture.Source.Encoded;
+            name = string.IsNullOrWhiteSpace(picture.Name) ? "Picture" : picture.Name;
+        }
+        else
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Picture to turn into a depthmap",
+                FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = [.. PictureExtensions.Select(e => "*" + e)] }],
+            });
+            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+            bytes = await File.ReadAllBytesAsync(path);
+            name = Path.GetFileNameWithoutExtension(path);
+        }
+        var w = new DepthChargeWindow(_depthCharge, _settings, bytes, name, (png, label) => AddDepthmap(png, label, picture));
+        await w.ShowDialog(this);
+    }
+
+    void AddDepthmap(byte[] png, string label, ImageShape? over)
+    {
+        var src = ImageSource.FromEncoded(png);
+        var state = _doc.State;
+        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
+        {
+            Name = $"Relief · {label}",
+            ImageMode = ImageEngraveMode.Grayscale, // darker = deeper: power follows the depth
+        };
+        state = Ops.AddLayer(state, layer, 0);
+        ImageShape shape;
+        if (over is not null)
+        {
+            // Same place and size as the original; a cropped depthmap fits inside it, centred.
+            double s = Math.Min(over.SizeMm.X / src.Width, over.SizeMm.Y / src.Height);
+            var size = new Vec2(src.Width * s, src.Height * s);
+            var inset = (over.SizeMm - size) / 2;
+            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(inset).Then(over.Transform) };
+        }
+        else
+        {
+            var size = ImageShape.DefaultSize(src, 100);
+            var at = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH).Center - size / 2;
+            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(at) };
+        }
+        _doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
+        _layers.Activate(layer.Id);
     }
 
     void CenterSelInField()
@@ -1111,6 +1173,7 @@ public partial class MainWindow : Window
         if (_closeConfirmed || !_doc.Dirty)
         {
             _machine.Shutdown();
+            _depthCharge.Dispose(); // stops DepthCharge only if this program started it
             return;
         }
         e.Cancel = true;

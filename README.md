@@ -28,6 +28,7 @@ straight to the machine over your own network.
 - Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures, and trace pictures into vectors
 - Layers that cut, score, engrave areas, or engrave pictures (dithered), with blue diode and red fiber settings
 - Material test generator (power × speed grid)
+- Depthmaps for relief engraving with [DepthCharge](#depthcharge) (your own local DA3 / Depth Pro app), placed straight onto the design
 - Calibrated overview camera laid over the work area, at any material height
 - Draw from the camera: fit a design onto a real piece (move/turn/resize), pick a piece's outline with a magic wand (tolerance, smoothness, corners, speck filter), or trace edges with a magnetic pen
 - Auto-focus, camera lights, beeper, job pause/resume/stop and progress
@@ -55,6 +56,17 @@ machine's start button.
    the machine's button to allow this computer.
 
 Help → Getting started shows the short tour again.
+
+## DepthCharge
+
+PhotonCanvas can turn a picture into a relief depthmap with **DepthCharge**, a separate
+local app that runs depth models (DA3, Depth Pro) on your graphics card. Install DepthCharge
+first (its `DepthCharge-Setup.exe`, or a set-up folder in Documents). Then right-click a
+picture → **Depthmap with DepthCharge…** (or Tools, or the Picture card). PhotonCanvas starts
+DepthCharge in the background if needed, talks to it on 127.0.0.1 only, and stops it again on
+exit if it started it. Crops and masks made in DepthCharge's own editor (**Open in DepthCharge**)
+are used too. DepthCharge is not part of PhotonCanvas; its models keep their own licences
+(Depth Pro is non-commercial research only).
 
 ## Where things are kept
 

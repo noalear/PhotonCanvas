@@ -61,6 +61,8 @@ public sealed class AppSettings
     public double WandSmoothness { get; set; } = 3;
     public double WandCorners { get; set; } = 40;
     public double WandIgnoreMm2 { get; set; } = 2;
+    /// <summary>The user's DepthCharge folder, if it isn't in a usual place.</summary>
+    public string? DepthChargeFolder { get; set; }
 
     static readonly JsonSerializerOptions Json = new()
     {
