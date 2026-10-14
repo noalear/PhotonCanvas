@@ -58,6 +58,10 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
+    <!-- Every window (main, dialogs, tools) shows the app icon. -->
+    <Style Selector="Window">
+      <Setter Property="Icon" Value="/Assets/photoncanvas.ico" />
+    </Style>
     <Style Selector="Window">
       <Setter Property="Background" Value="{StaticResource Bg0}" />
       <Setter Property="FontSize" Value="13" />

@@ -1,3 +1,5 @@
+<img src="src/PhotonCanvas.App/Assets/photoncanvas-512.png" alt="PhotonCanvas icon" width="96" align="right">
+
 # PhotonCanvas
 
 A free, offline, open replacement for xTool Studio for the **xTool F2 Ultra** laser.
