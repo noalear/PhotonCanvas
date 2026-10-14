@@ -459,6 +459,10 @@ public sealed class DeviceClient : IAsyncDisposable
         up.Touch();
         long total = up.Data.Length;
         long end = Math.Min(offset + window, total);
+        // Use the packet size the device asked for, not our proposal.
+        try { await up.Ready.Task.WaitAsync(_options.TransferTimeout, _lifetime.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; } // upload abandoned or connection closing
+        catch (TimeoutException) { up.Fail(new DeviceException(DeviceException.TimeoutCode, "The machine asked for file data before confirming the upload.")); return; }
         try
         {
             for (long pos = offset; pos < end;)
@@ -712,6 +716,7 @@ public sealed class DeviceClient : IAsyncDisposable
                 }, cancellationToken: cancellationToken).ConfigureAwait(false);
                 long devicePacket = Json.Long(info as JsonObject, "packetsize") ?? PacketSize;
                 up.PacketSize = (int)Math.Clamp(devicePacket, 1, PacketSize);
+                up.Ready.TrySetResult();
 
                 while (!up.Done.Task.IsCompleted)
                 {
@@ -728,6 +733,7 @@ public sealed class DeviceClient : IAsyncDisposable
             }
             finally
             {
+                up.Ready.TrySetCanceled();
                 _uploads.TryRemove(new KeyValuePair<int, UploadState>(channel, up));
             }
         }
@@ -1232,6 +1238,11 @@ public sealed class DeviceClient : IAsyncDisposable
         long _sent;
         public byte[] Data { get; } = data;
         public volatile int PacketSize = DeviceClient.PacketSize;
+        /// <summary>
+        /// Set once the device's reply to the announcement (with its packet size) has been read.
+        /// The device may ask for data a moment before that reply is processed.
+        /// </summary>
+        public TaskCompletionSource Ready { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource<JsonObject> Done { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         /// <summary>Released on every sign of life from the device.</summary>
         public SemaphoreSlim Activity { get; } = new(0);
