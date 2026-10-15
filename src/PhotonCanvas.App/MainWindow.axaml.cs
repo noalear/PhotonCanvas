@@ -47,6 +47,17 @@ public partial class MainWindow : Window
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
         _props.DepthmapRequested += im => _ = Guard(() => MakeDepthmap(im));
+        _library = Doc.Materials.MaterialLibrary.Load(Path.Combine(AppIdentity.DataDir, "materials"));
+        if (!_settings.PresetsAdopted)
+        {
+            // Saved presets move into the material library once.
+            if (_library.AdoptPresets(_settings.Presets.Select(p => (p.Name, p.Mode, p.Laser, p.LinesPerCm))) > 0) _library.Save();
+            _settings.PresetsAdopted = true;
+            _settings.Save();
+        }
+        _props.Library = _library;
+        _props.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
+        _props.LibraryRequested += () => _ = Guard(ShowLibrary);
         _machine = new MachinePanel(_settings);
         _job = new JobPanel(_doc, _settings, Canvas, _machine);
         LayersHost.Content = _layers;
@@ -385,7 +396,9 @@ public partial class MainWindow : Window
             Header = "_Tools",
             Items =
             {
+                AsyncItem("Material library…", ShowLibrary),
                 AsyncItem("Material test…", AddMaterialTest),
+                AsyncItem("Record material test results…", RecordTestResults),
                 AsyncItem("Depthmap with DepthCharge…", () => MakeDepthmap(SelectedPicture())),
                 AsyncItem("Fit to piece in camera…", FitToCamera, null, () => SelectedOutline().Count > 0),
                 AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, null, () => SelectedPicture() is not null),
@@ -613,6 +626,39 @@ public partial class MainWindow : Window
     }
 
     readonly DepthChargeService _depthCharge = new();
+    readonly Doc.Materials.MaterialLibrary _library;
+
+    async Task ShowLibrary()
+    {
+        var w = new MaterialLibraryWindow(_library, _settings, (m, r) => _props.ApplyRecipe(m, r));
+        w.LibraryChanged += _props.RefreshMaterials;
+        await w.ShowDialog(this);
+        _props.RefreshMaterials();
+    }
+
+    async Task SaveToLibrary(Layer layer)
+    {
+        // A photo of this layer's work, if the camera picture covers it.
+        byte[]? photo = null;
+        var b = _doc.State.Bounds(_doc.State.ShapesOn(layer.Id).Select(s => s.Id).ToHashSet());
+        if (Canvas.Photo is { } p && !b.IsEmpty)
+            photo = Doc.Materials.MaterialLibrary.CropPhoto(p.Image, p.Area, p.MmPerPx, b.Inflate(2));
+        var w = new SaveRecipeWindow(_library, layer, _machine.Distance, photo);
+        await w.ShowDialog(this);
+        if (w.Result is { } saved)
+        {
+            _doc.Commit("Material", Ops.UpdateLayers(_doc.State, new HashSet<Guid> { layer.Id },
+                l => l with { Material = new Doc.Materials.MaterialRef(saved.Material.Id, saved.Material.Label, saved.Recipe.Id, saved.Recipe.Title) }));
+            _props.RefreshMaterials();
+        }
+    }
+
+    async Task RecordTestResults()
+    {
+        var w = new RecordTestWindow(_doc.State, _library, Canvas.Photo, _machine.UpdatePhotoAsync, () => Canvas.Photo, _machine.Distance);
+        await w.ShowDialog(this);
+        _props.RefreshMaterials();
+    }
 
     /// <summary>
     /// Depthmap of a picture (or a picture file) via DepthCharge. The result goes over the

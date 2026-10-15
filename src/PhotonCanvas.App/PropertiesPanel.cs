@@ -95,7 +95,10 @@ public sealed class PropertiesPanel : UserControl
     readonly NumericUpDown _freq = Number(1, 4000, 5, "0");
     readonly TextBlock _passHint = Hint(), _lpcmHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _pulseRow, _freqRow;
-    readonly ComboBox _presets = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Apply a saved preset…" };
+    readonly ComboBox _material = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly ComboBox _recipe = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly TextBlock _recipeInfo = Hint();
+    readonly Image _recipePhoto = new() { MaxHeight = 110, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
 
     public PropertiesPanel(Document doc, LayersPanel layers, AppSettings settings)
     {
@@ -227,10 +230,16 @@ public sealed class PropertiesPanel : UserControl
 
         _pulseRow = Field("Pulse width", _pulse, tip: "Fiber only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "Fiber only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
-        var savePreset = Button("Save as preset…", tip: "Remember these settings under a name, e.g. \"3 mm basswood – cut\".");
-        savePreset.Click += async (_, _) => await SavePreset();
-        var delPreset = Button("Delete preset", tip: "Remove the preset currently shown in the list.");
-        delPreset.Click += (_, _) => DeletePreset();
+        var saveToLib = Button("Save to library…", tip: "Remember these settings for a material, with how well they worked (and a photo of the result).");
+        saveToLib.Click += (_, _) =>
+        {
+            var l = EditLayersSet().FirstOrDefault(x => x.Id == _doc.ActiveLayer) ?? EditLayersSet().FirstOrDefault();
+            if (l is not null) SaveToLibraryRequested?.Invoke(l);
+        };
+        var openLib = Button("Library…", tip: "Your material and cutting library: browse, edit, share.");
+        openLib.Click += (_, _) => LibraryRequested?.Invoke();
+        ToolTip.SetTip(_material, "What this layer is for. Picking a material lists its saved settings below.");
+        ToolTip.SetTip(_recipe, "Apply settings saved for this material (★ rating, ✓ = tested).");
         var layerCard = new Border
         {
             Classes = { "card" },
@@ -249,8 +258,11 @@ public sealed class PropertiesPanel : UserControl
                     _cutExtras, _fillExtras, _imageExtras,
                     _advanced,
                     new Separator { Margin = new(0, 4) },
-                    _presets,
-                    Row(savePreset, delPreset),
+                    Field("Material", _material),
+                    Field("Settings", _recipe),
+                    _recipeInfo,
+                    _recipePhoto,
+                    Row(saveToLib, openLib),
                 },
             },
         };
@@ -271,12 +283,12 @@ public sealed class PropertiesPanel : UserControl
             EditLayers("Pulse width", l => l with { Laser = l.Laser with { PulseWidthNs = lim.PulseWidthNs, FrequencyKhz = lim.DefaultKhz } }, true);
         };
         _freq.ValueChanged += (_, _) => EditLayers("Frequency", l => l with { Laser = l.Laser with { FrequencyKhz = (int)_freq.Value!.Value } }, _freq.Value.HasValue, "freq");
-        _presets.SelectionChanged += (_, _) => ApplyPreset();
+        _material.SelectionChanged += (_, _) => MaterialChosen();
+        _recipe.SelectionChanged += (_, _) => RecipeChosen();
 
         Content = new ScrollViewer { Content = new StackPanel { Children = { _selCard, _textCard, _picCard, layerCard } } };
         _doc.Changed += _ => Refresh();
         _layers.SelectionChanged += Refresh;
-        RefreshPresets();
         Refresh();
     }
 
@@ -420,6 +432,7 @@ public sealed class PropertiesPanel : UserControl
         var ls = EditLayersSet().ToList();
         if (ls.Count == 0) return;
         _layerTitle.Text = ls.Count == 1 ? $"LAYER · {ls[0].Name.ToUpperInvariant()}" : $"{ls.Count} LAYERS · EDITING TOGETHER";
+        RefreshMaterial();
 
         T? Same<T>(Func<Layer, T> f) where T : struct
         {
@@ -549,42 +562,90 @@ public sealed class PropertiesPanel : UserControl
         _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, layer.Id));
     }
 
-    // ---- presets ----------------------------------------------------------------
+    // ---- material ---------------------------------------------------------------
 
-    void RefreshPresets()
+    /// <summary>The material library (set by the main window).</summary>
+    public PhotonCanvas.Doc.Materials.MaterialLibrary? Library { get; set; }
+
+    /// <summary>Save the active layer's settings to the library.</summary>
+    public event Action<Layer>? SaveToLibraryRequested;
+    /// <summary>Open the library window.</summary>
+    public event Action? LibraryRequested;
+
+    List<PhotonCanvas.Doc.Materials.Recipe> _recipeChoices = [];
+
+    /// <summary>Re-read the library (after it changed) and show the layer's material.</summary>
+    public void RefreshMaterials()
     {
         _updating = true;
-        _presets.ItemsSource = _settings.Presets.Select(p => $"{p.Name}  ·  {p.Mode} {p.Laser.Power:0.#}% {p.Laser.Speed:0.#} mm/s ×{p.Laser.Passes}").ToList();
-        _presets.SelectedIndex = -1;
-        _updating = false;
+        try { RefreshMaterial(); }
+        finally { _updating = false; }
     }
 
-    void ApplyPreset()
+    void RefreshMaterial()
     {
-        if (_updating || _presets.SelectedIndex < 0) return;
-        var p = _settings.Presets[_presets.SelectedIndex];
-        EditLayers($"Apply preset \"{p.Name}\"", l => l with { Mode = p.Mode, Laser = p.Laser, LinesPerCm = p.LinesPerCm }, true);
+        var lib = Library;
+        var ls = EditLayersSet().ToList();
+        var mats = lib?.Materials ?? [];
+        _material.ItemsSource = mats.Select(m => m.Label).Prepend("None").ToList();
+        var ids = ls.Select(l => l.Material?.MaterialId).Distinct().ToList();
+        var mat = ids.Count == 1 && ids[0] is { } id ? lib?.Find(id) : null;
+        _material.SelectedIndex = ids.Count != 1 ? -1 : mat is null ? (ids[0] is null ? 0 : -1) : mats.IndexOf(mat) + 1;
+        _material.PlaceholderText = ids.Count != 1 ? "mixed" : ls.FirstOrDefault()?.Material is { } missing && mat is null ? $"{missing.Label} (not in your library)" : "";
+
+        _recipeChoices = mat?.Recipes.OrderBy(r => r.Purpose).ThenByDescending(r => r.Rating).ToList() ?? [];
+        _recipe.ItemsSource = _recipeChoices.Select(r => $"{r.Purpose} · {r.Title}  {PhotonCanvas.App.Stars.Text(r.Rating)}{(r.Tested ? "  ✓" : "")}").ToList();
+        _recipe.IsEnabled = _recipeChoices.Count > 0;
+        _recipe.PlaceholderText = mat is null ? "Pick a material first" : _recipeChoices.Count == 0 ? "No saved settings yet" : "Apply saved settings…";
+        var layer = ls.FirstOrDefault(l => l.Id == _doc.ActiveLayer) ?? ls.FirstOrDefault();
+        var used = layer?.Material?.RecipeId is { } rid ? _recipeChoices.FirstOrDefault(r => r.Id == rid) : null;
+        _recipe.SelectedIndex = used is null ? -1 : _recipeChoices.IndexOf(used);
+
+        _recipeInfo.Text = "";
+        _recipePhoto.IsVisible = false;
+        if (used is not null && layer is not null)
+        {
+            bool same = PhotonCanvas.Doc.Materials.ProcessSettings.From(layer) == used.Settings;
+            string who = !used.Tested ? "untested" : used.TestedBy.Length == 0 ? "tested by you" : $"tested by {used.TestedBy}";
+            _recipeInfo.Text = (same ? $"Using “{used.Title}”, {who}." : $"Changed since applying “{used.Title}”.") +
+                (used.FocusMm is { } f ? $" Focus {f:0.0} mm." : "") + (used.Notes.Length > 0 ? $"\n{used.Notes}" : "");
+            if (lib?.PhotoPath(used.Photo) is { } path)
+            {
+                try
+                {
+                    var old = _recipePhoto.Source as IDisposable;
+                    _recipePhoto.Source = new Avalonia.Media.Imaging.Bitmap(path);
+                    old?.Dispose();
+                    _recipePhoto.IsVisible = true;
+                }
+                catch (Exception e) when (e is ArgumentException or IOException) { }
+            }
+        }
+        else if (mat is null && lib is { Materials.Count: 0 })
+            _recipeInfo.Text = "Your library is empty: set up a layer that works, then Save to library.";
     }
 
-    async Task SavePreset()
+    void MaterialChosen()
     {
-        var l = EditLayersSet().FirstOrDefault(x => x.Id == _doc.ActiveLayer) ?? EditLayersSet().FirstOrDefault();
-        if (l is null || TopLevel.GetTopLevel(this) is not Window owner) return;
-        var name = await Dialogs.Prompt(owner, "Save preset", "Name for these settings:", l.Name);
-        if (string.IsNullOrWhiteSpace(name)) return;
-        _settings.Presets.RemoveAll(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-        _settings.Presets.Add(new Preset(name.Trim(), l.Mode, l.Laser, l.LinesPerCm));
-        _settings.Presets.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
-        _settings.Save();
-        RefreshPresets();
+        if (_updating || Library is not { } lib || _material.SelectedIndex < 0) return;
+        if (_material.SelectedIndex == 0)
+        {
+            EditLayers("No material", l => l with { Material = null }, true);
+            return;
+        }
+        var m = lib.Materials[_material.SelectedIndex - 1];
+        EditLayers($"Material: {m.Label}", l => l with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label) }, true);
     }
 
-    void DeletePreset()
+    void RecipeChosen()
     {
-        int i = _presets.SelectedIndex;
-        if (i < 0 || i >= _settings.Presets.Count) return;
-        _settings.Presets.RemoveAt(i);
-        _settings.Save();
-        RefreshPresets();
+        if (_updating || Library is not { } lib || _recipe.SelectedIndex < 0 || _recipe.SelectedIndex >= _recipeChoices.Count) return;
+        var layer = EditLayersSet().FirstOrDefault();
+        if (layer?.Material is not { } mref || lib.Find(mref.MaterialId) is not { } m) return;
+        ApplyRecipe(m, _recipeChoices[_recipe.SelectedIndex]);
     }
+
+    /// <summary>Put a recipe's settings on the selected layers and remember which it was.</summary>
+    public void ApplyRecipe(PhotonCanvas.Doc.Materials.Material m, PhotonCanvas.Doc.Materials.Recipe r) =>
+        EditLayers($"Apply {m.Label} · {r.Title}", l => r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, true);
 }

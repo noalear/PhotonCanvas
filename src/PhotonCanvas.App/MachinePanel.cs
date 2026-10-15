@@ -318,6 +318,25 @@ public sealed class MachinePanel : UserControl
         await RefreshOverlay();
     }
 
+    /// <summary>
+    /// Take a fresh work-area photo (turning Camera on work area on if needed). Finishes when the
+    /// new picture has been handed out (PhotoChanged), or after 20 s.
+    /// </summary>
+    public async Task UpdatePhotoAsync()
+    {
+        if (_calibrations.Count == 0 || !IsConnected) return;
+        var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Got(CameraPhoto? _) => done.TrySetResult();
+        PhotoChanged += Got;
+        try
+        {
+            if (_onCanvas.IsChecked != true) _onCanvas.IsChecked = true; // takes a photo itself
+            else _ = RefreshOverlay();
+            await Task.WhenAny(done.Task, Task.Delay(20000));
+        }
+        finally { PhotoChanged -= Got; }
+    }
+
     async Task RefreshOverlay()
     {
         if (_onCanvas.IsChecked != true) return;

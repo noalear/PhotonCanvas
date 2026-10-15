@@ -442,7 +442,8 @@ public sealed class LayersPanel : UserControl
         string light = l.Laser.Light == Core.LightSource.Red ? "fiber" : "diode";
         string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
         string shapes = count == 1 ? "1 shape" : $"{count} shapes";
-        return $"{mode} · {l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes} · {light} · {shapes}";
+        string material = l.Material is { } m ? $"{m.Label} · " : "";
+        return $"{material}{mode} · {l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes} · {light} · {shapes}";
     }
 
     static IBrush Res(string key) => (IBrush)Application.Current!.FindResource(key)!;
