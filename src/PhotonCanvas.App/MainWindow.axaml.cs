@@ -457,6 +457,9 @@ public partial class MainWindow : Window
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a power × speed test grid to find the right settings for a new material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
+        var colour = laser.Group("Colour on metal");
+        colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
+        colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
         job.Large("Ship It", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
@@ -1425,6 +1428,23 @@ public partial class MainWindow : Window
             _doc.Commit("Fit to camera", Ops.Transform(_doc.State, ids, move), ids);
         });
         await w.ShowDialog(this);
+    }
+
+    async Task AddColourTest()
+    {
+        var w = new ColourTestWindow(_settings.TextFont);
+        await w.ShowDialog(this);
+        if (w.Result is not { } o) return;
+        var (state, added) = Doc.Colour.ColourTest.Add(_doc.State, o);
+        _doc.Commit("Colour test", state, added);
+        Canvas.FitField();
+    }
+
+    async Task MeasureColours()
+    {
+        var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance);
+        await w.ShowDialog(this);
+        _layerEditor.RefreshMaterials();
     }
 
     async Task AddMaterialTest()

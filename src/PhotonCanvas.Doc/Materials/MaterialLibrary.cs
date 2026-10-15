@@ -118,6 +118,8 @@ public sealed record Material
     public double? ThicknessMm { get; init; }
     public string Notes { get; init; } = "";
     public ImmutableList<Recipe> Recipes { get; init; } = [];
+    /// <summary>Colours measured from colour tests on this material (MOPA on metal).</summary>
+    public ImmutableList<PhotonCanvas.Doc.Colour.ColourPalette> Palettes { get; init; } = [];
     public DateTime Updated { get; init; } = DateTime.Now;
 
     /// <summary>e.g. "Basswood 3 mm".</summary>

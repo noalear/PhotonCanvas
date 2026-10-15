@@ -1,0 +1,164 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Layout;
+using Avalonia.Media;
+using PhotonCanvas.Core;
+using PhotonCanvas.Doc;
+using PhotonCanvas.Doc.Colour;
+using static PhotonCanvas.App.UiKit;
+
+namespace PhotonCanvas.App;
+
+/// <summary>
+/// Makes a colour test grid for the MOPA laser on metal: one setting across, another down, the
+/// rest fixed. Burn it on the plate you'll use, then measure it (Laser → Measure colours) to
+/// see which colours that plate really gives.
+/// </summary>
+public sealed class ColourTestWindow : Window
+{
+    static readonly ColourParam[] Params = [ColourParam.Speed, ColourParam.LinesPerCm, ColourParam.Power, ColourParam.FrequencyKhz, ColourParam.PulseWidthNs];
+    static string[] ParamNames => Params.Select(ColourTest.Name).ToArray();
+
+    readonly ComboBox _across = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 0 };
+    readonly ComboBox _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 1 };
+    readonly NumericUpDown _aMin = Number(0, 15000, 10, "0.#"), _aMax = Number(0, 15000, 10, "0.#"), _aSteps = Number(1, 20, 1, "0");
+    readonly NumericUpDown _dMin = Number(0, 15000, 10, "0.#"), _dMax = Number(0, 15000, 10, "0.#"), _dSteps = Number(1, 20, 1, "0");
+    readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _speed = Number(2, 15000, 50, "0"), _lpcm = Number(10, 1000, 50, "0");
+    readonly NumericUpDown _freq = Number(1, 4000, 10, "0");
+    readonly ComboBox _pulse = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly NumericUpDown _cell = Number(2, 20, 0.5m, "0.#"), _gap = Number(0.5m, 10, 0.5m, "0.#");
+    readonly Control _powerRow, _speedRow, _lpcmRow, _freqRow, _pulseRow;
+    readonly TextBlock _summary = Hint();
+    readonly MachineProfile _machine = MachineProfile.F2Ultra;
+    readonly string _font;
+
+    /// <summary>The options chosen, or null if cancelled.</summary>
+    public ColourTestOptions? Result { get; private set; }
+
+    public ColourTestWindow(string font)
+    {
+        _font = font;
+        Title = "Colour test (MOPA)";
+        Width = 540;
+        SizeToContent = SizeToContent.Height;
+        CanResize = false;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Background = Brush("Bg1");
+
+        _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
+        _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == 30);
+        _power.Value = 40; _speed.Value = 800; _lpcm.Value = 600; _freq.Value = 300;
+        _cell.Value = 5; _gap.Value = 2;
+        _aSteps.Value = 8; _dSteps.Value = 8;
+        Defaults(_across, _aMin, _aMax);
+        Defaults(_down, _dMin, _dMax);
+        _across.SelectionChanged += (_, _) => { Defaults(_across, _aMin, _aMax); Update(); };
+        _down.SelectionChanged += (_, _) => { Defaults(_down, _dMin, _dMax); Update(); };
+        _pulse.SelectionChanged += (_, _) => Update();
+        foreach (var n in new[] { _aMin, _aMax, _aSteps, _dMin, _dMax, _dSteps, _power, _speed, _lpcm, _freq, _cell, _gap }) n.ValueChanged += (_, _) => Update();
+
+        _powerRow = Field("Power %", _power);
+        _speedRow = Field("Speed mm/s", _speed);
+        _lpcmRow = Field("Lines/cm", _lpcm, tip: "Fill line density. 1000 lines/cm = 0.01 mm apart, the finest this machine takes.");
+        _freqRow = Field("Frequency kHz", _freq, tip: "Brought down to the most the chosen pulse width allows.");
+        _pulseRow = Field("Pulse width", _pulse);
+
+        var add = new Button { Content = "Add to design", Classes = { "primary" }, IsDefault = true, MinWidth = 120 };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 100 };
+        add.Click += (_, _) => { Result = Options(); Close(); };
+        cancel.Click += (_, _) => Close();
+
+        Content = new Border
+        {
+            Padding = new Thickness(20),
+            Child = new StackPanel
+            {
+                Spacing = 10,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        TextWrapping = TextWrapping.Wrap,
+                        Text = "Colour on stainless steel and titanium comes from a thin oxide layer: its thickness, set by how much energy goes in, decides the colour. " +
+                               "This grid tries a range of settings on your plate so you can see, and measure, which colours it really gives.",
+                    },
+                    Row(Field2("Across", _across), Field2("from", _aMin), Field2("to", _aMax), Field2("steps", _aSteps)),
+                    Row(Field2("Down", _down), Field2("from", _dMin), Field2("to", _dMax), Field2("steps", _dSteps)),
+                    new TextBlock { Text = "THE REST", Classes = { "h" }, Margin = new(0, 6, 0, 0) },
+                    _powerRow, _speedRow, _lpcmRow, _freqRow, _pulseRow,
+                    Row(Field2("Square (mm)", _cell), Field2("Gap (mm)", _gap)),
+                    _summary,
+                    Hint("Focus on the plate first and keep that focus for everything you mark with these colours: a millimetre off changes them. " +
+                         "Use a clean, flat plate with the same finish as the real piece. The squares run from the least energy to the most."),
+                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, add } },
+                },
+            },
+        };
+        Update();
+    }
+
+    static Control Field2(string label, Control editor) => new StackPanel
+    {
+        Spacing = 2,
+        Children = { new TextBlock { Text = label, Classes = { "muted" }, FontSize = 12 }, editor },
+    };
+
+    static ColourParam Param(ComboBox c) => Params[Math.Max(0, c.SelectedIndex)];
+
+    /// <summary>A sensible starting range for a setting.</summary>
+    static void Defaults(ComboBox which, NumericUpDown min, NumericUpDown max)
+    {
+        (decimal a, decimal b) = Param(which) switch
+        {
+            ColourParam.Speed => (200m, 1600m),
+            ColourParam.LinesPerCm => (300m, 1000m),
+            ColourParam.Power => (20m, 80m),
+            ColourParam.FrequencyKhz => (100m, 1000m),
+            _ => (4m, 200m),
+        };
+        min.Value = a;
+        max.Value = b;
+    }
+
+    ColourTestOptions Options() => new()
+    {
+        Across = Param(_across),
+        AcrossMin = (double)(_aMin.Value ?? 0), AcrossMax = (double)(_aMax.Value ?? 0), AcrossSteps = (int)(_aSteps.Value ?? 1),
+        Down = Param(_down),
+        DownMin = (double)(_dMin.Value ?? 0), DownMax = (double)(_dMax.Value ?? 0), DownSteps = (int)(_dSteps.Value ?? 1),
+        Power = (double)(_power.Value ?? 40),
+        Speed = (double)(_speed.Value ?? 800),
+        LinesPerCm = (double)(_lpcm.Value ?? 600),
+        FrequencyKhz = (int)(_freq.Value ?? 300),
+        PulseWidthNs = _machine.Mopa[Math.Max(0, _pulse.SelectedIndex)].PulseWidthNs,
+        CellMm = (double)(_cell.Value ?? 5),
+        GapMm = (double)(_gap.Value ?? 2),
+        Font = _font,
+    };
+
+    void Update()
+    {
+        var o = Options();
+        // The swept settings come from the grid, so hide their fixed boxes.
+        var swept = new HashSet<ColourParam> { o.Across, o.Down };
+        _powerRow.IsVisible = !swept.Contains(ColourParam.Power);
+        _speedRow.IsVisible = !swept.Contains(ColourParam.Speed);
+        _lpcmRow.IsVisible = !swept.Contains(ColourParam.LinesPerCm);
+        _freqRow.IsVisible = !swept.Contains(ColourParam.FrequencyKhz);
+        _pulseRow.IsVisible = !swept.Contains(ColourParam.PulseWidthNs);
+        if (o.Across == o.Down)
+        {
+            _summary.Text = "⚠ Across and down need to be different settings.";
+            return;
+        }
+        var (after, ids) = ColourTest.Add(DocState.New(), o, _machine); // just the test, for its size and time
+        var set = ids.ToHashSet();
+        var b = after.Shapes.Where(x => set.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, x) => a.Union(x));
+        int n = ColourTest.Cells(after).Count;
+        bool fits = b.MaxX <= _machine.FieldW && b.MaxY <= _machine.FieldH;
+        string time = "";
+        try { time = $", about {Duration(JobBuilder.Build(after, new JobOptions { WholeJobPasses = false }).EstimateS)} to mark"; }
+        catch (JobException) { }
+        _summary.Text = $"{n} squares, {b.Width:0} × {b.Height:0} mm{time}." + (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.");
+    }
+}
