@@ -338,6 +338,7 @@ public partial class MainWindow : Window
                 Item("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), null, () => SelectedPaths().Count > 1),
                 Item("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), null, () => SelectedPaths().Count > 1),
                 new Separator(),
+                AsyncItem("Nest parts on material…", NestSel, "Ctrl+Alt+N", HasSel),
                 AsyncItem("Grid array…", () => ArraySel(circular: false), null, HasSel),
                 AsyncItem("Circular array…", () => ArraySel(circular: true), null, HasSel),
                 Item("Distribute horizontally (equal gaps)", () => DistributeSel(true), null, () => _doc.Selection.Count > 2),
@@ -594,6 +595,7 @@ public partial class MainWindow : Window
                 Do("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), paths.Count > 1),
                 Do("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), paths.Count > 1)),
             Sub("Array",
+                DoAsync("Nest on material…", NestSel),
                 DoAsync("Grid array…", () => ArraySel(circular: false)),
                 DoAsync("Circular array…", () => ArraySel(circular: true))),
             Sub("Align and distribute",
@@ -731,6 +733,12 @@ public partial class MainWindow : Window
         }
         _doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
         _layers.Activate(layer.Id);
+    }
+
+    async Task NestSel()
+    {
+        if (_doc.Selection.Count == 0) return;
+        await new NestWindow(_doc, _doc.Selection).ShowDialog(this);
     }
 
     void CenterSelInField()

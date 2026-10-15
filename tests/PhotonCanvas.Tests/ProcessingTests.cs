@@ -479,3 +479,95 @@ public class GrayscaleTests
         Assert.Contains("lightest grey", Assert.Throws<JobException>(() => JobBuilder.Build(bad, new())).Message);
     }
 }
+
+public class NestingTests
+{
+    static readonly MachineProfile M = MachineProfile.F2Ultra;
+
+    static (DocState S, List<Guid> Ids) Parts(params PathGeometry[] geos)
+    {
+        var s = DocState.New();
+        var shapes = geos.Select(g => (Shape)new PathShape { LayerId = s.Layers[0].Id, Geometry = g }).ToList();
+        return (Ops.AddShapes(s, shapes), shapes.Select(x => x.Id).ToList());
+    }
+
+    static void NoOverlaps(IEnumerable<Rect2> boxes, double gap)
+    {
+        var list = boxes.ToList();
+        for (int i = 0; i < list.Count; i++)
+            for (int j = i + 1; j < list.Count; j++)
+            {
+                var a = list[i]; var b = list[j];
+                bool apart = a.MaxX + gap <= b.MinX + 0.01 || b.MaxX + gap <= a.MinX + 0.01 || a.MaxY + gap <= b.MinY + 0.01 || b.MaxY + gap <= a.MinY + 0.01;
+                Assert.True(apart, $"{a} and {b} are closer than {gap} mm");
+            }
+    }
+
+    [Fact]
+    public void PacksPartsWithGapsInsideTheSheet()
+    {
+        var (s, ids) = Parts(Enumerable.Range(0, 6).Select(i => PathGeometry.Rect(150 + i, 150, 40, 30)).ToArray());
+        var sheet = PathGeometry.Rect(0, 0, 100, 100);
+        var (after, report) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = sheet, SpacingMm = 2, MarginMm = 2, RotationStepDeg = 90 }, M);
+        Assert.Equal((6, 0), (report.Placed, report.DidNotFit));
+        var boxes = ids.Select(id => after.FindShape(id)!.Bounds).ToList();
+        Assert.All(boxes, b => Assert.True(b.MinX >= 2 - 0.01 && b.MinY >= 2 - 0.01 && b.MaxX <= 98.01 && b.MaxY <= 98.01, $"{b} outside the margin"));
+        NoOverlaps(boxes, 2);
+    }
+
+    [Fact]
+    public void RotatesALongPartToFit()
+    {
+        var (s, ids) = Parts(PathGeometry.Rect(0, 0, 90, 10));
+        var tall = PathGeometry.Rect(0, 0, 40, 120);
+        Assert.Equal(1, Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = tall, RotationStepDeg = 0 }, M).Report.DidNotFit);
+        var (after, report) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = tall, RotationStepDeg = 90 }, M);
+        Assert.Equal(1, report.Placed);
+        var b = after.FindShape(ids[0])!.Bounds;
+        Assert.True(b.Height > 80 && b.Width < 15, $"{b}");
+    }
+
+    [Fact]
+    public void AvoidsShapesAlreadyOnTheSheetAndKeepsGroupsTogether()
+    {
+        var s = DocState.New();
+        var l = s.Layers[0].Id;
+        var obstacle = new PathShape { LayerId = l, Geometry = PathGeometry.Rect(0, 0, 60, 100) };
+        var g = Guid.NewGuid();
+        var a = new PathShape { LayerId = l, GroupId = g, Geometry = PathGeometry.Rect(150, 150, 20, 20) };
+        var b = new PathShape { LayerId = l, GroupId = g, Geometry = PathGeometry.Ellipse(185, 160, 5, 5) };
+        s = Ops.AddShapes(s, [obstacle, a, b]);
+        var (after, report) = Nesting.Nest(s, new HashSet<Guid> { a.Id, b.Id }, new NestOptions { Sheet = PathGeometry.Rect(0, 0, 100, 100), SpacingMm = 2 }, M);
+        Assert.Equal(1, report.Placed); // one group = one part
+        var na = after.FindShape(a.Id)!.Bounds; var nb = after.FindShape(b.Id)!.Bounds;
+        Assert.True(na.MinX >= 62 - 0.01, $"{na} overlaps the obstacle");
+        Assert.Equal(25, nb.Center.Dist(na.Center), 1); // still 25 mm apart, as grouped (it may have been turned)
+        Assert.Equal(after.FindShape(obstacle.Id)!.Bounds, obstacle.Bounds); // obstacle untouched
+    }
+
+    [Fact]
+    public void FillsTheSheetWithCopies()
+    {
+        var (s, ids) = Parts(PathGeometry.Rect(150, 150, 20, 20));
+        var (after, report) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = PathGeometry.Rect(0, 0, 100, 100), SpacingMm = 2, MarginMm = 2, FillSheet = true, RotationStepDeg = 0 }, M);
+        Assert.Equal(16, report.Placed); // 4 × 4 with 2 mm gaps in 96 × 96
+        Assert.Equal(15, report.Added.Count);
+        NoOverlaps(after.Shapes.Select(x => x.Bounds), 2);
+        var (_, three) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = PathGeometry.Rect(0, 0, 100, 100), Copies = 3 }, M);
+        Assert.Equal((3, 2), (three.Placed, three.Added.Count));
+    }
+
+    [Fact]
+    public void ReportsPartsThatDontFitAndUsesRoundSheets()
+    {
+        var (s, ids) = Parts(PathGeometry.Rect(0, 0, 150, 150), PathGeometry.Rect(0, 0, 20, 20));
+        var circle = PathGeometry.Ellipse(110, 110, 50, 50);
+        var (after, report) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = circle, MarginMm = 1 }, M);
+        Assert.Equal((1, 1), (report.Placed, report.DidNotFit));
+        Assert.Equal(ids[0], report.Unplaced.Single());
+        // The small square sits inside the circle.
+        var b = after.FindShape(ids[1])!.Bounds;
+        foreach (var corner in new[] { new Vec2(b.MinX, b.MinY), new Vec2(b.MaxX, b.MinY), new Vec2(b.MinX, b.MaxY), new Vec2(b.MaxX, b.MaxY) })
+            Assert.True(corner.Dist(new Vec2(110, 110)) <= 50, $"{corner} is outside the circle");
+    }
+}
