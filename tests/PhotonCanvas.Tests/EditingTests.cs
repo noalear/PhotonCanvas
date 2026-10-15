@@ -269,3 +269,42 @@ public class FrameTests
         Assert.InRange(top + bottom, bmp.Height - 6, bmp.Height + 4);
     }
 }
+
+public class ShapeLibraryTests
+{
+    [Fact]
+    public void EveryBuiltInShapeDrawsAndFitsItsBox()
+    {
+        var all = ShapeLibrary.BuiltIn;
+        Assert.True(all.Count >= 50, $"{all.Count} shapes");
+        Assert.Equal(all.Count, all.Select(s => s.Name).Distinct().Count());
+        Assert.All(all, s =>
+        {
+            Assert.False(s.Geometry.IsEmpty, s.Name);
+            var b = s.Geometry.Bounds(0.05);
+            if (!s.RealSize) Assert.InRange(Math.Max(b.Width, b.Height), 99.5, 100.5);
+            Assert.True(b.MinX > -0.5 && b.MinY > -0.5, $"{s.Name} at {b}");
+        });
+        Assert.Contains(ShapeLibrary.UserCategory, ShapeLibrary.Categories);
+    }
+
+    [Fact]
+    public void SavesAndLoadsTheUsersShapes()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "photoncanvas-shapes-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var s = DocState.New();
+            var shapes = new[] { new PathShape { LayerId = s.Layers[0].Id, Geometry = PathGeometry.Rect(10, 10, 40, 20) }, new PathShape { LayerId = s.Layers[0].Id, Geometry = PathGeometry.Ellipse(80, 20, 10, 10) } };
+            var f1 = ShapeLibrary.SaveUser(dir, "My/badge?", shapes);
+            var f2 = ShapeLibrary.SaveUser(dir, "My/badge?", shapes);
+            Assert.NotEqual(f1, f2); // never overwrites
+            var mine = ShapeLibrary.LoadUser(dir);
+            Assert.Equal(2, mine.Count);
+            Assert.All(mine, m => { Assert.True(m.IsUser); Assert.Equal(2, m.Geometry.Subpaths.Length); Assert.Equal(100, m.Geometry.Bounds(0.05).Width, 0); });
+            File.WriteAllText(Path.Combine(dir, "broken" + DocFile.Extension), "nope");
+            Assert.Equal(2, ShapeLibrary.LoadUser(dir).Count);
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+}

@@ -41,6 +41,7 @@
         <ToggleButton x:Name="ToolPen" Classes="tool" ToolTip.Tip="Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish"><PathIcon Data="{StaticResource IcPen}" /></ToggleButton>
         <ToggleButton x:Name="ToolText" Classes="tool" ToolTip.Tip="Text (T) · click where the text should go"><PathIcon Data="{StaticResource IcText}" /></ToggleButton>
         <ToggleButton x:Name="ToolNodes" Classes="tool" ToolTip.Tip="Edit points (N, or double-click a shape) · drag points and handles · double-click an edge to add · Delete removes · S = smooth/sharp"><PathIcon Data="{StaticResource IcNodes}" /></ToggleButton>
+        <Button x:Name="ShapesButton" Classes="icon" ToolTip.Tip="Shape library (I) · hearts, stars, badges, frames, living hinges and your own saved shapes"><PathIcon Data="{StaticResource IcHeart}" /></Button>
         <ToggleButton x:Name="ToolWand" Classes="tool" ToolTip.Tip="Pick piece from camera (W) · click inside a piece on the camera picture to outline it"><PathIcon Data="{StaticResource IcWand}" /></ToggleButton>
         <ToggleButton x:Name="ToolMagnetic" Classes="tool" ToolTip.Tip="Magnetic pen (M) · click along an edge on the camera picture; the line hugs the edge between clicks"><PathIcon Data="{StaticResource IcLasso}" /></ToggleButton>
         <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>

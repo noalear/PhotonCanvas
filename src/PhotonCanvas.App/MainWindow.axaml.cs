@@ -92,6 +92,7 @@ public partial class MainWindow : Window
         };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Canvas.ContextRequested += (_, e) => { e.Handled = true; OpenCanvasMenu(); };
+        ShapesButton.Click += (_, _) => ShowShapes();
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
         Opened += async (_, _) =>
@@ -398,6 +399,7 @@ public partial class MainWindow : Window
             Header = "_Tools",
             Items =
             {
+                Item("Shape library…", ShowShapes, "I"),
                 AsyncItem("Material library…", ShowLibrary),
                 AsyncItem("Material test…", AddMaterialTest),
                 AsyncItem("Record material test results…", RecordTestResults),
@@ -518,6 +520,7 @@ public partial class MainWindow : Window
             (false, false, Key.N) => () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; },
             (false, false, Key.H) => () => Canvas.Tool = Tool.Pan,
             (false, false, Key.W) => () => Canvas.Tool = Tool.Wand,
+            (false, false, Key.I) => ShowShapes,
             (false, false, Key.M) => () => Canvas.Tool = Tool.Magnetic,
             _ => null,
         };
@@ -626,6 +629,7 @@ public partial class MainWindow : Window
             DoAsync("Remove picture background…", () => picture is not null ? RemoveBackground(picture) : Task.CompletedTask, picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
+            Do("Save to My shapes…", ShowShapes, paths.Count > 0),
         ];
     }
 
@@ -734,6 +738,38 @@ public partial class MainWindow : Window
         _doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
         _layers.Activate(layer.Id);
     }
+
+    ShapeLibraryWindow? _shapesWindow;
+    string ShapesFolder => Path.Combine(AppIdentity.DataDir, "shapes");
+
+    /// <summary>The shape library (one window, brought forward if already open).</summary>
+    void ShowShapes()
+    {
+        if (_shapesWindow is { } open) { open.Activate(); return; }
+        var w = new ShapeLibraryWindow(ShapesFolder, InsertLibraryShape,
+            () => _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList());
+        w.Closed += (_, _) => _shapesWindow = null;
+        _shapesWindow = w;
+        w.Show(this);
+    }
+
+    /// <summary>Add a library shape in the middle of the work area (40 mm across unless it has a real size), on the drawing layer.</summary>
+    void InsertLibraryShape(LibraryShape item)
+    {
+        var layer = _doc.State.FindLayer(_doc.ActiveLayer) is { Visible: true, Locked: false } l && l.Mode != LayerMode.Image ? l
+            : _doc.State.Layers.FirstOrDefault(x => x.Visible && !x.Locked && x.Mode != LayerMode.Image);
+        if (layer is null) return;
+        var g = item.Geometry;
+        if (!item.RealSize) g = ShapeLibrary.Fit(g, 40);
+        var b = g.Bounds(0.01);
+        var field = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH);
+        // Stagger repeated adds so they don't stack exactly.
+        double nudge = 6 * (_insertCount++ % 6);
+        var shape = new PathShape { Name = item.Name, LayerId = layer.Id, Geometry = g, Transform = Affine.Translate(field.Center - b.Center + new Vec2(nudge, nudge)) };
+        _doc.Commit($"Add {item.Name}", Ops.AddShapes(_doc.State, [shape]), [shape.Id]);
+    }
+
+    int _insertCount;
 
     async Task NestSel()
     {
