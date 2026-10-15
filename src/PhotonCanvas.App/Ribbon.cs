@@ -19,6 +19,7 @@ public sealed class Ribbon : UserControl
     readonly StackPanel _tabStrip = new() { Orientation = Orientation.Horizontal, Spacing = 0 };
     readonly ContentControl _body = new();
     readonly Border _bodyBorder;
+    readonly DockPanel _bodyDock = new();
     readonly DockPanel _header = new();
     readonly List<RibbonTab> _tabs = [];
     readonly List<(Control Control, Func<bool> Enabled)> _conditional = [];
@@ -33,13 +34,14 @@ public sealed class Ribbon : UserControl
             Background = Brush("Bg2"),
             BorderBrush = Brush("Line"),
             BorderThickness = new(0, 1, 0, 1),
-            Child = new ScrollViewer
-            {
-                Content = _body,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            },
+            Child = _bodyDock,
         };
+        _bodyDock.Children.Add(new ScrollViewer
+        {
+            Content = _body,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+        });
         DockPanel.SetDock(_tabStrip, Dock.Left);
         _header.Children.Add(_tabStrip);
         var root = new DockPanel { Background = Brush("Bg1") };
@@ -55,6 +57,14 @@ public sealed class Ribbon : UserControl
         c.Margin = new(6, 3, 8, 3);
         DockPanel.SetDock(c, Dock.Left);
         _header.Children.Insert(0, c);
+    }
+
+    /// <summary>Something always shown at the right end of the ribbon, whichever tab is open (the machine).</summary>
+    public void SetBodyTrail(Control c)
+    {
+        var holder = new Border { BorderBrush = Brush("Line"), BorderThickness = new(1, 0, 0, 0), Margin = new(0, 4), Padding = new(8, 0, 6, 0), Child = c };
+        DockPanel.SetDock(holder, Dock.Right);
+        _bodyDock.Children.Insert(0, holder);
     }
 
     /// <summary>Controls at the right end of the tab row (undo, redo, settings, help).</summary>

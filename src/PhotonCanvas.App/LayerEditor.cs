@@ -11,7 +11,7 @@ using static PhotonCanvas.App.UiKit;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// A layer's settings, shown inside the active layer's card in the layer list: what the
+/// The active layer's settings (bottom of the right column): what the
 /// laser does, with which source, how hard and how fast, then the material it is for.
 /// The rarely changed settings fold away under "More". Editing several selected layers
 /// changes them all; values that differ show as "mixed".
@@ -25,6 +25,8 @@ public sealed class LayerEditor : UserControl
     bool _updating;
 
     readonly TextBlock _several = new() { Classes = { "hint" }, IsVisible = false };
+    readonly TextBlock _title = new() { Classes = { "h" }, Margin = new(0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly Border _swatch = new() { Width = 4, Height = 14, CornerRadius = new(2), Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     readonly Segmented _mode = new(("Cut", "IcCut"), ("Score", "IcLine"), ("Engrave", "IcPreview"), ("Picture", "IcImage"));
     readonly Segmented _light = new(("Diode · blue", null), ("Fiber · red", null));
     readonly NumericUpDown _power = Num(0, 100, 1, "0.#"), _speed = Num(2, 15000, 5, "0.#"), _passes = Num(1, 10000, 1, "0");
@@ -171,6 +173,7 @@ public sealed class LayerEditor : UserControl
             Spacing = 8,
             Children =
             {
+                new StackPanel { Orientation = Orientation.Horizontal, Children = { _swatch, _title } },
                 _several,
                 _mode,
                 _light,
@@ -251,6 +254,10 @@ public sealed class LayerEditor : UserControl
         if (ls.Count == 0) return;
         _several.Text = $"Editing {ls.Count} layers together. Values that differ show as “mixed”.";
         _several.IsVisible = ls.Count > 1;
+        _title.Text = ls.Count == 1 ? $"LAYER · {ls[0].Name.ToUpperInvariant()}" : $"{ls.Count} LAYERS";
+        var c = ls[0].Color;
+        _swatch.Background = new SolidColorBrush(Color.FromRgb((byte)(c >> 16), (byte)(c >> 8), (byte)c));
+        _swatch.IsVisible = ls.Count == 1;
         RefreshMaterial();
 
         T? Same<T>(Func<Layer, T> f) where T : struct

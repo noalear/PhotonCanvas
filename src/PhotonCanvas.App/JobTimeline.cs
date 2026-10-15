@@ -130,25 +130,27 @@ public sealed class JobTimeline : Control
         {
             bool hot = seg.Layer is { } id && id == _hover;
             var c = seg.Colour;
-            double alpha = seg.Layer is null ? 1 : hot ? 1 : 0.78;
-            if (_progress is not null && r.X >= done) alpha *= 0.35;
-            ctx.DrawRectangle(new SolidColorBrush(c, alpha), null, r, 4, 4);
+            // A tint of the layer's colour with a solid edge: readable, and calm next to the rest of the UI.
+            double alpha = seg.Layer is null ? 0.6 : hot ? 0.42 : 0.26;
+            if (_progress is not null && r.X >= done) alpha *= 0.5;
+            ctx.DrawRectangle(new SolidColorBrush(c, alpha), new Pen(new SolidColorBrush(c, hot ? 0.9 : 0.55), 1), r.Deflate(0.5), 4, 4);
+            if (seg.Layer is not null)
+                ctx.DrawRectangle(new SolidColorBrush(c), null, new Rect(r.X, r.Y, Math.Min(3, r.Width), r.Height), 2, 2);
             if (_progress is not null && r.X < done && r.Right > done)
                 ctx.DrawRectangle(new SolidColorBrush(Color.Parse("#990E1014")), null, new Rect(done, r.Y, r.Right - done, r.Height), 0, 0);
             if (seg.Layer == _active && seg.Layer is not null)
-                ctx.DrawRectangle(Brushes.White, null, new Rect(r.X + 2, r.Bottom - 3, Math.Max(1, r.Width - 4), 2), 1, 1);
+                ctx.DrawRectangle(new SolidColorBrush(Color.Parse("#E7E9EE"), 0.85), null, new Rect(r.X + 4, r.Bottom - 3, Math.Max(1, r.Width - 6), 1.5), 1, 1);
             if (seg.NewRound) // a notch between rounds
                 ctx.DrawRectangle(new SolidColorBrush(Color.Parse("#8F98A6")), null, new Rect(r.X - 5.5, r.Y + 6, 2, r.Height - 12), 1, 1);
             if (seg.Label.Length == 0 || r.Width < 26) continue;
-            double lum = (0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B) / 255;
-            var ink = lum > 0.6 ? Color.Parse("#14171C") : Colors.White;
+            var ink = Color.Parse("#E7E9EE");
             var t = new FormattedText(seg.Label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, 11, new SolidColorBrush(ink))
-            { MaxTextWidth = r.Width - 8, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
+            { MaxTextWidth = r.Width - 10, MaxLineCount = 1, Trimming = TextTrimming.CharacterEllipsis };
             if (t.Width < 4) continue;
-            ctx.DrawText(t, new Point(r.X + 4, r.Y + (r.Height - t.Height) / 2));
+            ctx.DrawText(t, new Point(r.X + 7, r.Y + (r.Height - t.Height) / 2));
         }
         if (_progress is not null)
-            ctx.DrawRectangle(Brushes.White, null, new Rect(Math.Min(done, area.Width - 2), -1, 2, area.Height + 2));
+            ctx.DrawRectangle(new SolidColorBrush(Color.Parse("#E7E9EE")), null, new Rect(Math.Min(done, area.Width - 2), -1, 2, area.Height + 2));
     }
 
     Seg? At(Point p) => _laid.FirstOrDefault(x => x.Rect.Contains(p)).Seg;

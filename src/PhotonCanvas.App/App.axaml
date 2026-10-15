@@ -15,10 +15,21 @@
       <SolidColorBrush x:Key="Line" Color="#2C323D" />
       <SolidColorBrush x:Key="TextMain" Color="#E7E9EE" />
       <SolidColorBrush x:Key="TextMuted" Color="#8F98A6" />
-      <SolidColorBrush x:Key="Accent" Color="#4F8CFF" />
-      <SolidColorBrush x:Key="Warn" Color="#F5A524" />
-      <SolidColorBrush x:Key="Danger" Color="#F25555" />
-      <SolidColorBrush x:Key="Ok" Color="#2FC27A" />
+      <SolidColorBrush x:Key="Accent" Color="#4C7BD9" />
+      <SolidColorBrush x:Key="AccentDeep" Color="#2F5DB3" />
+      <SolidColorBrush x:Key="AccentSoft" Color="#22324F" />
+      <SolidColorBrush x:Key="AccentLine" Color="#3E5F99" />
+      <!-- The theme's own accent (check boxes, sliders, focus) matches ours rather than the Windows accent. -->
+      <Color x:Key="SystemAccentColor">#4C7BD9</Color>
+      <Color x:Key="SystemAccentColorDark1">#4170C9</Color>
+      <Color x:Key="SystemAccentColorDark2">#3763B8</Color>
+      <Color x:Key="SystemAccentColorDark3">#2F5DB3</Color>
+      <Color x:Key="SystemAccentColorLight1">#5C88DE</Color>
+      <Color x:Key="SystemAccentColorLight2">#6E96E3</Color>
+      <Color x:Key="SystemAccentColorLight3">#82A4E8</Color>
+      <SolidColorBrush x:Key="Warn" Color="#D6A24A" />
+      <SolidColorBrush x:Key="Danger" Color="#C9554E" />
+      <SolidColorBrush x:Key="Ok" Color="#4FAF83" />
 
       <!-- Icons: 24×24, filled (even-odd) -->
       <StreamGeometry x:Key="IcEye">M12 5C6.5 5 2.7 9.2 1.5 12c1.2 2.8 5 7 10.5 7s9.3-4.2 10.5-7C21.3 9.2 17.5 5 12 5zM12 16.5A4.5 4.5 0 1 1 12 7.5a4.5 4.5 0 0 1 0 9zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z</StreamGeometry>
@@ -119,7 +130,9 @@
       <Setter Property="Background" Value="{StaticResource Accent}" />
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="{StaticResource AccentDeep}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="FontWeight" Value="SemiBold" />
       <Setter Property="HorizontalAlignment" Value="Stretch" />
@@ -147,13 +160,13 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ToggleButton.rb:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#24406E" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
     <Style Selector="ToggleButton.rb:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2D4F86" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="#2A3D5F" />
+      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
     </Style>
     <Style Selector="Button.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -201,13 +214,13 @@
       <Setter Property="CornerRadius" Value="0,6,6,0" />
     </Style>
     <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#24406E" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
     <Style Selector="ToggleButton.seg:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2D4F86" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="#2A3D5F" />
+      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
 

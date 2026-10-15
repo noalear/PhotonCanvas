@@ -10,10 +10,10 @@ using static PhotonCanvas.App.UiKit;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// The machine, where you look while setting up a job: a floating panel in the corner of the
-/// work area. Status at a glance (click it to connect, or for machine settings), then the
-/// things you reach for at the machine: the camera picture and live view, the lights,
-/// auto-focus and the focus height (nudge it or type it). Folds down to just the status.
+/// The machine, at the right end of the ribbon whichever tab is open: status at a glance
+/// (click it to connect, or for machine settings), then the things you reach for at the
+/// machine: the camera picture and live view, the lights, auto-focus and the focus height
+/// (nudge it or type it). Only the status and Connect show while disconnected.
 /// </summary>
 public sealed class MachineHud : UserControl
 {
@@ -22,8 +22,9 @@ public sealed class MachineHud : UserControl
     readonly Border _dot = new() { Width = 9, Height = 9, CornerRadius = new(5), VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock _status = new() { FontSize = 12.5, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
     readonly Button _pill = new() { Classes = { "chip" }, Padding = new(10, 4) };
-    readonly Button _fold = new() { Classes = { "icon" }, MinWidth = 24, MinHeight = 24, Padding = new(2) };
     readonly StackPanel _body;
+    readonly StackPanel _cameraRow;
+    string? _note; // shown in place of the status while the head moves, or after a focus error
 
     readonly Button _photo, _focus;
     readonly ToggleButton _camera = new() { Classes = { "rb" } }, _live = new() { Classes = { "rb" } };
@@ -32,16 +33,12 @@ public sealed class MachineHud : UserControl
     readonly Slider _front = new() { Minimum = 0, Maximum = 100, Width = 160 }, _back = new() { Minimum = 0, Maximum = 100, Width = 160 };
     readonly NumericUpDown _height = Number(0, 150, 0.5m, "0.0");
     readonly Button _up, _down;
-    readonly TextBlock _focusNote = new() { Classes = { "hint" }, MaxWidth = 230, IsVisible = false };
     readonly Button _connect = new() { Classes = { "chip" }, Content = "Connect", Margin = new(6, 0, 0, 0) };
     readonly DispatcherTimer _focusDelay = new() { Interval = TimeSpan.FromMilliseconds(700) };
     bool _updating, _pending;
 
     /// <summary>Open machine settings.</summary>
     public event Action? SettingsRequested;
-
-    /// <summary>The controls were folded or shown.</summary>
-    public event Action? FoldChanged;
 
     /// <summary>Calibrate the camera.</summary>
     public event Action? CalibrateRequested;
@@ -66,16 +63,13 @@ public sealed class MachineHud : UserControl
     {
         _m = machine;
         _settings = settings;
-        HorizontalAlignment = HorizontalAlignment.Right;
-        VerticalAlignment = VerticalAlignment.Top;
-        Margin = new(0, 12, 12, 0);
+        VerticalAlignment = VerticalAlignment.Stretch;
 
         // ---- status ----
         _pill.Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Children = { _dot, _status } };
         _pill.Click += (_, _) => PillMenu().Open(_pill);
         _connect.Click += async (_, _) => await _m.ConnectNowAsync();
         ToolTip.SetTip(_connect, "Connect to the last machine, or the one found on the network.");
-        _fold.Click += (_, _) => { _settings.MachineHudFolded = !_settings.MachineHudFolded; _settings.Save(); Update(); FoldChanged?.Invoke(); };
 
         // ---- camera ----
         _photo = Tip(new Button { Classes = { "rb" }, Content = IconLabel("IcCamera", "Photo") }, "Take a new photo of the bed and lay it under your design.");
@@ -153,34 +147,29 @@ public sealed class MachineHud : UserControl
             {
                 new TextBlock { Text = "Focus", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(4, 0, 4, 0) },
                 _down, _height, _up,
-                new TextBlock { Text = "mm", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(2, 0, 6, 0) },
-                _focus,
+                new TextBlock { Text = "mm", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(2, 0, 0, 0) },
             },
         };
-        _body = new StackPanel
-        {
-            Spacing = 4, Margin = new(0, 6, 0, 0),
-            Children =
-            {
-                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _photo, _camera, _live, _lights } },
-                focusRow,
-                _focusNote,
-            },
-        };
-        var head = new DockPanel { Children = { _fold, _connect, _pill } };
-        DockPanel.SetDock(_fold, Dock.Right);
-        DockPanel.SetDock(_connect, Dock.Right);
-        _fold.Margin = new(6, 0, 0, 0);
-        Content = new Border { Classes = { "hud" }, Child = new StackPanel { Children = { head, _body } } };
+        _cameraRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _photo, _camera, _live, _lights } };
+        _body = focusRow;
+        // Three narrow rows: status (and auto-focus), camera and lights, focus height.
+        var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _pill, _connect, _focus } };
+        _connect.Margin = new(0);
+        _status.MaxWidth = 170;
+        _status.TextTrimming = TextTrimming.CharacterEllipsis;
+        var grid = new Grid { RowDefinitions = new("Auto,Auto,Auto"), Margin = new(0, 4, 0, 2), RowSpacing = 4, VerticalAlignment = VerticalAlignment.Center };
+        grid.Children.Add(top);
+        Grid.SetRow(_cameraRow, 1);
+        grid.Children.Add(_cameraRow);
+        Grid.SetRow(_body, 2);
+        grid.Children.Add(_body);
+        Content = grid;
 
         _m.StateChanged += Update;
         _m.ConnectionChanged += Update;
         _m.ModeChanged += _ => Update();
         Update();
     }
-
-    /// <summary>Show or fold the controls after the setting changed elsewhere.</summary>
-    public void Refold() => Update();
 
     ContextMenu PillMenu()
     {
@@ -219,8 +208,8 @@ public sealed class MachineHud : UserControl
         double from = _height.Value is { } v ? (double)v : _m.Distance ?? 0;
         _height.Value = (decimal)Math.Clamp(Math.Round(from + mm, 1), 0, 150);
         _pending = true;
-        _focusNote.Text = $"Moving to {_height.Value:0.0} mm…";
-        _focusNote.IsVisible = true;
+        _note = $"Moving to {_height.Value:0.0} mm…";
+        Update();
         _focusDelay.Stop();
         _focusDelay.Start();
     }
@@ -230,11 +219,12 @@ public sealed class MachineHud : UserControl
         _focusDelay.Stop();
         _pending = false;
         if (_m.Distance is { } d && Math.Abs(d - mm) < 0.05) { Update(); return; }
-        _focusNote.Text = $"Moving the head to {mm:0.0} mm…";
-        _focusNote.IsVisible = true;
+        _note = $"Moving to {mm:0.0} mm…";
+        Update();
         var error = await _m.MoveFocusAsync(mm);
-        _focusNote.Text = error ?? "";
-        _focusNote.IsVisible = error is not null;
+        _note = error;
+        // An error stays up for a while, then the status comes back.
+        if (error is not null) DispatcherTimer.RunOnce(() => { if (_note == error) { _note = null; Update(); } }, TimeSpan.FromSeconds(8));
         Update();
     }
 
@@ -246,22 +236,21 @@ public sealed class MachineHud : UserControl
             bool on = _m.IsConnected;
             string mode = _m.Mode;
             var (colour, text) = !on ? ("#6B7380", "Not connected")
-                : mode is "P_WORKING" ? ("#4F8CFF", "Running")
-                : mode is "P_PAUSE" or "P_WORK" ? ("#F5A524", _m.ModeText)
-                : _m.IsFraming ? ("#F5A524", "Framing")
-                : mode is "P_ERROR" or "P_SLEEP" ? ("#F25555", _m.ModeText)
-                : ("#2FC27A", _m.ModeText);
+                : mode is "P_WORKING" ? ("#4C7BD9", "Running")
+                : mode is "P_PAUSE" or "P_WORK" ? ("#D6A24A", _m.ModeText)
+                : _m.IsFraming ? ("#D6A24A", "Framing")
+                : mode is "P_ERROR" or "P_SLEEP" ? ("#C9554E", _m.ModeText)
+                : ("#4FAF83", _m.ModeText);
             _dot.Background = new SolidColorBrush(Color.Parse(colour));
-            _status.Text = on ? $"F2 Ultra · {text}" : text;
-            ToolTip.SetTip(_pill, on ? "Click to disconnect, calibrate the camera or open machine settings." : "Click to connect (or for machine settings).");
+            if (!on) _note = null;
+            _status.Text = _note ?? (on ? $"F2 Ultra · {text}" : text);
+            ToolTip.SetTip(_pill, (_note is { } n ? n + "\n\n" : "") +
+                (on ? "Click to disconnect, calibrate the camera or open machine settings." : "Click to connect (or for machine settings)."));
 
-            // Not connected: just the status and Connect. Connected: the controls, unless folded away.
-            bool folded = _settings.MachineHudFolded;
-            _body.IsVisible = on && !folded;
-            _fold.IsVisible = on;
+            // Not connected: just the status and Connect.
+            _body.IsVisible = _cameraRow.IsVisible = on;
             _connect.IsVisible = !on;
-            _fold.Content = new TextBlock { Text = folded ? "▾" : "▴", FontSize = 13, HorizontalAlignment = HorizontalAlignment.Center };
-            ToolTip.SetTip(_fold, folded ? "Show the camera, light and focus controls" : "Fold the machine controls away");
+            _focus.IsVisible = on;
 
             bool idle = on && mode is "P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "";
             _photo.IsEnabled = on && _m.HasCalibration;

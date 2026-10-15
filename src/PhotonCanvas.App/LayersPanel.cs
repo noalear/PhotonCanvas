@@ -271,13 +271,7 @@ public sealed class LayersPanel : UserControl
         Grid.SetColumn(lck, 4); top.Children.Add(lck);
 
         // What it does, at a glance: mode, material, power/speed/passes, time.
-        var (modeText, modeColour) = l.Mode switch
-        {
-            LayerMode.Cut => ("CUT", "#F25555"),
-            LayerMode.Score => ("SCORE", "#F5A524"),
-            LayerMode.Fill => ("ENGRAVE", "#4F8CFF"),
-            _ => ("PICTURE", "#B07CFF"),
-        };
+        var (modeText, modeColour) = ModeLook(l.Mode);
         var pill = new Border
         {
             CornerRadius = new(4), Padding = new(5, 1), VerticalAlignment = VerticalAlignment.Center,
@@ -330,7 +324,7 @@ public sealed class LayersPanel : UserControl
         // Buttons and the colour bar handle their own presses, so this only fires on the card itself.
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
         row.ContextRequested += (_, e) => { e.Handled = true; RowMenu(l).Open(row); };
-        if (active && _selected.Count == 1)
+        if (active && _selected.Count == 1 && _editor is not null)
             ToolTip.SetTip(row, open ? "Click to fold the settings away" : "Click to show this layer's settings");
         return row;
     }
@@ -523,6 +517,15 @@ public sealed class LayersPanel : UserControl
         foreach (var c in ShapeActions?.Invoke(targets) ?? []) menu.Items.Add(c);
         return menu;
     }
+
+    /// <summary>The label and its colour for a layer's mode (muted tones, for chips).</summary>
+    public static (string Text, string Colour) ModeLook(LayerMode m) => m switch
+    {
+        LayerMode.Cut => ("CUT", "#D97A6C"),
+        LayerMode.Score => ("SCORE", "#CFA55A"),
+        LayerMode.Fill => ("ENGRAVE", "#7C9FD4"),
+        _ => ("PICTURE", "#A592CF"),
+    };
 
     static IBrush Res(string key) => (IBrush)Application.Current!.FindResource(key)!;
 

@@ -65,7 +65,6 @@ public partial class MainWindow : Window
         _layerEditor = new LayerEditor(_doc, _layers, _settings) { Library = _library };
         _layerEditor.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
         _layerEditor.LibraryRequested += () => _ = Guard(ShowLibrary);
-        _layers.Editor = _layerEditor;
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
@@ -73,12 +72,11 @@ public partial class MainWindow : Window
         _hud = new MachineHud(_machine, _settings);
         _hud.SettingsRequested += () => _ = Guard(() => ShowSettings("Machine"));
         _hud.CalibrateRequested += () => _ = Guard(_machine.CalibrateAsync);
-        _hud.FoldChanged += () => _ribbon.Refresh();
-        _hud.FoldChanged += () => _ribbon.Refresh();
         LayersHost.Content = _layers;
         InspectorHost.Content = _props;
         JobHost.Content = _job;
-        HudHost.Content = _hud;
+        LayerSettingsHost.Content = _layerEditor;
+        _ribbon.SetBodyTrail(_hud);
         RibbonHost.Content = _ribbon;
 
         BuildRibbon();
@@ -136,7 +134,7 @@ public partial class MainWindow : Window
         if (_doc.InEdit) return;
         int n = _doc.State.Shapes.Count, sel = _doc.Selection.Count;
         StatusText.Text = sel > 0 ? $"{sel} of {n} shapes selected" : n == 0
-            ? "Draw with the Home tab, or drag a file in (SVG, DXF, PDF, pictures). New material? Laser → Material test."
+            ? "Draw with the Home tab, or drag a file in (SVG, DXF, PDF, pictures). New material? Laser → Test grid."
             : $"{n} shapes · {_doc.State.Layers.Count} layers";
         _ribbon.Refresh();
         _ribbon.Highlight("Picture", SelectedPicture() is not null);
@@ -308,8 +306,8 @@ public partial class MainWindow : Window
         _recentMenu = new MenuItem { Header = "Open recent" };
         var file = new Button
         {
-            Content = "File", Background = UiKit.Brush("Accent"), Foreground = Avalonia.Media.Brushes.White,
-            FontWeight = Avalonia.Media.FontWeight.SemiBold, Padding = new(14, 4), CornerRadius = new(5),
+            Content = "File", Background = UiKit.Brush("Bg3"), BorderBrush = UiKit.Brush("Line"), BorderThickness = new(1),
+            FontWeight = Avalonia.Media.FontWeight.SemiBold, Padding = new(14, 3), CornerRadius = new(5),
         };
         file.Flyout = new MenuFlyout
         {
@@ -492,7 +490,6 @@ public partial class MainWindow : Window
         grid.SmallToggle("Snap to grid", "IcGrid", on => { _settings.SnapToGrid = on; SaveAndApplyGrid(); }, "Snap to the grid's minor lines", null, () => _settings.SnapToGrid);
         grid.Small("Grid settings…", "IcSettings", () => _ = Guard(ShowGridSettings), "Grid spacing and colours, snap distance (Ctrl+')");
         var panels = view.Group("Show");
-        panels.SmallToggle("Machine controls", "IcPlug", on => { _settings.MachineHudFolded = !on; _settings.Save(); _hud.Refold(); }, "The camera, light and focus controls on the work area", null, () => !_settings.MachineHudFolded);
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
 
         _ribbon.Select(_settings.RibbonTab);

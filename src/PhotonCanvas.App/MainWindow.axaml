@@ -18,10 +18,7 @@
       </StackPanel>
     </Border>
 
-    <!-- The job, always in view -->
-    <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
-
-    <Grid ColumnDefinitions="310,4,*,4,280">
+    <Grid ColumnDefinitions="280,4,*,4,300">
       <!-- Layers, each with its settings -->
       <Border Grid.Column="0" Background="{StaticResource Bg1}" Padding="10,10,6,0">
         <ContentControl x:Name="LayersHost" />
@@ -61,17 +58,24 @@
             <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
           </StackPanel>
         </Border>
-        <Panel>
-          <app:CanvasView x:Name="Canvas" />
-          <ContentControl x:Name="HudHost" HorizontalAlignment="Right" VerticalAlignment="Top" />
-        </Panel>
+        <!-- The job, always in view under the work area -->
+        <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
+        <app:CanvasView x:Name="Canvas" />
       </DockPanel>
 
       <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
-      <!-- What's selected -->
-      <Border Grid.Column="4" Background="{StaticResource Bg1}" Padding="10,10,10,0">
-        <ContentControl x:Name="InspectorHost" />
-      </Border>
+      <!-- What's selected (top) and how its layer is processed (bottom) -->
+      <Grid Grid.Column="4" RowDefinitions="*,4,*" Background="{StaticResource Bg1}">
+        <Border Grid.Row="0" Padding="10,10,10,0">
+          <ContentControl x:Name="InspectorHost" />
+        </Border>
+        <GridSplitter Grid.Row="1" Background="{StaticResource Line}" ResizeDirection="Rows" />
+        <Border Grid.Row="2" Padding="10,10,10,0">
+          <ScrollViewer>
+            <ContentControl x:Name="LayerSettingsHost" Margin="0,0,0,10" />
+          </ScrollViewer>
+        </Border>
+      </Grid>
     </Grid>
   </DockPanel>
 </Window>

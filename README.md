@@ -52,7 +52,7 @@ machine's start button.
    it at xTool Studio's `resources\app.asar`, or paste them in; each one is checked
    against a fingerprint. Don't have xTool Studio? Install it, run the setup once, then
    uninstall it.
-4. Turn the laser on. PhotonCanvas finds and connects to it (status at the top right of the work area); the first time, press
+4. Turn the laser on. PhotonCanvas finds and connects to it (its status shows at the right end of the ribbon); the first time, press
    the machine's button to allow this computer.
 
 The ? menu at the top right → Getting started shows the short tour again.

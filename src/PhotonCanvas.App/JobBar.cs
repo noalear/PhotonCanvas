@@ -30,7 +30,7 @@ public sealed class JobBar : UserControl
     readonly ComboBox _passMode = new()
     {
         ItemsSource = new[] { "Round by round", "Path by path" },
-        MinWidth = 140, FontSize = 12, MinHeight = 26, Padding = new(8, 2),
+        MinWidth = 0, FontSize = 11.5, MinHeight = 22, Height = 24, Padding = new(8, 0),
     };
     readonly NumericUpDown _delay = Number(0, 3600, 0.5m, "0.#");
     readonly StackPanel _delayRow;
@@ -41,7 +41,7 @@ public sealed class JobBar : UserControl
     readonly Button _checks = new() { Classes = { "chip" } };
     readonly StackPanel _messages = new() { Spacing = 8, Width = 380 };
     readonly ToggleButton _order = new() { Classes = { "chip" } };
-    readonly Button _send = new() { Classes = { "primary" }, Width = 176, Height = 54, Padding = new(10, 4) };
+    readonly Button _send = new() { Classes = { "primary" }, Width = 158, Height = 54, Padding = new(8, 4) };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 4, Margin = new(0, 3, 0, 0) };
     string _sendState = "";
     string? _hoverText;
@@ -49,8 +49,8 @@ public sealed class JobBar : UserControl
     // running job
     readonly StackPanel _runPanel;
     readonly TextBlock _runState = new() { FontWeight = FontWeight.SemiBold, FontSize = 12.5 };
-    readonly Button _pause = new() { Content = "Pause", Width = 84, HorizontalContentAlignment = HorizontalAlignment.Center };
-    readonly Button _stop = new() { Content = "Stop", Width = 84, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Button _pause = new() { Content = "Pause", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Button _stop = new() { Content = "Stop", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center };
     DateTime? _startedAt;
     double? _sentEstimate;
     double _pausedFor;
@@ -59,7 +59,7 @@ public sealed class JobBar : UserControl
     readonly DispatcherTimer _runTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     // framing
-    readonly SplitButton _frame = new() { Height = 54, Width = 112 };
+    readonly SplitButton _frame = new() { Height = 54, Width = 96 };
     readonly RadioButton _frameRect = new() { Content = "Rectangle around everything", GroupName = "frame" };
     readonly RadioButton _frameOutline = new() { Content = "Snug outline (round or angled designs)", GroupName = "frame" };
     bool _frameConfirmed, _frameUpdating, _frameDirty;
@@ -98,10 +98,10 @@ public sealed class JobBar : UserControl
                     Children =
                     {
                         new PathIcon { Data = Icon("IcSend"), Width = 16, Height = 16, Foreground = Brushes.White },
-                        new TextBlock { Text = "Send to machine", FontSize = 14, VerticalAlignment = VerticalAlignment.Center },
+                        _sendText,
                     },
                 },
-                new TextBlock { Text = "waits for its start button", FontSize = 10.5, FontWeight = FontWeight.Normal, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center },
+                _sendSub,
             },
         };
         ToolTip.SetTip(_send, "Uploads the job. Nothing moves or fires until you press the start button on the machine.");
@@ -114,7 +114,7 @@ public sealed class JobBar : UserControl
         _stop.Click += async (_, _) => await StopJob();
         _runPanel = new StackPanel
         {
-            Width = 176, Spacing = 4, IsVisible = false, VerticalAlignment = VerticalAlignment.Center,
+            Width = 158, Spacing = 4, IsVisible = false, VerticalAlignment = VerticalAlignment.Center,
             Children = { _runState, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _pause, _stop } } },
         };
         var sendArea = new Panel { Children = { _send, _runPanel }, VerticalAlignment = VerticalAlignment.Center };
@@ -152,10 +152,6 @@ public sealed class JobBar : UserControl
         // ---- timeline (middle) ----
         _timeline.LayerClicked += id => LayerClicked?.Invoke(id);
         _timeline.Hovered += t => { _hoverText = t; ShowCaption(); };
-        var title = new TextBlock { Text = "JOB", Classes = { "h" }, Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-        var head = new DockPanel { Children = { title, _summary } };
-        DockPanel.SetDock(title, Dock.Left);
-        var middle = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Children = { head, _timeline, new Panel { Children = { _caption, _progress } } } };
 
         // ---- time and passes (right) ----
         _passMode.SelectedIndex = settings.WholeJobPasses ? 0 : 1;
@@ -164,7 +160,8 @@ public sealed class JobBar : UserControl
         _delay.Width = 52;
         _delay.ShowButtonSpinner = false;
         _delay.HorizontalContentAlignment = HorizontalAlignment.Center;
-        _delay.MinHeight = 26;
+        _delay.MinHeight = 22;
+        _delay.Height = 24;
         _delay.FontSize = 12;
         ToolTip.SetTip(_delay, "Seconds to wait between rounds, e.g. to let the material cool or to check progress.");
         _delayRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { new TextBlock { Text = "pause", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center }, _delay, new TextBlock { Text = "s", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center } } };
@@ -173,33 +170,53 @@ public sealed class JobBar : UserControl
         ToolTip.SetTip(_estimate, "Estimated time. It ignores acceleration, so real jobs run a little longer.");
         var passes = new StackPanel
         {
-            Orientation = Orientation.Horizontal, Spacing = 6,
-            Children = { new TextBlock { Text = "Passes", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center }, _passMode, _delayRow },
+            Orientation = Orientation.Horizontal, Spacing = 6, Margin = new(12, 0, 0, 0),
+            Children = { _passesLabel, _passMode, _delayRow },
         };
-        var right = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center, Children = { _estimate, passes } };
+        var right = new StackPanel
+        {
+            Spacing = 0, VerticalAlignment = VerticalAlignment.Center,
+            Children = { _estimate, _estimatedLabel },
+        };
 
         // ---- checks, order, export ----
         _checks.Flyout = new Flyout { Placement = PlacementMode.TopEdgeAlignedRight, Content = _messages };
         ToolTip.SetTip(_checks, "Things worth knowing before you send. Click for the list.");
-        _order.Content = Chip("IcPreview", "Order");
+        Compact(false);
         ToolTip.SetTip(_order, "Show the processing order on the work area: numbered paths and the travel moves between them.");
         _order.IsCheckedChanged += (_, _) => _canvas.Preview = _order.IsChecked == true ? _job : null;
-        var more = new Button { Classes = { "chip" }, Content = Chip("IcExport", "Export") };
+        var more = _export;
         var exportXf = new MenuItem { Header = "Job package for the machine (.xf)…" };
         exportXf.Click += async (_, _) => await Export(true);
         var exportGc = new MenuItem { Header = "G-code as text (.gcode)…" };
         exportGc.Click += async (_, _) => await Export(false);
         more.Flyout = new MenuFlyout { Placement = PlacementMode.TopEdgeAlignedRight, Items = { exportXf, exportGc } };
         ToolTip.SetTip(more, "Save the job to a file instead of sending it.");
-        var tools = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Children = { _checks, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _order, more } } } };
+        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _checks, _order, more } };
+        foreach (var c in new Control[] { _checks, _order, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
 
-        var grid = new Grid { ColumnDefinitions = new("Auto,Auto,*,Auto,Auto"), ColumnSpacing = 14, Margin = new(12, 8) };
+        var title = new TextBlock { Text = "JOB", Classes = { "h" }, Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+        var head = new DockPanel();
+        DockPanel.SetDock(title, Dock.Left);
+        DockPanel.SetDock(passes, Dock.Right);
+        head.Children.Add(title);
+        head.Children.Add(passes);
+        _summary.VerticalAlignment = VerticalAlignment.Center;
+        head.Children.Add(_summary);
+        var foot = new DockPanel();
+        DockPanel.SetDock(chips, Dock.Right);
+        foot.Children.Add(chips);
+        _caption.VerticalAlignment = VerticalAlignment.Center;
+        foot.Children.Add(new Panel { Children = { _caption, _progress } });
+        var middle = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Children = { head, _timeline, foot } };
+
+        var grid = new Grid { ColumnDefinitions = new("Auto,Auto,*,Auto"), ColumnSpacing = 12, Margin = new(10, 8) };
         grid.Children.Add(sendArea);
         Grid.SetColumn(_frame, 1); grid.Children.Add(_frame);
         Grid.SetColumn(middle, 2); grid.Children.Add(middle);
         Grid.SetColumn(right, 3); grid.Children.Add(right);
-        Grid.SetColumn(tools, 4); grid.Children.Add(tools);
-        Content = new Border { Background = Brush("Bg1"), BorderBrush = Brush("Line"), BorderThickness = new(0, 1, 0, 0), Child = grid };
+        Content = new Border { Background = Brush("Bg1"), BorderBrush = Brush("Line"), BorderThickness = new(0, 1, 0, 0), Child = grid, ClipToBounds = true };
+        SizeChanged += (_, e) => Compact(e.NewSize.Width < 840);
 
         _machine.ConnectionChanged += UpdateSend;
         _machine.ModeChanged += OnModeChanged;
@@ -212,7 +229,30 @@ public sealed class JobBar : UserControl
         Schedule();
     }
 
-    static Control Chip(string icon, string text) => new StackPanel
+    readonly TextBlock _sendSub = new() { Text = "waits for its start button", FontSize = 10.5, FontWeight = FontWeight.Normal, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center };
+    readonly TextBlock _passesLabel = new() { Text = "Passes", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
+    readonly TextBlock _estimatedLabel = new() { Text = "estimated", FontSize = 10.5, Foreground = Brush("TextMuted"), HorizontalAlignment = HorizontalAlignment.Right };
+    readonly Button _export = new() { Classes = { "chip" } };
+    readonly TextBlock _sendText = new() { Text = "Send to machine", FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+    bool? _compact;
+
+    /// <summary>Narrow (a small window): drop the secondary labels so the timeline keeps its room.</summary>
+    void Compact(bool on)
+    {
+        if (_compact == on) return;
+        _compact = on;
+        _send.Width = _runPanel.Width = on ? 132 : 158;
+        _sendText.Text = on ? "Send" : "Send to machine";
+        _sendSub.IsVisible = _passesLabel.IsVisible = _estimatedLabel.IsVisible = !on;
+        _frame.Width = on ? 88 : 96;
+        _order.Content = on ? Chip("IcPreview", null) : Chip("IcPreview", "Order");
+        _export.Content = on ? Chip("IcExport", null) : Chip("IcExport", "Export");
+        _estimate.FontSize = on ? 18 : 22;
+    }
+
+    static Control Chip(string icon, string? text) => text is null
+        ? new PathIcon { Data = Icon(icon), Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center }
+        : new StackPanel
     {
         Orientation = Orientation.Horizontal, Spacing = 5,
         Children = { new PathIcon { Data = Icon(icon), Width = 12, Height = 12, VerticalAlignment = VerticalAlignment.Center }, new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center } },
@@ -331,7 +371,7 @@ public sealed class JobBar : UserControl
         _send.IsEnabled = CanSend;
         UpdateFrameButton();
         if (!_sending)
-            _sendState = !_machine.IsConnected ? "Connect the machine (top right of the work area) to send or frame."
+            _sendState = !_machine.IsConnected ? "Connect the machine (right end of the ribbon) to send or frame."
                 : _job is null ? "Fix the problem in Checks to send." : "Ready to send.";
         ShowCaption();
     }
