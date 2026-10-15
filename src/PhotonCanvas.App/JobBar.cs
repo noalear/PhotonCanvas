@@ -41,7 +41,7 @@ public sealed class JobBar : UserControl
     readonly Button _checks = new() { Classes = { "chip" } };
     readonly StackPanel _messages = new() { Spacing = 8, Width = 380 };
     readonly ToggleButton _order = new() { Classes = { "chip" } };
-    readonly Button _send = new() { Classes = { "primary" }, Width = 158, Height = 54, Padding = new(8, 4) };
+    readonly Button _send = new() { Classes = { "primary" }, Width = 140, Height = 48, Padding = new(12, 0), CornerRadius = new(8), VerticalContentAlignment = VerticalAlignment.Center };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 4, Margin = new(0, 3, 0, 0) };
     string _sendState = "";
     string? _hoverText;
@@ -88,20 +88,11 @@ public sealed class JobBar : UserControl
         // ---- send / run (left) ----
         _send.Content = new StackPanel
         {
-            Spacing = 1,
-            HorizontalAlignment = HorizontalAlignment.Center,
+            Orientation = Orientation.Horizontal, Spacing = 9, HorizontalAlignment = HorizontalAlignment.Center,
             Children =
             {
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal, Spacing = 8, HorizontalAlignment = HorizontalAlignment.Center,
-                    Children =
-                    {
-                        new PathIcon { Data = Icon("IcSend"), Width = 16, Height = 16, Foreground = Brushes.White },
-                        _sendText,
-                    },
-                },
-                _sendSub,
+                new PathIcon { Data = Icon("IcSend"), Width = 17, Height = 17, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center },
+                _sendText,
             },
         };
         ToolTip.SetTip(_send, "Uploads the job. Nothing moves or fires until you press the start button on the machine.");
@@ -229,11 +220,10 @@ public sealed class JobBar : UserControl
         Schedule();
     }
 
-    readonly TextBlock _sendSub = new() { Text = "waits for its start button", FontSize = 10.5, FontWeight = FontWeight.Normal, Opacity = 0.8, HorizontalAlignment = HorizontalAlignment.Center };
     readonly TextBlock _passesLabel = new() { Text = "Passes", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock _estimatedLabel = new() { Text = "estimated", FontSize = 10.5, Foreground = Brush("TextMuted"), HorizontalAlignment = HorizontalAlignment.Right };
     readonly Button _export = new() { Classes = { "chip" } };
-    readonly TextBlock _sendText = new() { Text = "Send to machine", FontSize = 14, VerticalAlignment = VerticalAlignment.Center };
+    readonly TextBlock _sendText = new() { Text = "Ship It", FontSize = 15, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
     bool? _compact;
 
     /// <summary>Narrow (a small window): drop the secondary labels so the timeline keeps its room.</summary>
@@ -241,9 +231,9 @@ public sealed class JobBar : UserControl
     {
         if (_compact == on) return;
         _compact = on;
-        _send.Width = _runPanel.Width = on ? 132 : 158;
-        _sendText.Text = on ? "Send" : "Send to machine";
-        _sendSub.IsVisible = _passesLabel.IsVisible = _estimatedLabel.IsVisible = !on;
+        _send.Width = on ? 124 : 140;
+        _runPanel.Width = on ? 132 : 158;
+        _passesLabel.IsVisible = _estimatedLabel.IsVisible = !on;
         _frame.Width = on ? 88 : 96;
         _order.Content = on ? Chip("IcPreview", null) : Chip("IcPreview", "Order");
         _export.Content = on ? Chip("IcExport", null) : Chip("IcExport", "Export");
@@ -622,7 +612,7 @@ public sealed class JobBar : UserControl
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();
         sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button.");
-        if (!await Dialogs.Confirm(owner, "Send job to machine", sb.ToString(), "Upload", "Cancel")) return;
+        if (!await Dialogs.Confirm(owner, "Ship it to the machine?", sb.ToString(), "Ship It", "Cancel")) return;
 
         _sending = true;
         _progress.IsVisible = true;

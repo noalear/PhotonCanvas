@@ -360,7 +360,7 @@ public partial class MainWindow : Window
         _ribbon.Track(_redoButton, () => _doc.CanRedo);
 
         // ---- Home: everyday drawing and editing ----
-        var home = _ribbon.Tab("Home", "Draw, select and edit");
+        var home = _ribbon.Tab("Home", "Draw, select, combine and edit");
         var clip = home.Group("Clipboard");
         clip.Large("Paste", "IcPaste", Paste, "Paste (Ctrl+V)", () => _clipboard.Count > 0);
         clip.Small("Cut", "IcCut", CutSel, "Cut (Ctrl+X)", HasSel);
@@ -371,47 +371,40 @@ public partial class MainWindow : Window
         ToolSmall(select, "Edit points", "IcNodes", Tool.Nodes, "Edit a shape's points and curves (N, or double-click a shape)");
         ToolSmall(select, "Pan", "IcHand", Tool.Pan, "Pan the view (H, or hold Space / middle mouse)");
         select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
+        select.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
+        select.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
+        select.Small("Invert", "IcExclude", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id))), "Select what isn't selected, and the other way round");
         var draw = home.Group("Draw");
-        ToolLarge(draw, "Rectangle", "IcRect", Tool.Rect, "Rectangle (R) · Shift = square · Alt = from centre");
-        ToolLarge(draw, "Ellipse", "IcEllipse", Tool.Ellipse, "Ellipse (E) · Shift = circle · Alt = from centre");
-        ToolLarge(draw, "Pen", "IcPen", Tool.Pen, "Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish");
         ToolLarge(draw, "Text", "IcText", Tool.Text, "Text (T) · click where the text should go");
+        ToolLarge(draw, "Pen", "IcPen", Tool.Pen, "Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish");
+        ToolSmall(draw, "Ellipse", "IcEllipse", Tool.Ellipse, "Ellipse (E) · Shift = circle · Alt = from centre");
+        ToolSmall(draw, "Rectangle", "IcRect", Tool.Rect, "Rectangle (R) · Shift = square · Alt = from centre");
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
-        draw.Large("Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
-        var import = home.Group("Bring in");
-        import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
-        import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
-        import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
-        var lay = home.Group("Layers");
-        lay.Large("New layer", "IcPlus", _layers.AddLayer, "Add a layer below the active one (Ctrl+L)");
-        lay.Small("Move here", "IcDown", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)), "Move the selected shapes to the active layer (Ctrl+M)", HasSel);
-
-        // ---- Shape: combining and changing shapes ----
-        var shape = _ribbon.Tab("Shape", "Group, combine, weld, offset and repeat shapes");
-        var grp = shape.Group("Group");
+        draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
+        ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
+        ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
+        var grp = home.Group("Group");
         grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
         grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", HasSel);
         grp.Small("Combine", "IcCombine", Combine, "Combine into one compound shape: overlapping parts make holes (Ctrl+K)", Many);
         grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", HasSel);
-        var boolean = shape.Group("Shape builder");
+        var boolean = home.Group("Shape builder");
         boolean.Large("Weld", "IcWeld", () => BooleanSel(BoolOp.Union), "Weld: merge overlapping shapes into one outline (Ctrl+Shift+U)", TwoPaths);
         boolean.Small("Subtract", "IcSubtract", () => BooleanSel(BoolOp.Subtract), "Subtract: the bottom shape minus the ones above it (Ctrl+Shift+M)", TwoPaths);
         boolean.Small("Intersect", "IcIntersect", () => BooleanSel(BoolOp.Intersect), "Intersect: keep only where they overlap", TwoPaths);
         boolean.Small("Exclude", "IcExclude", () => BooleanSel(BoolOp.Exclude), "Exclude: remove where they overlap", TwoPaths);
-        var outline = shape.Group("Outline");
+        var outline = home.Group("Outline");
         outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: a new outline a set distance outside or inside (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
         outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
-        var repeat = shape.Group("Repeat");
-        repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
-        repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
-        repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
-        var lib = shape.Group("Library");
-        lib.Large("Shapes", "IcHeart", ShowShapes, "Shape library (I); save your own shapes there too");
+        var import = home.Group("Bring in");
+        import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
+        import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
+        import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
 
-        // ---- Arrange: position, align, order ----
-        var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate and order");
+        // ---- Arrange: position, align, order, repeat ----
+        var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate, order and repeat");
         var align = arrange.Group("Align");
         align.Icons(3,
             ("IcAlignLeft", "Align left edges", () => AlignSel(Align.Left), Many),
@@ -432,10 +425,10 @@ public partial class MainWindow : Window
         var order = arrange.Group("Order");
         order.Small("To front", "IcFront", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), "Bring to front (drawn last on its layer)", HasSel);
         order.Small("To back", "IcBack", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), "Send to back", HasSel);
-        var selectAll = arrange.Group("Select");
-        selectAll.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
-        selectAll.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
-        selectAll.Small("Invert", "IcExclude", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id))), "Select what isn't selected, and the other way round");
+        var repeat = arrange.Group("Repeat");
+        repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
+        repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
+        repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
 
         // ---- Picture: photos and artwork ----
         var picture = _ribbon.Tab("Picture", "Trace, depthmaps and background removal (lights up when a picture is selected)");
@@ -447,35 +440,31 @@ public partial class MainWindow : Window
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
 
-        // ---- Camera: draw from what the machine sees ----
-        var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, pick pieces, fit designs to them");
+        // ---- Camera: what the machine sees ----
+        var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, fit designs to pieces, calibration");
         var see = camera.Group("See the bed");
         see.Large("Update photo", "IcCamera", () => _ = Guard(_machine.UpdatePhotoAsync), "Take a new photo of the bed and lay it under your design", () => _machine.IsConnected && _machine.HasCalibration);
         see.LargeToggle("Live view", "IcLive", on => _machine.LiveView = on, "Keep the camera picture updating", () => _machine.IsConnected, () => _machine.LiveView);
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
-        var pick = camera.Group("Draw from the camera");
-        ToolLarge(pick, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
-        ToolLarge(pick, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
 
         // ---- Laser: materials and the job ----
-        var laser = _ribbon.Tab("Laser", "Materials, tests, framing and sending");
+        var laser = _ribbon.Tab("Laser", "Materials, tests, framing and shipping the job");
         var mat = laser.Group("Materials");
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a power × speed test grid to find the right settings for a new material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
-        job.Large("Send", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
+        job.Large("Ship It", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
         job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
-        var head = laser.Group("Head");
-        head.Large("Auto-focus", "IcFocus", () => _ = Guard(async () => await _machine.AutoFocusNowAsync()), "Measure the material and move to focus (the head moves)", () => _machine.IsConnected && !_machine.IsBusyFocusing);
-        head.Large("Machine", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection and options");
+        var machine = laser.Group("Machine");
+        machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
 
         // ---- View ----
         var view = _ribbon.Tab("View", "Zoom, grid and snapping");

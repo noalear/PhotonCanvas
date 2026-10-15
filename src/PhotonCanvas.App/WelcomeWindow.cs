@@ -218,7 +218,7 @@ public sealed class WelcomeWindow : Window
                 Step("1", "Draw or import", "Use the Home tab of the ribbon, or drag in an SVG, DXF, PDF or picture (Home → Import). The square is the machine's 220 × 220 mm work area."),
                 Step("2", "Choose what the laser does", "Every shape belongs to a layer (left). A layer either cuts through, scores a line, engraves the area, or engraves a picture, at its own power and speed: click a layer to see and change its settings."),
                 Step("3", "Find the right settings", "New material? Use Laser → Test grid to burn a grid of power and speed squares on a scrap, then copy the best one."),
-                Step("4", "Send it", "In the job bar along the bottom, check the run order and time, then click Send to machine. Nothing happens until you press the start button on the machine."),
+                Step("4", "Send it", "In the job bar along the bottom, check the run order and time, then click Ship It. Nothing happens until you press the start button on the machine."),
                 Hint("The ? at the top right → Getting started shows this again. Hover over any setting to see what it does."),
             },
         };

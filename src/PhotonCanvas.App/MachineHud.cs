@@ -31,7 +31,14 @@ public sealed class MachineHud : UserControl
     readonly Button _lights;
     readonly Slider _opacity = new() { Minimum = 0.1, Maximum = 1, Width = 120 };
     readonly Slider _front = new() { Minimum = 0, Maximum = 100, Width = 160 }, _back = new() { Minimum = 0, Maximum = 100, Width = 160 };
-    readonly NumericUpDown _height = Number(0, 150, 0.5m, "0.0");
+    // Focus height: ▼ [21.6 mm] ▲ as one control.
+    readonly TextBox _height = new()
+    {
+        Width = 74, MinHeight = 0, Height = 26, Padding = new(2, 0), FontSize = 12.5,
+        BorderThickness = new(0), Background = Avalonia.Media.Brushes.Transparent,
+        HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+    };
+    double? _heightValue;
     readonly Button _up, _down;
     readonly Button _connect = new() { Classes = { "chip" }, Content = "Connect", Margin = new(6, 0, 0, 0) };
     readonly DispatcherTimer _focusDelay = new() { Interval = TimeSpan.FromMilliseconds(700) };
@@ -116,44 +123,68 @@ public sealed class MachineHud : UserControl
         };
 
         // ---- focus ----
-        _focus = Tip(new Button { Classes = { "rb" }, Content = IconLabel("IcFocus", "Auto-focus") }, "The machine measures the material under the head and moves to the right focus height. Place your material first.");
+        _focus = Tip(new Button
+        {
+            Classes = { "chip" }, Height = 28, Padding = new(10, 0), CornerRadius = new(6), VerticalContentAlignment = VerticalAlignment.Center,
+            Content = IconLabel("IcFocus", "Auto-focus"),
+        }, "The machine measures the material under the head and moves to the right focus height. Place your material first.");
         _focus.Click += async (_, _) => await _m.AutoFocusNowAsync();
-        _height.ShowButtonSpinner = false;
-        _height.Width = 64;
-        _height.MinHeight = 26;
-        _height.FontSize = 12;
-        _height.HorizontalContentAlignment = HorizontalAlignment.Center;
-        ToolTip.SetTip(_height, "Focus distance: the gap between the laser head and the material, in mm. Type a value and press Enter to move the head there.");
+        ToolTip.SetTip(_height, "Focus distance: the gap between the laser head and the material. Type a value and press Enter to move the head there; Esc puts it back.");
         _height.KeyDown += (_, e) =>
         {
-            if (e.Key != Key.Enter) return;
-            e.Handled = true;
-            if (_height.Value is { } v) _ = MoveTo((double)v);
+            if (e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                if (ParseHeight(_height.Text) is { } v) _ = MoveTo(v);
+                else ShowHeight(_heightValue);
+            }
+            else if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                ShowHeight(_m.Distance);
+            }
         };
-        _up = Tip(new Button { Classes = { "rb" }, Content = "▲", Width = 26, Padding = new(0), HorizontalContentAlignment = HorizontalAlignment.Center }, "Raise the head 1 mm (Shift: 0.1 mm). It moves when you stop clicking.");
-        _down = Tip(new Button { Classes = { "rb" }, Content = "▼", Width = 26, Padding = new(0), HorizontalContentAlignment = HorizontalAlignment.Center }, "Lower the head 1 mm (Shift: 0.1 mm). It moves when you stop clicking.");
+        _height.GotFocus += (_, _) => Avalonia.Threading.Dispatcher.UIThread.Post(_height.SelectAll);
+        _height.LostFocus += (_, _) => ShowHeight(_heightValue);
+        Button Arrow(string glyph, string tip, Thickness corner)
+        {
+            var b = new Button
+            {
+                Content = new TextBlock { Text = glyph, FontSize = 10 }, Width = 26, Height = 28, Padding = new(0),
+                Background = Brush("Bg3"), BorderThickness = new(0), CornerRadius = new(corner.Left, corner.Top, corner.Right, corner.Bottom),
+                HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+            };
+            return Tip(b, tip);
+        }
+        _down = Arrow("▼", "Lower the head 1 mm (Shift: 0.1 mm). It moves when you stop clicking.", new(5, 0, 0, 5));
+        _up = Arrow("▲", "Raise the head 1 mm (Shift: 0.1 mm). It moves when you stop clicking.", new(0, 5, 5, 0));
         _up.AddHandler(PointerReleasedEvent, (_, e) => Nudge(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? 0.1 : 1), Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _down.AddHandler(PointerReleasedEvent, (_, e) => Nudge(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -0.1 : -1), Avalonia.Interactivity.RoutingStrategies.Tunnel);
         _focusDelay.Tick += (_, _) =>
         {
             _focusDelay.Stop();
-            if (_height.Value is { } v) _ = MoveTo((double)v);
+            if (_heightValue is { } v) _ = MoveTo(v);
         };
 
+        var stepper = new Border
+        {
+            BorderBrush = Brush("Line"), BorderThickness = new(1), CornerRadius = new(6), Background = Brush("Bg1"), ClipToBounds = true,
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { _down, _height, _up } },
+        };
         var focusRow = new StackPanel
         {
-            Orientation = Orientation.Horizontal, Spacing = 3,
+            Orientation = Orientation.Horizontal, Spacing = 6,
             Children =
             {
-                new TextBlock { Text = "Focus", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(4, 0, 4, 0) },
-                _down, _height, _up,
-                new TextBlock { Text = "mm", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(2, 0, 0, 0) },
+                new TextBlock { Text = "Focus", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center, Margin = new(2, 0, 0, 0) },
+                stepper,
+                _focus,
             },
         };
         _cameraRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _photo, _camera, _live, _lights } };
         _body = focusRow;
         // Three narrow rows: status (and auto-focus), camera and lights, focus height.
-        var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _pill, _connect, _focus } };
+        var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _pill, _connect } };
         _connect.Margin = new(0);
         _status.MaxWidth = 170;
         _status.TextTrimming = TextTrimming.CharacterEllipsis;
@@ -169,6 +200,19 @@ public sealed class MachineHud : UserControl
         _m.ConnectionChanged += Update;
         _m.ModeChanged += _ => Update();
         Update();
+    }
+
+    void ShowHeight(double? mm)
+    {
+        _heightValue = mm is { } v ? Math.Round(v, 1) : null;
+        _height.Text = _heightValue is { } h ? $"{h:0.0} mm" : "– mm";
+    }
+
+    /// <summary>"21.6", "21.6 mm", "21,6" → 21.6; null if it isn't a number in range.</summary>
+    static double? ParseHeight(string? text)
+    {
+        var t = (text ?? "").Replace("mm", "", StringComparison.OrdinalIgnoreCase).Replace(',', '.').Trim();
+        return double.TryParse(t, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v is >= 0 and <= 150 ? v : null;
     }
 
     ContextMenu PillMenu()
@@ -205,10 +249,10 @@ public sealed class MachineHud : UserControl
     void Nudge(double mm)
     {
         if (!_m.IsConnected || _m.IsBusyFocusing) return;
-        double from = _height.Value is { } v ? (double)v : _m.Distance ?? 0;
-        _height.Value = (decimal)Math.Clamp(Math.Round(from + mm, 1), 0, 150);
+        double from = _heightValue ?? _m.Distance ?? 0;
+        ShowHeight(Math.Clamp(Math.Round(from + mm, 1), 0, 150));
         _pending = true;
-        _note = $"Moving to {_height.Value:0.0} mm…";
+        _note = $"Moving to {_heightValue:0.0} mm…";
         Update();
         _focusDelay.Stop();
         _focusDelay.Start();
@@ -250,7 +294,6 @@ public sealed class MachineHud : UserControl
             // Not connected: just the status and Connect.
             _body.IsVisible = _cameraRow.IsVisible = on;
             _connect.IsVisible = !on;
-            _focus.IsVisible = on;
 
             bool idle = on && mode is "P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "";
             _photo.IsEnabled = on && _m.HasCalibration;
@@ -264,9 +307,7 @@ public sealed class MachineHud : UserControl
             _back.Value = b;
             _focus.IsEnabled = idle && !_m.IsBusyFocusing;
             _up.IsEnabled = _down.IsEnabled = _height.IsEnabled = idle && !_m.IsBusyFocusing;
-            if (!_pending && !_height.IsKeyboardFocusWithin)
-                _height.Value = _m.Distance is { } d ? (decimal)Math.Round(d, 1) : null;
-            _height.Watermark = on ? "–" : "";
+            if (!_pending && !_height.IsKeyboardFocusWithin) ShowHeight(_m.Distance);
         }
         finally { _updating = false; }
     }

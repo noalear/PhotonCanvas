@@ -4,6 +4,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
@@ -12,6 +13,8 @@ namespace PhotonCanvas.App;
 /// The command ribbon: tabs of labelled groups. Big buttons (icon over label) for the
 /// main command of a group, stacked small ones (icon beside label) for its relatives.
 /// Every button can say when it applies; <see cref="Refresh"/> re-checks them all.
+/// When a tab doesn't fit, small buttons drop their labels first, then big ones
+/// (the tooltips still say what each does).
 /// Double-click a tab to fold the ribbon away (and again to bring it back).
 /// </summary>
 public sealed class Ribbon : UserControl
@@ -20,6 +23,49 @@ public sealed class Ribbon : UserControl
     readonly ContentControl _body = new();
     readonly Border _bodyBorder;
     readonly DockPanel _bodyDock = new();
+    readonly ScrollViewer _scroll = new()
+    {
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+    };
+    bool _fitQueued;
+
+    void FitLater()
+    {
+        if (_fitQueued) return;
+        _fitQueued = true;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => { _fitQueued = false; Fit(); }, Avalonia.Threading.DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// Show as many labels as fit. Labels go a group at a time from the right: first the small
+    /// buttons' labels, then (if it still doesn't fit) the big buttons' labels.
+    /// </summary>
+    void Fit()
+    {
+        if (_current is not { } tab) return;
+        double avail = _scroll.Bounds.Width;
+        if (avail <= 1 || !tab.Panel.IsAttachedToVisualTree()) return;
+        // Each tab's width at each level is measured once; after that, fitting only picks a level.
+        if (tab.Widths is null)
+        {
+            var widths = new double[tab.Levels + 1];
+            for (int level = 0; level <= tab.Levels; level++)
+            {
+                tab.SetLevel(level);
+                // Hidden labels only invalidate their own parent; re-measure the whole tab.
+                foreach (var v in tab.Panel.GetVisualDescendants().OfType<Layoutable>()) v.InvalidateMeasure();
+                tab.Panel.InvalidateMeasure();
+                tab.Panel.Measure(Size.Infinity);
+                widths[level] = tab.Panel.DesiredSize.Width;
+            }
+            if (widths[0] > 1) tab.Widths = widths;
+            tab.SetLevel(-1);
+            if (tab.Widths is null) return;
+        }
+        int pick = Array.FindIndex(tab.Widths, w => w <= avail);
+        tab.SetLevel(pick < 0 ? tab.Levels : pick);
+    }
     readonly DockPanel _header = new();
     readonly List<RibbonTab> _tabs = [];
     readonly List<(Control Control, Func<bool> Enabled)> _conditional = [];
@@ -36,12 +82,11 @@ public sealed class Ribbon : UserControl
             BorderThickness = new(0, 1, 0, 1),
             Child = _bodyDock,
         };
-        _bodyDock.Children.Add(new ScrollViewer
-        {
-            Content = _body,
-            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
-        });
+        _bodyDock.Children.Add(_scroll);
+        _scroll.SizeChanged += (_, _) => FitLater();
+        // Also when the space changes (the machine group grows on connecting).
+        _scroll.ScrollChanged += (_, e) => { if (e.ViewportDelta.X != 0) FitLater(); };
+        _scroll.AttachedToVisualTree += (_, _) => FitLater();
         DockPanel.SetDock(_tabStrip, Dock.Left);
         _header.Children.Add(_tabStrip);
         var root = new DockPanel { Background = Brush("Bg1") };
@@ -104,8 +149,10 @@ public sealed class Ribbon : UserControl
     {
         if (_current is not null && _current != tab) TabSelected?.Invoke(tab.Name);
         _current = tab;
+        _scroll.Content ??= _body;
         foreach (var t in _tabs) t.Header.IsChecked = t == tab;
         _body.Content = tab.Panel;
+        FitLater();
     }
 
     void Fold(bool folded)
@@ -144,6 +191,28 @@ public sealed class RibbonTab
     internal string Name { get; }
     internal ToggleButton Header { get; }
     internal StackPanel Panel { get; } = new() { Orientation = Orientation.Horizontal, Margin = new(4, 0) };
+    internal List<RibbonGroup> Groups { get; } = [];
+
+    /// <summary>How many steps of label-dropping there are (two per group).</summary>
+    internal int Levels => Groups.Count * 2;
+
+    internal double[]? Widths { get; set; }
+    int _level = -1;
+
+    /// <summary>
+    /// 0 = every label. 1…n = the last 1…n groups lose their small-button labels; n+1…2n = the
+    /// last groups lose their big-button labels too. -1 forgets the current level.
+    /// </summary>
+    internal void SetLevel(int level)
+    {
+        if (level == _level) return;
+        _level = level;
+        if (level < 0) return;
+        int n = Groups.Count;
+        int smallOff = Math.Min(level, n), largeOff = Math.Max(0, level - n);
+        for (int i = 0; i < n; i++)
+            Groups[i].ShowLabels(small: i < n - smallOff, large: i < n - largeOff);
+    }
 
     internal RibbonTab(Ribbon ribbon, string name, ToggleButton header)
     {
@@ -154,8 +223,9 @@ public sealed class RibbonTab
 
     public RibbonGroup Group(string title)
     {
-        var g = new RibbonGroup(_ribbon, title);
+        var g = new RibbonGroup(_ribbon, this, title);
         Panel.Children.Add(g.Root);
+        Groups.Add(g);
         return g;
     }
 }
@@ -164,13 +234,28 @@ public sealed class RibbonTab
 public sealed class RibbonGroup
 {
     readonly Ribbon _ribbon;
-    readonly StackPanel _items = new() { Orientation = Orientation.Horizontal, Spacing = 2, VerticalAlignment = VerticalAlignment.Top };
+    readonly StackPanel _items = new() { Orientation = Orientation.Horizontal, Spacing = 1, VerticalAlignment = VerticalAlignment.Top };
     StackPanel? _column;
     internal Control Root { get; }
 
-    internal RibbonGroup(Ribbon ribbon, string title)
+    readonly RibbonTab _tab;
+    readonly List<TextBlock> _smallLabels = [];
+    readonly List<(Control Button, TextBlock Label)> _largeLabels = [];
+
+    internal void ShowLabels(bool small, bool large)
+    {
+        foreach (var t in _smallLabels) t.IsVisible = small;
+        foreach (var (b, t) in _largeLabels)
+        {
+            t.IsVisible = large;
+            b.MinWidth = large ? 44 : 34;
+        }
+    }
+
+    internal RibbonGroup(Ribbon ribbon, RibbonTab tab, string title)
     {
         _ribbon = ribbon;
+        _tab = tab;
         var grid = new Grid { RowDefinitions = new("*,Auto"), Height = 84, Margin = new(4, 4, 4, 2) };
         grid.Children.Add(_items);
         var label = new TextBlock
@@ -188,6 +273,20 @@ public sealed class RibbonGroup
             Margin = new(0, 4),
             Child = grid,
         };
+    }
+
+    Control LargeContent(Control button, string label, string icon)
+    {
+        var c = (StackPanel)LargeContent(label, icon);
+        _largeLabels.Add((button, (TextBlock)c.Children[1]));
+        return c;
+    }
+
+    Control SmallContent(string label, string icon, bool track)
+    {
+        var c = (StackPanel)SmallContent(label, icon);
+        if (track) _smallLabels.Add((TextBlock)c.Children[1]);
+        return c;
     }
 
     static Control LargeContent(string label, string icon) => new StackPanel
@@ -222,7 +321,8 @@ public sealed class RibbonGroup
     void AddLarge(Control b)
     {
         _column = null;
-        b.MinWidth = 52;
+        b.MinWidth = 44;
+        if (b is TemplatedControl tc) tc.Padding = new(3, 3);
         b.Height = 62;
         b.VerticalAlignment = VerticalAlignment.Top;
         _items.Children.Add(b);
@@ -243,7 +343,8 @@ public sealed class RibbonGroup
 
     public Button Large(string label, string icon, Action action, string? tip = null, Func<bool>? enabled = null)
     {
-        var b = new Button { Classes = { "rb" }, Content = LargeContent(label, icon) };
+        var b = new Button { Classes = { "rb" } };
+        b.Content = LargeContent(b, label, icon);
         b.Click += (_, _) => action();
         AddLarge(b);
         return Setup(b, tip, enabled);
@@ -251,7 +352,8 @@ public sealed class RibbonGroup
 
     public ToggleButton LargeToggle(string label, string icon, Action<bool> changed, string? tip = null, Func<bool>? enabled = null, Func<bool>? isChecked = null)
     {
-        var b = new ToggleButton { Classes = { "rb" }, Content = LargeContent(label, icon) };
+        var b = new ToggleButton { Classes = { "rb" } };
+        b.Content = LargeContent(b, label, icon);
         b.Click += (_, _) => changed(b.IsChecked == true);
         AddLarge(b);
         _ribbon.TrackChecked(b, isChecked);
@@ -260,7 +362,7 @@ public sealed class RibbonGroup
 
     public Button Small(string label, string icon, Action action, string? tip = null, Func<bool>? enabled = null)
     {
-        var b = new Button { Classes = { "rb" }, Content = SmallContent(label, icon), Padding = new(4, 1) };
+        var b = new Button { Classes = { "rb" }, Content = SmallContent(label, icon, true), Padding = new(4, 1) };
         b.Click += (_, _) => action();
         AddSmall(b);
         return Setup(b, tip, enabled);
@@ -268,7 +370,7 @@ public sealed class RibbonGroup
 
     public ToggleButton SmallToggle(string label, string icon, Action<bool> changed, string? tip = null, Func<bool>? enabled = null, Func<bool>? isChecked = null)
     {
-        var b = new ToggleButton { Classes = { "rb" }, Content = SmallContent(label, icon), Padding = new(4, 1) };
+        var b = new ToggleButton { Classes = { "rb" }, Content = SmallContent(label, icon, true), Padding = new(4, 1) };
         b.Click += (_, _) => changed(b.IsChecked == true);
         AddSmall(b);
         _ribbon.TrackChecked(b, isChecked);
