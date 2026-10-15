@@ -28,7 +28,7 @@ public sealed class LayerEditor : UserControl
     readonly TextBlock _title = new() { Classes = { "h" }, Margin = new(0), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
     readonly Border _swatch = new() { Width = 4, Height = 14, CornerRadius = new(2), Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     readonly Segmented _mode = new(("Cut", "IcCut"), ("Score", "IcLine"), ("Engrave", "IcPreview"), ("Picture", "IcImage"));
-    readonly Segmented _light = new(("Diode · blue", null), ("Fiber · red", null));
+    readonly Segmented _light = new(("Diode · blue", null), ("MOPA", null));
     readonly NumericUpDown _power = Num(0, 100, 1, "0.#"), _speed = Num(2, 15000, 5, "0.#"), _passes = Num(1, 10000, 1, "0");
     readonly NumericUpDown _lpcm = Number(1, 1000, 10, "0.#");
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
@@ -42,7 +42,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _kerf = Number(-1, 1, 0.01m, "0.###"), _tabs = Number(0, 100, 1, "0"), _tabWidth = Number(0.1m, 10, 0.1m, "0.##");
     readonly NumericUpDown _overcut = Number(0, 10, 0.1m, "0.##"), _leadIn = Number(0, 10, 0.5m, "0.##");
     readonly NumericUpDown _stepDown = Number(0, 2, 0.1m, "0.##"), _stepFirst = Number(0, 2, 0.05m, "0.##");
-    readonly CheckBox _wobble = new() { Content = "Wobble (fiber)" };
+    readonly CheckBox _wobble = new() { Content = "Wobble (MOPA)" };
     readonly NumericUpDown _wobbleD = Number(0.01m, 5, 0.01m, "0.###"), _wobbleS = Number(0.005m, 5, 0.005m, "0.###");
     readonly Control _wobbleRows;
     readonly NumericUpDown _fillAngle = Number(-180, 180, 15, "0.#"), _overscan = Number(0, 20, 0.5m, "0.##");
@@ -91,7 +91,7 @@ public sealed class LayerEditor : UserControl
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
 
         ToolTip.SetTip(_mode, "Cut and Score follow the outline (Score is lighter and runs first). Engrave scans back and forth to burn the inside of closed shapes. Picture engraves photos as fine dots.");
-        ToolTip.SetTip(_light, "Blue: 40 W diode, for wood, leather, acrylic, paper. Red: 60 W MOPA fiber, for metals and some plastics.");
+        ToolTip.SetTip(_light, "Blue: 40 W diode, for wood, leather, acrylic, paper. MOPA: the 60 W MOPA fiber laser, for metals (including colour on stainless) and some plastics.");
         var trio = Row(
             Labelled("Power %", _power, "Percent of the laser's full power."),
             Labelled("Speed mm/s", _speed, "How fast the beam moves while firing. Slower = deeper and darker."),
@@ -127,7 +127,7 @@ public sealed class LayerEditor : UserControl
             },
         };
         ((StackPanel)_cutExtras).Children.Add(_wobbleRows);
-        ToolTip.SetTip(_wobble, "Fiber laser only: the beam traces small overlapping circles along the path.");
+        ToolTip.SetTip(_wobble, "MOPA only: the beam traces small overlapping circles along the path.");
         _fillExtras = new StackPanel
         {
             Spacing = 6,
@@ -149,13 +149,13 @@ public sealed class LayerEditor : UserControl
                 _dotRow,
             },
         };
-        _pulseRow = Field("Pulse width", _pulse, tip: "Fiber only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
-        _freqRow = Field("Frequency", _freq, _freqHint, "Fiber only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
+        _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
+        _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _imageExtras, _pulseRow, _freqRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
-        ToolTip.SetTip(_more, "Kerf, tabs, overcut, lead-in, step-down, wobble, scan angle, overscan, dot time and fiber pulse settings. The defaults work for most jobs.");
+        ToolTip.SetTip(_more, "Kerf, tabs, overcut, lead-in, step-down, wobble, scan angle, overscan, dot time and MOPA pulse settings. The defaults work for most jobs.");
 
         var saveToLib = Button("Save to library…", tip: "Remember these settings for a material, with how well they worked (and a photo of the result).");
         saveToLib.Click += (_, _) =>

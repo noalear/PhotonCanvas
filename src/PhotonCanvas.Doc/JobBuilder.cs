@@ -203,7 +203,7 @@ public static class JobBuilder
                 StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
                 bool wobble = layer.Wobble && layer.Laser.Light == LightSource.Red;
                 if (layer.Wobble && !wobble)
-                    warnings.Add($"Layer \"{layer.Name}\": wobble only works with the red fiber laser, so it's ignored on the blue diode.");
+                    warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
                 foreach (var (path, depth) in Order(paths, ref pos))

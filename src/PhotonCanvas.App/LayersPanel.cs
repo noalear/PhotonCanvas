@@ -278,7 +278,7 @@ public sealed class LayersPanel : UserControl
             Background = new SolidColorBrush(Color.Parse(modeColour), 0.2),
             Child = new TextBlock { Text = modeText, FontSize = 10, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.Parse(modeColour)), LetterSpacing = 0.5 },
         };
-        string light = l.Laser.Light == Core.LightSource.Red ? " · fiber" : "";
+        string light = l.Laser.Light == Core.LightSource.Red ? " · MOPA" : "";
         string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
         string detail = l.Mode == LayerMode.Image ? $"{l.Laser.Power:0.#}% · {l.Dpi:0} dpi{light}" : $"{l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes}{light}";
         var info = new StackPanel

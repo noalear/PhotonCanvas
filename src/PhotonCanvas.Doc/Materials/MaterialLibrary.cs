@@ -79,7 +79,7 @@ public sealed record ProcessSettings
     /// <summary>One line for lists, e.g. "Cut · blue 70% · 40 mm/s ×8".</summary>
     public string Summary()
     {
-        string light = Laser.Light == LightSource.Red ? $"fiber {Laser.PulseWidthNs} ns {Laser.FrequencyKhz} kHz" : "diode";
+        string light = Laser.Light == LightSource.Red ? $"MOPA {Laser.PulseWidthNs} ns {Laser.FrequencyKhz} kHz" : "diode";
         string mode = Mode switch { LayerMode.Fill => $"engrave {LinesPerCm:0} l/cm", LayerMode.Image => $"picture {Dpi:0} dpi", LayerMode.Score => "score", _ => "cut" };
         return $"{mode} · {light} {Laser.Power:0.#}% · {Laser.Speed:0.#} mm/s" + (Laser.Passes > 1 ? $" ×{Laser.Passes}" : "");
     }

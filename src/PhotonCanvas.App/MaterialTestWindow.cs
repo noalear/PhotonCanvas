@@ -16,7 +16,7 @@ namespace PhotonCanvas.App;
 public sealed class MaterialTestWindow : Window
 {
     readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Engrave (filled squares)", "Score (outlines)", "Cut (outlines)" }, SelectedIndex = 0 };
-    readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Blue diode (wood, leather, acrylic, paper…)", "Red fiber (metals, some plastics)" }, SelectedIndex = 0 };
+    readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Blue diode (wood, leather, acrylic, paper…)", "MOPA (metals, some plastics)" }, SelectedIndex = 0 };
     readonly NumericUpDown _pMin = Number(1, 100, 5, "0.#"), _pMax = Number(1, 100, 5, "0.#"), _pSteps = Number(1, 10, 1, "0");
     readonly NumericUpDown _sMin = Number(2, 15000, 10, "0.#"), _sMax = Number(2, 15000, 10, "0.#"), _sSteps = Number(1, 10, 1, "0");
     readonly NumericUpDown _cell = Number(3, 30, 1, "0.#");

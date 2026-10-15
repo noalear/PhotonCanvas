@@ -589,7 +589,7 @@ public sealed class JobBar : UserControl
         var sb = new StringBuilder();
         foreach (var l in JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesOn(l.Id).Any()))
         {
-            var src = l.Laser.Light == LightSource.Red ? $"fiber {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
+            var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
             sb.AppendLine($"• {l.Name}: {l.Mode}, {l.Laser.Power:0.#}% at {l.Laser.Speed:0.#} mm/s × {l.Laser.Passes} ({src})");
         }
         var opt = Options;
