@@ -149,3 +149,10 @@ G25X147.366                   rows alternate direction (zigzag)
 
 - Vector blue 1 pass ✓, vector red 8 passes ✓, fill ✓.
 - Dot bitmap ✓. This test checks the G-code emission from the same dot pattern. Our own Jarvis dithering is not verified yet.
+
+## Step-down per pass ("focus descent") and wobble (captured 2026-10-14)
+
+From xTool Studio exports of a 20 mm square, blue cut 70% 40 mm/s × 3 (`captures/gc/blue_cut_70p_40mms_3pass*.gc`) and red cut with wobble (`red_cut_70p_40mms_3pass_wobble_0.05_0.015.gc`).
+
+- **Step-down** replaces the `G104 P3 … G105` pass loop with the passes written out. The head moves are relative Z, wrapped as `G102` / `G91` / `G0Z<mm>F600` / `G90` / `G103` / `G0F180000`. Before pass 1 it drops by the "first" value (0.01 by default), before each later pass by the per-pass value, and after `# motion_end` it rises by the total, followed by `# MUST`. The first pass has an extra `# MUST` + `G0` to the start point. PhotonCanvas reproduces this line for line (`SampleTests.BlueCut3PassesWithStepDown`). In whole-job pass mode it lowers to that round's depth before the block and rises straight after, so other layers keep their focus.
+- **Wobble** is not a firmware feature. The path is expanded into loops: radius = diameter/2, 36 points per loop turning −10° per point (starting at −100°), the loop centre advancing `spacing/36` along the path per point. For 0.05 / 0.015 mm that is ~2400 points per mm. PhotonCanvas matches xTool's 192,000 points to within 0.012 mm (`SampleTests.RedCutWithWobbleMatchesPointByPoint`). Fiber (red) only.

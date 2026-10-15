@@ -29,12 +29,18 @@ public sealed record ProcessSettings
     public double FillAngleDeg { get; init; }
     public bool Crosshatch { get; init; }
     public double OverscanMm { get; init; }
+    public double StepDownMm { get; init; }
+    public double StepDownFirstMm { get; init; }
+    public bool Wobble { get; init; }
+    public double WobbleDiameterMm { get; init; } = 0.05;
+    public double WobbleSpacingMm { get; init; } = 0.015;
 
     public static ProcessSettings From(Layer l) => new()
     {
         Mode = l.Mode, Laser = l.Laser, LinesPerCm = l.LinesPerCm, Dpi = l.Dpi, DotUs = l.DotUs, Dither = l.Dither,
         ImageMode = l.ImageMode, GrayMinPower = l.GrayMinPower, KerfMm = l.KerfMm, TabCount = l.TabCount, TabWidthMm = l.TabWidthMm,
         OvercutMm = l.OvercutMm, LeadInMm = l.LeadInMm, FillAngleDeg = l.FillAngleDeg, Crosshatch = l.Crosshatch, OverscanMm = l.OverscanMm,
+        StepDownMm = l.StepDownMm, StepDownFirstMm = l.StepDownFirstMm, Wobble = l.Wobble, WobbleDiameterMm = l.WobbleDiameterMm, WobbleSpacingMm = l.WobbleSpacingMm,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -42,6 +48,7 @@ public sealed record ProcessSettings
         Mode = Mode, Laser = Laser, LinesPerCm = LinesPerCm, Dpi = Dpi, DotUs = DotUs, Dither = Dither,
         ImageMode = ImageMode, GrayMinPower = GrayMinPower, KerfMm = KerfMm, TabCount = TabCount, TabWidthMm = TabWidthMm,
         OvercutMm = OvercutMm, LeadInMm = LeadInMm, FillAngleDeg = FillAngleDeg, Crosshatch = Crosshatch, OverscanMm = OverscanMm,
+        StepDownMm = StepDownMm, StepDownFirstMm = StepDownFirstMm, Wobble = Wobble, WobbleDiameterMm = WobbleDiameterMm, WobbleSpacingMm = WobbleSpacingMm,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>
@@ -63,6 +70,10 @@ public sealed record ProcessSettings
         OvercutMm = Math.Clamp(OvercutMm, 0, 20),
         LeadInMm = Math.Clamp(LeadInMm, 0, 20),
         OverscanMm = Math.Clamp(OverscanMm, 0, 50),
+        StepDownMm = Math.Clamp(StepDownMm, 0, StepDown.MaxPerPassMm),
+        StepDownFirstMm = Math.Clamp(StepDownFirstMm, 0, StepDown.MaxPerPassMm),
+        WobbleDiameterMm = Math.Clamp(WobbleDiameterMm, PhotonCanvas.Core.Wobble.MinDiameterMm, PhotonCanvas.Core.Wobble.MaxDiameterMm),
+        WobbleSpacingMm = Math.Clamp(WobbleSpacingMm, PhotonCanvas.Core.Wobble.MinSpacingMm, PhotonCanvas.Core.Wobble.MaxSpacingMm),
     };
 
     /// <summary>One line for lists, e.g. "Cut · blue 70% · 40 mm/s ×8".</summary>

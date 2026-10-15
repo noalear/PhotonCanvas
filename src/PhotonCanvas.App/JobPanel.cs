@@ -428,6 +428,14 @@ public sealed class JobPanel : UserControl
             : "Each path runs all its passes before the next.");
         sb.AppendLine($"Size {job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm · about {Duration(job.EstimateS)}.");
         if (_machine.Distance is { } d) sb.AppendLine($"Machine focus distance: {d:0.0} mm. Make sure this matches your material.");
+        // Step-down lowers the head: never let it come near the material.
+        double deepest = JobBuilder.OutputLayers(_doc.State).Where(l => l.Mode is LayerMode.Cut or LayerMode.Score && (l.StepDownMm > 0 || l.StepDownFirstMm > 0))
+            .Select(l => l.StepDownFirstMm + (Math.Max(1, l.Laser.Passes) - 1) * l.StepDownMm).DefaultIfEmpty(0).Max();
+        if (deepest > 0 && _machine.Distance is { } focus && deepest > focus - 3)
+        {
+            await Dialogs.Message(owner, "Can't send", $"Step-down would lower the head {deepest:0.##} mm, but it's only {focus:0.0} mm from the material. Reduce the step-down or the passes.");
+            return;
+        }
         foreach (var w in job.Warnings) sb.AppendLine($"⚠ {w}");
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");

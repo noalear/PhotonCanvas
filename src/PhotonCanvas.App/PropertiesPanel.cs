@@ -74,6 +74,10 @@ public sealed class PropertiesPanel : UserControl
     // cut / fill / image extras
     readonly NumericUpDown _kerf = Number(-1, 1, 0.01m, "0.###"), _tabs = Number(0, 100, 1, "0"), _tabWidth = Number(0.1m, 10, 0.1m, "0.##");
     readonly NumericUpDown _overcut = Number(0, 10, 0.1m, "0.##"), _leadIn = Number(0, 10, 0.5m, "0.##");
+    readonly NumericUpDown _stepDown = Number(0, 2, 0.1m, "0.##"), _stepFirst = Number(0, 2, 0.05m, "0.##");
+    readonly CheckBox _wobble = new() { Content = "Wobble (fiber)" };
+    readonly NumericUpDown _wobbleD = Number(0.01m, 5, 0.01m, "0.###"), _wobbleS = Number(0.005m, 5, 0.005m, "0.###");
+    readonly Control _wobbleRows;
     readonly NumericUpDown _fillAngle = Number(-180, 180, 15, "0.#"), _overscan = Number(0, 20, 0.5m, "0.##");
     readonly CheckBox _crosshatch = new() { Content = "Crosshatch (second pass at 90°)" };
     readonly ComboBox _imageMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots (dithered)", "Greyscale (experimental)" } };
@@ -172,8 +176,22 @@ public sealed class PropertiesPanel : UserControl
                 Field("Tab width (mm)", _tabWidth),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
                 Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
+                Field("Step down/pass", _stepDown, tip: "Lower the head this many mm before each pass after the first, so the focus follows the cut into thick material. The head goes back up afterwards. 0 = off."),
+                Field("First step down", _stepFirst, tip: "With step-down: also lower the head this much before the first pass (mm)."),
+                _wobble,
             },
         };
+        _wobbleRows = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Field("Wobble size (mm)", _wobbleD, tip: "Diameter of the small circles the beam traces while moving. Wider, smoother marks and cuts on metal."),
+                Field("Wobble spacing", _wobbleS, tip: "How far the circles move forward per loop (mm). Smaller = denser, slower."),
+            },
+        };
+        ((StackPanel)_cutExtras).Children.Add(_wobbleRows);
+        ToolTip.SetTip(_wobble, "Fiber laser only: the beam traces small overlapping circles along the path.");
         _fillExtras = new StackPanel
         {
             Spacing = 8,
@@ -199,6 +217,11 @@ public sealed class PropertiesPanel : UserControl
         _tabWidth.ValueChanged += (_, _) => EditLayers("Tab width", l => l with { TabWidthMm = (double)_tabWidth.Value!.Value }, _tabWidth.Value.HasValue, "tabw");
         _overcut.ValueChanged += (_, _) => EditLayers("Overcut", l => l with { OvercutMm = (double)_overcut.Value!.Value }, _overcut.Value.HasValue, "overcut");
         _leadIn.ValueChanged += (_, _) => EditLayers("Lead-in", l => l with { LeadInMm = (double)_leadIn.Value!.Value }, _leadIn.Value.HasValue, "leadin");
+        _stepDown.ValueChanged += (_, _) => EditLayers("Step down", l => l with { StepDownMm = (double)_stepDown.Value!.Value }, _stepDown.Value.HasValue, "stepdown");
+        _stepFirst.ValueChanged += (_, _) => EditLayers("First step down", l => l with { StepDownFirstMm = (double)_stepFirst.Value!.Value }, _stepFirst.Value.HasValue, "stepfirst");
+        _wobble.IsCheckedChanged += (_, _) => EditLayers("Wobble", l => l with { Wobble = _wobble.IsChecked == true }, _wobble.IsChecked.HasValue);
+        _wobbleD.ValueChanged += (_, _) => EditLayers("Wobble size", l => l with { WobbleDiameterMm = (double)_wobbleD.Value!.Value }, _wobbleD.Value.HasValue, "wobbled");
+        _wobbleS.ValueChanged += (_, _) => EditLayers("Wobble spacing", l => l with { WobbleSpacingMm = (double)_wobbleS.Value!.Value }, _wobbleS.Value.HasValue, "wobbles");
         _fillAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_fillAngle.Value!.Value }, _fillAngle.Value.HasValue, "fangle");
         _overscan.ValueChanged += (_, _) => EditLayers("Overscan", l => l with { OverscanMm = (double)_overscan.Value!.Value }, _overscan.Value.HasValue, "overscan");
         _crosshatch.IsCheckedChanged += (_, _) => EditLayers("Crosshatch", l => l with { Crosshatch = _crosshatch.IsChecked == true }, _crosshatch.IsChecked.HasValue);
@@ -475,6 +498,11 @@ public sealed class PropertiesPanel : UserControl
         Num(_tabWidth, Same(l => l.TabWidthMm));
         Num(_overcut, Same(l => l.OvercutMm));
         Num(_leadIn, Same(l => l.LeadInMm));
+        Num(_stepDown, Same(l => l.StepDownMm));
+        Num(_stepFirst, Same(l => l.StepDownFirstMm));
+        _wobble.IsChecked = Same(l => l.Wobble);
+        Num(_wobbleD, Same(l => l.WobbleDiameterMm));
+        Num(_wobbleS, Same(l => l.WobbleSpacingMm));
         Num(_fillAngle, Same(l => l.FillAngleDeg));
         Num(_overscan, Same(l => l.OverscanMm));
         _crosshatch.IsChecked = Same(l => l.Crosshatch);
@@ -489,6 +517,8 @@ public sealed class PropertiesPanel : UserControl
         _dither.PlaceholderText = dith is null ? "mixed" : "";
         _dpiHint.Text = Same(l => l.Dpi) is { } dpi ? $"Dots {25.4 / dpi:0.###} mm apart." : "";
         _pulseRow.IsVisible = _freqRow.IsVisible = anyRed && adv;
+        _wobble.IsVisible = anyRed;
+        _wobbleRows.IsVisible = anyRed && ls.Any(l => l.Wobble);
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;
         _pulse.PlaceholderText = pw is null ? "mixed" : "";

@@ -36,7 +36,66 @@ public abstract record PassMode
 
 public abstract record Block(LaserSettings Laser);
 
-public sealed record VectorBlock(Polyline Path, LaserSettings Laser) : Block(Laser);
+public sealed record VectorBlock(Polyline Path, LaserSettings Laser) : Block(Laser)
+{
+    /// <summary>Lower the head between passes (for cutting thick material); null = keep the focus.</summary>
+    public StepDown? Drop { get; init; }
+}
+
+/// <summary>
+/// Lower the head by <see cref="FirstMm"/> before the first pass and by <see cref="PerPassMm"/>
+/// before each later pass, so the focus follows the cut down into thick material. The head goes
+/// back up by the total afterwards. Encoded as xTool Studio does (relative Z between
+/// <c>G102</c>/<c>G103</c>, 10 mm/s), checked against its exports.
+/// </summary>
+public sealed record StepDown(double FirstMm, double PerPassMm)
+{
+    public const double MaxPerPassMm = 2, MaxTotalMm = 10;
+
+    /// <summary>How far the head is lowered for pass <paramref name="pass"/> (1-based).</summary>
+    public double DepthFor(int pass) => FirstMm + (pass - 1) * PerPassMm;
+
+    public void Validate(int passes)
+    {
+        JobException.CheckRange("first step down", FirstMm, 0, MaxPerPassMm, "mm");
+        JobException.CheckRange("step down per pass", PerPassMm, 0, MaxPerPassMm, "mm");
+        if (DepthFor(passes) > MaxTotalMm + 1e-9)
+            throw new JobException($"Stepping down {PerPassMm:0.##} mm for each of {passes} passes lowers the head {DepthFor(passes):0.##} mm in total; the limit is {MaxTotalMm} mm.");
+    }
+}
+
+/// <summary>
+/// Fiber "wobble": the beam traces small circles while moving along the path, for wider,
+/// smoother marks and cuts. Generated as xTool Studio does (checked point by point against its
+/// export): 36 points per loop turning 10° each, starting at −100°, the loop centre advancing
+/// <c>spacing / 36</c> along the path per point.
+/// </summary>
+public static class Wobble
+{
+    public const int PointsPerLoop = 36;
+    public const double MinDiameterMm = 0.01, MaxDiameterMm = 5, MinSpacingMm = 0.005, MaxSpacingMm = 5;
+
+    public static List<Vec2> Expand(IReadOnlyList<Vec2> path, double diameterMm, double spacingMm)
+    {
+        if (path.Count < 2) return [.. path];
+        var cum = new double[path.Count];
+        for (int i = 1; i < path.Count; i++) cum[i] = cum[i - 1] + path[i - 1].Dist(path[i]);
+        double total = cum[^1], r = diameterMm / 2, step = spacingMm / PointsPerLoop;
+        long n = (long)Math.Ceiling(total / step);
+        var o = new List<Vec2>((int)Math.Min(n + 1, int.MaxValue / 2));
+        int seg = 1;
+        for (long i = 0; i <= n; i++)
+        {
+            double s = Math.Min(i * step, total);
+            while (seg < path.Count - 1 && cum[seg] < s) seg++;
+            double len = cum[seg] - cum[seg - 1];
+            var c = len < 1e-12 ? path[seg] : path[seg - 1] + (path[seg] - path[seg - 1]) * ((s - cum[seg - 1]) / len);
+            double a = (-100 - 10.0 * i) * Math.PI / 180;
+            o.Add(new Vec2(c.X + r * Math.Cos(a), c.Y + r * Math.Sin(a)));
+        }
+        return o;
+    }
+}
 
 /// <summary>Zigzag line fill of closed polygons, even-odd rule (holes work).</summary>
 public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, LaserSettings Laser, double LinesPerCm)
@@ -142,6 +201,7 @@ public sealed class Job
             {
                 case VectorBlock b:
                     b.Path.Validate();
+                    b.Drop?.Validate(PassMode is PassMode.Rounds ? Rounds : b.Laser.Passes);
                     var pts = b.Path.EmittedPoints();
                     anyMotion |= pts.Count >= 2;
                     foreach (var p in pts) CheckPoint(p, ctx);
@@ -224,7 +284,7 @@ public sealed class Job
                     }
                     foreach (var b in Blocks.Where(b => b.Laser.Passes >= round))
                     {
-                        lines.AddRange(RenderBlock(b, tag, 1));
+                        lines.AddRange(RenderBlock(b, tag, 1, round));
                         lines.Add("");
                     }
                 }
@@ -356,8 +416,9 @@ public sealed class Job
         return v;
     }
 
-    static List<string> RenderBlock(Block block, string tag, int passes) => block switch
+    static List<string> RenderBlock(Block block, string tag, int passes, int round = 1) => block switch
     {
+        VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes, round),
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
         DotBlock b => RenderDots(b, tag, passes),
@@ -381,6 +442,43 @@ public sealed class Job
         v.AddRange(["M523P40", "", ""]);
         v.AddRange(PassLoop(passes, body));
         v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
+        return v;
+    }
+
+    /// <summary>Relative Z move of the head (negative = down), as xTool Studio writes it.</summary>
+    static string[] ZMove(double mm) => ["G102", "G91", $"G0Z{Trim3(mm)}F600", "G90", "G103", "G0F180000"];
+
+    /// <summary>
+    /// A cut with step-down. With <paramref name="passes"/> &gt; 1 (per-path passes) the passes are
+    /// written out one after another, the head lowered before each and raised by the total at the
+    /// end, exactly like xTool Studio. With one pass (whole-job rounds) the head is lowered to this
+    /// round's depth and raised again straight after, so other layers keep their focus.
+    /// </summary>
+    static List<string> RenderSteppedVector(VectorBlock b, string tag, int passes, int round)
+    {
+        var pts = b.Path.EmittedPoints();
+        if (pts.Count < 2) return [];
+        var l = b.Laser;
+        var drop = b.Drop!;
+        var path = new List<string> { $"G0X{Trim3(pts[0].X)}Y{Trim3(pts[0].Y)}" };
+        for (int i = 1; i < pts.Count; i++)
+            path.Add($"G1X{Trim3(pts[i].X)}Y{Trim3(pts[i].Y)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+        var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
+        v.AddRange(SourceLines(l, true));
+        v.AddRange(["M523P40", "", ""]);
+        v.Add($"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}");
+        double first = passes > 1 ? drop.FirstMm : drop.DepthFor(round);
+        if (first > 0) v.AddRange(ZMove(-first));
+        v.AddRange(["# MUST", path[0]]);
+        v.AddRange(path);
+        for (int p = 2; p <= passes; p++)
+        {
+            if (drop.PerPassMm > 0) v.AddRange(ZMove(-drop.PerPassMm));
+            v.AddRange(path);
+        }
+        v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
+        double back = passes > 1 ? drop.DepthFor(passes) : first;
+        if (back > 0) v.AddRange([.. ZMove(back), "# MUST"]);
         return v;
     }
 

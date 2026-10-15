@@ -53,6 +53,11 @@ public static class DocFile
                 ["fillAngleDeg"] = l.FillAngleDeg,
                 ["crosshatch"] = l.Crosshatch,
                 ["overscanMm"] = l.OverscanMm,
+                ["stepDownMm"] = l.StepDownMm,
+                ["stepDownFirstMm"] = l.StepDownFirstMm,
+                ["wobble"] = l.Wobble,
+                ["wobbleDiameterMm"] = l.WobbleDiameterMm,
+                ["wobbleSpacingMm"] = l.WobbleSpacingMm,
                 ["material"] = l.Material is { } mat ? new JsonObject
                 {
                     ["id"] = mat.MaterialId.ToString(),
@@ -176,6 +181,11 @@ public static class DocFile
                     FillAngleDeg = n["fillAngleDeg"]?.GetValue<double>() ?? 0,
                     Crosshatch = n["crosshatch"]?.GetValue<bool>() ?? false,
                     OverscanMm = n["overscanMm"]?.GetValue<double>() ?? 0,
+                    StepDownMm = n["stepDownMm"]?.GetValue<double>() ?? 0,
+                    StepDownFirstMm = n["stepDownFirstMm"]?.GetValue<double>() ?? 0,
+                    Wobble = n["wobble"]?.GetValue<bool>() ?? false,
+                    WobbleDiameterMm = n["wobbleDiameterMm"]?.GetValue<double>() ?? 0.05,
+                    WobbleSpacingMm = n["wobbleSpacingMm"]?.GetValue<double>() ?? 0.015,
                     Material = n["material"] is JsonObject mo && Guid.TryParse(mo["id"]?.GetValue<string>(), out var mid)
                         ? new Materials.MaterialRef(mid, mo["label"]?.GetValue<string>() ?? "",
                             Guid.TryParse(mo["recipeId"]?.GetValue<string>(), out var rid) ? rid : null, mo["recipeTitle"]?.GetValue<string>())

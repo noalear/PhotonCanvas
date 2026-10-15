@@ -214,3 +214,86 @@ public class XfTests
         Assert.Equal(Convert.ToString(sum, 8).PadLeft(6, '0'), Encoding.ASCII.GetString(xf, 148, 6));
     }
 }
+
+public class StepDownTests
+{
+    static Polyline Square() => Polyline.Loop((100, 100), (120, 100), (120, 120), (100, 120));
+
+    static List<double> ZMoves(string gcode) => gcode.Split('\n')
+        .Where(l => l.StartsWith("G0Z"))
+        .Select(l => double.Parse(l[3..l.IndexOf('F')], System.Globalization.CultureInfo.InvariantCulture)).ToList();
+
+    [Fact]
+    public void WholeJobPassesGoDownAndBackUpEachRound()
+    {
+        // A step-down cut and a plain score in the same job: the score must stay in focus.
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(3)) { Drop = new StepDown(0.2, 0.5) };
+        var score = new VectorBlock(Polyline.Open((10, 10), (50, 10)), LaserSettings.Blue(20, 200).WithPasses(2));
+        var g = new Job(MachineProfile.F2Ultra, [cut, score]) { PassMode = new PassMode.Rounds(0) }.Render();
+        Assert.Equal([-0.2, 0.2, -0.7, 0.7, -1.2, 1.2], ZMoves(g));
+        Assert.Equal(0, ZMoves(g).Sum(), 9);
+    }
+
+    [Fact]
+    public void PerPathPassesEndWhereTheyStarted()
+    {
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(4)) { Drop = new StepDown(0, 0.3) };
+        var g = new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.PerBlock() }.Render();
+        Assert.Equal([-0.3, -0.3, -0.3, 0.9], ZMoves(g));
+        Assert.DoesNotContain("G104", g); // passes written out, not looped
+    }
+
+    [Fact]
+    public void RefusesToDriveTheHeadTooFar()
+    {
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(30)) { Drop = new StepDown(0, 0.5) };
+        var e = Assert.Throws<JobException>(() => new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.PerBlock() }.Render());
+        Assert.Contains("14.5 mm", e.Message);
+        Assert.Throws<JobException>(() => new Job(MachineProfile.F2Ultra, [new VectorBlock(Square(), LaserSettings.Blue(70, 40)) { Drop = new StepDown(0, 3) }]).Render());
+    }
+
+    [Fact]
+    public void WobbleTracesLoopsAlongThePath()
+    {
+        var pts = Wobble.Expand([new Vec2(0, 0), new Vec2(10, 0)], 0.4, 0.1);
+        Assert.Equal(3601, pts.Count); // 10 mm / (0.1 / 36) + 1
+        // Each point is one radius from where the loop centre is at that moment.
+        for (int i = 0; i < pts.Count; i += 37)
+        {
+            var c = new Vec2(Math.Min(i * 0.1 / 36, 10), 0);
+            Assert.Equal(0.2, pts[i].Dist(c), 6);
+        }
+        Assert.Equal(new Vec2(0.2 * Math.Cos(-100 * Math.PI / 180), 0.2 * Math.Sin(-100 * Math.PI / 180)), pts[0]);
+    }
+}
+
+public class LayerDescentWobbleTests
+{
+    [Fact]
+    public void LayerSettingsReachTheJobAndTheFile()
+    {
+        var s = PhotonCanvas.Doc.DocState.New();
+        var layer = s.Layers[0] with
+        {
+            Laser = LaserSettings.Red(70, 40, 200, 65).WithPasses(3),
+            StepDownMm = 0.5, StepDownFirstMm = 0.01, Wobble = true, WobbleDiameterMm = 0.05, WobbleSpacingMm = 0.015,
+        };
+        s = s with { Layers = [layer] };
+        s = PhotonCanvas.Doc.Ops.AddShapes(s, [new PhotonCanvas.Doc.PathShape { LayerId = layer.Id, Geometry = PhotonCanvas.Doc.PathGeometry.Rect(100, 100, 20, 20) }]);
+        var job = PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false });
+        var block = Assert.IsType<VectorBlock>(Assert.Single(job.Job.Blocks));
+        Assert.Equal(new StepDown(0.01, 0.5), block.Drop);
+        Assert.InRange(block.Path.Points.Count, 191_000, 193_000); // wobbled: ~2400 points per mm of an 80 mm square
+        Assert.Contains(job.Warnings, w => w.Contains("1.01 mm"));
+        Assert.Contains("G0Z1.01F600", job.Motion);
+
+        var back = PhotonCanvas.Doc.DocFile.Deserialize(PhotonCanvas.Doc.DocFile.Serialize(s)).Layers[0];
+        Assert.Equal((0.5, 0.01, true, 0.05, 0.015), (back.StepDownMm, back.StepDownFirstMm, back.Wobble, back.WobbleDiameterMm, back.WobbleSpacingMm));
+
+        // Blue diode: wobble ignored, with a warning.
+        var blue = s with { Layers = [layer with { Laser = LaserSettings.Blue(70, 40).WithPasses(3) }] };
+        var bj = PhotonCanvas.Doc.JobBuilder.Build(blue, new PhotonCanvas.Doc.JobOptions());
+        Assert.Contains(bj.Warnings, w => w.Contains("wobble only works"));
+        Assert.True(((VectorBlock)bj.Job.Blocks[0]).Path.Points.Count < 10);
+    }
+}

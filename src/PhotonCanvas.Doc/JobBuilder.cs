@@ -184,12 +184,24 @@ public static class JobBuilder
                     ? ApplyKerf(shapes, layer, opt.Tolerance, warnings)
                     : shapes.SelectMany(sh => sh.World.Flatten(opt.Tolerance)).Where(f => f.Points.Count >= 2).ToList();
                 var extras = new CutExtras(layer);
+                StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
+                bool wobble = layer.Wobble && layer.Laser.Light == LightSource.Red;
+                if (layer.Wobble && !wobble)
+                    warnings.Add($"Layer \"{layer.Name}\": wobble only works with the red fiber laser, so it's ignored on the blue diode.");
+                if (drop is not null)
+                    warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
                 foreach (var (path, depth) in Order(paths, ref pos))
                     foreach (var p in extras.Pieces(path, depth))
                     {
                         var pl = p.Closed ? Polyline.Loop(p.Points) : Polyline.Open(p.Points);
                         if (!pl.HasExtent) continue;
-                        blocks.Add(new VectorBlock(pl, layer.Laser));
+                        if (wobble)
+                        {
+                            if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
+                                throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
+                            pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
+                        }
+                        blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop });
                         steps.Add(new(layer.Id, p.Points, p.Closed, false));
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }

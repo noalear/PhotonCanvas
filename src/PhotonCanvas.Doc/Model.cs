@@ -74,6 +74,17 @@ public sealed record Layer
     /// <summary>Fill: extend each scan line this far beyond the shape with the laser off, so the beam is at speed when it burns (mm).</summary>
     public double OverscanMm { get; init; }
 
+    /// <summary>Cut/Score: lower the head by this much before each pass after the first (mm, 0 = off). For thick material.</summary>
+    public double StepDownMm { get; init; }
+    /// <summary>Cut/Score with step-down: lower the head by this much before the first pass too (mm).</summary>
+    public double StepDownFirstMm { get; init; }
+    /// <summary>Cut/Score on the fiber laser: trace small circles along the path (wider, smoother marks).</summary>
+    public bool Wobble { get; init; }
+    /// <summary>Wobble circle diameter (mm).</summary>
+    public double WobbleDiameterMm { get; init; } = 0.05;
+    /// <summary>How far the circles advance per loop (mm).</summary>
+    public double WobbleSpacingMm { get; init; } = 0.015;
+
     /// <summary>The material this layer is for, and the library recipe its settings came from (null = none chosen).</summary>
     public Materials.MaterialRef? Material { get; init; }
 
