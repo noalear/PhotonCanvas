@@ -388,6 +388,18 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task MovesTheFocusToATypedDistanceLikeXToolStudio()
+    {
+        await using var client = await Connected();
+        Assert.Equal(26, await client.MoveFocusAsync(20)); // head Z = distance + 6
+        Assert.Equal(["P_AUTOFOCUS"], _fake.Modes);
+        var go = _fake.Requests.Single(r => Url(r) == "/v1/laser-head/focus/control")["data"]!;
+        Assert.Equal(("goTo", 26.0, 1), (go["action"]!.GetValue<string>(), go["z"]!.GetValue<double>(), go["stopFirst"]!.GetValue<int>()));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.MoveFocusAsync(151));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => client.MoveFocusAsync(-1));
+    }
+
+    [Fact]
     public async Task AutoFocusStoppedOrSilentReturnsToIdleWithAReadableError()
     {
         await using var client = await Connected();
@@ -910,11 +922,11 @@ sealed class FakeDevice : IAsyncDisposable
                 break;
             case "/v1/laser-head/focus/control":
                 await Reply(req, 0);
-                if (data!["action"]!.GetValue<string>() == "auto_start" && FocusOutcome is { } outcome)
+                if (data!["action"]!.GetValue<string>() is "auto_start" or "goTo" && FocusOutcome is { } outcome)
                     _ = Task.Run(async () =>
                     {
                         await Task.Delay(50);
-                        if (outcome == "FOCUS_FINISHED") HeadZ = 9.5;
+                        if (outcome == "FOCUS_FINISHED") HeadZ = data["action"]!.GetValue<string>() == "goTo" ? data["z"]!.GetValue<double>() : 9.5;
                         await PushAsync(new JsonObject
                         {
                             ["type"] = "request", ["method"] = "REPORT", ["url"] = "/v1/device/report",

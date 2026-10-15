@@ -920,7 +920,26 @@ public sealed class DeviceClient : IAsyncDisposable
     /// FOCUS_FINISHED (or FOCUS_STOPED, e.g. its button). Returns the new head Z.
     /// On any failure the machine is put back to idle.
     /// </summary>
-    public async Task<double> AutoFocusAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    public Task<double> AutoFocusAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default) =>
+        FocusAsync(new JsonObject { ["action"] = "auto_start" }, "Auto-focus", timeout, cancellationToken);
+
+    /// <summary>Highest head Z the stock app ever sends (mm).</summary>
+    public const double MaxHeadZ = 156;
+
+    /// <summary>
+    /// Move the head to a focus distance (mm between laser and material, as the machine's own
+    /// distance reading: head Z = distance + <paramref name="zOffset"/>), the way xTool Studio's
+    /// "hand focus" does: focus mode, then <c>goTo</c>, then wait for FOCUS_FINISHED. Returns head Z.
+    /// </summary>
+    public Task<double> MoveFocusAsync(double distanceMm, double zOffset = 6, TimeSpan? timeout = null, CancellationToken cancellationToken = default)
+    {
+        double z = distanceMm + zOffset;
+        if (!double.IsFinite(z) || z < zOffset || z > MaxHeadZ)
+            throw new ArgumentOutOfRangeException(nameof(distanceMm), distanceMm, $"Focus distance must be 0–{MaxHeadZ - zOffset} mm.");
+        return FocusAsync(new JsonObject { ["action"] = "goTo", ["z"] = Math.Round(z, 2), ["stopFirst"] = 1 }, "Moving the focus", timeout, cancellationToken);
+    }
+
+    async Task<double> FocusAsync(JsonObject control, string what, TimeSpan? timeout, CancellationToken cancellationToken)
     {
         var outcome = new TaskCompletionSource<DeviceEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
         void OnEvent(DeviceEvent ev)
@@ -931,7 +950,7 @@ public sealed class DeviceClient : IAsyncDisposable
         try
         {
             await RequestAsync("PUT", "/v1/device/mode", new JsonObject { ["mode"] = "P_AUTOFOCUS" }, cancellationToken: cancellationToken).ConfigureAwait(false);
-            await RequestAsync("POST", "/v1/laser-head/focus/control", new JsonObject { ["action"] = "auto_start" },
+            await RequestAsync("POST", "/v1/laser-head/focus/control", control,
                 timeout: TimeSpan.FromSeconds(60), cancellationToken: cancellationToken).ConfigureAwait(false);
             DeviceEvent ev;
             try
@@ -940,13 +959,13 @@ public sealed class DeviceClient : IAsyncDisposable
             }
             catch (TimeoutException)
             {
-                throw new DeviceException(DeviceException.FocusFailedCode, "Auto-focus didn't finish within 2 minutes.");
+                throw new DeviceException(DeviceException.FocusFailedCode, $"{what} didn't finish within 2 minutes.");
             }
             if (ev.Type != "FOCUS_FINISHED")
                 throw new DeviceException(DeviceException.FocusFailedCode,
-                    ev.Type == "AXIS_HOME_STARTED" ? "Auto-focus was interrupted: the machine started homing its Z axis."
-                    : ev.InfoText == "Button" ? "Auto-focus was stopped with the machine's button."
-                    : $"Auto-focus stopped{(string.IsNullOrEmpty(ev.InfoText) ? "" : $" ({ev.InfoText})")}.");
+                    ev.Type == "AXIS_HOME_STARTED" ? $"{what} was interrupted: the machine started homing its Z axis."
+                    : ev.InfoText == "Button" ? $"{what} was stopped with the machine's button."
+                    : $"{what} stopped{(string.IsNullOrEmpty(ev.InfoText) ? "" : $" ({ev.InfoText})")}.");
             return await GetHeadZAsync(cancellationToken).ConfigureAwait(false);
         }
         catch (Exception e) when (e is DeviceException or OperationCanceledException)

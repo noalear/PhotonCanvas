@@ -166,6 +166,10 @@ public sealed class MachinePanel : UserControl
         SetDisconnectedUi("Not connected.");
         UpdateCalState();
         UpdateKeysState();
+        ConnectionChanged += Changed;
+        _onCanvas.IsCheckedChanged += (_, _) => Changed();
+        _live.IsCheckedChanged += (_, _) => Changed();
+        _opacity.ValueChanged += (_, _) => Changed();
     }
 
     void UpdateKeysState()
@@ -179,7 +183,7 @@ public sealed class MachinePanel : UserControl
     /// <summary>Open the connection-keys setup. True when valid keys are in place afterwards.</summary>
     public async Task<bool> SetUpKeys()
     {
-        if (TopLevel.GetTopLevel(this) is not Window owner) return false;
+        if (Owner is not { } owner) return false;
         var w = new KeysWindow();
         await w.ShowDialog(owner);
         _keys = MachineKeys.Load();
@@ -192,7 +196,94 @@ public sealed class MachinePanel : UserControl
 
     public bool HasKeys => _keys.IsComplete;
 
-    public double OverlayOpacity => _opacity.Value;
+    /// <summary>Window for this panel's dialogs when it isn't shown anywhere (it lives in Settings).</summary>
+    public Window? OwnerWindow { get; set; }
+    Window? Owner => TopLevel.GetTopLevel(this) as Window ?? OwnerWindow;
+
+    // ---- for the controls on the work area -----------------------------------------------
+
+    /// <summary>Something the work-area controls show changed (connection, mode, focus, lights, camera). UI thread.</summary>
+    public event Action? StateChanged;
+    void Changed() => StateChanged?.Invoke();
+
+    /// <summary>Overlay opacity (also settable from the work area).</summary>
+    public double OverlayOpacity
+    {
+        get => _opacity.Value;
+        set => _opacity.Value = Math.Clamp(value, _opacity.Minimum, _opacity.Maximum);
+    }
+
+    public bool HasCalibration => _calibrations.Count > 0;
+
+    /// <summary>The calibrated camera picture under the design.</summary>
+    public bool CameraOnWorkArea
+    {
+        get => _onCanvas.IsChecked == true;
+        set { if (_onCanvas.IsChecked != value) _onCanvas.IsChecked = value; Changed(); }
+    }
+
+    /// <summary>Continuous overview camera (keeps the work-area picture updating).</summary>
+    public bool LiveView
+    {
+        get => _live.IsChecked == true;
+        set
+        {
+            if (!_live.IsEnabled || LiveView == value) return;
+            _stream.SelectedIndex = 0;
+            _live.IsChecked = value;
+            Changed();
+        }
+    }
+
+    public (int Front, int Back) Lights => ((int)Math.Round(_frontLight.Value), (int)Math.Round(_backLight.Value));
+
+    public void SetLights(int front, int back)
+    {
+        _frontLight.Value = Math.Clamp(front, 0, 100);
+        _backLight.Value = Math.Clamp(back, 0, 100);
+    }
+
+    /// <summary>"Ready", "Running a job"… or "Not connected".</summary>
+    public string ModeText => IsConnected ? Describe(Mode) : "Not connected";
+
+    public bool IsBusyFocusing { get; private set; }
+
+    /// <summary>Move the head to a focus distance (mm). Returns an error message, or null when done.</summary>
+    public async Task<string?> MoveFocusAsync(double distanceMm)
+    {
+        if (_client is not { } c) return "Not connected.";
+        if (Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "")) return $"The machine is busy ({Describe(Mode)}).";
+        IsBusyFocusing = true;
+        Changed();
+        Log($"Moving the focus to {distanceMm:0.0} mm.");
+        try
+        {
+            double z = await c.MoveFocusAsync(distanceMm, _machine.ZOffset);
+            ShowStatus("P_IDLE", z - _machine.ZOffset);
+            UpdateCalState();
+            if (_onCanvas.IsChecked == true) _ = RefreshOverlay();
+            return null;
+        }
+        catch (Exception e) when (e is DeviceException or ArgumentOutOfRangeException)
+        {
+            Log($"Focus: {e.Message}");
+            return e.Message;
+        }
+        finally { IsBusyFocusing = false; Changed(); }
+    }
+
+    /// <summary>Connect now: the last machine, else whatever answers on the network (sets up keys first if needed).</summary>
+    public async Task ConnectNowAsync()
+    {
+        if (IsConnected || _connecting) return;
+        if (!await EnsureKeys()) return;
+        if (_settings.LastMachineIp is { } last && IPAddress.TryParse(last, out _) && await ConnectTo(last)) return;
+        var found = await FindDevices();
+        foreach (var d in found.OrderByDescending(d => d.DeviceCode == _machine.DeviceCode))
+            if (await ConnectTo(d.Ip)) return;
+    }
+
+    public Task DisconnectAsync() => Disconnect("Disconnected.");
 
     static Control LightRow(string label, Slider s, TextBlock value)
     {
@@ -215,6 +306,7 @@ public sealed class MachinePanel : UserControl
         _frontText.Text = front == 0 ? "off" : $"{front}%";
         _backText.Text = back == 0 ? "off" : $"{back}%";
         _updatingLights = false;
+        Changed();
     }
 
     /// <summary>Send the slider values once they stop moving.</summary>
@@ -286,7 +378,7 @@ public sealed class MachinePanel : UserControl
 
     async Task OpenCalibration()
     {
-        if (TopLevel.GetTopLevel(this) is not Window owner) return;
+        if (Owner is not { } owner) return;
         var w = new CalibrationWindow(this, _settings, Distance);
         w.Saved += cal =>
         {
@@ -311,7 +403,7 @@ public sealed class MachinePanel : UserControl
         if (_calibrations.Count == 0)
         {
             _onCanvas.IsChecked = false;
-            if (TopLevel.GetTopLevel(this) is Window owner)
+            if (Owner is { } owner)
                 await Dialogs.Message(owner, "Calibrate first", "The camera needs calibrating before its picture can be placed accurately on the work area. Click Calibrate camera.");
             return;
         }
@@ -705,6 +797,7 @@ public sealed class MachinePanel : UserControl
         _live.IsChecked = false;
         _live.IsEnabled = false;
         StatusChanged?.Invoke("Machine: offline");
+        Changed();
     }
 
     /// <summary>Close the connection when the app exits.</summary>
@@ -770,6 +863,7 @@ public sealed class MachinePanel : UserControl
         Distance = dist;
         _mode.Text = Describe(mode);
         if (mode == "P_WORK" && LoadedJobDescription() is { } who) _mode.Text += $"\n{who}";
+        Changed();
         _distance.Text = dist is { } d ? $"Focus distance {d:0.0} mm (head Z {d + _machine.ZOffset:0.00}). Set it on the machine or in its focus menu." : "";
         StatusChanged?.Invoke($"Machine: {Describe(mode)}" + (dist is { } dd ? $" · distance {dd:0.0} mm" : ""));
     }
@@ -887,6 +981,8 @@ public sealed class MachinePanel : UserControl
             return;
         }
         _focus.IsEnabled = false;
+        IsBusyFocusing = true;
+        Changed();
         _focusState.Text = "Focusing… the head will move. Press the machine's button to stop.";
         Log("Auto-focus started.");
         try
@@ -904,7 +1000,7 @@ public sealed class MachinePanel : UserControl
             _focusState.Text = e.Message;
             Log($"Auto-focus: {e.Message}");
         }
-        finally { _focus.IsEnabled = IsConnected; }
+        finally { _focus.IsEnabled = IsConnected; IsBusyFocusing = false; Changed(); }
     }
 
     public const string LidOpenWarning =
@@ -943,7 +1039,7 @@ public sealed class MachinePanel : UserControl
     async Task SetLidOpen()
     {
         if (_updatingLid || _client is not { } c || _lidOpen.IsChecked is not bool on) return;
-        if (on && TopLevel.GetTopLevel(this) is Window owner &&
+        if (on && Owner is { } owner &&
             !await Dialogs.Confirm(owner, "Allow starting with the lid open?", LidOpenWarning, "I understand, allow it", "Keep it off"))
         {
             await RefreshLid();
@@ -1008,7 +1104,7 @@ public sealed class MachinePanel : UserControl
 
     async Task SaveSnapshot()
     {
-        if (_client is not { } c || TopLevel.GetTopLevel(this) is not Window owner) return;
+        if (_client is not { } c || Owner is not { } owner) return;
         var resume = await PauseLive();
         try
         {
