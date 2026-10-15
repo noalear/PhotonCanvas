@@ -53,6 +53,13 @@ public static class DocFile
                 ["fillAngleDeg"] = l.FillAngleDeg,
                 ["crosshatch"] = l.Crosshatch,
                 ["overscanMm"] = l.OverscanMm,
+                ["material"] = l.Material is { } mat ? new JsonObject
+                {
+                    ["id"] = mat.MaterialId.ToString(),
+                    ["label"] = mat.Label,
+                    ["recipeId"] = mat.RecipeId?.ToString(),
+                    ["recipeTitle"] = mat.RecipeTitle,
+                } : null,
             });
         var shapes = new JsonArray();
         foreach (var sh in s.Shapes)
@@ -169,6 +176,10 @@ public static class DocFile
                     FillAngleDeg = n["fillAngleDeg"]?.GetValue<double>() ?? 0,
                     Crosshatch = n["crosshatch"]?.GetValue<bool>() ?? false,
                     OverscanMm = n["overscanMm"]?.GetValue<double>() ?? 0,
+                    Material = n["material"] is JsonObject mo && Guid.TryParse(mo["id"]?.GetValue<string>(), out var mid)
+                        ? new Materials.MaterialRef(mid, mo["label"]?.GetValue<string>() ?? "",
+                            Guid.TryParse(mo["recipeId"]?.GetValue<string>(), out var rid) ? rid : null, mo["recipeTitle"]?.GetValue<string>())
+                        : null,
                 });
             }
             if (layers.Count == 0) layers.Add(Layer.Default(0));

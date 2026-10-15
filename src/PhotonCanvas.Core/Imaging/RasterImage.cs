@@ -48,6 +48,34 @@ public sealed class RasterImage
         return new RasterImage(src.Width, src.Height, src.Bytes);
     }
 
+    /// <summary>JPEG of this image, scaled down so its longest side is at most <paramref name="maxSide"/> (0 = full size).</summary>
+    public byte[] EncodeJpeg(int maxSide = 0, int quality = 85) => Encode(SKEncodedImageFormat.Jpeg, maxSide, quality);
+
+    /// <summary>PNG of this image (keeps transparency), optionally scaled down.</summary>
+    public byte[] EncodePng(int maxSide = 0) => Encode(SKEncodedImageFormat.Png, maxSide, 100);
+
+    byte[] Encode(SKEncodedImageFormat format, int maxSide, int quality)
+    {
+        var info = new SKImageInfo(Width, Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        using var bmp = new SKBitmap(info);
+        System.Runtime.InteropServices.Marshal.Copy(Rgba, 0, bmp.GetPixels(), Rgba.Length);
+        SKBitmap? resized = null;
+        try
+        {
+            var src = bmp;
+            if (maxSide > 0 && Math.Max(Width, Height) > maxSide)
+            {
+                double s = (double)maxSide / Math.Max(Width, Height);
+                resized = bmp.Resize(new SKImageInfo(Math.Max(1, (int)(Width * s)), Math.Max(1, (int)(Height * s)), SKColorType.Rgba8888, SKAlphaType.Unpremul), SKFilterQuality.High);
+                if (resized is not null) src = resized;
+            }
+            using var img = SKImage.FromBitmap(src);
+            using var data = img.Encode(format, quality);
+            return data.ToArray();
+        }
+        finally { resized?.Dispose(); }
+    }
+
     static SKBitmap? ApplyOrientation(SKBitmap bmp, SKEncodedOrigin origin)
     {
         if (origin is SKEncodedOrigin.TopLeft or SKEncodedOrigin.Default) return null;

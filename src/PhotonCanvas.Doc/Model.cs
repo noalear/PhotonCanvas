@@ -74,6 +74,9 @@ public sealed record Layer
     /// <summary>Fill: extend each scan line this far beyond the shape with the laser off, so the beam is at speed when it burns (mm).</summary>
     public double OverscanMm { get; init; }
 
+    /// <summary>The material this layer is for, and the library recipe its settings came from (null = none chosen).</summary>
+    public Materials.MaterialRef? Material { get; init; }
+
     /// <summary>A palette that stays distinguishable on dark and light canvases.</summary>
     public static readonly IReadOnlyList<uint> Palette =
     [
