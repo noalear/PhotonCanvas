@@ -54,6 +54,9 @@ public sealed class PropertiesPanel : UserControl
     /// <summary>The user asked for a depthmap of a picture (DepthCharge).</summary>
     public event Action<ImageShape>? DepthmapRequested;
 
+    /// <summary>The user asked to remove a picture's background.</summary>
+    public event Action<ImageShape>? RemoveBackgroundRequested;
+
     /// <summary>The user asked to snap the selection onto a piece seen by the camera.</summary>
     public event Action? FitToCameraRequested;
 
@@ -146,13 +149,15 @@ public sealed class PropertiesPanel : UserControl
         trace.Click += (_, _) => { if (SelectedPicture() is { } im) TraceRequested?.Invoke(im); };
         var depth = Button("Depthmap…", tip: "Turn the picture into a relief depthmap with DepthCharge.");
         depth.Click += (_, _) => { if (SelectedPicture() is { } im) DepthmapRequested?.Invoke(im); };
+        var removeBg = Button("Remove background…", tip: "Make the backdrop see-through so it isn't engraved.");
+        removeBg.Click += (_, _) => { if (SelectedPicture() is { } im) RemoveBackgroundRequested?.Invoke(im); };
         var resetTone = Button("Reset");
         resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
         _picCard = Card("Picture",
             Slider("Brightness", _bright), Slider("Contrast", _contrast), Slider("Gamma", _gamma), _invertPic,
             Hint("These change how the picture engraves (Image layers), not the file."),
             Row(trace, depth),
-            resetTone);
+            Row(removeBg, resetTone));
         _bright.ValueChanged += (_, _) => EditPicture("Picture brightness", t => t with { Brightness = _bright.Value }, "bright");
         _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");

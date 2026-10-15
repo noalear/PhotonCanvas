@@ -215,3 +215,65 @@ public class ImageTests
         Assert.Equal(img.Bounds, b.Bounds);
     }
 }
+
+public class BackgroundRemovalTests
+{
+    /// <summary>200 × 160: shaded light-grey backdrop with noise, a red ring (r 50) round a white middle (r 20).</summary>
+    static RasterImage Photo()
+    {
+        int w = 200, h = 160;
+        var rgba = new byte[w * h * 4];
+        var rng = new Random(4);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int o = (y * w + x) * 4;
+                double d = Math.Sqrt((x - 100) * (x - 100) + (y - 80) * (y - 80));
+                int n = rng.Next(-6, 7);
+                (int r, int g, int b) = d < 20 ? (250, 250, 250) : d < 50 ? (200, 30, 30) : (215 + x / 20, 215 + x / 20, 220 + x / 20);
+                rgba[o] = (byte)Math.Clamp(r + n, 0, 255); rgba[o + 1] = (byte)Math.Clamp(g + n, 0, 255); rgba[o + 2] = (byte)Math.Clamp(b + n, 0, 255); rgba[o + 3] = 255;
+            }
+        return new RasterImage(w, h, rgba);
+    }
+
+    static byte At(byte[] m, int x, int y) => m[y * 200 + x];
+
+    [Fact]
+    public void RemovesThePlainBackdropAndKeepsTheSubject()
+    {
+        var img = Photo();
+        var m = BackgroundRemoval.Mask(img, new BackgroundOptions { Tolerance = 15, Feather = 0 });
+        Assert.Equal(0, At(m, 5, 5));      // corner
+        Assert.Equal(0, At(m, 195, 150));  // far corner (shaded differently)
+        Assert.Equal(255, At(m, 100, 40)); // ring
+        Assert.Equal(255, At(m, 100, 80)); // white middle: enclosed, so kept
+        var cut = BackgroundRemoval.Apply(img, m);
+        Assert.Equal(0, cut.Rgba[(5 * 200 + 5) * 4 + 3]);
+        Assert.Equal(1f, cut.Luminance()[5 * 200 + 5]); // see-through engraves as white (no burn)
+    }
+
+    [Fact]
+    public void PickingAColourRemovesItToo()
+    {
+        var img = Photo();
+        var m = BackgroundRemoval.Mask(img, new BackgroundOptions { Tolerance = 15, Feather = 0, Picks = [(100, 80)] });
+        Assert.Equal(0, At(m, 100, 80));
+        Assert.Equal(255, At(m, 100, 40));
+        // Only the picked colour, without the edges.
+        var only = BackgroundRemoval.Mask(img, new BackgroundOptions { FromEdges = false, Tolerance = 15, Feather = 0, Picks = [(100, 80)] });
+        Assert.Equal(255, At(only, 5, 5));
+        Assert.Equal(0, At(only, 100, 80));
+    }
+
+    [Fact]
+    public void ShrinkAndFeatherWorkOnTheEdge()
+    {
+        var img = Photo();
+        var sharp = BackgroundRemoval.Mask(img, new BackgroundOptions { Tolerance = 15, Feather = 0 });
+        var shrunk = BackgroundRemoval.Mask(img, new BackgroundOptions { Tolerance = 15, Feather = 0, Shrink = 3 });
+        Assert.True(shrunk.Count(v => v == 255) < sharp.Count(v => v == 255));
+        Assert.Equal(255, At(shrunk, 100, 40));
+        var soft = BackgroundRemoval.Mask(img, new BackgroundOptions { Tolerance = 15, Feather = 2 });
+        Assert.Contains(soft, v => v is > 0 and < 255);
+    }
+}

@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
         _props.DepthmapRequested += im => _ = Guard(() => MakeDepthmap(im));
+        _props.RemoveBackgroundRequested += im => _ = Guard(() => RemoveBackground(im));
         _library = Doc.Materials.MaterialLibrary.Load(Path.Combine(AppIdentity.DataDir, "materials"));
         if (!_settings.PresetsAdopted)
         {
@@ -620,12 +621,27 @@ public partial class MainWindow : Window
             DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
             DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
             DoAsync("Depthmap with DepthCharge…", () => MakeDepthmap(picture), picture is not null),
+            DoAsync("Remove picture background…", () => picture is not null ? RemoveBackground(picture) : Task.CompletedTask, picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
         ];
     }
 
     readonly DepthChargeService _depthCharge = new();
+
+    async Task RemoveBackground(ImageShape im)
+    {
+        var w = new BackgroundWindow(im.Source.Pixels, result =>
+        {
+            var replaced = new ImageShape
+            {
+                Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = im.Transform,
+                SizeMm = im.SizeMm, Tone = im.Tone, Source = ImageSource.FromEncoded(result.ToPng()),
+            };
+            _doc.Commit("Remove background", Ops.Replace(_doc.State, replaced), [im.Id]);
+        });
+        await w.ShowDialog(this);
+    }
     readonly Doc.Materials.MaterialLibrary _library;
 
     async Task ShowLibrary()
