@@ -4,6 +4,9 @@
              RequestedThemeVariant="Dark">
   <Application.Resources>
     <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Icons.axaml" />
+      </ResourceDictionary.MergedDictionaries>
       <!-- Surfaces -->
       <SolidColorBrush x:Key="Bg0" Color="#0E1014" />
       <SolidColorBrush x:Key="Bg1" Color="#15181E" />
