@@ -18,7 +18,7 @@ straight to the machine over your own network.
 > authors are not liable for injury, fire, or damage to your machine, materials or
 > property (GPL v3, sections 15–16).
 >
-> **Lid-open mode** ("Allow starting with the lid open" on the Machine tab) removes the
+> **Lid-open mode** ("Allow starting with the lid open" in Settings → Machine) removes the
 > protection the lid gives you. Only turn it on if everyone in the room wears safety
 > glasses rated for 455 nm and 1064 nm, and never leave the machine unattended.
 
@@ -47,15 +47,15 @@ machine's start button.
 3. **Connection keys (one-time).** xTool machines expect three fixed codes when a
    program searches for them and pairs with them. They are not included in this
    project. If xTool Studio is installed on your computer, click **Find them in my
-   xTool Studio** (Machine tab or the welcome screen) and they are read from your own
+   xTool Studio** (Settings → Connection or the welcome screen) and they are read from your own
    copy in a few seconds and saved to `%APPDATA%\PhotonCanvas\keys.json`. You can also point
    it at xTool Studio's `resources\app.asar`, or paste them in; each one is checked
    against a fingerprint. Don't have xTool Studio? Install it, run the setup once, then
    uninstall it.
-4. Turn the laser on. The Machine tab finds and connects to it; the first time, press
+4. Turn the laser on. PhotonCanvas finds and connects to it (status at the top right of the work area); the first time, press
    the machine's button to allow this computer.
 
-Help → Getting started shows the short tour again.
+The ? menu at the top right → Getting started shows the short tour again.
 
 ## DepthCharge
 

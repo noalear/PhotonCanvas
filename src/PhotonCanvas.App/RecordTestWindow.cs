@@ -49,7 +49,7 @@ public sealed class RecordTestWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
 
-        // A material test is the "Test …" layers made by Tools → Material test: one square each.
+        // A material test is the "Test …" layers made by Laser → Test grid: one square each.
         _cells = state.Layers
             .Where(l => l.Name.StartsWith("Test ", StringComparison.Ordinal) && l.Name != "Test labels")
             .Select(l => (Layer: l, Shapes: state.ShapesOn(l.Id).ToList()))
@@ -105,7 +105,7 @@ public sealed class RecordTestWindow : Window
 
         if (_cells.Count == 0)
         {
-            _status.Text = "There's no material test in this design. Make one with Tools → Material test, burn it, then come back here.";
+            _status.Text = "There's no material test in this design. Make one with Laser → Test grid, burn it, then come back here.";
             update.IsEnabled = false;
         }
         else _status.Text = photo is null ? "Burn the test, then click Update photo." : "Click the squares that came out well (Update photo first if this picture is from before the burn).";

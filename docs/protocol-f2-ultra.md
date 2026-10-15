@@ -77,7 +77,7 @@ Implemented in `src/ytool/`.
 
 ### Machine keys
 
-Three fixed strings are needed: the discovery request key, the discovery reply key and the pairing key. They are not published here or built into the program. The desktop app's **Machine tab → Connection keys** finds them in the user's own installed xTool Studio (`resourcespp.asar`) by matching SHA-256 fingerprints, or the user can paste them in; they are saved to `%APPDATA%\PhotonCanvas\keys.json`.
+Three fixed strings are needed: the discovery request key, the discovery reply key and the pairing key. They are not published here or built into the program. The desktop app's **Settings → Connection → Connection keys** finds them in the user's own installed xTool Studio (`resourcespp.asar`) by matching SHA-256 fingerprints, or the user can paste them in; they are saved to `%APPDATA%\PhotonCanvas\keys.json`.
 
 ### HTTP probes (V1)
 

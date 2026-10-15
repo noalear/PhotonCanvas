@@ -241,7 +241,7 @@ public static class Discovery
         CancellationToken cancellationToken = default)
     {
         if (!keys.RequestValid || !keys.ReplyValid)
-            throw new InvalidOperationException("The machine keys haven't been set up yet (Machine tab → Connection keys).");
+            throw new InvalidOperationException("The machine keys haven't been set up yet (Settings → Connection → Connection keys).");
         var duration = timeout ?? TimeSpan.FromSeconds(4);
         if (duration <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(timeout), "Timeout must be positive.");

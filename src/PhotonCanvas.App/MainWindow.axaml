@@ -6,61 +6,29 @@
         Width="1500" Height="920" MinWidth="1000" MinHeight="640"
         WindowStartupLocation="CenterScreen">
   <DockPanel>
-    <!-- Menu -->
-    <Border DockPanel.Dock="Top" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1">
-      <DockPanel>
-        <Menu x:Name="MainMenu" DockPanel.Dock="Left" />
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2" Margin="0,0,8,0">
-          <Button x:Name="UndoButton" Classes="icon"><PathIcon Data="{StaticResource IcUndo}" /></Button>
-          <Button x:Name="RedoButton" Classes="icon"><PathIcon Data="{StaticResource IcRedo}" /></Button>
-        </StackPanel>
-      </DockPanel>
-    </Border>
+    <!-- Commands -->
+    <ContentControl x:Name="RibbonHost" DockPanel.Dock="Top" />
 
-    <!-- Status bar -->
-    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="12,4">
-      <DockPanel>
-        <TextBlock x:Name="MachineStatus" DockPanel.Dock="Right" Classes="muted" />
-        <StackPanel Orientation="Horizontal" Spacing="18">
-          <TextBlock x:Name="CursorText" Classes="muted" MinWidth="150" />
-          <TextBlock x:Name="ZoomText" Classes="muted" MinWidth="70" />
-          <TextBlock x:Name="StatusText" Classes="muted" />
-        </StackPanel>
-      </DockPanel>
-    </Border>
-
-    <!-- Tool strip -->
-    <Border DockPanel.Dock="Left" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0" Padding="6,8">
-      <StackPanel>
-        <ToggleButton x:Name="ToolSelect" Classes="tool" ToolTip.Tip="Select / move (V)"><PathIcon Data="{StaticResource IcCursor}" /></ToggleButton>
-        <ToggleButton x:Name="ToolRect" Classes="tool" ToolTip.Tip="Rectangle (R) · Shift = square · Alt = from centre"><PathIcon Data="{StaticResource IcRect}" /></ToggleButton>
-        <ToggleButton x:Name="ToolEllipse" Classes="tool" ToolTip.Tip="Ellipse (E) · Shift = circle · Alt = from centre"><PathIcon Data="{StaticResource IcEllipse}" /></ToggleButton>
-        <ToggleButton x:Name="ToolPolygon" Classes="tool" ToolTip.Tip="Polygon (O) · Shift = even · Alt = from centre"><PathIcon Data="{StaticResource IcPolygon}" /></ToggleButton>
-        <ToggleButton x:Name="ToolStar" Classes="tool" ToolTip.Tip="Star (S) · Shift = even · Alt = from centre"><PathIcon Data="{StaticResource IcStar}" /></ToggleButton>
-        <ToggleButton x:Name="ToolLine" Classes="tool" ToolTip.Tip="Line (L) · Shift = 45° steps"><PathIcon Data="{StaticResource IcLine}" /></ToggleButton>
-        <ToggleButton x:Name="ToolPen" Classes="tool" ToolTip.Tip="Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish"><PathIcon Data="{StaticResource IcPen}" /></ToggleButton>
-        <ToggleButton x:Name="ToolText" Classes="tool" ToolTip.Tip="Text (T) · click where the text should go"><PathIcon Data="{StaticResource IcText}" /></ToggleButton>
-        <ToggleButton x:Name="ToolNodes" Classes="tool" ToolTip.Tip="Edit points (N, or double-click a shape) · drag points and handles · double-click an edge to add · Delete removes · S = smooth/sharp"><PathIcon Data="{StaticResource IcNodes}" /></ToggleButton>
-        <Button x:Name="ShapesButton" Classes="icon" ToolTip.Tip="Shape library (I) · hearts, stars, badges, frames, living hinges and your own saved shapes"><PathIcon Data="{StaticResource IcHeart}" /></Button>
-        <ToggleButton x:Name="ToolWand" Classes="tool" ToolTip.Tip="Pick piece from camera (W) · click inside a piece on the camera picture to outline it"><PathIcon Data="{StaticResource IcWand}" /></ToggleButton>
-        <ToggleButton x:Name="ToolMagnetic" Classes="tool" ToolTip.Tip="Magnetic pen (M) · click along an edge on the camera picture; the line hugs the edge between clicks"><PathIcon Data="{StaticResource IcLasso}" /></ToggleButton>
-        <ToggleButton x:Name="ToolPan" Classes="tool" ToolTip.Tip="Pan (H) · or hold Space / middle mouse"><PathIcon Data="{StaticResource IcHand}" /></ToggleButton>
-        <Separator Margin="0,6" />
-        <Button x:Name="FitButton" Classes="icon" ToolTip.Tip="Fit work area (Home) · F fits the selection"><PathIcon Data="{StaticResource IcFit}" /></Button>
-        <Separator Margin="0,6" />
-        <ToggleButton x:Name="SnapObjectsButton" Classes="tool" ToolTip.Tip="Snap to shapes and the work area: edges, centres and centrelines (hold Ctrl to drag freely)"><PathIcon Data="{StaticResource IcMagnet}" /></ToggleButton>
-        <ToggleButton x:Name="SnapGridButton" Classes="tool" ToolTip.Tip="Snap to grid · right-click for grid &amp; snapping settings"><PathIcon Data="{StaticResource IcGrid}" /></ToggleButton>
+    <!-- Status line -->
+    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bg0}" Padding="12,2">
+      <StackPanel Orientation="Horizontal" Spacing="18">
+        <TextBlock x:Name="CursorText" Classes="muted" FontSize="11" MinWidth="150" />
+        <TextBlock x:Name="ZoomText" Classes="muted" FontSize="11" MinWidth="50" />
+        <TextBlock x:Name="StatusText" Classes="muted" FontSize="11" />
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="300,4,*,4,340">
-      <!-- Layers -->
-      <Border Grid.Column="0" Background="{StaticResource Bg1}" Padding="12">
+    <!-- The job, always in view -->
+    <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
+
+    <Grid ColumnDefinitions="310,4,*,4,280">
+      <!-- Layers, each with its settings -->
+      <Border Grid.Column="0" Background="{StaticResource Bg1}" Padding="10,10,6,0">
         <ContentControl x:Name="LayersHost" />
       </Border>
       <GridSplitter Grid.Column="1" Background="{StaticResource Line}" ResizeDirection="Columns" />
 
-      <!-- Canvas -->
+      <!-- Work area -->
       <DockPanel Grid.Column="2">
         <Border x:Name="ToolOptions" DockPanel.Dock="Top" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="False">
           <StackPanel Orientation="Horizontal" Spacing="10">
@@ -95,28 +63,14 @@
         </Border>
         <Panel>
           <app:CanvasView x:Name="Canvas" />
-          <Border x:Name="EmptyHint" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,28"
-                  Background="{StaticResource Bg2}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16,10">
-            <TextBlock TextAlignment="Center" Classes="muted" LineHeight="20"
-                       Text="Draw with the tools on the left, or drag a file in (SVG, DXF, PDF, pictures).&#10;New material? Tools → Material test finds the right power and speed.  ·  Help → Getting started" />
-          </Border>
+          <ContentControl x:Name="HudHost" HorizontalAlignment="Right" VerticalAlignment="Top" />
         </Panel>
       </DockPanel>
 
       <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
-      <!-- Right column: properties / job / machine -->
-      <Border Grid.Column="4" Background="{StaticResource Bg1}">
-        <TabControl x:Name="RightTabs" Padding="12,4,12,12">
-          <TabItem Header="Design">
-            <ContentControl x:Name="PropertiesHost" />
-          </TabItem>
-          <TabItem Header="Job">
-            <ContentControl x:Name="JobHost" />
-          </TabItem>
-          <TabItem Header="Machine">
-            <ContentControl x:Name="MachineHost" />
-          </TabItem>
-        </TabControl>
+      <!-- What's selected -->
+      <Border Grid.Column="4" Background="{StaticResource Bg1}" Padding="10,10,10,0">
+        <ContentControl x:Name="InspectorHost" />
       </Border>
     </Grid>
   </DockPanel>

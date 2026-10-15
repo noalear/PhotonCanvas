@@ -285,6 +285,9 @@ public sealed class MachinePanel : UserControl
 
     public Task DisconnectAsync() => Disconnect("Disconnected.");
 
+    /// <summary>Open camera calibration.</summary>
+    public Task CalibrateAsync() => OpenCalibration();
+
     static Control LightRow(string label, Slider s, TextBlock value)
     {
         var g = new Grid { ColumnDefinitions = new("60,*,44") };
@@ -341,7 +344,7 @@ public sealed class MachinePanel : UserControl
         catch (DeviceException e) { Log($"Couldn't read the light settings: {e.Message}"); }
     }
 
-    // ---- running job (used by the Job tab) -------------------------------------------
+    // ---- running job (used by the job bar) -------------------------------------------
 
     /// <summary>Machine mode changed (P_IDLE, P_WORK, P_WORKING, P_PAUSE…). On the UI thread.</summary>
     public event Action<string>? ModeChanged;
@@ -502,7 +505,7 @@ public sealed class MachinePanel : UserControl
     public async Task<SkiaSharp.SKBitmap> CaptureAreaAsync(Rect2 area, double mmPerPx, double distanceMm)
     {
         var choice = CalibrationSet.For(_calibrations, distanceMm)
-            ?? throw new InvalidOperationException("The camera isn't calibrated yet (Machine tab → Calibrate camera).");
+            ?? throw new InvalidOperationException("The camera isn't calibrated yet (Camera tab → Calibrate).");
         byte[] jpg;
         await PointersOffAsync();
         try

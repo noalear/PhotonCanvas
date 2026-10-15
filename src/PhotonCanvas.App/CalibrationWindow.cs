@@ -127,7 +127,7 @@ public sealed class CalibrationWindow : Window
 
     void UpdateConnectionHints()
     {
-        _burnState.Text = _machine.IsConnected ? "" : "Connect to the machine (Machine tab) to send the marks. If they are already burned, skip to step 2.";
+        _burnState.Text = _machine.IsConnected ? "" : "Connect to the machine (top right of the work area) to send the marks. If they are already burned, skip to step 2.";
         _photoState.Text = _machine.IsConnected ? "" : "Not connected: you can open a saved overview photo instead.";
     }
 
@@ -137,7 +137,7 @@ public sealed class CalibrationWindow : Window
     {
         if (!_machine.IsConnected)
         {
-            await Dialogs.Message(this, "Not connected", "Connect to the machine on the Machine tab first.");
+            await Dialogs.Message(this, "Not connected", "Connect to the machine first (top right of the work area).");
             return;
         }
         var laser = LaserSettings.Blue((double)(_power.Value ?? 30), (double)(_speed.Value ?? 150));
@@ -182,7 +182,7 @@ public sealed class CalibrationWindow : Window
     {
         if (!_machine.IsConnected)
         {
-            await Dialogs.Message(this, "Not connected", "Connect to the machine on the Machine tab, or open a saved photo.");
+            await Dialogs.Message(this, "Not connected", "Connect to the machine (top right of the work area), or open a saved photo.");
             return;
         }
         try

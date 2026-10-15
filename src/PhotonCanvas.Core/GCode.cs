@@ -183,7 +183,8 @@ public sealed class Job
         Preamble = blocks.Any(b => b is VectorBlock) ? Preamble.Cut : Preamble.Engrave;
     }
 
-    int Rounds => Blocks.Count == 0 ? 1 : Blocks.Max(b => b.Laser.Passes);
+    /// <summary>How many whole-job rounds run (the most passes of any block).</summary>
+    public int Rounds => Blocks.Count == 0 ? 1 : Blocks.Max(b => b.Laser.Passes);
 
     /// <summary>Checks every setting and every coordinate the laser will visit.</summary>
     public void Validate()
@@ -364,8 +365,15 @@ public sealed class Job
     /// </summary>
     public double EstimateSeconds()
     {
+        double work = Blocks.Sum(b => BlockSeconds(b) * b.Laser.Passes);
+        return PassMode is PassMode.Rounds r ? work + r.DelayS * Math.Max(0, Rounds - 1) : work;
+    }
+
+    /// <summary>Rough time for one pass of a block, in seconds (same model as <see cref="EstimateSeconds"/>).</summary>
+    public static double BlockSeconds(Block b)
+    {
         const double Jump = 3000;
-        double BlockTime(Block b) => b switch
+        return b switch
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
             FillBlock f => FillLines(f).Sum(s =>
@@ -374,8 +382,6 @@ public sealed class Job
                 (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed)),
             _ => 0,
         };
-        double work = Blocks.Sum(b => BlockTime(b) * b.Laser.Passes);
-        return PassMode is PassMode.Rounds r ? work + r.DelayS * Math.Max(0, Rounds - 1) : work;
     }
 
     static string[] Tail(string tag) =>

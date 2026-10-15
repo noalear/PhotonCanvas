@@ -404,6 +404,28 @@ public class JobBuilderTests
     }
 
     [Fact]
+    public void EachLayerGetsItsShareOfTheTimeInRunOrder()
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Laser = LaserSettings.Blue(70, 10).WithPasses(3) };
+        var fill = new Layer { Name = "Engrave", Mode = LayerMode.Fill, Laser = LaserSettings.Blue(30, 400) };
+        var empty = new Layer { Name = "Nothing here" };
+        s = s with { Layers = [fill, cut, empty] };
+        s = Ops.AddShapes(s, [Sq(cut.Id, 10, 10, 40), Sq(fill.Id, 60, 60, 20)]);
+
+        var perPath = JobBuilder.Build(s, new JobOptions { WholeJobPasses = false });
+        Assert.Equal([fill.Id, cut.Id], perPath.LayerTimes.Select(t => t.LayerId));
+        Assert.Equal(3, perPath.LayerTimes[1].Passes);
+        Assert.Equal(160 / 10.0 * 3, perPath.LayerTimes[1].TotalSeconds, 0.2);
+        Assert.Equal(perPath.EstimateS, perPath.LayerTimes.Sum(t => t.TotalSeconds), 1e-6);
+        Assert.Null(perPath.RoundDelayS);
+
+        var rounds = JobBuilder.Build(s, new JobOptions { WholeJobPasses = true, PassDelayS = 5 });
+        Assert.Equal(5, rounds.RoundDelayS);
+        Assert.Equal(rounds.EstimateS, rounds.LayerTimes.Sum(t => t.TotalSeconds) + 2 * 5, 1e-6);
+    }
+
+    [Fact]
     public void ErrorsAreReadable()
     {
         var s = DocState.New();

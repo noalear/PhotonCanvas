@@ -86,7 +86,7 @@ public sealed partial class CanvasView
     bool NeedsPhoto()
     {
         if (_photo is not null) return false;
-        Hint?.Invoke("Turn on Camera on work area (Machine tab) first: these tools draw from the camera picture.");
+        Hint?.Invoke("Show the camera picture first (Camera tab, or the machine controls on the work area): these tools draw from it.");
         return true;
     }
 

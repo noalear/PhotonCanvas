@@ -29,7 +29,7 @@ public sealed class MaterialLibraryWindow : Window
     readonly TextBox _notes = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 50 };
     readonly StackPanel _recipes = new() { Spacing = 6 };
     readonly Control _details;
-    readonly TextBlock _empty = Hint("Pick a material on the left, or make a new one. Recipes come from Save to library on a layer, or from a material test (Tools → Record material test results).");
+    readonly TextBlock _empty = Hint("Pick a material on the left, or make a new one. Recipes come from Save to library on a layer, or from a material test (Laser → Record results).");
     readonly TextBlock _status = Hint();
     List<Material> _shown = [];
     Material? _current;

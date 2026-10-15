@@ -1,4 +1,4 @@
-"""Machine keys, supplied by the user (the desktop app's Machine tab finds them in
+"""Machine keys, supplied by the user (the desktop app's Settings → Connection finds them in
 the user's own xTool Studio and saves them to %APPDATA%/PhotonCanvas/keys.json).
 
 Environment variables override the file: PHOTONCANVAS_DISCOVERY_REQUEST_KEY,
@@ -41,5 +41,5 @@ def load_keys(path: Path | None = None) -> MachineKeys:
         os.environ.get("PHOTONCANVAS_PAIRING_KEY", data.get("Pairing", "")),
     )
     if not (keys.discovery_request and keys.discovery_reply and keys.pairing):
-        raise RuntimeError(f"Machine keys not set up: run the desktop app's Machine tab -> Connection keys (or create {p}).")
+        raise RuntimeError(f"Machine keys not set up: run the desktop app's Settings -> Connection -> Connection keys (or create {p}).")
     return keys

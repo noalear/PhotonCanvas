@@ -11,7 +11,7 @@ namespace PhotonCanvas.App;
 /// <summary>
 /// First run: what this is, the safety notice and disclaimer (must be
 /// accepted), the connection keys, and how a job goes from drawing to laser.
-/// Also opened later from Help → Getting started (without the acceptance step).
+/// Also opened later from the help menu (Getting started) (without the acceptance step).
 /// </summary>
 public sealed class WelcomeWindow : Window
 {
@@ -163,7 +163,7 @@ public sealed class WelcomeWindow : Window
         void Refresh()
         {
             bool ok = _hasKeys();
-            _keysState.Text = ok ? "✓ Connection keys are set up." : "Not set up yet. You can also do this later on the Machine tab.";
+            _keysState.Text = ok ? "✓ Connection keys are set up." : "Not set up yet. You can also do this later in Settings.";
             _keysState.Foreground = ok ? Brush("Ok") : Brush("TextMain");
             setUp.IsVisible = !ok;
         }
@@ -180,7 +180,7 @@ public sealed class WelcomeWindow : Window
                      "if xTool Studio is installed on this computer, the setup reads them from it in a few seconds."),
                 setUp,
                 _keysState,
-                Para("Once that's done, the Machine tab finds and connects to the laser automatically. The first time, the machine may ask you to press its button to allow this computer."),
+                Para("Once that's done, PhotonCanvas finds and connects to the laser automatically. The first time, the machine may ask you to press its button to allow this computer."),
             },
         };
     }
@@ -215,11 +215,11 @@ public sealed class WelcomeWindow : Window
             Children =
             {
                 Title2("How a job works"),
-                Step("1", "Draw or import", "Use the tools on the left, or drag in an SVG, DXF, PDF or picture (File → Import). The square is the machine's 220 × 220 mm work area."),
-                Step("2", "Choose what the laser does", "Every shape belongs to a layer (left panel). A layer either cuts through, scores a line, engraves the area, or engraves a picture, at its own power and speed."),
-                Step("3", "Find the right settings", "New material? Use Tools → Material test to burn a grid of power and speed squares on a scrap, then copy the best one."),
-                Step("4", "Send it", "On the Job tab, check the preview and time, then click Send to machine. Nothing happens until you press the start button on the machine."),
-                Hint("Help → Getting started shows this again. Hover over any setting to see what it does."),
+                Step("1", "Draw or import", "Use the Home tab of the ribbon, or drag in an SVG, DXF, PDF or picture (Home → Import). The square is the machine's 220 × 220 mm work area."),
+                Step("2", "Choose what the laser does", "Every shape belongs to a layer (left). A layer either cuts through, scores a line, engraves the area, or engraves a picture, at its own power and speed: click a layer to see and change its settings."),
+                Step("3", "Find the right settings", "New material? Use Laser → Test grid to burn a grid of power and speed squares on a scrap, then copy the best one."),
+                Step("4", "Send it", "In the job bar along the bottom, check the run order and time, then click Send to machine. Nothing happens until you press the start button on the machine."),
+                Hint("The ? at the top right → Getting started shows this again. Hover over any setting to see what it does."),
             },
         };
     }

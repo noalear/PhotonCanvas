@@ -136,5 +136,97 @@
     <Style Selector="NumericUpDown">
       <Setter Property="MinHeight" Value="30" />
     </Style>
+
+    <!-- Ribbon -->
+    <Style Selector="Button.rb, ToggleButton.rb">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="4,3" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ToggleButton.rb:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#24406E" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="ToggleButton.rb:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2D4F86" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+    </Style>
+    <Style Selector="Button.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="ToggleButton.rbtab">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0,0,0,2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Padding" Value="14,5" />
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+    </Style>
+    <Style Selector="ToggleButton.rbtab:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Bg2}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="{StaticResource TextMain}" />
+    </Style>
+    <Style Selector="ToggleButton.rbtab:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Bg3}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="{StaticResource TextMain}" />
+    </Style>
+    <Style Selector="ToggleButton.rbtab.context">
+      <Setter Property="Foreground" Value="#7FB0FF" />
+    </Style>
+
+    <!-- Segmented choices (layer mode, laser) -->
+    <Style Selector="ToggleButton.seg">
+      <Setter Property="Background" Value="{StaticResource Bg1}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="0" />
+      <Setter Property="Padding" Value="4,5" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.seg.first">
+      <Setter Property="CornerRadius" Value="6,0,0,6" />
+    </Style>
+    <Style Selector="ToggleButton.seg.last">
+      <Setter Property="CornerRadius" Value="0,6,6,0" />
+    </Style>
+    <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#24406E" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="ToggleButton.seg:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2D4F86" />
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- Floating panels over the work area -->
+    <Style Selector="Border.hud">
+      <Setter Property="Background" Value="#E615181E" />
+      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="8" />
+      <Setter Property="BoxShadow" Value="0 4 18 0 #66000000" />
+    </Style>
+    <Style Selector="Button.chip, ToggleButton.chip">
+      <Setter Property="Background" Value="{StaticResource Bg2}" />
+      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="14" />
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
   </Application.Styles>
 </Application>

@@ -56,6 +56,10 @@ public sealed class AppSettings
     public List<SentJob> SentJobs { get; set; } = [];
     /// <summary>Frame with a tight outline instead of the rectangle.</summary>
     public bool FrameOutline { get; set; }
+    /// <summary>The machine controls on the work area are folded down to the status.</summary>
+    public bool MachineHudFolded { get; set; }
+    /// <summary>Ribbon tab last used.</summary>
+    public string RibbonTab { get; set; } = "Home";
     // Magic wand and magnetic pen (camera drawing tools).
     public double WandTolerance { get; set; } = 25;
     public double WandSmoothness { get; set; } = 3;

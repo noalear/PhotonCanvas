@@ -615,7 +615,7 @@ public sealed class DeviceClient : IAsyncDisposable
     {
         const string url = "/v1/user/parity";
         if (string.IsNullOrEmpty(_options.PairingKey))
-            throw new DeviceException(DeviceException.NotConnectedCode, "The machine keys haven't been set up yet (Machine tab → Connection keys).");
+            throw new DeviceException(DeviceException.NotConnectedCode, "The machine keys haven't been set up yet (Settings → Connection → Connection keys).");
         string token = TokenStore.GetToken(StatePath, Ip) ?? "";
         var resp = await SendRequestAsync("GET", url, new JsonObject
         {
@@ -1212,13 +1212,13 @@ public sealed class DeviceClient : IAsyncDisposable
     /// <summary>Why an upload was refused, in plain words.</summary>
     public static string BusyMessage(string mode) => mode switch
     {
-        "P_WORK" => "A job is already loaded on the machine, waiting for its start button. Start it, or cancel it (Stop on the Job tab, or long-press the machine's button), then send again.",
+        "P_WORK" => "A job is already loaded on the machine, waiting for its start button. Start it, or cancel it (Stop in the job bar, or long-press the machine's button), then send again.",
         "P_WORKING" => "The machine is running a job. Wait for it to finish, or stop it, then send again.",
         "P_PAUSE" => "A job is paused on the machine. Continue or stop it, then send again.",
         "P_SLEEP" => "The machine is asleep. Press its button to wake it, then send again.",
         "P_AUTOFOCUS" or "P_MEASURE" => "The machine is measuring or focusing. Wait for it to finish, then send again.",
         "P_FRAMING" => "The machine is framing (tracing the outline). Stop framing, then try again.",
-        "P_ERROR" => "The machine is reporting an error. Check it (the light or the Machine tab), then send again.",
+        "P_ERROR" => "The machine is reporting an error. Check it (the light, or Settings → Machine), then send again.",
         _ => $"The machine isn't ready for a new job (it reports \"{mode}\"). Wait a moment and try again.",
     };
 

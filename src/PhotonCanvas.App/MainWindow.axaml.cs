@@ -19,15 +19,21 @@ public partial class MainWindow : Window
     readonly Document _doc = new();
     readonly AppSettings _settings = AppSettings.Load();
     readonly LayersPanel _layers;
+    readonly LayerEditor _layerEditor;
     readonly PropertiesPanel _props;
-    readonly JobPanel _job;
+    readonly JobBar _job;
     readonly MachinePanel _machine;
+    readonly MachineHud _hud;
+    readonly Ribbon _ribbon = new();
     List<Shape> _clipboard = [];
     int _pasteCount;
     bool _closeConfirmed;
 
     /// <summary>A project to open once the window is shown (from the command line).</summary>
     public string? OpenPathOnStartup { get; set; }
+
+    /// <summary>Connect to the machine when the window opens (off for screenshots and tests).</summary>
+    public bool ConnectOnOpen { get; init; } = true;
 
     static readonly FilePickerFileType ProjectType = new("PhotonCanvas project") { Patterns = ["*.pcanvas", "*.ytool"] };
     static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs"] };
@@ -56,31 +62,35 @@ public partial class MainWindow : Window
             _settings.PresetsAdopted = true;
             _settings.Save();
         }
-        _props.Library = _library;
-        _props.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
-        _props.LibraryRequested += () => _ = Guard(ShowLibrary);
-        _machine = new MachinePanel(_settings);
-        _job = new JobPanel(_doc, _settings, Canvas, _machine);
+        _layerEditor = new LayerEditor(_doc, _layers, _settings) { Library = _library };
+        _layerEditor.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
+        _layerEditor.LibraryRequested += () => _ = Guard(ShowLibrary);
+        _layers.Editor = _layerEditor;
+        _machine = new MachinePanel(_settings) { OwnerWindow = this };
+        _job = new JobBar(_doc, _settings, Canvas, _machine);
+        _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
+        _job.LayerClicked += id => _layers.Activate(id);
+        _hud = new MachineHud(_machine, _settings);
+        _hud.SettingsRequested += () => _ = Guard(() => ShowSettings("Machine"));
+        _hud.CalibrateRequested += () => _ = Guard(_machine.CalibrateAsync);
+        _hud.FoldChanged += () => _ribbon.Refresh();
+        _hud.FoldChanged += () => _ribbon.Refresh();
         LayersHost.Content = _layers;
-        PropertiesHost.Content = _props;
+        InspectorHost.Content = _props;
         JobHost.Content = _job;
-        MachineHost.Content = _machine;
+        HudHost.Content = _hud;
+        RibbonHost.Content = _ribbon;
 
-        BuildMenu();
+        BuildRibbon();
         WireTools();
         ApplyGrid();
-        SnapObjectsButton.Click += (_, _) => { _settings.SnapToObjects = SnapObjectsButton.IsChecked == true; SaveAndApplyGrid(); };
-        SnapGridButton.Click += (_, _) => { _settings.SnapToGrid = SnapGridButton.IsChecked == true; SaveAndApplyGrid(); };
-        SnapGridButton.ContextRequested += (_, e) => { e.Handled = true; _ = Guard(ShowGridSettings); };
-        UndoButton.Click += (_, _) => _doc.Undo();
-        RedoButton.Click += (_, _) => _doc.Redo();
-        FitButton.Click += (_, _) => Canvas.FitField();
         Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {v.X:0.00}   Y {v.Y:0.00} mm" : "";
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
-        _machine.StatusChanged += s => MachineStatus.Text = s;
         _machine.PhotoChanged += p => Canvas.Photo = p;
+        _machine.StateChanged += _ribbon.Refresh;
+        _machine.FramingChanged += _ribbon.Refresh;
         Canvas.Hint += h => StatusText.Text = h;
         Canvas.CameraOpacity = _machine.OverlayOpacity;
         _machine.OverlayOpacityChanged += o => Canvas.CameraOpacity = o;
@@ -92,13 +102,12 @@ public partial class MainWindow : Window
         };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
         Canvas.ContextRequested += (_, e) => { e.Handled = true; OpenCanvasMenu(); };
-        ShapesButton.Click += (_, _) => ShowShapes();
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
         Opened += async (_, _) =>
         {
             Canvas.Focus();
-            if (_settings.AcceptedTermsVersion < WelcomeWindow.TermsVersion)
+            if (ConnectOnOpen && _settings.AcceptedTermsVersion < WelcomeWindow.TermsVersion)
             {
                 var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys);
                 await welcome.ShowDialog(this);
@@ -111,7 +120,7 @@ public partial class MainWindow : Window
                 _settings.AcceptedTermsVersion = WelcomeWindow.TermsVersion;
                 _settings.Save();
             }
-            _ = _machine.AutoConnectAsync();
+            if (ConnectOnOpen) _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
         };
         Closing += OnClosing;
@@ -124,14 +133,18 @@ public partial class MainWindow : Window
     {
         var name = _doc.FilePath is { } p ? Path.GetFileNameWithoutExtension(p) : "Untitled";
         Title = $"{name}{(_doc.Dirty ? " •" : "")} — {AppIdentity.ProductName}";
-        EmptyHint.IsVisible = _doc.State.Shapes.Count == 0;
-        UndoButton.IsEnabled = _doc.CanUndo;
-        RedoButton.IsEnabled = _doc.CanRedo;
-        ToolTip.SetTip(UndoButton, _doc.UndoLabel is { } u ? $"Undo {u} (Ctrl+Z)" : "Undo (Ctrl+Z)");
-        ToolTip.SetTip(RedoButton, _doc.RedoLabel is { } r ? $"Redo {r} (Ctrl+Y)" : "Redo (Ctrl+Y)");
+        if (_doc.InEdit) return;
         int n = _doc.State.Shapes.Count, sel = _doc.Selection.Count;
-        StatusText.Text = sel > 0 ? $"{sel} of {n} shapes selected" : $"{n} shapes · {_doc.State.Layers.Count} layers";
-        RefreshMenuState();
+        StatusText.Text = sel > 0 ? $"{sel} of {n} shapes selected" : n == 0
+            ? "Draw with the Home tab, or drag a file in (SVG, DXF, PDF, pictures). New material? Laser → Material test."
+            : $"{n} shapes · {_doc.State.Layers.Count} layers";
+        _ribbon.Refresh();
+        _ribbon.Highlight("Picture", SelectedPicture() is not null);
+        if (_undoButton is not null)
+        {
+            ToolTip.SetTip(_undoButton, _doc.UndoLabel is { } u ? $"Undo {u} (Ctrl+Z)" : "Undo (Ctrl+Z)");
+            ToolTip.SetTip(_redoButton!, _doc.RedoLabel is { } r ? $"Redo {r} (Ctrl+Y)" : "Redo (Ctrl+Y)");
+        }
     }
 
     System.Collections.Immutable.ImmutableHashSet<Guid> _lastSelection = [];
@@ -145,14 +158,10 @@ public partial class MainWindow : Window
         if (layers.Count == 1 && layers[0] != _doc.ActiveLayer) _layers.Activate(layers[0]);
     }
 
+    readonly List<(ToggleButton Button, Tool Tool)> _toolButtons = [];
+
     void WireTools()
     {
-        var map = new (ToggleButton Button, Tool Tool)[]
-        {
-            (ToolSelect, Tool.Select), (ToolRect, Tool.Rect), (ToolEllipse, Tool.Ellipse), (ToolPolygon, Tool.Polygon), (ToolStar, Tool.Star),
-            (ToolLine, Tool.Line), (ToolPen, Tool.Pen), (ToolText, Tool.Text), (ToolNodes, Tool.Nodes), (ToolPan, Tool.Pan),
-            (ToolWand, Tool.Wand), (ToolMagnetic, Tool.Magnetic),
-        };
         Canvas.PolygonSides = _settings.PolygonSides;
         Canvas.StarPoints = _settings.StarPoints;
         Canvas.StarInner = _settings.StarInnerPercent / 100;
@@ -182,7 +191,7 @@ public partial class MainWindow : Window
             ToolHint.Text = t switch
             {
                 Tool.Pen => "Click for corners, drag for curves. Click the first point to close; Enter or double-click to finish an open line; Backspace removes the last point.",
-                Tool.Text => "Click where the text should start, then type in the Text panel.",
+                Tool.Text => "Click where the text should start, then type in the Text panel on the right.",
                 Tool.Wand => "Click inside a piece on the camera picture to outline it. The sliders refine the last pick.",
                 Tool.Magnetic => "Click along an edge on the camera picture. Click the first point to close; Enter or double-click to finish; Backspace undoes a point.",
                 Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S makes it smooth or sharp. Alt-drag a handle to break a smooth point. Esc to finish.",
@@ -196,9 +205,8 @@ public partial class MainWindow : Window
         Canvas.ToolChanged += Options;
         WireWand();
         Canvas.TextRequested += at => CreateText(at);
-        Canvas.TextEditRequested += id => { _doc.Select([id]); RightTabs.SelectedIndex = 0; _props.FocusText(); };
-        foreach (var (b, t) in map) b.Click += (_, _) => { Canvas.Tool = t; Canvas.Focus(); };
-        void Sync(Tool t) { foreach (var (b, tool) in map) b.IsChecked = tool == t; }
+        Canvas.TextEditRequested += id => { _doc.Select([id]); _props.FocusText(); };
+        void Sync(Tool t) { foreach (var (b, tool) in _toolButtons) b.IsChecked = tool == t; }
         Canvas.ToolChanged += Sync;
         Sync(Canvas.Tool);
     }
@@ -235,12 +243,12 @@ public partial class MainWindow : Window
         Apply(save: false);
     }
 
-    // ---- menu ----------------------------------------------------------------
+    // ---- ribbon ----------------------------------------------------------------
 
-    MenuItem? _undoItem, _redoItem, _recentMenu;
-    MenuItem _showGridItem = null!, _snapObjectsItem = null!, _snapGridItem = null!;
+    Button? _undoButton, _redoButton;
+    MenuItem? _recentMenu;
 
-    /// <summary>Push the grid and snap settings to the canvas and every toggle that shows them.</summary>
+    /// <summary>Push the grid and snap settings to the canvas (the ribbon's toggles read them back).</summary>
     void ApplyGrid()
     {
         Canvas.Grid = GridWindow.From(_settings);
@@ -248,11 +256,7 @@ public partial class MainWindow : Window
         Canvas.SnapToObjects = _settings.SnapToObjects;
         Canvas.SnapToGrid = _settings.SnapToGrid;
         Canvas.SnapDistancePx = _settings.SnapDistancePx;
-        _showGridItem.IsChecked = _settings.ShowGrid;
-        _snapObjectsItem.IsChecked = _settings.SnapToObjects;
-        _snapGridItem.IsChecked = _settings.SnapToGrid;
-        SnapObjectsButton.IsChecked = _settings.SnapToObjects;
-        SnapGridButton.IsChecked = _settings.SnapToGrid;
+        _ribbon.Refresh();
     }
 
     void SaveAndApplyGrid()
@@ -262,27 +266,54 @@ public partial class MainWindow : Window
     }
 
     Task ShowGridSettings() => new GridWindow(_settings, ApplyGrid).ShowDialog(this);
-    readonly List<(MenuItem Item, Func<bool> Enabled)> _conditional = [];
 
-    MenuItem Item(string header, Action action, string? gesture = null, Func<bool>? enabled = null)
+    MenuItem Item(string header, Action action, string? gesture = null)
     {
         var m = new MenuItem { Header = header };
         if (gesture is not null) m.InputGesture = KeyGesture.Parse(gesture);
         m.Click += (_, _) => action();
-        if (enabled is not null) _conditional.Add((m, enabled));
         return m;
     }
 
-    MenuItem AsyncItem(string header, Func<Task> action, string? gesture = null, Func<bool>? enabled = null) =>
-        Item(header, () => _ = Guard(action), gesture, enabled);
+    MenuItem AsyncItem(string header, Func<Task> action, string? gesture = null) => Item(header, () => _ = Guard(action), gesture);
 
-    void BuildMenu()
+    static Button HeaderIcon(string icon, string tip)
+    {
+        var b = new Button { Classes = { "icon" }, Content = new PathIcon { Data = UiKit.Icon(icon) } };
+        ToolTip.SetTip(b, tip);
+        return b;
+    }
+
+    void BuildRibbon()
     {
         bool HasSel() => _doc.Selection.Count > 0;
-        _recentMenu = new MenuItem { Header = "Open recent" };
-        var file = new MenuItem
+        bool Many() => _doc.Selection.Count > 1;
+        bool TwoPaths() => SelectedPaths().Count > 1;
+        bool HasPicture() => SelectedPicture() is not null;
+        void Use(Tool t) { Canvas.Tool = t; Canvas.Focus(); }
+        ToggleButton ToolLarge(RibbonGroup g, string label, string icon, Tool t, string tip)
         {
-            Header = "_File",
+            var b = g.LargeToggle(label, icon, _ => Use(t), tip);
+            _toolButtons.Add((b, t));
+            return b;
+        }
+        ToggleButton ToolSmall(RibbonGroup g, string label, string icon, Tool t, string tip)
+        {
+            var b = g.SmallToggle(label, icon, _ => Use(t), tip);
+            _toolButtons.Add((b, t));
+            return b;
+        }
+
+        // ---- File (the button left of the tabs) ----
+        _recentMenu = new MenuItem { Header = "Open recent" };
+        var file = new Button
+        {
+            Content = "File", Background = UiKit.Brush("Accent"), Foreground = Avalonia.Media.Brushes.White,
+            FontWeight = Avalonia.Media.FontWeight.SemiBold, Padding = new(14, 4), CornerRadius = new(5),
+        };
+        file.Flyout = new MenuFlyout
+        {
+            Placement = PlacementMode.BottomEdgeAlignedLeft,
             Items =
             {
                 AsyncItem("New", NewDoc, "Ctrl+N"),
@@ -299,121 +330,24 @@ public partial class MainWindow : Window
                 AsyncItem("Export job package (.xf)…", () => _job.Export(xf: true)),
                 AsyncItem("Export G-code (.gcode)…", () => _job.Export(xf: false)),
                 new Separator(),
+                AsyncItem("Settings…", () => ShowSettings("Machine")),
                 Item("Exit", Close),
             },
         };
-        _undoItem = Item("Undo", _doc.Undo, "Ctrl+Z", () => _doc.CanUndo);
-        _redoItem = Item("Redo", _doc.Redo, "Ctrl+Y", () => _doc.CanRedo);
-        var edit = new MenuItem
+        _ribbon.SetLead(file);
+
+        _undoButton = HeaderIcon("IcUndo", "Undo (Ctrl+Z)");
+        _undoButton.Click += (_, _) => _doc.Undo();
+        _redoButton = HeaderIcon("IcRedo", "Redo (Ctrl+Y)");
+        _redoButton.Click += (_, _) => _doc.Redo();
+        var save = HeaderIcon("IcSave", "Save (Ctrl+S)");
+        save.Click += (_, _) => _ = Guard(() => Save(false));
+        var gear = HeaderIcon("IcSettings", "Settings: machine connection, camera calibration, grid, libraries");
+        gear.Click += (_, _) => _ = Guard(() => ShowSettings("Machine"));
+        var help = HeaderIcon("IcHelp", "Help");
+        help.Flyout = new MenuFlyout
         {
-            Header = "_Edit",
-            Items =
-            {
-                _undoItem, _redoItem,
-                new Separator(),
-                Item("Cut", CutSel, "Ctrl+X", HasSel),
-                Item("Copy", CopySel, "Ctrl+C", HasSel),
-                Item("Paste", Paste, "Ctrl+V", () => _clipboard.Count > 0),
-                Item("Duplicate", DuplicateSel, "Ctrl+D", HasSel),
-                Item("Delete", DeleteSel, "Delete", HasSel),
-                new Separator(),
-                Item("Select all", SelectAll, "Ctrl+A"),
-                Item("Select all on active layer", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Ctrl+Shift+A"),
-                Item("Invert selection", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id)))),
-            },
-        };
-        var arrange = new MenuItem
-        {
-            Header = "_Arrange",
-            Items =
-            {
-                Item("Group", GroupSel, "Ctrl+G", () => _doc.Selection.Count > 1),
-                Item("Ungroup", UngroupSel, "Ctrl+Shift+G", HasSel),
-                Item("Combine into one shape", Combine, "Ctrl+K", () => _doc.Selection.Count > 1),
-                Item("Break apart", BreakApart, "Ctrl+Shift+K", HasSel),
-                Item("Convert to paths", ConvertToPaths, "Ctrl+Shift+C", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape)),
-                new Separator(),
-                AsyncItem("Offset…", OffsetSel, "Ctrl+Shift+O", () => SelectedPaths().Count > 0),
-                Item("Weld (union)", () => BooleanSel(BoolOp.Union), "Ctrl+Shift+U", () => SelectedPaths().Count > 1),
-                Item("Subtract (bottom minus the rest)", () => BooleanSel(BoolOp.Subtract), "Ctrl+Shift+M", () => SelectedPaths().Count > 1),
-                Item("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), null, () => SelectedPaths().Count > 1),
-                Item("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), null, () => SelectedPaths().Count > 1),
-                new Separator(),
-                AsyncItem("Nest parts on material…", NestSel, "Ctrl+Alt+N", HasSel),
-                AsyncItem("Grid array…", () => ArraySel(circular: false), null, HasSel),
-                AsyncItem("Circular array…", () => ArraySel(circular: true), null, HasSel),
-                Item("Distribute horizontally (equal gaps)", () => DistributeSel(true), null, () => _doc.Selection.Count > 2),
-                Item("Distribute vertically (equal gaps)", () => DistributeSel(false), null, () => _doc.Selection.Count > 2),
-                AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, "Ctrl+T", () => SelectedPicture() is not null),
-                AsyncItem("Fit to piece in camera…", FitToCamera, "Ctrl+Shift+F", () => SelectedOutline().Count > 0),
-                new Separator(),
-                Item("Align left", () => AlignSel(Align.Left), null, () => _doc.Selection.Count > 1),
-                Item("Align centres horizontally", () => AlignSel(Align.CenterX), null, () => _doc.Selection.Count > 1),
-                Item("Align right", () => AlignSel(Align.Right), null, () => _doc.Selection.Count > 1),
-                Item("Align top", () => AlignSel(Align.Top), null, () => _doc.Selection.Count > 1),
-                Item("Align centres vertically", () => AlignSel(Align.CenterY), null, () => _doc.Selection.Count > 1),
-                Item("Align bottom", () => AlignSel(Align.Bottom), null, () => _doc.Selection.Count > 1),
-                new Separator(),
-                Item("Flip horizontally", () => FlipSel(true), null, HasSel),
-                Item("Flip vertically", () => FlipSel(false), null, HasSel),
-                Item("Rotate 90° clockwise", () => RotateSel(90), null, HasSel),
-                Item("Rotate 90° counter-clockwise", () => RotateSel(-90), null, HasSel),
-                new Separator(),
-                Item("Bring to front", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), null, HasSel),
-                Item("Send to back", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), null, HasSel),
-            },
-        };
-        _showGridItem = new MenuItem { Header = "Show grid", ToggleType = MenuItemToggleType.CheckBox };
-        _showGridItem.Click += (_, _) => { _settings.ShowGrid = _showGridItem.IsChecked; SaveAndApplyGrid(); };
-        _snapObjectsItem = new MenuItem { Header = "Snap to shapes & centrelines", ToggleType = MenuItemToggleType.CheckBox };
-        _snapObjectsItem.Click += (_, _) => { _settings.SnapToObjects = _snapObjectsItem.IsChecked; SaveAndApplyGrid(); };
-        _snapGridItem = new MenuItem { Header = "Snap to grid", ToggleType = MenuItemToggleType.CheckBox };
-        _snapGridItem.Click += (_, _) => { _settings.SnapToGrid = _snapGridItem.IsChecked; SaveAndApplyGrid(); };
-        var view = new MenuItem
-        {
-            Header = "_View",
-            Items =
-            {
-                Item("Fit work area", Canvas.FitField, "Home"),
-                Item("Fit selection / design", Canvas.FitSelection, "F"),
-                Item("Zoom in", () => Canvas.ZoomBy(1.25), "Ctrl+OemPlus"),
-                Item("Zoom out", () => Canvas.ZoomBy(0.8), "Ctrl+OemMinus"),
-                new Separator(),
-                _showGridItem,
-                _snapObjectsItem,
-                _snapGridItem,
-                AsyncItem("Grid & snapping…", ShowGridSettings, "Ctrl+OemQuotes"),
-            },
-        };
-        var layer = new MenuItem
-        {
-            Header = "_Layer",
-            Items =
-            {
-                Item("New layer", _layers.AddLayer, "Ctrl+L"),
-                Item("Move selection to active layer", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)), "Ctrl+M", HasSel),
-            },
-        };
-        var tools = new MenuItem
-        {
-            Header = "_Tools",
-            Items =
-            {
-                Item("Shape library…", ShowShapes, "I"),
-                AsyncItem("Material library…", ShowLibrary),
-                AsyncItem("Material test…", AddMaterialTest),
-                AsyncItem("Record material test results…", RecordTestResults),
-                AsyncItem("Depthmap with DepthCharge…", () => MakeDepthmap(SelectedPicture())),
-                AsyncItem("Fit to piece in camera…", FitToCamera, null, () => SelectedOutline().Count > 0),
-                AsyncItem("Trace picture…", () => SelectedPicture() is { } im ? Trace(im) : Task.CompletedTask, null, () => SelectedPicture() is not null),
-                new Separator(),
-                AsyncItem("Connection keys…", async () => await _machine.SetUpKeys()),
-                AsyncItem("Grid & snapping…", ShowGridSettings),
-            },
-        };
-        var help = new MenuItem
-        {
-            Header = "_Help",
+            Placement = PlacementMode.BottomEdgeAlignedRight,
             Items =
             {
                 AsyncItem("Getting started", ShowGettingStarted),
@@ -423,16 +357,148 @@ public partial class MainWindow : Window
                 AsyncItem($"About {AppIdentity.ProductName}", ShowAbout),
             },
         };
-        MainMenu.ItemsSource = new[] { file, edit, arrange, view, layer, tools, help };
-        MainMenu.Opened += (_, _) => RefreshMenuState();
-        RefreshRecent();
-    }
+        _ribbon.SetTrail(save, _undoButton, _redoButton, new Border { Width = 1, Background = UiKit.Brush("Line"), Margin = new(6, 6) }, gear, help);
+        _ribbon.Track(_undoButton, () => _doc.CanUndo);
+        _ribbon.Track(_redoButton, () => _doc.CanRedo);
 
-    void RefreshMenuState()
-    {
-        foreach (var (item, enabled) in _conditional) item.IsEnabled = enabled();
-        if (_undoItem is not null) _undoItem.Header = _doc.UndoLabel is { } u ? $"Undo {u}" : "Undo";
-        if (_redoItem is not null) _redoItem.Header = _doc.RedoLabel is { } r ? $"Redo {r}" : "Redo";
+        // ---- Home: everyday drawing and editing ----
+        var home = _ribbon.Tab("Home", "Draw, select and edit");
+        var clip = home.Group("Clipboard");
+        clip.Large("Paste", "IcPaste", Paste, "Paste (Ctrl+V)", () => _clipboard.Count > 0);
+        clip.Small("Cut", "IcCut", CutSel, "Cut (Ctrl+X)", HasSel);
+        clip.Small("Copy", "IcCopy", CopySel, "Copy (Ctrl+C)", HasSel);
+        clip.Small("Duplicate", "IcDuplicate", DuplicateSel, "Duplicate, offset a little (Ctrl+D)", HasSel);
+        var select = home.Group("Select");
+        ToolLarge(select, "Select", "IcCursor", Tool.Select, "Select and move (V). Drag left→right to select inside, right→left to select touching.");
+        ToolSmall(select, "Edit points", "IcNodes", Tool.Nodes, "Edit a shape's points and curves (N, or double-click a shape)");
+        ToolSmall(select, "Pan", "IcHand", Tool.Pan, "Pan the view (H, or hold Space / middle mouse)");
+        select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
+        var draw = home.Group("Draw");
+        ToolLarge(draw, "Rectangle", "IcRect", Tool.Rect, "Rectangle (R) · Shift = square · Alt = from centre");
+        ToolLarge(draw, "Ellipse", "IcEllipse", Tool.Ellipse, "Ellipse (E) · Shift = circle · Alt = from centre");
+        ToolLarge(draw, "Pen", "IcPen", Tool.Pen, "Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish");
+        ToolLarge(draw, "Text", "IcText", Tool.Text, "Text (T) · click where the text should go");
+        ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
+        ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
+        ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
+        draw.Large("Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
+        var import = home.Group("Bring in");
+        import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
+        import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
+        import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
+        var lay = home.Group("Layers");
+        lay.Large("New layer", "IcPlus", _layers.AddLayer, "Add a layer below the active one (Ctrl+L)");
+        lay.Small("Move here", "IcDown", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)), "Move the selected shapes to the active layer (Ctrl+M)", HasSel);
+
+        // ---- Shape: combining and changing shapes ----
+        var shape = _ribbon.Tab("Shape", "Group, combine, weld, offset and repeat shapes");
+        var grp = shape.Group("Group");
+        grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
+        grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", HasSel);
+        grp.Small("Combine", "IcCombine", Combine, "Combine into one compound shape: overlapping parts make holes (Ctrl+K)", Many);
+        grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", HasSel);
+        var boolean = shape.Group("Shape builder");
+        boolean.Large("Weld", "IcWeld", () => BooleanSel(BoolOp.Union), "Weld: merge overlapping shapes into one outline (Ctrl+Shift+U)", TwoPaths);
+        boolean.Small("Subtract", "IcSubtract", () => BooleanSel(BoolOp.Subtract), "Subtract: the bottom shape minus the ones above it (Ctrl+Shift+M)", TwoPaths);
+        boolean.Small("Intersect", "IcIntersect", () => BooleanSel(BoolOp.Intersect), "Intersect: keep only where they overlap", TwoPaths);
+        boolean.Small("Exclude", "IcExclude", () => BooleanSel(BoolOp.Exclude), "Exclude: remove where they overlap", TwoPaths);
+        var outline = shape.Group("Outline");
+        outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: a new outline a set distance outside or inside (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
+        outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
+        var repeat = shape.Group("Repeat");
+        repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
+        repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
+        repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
+        var lib = shape.Group("Library");
+        lib.Large("Shapes", "IcHeart", ShowShapes, "Shape library (I); save your own shapes there too");
+
+        // ---- Arrange: position, align, order ----
+        var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate and order");
+        var align = arrange.Group("Align");
+        align.Icons(3,
+            ("IcAlignLeft", "Align left edges", () => AlignSel(Align.Left), Many),
+            ("IcAlignCenterH", "Align centres horizontally", () => AlignSel(Align.CenterX), Many),
+            ("IcAlignRight", "Align right edges", () => AlignSel(Align.Right), Many),
+            ("IcAlignTop", "Align top edges", () => AlignSel(Align.Top), Many),
+            ("IcAlignMiddle", "Align centres vertically", () => AlignSel(Align.CenterY), Many),
+            ("IcAlignBottom", "Align bottom edges", () => AlignSel(Align.Bottom), Many));
+        align.Small("Spread across", "IcDistH", () => DistributeSel(true), "Distribute horizontally: equal gaps (3 or more shapes)", () => _doc.Selection.Count > 2);
+        align.Small("Spread down", "IcDistV", () => DistributeSel(false), "Distribute vertically: equal gaps (3 or more shapes)", () => _doc.Selection.Count > 2);
+        align.Small("Centre on bed", "IcFit", CenterSelInField, "Move the selection to the middle of the work area", HasSel);
+        var turn = arrange.Group("Flip & rotate");
+        turn.Small("Flip across", "IcFlipH", () => FlipSel(true), "Flip horizontally (mirror left–right)", HasSel);
+        turn.Small("Flip over", "IcFlipV", () => FlipSel(false), "Flip vertically (mirror top–bottom)", HasSel);
+        turn.Break();
+        turn.Small("Turn right", "IcRotateCw", () => RotateSel(90), "Rotate 90° clockwise", HasSel);
+        turn.Small("Turn left", "IcRotateCcw", () => RotateSel(-90), "Rotate 90° counter-clockwise", HasSel);
+        var order = arrange.Group("Order");
+        order.Small("To front", "IcFront", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), "Bring to front (drawn last on its layer)", HasSel);
+        order.Small("To back", "IcBack", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), "Send to back", HasSel);
+        var selectAll = arrange.Group("Select");
+        selectAll.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
+        selectAll.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
+        selectAll.Small("Invert", "IcExclude", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id))), "Select what isn't selected, and the other way round");
+
+        // ---- Picture: photos and artwork ----
+        var picture = _ribbon.Tab("Picture", "Trace, depthmaps and background removal (lights up when a picture is selected)");
+        var pin = picture.Group("Add");
+        pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
+        var pwork = picture.Group("Turn it into");
+        pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
+        pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
+        var pclean = picture.Group("Clean up");
+        pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
+
+        // ---- Camera: draw from what the machine sees ----
+        var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, pick pieces, fit designs to them");
+        var see = camera.Group("See the bed");
+        see.Large("Update photo", "IcCamera", () => _ = Guard(_machine.UpdatePhotoAsync), "Take a new photo of the bed and lay it under your design", () => _machine.IsConnected && _machine.HasCalibration);
+        see.LargeToggle("Live view", "IcLive", on => _machine.LiveView = on, "Keep the camera picture updating", () => _machine.IsConnected, () => _machine.LiveView);
+        see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
+        var pick = camera.Group("Draw from the camera");
+        ToolLarge(pick, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
+        ToolLarge(pick, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
+        var fit = camera.Group("Place");
+        fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
+        var cal = camera.Group("Set up");
+        cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+
+        // ---- Laser: materials and the job ----
+        var laser = _ribbon.Tab("Laser", "Materials, tests, framing and sending");
+        var mat = laser.Group("Materials");
+        mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
+        mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a power × speed test grid to find the right settings for a new material");
+        mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
+        var job = laser.Group("Job");
+        job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
+        job.Large("Send", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
+        job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
+        job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
+        job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
+        var head = laser.Group("Head");
+        head.Large("Auto-focus", "IcFocus", () => _ = Guard(async () => await _machine.AutoFocusNowAsync()), "Measure the material and move to focus (the head moves)", () => _machine.IsConnected && !_machine.IsBusyFocusing);
+        head.Large("Machine", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection and options");
+
+        // ---- View ----
+        var view = _ribbon.Tab("View", "Zoom, grid and snapping");
+        var zoom = view.Group("Zoom");
+        zoom.Large("Fit bed", "IcFit", Canvas.FitField, "Show the whole work area (Home)");
+        zoom.Small("Fit selection", "IcFit", Canvas.FitSelection, "Zoom to the selection, or the design (F)");
+        zoom.Small("Zoom in", "IcZoomIn", () => Canvas.ZoomBy(1.25), "Zoom in (Ctrl +)");
+        zoom.Small("Zoom out", "IcZoomOut", () => Canvas.ZoomBy(0.8), "Zoom out (Ctrl −)");
+        var grid = view.Group("Grid & snapping");
+        grid.LargeToggle("Snap to shapes", "IcMagnet", on => { _settings.SnapToObjects = on; SaveAndApplyGrid(); }, "Snap to shapes and the work area: edges, centres and centrelines (hold Ctrl while dragging to move freely)", null, () => _settings.SnapToObjects);
+        grid.SmallToggle("Show grid", "IcGrid", on => { _settings.ShowGrid = on; SaveAndApplyGrid(); }, "Show the grid", null, () => _settings.ShowGrid);
+        grid.SmallToggle("Snap to grid", "IcGrid", on => { _settings.SnapToGrid = on; SaveAndApplyGrid(); }, "Snap to the grid's minor lines", null, () => _settings.SnapToGrid);
+        grid.Small("Grid settings…", "IcSettings", () => _ = Guard(ShowGridSettings), "Grid spacing and colours, snap distance (Ctrl+')");
+        var panels = view.Group("Show");
+        panels.SmallToggle("Machine controls", "IcPlug", on => { _settings.MachineHudFolded = !on; _settings.Save(); _hud.Refold(); }, "The camera, light and focus controls on the work area", null, () => !_settings.MachineHudFolded);
+        panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
+
+        _ribbon.Select(_settings.RibbonTab);
+        _ribbon.TabSelected += t => { _settings.RibbonTab = t; _settings.Save(); };
+        RefreshRecent();
+        _ribbon.Refresh();
     }
 
     void RefreshRecent()
@@ -445,6 +511,38 @@ public partial class MainWindow : Window
             return (object)m;
         }).ToList();
         _recentMenu.ItemsSource = items.Count > 0 ? items : [new MenuItem { Header = "(none)", IsEnabled = false }];
+    }
+
+    /// <summary>The settings window, opened at a page; the machine panel moves into it while it's open.</summary>
+    async Task ShowSettings(string page)
+    {
+        var w = new SettingsWindow(_machine, page,
+        [
+            ("Workspace",
+            [
+                new("Grid & snapping…", "Grid spacing and colours, what snaps and how strongly.", ShowGridSettings),
+                new("Shape library…", "Built-in shapes and the ones you saved.", () => { ShowShapes(); return Task.CompletedTask; }),
+            ]),
+            ("Materials",
+            [
+                new("Material library…", "Settings that worked for each material, with photos. Share them as .pcmat files, or import other people's.", ShowLibrary),
+                new("Material test grid…", "Add a power × speed grid to the design to dial in a new material.", AddMaterialTest),
+            ]),
+            ("Connection",
+            [
+                new("Connection keys…", "The one-time setup that lets this program talk to the machine.", async () => await _machine.SetUpKeys()),
+                new("Calibrate camera…", "Line the camera picture up with where the laser marks (once per material height).", _machine.CalibrateAsync),
+            ]),
+            ("Help",
+            [
+                new("Getting started", "A short tour, and the connection setup.", ShowGettingStarted),
+                new("Keyboard shortcuts", "Every shortcut on one page.", ShowShortcuts),
+                new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
+                new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
+            ]),
+        ]);
+        await w.ShowDialog(this);
+        _ribbon.Refresh();
     }
 
     // ---- keyboard ------------------------------------------------------------
@@ -652,10 +750,10 @@ public partial class MainWindow : Window
 
     async Task ShowLibrary()
     {
-        var w = new MaterialLibraryWindow(_library, _settings, (m, r) => _props.ApplyRecipe(m, r));
-        w.LibraryChanged += _props.RefreshMaterials;
+        var w = new MaterialLibraryWindow(_library, _settings, (m, r) => _layerEditor.ApplyRecipe(m, r));
+        w.LibraryChanged += _layerEditor.RefreshMaterials;
         await w.ShowDialog(this);
-        _props.RefreshMaterials();
+        _layerEditor.RefreshMaterials();
     }
 
     async Task SaveToLibrary(Layer layer)
@@ -671,7 +769,7 @@ public partial class MainWindow : Window
         {
             _doc.Commit("Material", Ops.UpdateLayers(_doc.State, new HashSet<Guid> { layer.Id },
                 l => l with { Material = new Doc.Materials.MaterialRef(saved.Material.Id, saved.Material.Label, saved.Recipe.Id, saved.Recipe.Title) }));
-            _props.RefreshMaterials();
+            _layerEditor.RefreshMaterials();
         }
     }
 
@@ -679,7 +777,7 @@ public partial class MainWindow : Window
     {
         var w = new RecordTestWindow(_doc.State, _library, Canvas.Photo, _machine.UpdatePhotoAsync, () => Canvas.Photo, _machine.Distance);
         await w.ShowDialog(this);
-        _props.RefreshMaterials();
+        _layerEditor.RefreshMaterials();
     }
 
     /// <summary>
@@ -1090,7 +1188,6 @@ public partial class MainWindow : Window
         var placed = (TextShape)text.With(transform: Affine.Translate(at.X - (b.IsEmpty ? 0 : b.MinX), at.Y - (b.IsEmpty ? 0 : b.MinY)));
         _doc.Commit("Add text", Ops.AddShapes(_doc.State, [placed]), [placed.Id]);
         Canvas.Tool = Tool.Select;
-        RightTabs.SelectedIndex = 0;
         _props.FocusText(selectAll: true);
     }
 

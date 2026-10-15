@@ -10,11 +10,13 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// The layer list, with each layer's shapes underneath (expand with the arrow).
-/// Click a layer to make it active, Ctrl/Shift-click to select several for bulk
-/// editing, drag to reorder (top runs first), double-click to rename. Click a
-/// shape to select it on the canvas. Rows are rebuilt from the document on every
-/// change, so the list can never drift out of sync with it.
+/// The layers, as cards in run order (top runs first). Each card says what the layer does,
+/// how hard, how fast and how long it takes; the active layer's card opens up to show its
+/// settings (<see cref="Editor"/>), so a layer and its settings are always in one place.
+/// Click a card to make it active (click it again to fold its settings), Ctrl/Shift-click
+/// to edit several together, drag to reorder, double-click to rename; the arrow lists the
+/// layer's shapes. Cards are rebuilt from the document on every change, except the
+/// settings, which stay put so typing in them is never interrupted.
 /// </summary>
 public sealed class LayersPanel : UserControl
 {
@@ -43,6 +45,26 @@ public sealed class LayersPanel : UserControl
     bool _dragging;
     int _dropIndex = -1;
 
+    // the active layer's settings, docked under its card
+    readonly Border _editorHost;
+    Control? _editor;
+    bool _editorFolded, _wasActive;
+    IReadOnlyDictionary<Guid, double> _times = new Dictionary<Guid, double>();
+
+    /// <summary>The settings shown under the active layer's card.</summary>
+    public Control? Editor
+    {
+        get => _editor;
+        set { _editor = value; _editorHost.Child = value; Rebuild(); }
+    }
+
+    /// <summary>Each layer's estimated time in seconds (from the job), shown on its card.</summary>
+    public void SetTimes(IReadOnlyDictionary<Guid, double> seconds)
+    {
+        _times = seconds;
+        if (!_doc.InEdit) Rebuild();
+    }
+
     /// <summary>Layers chosen for editing (always includes the active layer).</summary>
     public ImmutableHashSet<Guid> SelectedLayers => _selected;
     public event Action? SelectionChanged;
@@ -68,6 +90,15 @@ public sealed class LayersPanel : UserControl
         var del = IconButton("IcTrash", "Delete selected layers (shapes move to the layer above)");
         del.Click += (_, _) => DeleteSelected();
 
+        _editorHost = new Border
+        {
+            Background = Res("Bg2"),
+            BorderBrush = Res("Accent"),
+            BorderThickness = new(1, 0, 1, 1),
+            CornerRadius = new(0, 0, 8, 8),
+            Padding = new(10, 8, 10, 10),
+            Margin = new(0, 0, 0, 6),
+        };
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { add, dup, up, down, merge, del } };
         var header = new DockPanel { Margin = new(0, 0, 0, 8) };
         header.Children.Add(new TextBlock { Text = "LAYERS", Classes = { "h" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(0) });
@@ -75,18 +106,11 @@ public sealed class LayersPanel : UserControl
         bar.HorizontalAlignment = HorizontalAlignment.Right;
         header.Children.Insert(0, bar);
 
-        var hint = new TextBlock
-        {
-            Classes = { "hint" },
-            Text = "Top layer runs first. ▸ shows a layer's shapes: click one to select it, double-click to rename, right-click for more. Ctrl/Shift-click to edit several layers at once.",
-            Margin = new(0, 8, 0, 0),
-        };
         var scroll = new ScrollViewer { Content = _rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         var root = new DockPanel();
         DockPanel.SetDock(header, Dock.Top);
-        DockPanel.SetDock(hint, Dock.Bottom);
         root.Children.Add(header);
-        root.Children.Add(hint);
+        ToolTip.SetTip(header, "Top layer runs first. Click a layer for its settings; Ctrl/Shift-click to edit several at once; drag to reorder; double-click to rename. The arrow lists a layer's shapes: click one to select it, right-click for more.");
         root.Children.Add(scroll);
         Content = root;
         _selected = [_doc.ActiveLayer];
@@ -114,6 +138,9 @@ public sealed class LayersPanel : UserControl
     {
         _anchor = id;
         SetSelection([id], id);
+        // Bring its card into view (it may have been chosen on the job timeline or the canvas).
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            _rows.Children.FirstOrDefault(c => c.Tag is Guid g && g == id)?.BringIntoView(), Avalonia.Threading.DispatcherPriority.Background);
     }
 
     void Rebuild()
@@ -133,38 +160,56 @@ public sealed class LayersPanel : UserControl
             foreach (var s in state.Shapes)
                 if (_doc.Selection.Contains(s.Id)) _expanded.Add(s.LayerId);
 
-        _rows.Children.Clear();
+        // Everything but the settings is rebuilt. The settings stay attached (moving them would drop
+        // the keyboard focus mid-typing): cards above the active layer go before them, the rest after.
+        for (int i = _rows.Children.Count - 1; i >= 0; i--)
+            if (_rows.Children[i] != _editorHost) _rows.Children.RemoveAt(i);
+        int activeIndex = state.LayerIndex(_doc.ActiveLayer);
+        bool showEditor = _editor is not null && activeIndex >= 0 && !_editorFolded && !_dragging;
+        if (!_rows.Children.Contains(_editorHost)) _rows.Children.Add(_editorHost);
+        _editorHost.IsVisible = showEditor;
+        int insertAt = 0;
         var counts = state.Shapes.GroupBy(s => s.LayerId).ToDictionary(g => g.Key, g => g.Count());
         Control? firstSelected = null;
         for (int i = 0; i < state.Layers.Count; i++)
         {
             var l = state.Layers[i];
             int count = counts.GetValueOrDefault(l.Id);
-            var block = new StackPanel { Spacing = 1, Tag = l.Id };
-            block.Children.Add(Row(l, i, count));
-            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(block, l, ref firstSelected);
-            _rows.Children.Add(block);
+            bool open = showEditor && i == activeIndex;
+            var block = new StackPanel { Spacing = 1, Tag = l.Id, Margin = new(0, 0, 0, open ? 0 : 5) };
+            block.Children.Add(Row(l, i, count, open));
+            var shapes = block;
+            if (open)
+            {
+                // The active card's shapes come after its settings.
+                shapes = new StackPanel { Spacing = 1, Margin = new(0, 0, 0, 5) };
+                _rows.Children.Insert(insertAt + 1, shapes);
+            }
+            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(shapes, l, ref firstSelected);
+            if (i <= activeIndex) _rows.Children.Insert(insertAt++, block);
+            else _rows.Children.Add(block);
         }
         if (newSelection && firstSelected is { } target)
             Avalonia.Threading.Dispatcher.UIThread.Post(() => target.BringIntoView());
         if (changed) SelectionChanged?.Invoke();
     }
 
-    Control Row(Layer l, int index, int count)
+    Control Row(Layer l, int index, int count, bool open)
     {
         bool active = l.Id == _doc.ActiveLayer;
         bool selected = _selected.Contains(l.Id);
-        var bg = active ? Res("Bg3") : selected ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent;
+        var colour = Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color);
+        bool live = l.Output && l.Visible;
 
-        var swatch = new Border
+        var bar = new Border
         {
-            Width = 14, Height = 14, CornerRadius = new(3),
-            Background = new SolidColorBrush(Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color)),
-            VerticalAlignment = VerticalAlignment.Center,
+            Width = 5, CornerRadius = new(3), Margin = new(0, 0, 6, 0),
+            Background = new SolidColorBrush(colour),
             Cursor = new Cursor(StandardCursorType.Hand),
+            Opacity = live ? 1 : 0.4,
         };
-        ToolTip.SetTip(swatch, "Layer colour (display only)");
-        swatch.PointerPressed += (_, e) => { e.Handled = true; ShowPalette(swatch, l); };
+        ToolTip.SetTip(bar, "Layer colour (display only): click to change");
+        bar.PointerPressed += (_, e) => { e.Handled = true; ShowPalette(bar, l); };
 
         Control name;
         if (_renaming == l.Id)
@@ -190,16 +235,15 @@ public sealed class LayersPanel : UserControl
         }
         else
         {
-            name = new StackPanel
-            {
-                VerticalAlignment = VerticalAlignment.Center,
-                Children =
-                {
-                    new TextBlock { Text = l.Name, FontWeight = active ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis,
-                        Opacity = l.Output && l.Visible ? 1 : 0.55 },
-                    new TextBlock { Classes = { "hint" }, Text = Summary(l, count) },
-                },
-            };
+            var title = new TextBlock { Text = l.Name, FontWeight = active ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis, Opacity = live ? 1 : 0.6, VerticalAlignment = VerticalAlignment.Center };
+            var n = new TextBlock { Text = count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes", Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0) };
+            var g = new Grid { ColumnDefinitions = new("Auto,Auto"), VerticalAlignment = VerticalAlignment.Center };
+            g.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+            g.ColumnDefinitions[0].MaxWidth = 150;
+            g.Children.Add(title);
+            Grid.SetColumn(n, 1);
+            g.Children.Add(n);
+            name = g;
         }
 
         var eye = Toggle(l.Visible ? "IcEye" : "IcEyeOff", l.Visible, l.Visible ? "Hide (hidden layers are never sent)" : "Show");
@@ -209,41 +253,85 @@ public sealed class LayersPanel : UserControl
         var outp = Toggle("IcBolt", l.Output, l.Output ? "Output on: this layer is sent to the laser" : "Output off: shown as a guide, never sent");
         outp.Click += (_, _) => ToggleOn(l, x => x with { Output = !x.Output }, l.Output ? "Disable layer output" : "Enable layer output");
 
-        bool open = _expanded.Contains(l.Id);
+        bool shapesOpen = _expanded.Contains(l.Id);
         var chevron = new Button
         {
-            Classes = { "icon" }, MinWidth = 18, MinHeight = 22, Padding = new(0), Margin = new(0, 0, 4, 0),
-            Content = new TextBlock { Text = count == 0 ? "" : open ? "▾" : "▸", FontSize = 13, VerticalAlignment = VerticalAlignment.Center },
+            Classes = { "icon" }, MinWidth = 18, MinHeight = 20, Padding = new(0), Margin = new(0, 0, 2, 0),
+            Content = new TextBlock { Text = count == 0 ? "" : shapesOpen ? "▾" : "▸", FontSize = 13, VerticalAlignment = VerticalAlignment.Center },
             IsEnabled = count > 0, VerticalAlignment = VerticalAlignment.Center,
         };
-        ToolTip.SetTip(chevron, open ? "Hide this layer's shapes" : "Show this layer's shapes");
+        ToolTip.SetTip(chevron, shapesOpen ? "Hide this layer's shapes" : "Show this layer's shapes");
         chevron.Click += (_, _) => { if (!_expanded.Remove(l.Id)) _expanded.Add(l.Id); Rebuild(); };
-        // Empty layers get a blank spacer so names still line up.
-        Control toggle = count > 0 ? chevron : new Border { Width = 18, Margin = new(0, 0, 4, 0) };
-        var lead = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center, Children = { toggle, swatch } };
 
-        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto,Auto,Auto"), Margin = new(2, 4, 4, 4) };
-        grid.Children.Add(lead);
-        Grid.SetColumn(name, 1);
-        name.Margin = new(10, 0, 4, 0);
-        grid.Children.Add(name);
-        Grid.SetColumn(outp, 2); grid.Children.Add(outp);
-        Grid.SetColumn(eye, 3); grid.Children.Add(eye);
-        Grid.SetColumn(lck, 4); grid.Children.Add(lck);
+        var top = new Grid { ColumnDefinitions = new("Auto,*,Auto,Auto,Auto") };
+        top.Children.Add(chevron);
+        Grid.SetColumn(name, 1); top.Children.Add(name);
+        Grid.SetColumn(outp, 2); top.Children.Add(outp);
+        Grid.SetColumn(eye, 3); top.Children.Add(eye);
+        Grid.SetColumn(lck, 4); top.Children.Add(lck);
 
+        // What it does, at a glance: mode, material, power/speed/passes, time.
+        var (modeText, modeColour) = l.Mode switch
+        {
+            LayerMode.Cut => ("CUT", "#F25555"),
+            LayerMode.Score => ("SCORE", "#F5A524"),
+            LayerMode.Fill => ("ENGRAVE", "#4F8CFF"),
+            _ => ("PICTURE", "#B07CFF"),
+        };
+        var pill = new Border
+        {
+            CornerRadius = new(4), Padding = new(5, 1), VerticalAlignment = VerticalAlignment.Center,
+            Background = new SolidColorBrush(Color.Parse(modeColour), 0.2),
+            Child = new TextBlock { Text = modeText, FontSize = 10, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.Parse(modeColour)), LetterSpacing = 0.5 },
+        };
+        string light = l.Laser.Light == Core.LightSource.Red ? " · fiber" : "";
+        string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
+        string detail = l.Mode == LayerMode.Image ? $"{l.Laser.Power:0.#}% · {l.Dpi:0} dpi{light}" : $"{l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes}{light}";
+        var info = new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center,
+            Children = { pill, new TextBlock { Text = detail, FontSize = 11.5, Foreground = Res("TextMuted"), VerticalAlignment = VerticalAlignment.Center } },
+        };
+        var time = new TextBlock
+        {
+            FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextMuted"),
+            Text = live && _times.TryGetValue(l.Id, out var t) ? UiKit.Clock(t) : "",
+        };
+        ToolTip.SetTip(time, "About how long this layer takes");
+        var bottom = new DockPanel { Margin = new(20, 3, 4, 0) };
+        DockPanel.SetDock(time, Dock.Right);
+        bottom.Children.Add(time);
+        bottom.Children.Add(info);
+        var lines = new StackPanel { Children = { top } };
+        if (l.Material is { } mat)
+            lines.Children.Add(new TextBlock
+            {
+                Text = mat.RecipeTitle is { Length: > 0 } rt ? $"{mat.Label} · {rt}" : mat.Label,
+                FontSize = 11.5, Margin = new(20, 1, 4, 0), TextTrimming = TextTrimming.CharacterEllipsis, Opacity = 0.85,
+            });
+        lines.Children.Add(bottom);
+
+        var grid = new Grid { ColumnDefinitions = new("Auto,*"), Margin = new(5, 5, 3, 6) };
+        grid.Children.Add(bar);
+        Grid.SetColumn(lines, 1);
+        grid.Children.Add(lines);
+
+        bool drop = _dragging && _dropIndex == index;
         var row = new Border
         {
-            Background = bg,
-            CornerRadius = new(6),
+            Background = active ? Res("Bg3") : selected ? new SolidColorBrush(Color.Parse("#20304A")) : Res("Bg2"),
+            CornerRadius = open ? new(8, 8, 0, 0) : new(8),
+            BorderThickness = drop ? new(1, 3, 1, 1) : new(1),
+            BorderBrush = drop || active || selected ? Res("Accent") : Res("Line"),
             Child = grid,
-            BorderThickness = new(0, 2, 0, 0),
-            BorderBrush = _dragging && _dropIndex == index ? Res("Accent") : Brushes.Transparent,
             Opacity = _dragging && _dragLayer == l.Id ? 0.5 : 1,
             Tag = l.Id,
         };
-        // Buttons and the swatch handle their own presses, so this only fires on the row itself.
+        // Buttons and the colour bar handle their own presses, so this only fires on the card itself.
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
         row.ContextRequested += (_, e) => { e.Handled = true; RowMenu(l).Open(row); };
+        if (active && _selected.Count == 1)
+            ToolTip.SetTip(row, open ? "Click to fold the settings away" : "Click to show this layer's settings");
         return row;
     }
 
@@ -436,16 +524,6 @@ public sealed class LayersPanel : UserControl
         return menu;
     }
 
-    static string Summary(Layer l, int count)
-    {
-        string mode = l.Mode switch { LayerMode.Cut => "Cut", LayerMode.Score => "Score", LayerMode.Fill => "Engrave", _ => $"Picture {l.Dpi:0} dpi" };
-        string light = l.Laser.Light == Core.LightSource.Red ? "fiber" : "diode";
-        string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
-        string shapes = count == 1 ? "1 shape" : $"{count} shapes";
-        string material = l.Material is { } m ? $"{m.Label} · " : "";
-        return $"{material}{mode} · {l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes} · {light} · {shapes}";
-    }
-
     static IBrush Res(string key) => (IBrush)Application.Current!.FindResource(key)!;
 
     static Button Toggle(string icon, bool on, string tip)
@@ -501,6 +579,9 @@ public sealed class LayersPanel : UserControl
         }
         else
         {
+            // Clicking the active card again folds or unfolds its settings (on release, if it wasn't a drag).
+            _wasActive = l.Id == _doc.ActiveLayer && _selected.Count == 1;
+            if (!_wasActive) _editorFolded = false;
             if (!_selected.Contains(l.Id) || _selected.Count == 1) Activate(l.Id);
             else _doc.SetActiveLayer(l.Id);
             // Capture on the container: rows are rebuilt on every change and would lose it.
@@ -518,11 +599,14 @@ public sealed class LayersPanel : UserControl
         var p = e.GetPosition(_rows);
         if (!_dragging && Math.Abs(p.Y - _dragStart.Y) < 6) return;
         _dragging = true;
-        int idx = _rows.Children.Count;
-        for (int i = 0; i < _rows.Children.Count; i++)
+        // Only the layer cards count (not the settings or the active layer's shape list).
+        int idx = _doc.State.Layers.Count, li = 0;
+        foreach (var child in _rows.Children)
         {
-            var b = _rows.Children[i].Bounds;
-            if (p.Y < b.Y + b.Height / 2) { idx = i; break; }
+            if (child.Tag is not Guid) continue;
+            var b = child.Bounds;
+            if (p.Y < b.Y + b.Height / 2) { idx = li; break; }
+            li++;
         }
         if (idx != _dropIndex)
         {
@@ -540,6 +624,12 @@ public sealed class LayersPanel : UserControl
         _dragging = false;
         _dropIndex = -1;
         e.Pointer.Capture(null);
+        if (id is { } clicked && !dragging && _wasActive && clicked == _doc.ActiveLayer)
+        {
+            _editorFolded = !_editorFolded;
+            Rebuild();
+        }
+        _wasActive = false;
         if (id is not { } lid || !dragging) return;
         int from = _doc.State.LayerIndex(lid);
         int to = drop > from ? drop - 1 : drop;

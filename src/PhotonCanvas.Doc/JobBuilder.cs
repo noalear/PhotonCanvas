@@ -32,6 +32,18 @@ public sealed record BuiltJob(
 {
     /// <summary>One processed path, in order, for the preview.</summary>
     public sealed record Step(Guid LayerId, List<Vec2> Points, bool Closed, bool Fill);
+
+    /// <summary>A layer's share of the job, in run order: seconds for one pass, and how many passes.</summary>
+    public sealed record LayerTime(Guid LayerId, double PassSeconds, int Passes)
+    {
+        public double TotalSeconds => PassSeconds * Passes;
+    }
+
+    /// <summary>Each output layer's time, in run order.</summary>
+    public IReadOnlyList<LayerTime> LayerTimes { get; init; } = [];
+
+    /// <summary>Whole-job rounds (passes run over the whole job), with the pause between them; null when each path runs its own passes.</summary>
+    public double? RoundDelayS { get; init; }
 }
 
 /// <summary>What framing traces.</summary>
@@ -107,6 +119,7 @@ public static class JobBuilder
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
         var layers = OutputLayers(s).ToList();
+        var times = new List<BuiltJob.LayerTime>();
 
         foreach (var (a, b) in StackedShapes(s).Take(3))
             warnings.Add($"\"{Label(a)}\" and \"{Label(b)}\" are the same size and in the same place, so both will be processed. If one is an old copy, delete it (ungroup first if they're grouped).");
@@ -120,10 +133,13 @@ public static class JobBuilder
             foreach (var later in layers.Skip(firstCut + 1).Where(l => l.Mode != LayerMode.Cut && s.ShapesOn(l.Id).Any()))
                 warnings.Add($"\"{later.Name}\" runs after the cut layer \"{layers[firstCut].Name}\". Parts may move or drop before it is processed; consider moving it above.");
 
+        // Where each layer's blocks start, for the per-layer times.
+        var starts = new List<(Layer Layer, int Start)>();
         foreach (var layer in layers)
         {
             var onLayer = s.ShapesOn(layer.Id).ToList();
             if (onLayer.Count == 0) continue;
+            starts.Add((layer, blocks.Count));
             try
             {
                 layer.Laser.Validate(opt.Machine);
@@ -209,6 +225,13 @@ public static class JobBuilder
             }
         }
 
+        for (int i = 0; i < starts.Count; i++)
+        {
+            var (layer, start) = starts[i];
+            int end = i + 1 < starts.Count ? starts[i + 1].Start : blocks.Count;
+            if (end > start) times.Add(new(layer.Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, layer.Laser.Passes)));
+        }
+
         if (blocks.Count == 0)
             throw new JobException(s.Shapes.Count == 0
                 ? "There is nothing on the canvas to process."
@@ -251,7 +274,11 @@ public static class JobBuilder
             Params = prms,
             Created = now ?? DateTimeOffset.Now,
         });
-        return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps);
+        return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps)
+        {
+            LayerTimes = times,
+            RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
+        };
     }
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
