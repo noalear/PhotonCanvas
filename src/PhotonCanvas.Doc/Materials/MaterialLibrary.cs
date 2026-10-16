@@ -120,6 +120,16 @@ public sealed record Material
     public double? ThicknessMm { get; init; }
     public string Notes { get; init; } = "";
     public ImmutableList<Recipe> Recipes { get; init; } = [];
+    /// <summary>Highly reflective (bare copper, brass, aluminium, silver, gold, chrome, mirror finishes): see <see cref="Layer.Reflective"/>.</summary>
+    public bool HighlyReflective { get; init; }
+
+    /// <summary>A guess from the name, for new materials: copper, brass, aluminium, silver, gold, chrome, mirror…</summary>
+    public static bool LooksReflective(string name)
+    {
+        string[] words = ["copper", "brass", "bronze", "alumin", "silver", "gold", "chrome", "mirror", "polished", "rhodium", "platinum"];
+        var n = name.ToLowerInvariant();
+        return words.Any(n.Contains);
+    }
     /// <summary>Colours measured from colour tests on this material (MOPA on metal).</summary>
     public ImmutableList<PhotonCanvas.Doc.Colour.ColourPalette> Palettes { get; init; } = [];
     public DateTime Updated { get; init; } = DateTime.Now;

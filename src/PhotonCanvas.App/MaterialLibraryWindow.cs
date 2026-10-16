@@ -26,6 +26,7 @@ public sealed class MaterialLibraryWindow : Window
     readonly TextBox _name = new();
     readonly ComboBox _category = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = Material.Categories };
     readonly NumericUpDown _thickness = Number(0, 100, 0.5m, "0.##");
+    readonly CheckBox _reflective = new() { Content = "Highly reflective" };
     readonly TextBox _notes = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 50 };
     readonly StackPanel _recipes = new() { Spacing = 6 };
     readonly Control _details;
@@ -60,6 +61,8 @@ public sealed class MaterialLibraryWindow : Window
         _notes.LostFocus += (_, _) => SaveMaterialFields();
         _category.SelectionChanged += (_, _) => SaveMaterialFields();
         _thickness.ValueChanged += (_, _) => SaveMaterialFields();
+        _reflective.IsCheckedChanged += (_, _) => SaveMaterialFields();
+        ToolTip.SetTip(_reflective, "Bare copper, brass, aluminium, silver, gold, chrome or mirror finishes. Layers using this material keep the MOPA out of the frequencies that bounce the most back into the fiber, and the job reminds you how to cut reflections.");
 
         var add = Button("New material");
         add.Click += (_, _) => NewMaterial();
@@ -86,7 +89,7 @@ public sealed class MaterialLibraryWindow : Window
             Spacing = 10,
             Children =
             {
-                Card("Material", Field("Name", _name), Field("Category", _category), Field("Thickness mm", _thickness, tip: "0 = doesn't apply (coatings, surfaces)."), _notes),
+                Card("Material", Field("Name", _name), Field("Category", _category), Field("Thickness mm", _thickness, tip: "0 = doesn't apply (coatings, surfaces)."), _reflective, _notes),
                 new TextBlock { Text = "RECIPES", Classes = { "h" } },
                 _recipes,
             },
@@ -140,6 +143,7 @@ public sealed class MaterialLibraryWindow : Window
         _name.Text = m.Name;
         _category.SelectedItem = Material.Categories.Contains(m.Category) ? m.Category : "Other";
         _thickness.Value = (decimal)(m.ThicknessMm ?? 0);
+        _reflective.IsChecked = m.HighlyReflective;
         _notes.Text = m.Notes;
         _loading = false;
         _recipes.Children.Clear();
@@ -154,7 +158,9 @@ public sealed class MaterialLibraryWindow : Window
         var name = _name.Text?.Trim();
         if (string.IsNullOrEmpty(name)) return;
         double t = (double)(_thickness.Value ?? 0);
-        var next = m with { Name = name, Category = _category.SelectedItem as string ?? "Other", ThicknessMm = t > 0 ? t : null, Notes = _notes.Text?.Trim() ?? "" };
+        // A new name that sounds reflective (copper, brass…) ticks the box, until it's set by hand.
+        bool reflective = _reflective.IsChecked == true || (name != m.Name && !m.HighlyReflective && Material.LooksReflective(name) && !Material.LooksReflective(m.Name));
+        var next = m with { Name = name, Category = _category.SelectedItem as string ?? "Other", ThicknessMm = t > 0 ? t : null, Notes = _notes.Text?.Trim() ?? "", HighlyReflective = reflective };
         if (next == m) return;
         _lib.Upsert(next);
         _current = _lib.Find(m.Id);

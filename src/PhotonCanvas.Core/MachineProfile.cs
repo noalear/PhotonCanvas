@@ -10,19 +10,19 @@ namespace PhotonCanvas.Core;
 /// <para><see cref="GapFromKhz"/> (long pulses only): from this frequency up to just under the
 /// full-power frequency, pulses are at their largest at close to full power. The stock software
 /// doesn't allow that range for relief engraving or on highly reflective materials, where the
-/// light bouncing back into the fiber can damage it. We keep out of it always: we can't tell
-/// how reflective the material is.</para>
+/// light bouncing back into the fiber can damage it. So do we: on layers marked highly
+/// reflective (from the material's tag); everywhere else the whole range is available.</para>
 /// </summary>
 public readonly record struct MopaLimit(int PulseWidthNs, int DefaultKhz, int MaxKhz, int? GapFromKhz = null)
 {
     /// <summary>In the range the module is protected from (see <see cref="GapFromKhz"/>).</summary>
     public bool InGap(int khz) => GapFromKhz is { } g && khz >= g && khz < DefaultKhz;
 
-    /// <summary>A frequency the source accepts: within 1–max, and out of the protected range (moved up to full power).</summary>
-    public int Safe(int khz)
+    /// <summary>A frequency the source accepts: within 1–max, and on reflective work out of the protected range (moved up to full power).</summary>
+    public int Safe(int khz, bool reflective = false)
     {
         int f = Math.Clamp(khz, 1, MaxKhz);
-        return InGap(f) ? DefaultKhz : f;
+        return reflective && InGap(f) ? DefaultKhz : f;
     }
 
     /// <summary>Roughly what share of its rated power the source can deliver at this frequency (1 = all of it).</summary>

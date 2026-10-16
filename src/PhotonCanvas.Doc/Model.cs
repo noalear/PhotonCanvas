@@ -88,6 +88,13 @@ public sealed record Layer
     /// <summary>The material this layer is for, and the library recipe its settings came from (null = none chosen).</summary>
     public Materials.MaterialRef? Material { get; init; }
 
+    /// <summary>
+    /// The material is highly reflective (bare copper, brass, aluminium, silver, gold, chrome,
+    /// mirror finishes): the MOPA keeps out of its protected frequency range, and the job reminds
+    /// you how to keep reflections down. Set from the material's tag, or by hand.
+    /// </summary>
+    public bool Reflective { get; init; }
+
     /// <summary>A palette that stays distinguishable on dark and light canvases.</summary>
     public static readonly IReadOnlyList<uint> Palette =
     [

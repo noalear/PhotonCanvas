@@ -124,6 +124,9 @@ public static class JobBuilder
         foreach (var (a, b) in StackedShapes(s).Take(3))
             warnings.Add($"\"{Label(a)}\" and \"{Label(b)}\" are the same size and in the same place, so both will be processed. If one is an old copy, delete it (ungroup first if they're grouped).");
 
+        foreach (var shiny in layers.Where(l => l.Reflective && s.ShapesOn(l.Id).Any()).Take(1))
+            warnings.Add($"\"{shiny.Name}\" is on highly reflective material and may throw reflections. Put it near the exhaust fan, or coat it with anti-reflective black marking spray.");
+
         foreach (var hidden in s.Layers.Where(l => l.Output && !l.Visible && s.ShapesOn(l.Id).Any()))
             warnings.Add($"Layer \"{hidden.Name}\" is hidden, so it will not be processed.");
 
@@ -142,7 +145,7 @@ public static class JobBuilder
             starts.Add((layer, blocks.Count));
             try
             {
-                layer.Laser.Validate(opt.Machine);
+                layer.Laser.Validate(opt.Machine, layer.Reflective);
                 ValidateExtras(layer);
             }
             catch (JobException e) { throw new JobException($"Layer \"{layer.Name}\": {e.Message}"); }

@@ -56,6 +56,7 @@ public sealed class LayerEditor : UserControl
 
     // material
     readonly ComboBox _material = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly CheckBox _reflective = new() { Content = "Highly reflective material" };
     readonly ComboBox _recipe = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock _recipeInfo = Hint();
     readonly Image _recipePhoto = new() { MaxHeight = 110, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, IsVisible = false };
@@ -166,6 +167,13 @@ public sealed class LayerEditor : UserControl
         var openLib = Button("Library…", tip: "Your material and cutting library: browse, edit, share.");
         openLib.Click += (_, _) => LibraryRequested?.Invoke();
         ToolTip.SetTip(_material, "What this layer is for. Picking a material lists its saved settings below.");
+        ToolTip.SetTip(_reflective, "Bare copper, brass, aluminium, silver, gold, chrome or mirror finishes. The MOPA then keeps out of the frequencies that bounce the most back into the fiber (long pulses only), and the job reminds you how to cut reflections. Set by the material's tag.");
+        _reflective.IsCheckedChanged += (_, _) => EditLayers(_reflective.IsChecked == true ? "Highly reflective" : "Not reflective", l =>
+        {
+            var next = l with { Reflective = _reflective.IsChecked == true };
+            // Turning it on moves a frequency in the protected range up to full power.
+            return _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? next with { Laser = next.Laser with { FrequencyKhz = lim.Safe(next.Laser.FrequencyKhz, next.Reflective) } } : next;
+        }, _reflective.IsChecked.HasValue);
         ToolTip.SetTip(_recipe, "Apply settings saved for this material (★ rating, ✓ = tested).");
 
         Content = new StackPanel
@@ -181,6 +189,7 @@ public sealed class LayerEditor : UserControl
                 _passHint,
                 _lpcmRow, _dpiRow, _ditherRow,
                 Field("Material", _material),
+                _reflective,
                 Field("Saved settings", _recipe),
                 _recipeInfo,
                 _recipePhoto,
@@ -218,13 +227,13 @@ public sealed class LayerEditor : UserControl
             if (_pulse.SelectedIndex < 0) return;
             var lim = _machine.Mopa[_pulse.SelectedIndex];
             // Keep the frequency where it can (colour work tunes it), within what this pulse width allows.
-            EditLayers("Pulse width", l => l with { Laser = l.Laser with { PulseWidthNs = lim.PulseWidthNs, FrequencyKhz = lim.Safe(l.Laser.FrequencyKhz) } }, true);
+            EditLayers("Pulse width", l => l with { Laser = l.Laser with { PulseWidthNs = lim.PulseWidthNs, FrequencyKhz = lim.Safe(l.Laser.FrequencyKhz, l.Reflective) } }, true);
         };
         _freq.ValueChanged += (_, _) => EditLayers("Frequency", l =>
         {
             int f = (int)_freq.Value!.Value;
             // Out of the range the source is protected from (long pulses): up to full power.
-            return l with { Laser = l.Laser with { FrequencyKhz = _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? lim.Safe(f) : f } };
+            return l with { Laser = l.Laser with { FrequencyKhz = _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? lim.Safe(f, l.Reflective) : f } };
         }, _freq.Value.HasValue, "freq");
         _material.SelectionChanged += (_, _) => MaterialChosen();
         _recipe.SelectionChanged += (_, _) => RecipeChosen();
@@ -333,15 +342,16 @@ public sealed class LayerEditor : UserControl
         _lpcmHint.Text = Same(l => l.LinesPerCm) is { } lp
             ? $"Lines {10 / lp:0.###} mm apart." + (lp > 1000 ? " Very fine: much longer jobs and more heat (thin sheet can warp)." : "")
             : "";
-        _freqHint.Text = lim is not { } lm ? "" : FrequencyHint(lm, Same(l => l.Laser.FrequencyKhz));
+        _reflective.IsChecked = Same(l => l.Reflective);
+        _freqHint.Text = lim is not { } lm ? "" : FrequencyHint(lm, Same(l => l.Laser.FrequencyKhz), ls.Any(l => l.Reflective));
         _freqHint.Foreground = lim is { } lw && Same(l => l.Laser.FrequencyKhz) is { } fw && fw < lw.DefaultKhz ? Brush("Warn") : Brush("TextMuted");
     }
 
     /// <summary>What the source can do at this pulse width and frequency, in plain words.</summary>
-    static string FrequencyHint(MopaLimit lm, int? f)
+    static string FrequencyHint(MopaLimit lm, int? f, bool reflective)
     {
         string range = $"Full power from {lm.DefaultKhz} to {lm.MaxKhz} kHz at {lm.PulseWidthNs} ns.";
-        if (lm.GapFromKhz is { } g) range += $" {g}–{lm.DefaultKhz - 1} kHz is skipped to protect the source.";
+        if (reflective && lm.GapFromKhz is { } g) range += $" On this reflective material {g}–{lm.DefaultKhz - 1} kHz is skipped to protect the source.";
         if (f is not { } khz || khz >= lm.DefaultKhz) return range;
         double share = lm.PowerAvailable(khz);
         return $"At {khz} kHz each pulse is already as big as the source allows, so it gives only about {share * 100:0}% of its 60 W " +
@@ -413,7 +423,7 @@ public sealed class LayerEditor : UserControl
             return;
         }
         var m = lib.Materials[_material.SelectedIndex - 1];
-        EditLayers($"Material: {m.Label}", l => l with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label) }, true);
+        EditLayers($"Material: {m.Label}", l => WithReflective(l with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label) }, m.HighlyReflective), true);
     }
 
     void RecipeChosen()
@@ -426,7 +436,14 @@ public sealed class LayerEditor : UserControl
 
     /// <summary>Put a recipe's settings on the selected layers and remember which it was.</summary>
     public void ApplyRecipe(PhotonCanvas.Doc.Materials.Material m, PhotonCanvas.Doc.Materials.Recipe r) =>
-        EditLayers($"Apply {m.Label} · {r.Title}", l => r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, true);
+        EditLayers($"Apply {m.Label} · {r.Title}", l => WithReflective(r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, m.HighlyReflective), true);
+
+    /// <summary>The layer takes the material's reflective tag (and a frequency that respects it).</summary>
+    Layer WithReflective(Layer l, bool reflective)
+    {
+        var next = l with { Reflective = reflective };
+        return _machine.MopaLimitFor(next.Laser.PulseWidthNs) is { } lim ? next with { Laser = next.Laser with { FrequencyKhz = lim.Safe(next.Laser.FrequencyKhz, reflective) } } : next;
+    }
 }
 
 /// <summary>A row of mutually exclusive choices (one is lit). -1 = none (mixed values).</summary>

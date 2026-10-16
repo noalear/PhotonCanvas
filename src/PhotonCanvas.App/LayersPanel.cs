@@ -284,7 +284,7 @@ public sealed class LayersPanel : UserControl
         var info = new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center,
-            Children = { pill, new TextBlock { Text = detail, FontSize = 11.5, Foreground = Res("TextMuted"), VerticalAlignment = VerticalAlignment.Center } },
+            Children = { pill, new TextBlock { Text = detail, FontSize = 11.5, Foreground = Res("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 170 } },
         };
         var time = new TextBlock
         {

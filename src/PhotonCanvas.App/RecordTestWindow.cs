@@ -167,7 +167,7 @@ public sealed class RecordTestWindow : Window
             var name = _newName.Text?.Trim();
             if (string.IsNullOrEmpty(name)) { _status.Text = "Give the material a name."; _newName.Focus(); return; }
             double t = (double)(_thickness.Value ?? 0);
-            m = new Material { Name = name, Category = _category.SelectedItem as string ?? "Other", ThicknessMm = t > 0 ? t : null };
+            m = new Material { Name = name, Category = _category.SelectedItem as string ?? "Other", ThicknessMm = t > 0 ? t : null, HighlyReflective = Material.LooksReflective(name) };
         }
         else m = _lib.Materials[_material.SelectedIndex - 1];
         var photo = _photo();

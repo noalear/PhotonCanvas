@@ -587,10 +587,24 @@ public sealed class JobBar : UserControl
         }
 
         var sb = new StringBuilder();
-        foreach (var l in JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesOn(l.Id).Any()))
+        var sent = JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesOn(l.Id).Any()).ToList();
+        static string Line(Layer l)
         {
             var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
-            sb.AppendLine($"• {l.Name}: {l.Mode}, {l.Laser.Power:0.#}% at {l.Laser.Speed:0.#} mm/s × {l.Laser.Passes} ({src})");
+            return $"• {l.Name}: {l.Mode}, {l.Laser.Power:0.#}% at {l.Laser.Speed:0.#} mm/s × {l.Laser.Passes} ({src})";
+        }
+        if (sent.Count <= 8)
+            foreach (var l in sent) sb.AppendLine(Line(l));
+        else
+        {
+            // Many layers (a test grid): the ranges say more than 50 lines would.
+            static string Range(IEnumerable<double> v, string unit) { var a = v.Min(); var b = v.Max(); return a == b ? $"{a:0.#}{unit}" : $"{a:0.#}–{b:0.#}{unit}"; }
+            sb.AppendLine($"{sent.Count} layers: power {Range(sent.Select(l => l.Laser.Power), "%")}, speed {Range(sent.Select(l => l.Laser.Speed), " mm/s")}" +
+                          (sent.Any(l => l.Laser.Light == LightSource.Red)
+                              ? $", MOPA {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.PulseWidthNs), " ns")} at {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.FrequencyKhz), " kHz")}"
+                              : "") + ".");
+            sb.AppendLine($"First: {Line(sent[0])[2..]}");
+            sb.AppendLine($"Last: {Line(sent[^1])[2..]}");
         }
         var opt = Options;
         sb.AppendLine();

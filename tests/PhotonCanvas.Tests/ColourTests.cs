@@ -141,24 +141,26 @@ public class MopaLimitTests
     static MopaLimit At(int ns) => MachineProfile.F2Ultra.MopaLimitFor(ns)!.Value;
 
     [Fact]
-    public void LongPulsesSkipTheRangeTheSourceIsProtectedFrom()
+    public void OnReflectiveMaterialLongPulsesSkipTheRangeTheSourceIsProtectedFrom()
     {
-        // 200 ns: full power from 65 kHz, 48–64 kHz kept out of (as the stock software does on reflective work).
+        // 200 ns: full power from 65 kHz; 48–64 kHz kept out of on reflective work (as the stock software does).
         var l = At(200);
         Assert.True(l.InGap(48));
         Assert.True(l.InGap(64));
         Assert.False(l.InGap(47));
         Assert.False(l.InGap(65));
-        Assert.Equal(65, l.Safe(50));
-        Assert.Equal(47, l.Safe(47));
+        Assert.Equal(65, l.Safe(50, reflective: true));
+        Assert.Equal(50, l.Safe(50)); // everywhere else the whole range is there
+        Assert.Equal(47, l.Safe(47, reflective: true));
         Assert.Equal(1000, l.Safe(5000)); // and never above its maximum
         Assert.Equal(1, l.Safe(0));
         // Short pulses have no such range.
         Assert.Null(At(6).GapFromKhz);
         Assert.Equal(300, At(6).Safe(300));
 
-        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra));
+        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra, reflective: true));
         Assert.Contains("48–64 kHz", ex.Message);
+        LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra);
         LaserSettings.Red(50, 500, 200, 65).Validate(MachineProfile.F2Ultra);
         LaserSettings.Red(50, 500, 200, 40).Validate(MachineProfile.F2Ultra);
     }
@@ -177,24 +179,26 @@ public class MopaLimitTests
     {
         var s = new PhotonCanvas.Doc.Materials.ProcessSettings
         {
-            Laser = LaserSettings.Red(50, 500, 190, 55), // not a real pulse width, and in the protected range
+            Laser = LaserSettings.Red(50, 500, 190, 5000), // not a real pulse width, and above its maximum
             LinesPerCm = 99999,
         }.Clamped(MachineProfile.F2Ultra);
         Assert.Equal(200, s.Laser.PulseWidthNs);
-        Assert.Equal(65, s.Laser.FrequencyKhz);
+        Assert.Equal(1000, s.Laser.FrequencyKhz);
         Assert.Equal(FillBlock.MaxLinesPerCm, s.LinesPerCm);
     }
 
     [Fact]
-    public void FillsDownToTwoMicronsBuild()
+    public void FillsDownToOneMicronBuild()
     {
         var s = DocState.New();
-        var layer = new Layer { Name = "Colour", Mode = LayerMode.Fill, Laser = LaserSettings.Red(20, 800, 6, 500), LinesPerCm = 5000 };
+        var layer = new Layer { Name = "Colour", Mode = LayerMode.Fill, Laser = LaserSettings.Red(20, 800, 6, 500), LinesPerCm = 10000 };
         s = Ops.AddLayer(s, layer);
         s = Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(10, 10, 2, 2) }]);
         var job = JobBuilder.Build(s, new JobOptions());
         Assert.Contains("G1", job.Motion);
-        var tooFine = Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { LinesPerCm = 5001 });
+        Assert.Contains("Y10.001S0", job.Motion); // lines 0.001 mm apart
+        Assert.Contains("Y10.002S0", job.Motion);
+        var tooFine = Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { LinesPerCm = 10001 });
         Assert.Throws<JobException>(() => JobBuilder.Build(tooFine, new JobOptions()));
     }
 }
@@ -282,5 +286,32 @@ public class DiffractionTests
         }
         var job = JobBuilder.Build(Ops.UpdateLayers(after, new HashSet<Guid> { picLayer.Id }, l => l with { Output = false }), new JobOptions());
         Assert.Equal(2, job.LayerTimes.Count);
+    }
+}
+
+public class ReflectiveTests
+{
+    [Fact]
+    public void ReflectiveLayersKeepOutOfTheProtectedRangeAndGetAReminder()
+    {
+        var s = DocState.New();
+        var layer = new Layer { Name = "Brass tag", Mode = LayerMode.Fill, Laser = LaserSettings.Red(50, 500, 200, 55), LinesPerCm = 100 };
+        s = Ops.AddLayer(s, layer);
+        s = Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(10, 10, 5, 5) }]);
+        var plain = JobBuilder.Build(s, new JobOptions());
+        Assert.DoesNotContain(plain.Warnings, w => w.Contains("reflective"));
+        var shiny = Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { Reflective = true });
+        Assert.Contains("48–64 kHz", Assert.Throws<JobException>(() => JobBuilder.Build(shiny, new JobOptions())).Message);
+        var ok = Ops.UpdateLayers(shiny, new HashSet<Guid> { layer.Id }, l => l with { Laser = l.Laser with { FrequencyKhz = 65 } });
+        Assert.Contains(JobBuilder.Build(ok, new JobOptions()).Warnings, w => w.Contains("black marking spray"));
+    }
+
+    [Fact]
+    public void NamesThatSoundReflectiveAreGuessed()
+    {
+        Assert.True(PhotonCanvas.Doc.Materials.Material.LooksReflective("Polished brass 1 mm"));
+        Assert.True(PhotonCanvas.Doc.Materials.Material.LooksReflective("Aluminium sheet"));
+        Assert.False(PhotonCanvas.Doc.Materials.Material.LooksReflective("Basswood"));
+        Assert.False(PhotonCanvas.Doc.Materials.Material.LooksReflective("304 stainless, brushed"));
     }
 }

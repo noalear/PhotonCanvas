@@ -45,7 +45,8 @@ public sealed record LaserSettings
     public static readonly IReadOnlyList<int> PulseWidths =
         [2, 4, 6, 9, 13, 20, 30, 45, 60, 80, 100, 150, 200, 250, 350, 500];
 
-    public void Validate(MachineProfile m)
+    /// <param name="reflective">Highly reflective material: keep out of the source's protected frequency range.</param>
+    public void Validate(MachineProfile m, bool reflective = false)
     {
         JobException.CheckRange("power", Power, 0, 100, "%");
         JobException.CheckRange("speed", Speed, m.MinSpeed, m.MaxSpeed, "mm/s");
@@ -56,10 +57,10 @@ public sealed record LaserSettings
                 ?? throw new JobException(
                     $"Pulse width {PulseWidthNs} ns is not supported; choose one of {string.Join(", ", PulseWidths)} ns.");
             JobException.CheckRange("frequency", FrequencyKhz, 1, lim.MaxKhz, "kHz");
-            if (lim.InGap(FrequencyKhz))
+            if (reflective && lim.InGap(FrequencyKhz))
                 throw new JobException(
-                    $"At {PulseWidthNs} ns, {lim.GapFromKhz}–{lim.DefaultKhz - 1} kHz is kept out of to protect the laser source " +
-                    $"(the largest pulses at nearly full power, which reflective metal can bounce back into the fiber). Use {lim.DefaultKhz} kHz or more, or {lim.GapFromKhz - 1} kHz or less.");
+                    $"On highly reflective material, {lim.GapFromKhz}–{lim.DefaultKhz - 1} kHz at {PulseWidthNs} ns is kept out of to protect the laser source " +
+                    $"(the largest pulses at nearly full power, which the material can bounce back into the fiber). Use {lim.DefaultKhz} kHz or more, or {lim.GapFromKhz - 1} kHz or less.");
         }
     }
 }

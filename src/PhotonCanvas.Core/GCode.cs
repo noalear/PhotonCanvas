@@ -101,8 +101,11 @@ public static class Wobble
 public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, LaserSettings Laser, double LinesPerCm)
     : Block(Laser)
 {
-    /// <summary>Densest fill: 0.002 mm between lines (the stock software's limit for this machine).</summary>
-    public const double MaxLinesPerCm = 5000;
+    /// <summary>
+    /// Densest fill: 0.001 mm between lines, the finest the G-code's coordinates can express. The
+    /// stock software stops at 0.002 mm; finer works the same way, it just puts in more heat and time.
+    /// </summary>
+    public const double MaxLinesPerCm = 10000;
 
     /// <summary>
     /// Direction of the scan lines in degrees, turning the same way as the

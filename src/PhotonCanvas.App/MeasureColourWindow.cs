@@ -336,7 +336,7 @@ public sealed class MeasureColourWindow : Window
         {
             var name = _newName.Text?.Trim();
             if (string.IsNullOrEmpty(name)) { _status.Text = "Give the material a name."; _newName.Focus(); return; }
-            m = new Material { Name = name, Category = "Metal" };
+            m = new Material { Name = name, Category = "Metal", HighlyReflective = Material.LooksReflective(name) };
         }
         else m = _lib.Materials[_material.SelectedIndex - 1];
         var palette = new ColourPalette

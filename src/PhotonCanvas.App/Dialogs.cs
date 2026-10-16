@@ -34,11 +34,18 @@ static class Dialogs
         return p;
     }
 
-    static Control Body(string message, IBrush? accent = null) => new TextBlock
+    /// <summary>The message, scrolling when it's long, so the buttons below always stay on screen.</summary>
+    static Control Body(string message, IBrush? accent = null) => new ScrollViewer
     {
-        Text = message,
-        TextWrapping = TextWrapping.Wrap,
-        Foreground = accent ?? UiKit.Brush("TextMain"),
+        MaxHeight = 520,
+        VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+        Content = new TextBlock
+        {
+            Text = message,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = accent ?? UiKit.Brush("TextMain"),
+            Margin = new Thickness(0, 0, 12, 0),
+        },
     };
 
     public static async Task Message(Window owner, string title, string message)
