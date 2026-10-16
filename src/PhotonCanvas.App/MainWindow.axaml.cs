@@ -1478,7 +1478,7 @@ public partial class MainWindow : Window
 
     async Task MeasureColours()
     {
-        var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance);
+        var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance, _machine);
         await w.ShowDialog(this);
         _layerEditor.RefreshMaterials();
     }
