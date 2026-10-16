@@ -39,6 +39,19 @@ public sealed record ColourTestOptions
     /// <summary>Settings for the axis labels (a light MOPA mark).</summary>
     public double LabelPower { get; init; } = 30;
     public double LabelSpeed { get; init; } = 1000;
+    /// <summary>Run-up and run-out past each square with the laser off, mm (steady speed matters for gratings).</summary>
+    public double OverscanMm { get; init; }
+    /// <summary>Label a frequency axis as the grating pitch it makes (µm = speed ÷ frequency).</summary>
+    public bool LabelPitch { get; init; }
+
+    /// <summary>Diffraction gratings on polished stainless: 60 ns at 300 mm/s, lines 0.06 mm apart; pitch across, power down.</summary>
+    public static ColourTestOptions Gratings => new()
+    {
+        Across = ColourParam.FrequencyKhz, AcrossMin = 200, AcrossMax = 500, AcrossSteps = 7,
+        Down = ColourParam.Power, DownMin = 20, DownMax = 45, DownSteps = 6,
+        Power = 32, Speed = 300, LinesPerCm = 10 / 0.06, FrequencyKhz = 300, PulseWidthNs = 60,
+        CellMm = 6, GapMm = 2, OverscanMm = 0.2, LabelPitch = true,
+    };
 }
 
 /// <summary>One square of a colour test: where it is in the grid and what it was marked with.</summary>
@@ -145,7 +158,7 @@ public static class ColourTest
                 LinesPerCm = lpcm,
                 FillAngleDeg = 0,
                 Crosshatch = false,
-                OverscanMm = 0,
+                OverscanMm = Math.Clamp(o.OverscanMm, 0, 5),
             };
             s = Ops.AddLayer(s, layer);
             shapes.Add(new PathShape
@@ -175,12 +188,15 @@ public static class ColourTest
         }
         static string Fmt(double v) => v >= 100 ? $"{v:0}" : $"{v:0.#}";
         double gridW = across.Count * pitch - o.GapMm, gridH = down.Count * pitch - o.GapMm;
-        shapes.Add(Label(Name(o.Across), x0 + gridW / 2, o.Origin.Y + o.LabelMm / 2));
+        // Frequency as grating pitch, when asked: the pitch is what shows.
+        string AxisName(ColourParam p) => o.LabelPitch && p == ColourParam.FrequencyKhz ? "Pitch µm" : Name(p);
+        string Value(ColourParam p, double v) => o.LabelPitch && p == ColourParam.FrequencyKhz ? $"{Diffraction.PitchUm(o.Speed, (int)v):0.00}" : Fmt(v);
+        shapes.Add(Label(AxisName(o.Across), x0 + gridW / 2, o.Origin.Y + o.LabelMm / 2));
         for (int c = 0; c < across.Count; c++)
-            shapes.Add(Label(Fmt(across[c]), x0 + c * pitch + o.CellMm / 2, y0 - o.GapMm / 2 - o.LabelMm / 2));
+            shapes.Add(Label(Value(o.Across, across[c]), x0 + c * pitch + o.CellMm / 2, y0 - o.GapMm / 2 - o.LabelMm / 2));
         for (int r = 0; r < down.Count; r++)
-            shapes.Add(Label(Fmt(down[r]), x0 - o.GapMm, y0 + r * pitch + o.CellMm / 2, rightAlign: true));
-        shapes.Add(Label(Name(o.Down).Split(' ')[0], x0 - o.GapMm, y0 + gridH + o.GapMm + o.LabelMm / 2, rightAlign: true));
+            shapes.Add(Label(Value(o.Down, down[r]), x0 - o.GapMm, y0 + r * pitch + o.CellMm / 2, rightAlign: true));
+        shapes.Add(Label(AxisName(o.Down).Split(' ')[0], x0 - o.GapMm, y0 + gridH + o.GapMm + o.LabelMm / 2, rightAlign: true));
 
         s = Ops.AddShapes(s, shapes);
         return (s, shapes.Select(x => x.Id).ToList());

@@ -198,3 +198,89 @@ public class MopaLimitTests
         Assert.Throws<JobException>(() => JobBuilder.Build(tooFine, new JobOptions()));
     }
 }
+
+public class DiffractionTests
+{
+    /// <summary>A picture of solid blocks: each (x0, y0, x1, y1, r, g, b) in pixels.</summary>
+    static RasterImage Blocks(int w, int h, params (int X0, int Y0, int X1, int Y1, byte R, byte G, byte B)[] blocks)
+    {
+        var rgba = new byte[w * h * 4];
+        for (int i = 0; i < w * h; i++) { rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = 255; rgba[i * 4 + 3] = 255; }
+        foreach (var (x0, y0, x1, y1, r, g, b) in blocks)
+            for (int y = y0; y < y1; y++)
+                for (int x = x0; x < x1; x++)
+                {
+                    int i = (y * w + x) * 4;
+                    rgba[i] = r; rgba[i + 1] = g; rgba[i + 2] = b;
+                }
+        return new RasterImage(w, h, rgba);
+    }
+
+    [Fact]
+    public void PitchIsSpeedOverFrequency()
+    {
+        Assert.Equal(1.0, Diffraction.PitchUm(300, 300), 9);
+        Assert.Equal(640, Diffraction.Wavelength(0), 1);
+        Assert.Equal(530, Diffraction.Wavelength(120), 1);
+        Assert.Equal(460, Diffraction.Wavelength(240), 1);
+    }
+
+    [Fact]
+    public void ShimmerSharesBrightnessOutOverDirectionsAndLeavesWhiteBare()
+    {
+        // 40 × 20 px picture shown 20 × 10 mm, 1 mm pixels: black left quarter, mid-grey next, white the rest.
+        var img = Blocks(40, 20, (0, 0, 10, 20, 0, 0, 0), (10, 0, 20, 20, 119, 119, 119));
+        var map = Diffraction.Map(img, new Vec2(20, 10), new DiffractionOptions { PixelMm = 1, AngleSteps = 4 });
+        Assert.Equal(20, map.Cols);
+        Assert.Equal(10, map.Rows);
+        Assert.Equal(2, map.Buckets.Count);
+        var black = map.Buckets.Single(b => b.AngleDeg == 0);
+        Assert.Equal(50, black.Pixels);
+        Assert.Equal(90, map.Buckets.Single(b => b != black).AngleDeg); // L ≈ 50 → step 2 of 4
+        Assert.Equal(100, map.Cells.Count(c => c < 0)); // the white half is left bare
+        Assert.All(map.Buckets, b => Assert.Equal(1.0, b.PitchUm, 2));
+    }
+
+    [Fact]
+    public void ColourModeTurnsHueIntoPitchWithinTheSourcesLimits()
+    {
+        var img = Blocks(30, 10, (0, 0, 10, 10, 220, 30, 30), (10, 0, 20, 10, 40, 60, 220), (20, 0, 30, 10, 128, 128, 128));
+        var o = new DiffractionOptions { Mode = DiffractionMode.Colour, PixelMm = 1, ColourSteps = 12 };
+        var map = Diffraction.Map(img, new Vec2(30, 10), o);
+        Assert.Equal(2, map.Buckets.Count); // grey isn't a grating colour
+        var red = map.Buckets.MaxBy(b => b.PitchUm)!;
+        var blue = map.Buckets.MinBy(b => b.PitchUm)!;
+        Assert.InRange(red.PitchUm, 1.15, 1.25);   // ≈ 640/530 µm
+        Assert.InRange(blue.PitchUm, 0.82, 0.92);  // ≈ 460/530 µm
+        var lim = MachineProfile.F2Ultra.MopaLimitFor(60)!.Value;
+        Assert.All(map.Buckets, b => Assert.Equal(lim.Safe(b.FrequencyKhz), b.FrequencyKhz));
+    }
+
+    [Fact]
+    public void AddsOneFillLayerPerBucketOverThePictureAndBuilds()
+    {
+        var img = Blocks(40, 20, (0, 0, 10, 20, 0, 0, 0), (10, 0, 20, 20, 119, 119, 119));
+        var src = ImageSource.FromEncoded(img.ToPng());
+        var s = DocState.New();
+        var picLayer = Layer.Default(1, LayerMode.Image);
+        s = Ops.AddLayer(s, picLayer);
+        var pic = new ImageShape { Name = "pic", LayerId = picLayer.Id, Source = src, SizeMm = new Vec2(20, 10), Transform = Affine.Translate(50, 60) };
+        s = Ops.AddShapes(s, [pic]);
+        var (after, added) = Diffraction.Add(s, pic, new DiffractionOptions { PixelMm = 1, AngleSteps = 4 });
+        Assert.Equal(2, added.Count);
+        var layers = after.Layers.Where(l => l.Name.StartsWith(Diffraction.LayerPrefix)).ToList();
+        Assert.Equal(2, layers.Count);
+        Assert.Contains(layers, l => l.FillAngleDeg == 90);
+        Assert.All(layers, l => Assert.Equal(LightSource.Red, l.Laser.Light));
+        // Each bucket's pixels merged into one strip (10 columns × 10 rows each).
+        foreach (var id in added)
+        {
+            var shape = (PathShape)after.FindShape(id)!;
+            Assert.Single(shape.Geometry.Subpaths);
+            var b = shape.Bounds;
+            Assert.True(b.MinX >= 50 - 1e-9 && b.MaxX <= 70 + 1e-9 && b.MinY >= 60 - 1e-9 && b.MaxY <= 70 + 1e-9);
+        }
+        var job = JobBuilder.Build(Ops.UpdateLayers(after, new HashSet<Guid> { picLayer.Id }, l => l with { Output = false }), new JobOptions());
+        Assert.Equal(2, job.LayerTimes.Count);
+    }
+}

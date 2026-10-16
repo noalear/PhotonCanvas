@@ -436,6 +436,7 @@ public partial class MainWindow : Window
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
+        pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
@@ -1428,6 +1429,22 @@ public partial class MainWindow : Window
             _doc.Commit("Fit to camera", Ops.Transform(_doc.State, ids, move), ids);
         });
         await w.ShowDialog(this);
+    }
+
+    /// <summary>Grating layers over a picture; the picture itself stops being sent when it's alone on its layer.</summary>
+    async Task MakeDiffraction(ImageShape picture)
+    {
+        var w = new DiffractionWindow(picture);
+        await w.ShowDialog(this);
+        if (w.Result is not { } o) return;
+        var (state, added) = Doc.Colour.Diffraction.Add(_doc.State, picture, o);
+        if (added.Count == 0) return;
+        bool alone = state.ShapesOn(picture.LayerId).Count() == 1;
+        if (alone) state = Ops.UpdateLayers(state, new HashSet<Guid> { picture.LayerId }, l => l with { Output = false });
+        _doc.Commit("Diffraction picture", state, added);
+        StatusText.Text = alone
+            ? $"Added {added.Count} grating layers. The picture's own layer is now a guide only (not sent)."
+            : $"Added {added.Count} grating layers. The picture shares its layer, which is still sent: turn its output off if you only want the gratings.";
     }
 
     async Task AddColourTest()

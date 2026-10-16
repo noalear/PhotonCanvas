@@ -508,7 +508,12 @@ public sealed class Job
         xs.Sort();
         var spans = new List<(double, double)>(xs.Count / 2);
         for (int i = 0; i + 1 < xs.Count; i += 2)
-            if (xs[i + 1] - xs[i] > 1e-6) spans.Add((xs[i], xs[i + 1]));
+        {
+            if (xs[i + 1] - xs[i] <= 1e-6) continue;
+            // Shapes that touch (pixels side by side) make one continuous line, not a stop-start at each edge.
+            if (spans.Count > 0 && xs[i] - spans[^1].Item2 <= 1e-6) spans[^1] = (spans[^1].Item1, xs[i + 1]);
+            else spans.Add((xs[i], xs[i + 1]));
+        }
         return spans;
     }
 

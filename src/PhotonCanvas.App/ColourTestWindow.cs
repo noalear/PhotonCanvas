@@ -29,6 +29,9 @@ public sealed class ColourTestWindow : Window
     readonly NumericUpDown _cell = Number(2, 20, 0.5m, "0.#"), _gap = Number(0.5m, 10, 0.5m, "0.#");
     readonly Control _powerRow, _speedRow, _lpcmRow, _freqRow, _pulseRow;
     readonly TextBlock _summary = Hint();
+    readonly ComboBox _kind = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Oxide colours (stainless, titanium)", "Diffraction gratings (polished stainless)" }, SelectedIndex = 0 };
+    readonly TextBlock _about = new() { TextWrapping = TextWrapping.Wrap };
+    bool _loading;
     readonly MachineProfile _machine = MachineProfile.F2Ultra;
     readonly string _font;
 
@@ -47,15 +50,11 @@ public sealed class ColourTestWindow : Window
 
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
         _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == 6);
-        _power.Value = 30; _speed.Value = 800; _lpcm.Value = 5000; _freq.Value = 500;
-        _cell.Value = 5; _gap.Value = 2;
-        _aSteps.Value = 8; _dSteps.Value = 6;
-        Defaults(_across, _aMin, _aMax);
-        Defaults(_down, _dMin, _dMax);
-        _across.SelectionChanged += (_, _) => { Defaults(_across, _aMin, _aMax); Update(); };
-        _down.SelectionChanged += (_, _) => { Defaults(_down, _dMin, _dMax); Update(); };
+        _kind.SelectionChanged += (_, _) => Load(_kind.SelectedIndex == 1 ? ColourTestOptions.Gratings : new ColourTestOptions());
+        _across.SelectionChanged += (_, _) => { if (_loading) return; Defaults(_across, _aMin, _aMax); Update(); };
+        _down.SelectionChanged += (_, _) => { if (_loading) return; Defaults(_down, _dMin, _dMax); Update(); };
         _pulse.SelectionChanged += (_, _) => Update();
-        foreach (var n in new[] { _aMin, _aMax, _aSteps, _dMin, _dMax, _dSteps, _power, _speed, _lpcm, _freq, _cell, _gap }) n.ValueChanged += (_, _) => Update();
+        foreach (var n in new[] { _aMin, _aMax, _aSteps, _dMin, _dMax, _dSteps, _power, _speed, _lpcm, _freq, _cell, _gap }) n.ValueChanged += (_, _) => { if (!_loading) Update(); };
 
         _powerRow = Field("Power %", _power);
         _speedRow = Field("Speed mm/s", _speed);
@@ -76,12 +75,8 @@ public sealed class ColourTestWindow : Window
                 Spacing = 10,
                 Children =
                 {
-                    new TextBlock
-                    {
-                        TextWrapping = TextWrapping.Wrap,
-                        Text = "Colour on stainless steel and titanium comes from a thin oxide layer: its thickness, set by how much energy goes in, decides the colour. " +
-                               "This grid tries a range of settings on your plate so you can see, and measure, which colours it really gives.",
-                    },
+                    Field("Test", _kind),
+                    _about,
                     Row(Field2("Across", _across), Field2("from", _aMin), Field2("to", _aMax), Field2("steps", _aSteps)),
                     Row(Field2("Down", _down), Field2("from", _dMin), Field2("to", _dMax), Field2("steps", _dSteps)),
                     new TextBlock { Text = "THE REST", Classes = { "h" }, Margin = new(0, 6, 0, 0) },
@@ -94,7 +89,7 @@ public sealed class ColourTestWindow : Window
                 },
             },
         };
-        Update();
+        Load(new ColourTestOptions());
     }
 
     static Control Field2(string label, Control editor) => new StackPanel
@@ -102,6 +97,29 @@ public sealed class ColourTestWindow : Window
         Spacing = 2,
         Children = { new TextBlock { Text = label, Classes = { "muted" }, FontSize = 12 }, editor },
     };
+
+    /// <summary>Fill every box from a set of options (a preset).</summary>
+    void Load(ColourTestOptions o)
+    {
+        _loading = true;
+        _across.SelectedIndex = Array.IndexOf(Params, o.Across);
+        _down.SelectedIndex = Array.IndexOf(Params, o.Down);
+        _aMin.Value = (decimal)o.AcrossMin; _aMax.Value = (decimal)o.AcrossMax; _aSteps.Value = o.AcrossSteps;
+        _dMin.Value = (decimal)o.DownMin; _dMax.Value = (decimal)o.DownMax; _dSteps.Value = o.DownSteps;
+        _power.Value = (decimal)o.Power; _speed.Value = (decimal)o.Speed; _lpcm.Value = (decimal)Math.Round(o.LinesPerCm); _freq.Value = o.FrequencyKhz;
+        _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == o.PulseWidthNs);
+        _cell.Value = (decimal)o.CellMm; _gap.Value = (decimal)o.GapMm;
+        _loading = false;
+        _about.Text = Gratings
+            ? "Each pulse leaves a mark a set distance from the last (speed ÷ frequency: 300 mm/s at 300 kHz = 1 µm), and a row of them diffracts light like a grating. " +
+              "Tilt the burned test under a lamp: the best squares show bright rainbow colours. Use polished (mirror) stainless, held flat."
+            : "Colour on stainless steel and titanium comes from a thin oxide layer: its thickness, set by how much energy goes in, decides the colour. " +
+              "This grid tries a range of settings on your plate so you can see, and measure, which colours it really gives.";
+        Title = Gratings ? "Grating test (MOPA)" : "Colour test (MOPA)";
+        Update();
+    }
+
+    bool Gratings => _kind.SelectedIndex == 1;
 
     static ColourParam Param(ComboBox c) => Params[Math.Max(0, c.SelectedIndex)];
 
@@ -134,6 +152,8 @@ public sealed class ColourTestWindow : Window
         CellMm = (double)(_cell.Value ?? 5),
         GapMm = (double)(_gap.Value ?? 2),
         Font = _font,
+        OverscanMm = Gratings ? ColourTestOptions.Gratings.OverscanMm : 0,
+        LabelPitch = Gratings,
     };
 
     void Update()
@@ -159,6 +179,12 @@ public sealed class ColourTestWindow : Window
         string time = "";
         try { time = $", about {Duration(JobBuilder.Build(after, new JobOptions { WholeJobPasses = false }).EstimateS)} to mark"; }
         catch (JobException) { }
-        _summary.Text = $"{n} squares, {b.Width:0} × {b.Height:0} mm{time}." + (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.");
+        string pitches = "";
+        if (o.Across == ColourParam.FrequencyKhz || o.Down == ColourParam.FrequencyKhz)
+        {
+            var (lo, hi) = o.Across == ColourParam.FrequencyKhz ? (o.AcrossMin, o.AcrossMax) : (o.DownMin, o.DownMax);
+            pitches = $" Pulse spacing {Doc.Colour.Diffraction.PitchUm(o.Speed, (int)Math.Max(1, hi)):0.00}–{Doc.Colour.Diffraction.PitchUm(o.Speed, (int)Math.Max(1, lo)):0.00} µm.";
+        }
+        _summary.Text = $"{n} squares, {b.Width:0} × {b.Height:0} mm{time}.{pitches}" + (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.");
     }
 }
