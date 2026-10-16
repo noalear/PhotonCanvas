@@ -25,6 +25,23 @@ public partial class MainWindow : Window
     readonly MachinePanel _machine;
     readonly MachineHud _hud;
     readonly Ribbon _ribbon = new();
+    CloseUpView? _closeUp;
+
+    /// <summary>The close-up camera on the work area: open or close it.</summary>
+    void ToggleCloseUp(bool open)
+    {
+        if (!open) { _closeUp?.Close(); return; }
+        if (_closeUp is null)
+        {
+            _closeUp = new CloseUpView(_machine);
+            _closeUp.Closed += _ribbon.Refresh;
+            CanvasOverlay.Content = _closeUp;
+        }
+        _ = Guard(_closeUp.OpenAsync);
+        _ribbon.Refresh();
+    }
+
+    bool CloseUpOpen => _closeUp?.IsVisible == true;
     List<Shape> _clipboard = [];
     int _pasteCount;
     bool _closeConfirmed;
@@ -72,6 +89,7 @@ public partial class MainWindow : Window
         _hud = new MachineHud(_machine, _settings);
         _hud.SettingsRequested += () => _ = Guard(() => ShowSettings("Machine"));
         _hud.CalibrateRequested += () => _ = Guard(_machine.CalibrateAsync);
+        _hud.CloseUpRequested += () => ToggleCloseUp(!CloseUpOpen);
         LayersHost.Content = _layers;
         InspectorHost.Content = _props;
         JobHost.Content = _job;
@@ -446,6 +464,7 @@ public partial class MainWindow : Window
         var see = camera.Group("See the bed");
         see.Large("Update photo", "IcCamera", () => _ = Guard(_machine.UpdatePhotoAsync), "Take a new photo of the bed and lay it under your design", () => _machine.IsConnected && _machine.HasCalibration);
         see.LargeToggle("Live view", "IcLive", on => _machine.LiveView = on, "Keep the camera picture updating", () => _machine.IsConnected, () => _machine.LiveView);
+        see.LargeToggle("Close-up", "IcZoomIn", ToggleCloseUp, "The close-up camera in the laser head, in a corner of the work area: live or one photo at a time", null, () => CloseUpOpen);
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);

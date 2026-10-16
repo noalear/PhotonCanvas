@@ -225,7 +225,7 @@ public sealed class MachinePanel : UserControl
     /// <summary>Continuous overview camera (keeps the work-area picture updating).</summary>
     public bool LiveView
     {
-        get => _live.IsChecked == true;
+        get => _live.IsChecked == true && _stream.SelectedIndex == 0;
         set
         {
             if (!_live.IsEnabled || LiveView == value) return;
@@ -233,6 +233,40 @@ public sealed class MachinePanel : UserControl
             _live.IsChecked = value;
             Changed();
         }
+    }
+
+    /// <summary>
+    /// Continuous close-up camera (the one in the laser head). The machine streams one camera
+    /// at a time, so this and <see cref="LiveView"/> take turns.
+    /// </summary>
+    public bool CloseUpLive
+    {
+        get => _live.IsChecked == true && _stream.SelectedIndex == 1;
+        set
+        {
+            if (!_live.IsEnabled || CloseUpLive == value) return;
+            if (value) _stream.SelectedIndex = 1;
+            _live.IsChecked = value;
+            if (!value) _stream.SelectedIndex = 0;
+            Changed();
+        }
+    }
+
+    /// <summary>A close-up frame arrived (already decoded; show it turned by <see cref="CloseUpRotationDeg"/>). UI thread.</summary>
+    public event Action<Bitmap>? CloseUpFrame;
+
+    /// <summary>How far the close-up picture is turned to look straight (the camera sits at an angle in the head).</summary>
+    public double CloseUpRotationDeg => _settings.CloseUpRotationDeg;
+
+    /// <summary>One close-up photo (shown through <see cref="CloseUpFrame"/> too). Null when not connected.</summary>
+    public async Task<byte[]?> CloseUpPhotoAsync()
+    {
+        if (!IsConnected) return null;
+        var jpg = await SnapshotAsync(1);
+        using var ms = new MemoryStream(jpg);
+        var bmp = Bitmap.DecodeToWidth(ms, 1000);
+        ShowFrame(bmp, 1);
+        return jpg;
     }
 
     public (int Front, int Back) Lights => ((int)Math.Round(_frontLight.Value), (int)Math.Round(_backLight.Value));
@@ -613,6 +647,7 @@ public sealed class MachinePanel : UserControl
         old?.Dispose();
         _shownStream = stream;
         _imageRotation.Angle = stream == 1 ? _settings.CloseUpRotationDeg : 0;
+        if (stream == 1) CloseUpFrame?.Invoke(bmp);
     }
 
     async Task Find()

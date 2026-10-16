@@ -47,6 +47,9 @@ public sealed class MachineHud : UserControl
     /// <summary>Open machine settings.</summary>
     public event Action? SettingsRequested;
 
+    /// <summary>Open the close-up camera on the work area.</summary>
+    public event Action? CloseUpRequested;
+
     /// <summary>Calibrate the camera.</summary>
     public event Action? CalibrateRequested;
 
@@ -181,7 +184,9 @@ public sealed class MachineHud : UserControl
                 _focus,
             },
         };
-        _cameraRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _photo, _camera, _live, _lights } };
+        var closeUp = Tip(new Button { Classes = { "rb" }, Content = IconLabel("IcZoomIn", "Close-up") }, "The close-up camera in the laser head, on the work area.");
+        closeUp.Click += (_, _) => CloseUpRequested?.Invoke();
+        _cameraRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _photo, _camera, _live, closeUp, _lights } };
         _body = focusRow;
         // Three narrow rows: status (and auto-focus), camera and lights, focus height.
         var top = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { _pill, _connect } };

@@ -60,7 +60,10 @@
         </Border>
         <!-- The job, always in view under the work area -->
         <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
-        <app:CanvasView x:Name="Canvas" />
+        <Panel>
+          <app:CanvasView x:Name="Canvas" />
+          <ContentControl x:Name="CanvasOverlay" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+        </Panel>
       </DockPanel>
 
       <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
