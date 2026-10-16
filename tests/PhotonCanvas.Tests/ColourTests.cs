@@ -135,3 +135,66 @@ public class ColourTests
         Assert.True(lab.Chroma < 0.5);
     }
 }
+
+public class MopaLimitTests
+{
+    static MopaLimit At(int ns) => MachineProfile.F2Ultra.MopaLimitFor(ns)!.Value;
+
+    [Fact]
+    public void LongPulsesSkipTheRangeTheSourceIsProtectedFrom()
+    {
+        // 200 ns: full power from 65 kHz, 48–64 kHz kept out of (as the stock software does on reflective work).
+        var l = At(200);
+        Assert.True(l.InGap(48));
+        Assert.True(l.InGap(64));
+        Assert.False(l.InGap(47));
+        Assert.False(l.InGap(65));
+        Assert.Equal(65, l.Safe(50));
+        Assert.Equal(47, l.Safe(47));
+        Assert.Equal(1000, l.Safe(5000)); // and never above its maximum
+        Assert.Equal(1, l.Safe(0));
+        // Short pulses have no such range.
+        Assert.Null(At(6).GapFromKhz);
+        Assert.Equal(300, At(6).Safe(300));
+
+        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra));
+        Assert.Contains("48–64 kHz", ex.Message);
+        LaserSettings.Red(50, 500, 200, 65).Validate(MachineProfile.F2Ultra);
+        LaserSettings.Red(50, 500, 200, 40).Validate(MachineProfile.F2Ultra);
+    }
+
+    [Fact]
+    public void BelowFullPowerFrequencyTheSourceGivesLess()
+    {
+        var l = At(6); // full power from 850 kHz
+        Assert.Equal(1, l.PowerAvailable(850));
+        Assert.Equal(1, l.PowerAvailable(2000));
+        Assert.Equal(300 / 850.0, l.PowerAvailable(300), 9);
+    }
+
+    [Fact]
+    public void ImportedSettingsAreBroughtWithinTheSourcesLimits()
+    {
+        var s = new PhotonCanvas.Doc.Materials.ProcessSettings
+        {
+            Laser = LaserSettings.Red(50, 500, 190, 55), // not a real pulse width, and in the protected range
+            LinesPerCm = 99999,
+        }.Clamped(MachineProfile.F2Ultra);
+        Assert.Equal(200, s.Laser.PulseWidthNs);
+        Assert.Equal(65, s.Laser.FrequencyKhz);
+        Assert.Equal(FillBlock.MaxLinesPerCm, s.LinesPerCm);
+    }
+
+    [Fact]
+    public void FillsDownToTwoMicronsBuild()
+    {
+        var s = DocState.New();
+        var layer = new Layer { Name = "Colour", Mode = LayerMode.Fill, Laser = LaserSettings.Red(20, 800, 6, 500), LinesPerCm = 5000 };
+        s = Ops.AddLayer(s, layer);
+        s = Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(10, 10, 2, 2) }]);
+        var job = JobBuilder.Build(s, new JobOptions());
+        Assert.Contains("G1", job.Motion);
+        var tooFine = Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { LinesPerCm = 5001 });
+        Assert.Throws<JobException>(() => JobBuilder.Build(tooFine, new JobOptions()));
+    }
+}

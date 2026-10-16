@@ -128,7 +128,7 @@ public sealed class MaterialTests : IDisposable
         Assert.Equal(100, s.Laser.Power);
         Assert.Equal(MachineProfile.F2Ultra.MaxSpeed, s.Laser.Speed);
         Assert.Equal(1, s.Laser.Passes);
-        Assert.Equal(1000, s.LinesPerCm);
+        Assert.Equal(FillBlock.MaxLinesPerCm, s.LinesPerCm);
         Assert.Null(lib.Materials.Single().Recipes.Single().Photo);
         Assert.False(File.Exists(Path.Combine(_dir, "evil.jpg")));
 

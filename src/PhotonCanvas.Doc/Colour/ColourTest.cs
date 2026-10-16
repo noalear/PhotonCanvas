@@ -71,7 +71,7 @@ public static class ColourTest
         {
             ColourParam.Power => Math.Clamp(v, 0, 100),
             ColourParam.Speed => Math.Clamp(v, m.MinSpeed, m.MaxSpeed),
-            ColourParam.LinesPerCm => Math.Clamp(v, 1, 1000),
+            ColourParam.LinesPerCm => Math.Clamp(v, 1, FillBlock.MaxLinesPerCm),
             ColourParam.FrequencyKhz => Math.Clamp(Math.Round(v), 1, 4000),
             _ => v,
         }).Distinct().ToList();
@@ -102,9 +102,9 @@ public static class ColourTest
             Power = Math.Clamp(power, 0, 100),
             Speed = Math.Clamp(speed, m.MinSpeed, m.MaxSpeed),
             PulseWidthNs = lim.PulseWidthNs,
-            FrequencyKhz = (int)Math.Clamp(Math.Round(freq), 1, lim.MaxKhz),
+            FrequencyKhz = lim.Safe((int)Math.Round(freq)),
         };
-        return (laser, Math.Clamp(lpcm, 1, 1000));
+        return (laser, Math.Clamp(lpcm, 1, FillBlock.MaxLinesPerCm));
     }
 
     /// <summary>Energy per area, relative (power ÷ (speed × line spacing)): the order the squares run in.</summary>

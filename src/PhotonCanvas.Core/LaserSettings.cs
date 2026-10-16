@@ -56,6 +56,10 @@ public sealed record LaserSettings
                 ?? throw new JobException(
                     $"Pulse width {PulseWidthNs} ns is not supported; choose one of {string.Join(", ", PulseWidths)} ns.");
             JobException.CheckRange("frequency", FrequencyKhz, 1, lim.MaxKhz, "kHz");
+            if (lim.InGap(FrequencyKhz))
+                throw new JobException(
+                    $"At {PulseWidthNs} ns, {lim.GapFromKhz}–{lim.DefaultKhz - 1} kHz is kept out of to protect the laser source " +
+                    $"(the largest pulses at nearly full power, which reflective metal can bounce back into the fiber). Use {lim.DefaultKhz} kHz or more, or {lim.GapFromKhz - 1} kHz or less.");
         }
     }
 }

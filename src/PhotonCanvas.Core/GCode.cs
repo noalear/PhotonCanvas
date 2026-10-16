@@ -101,6 +101,9 @@ public static class Wobble
 public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, LaserSettings Laser, double LinesPerCm)
     : Block(Laser)
 {
+    /// <summary>Densest fill: 0.002 mm between lines (the stock software's limit for this machine).</summary>
+    public const double MaxLinesPerCm = 5000;
+
     /// <summary>
     /// Direction of the scan lines in degrees, turning the same way as the
     /// rotate tool (0 = left–right, 90 = top–bottom). Only the line direction
@@ -208,7 +211,7 @@ public sealed class Job
                     foreach (var p in pts) CheckPoint(p, ctx);
                     break;
                 case FillBlock b:
-                    JobException.CheckRange("line density", b.LinesPerCm, 1, 1000, "lines/cm");
+                    JobException.CheckRange("line density", b.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
                     if (!double.IsFinite(b.AngleDeg)) throw new JobException("The fill angle is not a valid number.");
                     JobException.CheckRange("overscan", b.OverscanMm, 0, MaxOverscanMm, "mm");
                     foreach (var p in b.Polygons.SelectMany(x => x))

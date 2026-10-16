@@ -23,7 +23,7 @@ public sealed class ColourTestWindow : Window
     readonly ComboBox _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 1 };
     readonly NumericUpDown _aMin = Number(0, 15000, 10, "0.#"), _aMax = Number(0, 15000, 10, "0.#"), _aSteps = Number(1, 20, 1, "0");
     readonly NumericUpDown _dMin = Number(0, 15000, 10, "0.#"), _dMax = Number(0, 15000, 10, "0.#"), _dSteps = Number(1, 20, 1, "0");
-    readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _speed = Number(2, 15000, 50, "0"), _lpcm = Number(10, 1000, 50, "0");
+    readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _speed = Number(2, 15000, 50, "0"), _lpcm = Number(10, (decimal)FillBlock.MaxLinesPerCm, 50, "0");
     readonly NumericUpDown _freq = Number(1, 4000, 10, "0");
     readonly ComboBox _pulse = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _cell = Number(2, 20, 0.5m, "0.#"), _gap = Number(0.5m, 10, 0.5m, "0.#");
@@ -59,7 +59,7 @@ public sealed class ColourTestWindow : Window
 
         _powerRow = Field("Power %", _power);
         _speedRow = Field("Speed mm/s", _speed);
-        _lpcmRow = Field("Lines/cm", _lpcm, tip: "Fill line density. 1000 lines/cm = 0.01 mm apart, the finest this machine takes.");
+        _lpcmRow = Field("Lines/cm", _lpcm, tip: "Fill line density. 5000 lines/cm = 0.002 mm apart, the finest this machine takes. Finer = longer and hotter.");
         _freqRow = Field("Frequency kHz", _freq, tip: "Brought down to the most the chosen pulse width allows.");
         _pulseRow = Field("Pulse width", _pulse);
 

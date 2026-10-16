@@ -30,7 +30,7 @@ public sealed class LayerEditor : UserControl
     readonly Segmented _mode = new(("Cut", "IcCut"), ("Score", "IcLine"), ("Engrave", "IcPreview"), ("Picture", "IcImage"));
     readonly Segmented _light = new(("Diode · blue", null), ("MOPA", null));
     readonly NumericUpDown _power = Num(0, 100, 1, "0.#"), _speed = Num(2, 15000, 5, "0.#"), _passes = Num(1, 10000, 1, "0");
-    readonly NumericUpDown _lpcm = Number(1, 1000, 10, "0.#");
+    readonly NumericUpDown _lpcm = Number(1, (decimal)FillBlock.MaxLinesPerCm, 10, "0.#");
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
     readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
     readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth)", "Floyd–Steinberg", "Stucki", "Atkinson (contrasty)", "Bayer (pattern)", "Threshold (line art)" } };
@@ -217,10 +217,15 @@ public sealed class LayerEditor : UserControl
         {
             if (_pulse.SelectedIndex < 0) return;
             var lim = _machine.Mopa[_pulse.SelectedIndex];
-            // A new pulse width resets the frequency to the source's recommended value for it.
-            EditLayers("Pulse width", l => l with { Laser = l.Laser with { PulseWidthNs = lim.PulseWidthNs, FrequencyKhz = lim.DefaultKhz } }, true);
+            // Keep the frequency where it can (colour work tunes it), within what this pulse width allows.
+            EditLayers("Pulse width", l => l with { Laser = l.Laser with { PulseWidthNs = lim.PulseWidthNs, FrequencyKhz = lim.Safe(l.Laser.FrequencyKhz) } }, true);
         };
-        _freq.ValueChanged += (_, _) => EditLayers("Frequency", l => l with { Laser = l.Laser with { FrequencyKhz = (int)_freq.Value!.Value } }, _freq.Value.HasValue, "freq");
+        _freq.ValueChanged += (_, _) => EditLayers("Frequency", l =>
+        {
+            int f = (int)_freq.Value!.Value;
+            // Out of the range the source is protected from (long pulses): up to full power.
+            return l with { Laser = l.Laser with { FrequencyKhz = _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? lim.Safe(f) : f } };
+        }, _freq.Value.HasValue, "freq");
         _material.SelectionChanged += (_, _) => MaterialChosen();
         _recipe.SelectionChanged += (_, _) => RecipeChosen();
 
@@ -325,8 +330,22 @@ public sealed class LayerEditor : UserControl
             : _settings.WholeJobPasses ? "Passes run over the whole job, one round at a time (set in the job bar)."
             : "Each path repeats all its passes before the next one.";
         _passHint.IsVisible = _passHint.Text.Length > 0;
-        _lpcmHint.Text = Same(l => l.LinesPerCm) is { } lp ? $"Lines {10 / lp:0.###} mm apart." : "";
-        _freqHint.Text = lim is { } lm ? $"This pulse width allows 1–{lm.MaxKhz} kHz (recommended {lm.DefaultKhz})." : "";
+        _lpcmHint.Text = Same(l => l.LinesPerCm) is { } lp
+            ? $"Lines {10 / lp:0.###} mm apart." + (lp > 1000 ? " Very fine: much longer jobs and more heat (thin sheet can warp)." : "")
+            : "";
+        _freqHint.Text = lim is not { } lm ? "" : FrequencyHint(lm, Same(l => l.Laser.FrequencyKhz));
+        _freqHint.Foreground = lim is { } lw && Same(l => l.Laser.FrequencyKhz) is { } fw && fw < lw.DefaultKhz ? Brush("Warn") : Brush("TextMuted");
+    }
+
+    /// <summary>What the source can do at this pulse width and frequency, in plain words.</summary>
+    static string FrequencyHint(MopaLimit lm, int? f)
+    {
+        string range = $"Full power from {lm.DefaultKhz} to {lm.MaxKhz} kHz at {lm.PulseWidthNs} ns.";
+        if (lm.GapFromKhz is { } g) range += $" {g}–{lm.DefaultKhz - 1} kHz is skipped to protect the source.";
+        if (f is not { } khz || khz >= lm.DefaultKhz) return range;
+        double share = lm.PowerAvailable(khz);
+        return $"At {khz} kHz each pulse is already as big as the source allows, so it gives only about {share * 100:0}% of its 60 W " +
+               $"(100% power here ≈ {share * 100:0}% at full power). Fine for colour and gentle marks. " + range;
     }
 
     // ---- material ---------------------------------------------------------------
