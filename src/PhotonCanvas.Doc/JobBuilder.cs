@@ -44,6 +44,19 @@ public sealed record BuiltJob(
 
     /// <summary>Whole-job rounds (passes run over the whole job), with the pause between them; null when each path runs its own passes.</summary>
     public double? RoundDelayS { get; init; }
+
+    /// <summary>
+    /// One stretch of the run, in the order it happens: seconds from the start (by the same
+    /// estimate as <see cref="EstimateS"/>), the steps it marks, and how long one pass of them
+    /// takes (a stretch may repeat its passes). A pause between rounds marks nothing.
+    /// </summary>
+    public sealed record RunSpan(double Start, double End, int FirstStep, int StepCount, double PassSeconds)
+    {
+        public bool IsPause => StepCount == 0;
+    }
+
+    /// <summary>The whole run, in order (for showing where the laser is while it runs).</summary>
+    public IReadOnlyList<RunSpan> Timeline { get; init; } = [];
 }
 
 /// <summary>What framing traces.</summary>
@@ -116,6 +129,12 @@ public static class JobBuilder
         var warnings = new List<string>();
         var blocks = new List<Block>();
         var steps = new List<BuiltJob.Step>();
+        // Which steps each block marks (blocks and steps are added together, a group at a time).
+        var blockSteps = new List<(int First, int Count)>();
+        void Link(int blockMark, int stepMark)
+        {
+            while (blockSteps.Count < blocks.Count) blockSteps.Add((stepMark, steps.Count - stepMark));
+        }
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
         var layers = OutputLayers(s).ToList();
@@ -160,8 +179,10 @@ public static class JobBuilder
                 {
                     var (block, area) = Rasterize(img, layer);
                     if (block is null) continue;
+                    int bm = blocks.Count, sm = steps.Count;
                     blocks.Add(block);
                     steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));
+                    Link(bm, sm);
                     bounds = bounds.Union(area);
                 }
                 continue;
@@ -186,6 +207,7 @@ public static class JobBuilder
                     var cross = layer.Crosshatch ? block with { AngleDeg = layer.FillAngleDeg + 90 } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
                     if (!first && !second) continue;
+                    int bm = blocks.Count, sm = steps.Count;
                     if (first) blocks.Add(block);
                     if (second) blocks.Add(cross!);
                     foreach (var p in polys)
@@ -193,6 +215,7 @@ public static class JobBuilder
                         steps.Add(new(layer.Id, p.Points, true, true));
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
+                    Link(bm, sm);
                 }
                 if (open > 0)
                     warnings.Add($"Layer \"{layer.Name}\": {open} open path(s) can't be filled and were skipped. Close them, or put them on a Cut/Score layer.");
@@ -220,8 +243,10 @@ public static class JobBuilder
                                 throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
                             pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
                         }
+                        int bm = blocks.Count, sm = steps.Count;
                         blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop });
                         steps.Add(new(layer.Id, p.Points, p.Closed, false));
+                        Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
                 extras.Warn(warnings);
@@ -281,7 +306,42 @@ public static class JobBuilder
         {
             LayerTimes = times,
             RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
+            Timeline = Timeline(job, blockSteps),
         };
+    }
+
+    /// <summary>The run in order, the way <see cref="Job.Render"/> lays it out (rounds or per-path passes).</summary>
+    static List<BuiltJob.RunSpan> Timeline(Job job, IReadOnlyList<(int First, int Count)> blockSteps)
+    {
+        var spans = new List<BuiltJob.RunSpan>();
+        double t = 0;
+        var sec = job.Blocks.Select(Job.BlockSeconds).ToList();
+        if (job.PassMode is PassMode.Rounds r)
+        {
+            int rounds = job.Rounds;
+            for (int round = 1; round <= rounds; round++)
+            {
+                for (int i = 0; i < job.Blocks.Count; i++)
+                {
+                    if (job.Blocks[i].Laser.Passes < round) continue;
+                    spans.Add(new(t, t + sec[i], blockSteps[i].First, blockSteps[i].Count, sec[i]));
+                    t += sec[i];
+                }
+                if (round < rounds && r.DelayS > 0)
+                {
+                    spans.Add(new(t, t + r.DelayS, 0, 0, r.DelayS));
+                    t += r.DelayS;
+                }
+            }
+        }
+        else
+            for (int i = 0; i < job.Blocks.Count; i++)
+            {
+                double d = sec[i] * job.Blocks[i].Laser.Passes;
+                spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, sec[i]));
+                t += d;
+            }
+        return spans;
     }
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;

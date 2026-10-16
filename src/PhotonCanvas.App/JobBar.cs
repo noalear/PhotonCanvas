@@ -57,6 +57,11 @@ public sealed class JobBar : UserControl
     DateTime? _pausedAt;
     string _runTimes = "";
     readonly DispatcherTimer _runTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    // Where the laser is: the job as sent, followed by elapsed time (the machine only reports that).
+    readonly DispatcherTimer _follow = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    BuiltJob? _sentJob;
+    double? _machineElapsed;
+    DateTime _machineElapsedAt;
 
     // framing
     readonly SplitButton _frame = new() { Height = 54, Width = 96 };
@@ -213,6 +218,7 @@ public sealed class JobBar : UserControl
         _machine.ModeChanged += OnModeChanged;
         _machine.LoadedJobChanged += () => { if (_machine.Mode == "P_WORK") ShowLoaded(); };
         _runTimer.Tick += async (_, _) => await TickRun();
+        _follow.Tick += (_, _) => Follow();
         _doc.Changed += content => { if (content) Schedule(); else if (!_doc.InEdit) ShowTimeline(); };
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
         UpdateDelayRow();
@@ -403,6 +409,8 @@ public sealed class JobBar : UserControl
                 if (_pausedAt is { } p) _pausedFor += (DateTime.Now - p).TotalSeconds;
                 _pausedAt = null;
                 _startedAt ??= DateTime.Now;
+                _machineElapsedAt = DateTime.Now;
+                if (_sentJob is not null) _follow.Start();
                 _runState.Text = "Running";
                 _pause.Content = "Pause";
                 _pause.IsEnabled = _stop.IsEnabled = true;
@@ -411,6 +419,8 @@ public sealed class JobBar : UserControl
             case "P_PAUSE":
                 ShowRunning(true);
                 _pausedAt ??= DateTime.Now;
+                _follow.Stop();
+                Follow();
                 _runState.Text = "Paused";
                 _pause.Content = "Continue";
                 _pause.IsEnabled = _stop.IsEnabled = true;
@@ -418,7 +428,15 @@ public sealed class JobBar : UserControl
             default:
                 // Finished, cancelled or idle: say how it ended, then go back to Send.
                 if (_runPanel.IsVisible && _startedAt is not null)
-                    _sendState = mode is "P_WORK_DONE" or "P_FINISH" ? $"Finished in {Clock((DateTime.Now - _startedAt.Value).TotalSeconds - _pausedFor)}." : "The job ended.";
+                {
+                    double took = (DateTime.Now - _startedAt.Value).TotalSeconds - _pausedFor;
+                    bool finished = mode is "P_WORK_DONE" or "P_FINISH";
+                    _sendState = finished ? $"Finished in {Clock(took)}." : "The job ended.";
+                    if (finished) LearnTiming(took);
+                }
+                _follow.Stop();
+                _canvas.ShowRun(null, null);
+                _machineElapsed = null;
                 ShowRunning(false);
                 _runTimer.Stop();
                 _runTimes = "";
@@ -440,17 +458,50 @@ public sealed class JobBar : UserControl
             if (await _machine.GetJobProgressAsync() is { } prog)
             {
                 fraction = prog.Fraction;
-                if (prog.ElapsedS is { } e && e > 0) elapsed = e;
+                if (prog.ElapsedS is { } e && e > 0)
+                {
+                    elapsed = e;
+                    _machineElapsed = e;
+                    _machineElapsedAt = DateTime.Now;
+                }
             }
         }
         catch (DeviceException) { }
         // Remaining: from the machine's progress when it gives one, else from our estimate.
         double? remaining = null;
         if (fraction is { } f && f > 0.02) remaining = elapsed / f * (1 - f);
-        else if (_sentEstimate is { } est) remaining = Math.Max(0, est - elapsed);
-        _timeline.Progress = fraction ?? (_sentEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / e2) : 0);
+        else if (_sentEstimate is { } est) remaining = Math.Max(0, est * Math.Clamp(_settings.JobTimeScale, 0.3, 5) - elapsed);
+        _timeline.Progress = fraction ?? (_sentEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / (e2 * Math.Clamp(_settings.JobTimeScale, 0.3, 5))) : 0);
         _runTimes = $"Elapsed {Clock(elapsed)}" + (remaining is { } r ? $" · about {Clock(r)} left" : "");
         ShowCaption();
+    }
+
+    /// <summary>Seconds the laser has been working: the machine's own count when it gives one, carried forward smoothly between reports.</summary>
+    double RunningSeconds()
+    {
+        if (_startedAt is not { } start) return 0;
+        double paused = _pausedFor + (_pausedAt is { } p ? (DateTime.Now - p).TotalSeconds : 0);
+        if (_machineElapsed is { } m)
+            return m + (_pausedAt is null ? (DateTime.Now - _machineElapsedAt).TotalSeconds : 0);
+        return (DateTime.Now - start).TotalSeconds - paused;
+    }
+
+    /// <summary>Move the "laser is here" marker on the work area.</summary>
+    void Follow()
+    {
+        if (_sentJob is not { } job || _startedAt is null) return;
+        // The estimate leaves out acceleration: scale real time back onto it, by what past jobs showed.
+        double est = RunningSeconds() / Math.Clamp(_settings.JobTimeScale, 0.3, 5);
+        _canvas.ShowRun(job, RunTracker.At(job, est));
+    }
+
+    /// <summary>After a finished job: how much longer it took than estimated, blended into what's learned.</summary>
+    void LearnTiming(double tookSeconds)
+    {
+        if (_sentJob is not { EstimateS: > 10 } job) return;
+        double ratio = Math.Clamp(tookSeconds / job.EstimateS, 0.5, 4);
+        _settings.JobTimeScale = Math.Round(_settings.JobTimeScale * 0.6 + ratio * 0.4, 3);
+        _settings.Save();
     }
 
     async Task PauseOrResume()
@@ -640,6 +691,7 @@ public sealed class JobBar : UserControl
             await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None, replaceLoadedJob: true,
                 name: _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "Untitled");
             _sentEstimate = job.EstimateS;
+            _sentJob = job;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }
         catch (DeviceException e)

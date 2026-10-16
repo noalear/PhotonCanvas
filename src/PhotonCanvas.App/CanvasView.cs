@@ -119,6 +119,15 @@ public sealed partial class CanvasView : Control
         }
     }
 
+    (BuiltJob Job, RunMarker Marker)? _run;
+
+    /// <summary>A running job: what's been marked, what's being marked, and where the laser is (null hides it).</summary>
+    public void ShowRun(BuiltJob? job, RunMarker? marker)
+    {
+        _run = job is not null && marker is not null ? (job, marker) : null;
+        InvalidateVisual();
+    }
+
     BuiltJob? _preview;
     /// <summary>When set, the processing order and travel moves are drawn over the design.</summary>
     public BuiltJob? Preview
@@ -267,6 +276,7 @@ public sealed partial class CanvasView : Control
             {
                 DrawShapes(ctx, doc);
                 if (_preview is not null) DrawPreview(ctx, _preview);
+                if (_run is { } run) DrawRun(ctx, run.Job, run.Marker);
                 if (_drag == Drag.Create) DrawCreatePreview(ctx);
                 if (_tool == Tool.Pen) DrawPen(ctx);
                 if (_tool == Tool.Wand) DrawWand(ctx);
@@ -327,6 +337,49 @@ public sealed partial class CanvasView : Control
         }
         ctx.DrawGeometry(null, new Pen(new SolidColorBrush(LayerColor(layer)), (sel ? 2.2 : hov ? 2 : 1) * px), g);
         if (sel) ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 0.8 * px, new DashStyle([3, 3], 0)), g);
+    }
+
+    static readonly Color DoneColor = Color.Parse("#4FAF83"), NowColor = Color.Parse("#E8B04A"), LaserColor = Color.Parse("#FF4D3D");
+
+    /// <summary>Marked paths in green, the one being marked in amber, the laser as a red dot (or a red scan line on fills).</summary>
+    void DrawRun(DrawingContext ctx, BuiltJob job, RunMarker m)
+    {
+        double px = 1 / _scale;
+        StreamGeometry Path(BuiltJob.Step st)
+        {
+            var g = new StreamGeometry();
+            using var c = g.Open();
+            c.BeginFigure(P(st.Points[0]), st.Fill);
+            for (int k = 1; k < st.Points.Count; k++) c.LineTo(P(st.Points[k]));
+            c.EndFigure(st.Closed);
+            return g;
+        }
+        var donePen = new Pen(new SolidColorBrush(DoneColor), 2 * px);
+        var doneFill = new SolidColorBrush(DoneColor, 0.28);
+        foreach (int i in m.Done)
+        {
+            if (i >= job.Steps.Count || job.Steps[i].Points.Count == 0) continue;
+            var st = job.Steps[i];
+            ctx.DrawGeometry(st.Fill ? doneFill : null, donePen, Path(st));
+        }
+        var nowPen = new Pen(new SolidColorBrush(NowColor), 2.4 * px);
+        foreach (int i in m.Current)
+        {
+            if (i >= job.Steps.Count || job.Steps[i].Points.Count == 0) continue;
+            ctx.DrawGeometry(null, nowPen, Path(job.Steps[i]));
+        }
+        if (m.Sweep is { } sw)
+        {
+            ctx.DrawLine(new Pen(new SolidColorBrush(LaserColor, 0.3), 7 * px), P(sw.A), P(sw.B));
+            ctx.DrawLine(new Pen(new SolidColorBrush(LaserColor), 1.8 * px), P(sw.A), P(sw.B));
+        }
+        if (m.Head is { } h)
+        {
+            var c = P(h);
+            ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.18), null, c, 14 * px, 14 * px);
+            ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.4), null, c, 7 * px, 7 * px);
+            ctx.DrawEllipse(new SolidColorBrush(LaserColor), new Pen(Brushes.White, 1.2 * px), c, 3.5 * px, 3.5 * px);
+        }
     }
 
     void DrawPreview(DrawingContext ctx, BuiltJob job)

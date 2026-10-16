@@ -454,3 +454,58 @@ public class JobBuilderTests
         Assert.Contains("G104 P3", stock.Motion);
     }
 }
+
+public class RunTrackerTests
+{
+    static PathShape Sq(Guid layer, double x, double y, double s) => new() { LayerId = layer, Geometry = PathGeometry.Rect(x, y, s, s) };
+
+    [Fact]
+    public void FollowsTheRunInOrderFromElapsedTime()
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Laser = LaserSettings.Blue(70, 10) }; // 10 mm/s: a 40 mm square takes 4 s
+        s = s with { Layers = [cut] };
+        s = Ops.AddShapes(s, [Sq(cut.Id, 10, 10, 10), Sq(cut.Id, 100, 10, 10)]);
+        var job = JobBuilder.Build(s, new JobOptions { WholeJobPasses = false });
+        Assert.Equal(2, job.Timeline.Count);
+        Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
+
+        var start = RunTracker.At(job, 0.01);
+        Assert.Empty(start.Done);
+        Assert.Single(start.Current);
+        Assert.NotNull(start.Head);
+
+        // Halfway round the first square (2 s of 4): the opposite corner from where it started.
+        var first = job.Steps[start.Current[0]].Points[0];
+        var half = RunTracker.At(job, job.Timeline[0].Start + job.Timeline[0].PassSeconds / 2);
+        Assert.True(half.Head!.Value.Dist(first) > 13); // across the diagonal (≈14.1 mm)
+
+        var second = RunTracker.At(job, job.Timeline[1].Start + 0.1);
+        Assert.Equal([start.Current[0]], second.Done);
+        Assert.NotEqual(start.Current[0], second.Current[0]);
+
+        var end = RunTracker.At(job, job.EstimateS + 5);
+        Assert.Equal(2, end.Done.Count);
+        Assert.Empty(end.Current);
+        Assert.Equal(1, end.Fraction);
+    }
+
+    [Fact]
+    public void RoundsRepeatAndPauseBetween()
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Laser = LaserSettings.Blue(70, 10).WithPasses(2) };
+        var fill = new Layer { Name = "Engrave", Mode = LayerMode.Fill, Laser = LaserSettings.Blue(30, 400) };
+        s = s with { Layers = [fill, cut] };
+        s = Ops.AddShapes(s, [Sq(cut.Id, 10, 10, 10), Sq(fill.Id, 50, 50, 10)]);
+        var job = JobBuilder.Build(s, new JobOptions { WholeJobPasses = true, PassDelayS = 3 });
+        // Round 1: fill, cut; pause; round 2: cut only.
+        Assert.Equal(4, job.Timeline.Count);
+        Assert.True(job.Timeline[2].IsPause);
+        Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
+        var filling = RunTracker.At(job, job.Timeline[0].Start + job.Timeline[0].PassSeconds / 2);
+        Assert.NotNull(filling.Sweep);
+        Assert.Null(filling.Head);
+        Assert.True(RunTracker.At(job, job.Timeline[2].Start + 1).Pausing);
+    }
+}

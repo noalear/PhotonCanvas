@@ -56,6 +56,11 @@ public sealed class AppSettings
     public List<SentJob> SentJobs { get; set; } = [];
     /// <summary>Frame with a tight outline instead of the rectangle.</summary>
     public bool FrameOutline { get; set; }
+    /// <summary>
+    /// How much longer real jobs take than our estimate (it leaves out acceleration), learned
+    /// from finished jobs; keeps the "laser is here" marker in step with the machine.
+    /// </summary>
+    public double JobTimeScale { get; set; } = 1.0;
     /// <summary>The machine controls on the work area are folded down to the status.</summary>
     public bool MachineHudFolded { get; set; }
     /// <summary>Ribbon tab last used.</summary>
