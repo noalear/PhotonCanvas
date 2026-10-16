@@ -76,6 +76,32 @@ public sealed class RasterImage
         finally { resized?.Dispose(); }
     }
 
+    /// <summary>
+    /// This image turned <paramref name="degreesClockwise"/> about its centre, on a canvas big
+    /// enough to hold all of it (the corners outside the picture are transparent).
+    /// </summary>
+    public RasterImage Rotated(double degreesClockwise)
+    {
+        double d = (degreesClockwise % 360 + 360) % 360;
+        if (d < 1e-9) return this;
+        double r = d * Math.PI / 180, cos = Math.Abs(Math.Cos(r)), sin = Math.Abs(Math.Sin(r));
+        int w = (int)Math.Ceiling(Width * cos + Height * sin - 1e-6), h = (int)Math.Ceiling(Width * sin + Height * cos - 1e-6);
+        var info = new SKImageInfo(Width, Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        using var src = new SKBitmap(info);
+        System.Runtime.InteropServices.Marshal.Copy(Rgba, 0, src.GetPixels(), Rgba.Length);
+        using var dst = new SKBitmap(new SKImageInfo(w, h, SKColorType.Rgba8888, SKAlphaType.Unpremul));
+        using (var c = new SKCanvas(dst))
+        {
+            c.Clear(SKColors.Transparent);
+            c.Translate(w / 2f, h / 2f);
+            c.RotateDegrees((float)d);
+            c.Translate(-Width / 2f, -Height / 2f);
+            using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.High };
+            c.DrawBitmap(src, 0, 0, paint);
+        }
+        return new RasterImage(w, h, dst.Bytes);
+    }
+
     static SKBitmap? ApplyOrientation(SKBitmap bmp, SKEncodedOrigin origin)
     {
         if (origin is SKEncodedOrigin.TopLeft or SKEncodedOrigin.Default) return null;

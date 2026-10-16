@@ -315,3 +315,30 @@ public class ReflectiveTests
         Assert.False(PhotonCanvas.Doc.Materials.Material.LooksReflective("304 stainless, brushed"));
     }
 }
+
+public class RotateTests
+{
+    [Fact]
+    public void QuarterTurnClockwisePutsTheLeftSideOnTop()
+    {
+        // 40 × 20: left half red, right half blue.
+        int w = 40, h = 20;
+        var rgba = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                rgba[i] = (byte)(x < 20 ? 255 : 0); rgba[i + 2] = (byte)(x < 20 ? 0 : 255); rgba[i + 3] = 255;
+            }
+        var r = new RasterImage(w, h, rgba).Rotated(90);
+        Assert.Equal(20, r.Width);
+        Assert.Equal(40, r.Height);
+        int Px(int x, int y) => (y * r.Width + x) * 4;
+        Assert.True(r.Rgba[Px(10, 5)] > 200 && r.Rgba[Px(10, 5) + 2] < 50);   // top: red
+        Assert.True(r.Rgba[Px(10, 35) + 2] > 200 && r.Rgba[Px(10, 35)] < 50); // bottom: blue
+        // A slanted turn grows the canvas and leaves the corners clear.
+        var s = new RasterImage(w, h, rgba).Rotated(30);
+        Assert.True(s.Width > w && s.Height > h);
+        Assert.True(s.Rgba[3] < 10);
+    }
+}

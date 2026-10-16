@@ -39,6 +39,7 @@ public sealed class MeasureColourWindow : Window
     readonly TextBlock _frontText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center }, _backText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center };
     readonly Button _block = new() { Content = "Which squares are in this photo?" };
     bool _settingLights;
+    double? _photoTurn; // a close-up photo, turned this far before showing
     // The block of squares the current photo shows (rows/columns, inclusive), and picking it on the chart.
     (int R0, int C0, int R1, int C1) _section;
     (int R, int C)? _sectionFirst;
@@ -200,6 +201,7 @@ public sealed class MeasureColourWindow : Window
         {
             var bytes = await File.ReadAllBytesAsync(path);
             var img = await Task.Run(() => RasterImage.Decode(bytes));
+            _photoTurn = null;
             SetImage(img, Path.GetExtension(path).ToLowerInvariant() is ".tif" or ".tiff" or ".png" ? "scan" : "photo");
             _status.Text = $"{Path.GetFileName(path)} · {img.Width} × {img.Height} px";
         }
@@ -219,7 +221,10 @@ public sealed class MeasureColourWindow : Window
         {
             if (await _machine.CloseUpPhotoAsync() is { } jpg)
             {
-                var img = await Task.Run(() => RasterImage.Decode(jpg));
+                // Turned the way the camera sits, so the grid reads the same way round as on screen.
+                double turn = _machine.CloseUpRotationDeg;
+                var img = await Task.Run(() => RasterImage.Decode(jpg).Rotated(turn));
+                _photoTurn = turn;
                 SetImage(img, "close-up camera");
                 _status.Text = $"Close-up photo, lights front {_front.Value:0}% / back {_back.Value:0}%. " +
                                (_section == (0, 0, _rows - 1, _cols - 1) ? "If it shows only part of the grid, say which squares first." : "");
@@ -259,6 +264,7 @@ public sealed class MeasureColourWindow : Window
     void UseCamera()
     {
         if (_camera is not { } p) return;
+        _photoTurn = null;
         _section = (0, 0, _rows - 1, _cols - 1);
         SetImage(p.Image, "overview camera");
         // The camera picture is already mapped to the bed: no corners to click.
@@ -291,6 +297,41 @@ public sealed class MeasureColourWindow : Window
         return [("top-left", Cell(r0, c0)), ("top-right", Cell(r0, c1)), ("bottom-right", Cell(r1, c1)), ("bottom-left", Cell(r1, c0))];
     }
 
+    /// <summary>A square as it's labelled on the burned plate, e.g. "200 kHz and 20% power".</summary>
+    string Describe(ColourTestCell cell)
+    {
+        static string Value(ColourParam p, Layer l) => p switch
+        {
+            ColourParam.Power => $"{l.Laser.Power:0.#}% power",
+            ColourParam.Speed => $"{l.Laser.Speed:0.#} mm/s",
+            ColourParam.LinesPerCm => $"{l.LinesPerCm:0} lines/cm",
+            ColourParam.FrequencyKhz => $"{l.Laser.FrequencyKhz} kHz",
+            _ => $"{l.Laser.PulseWidthNs} ns",
+        };
+        static double Of(ColourParam p, Layer l) => p switch
+        {
+            ColourParam.Power => l.Laser.Power,
+            ColourParam.Speed => l.Laser.Speed,
+            ColourParam.LinesPerCm => l.LinesPerCm,
+            ColourParam.FrequencyKhz => l.Laser.FrequencyKhz,
+            _ => l.Laser.PulseWidthNs,
+        };
+        // Which setting changes across the grid, and which down it.
+        ColourParam? Varies(ColourTestCell a, ColourTestCell? b) => b is null ? null
+            : Enum.GetValues<ColourParam>().Cast<ColourParam?>().FirstOrDefault(p => Math.Abs(Of(p!.Value, a.Layer) - Of(p.Value, b.Layer)) > 1e-9);
+        var origin = Cell(0, 0);
+        var across = Varies(origin, _cols > 1 ? Cell(0, 1) : null);
+        var down = Varies(origin, _rows > 1 ? Cell(1, 0) : null);
+        var parts = new List<string>();
+        if (across is { } a) parts.Add(Value(a, cell.Layer));
+        if (down is { } d) parts.Add(Value(d, cell.Layer));
+        return parts.Count == 0 ? $"row {cell.Row + 1}, column {cell.Col + 1}" : string.Join(" and ", parts);
+    }
+
+    /// <summary>The square to click next in the photo (outlined on the chart), if any.</summary>
+    (int R, int C)? NextCorner => _image is not null && !_pickingGrey && !_pickingSection && _mmToPx is null && _corners.Count < 4
+        ? (CornerCells()[_corners.Count].Cell.Row, CornerCells()[_corners.Count].Cell.Col) : null;
+
     bool InSection(int r, int c) => r >= _section.R0 && r <= _section.R1 && c >= _section.C0 && c <= _section.C1;
 
     ColourTestCell Cell(int r, int c) => _cells.FirstOrDefault(x => x.Row == r && x.Col == c) ?? _cells[0];
@@ -304,7 +345,7 @@ public sealed class MeasureColourWindow : Window
         else if (_mmToPx is null && _corners.Count < 4)
         {
             var (name, cell) = CornerCells()[_corners.Count];
-            _step.Text = $"Click the middle of the {name} square (R{cell.Row + 1} C{cell.Col + 1}).";
+            _step.Text = $"{_corners.Count + 1} of 4: click the middle of the square at {Describe(cell)}, the {name} corner (outlined on the chart).";
         }
         else _step.Text = _byCell.Count < _cells.Count
             ? $"Measured {_byCell.Count} of {_cells.Count} squares. Check the outlines sit inside each square. For the rest, slide the plate, take another photo and say which squares it shows."
@@ -339,9 +380,32 @@ public sealed class MeasureColourWindow : Window
             var pairs = CornerCells().Select((c, i) => (c.Cell.Bounds.Center, _corners[i])).ToList();
             _mmToPx = Homography.Fit(pairs);
             if (_mmToPx is null) { _corners.Clear(); _status.Text = "Those four points don't make a grid: click the corners again."; }
+            else LearnTurn(_mmToPx.Value, pairs[0].Center);
             Remeasure();
         }
         UpdateStep();
+        ShowResults(); // moves the outline on the chart to the next corner
+    }
+
+    /// <summary>
+    /// From the clicked corners: how far off straight the close-up photo still is. The camera's
+    /// angle is corrected by that, so the next photos (and the close-up view) come out straight.
+    /// </summary>
+    void LearnTurn(Homography h, Vec2 atMm)
+    {
+        if (_photoTurn is not { } turned || _machine is null) return;
+        var o = h.Apply(atMm);
+        var x = h.Apply(atMm + new Vec2(1, 0)) - o;
+        var y = h.Apply(atMm + new Vec2(0, 1)) - o;
+        if (x.X * y.Y - x.Y * y.X < 0)
+        {
+            _status.Text = "This photo looks mirrored. The measurement is fine, but the close-up view can't be straightened by turning alone.";
+            return;
+        }
+        double off = Math.Atan2(x.Y, x.X) * 180 / Math.PI;
+        if (Math.Abs(off) < 0.5) return;
+        _machine.LearnCloseUpRotation(turned - off);
+        _status.Text = $"Learned the close-up camera's angle ({_machine.CloseUpRotationDeg:0.#}°): the next photos come out straight.";
     }
 
     void Remeasure()
@@ -392,7 +456,7 @@ public sealed class MeasureColourWindow : Window
             var empty = new Border
             {
                 Width = size, Height = size, Margin = new(1.5), CornerRadius = new(3), Background = Brush("Bg0"),
-                BorderThickness = new(1), BorderBrush = InSection(r, c) ? Brush("Accent") : Brush("Line"),
+                BorderThickness = new(NextCorner == (r, c) ? 3 : 1), BorderBrush = NextCorner == (r, c) ? Brushes.White : InSection(r, c) ? Brush("Accent") : Brush("Line"),
                 Cursor = new Cursor(StandardCursorType.Hand),
             };
             ToolTip.SetTip(empty, $"R{r + 1} C{c + 1}: not measured yet");
@@ -408,7 +472,7 @@ public sealed class MeasureColourWindow : Window
             {
                 Width = size, Height = size, Margin = new(1.5), CornerRadius = new(3),
                 Background = Fill(s), Opacity = s.Use ? 1 : 0.35,
-                BorderThickness = new(distinct.Contains(s) ? 2 : 0), BorderBrush = Brushes.White,
+                BorderThickness = new(NextCorner == (s.Row, s.Col) ? 3 : distinct.Contains(s) ? 2 : 0), BorderBrush = Brushes.White,
                 Child = s.Spread > ColourMeasure.BlotchySpread ? new TextBlock { Text = "!", FontWeight = FontWeight.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center } : null,
                 Cursor = new Cursor(StandardCursorType.Hand),
             };

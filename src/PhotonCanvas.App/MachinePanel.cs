@@ -113,6 +113,8 @@ public sealed class MachinePanel : UserControl
         // The close-up camera sits rotated in the head; straighten it for display.
         var rotated = new LayoutTransformControl { LayoutTransform = _imageRotation, Child = _image, MaxHeight = 300 };
         var imgBorder = new Border { Background = Brush("Bg0"), CornerRadius = new(6), MinHeight = 120, Child = rotated, ClipToBounds = true };
+        // The first default (31.2°) was upside down: the close-up camera sits turned about 211°.
+        if (Math.Abs(_settings.CloseUpRotationDeg - 31.2) < 1e-9) { _settings.CloseUpRotationDeg = -148.8; _settings.Save(); }
         _straighten.Value = (decimal)_settings.CloseUpRotationDeg;
         _straighten.ValueChanged += (_, _) =>
         {
@@ -120,7 +122,7 @@ public sealed class MachinePanel : UserControl
             _settings.Save();
             if (_shownStream == 1) _imageRotation.Angle = _settings.CloseUpRotationDeg;
         };
-        _straightenRow = Field("Straighten", _straighten, Hint("Degrees clockwise. The close-up camera is mounted at an angle; about 31° on the F2 Ultra."),
+        _straightenRow = Field("Straighten", _straighten, Hint("Degrees clockwise. The close-up camera sits turned in the head (about −149° on the F2 Ultra); Measure colours learns the exact angle from your corner clicks."),
             "Rotates the close-up picture for display only. Saved snapshots stay as the camera took them.");
         _straightenRow.IsVisible = false;
         _stream.SelectionChanged += (_, _) =>
@@ -257,6 +259,14 @@ public sealed class MachinePanel : UserControl
 
     /// <summary>How far the close-up picture is turned to look straight (the camera sits at an angle in the head).</summary>
     public double CloseUpRotationDeg => _settings.CloseUpRotationDeg;
+
+    /// <summary>Remember how far the close-up picture must turn to look straight (learned from a photo of a known grid).</summary>
+    public void LearnCloseUpRotation(double degreesClockwise)
+    {
+        double d = ((degreesClockwise + 180) % 360 + 360) % 360 - 180;
+        _straighten.Value = (decimal)Math.Round(d, 1); // saves it
+        Changed();
+    }
 
     /// <summary>One close-up photo (shown through <see cref="CloseUpFrame"/> too). Null when not connected.</summary>
     public async Task<byte[]?> CloseUpPhotoAsync()
