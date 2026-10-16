@@ -11,21 +11,24 @@ public enum ColourParam { Power, Speed, LinesPerCm, FrequencyKhz, PulseWidthNs }
 /// </summary>
 public sealed record ColourTestOptions
 {
-    public ColourParam Across { get; init; } = ColourParam.Speed;
+    // Defaults follow what has worked on stainless with MOPA sources (Applied Science's published
+    // settings): short 6 ns pulses at 800 mm/s, lines 0.002 mm apart, with frequency doing most of
+    // the work and power fine-tuning it. Power is a wider range here: our source is 60 W, not 100.
+    public ColourParam Across { get; init; } = ColourParam.FrequencyKhz;
     public double AcrossMin { get; init; } = 200;
-    public double AcrossMax { get; init; } = 1600;
+    public double AcrossMax { get; init; } = 1500;
     public int AcrossSteps { get; init; } = 8;
-    public ColourParam Down { get; init; } = ColourParam.LinesPerCm;
-    public double DownMin { get; init; } = 300;
-    public double DownMax { get; init; } = 1000;
-    public int DownSteps { get; init; } = 8;
+    public ColourParam Down { get; init; } = ColourParam.Power;
+    public double DownMin { get; init; } = 20;
+    public double DownMax { get; init; } = 60;
+    public int DownSteps { get; init; } = 6;
 
     // The settings that aren't swept.
-    public double Power { get; init; } = 40;
+    public double Power { get; init; } = 30;
     public double Speed { get; init; } = 800;
-    public double LinesPerCm { get; init; } = 600;
-    public int FrequencyKhz { get; init; } = 300;
-    public int PulseWidthNs { get; init; } = 30;
+    public double LinesPerCm { get; init; } = 5000;
+    public int FrequencyKhz { get; init; } = 500;
+    public int PulseWidthNs { get; init; } = 6;
 
     public double CellMm { get; init; } = 5;
     public double GapMm { get; init; } = 2;

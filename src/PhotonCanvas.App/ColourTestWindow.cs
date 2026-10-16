@@ -19,8 +19,8 @@ public sealed class ColourTestWindow : Window
     static readonly ColourParam[] Params = [ColourParam.Speed, ColourParam.LinesPerCm, ColourParam.Power, ColourParam.FrequencyKhz, ColourParam.PulseWidthNs];
     static string[] ParamNames => Params.Select(ColourTest.Name).ToArray();
 
-    readonly ComboBox _across = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 0 };
-    readonly ComboBox _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 1 };
+    readonly ComboBox _across = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 3 };
+    readonly ComboBox _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames, SelectedIndex = 2 };
     readonly NumericUpDown _aMin = Number(0, 15000, 10, "0.#"), _aMax = Number(0, 15000, 10, "0.#"), _aSteps = Number(1, 20, 1, "0");
     readonly NumericUpDown _dMin = Number(0, 15000, 10, "0.#"), _dMax = Number(0, 15000, 10, "0.#"), _dSteps = Number(1, 20, 1, "0");
     readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _speed = Number(2, 15000, 50, "0"), _lpcm = Number(10, (decimal)FillBlock.MaxLinesPerCm, 50, "0");
@@ -46,10 +46,10 @@ public sealed class ColourTestWindow : Window
         Background = Brush("Bg1");
 
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
-        _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == 30);
-        _power.Value = 40; _speed.Value = 800; _lpcm.Value = 600; _freq.Value = 300;
+        _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == 6);
+        _power.Value = 30; _speed.Value = 800; _lpcm.Value = 5000; _freq.Value = 500;
         _cell.Value = 5; _gap.Value = 2;
-        _aSteps.Value = 8; _dSteps.Value = 8;
+        _aSteps.Value = 8; _dSteps.Value = 6;
         Defaults(_across, _aMin, _aMax);
         Defaults(_down, _dMin, _dMax);
         _across.SelectionChanged += (_, _) => { Defaults(_across, _aMin, _aMax); Update(); };
@@ -112,8 +112,8 @@ public sealed class ColourTestWindow : Window
         {
             ColourParam.Speed => (200m, 1600m),
             ColourParam.LinesPerCm => (300m, 1000m),
-            ColourParam.Power => (20m, 80m),
-            ColourParam.FrequencyKhz => (100m, 1000m),
+            ColourParam.Power => (20m, 60m),
+            ColourParam.FrequencyKhz => (200m, 1500m),
             _ => (4m, 200m),
         };
         min.Value = a;
