@@ -132,6 +132,8 @@ public sealed record Material
     }
     /// <summary>Colours measured from colour tests on this material (MOPA on metal).</summary>
     public ImmutableList<PhotonCanvas.Doc.Colour.ColourPalette> Palettes { get; init; } = [];
+    /// <summary>Grating tests on this material, photographed from the five fixed views.</summary>
+    public ImmutableList<PhotonCanvas.Doc.Colour.GratingSet> Gratings { get; init; } = [];
     public DateTime Updated { get; init; } = DateTime.Now;
 
     /// <summary>e.g. "Basswood 3 mm".</summary>
@@ -220,10 +222,24 @@ public sealed class MaterialLibrary
     {
         if (Find(id) is not { } m) return;
         foreach (var r in m.Recipes) DeletePhoto(r.Photo);
+        foreach (var f in m.Gratings.SelectMany(GratingFiles)) DeletePhoto(f);
         Materials.Remove(m);
     }
 
     /// <summary>Save a photo for a recipe and return its file name.</summary>
+    /// <summary>The image files a grating set keeps (its views' pictures and its animation).</summary>
+    public static IEnumerable<string> GratingFiles(PhotonCanvas.Doc.Colour.GratingSet g) =>
+        g.Views.Select(v => v.Frame).Append(g.Gif).OfType<string>();
+
+    /// <summary>Save a file in the photo folder under <paramref name="name"/> (a plain name ending .jpg, .png or .gif).</summary>
+    public string SaveFile(string name, byte[] data)
+    {
+        if (!SafeName(name)) throw new ArgumentException("Not a usable file name.", nameof(name));
+        Directory.CreateDirectory(PhotoFolder);
+        File.WriteAllBytes(Path.Combine(PhotoFolder, name), data);
+        return name;
+    }
+
     public string SavePhoto(Guid recipeId, byte[] jpeg)
     {
         Directory.CreateDirectory(PhotoFolder);
@@ -242,7 +258,7 @@ public sealed class MaterialLibrary
 
     static bool SafeName(string name) =>
         name.Length is > 0 and < 80 && name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.') && !name.StartsWith('.') &&
-        (name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
+        (name.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".png", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".gif", StringComparison.OrdinalIgnoreCase));
 
     // ---- sharing --------------------------------------------------------------------------
 
@@ -254,7 +270,7 @@ public sealed class MaterialLibrary
         var body = new FileBody(FileFormat, 1, string.IsNullOrWhiteSpace(author) ? null : author.Trim(), DateTime.Now, list);
         using (var w = new StreamWriter(zip.CreateEntry("library.json").Open()))
             w.Write(JsonSerializer.Serialize(body, Json));
-        foreach (var name in list.SelectMany(m => m.Recipes).Select(r => r.Photo).OfType<string>().Distinct())
+        foreach (var name in list.SelectMany(m => m.Recipes).Select(r => r.Photo).OfType<string>().Concat(list.SelectMany(m => m.Gratings).SelectMany(GratingFiles)).Distinct())
             if (PhotoPath(name) is { } path)
                 zip.CreateEntryFromFile(path, "photos/" + name, CompressionLevel.NoCompression);
     }
@@ -313,6 +329,29 @@ public sealed class MaterialLibrary
                 });
             }
             newRecipes += added.Count;
+            // Palettes and grating sets you don't have yet (grating pictures come with them).
+            var knownPalettes = mine?.Palettes.Select(p => p.Id).ToHashSet() ?? [];
+            var palettes = (incoming.Palettes ?? []).Where(p => p is not null && !knownPalettes.Contains(p.Id)).ToList();
+            var knownGratings = mine?.Gratings.Select(g => g.Id).ToHashSet() ?? [];
+            var gratings = new List<PhotonCanvas.Doc.Colour.GratingSet>();
+            foreach (var g in incoming.Gratings ?? [])
+            {
+                if (g is null || knownGratings.Contains(g.Id)) continue;
+                string? Bring(string? name, string local)
+                {
+                    if (name is null || !SafeName(name) || zip.GetEntry("photos/" + name) is not { Length: > 0 and <= MaxPhotoBytes } e) return null;
+                    Directory.CreateDirectory(PhotoFolder);
+                    e.ExtractToFile(Path.Combine(PhotoFolder, local), overwrite: true);
+                    return local;
+                }
+                gratings.Add(g with
+                {
+                    Name = Trim(g.Name, 120),
+                    Notes = Trim(g.Notes, 4000),
+                    Views = [.. (g.Views ?? []).Where(v => v is not null).Select(v => v with { Frame = Bring(v.Frame, $"{g.Id:N}-{v.View}.png".ToLowerInvariant()) })],
+                    Gif = Bring(g.Gif, $"{g.Id:N}.gif"),
+                });
+            }
             if (mine is null)
             {
                 Upsert(incoming with
@@ -322,11 +361,13 @@ public sealed class MaterialLibrary
                     Notes = Trim(incoming.Notes, 4000),
                     ThicknessMm = incoming.ThicknessMm is { } t && t is > 0 and < 500 ? t : null,
                     Recipes = [.. added],
+                    Palettes = [.. palettes],
+                    Gratings = [.. gratings],
                 });
                 newMaterials++;
             }
-            else if (added.Count > 0)
-                Upsert(mine with { Recipes = mine.Recipes.AddRange(added) });
+            else if (added.Count > 0 || palettes.Count > 0 || gratings.Count > 0)
+                Upsert(mine with { Recipes = mine.Recipes.AddRange(added), Palettes = mine.Palettes.AddRange(palettes), Gratings = mine.Gratings.AddRange(gratings) });
         }
         return new ImportResult(newMaterials, newRecipes, skipped, from);
     }

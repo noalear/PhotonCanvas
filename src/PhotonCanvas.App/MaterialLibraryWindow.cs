@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using PhotonCanvas.Doc.Colour;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
@@ -29,6 +30,12 @@ public sealed class MaterialLibraryWindow : Window
     readonly CheckBox _reflective = new() { Content = "Highly reflective" };
     readonly TextBox _notes = new() { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 50 };
     readonly StackPanel _recipes = new() { Spacing = 6 };
+    readonly StackPanel _tests = new() { Spacing = 6 };
+    readonly TextBlock _testsHeader = new() { Text = "COLOUR AND GRATING TESTS", Classes = { "h" } };
+    // Grating sets play their views; one timer moves them all.
+    readonly Avalonia.Threading.DispatcherTimer _play = new() { Interval = TimeSpan.FromMilliseconds(900) };
+    readonly List<(Image Image, TextBlock Label, Bitmap[] Frames, string[] Names)> _players = [];
+    int _tick;
     readonly Control _details;
     readonly TextBlock _empty = Hint("Pick a material on the left, or make a new one. Recipes come from Save to library on a layer, or from a material test (Laser → Record results).");
     readonly TextBlock _status = Hint();
@@ -44,6 +51,8 @@ public sealed class MaterialLibraryWindow : Window
         _lib = lib;
         _settings = settings;
         _apply = applyToLayers;
+        _play.Tick += (_, _) => Play();
+        Closed += (_, _) => { _play.Stop(); foreach (var p in _players) foreach (var f in p.Frames) f.Dispose(); };
         Title = "Material library";
         Width = 1000;
         Height = 720;
@@ -92,6 +101,8 @@ public sealed class MaterialLibraryWindow : Window
                 Card("Material", Field("Name", _name), Field("Category", _category), Field("Thickness mm", _thickness, tip: "0 = doesn't apply (coatings, surfaces)."), _reflective, _notes),
                 new TextBlock { Text = "RECIPES", Classes = { "h" } },
                 _recipes,
+                _testsHeader,
+                _tests,
             },
         };
         var right = new ScrollViewer { Content = new Panel { Children = { _empty, _details } } };
@@ -150,6 +161,132 @@ public sealed class MaterialLibraryWindow : Window
         if (m.Recipes.Count == 0) _recipes.Children.Add(Hint("No recipes yet."));
         foreach (var r in m.Recipes.OrderBy(r => r.Purpose).ThenByDescending(r => r.Rating))
             _recipes.Children.Add(RecipeCard(m, r));
+        ShowTests(m);
+    }
+
+    // ---- colour palettes and grating sets ---------------------------------------------------
+
+    void ShowTests(Material m)
+    {
+        foreach (var p in _players) foreach (var f in p.Frames) f.Dispose();
+        _players.Clear();
+        _tests.Children.Clear();
+        _testsHeader.IsVisible = _tests.IsVisible = m.Palettes.Count > 0 || m.Gratings.Count > 0;
+        foreach (var p in m.Palettes.OrderByDescending(p => p.Measured)) _tests.Children.Add(PaletteCard(m, p));
+        foreach (var g in m.Gratings.OrderByDescending(g => g.Measured)) _tests.Children.Add(GratingCard(m, g));
+        if (_players.Count > 0) _play.Start(); else _play.Stop();
+    }
+
+    void Play()
+    {
+        _tick++;
+        foreach (var (image, label, frames, names) in _players)
+        {
+            int i = _tick % frames.Length;
+            image.Source = frames[i];
+            label.Text = names[i];
+        }
+    }
+
+    Control DeleteButton(string what, Action remove)
+    {
+        var b = new Button { Classes = { "icon" }, Content = new PathIcon { Data = Icon("IcTrash"), Width = 13, Height = 13 }, VerticalAlignment = VerticalAlignment.Top };
+        ToolTip.SetTip(b, $"Delete this {what}");
+        b.Click += async (_, _) =>
+        {
+            if (!await Dialogs.Confirm(this, $"Delete {what}", $"Delete this {what} from the library? This can't be undone.", "Delete", "Keep")) return;
+            remove();
+            _lib.Save();
+            Changed();
+            if (_current is { } cur) Fill(cur.Id);
+        };
+        return b;
+    }
+
+    Control PaletteCard(Material m, ColourPalette p)
+    {
+        var distinct = ColourMeasure.Distinct(p.Swatches);
+        var chips = new WrapPanel();
+        foreach (var s in distinct)
+        {
+            var (r, g, b) = PhotonCanvas.Core.Imaging.ColourScience.LabToSrgb(s.Colour);
+            var chip = new Border { Width = 18, Height = 18, Margin = new(0, 0, 3, 3), CornerRadius = new(3), Background = new SolidColorBrush(Color.FromRgb(r, g, b)) };
+            ToolTip.SetTip(chip, s.Settings.Summary());
+            chips.Children.Add(chip);
+        }
+        var info = new StackPanel
+        {
+            Spacing = 3,
+            Children =
+            {
+                new TextBlock { Text = $"Colour palette · {p.Name}", FontWeight = FontWeight.SemiBold },
+                Hint($"{p.Measured:d MMM yyyy} · {p.Swatches.Count} squares, {distinct.Count} clearly different colours" + (p.Method.Length > 0 ? $" · {p.Method}" : "") + (p.FocusMm is { } f ? $" · focus {f:0.0} mm" : "")),
+                chips,
+            },
+        };
+        var row = new DockPanel();
+        var del = DeleteButton("palette", () => _lib.Upsert(m with { Palettes = m.Palettes.Remove(p) }));
+        DockPanel.SetDock(del, Dock.Right);
+        row.Children.Add(del);
+        row.Children.Add(info);
+        return new Border { Classes = { "card" }, Margin = new(0), Child = row };
+    }
+
+    Control GratingCard(Material m, GratingSet g)
+    {
+        // The views as an animation, from the frames saved with the set.
+        var frames = new List<Bitmap>();
+        var names = new List<string>();
+        foreach (var v in g.Views)
+            if (_lib.PhotoPath(v.Frame) is { } path)
+                try { frames.Add(new Bitmap(path)); names.Add(GratingViews.Short(v.View)); }
+                catch (Exception e) when (e is ArgumentException or IOException) { }
+        var image = new Image { Stretch = Stretch.Uniform, MaxHeight = 220, HorizontalAlignment = HorizontalAlignment.Left };
+        var label = new TextBlock { Classes = { "muted" } };
+        if (frames.Count > 0)
+        {
+            image.Source = frames[0];
+            label.Text = names[0];
+            _players.Add((image, label, [.. frames], [.. names]));
+        }
+        var best = GratingMeasure.Score(g.Views).Take(3).Select(sc =>
+            $"• R{sc.Row + 1} C{sc.Col + 1} ({sc.Settings.Summary()}): {(sc.LightsUpAt.Count == 0 ? "weak everywhere" : "lights up at " + string.Join(", ", sc.LightsUpAt.Select(GratingViews.Short)))}");
+        var gif = new Button { Content = "Save GIF…", IsEnabled = _lib.PhotoPath(g.Gif) is not null, HorizontalAlignment = HorizontalAlignment.Left };
+        gif.Click += async (_, _) =>
+        {
+            if (_lib.PhotoPath(g.Gif) is not { } src) return;
+            var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save the views as a GIF",
+                DefaultExtension = "gif",
+                SuggestedFileName = g.Name + ".gif",
+                FileTypeChoices = [new FilePickerFileType("GIF") { Patterns = ["*.gif"] }],
+            });
+            if (file?.TryGetLocalPath() is { } dst) File.Copy(src, dst, overwrite: true);
+        };
+        var info = new StackPanel
+        {
+            Spacing = 4,
+            Children =
+            {
+                new TextBlock { Text = $"Gratings · {g.Name}", FontWeight = FontWeight.SemiBold },
+                Hint($"{g.Measured:d MMM yyyy} · {g.Views.Count} of 5 views" + (g.FocusMm is { } f ? $" · focus {f:0.0} mm" : "") + (g.Notes.Length > 0 ? $"\n{g.Notes}" : "")),
+                image,
+                label,
+                new TextBlock { Text = string.Join("\n", best), TextWrapping = TextWrapping.Wrap, FontSize = 12 },
+                gif,
+            },
+        };
+        var row = new DockPanel();
+        var del = DeleteButton("grating set", () =>
+        {
+            foreach (var file in MaterialLibrary.GratingFiles(g)) _lib.DeletePhoto(file);
+            _lib.Upsert(m with { Gratings = m.Gratings.Remove(g) });
+        });
+        DockPanel.SetDock(del, Dock.Right);
+        row.Children.Add(del);
+        row.Children.Add(info);
+        return new Border { Classes = { "card" }, Margin = new(0), Child = row };
     }
 
     void SaveMaterialFields()

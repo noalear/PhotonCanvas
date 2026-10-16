@@ -342,3 +342,111 @@ public class RotateTests
         Assert.True(s.Rgba[3] < 10);
     }
 }
+
+public class GratingTests
+{
+    static RasterImage Solid(int w, int h, byte r, byte g, byte b)
+    {
+        var px = new byte[w * h * 4];
+        for (int i = 0; i < w * h; i++) { px[i * 4] = r; px[i * 4 + 1] = g; px[i * 4 + 2] = b; px[i * 4 + 3] = 255; }
+        return new RasterImage(w, h, px);
+    }
+
+    [Fact]
+    public void GifHasEveryFrameInItsColours()
+    {
+        // Three frames, the middle one a gradient (more than 256 colours, so it must be quantized).
+        var grad = new byte[64 * 48 * 4];
+        for (int y = 0; y < 48; y++)
+            for (int x = 0; x < 64; x++)
+            {
+                int i = (y * 64 + x) * 4;
+                grad[i] = (byte)(x * 4); grad[i + 1] = (byte)(y * 5); grad[i + 2] = 128; grad[i + 3] = 255;
+            }
+        var frames = new[] { Solid(64, 48, 200, 30, 40), new RasterImage(64, 48, grad), Solid(64, 48, 20, 90, 220) };
+        var gif = GifEncoder.Encode(frames, 80);
+        Assert.Equal("GIF89a", System.Text.Encoding.ASCII.GetString(gif, 0, 6));
+        using var codec = SkiaSharp.SKCodec.Create(new SkiaSharp.SKMemoryStream(gif));
+        Assert.NotNull(codec);
+        Assert.Equal(3, codec.FrameCount);
+        Assert.Equal(800, codec.FrameInfo[0].Duration);
+        var info = new SkiaSharp.SKImageInfo(64, 48, SkiaSharp.SKColorType.Rgba8888, SkiaSharp.SKAlphaType.Unpremul);
+        using var bmp = new SkiaSharp.SKBitmap(info);
+        for (int f = 0; f < 3; f++)
+        {
+            Assert.Equal(SkiaSharp.SKCodecResult.Success, codec.GetPixels(info, bmp.GetPixels(), new SkiaSharp.SKCodecOptions(f)));
+            var want = frames[f].Rgba;
+            var got = bmp.Bytes;
+            foreach (int p in new[] { 0, 64 * 24 + 32, 64 * 48 - 1 })
+                for (int ch = 0; ch < 3; ch++)
+                    Assert.InRange(got[p * 4 + ch] - want[p * 4 + ch], -12, 12);
+        }
+    }
+
+    [Fact]
+    public void StraightensAPerspectivePhotoOfTheGrid()
+    {
+        // A photo taken at an angle: the 0–10 mm square appears as a trapezoid.
+        var mmToPx = Homography.Fit([(new Vec2(0, 0), new Vec2(20, 30)), (new Vec2(10, 0), new Vec2(180, 20)), (new Vec2(10, 10), new Vec2(190, 170)), (new Vec2(0, 10), new Vec2(10, 160))])!.Value;
+        var pxToMm = Homography.Fit([(new Vec2(20, 30), new Vec2(0, 0)), (new Vec2(180, 20), new Vec2(10, 0)), (new Vec2(190, 170), new Vec2(10, 10)), (new Vec2(10, 160), new Vec2(0, 10))])!.Value;
+        int w = 200, h = 200;
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var mm = pxToMm.Apply(new Vec2(x + 0.5, y + 0.5));
+                int i = (y * w + x) * 4;
+                bool left = mm.X < 5;
+                px[i] = (byte)(left ? 220 : 30); px[i + 2] = (byte)(left ? 30 : 220); px[i + 3] = 255;
+            }
+        var flat = GratingMeasure.Straighten(new RasterImage(w, h, px), mmToPx, new Rect2(0, 0, 10, 10), 10);
+        Assert.Equal(100, flat.Width);
+        Assert.True(flat.Rgba[(50 * 100 + 20) * 4] > 200);     // left half red, straight
+        Assert.True(flat.Rgba[(50 * 100 + 80) * 4 + 2] > 200); // right half blue
+        Assert.True(flat.Rgba[(5 * 100 + 20) * 4] > 200);      // even near the top edge
+    }
+
+    [Fact]
+    public void ScoresSquaresByTheirBestViewAndSaysWhereTheyLightUp()
+    {
+        ColourSwatch S(int r, int c, double chroma) => new() { Row = r, Col = c, L = 60, A = chroma, B = 0 };
+        var views = new[]
+        {
+            new GratingViewResult { View = GratingView.Straight, Swatches = [S(0, 0, 5), S(0, 1, 3)] },
+            new GratingViewResult { View = GratingView.Top, Swatches = [S(0, 0, 40), S(0, 1, 8)] },
+            new GratingViewResult { View = GratingView.Bottom, Swatches = [S(0, 0, 30), S(0, 1, 20)] },
+        };
+        var scores = GratingMeasure.Score(views);
+        Assert.Equal((0, 0), (scores[0].Row, scores[0].Col));
+        Assert.Equal(40, scores[0].Vividness, 6);
+        Assert.Equal([GratingView.Top, GratingView.Bottom], scores[0].LightsUpAt);
+        Assert.Equal([GratingView.Bottom], scores[1].LightsUpAt);
+    }
+
+    [Fact]
+    public void GratingSetsTravelWithTheirPictures()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pc-gratings-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var src = new PhotonCanvas.Doc.Materials.MaterialLibrary(Path.Combine(dir, "a"));
+            var id = Guid.NewGuid();
+            var frame = src.SaveFile($"{id:N}-straight.png", Solid(8, 8, 10, 20, 30).EncodePng());
+            var gif = src.SaveFile($"{id:N}.gif", GifEncoder.Encode([Solid(8, 8, 10, 20, 30)], 50));
+            var set = new GratingSet { Id = id, Name = "Gratings 1", Views = [new GratingViewResult { View = GratingView.Straight, Frame = frame }], Gif = gif };
+            var m = new PhotonCanvas.Doc.Materials.Material { Name = "Mirror stainless", Gratings = [set], Palettes = [new ColourPalette { Name = "p" }] };
+            src.Upsert(m);
+            using var file = new MemoryStream();
+            src.Export(file, src.Materials, "me");
+            file.Position = 0;
+            var dst = new PhotonCanvas.Doc.Materials.MaterialLibrary(Path.Combine(dir, "b"));
+            dst.Import(file, "x");
+            var got = dst.Materials.Single();
+            Assert.Single(got.Palettes);
+            var g = got.Gratings.Single();
+            Assert.NotNull(dst.PhotoPath(g.Gif));
+            Assert.NotNull(dst.PhotoPath(g.Views[0].Frame));
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+    }
+}

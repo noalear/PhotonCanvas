@@ -102,6 +102,23 @@ public sealed class RasterImage
         return new RasterImage(w, h, dst.Bytes);
     }
 
+    /// <summary>This image with a caption on a dark band along the bottom (for labelled animation frames).</summary>
+    public RasterImage WithCaption(string text)
+    {
+        var info = new SKImageInfo(Width, Height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
+        using var bmp = new SKBitmap(info);
+        System.Runtime.InteropServices.Marshal.Copy(Rgba, 0, bmp.GetPixels(), Rgba.Length);
+        using (var c = new SKCanvas(bmp))
+        {
+            float size = Math.Clamp(Height / 18f, 12, 40);
+            using var band = new SKPaint { Color = new SKColor(14, 16, 20, 200) };
+            c.DrawRect(0, Height - size * 1.6f, Width, size * 1.6f, band);
+            using var ink = new SKPaint { Color = SKColors.White, IsAntialias = true, TextSize = size, Typeface = SKTypeface.FromFamilyName(null, SKFontStyle.Bold) };
+            c.DrawText(text, size * 0.5f, Height - size * 0.5f, ink);
+        }
+        return new RasterImage(Width, Height, bmp.Bytes);
+    }
+
     static SKBitmap? ApplyOrientation(SKBitmap bmp, SKEncodedOrigin origin)
     {
         if (origin is SKEncodedOrigin.TopLeft or SKEncodedOrigin.Default) return null;

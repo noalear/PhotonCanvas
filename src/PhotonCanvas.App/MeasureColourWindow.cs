@@ -25,6 +25,10 @@ namespace PhotonCanvas.App;
 /// results add up. The machine's lights can be set from here, and are saved with the palette. Shows what the plate really gave (as swatches and as a
 /// colour map), how many clearly different colours that is, and saves them to the material
 /// library as a palette for colour pictures.
+/// <para>Gratings change with the angle they're seen from, so in Gratings mode the test is
+/// photographed from five fixed views (straight, and 45° from each side, the lamp kept still).
+/// Each view is measured on its own; the views play as a synchronised animation (also saved as
+/// a GIF), and the set is saved to the library with a summary of the strongest squares.</para>
 /// </summary>
 public sealed class MeasureColourWindow : Window
 {
@@ -39,12 +43,9 @@ public sealed class MeasureColourWindow : Window
     readonly TextBlock _frontText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center }, _backText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center };
     readonly Button _block = new() { Content = "Which squares are in this photo?" };
     bool _settingLights;
-    double? _photoTurn; // a close-up photo, turned this far before showing
     // The block of squares the current photo shows (rows/columns, inclusive), and picking it on the chart.
-    (int R0, int C0, int R1, int C1) _section;
     (int R, int C)? _sectionFirst;
     bool _pickingSection;
-    readonly Dictionary<(int, int), ColourSwatch> _byCell = [];
 
     readonly PickView _view = new();
     readonly TextBlock _step = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
@@ -61,13 +62,43 @@ public sealed class MeasureColourWindow : Window
     readonly Button _csv = new() { Content = "Export CSV…", IsEnabled = false };
     readonly Button _grey = new() { Content = "Pick grey card…" };
 
-    RasterImage? _image;
-    string _method = "";
-    Homography? _mmToPx;
-    readonly List<Vec2> _corners = [];
     readonly List<Vec2> _greyClicks = [];
+
+    /// <summary>One photo of the test and what was read from it (oxide mode uses one; gratings one per view).</summary>
+    sealed class Shot
+    {
+        public RasterImage? Image;
+        public Bitmap? Display;
+        public string Method = "";
+        public Homography? MmToPx;
+        public readonly List<Vec2> Corners = [];
+        public (double R, double G, double B)? Balance;
+        public double? PhotoTurn; // a close-up photo, turned this far before showing
+        // The block of squares this photo shows (rows/columns, inclusive).
+        public (int R0, int C0, int R1, int C1) Section;
+        public readonly Dictionary<(int, int), ColourSwatch> ByCell = [];
+        // Gratings: the grid as this view saw it, straightened.
+        public RasterImage? Frame;
+        public Bitmap? FrameBitmap;
+    }
+
+    readonly Shot[] _shots;
+    Shot _s;
+
+    // Gratings: five fixed views, played together.
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Oxide colours: one photo", "Gratings: five views" }, SelectedIndex = 0 };
+    readonly Segmented _viewPick = new([.. GratingViews.All.Select(v => (GratingViews.Short(v), (string?)null))]);
+    readonly TextBlock _viewsState = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
+    readonly Image _anim = new() { Stretch = Stretch.Uniform, MaxHeight = 280 };
+    readonly TextBlock _animLabel = new() { Classes = { "muted" }, HorizontalAlignment = HorizontalAlignment.Center };
+    readonly Avalonia.Threading.DispatcherTimer _animTimer = new() { Interval = TimeSpan.FromMilliseconds(900) };
+    int _animAt;
+    readonly Button _gif = new() { Content = "Save GIF…", IsEnabled = false };
+    readonly TextBox _notes = new() { Watermark = "Where the lamp was, how far the camera was (e.g. desk lamp above the back edge, phone 1.5 m away, zoomed)", AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 50 };
+    readonly StackPanel _gratingTop = new() { Spacing = 6 }, _gratingRight = new() { Spacing = 8 }, _oxideRight = new() { Spacing = 10 };
+    bool Gratings => _mode.SelectedIndex == 1;
+    GratingView CurrentView => GratingViews.All[Array.IndexOf(_shots, _s)];
     bool _pickingGrey;
-    (double R, double G, double B)? _balance;
     List<ColourSwatch> _measured = [];
 
     public MeasureColourWindow(DocState state, MaterialLibrary lib, CameraPhoto? camera, double? focusMm, MachinePanel? machine = null)
@@ -79,7 +110,8 @@ public sealed class MeasureColourWindow : Window
         _focus = focusMm;
         _rows = _cells.Count == 0 ? 0 : _cells.Max(c => c.Row) + 1;
         _cols = _cells.Count == 0 ? 0 : _cells.Max(c => c.Col) + 1;
-        _section = (0, 0, Math.Max(0, _rows - 1), Math.Max(0, _cols - 1));
+        _shots = [.. Enumerable.Range(0, 5).Select(_ => new Shot { Section = (0, 0, Math.Max(0, _rows - 1), Math.Max(0, _cols - 1)) })];
+        _s = _shots[0];
         Title = "Measure colours";
         Width = 1240;
         Height = 820;
@@ -114,7 +146,7 @@ public sealed class MeasureColourWindow : Window
         _back.ValueChanged += (_, _) => LightsChanged();
         ShowLightText();
         var reset = Button("Click the corners again");
-        reset.Click += (_, _) => { _corners.Clear(); _mmToPx = null; Remeasure(); };
+        reset.Click += (_, _) => { _s.Corners.Clear(); _s.MmToPx = null; Remeasure(); };
         ToolTip.SetTip(_grey, "Click two opposite corners of a grey or white card in the picture: its colour is taken as neutral, which corrects the light's tint.");
         _grey.Click += (_, _) => { _pickingGrey = true; _greyClicks.Clear(); UpdateStep(); };
         _view.Clicked += OnPicked;
@@ -124,6 +156,25 @@ public sealed class MeasureColourWindow : Window
         _material.SelectionChanged += (_, _) => _newName.IsVisible = _material.SelectedIndex == 0;
         _paletteName.Text = $"Colour test {DateTime.Now:yyyy-MM-dd}";
         _save.Click += (_, _) => Save();
+        // A grating test (overscan on every square) starts in Gratings mode.
+        _mode.SelectedIndex = _cells.Count > 0 && _cells.All(c => c.Layer.OverscanMm > 0) ? 1 : 0;
+        _mode.SelectionChanged += (_, _) => ModeChanged();
+        _viewPick.SelectedIndex = 0;
+        _viewPick.Changed += i => SelectShot(i);
+        _animTimer.Tick += (_, _) => NextFrame();
+        Closed += (_, _) => _animTimer.Stop();
+        _gif.Click += async (_, _) => await SaveGif();
+        ToolTip.SetTip(_gif, "Save the views as an animated GIF: the grid as each view saw it, one after another.");
+        _gratingTop.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 8,
+            Children = { new TextBlock { Text = "View", Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center }, new Border { Width = 470, Child = _viewPick } },
+        });
+        _gratingTop.Children.Add(_viewsState);
+        _gratingRight.Children.Add(new TextBlock { Text = "THE VIEWS TOGETHER", Classes = { "h" } });
+        _gratingRight.Children.Add(new Border { Background = Brush("Bg0"), CornerRadius = new(6), MinHeight = 120, Child = _anim, ClipToBounds = true });
+        _gratingRight.Children.Add(_animLabel);
+        _gratingRight.Children.Add(_gif);
         _csv.Click += async (_, _) => await ExportCsv();
 
         var left = new DockPanel();
@@ -142,7 +193,7 @@ public sealed class MeasureColourWindow : Window
                 new TextBlock { Text = lightsOn ? "Keep them the same for every photo you compare." : "Connect the machine to set its lights.", Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(8, 0, 0, 0) },
             },
         };
-        var top = new StackPanel { Spacing = 6, Margin = new(0, 0, 0, 8), Children = { tools, tools2, lights, _step, _status } };
+        var top = new StackPanel { Spacing = 6, Margin = new(0, 0, 0, 8), Children = { Field("Measure", _mode), _gratingTop, tools, tools2, lights, _step, _status } };
         DockPanel.SetDock(top, Dock.Top);
         left.Children.Add(top);
         left.Children.Add(new Border { Background = Brush("Bg0"), CornerRadius = new(6), ClipToBounds = true, Child = _view });
@@ -155,22 +206,25 @@ public sealed class MeasureColourWindow : Window
                 new TextBlock { Text = "WHAT THE PLATE GAVE", Classes = { "h" } },
                 _swatches,
                 Hint("Click a square to leave it out (blotchy or burnt ones are left out already: marked !)."),
-                new TextBlock { Text = "COLOUR MAP", Classes = { "h" }, Margin = new(0, 4, 0, 0) },
-                _map,
-                Hint("Each dot is a square, placed by hue and saturation (grey in the middle). Ringed dots are the clearly different ones."),
-                new StackPanel
-                {
-                    Orientation = Orientation.Horizontal, Spacing = 8,
-                    Children = { new TextBlock { Text = "Clearly different if ΔE ≥", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _distinct, _distinctText },
-                },
+                _oxideRight,
+                _gratingRight,
                 _verdict,
                 new TextBlock { Text = "SAVE", Classes = { "h" }, Margin = new(0, 4, 0, 0) },
                 Field("Material", _material),
                 _newName,
-                Field("Palette name", _paletteName),
+                Field("Name", _paletteName),
+                _notes,
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _save, _csv } },
             },
         };
+        _oxideRight.Children.Add(new TextBlock { Text = "COLOUR MAP", Classes = { "h" }, Margin = new(0, 4, 0, 0) });
+        _oxideRight.Children.Add(_map);
+        _oxideRight.Children.Add(Hint("Each dot is a square, placed by hue and saturation (grey in the middle). Ringed dots are the clearly different ones."));
+        _oxideRight.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 8,
+            Children = { new TextBlock { Text = "Clearly different if ΔE ≥", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _distinct, _distinctText },
+        });
         var grid = new Grid { ColumnDefinitions = new("*,16,420") };
         grid.Children.Add(left);
         var rs = new ScrollViewer { Content = right };
@@ -183,8 +237,73 @@ public sealed class MeasureColourWindow : Window
             _step.Text = "There's no colour test in this design. Add one with Laser → Colour test, burn it, then come back here with a scan or photo of it.";
             open.IsEnabled = cam.IsEnabled = closeUp.IsEnabled = false;
         }
-        UpdateStep();
-        ShowResults();
+        ModeChanged();
+    }
+
+    // ---- gratings: views -----------------------------------------------------------------
+
+    void ModeChanged()
+    {
+        bool g = Gratings;
+        _gratingTop.IsVisible = _gratingRight.IsVisible = _notes.IsVisible = g;
+        _oxideRight.IsVisible = !g;
+        _save.Content = g ? "Save grating set" : "Save palette";
+        if (string.IsNullOrWhiteSpace(_paletteName.Text) || _paletteName.Text.StartsWith("Colour test ") || _paletteName.Text.StartsWith("Gratings "))
+            _paletteName.Text = $"{(g ? "Gratings" : "Colour test")} {DateTime.Now:yyyy-MM-dd}";
+        SelectShot(g ? Math.Max(0, _viewPick.SelectedIndex) : 0);
+        if (g) _animTimer.Start(); else _animTimer.Stop();
+    }
+
+    /// <summary>Switch to one view's photo (or the single oxide photo).</summary>
+    void SelectShot(int i)
+    {
+        _s = _shots[Math.Clamp(i, 0, _shots.Length - 1)];
+        _greyClicks.Clear();
+        _pickingGrey = _pickingSection = false;
+        _view.Bitmap = _s.Display;
+        _view.ImageSize = _s.Image is { } img ? new Size(img.Width, img.Height) : default;
+        Remeasure();
+    }
+
+    /// <summary>The next view's straightened picture in the animation.</summary>
+    void NextFrame()
+    {
+        var frames = _shots.Select((s, i) => (s, i)).Where(x => x.s.FrameBitmap is not null).ToList();
+        if (frames.Count == 0) { _anim.Source = null; _animLabel.Text = "Measure a view to see it here."; return; }
+        _animAt = (_animAt + 1) % frames.Count;
+        var (shot, i) = frames[_animAt];
+        _anim.Source = shot.FrameBitmap;
+        _animLabel.Text = $"{GratingViews.Short(GratingViews.All[i])}  ({_animAt + 1} of {frames.Count})";
+    }
+
+    /// <summary>The grid as the current view saw it, straightened and labelled (for the animation and the library).</summary>
+    void MakeFrame()
+    {
+        if (!Gratings || _s.Image is not { } img || _s.MmToPx is not { } h || _cells.Count == 0) return;
+        var area = _cells.Select(c => c.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b)).Inflate(1.5);
+        area = new Rect2(area.MinX, area.MinY, area.MaxX, area.MaxY + area.Height * 0.16); // room below for the caption
+        double pxPerMm = Math.Clamp(640 / Math.Max(1, area.Width), 4, 20);
+        _s.Frame = GratingMeasure.Straighten(img, h, area, pxPerMm).WithCaption(GratingViews.Short(CurrentView));
+        _s.FrameBitmap?.Dispose();
+        using var ms = new MemoryStream(_s.Frame.EncodePng());
+        _s.FrameBitmap = new Bitmap(ms);
+        _gif.IsEnabled = true;
+    }
+
+    async Task SaveGif()
+    {
+        var frames = _shots.Where(s => s.Frame is not null).Select(s => s.Frame!).ToList();
+        if (frames.Count == 0) return;
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save the views as a GIF",
+            DefaultExtension = "gif",
+            SuggestedFileName = (_paletteName.Text ?? "gratings") + ".gif",
+            FileTypeChoices = [new FilePickerFileType("GIF") { Patterns = ["*.gif"] }],
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+        await File.WriteAllBytesAsync(path, await Task.Run(() => GifEncoder.Encode(frames, 90)));
+        _status.Text = $"Saved {Path.GetFileName(path)} ({frames.Count} views).";
     }
 
     // ---- picture and corners ------------------------------------------------------------
@@ -201,7 +320,7 @@ public sealed class MeasureColourWindow : Window
         {
             var bytes = await File.ReadAllBytesAsync(path);
             var img = await Task.Run(() => RasterImage.Decode(bytes));
-            _photoTurn = null;
+            _s.PhotoTurn = null;
             SetImage(img, Path.GetExtension(path).ToLowerInvariant() is ".tif" or ".tiff" or ".png" ? "scan" : "photo");
             _status.Text = $"{Path.GetFileName(path)} · {img.Width} × {img.Height} px";
         }
@@ -224,10 +343,10 @@ public sealed class MeasureColourWindow : Window
                 // Turned the way the camera sits, so the grid reads the same way round as on screen.
                 double turn = _machine.CloseUpRotationDeg;
                 var img = await Task.Run(() => RasterImage.Decode(jpg).Rotated(turn));
-                _photoTurn = turn;
+                _s.PhotoTurn = turn;
                 SetImage(img, "close-up camera");
                 _status.Text = $"Close-up photo, lights front {_front.Value:0}% / back {_back.Value:0}%. " +
-                               (_section == (0, 0, _rows - 1, _cols - 1) ? "If it shows only part of the grid, say which squares first." : "");
+                               (_s.Section == (0, 0, _rows - 1, _cols - 1) ? "If it shows only part of the grid, say which squares first." : "");
             }
         }
         catch (Exception e) when (e is PhotonCanvas.Device.DeviceException or FormatException or ArgumentException)
@@ -264,28 +383,31 @@ public sealed class MeasureColourWindow : Window
     void UseCamera()
     {
         if (_camera is not { } p) return;
-        _photoTurn = null;
-        _section = (0, 0, _rows - 1, _cols - 1);
+        _s.PhotoTurn = null;
+        _s.Section = (0, 0, _rows - 1, _cols - 1);
         SetImage(p.Image, "overview camera");
         // The camera picture is already mapped to the bed: no corners to click.
         var a = p.Area;
         Vec2 Px(Vec2 mm) => new((mm.X - a.MinX) / p.MmPerPx, (mm.Y - a.MinY) / p.MmPerPx);
-        _mmToPx = Homography.Fit([.. new[] { a.TopLeft, new Vec2(a.MaxX, a.MinY), a.BottomRight, new Vec2(a.MinX, a.MaxY) }.Select(m => (m, Px(m)))]);
+        _s.MmToPx = Homography.Fit([.. new[] { a.TopLeft, new Vec2(a.MaxX, a.MinY), a.BottomRight, new Vec2(a.MinX, a.MaxY) }.Select(m => (m, Px(m)))]);
         _status.Text = "Using the machine's camera picture. Its colours are only a rough guide.";
         Remeasure();
     }
 
     void SetImage(RasterImage img, string method)
     {
-        _image = img;
-        _method = method;
-        _corners.Clear();
+        _s.Image = img;
+        _s.Method = method;
+        _s.Corners.Clear();
         _greyClicks.Clear();
-        _balance = null;
-        _mmToPx = null;
-        var old = _view.Bitmap;
-        using (var ms = new MemoryStream(img.EncodeJpeg(2400, 92))) _view.Bitmap = new Bitmap(ms);
-        old?.Dispose();
+        _s.Balance = null;
+        _s.MmToPx = null;
+        _s.Display?.Dispose();
+        using (var ms = new MemoryStream(img.EncodeJpeg(2400, 92))) _s.Display = new Bitmap(ms);
+        _view.Bitmap = _s.Display;
+        _s.Frame = null;
+        _s.FrameBitmap?.Dispose();
+        _s.FrameBitmap = null;
         _view.ImageSize = new(img.Width, img.Height);
         Remeasure();
     }
@@ -293,7 +415,7 @@ public sealed class MeasureColourWindow : Window
     /// <summary>Where the corner squares are, in the order they're clicked.</summary>
     IReadOnlyList<(string Name, ColourTestCell Cell)> CornerCells()
     {
-        var (r0, c0, r1, c1) = _section;
+        var (r0, c0, r1, c1) = _s.Section;
         return [("top-left", Cell(r0, c0)), ("top-right", Cell(r0, c1)), ("bottom-right", Cell(r1, c1)), ("bottom-left", Cell(r1, c0))];
     }
 
@@ -329,10 +451,10 @@ public sealed class MeasureColourWindow : Window
     }
 
     /// <summary>The square to click next in the photo (outlined on the chart), if any.</summary>
-    (int R, int C)? NextCorner => _image is not null && !_pickingGrey && !_pickingSection && _mmToPx is null && _corners.Count < 4
-        ? (CornerCells()[_corners.Count].Cell.Row, CornerCells()[_corners.Count].Cell.Col) : null;
+    (int R, int C)? NextCorner => _s.Image is not null && !_pickingGrey && !_pickingSection && _s.MmToPx is null && _s.Corners.Count < 4
+        ? (CornerCells()[_s.Corners.Count].Cell.Row, CornerCells()[_s.Corners.Count].Cell.Col) : null;
 
-    bool InSection(int r, int c) => r >= _section.R0 && r <= _section.R1 && c >= _section.C0 && c <= _section.C1;
+    bool InSection(int r, int c) => r >= _s.Section.R0 && r <= _s.Section.R1 && c >= _s.Section.C0 && c <= _s.Section.C1;
 
     ColourTestCell Cell(int r, int c) => _cells.FirstOrDefault(x => x.Row == r && x.Col == c) ?? _cells[0];
 
@@ -340,24 +462,27 @@ public sealed class MeasureColourWindow : Window
     {
         if (_cells.Count == 0) return;
         if (_pickingSection) _step.Text = _sectionFirst is null ? "On the chart, click the first square this photo shows." : "Now the last square it shows (the opposite corner of the block).";
-        else if (_image is null) _step.Text = "Put the burned test under the close-up camera and take a close-up photo (or open a scan).";
+        else if (_s.Image is null) _step.Text = Gratings
+            ? $"{GratingViews.Short(CurrentView)}: photograph the plate {GratingViews.Long(CurrentView)}, the lamp where it stays for every view, then open the photo here." +
+              (CurrentView == GratingView.Straight ? " (The close-up camera works for this one.)" : "")
+            : "Put the burned test under the close-up camera and take a close-up photo (or open a scan).";
         else if (_pickingGrey) _step.Text = _greyClicks.Count == 0 ? "Click one corner of the grey card." : "Now the opposite corner.";
-        else if (_mmToPx is null && _corners.Count < 4)
+        else if (_s.MmToPx is null && _s.Corners.Count < 4)
         {
-            var (name, cell) = CornerCells()[_corners.Count];
-            _step.Text = $"{_corners.Count + 1} of 4: click the middle of the square at {Describe(cell)}, the {name} corner (outlined on the chart).";
+            var (name, cell) = CornerCells()[_s.Corners.Count];
+            _step.Text = $"{_s.Corners.Count + 1} of 4: click the middle of the square at {Describe(cell)}, the {name} corner (outlined on the chart).";
         }
-        else _step.Text = _byCell.Count < _cells.Count
-            ? $"Measured {_byCell.Count} of {_cells.Count} squares. Check the outlines sit inside each square. For the rest, slide the plate, take another photo and say which squares it shows."
+        else _step.Text = _s.ByCell.Count < _cells.Count
+            ? $"Measured {_s.ByCell.Count} of {_cells.Count} squares. Check the outlines sit inside each square. For the rest, slide the plate, take another photo and say which squares it shows."
             : "All squares measured. Check the outlines sit inside each square; if not, click the corners again.";
-        _view.Corners = _corners.ToList();
+        _view.Corners = _s.Corners.ToList();
         _view.Grey = _greyClicks.Count == 2 ? [_greyClicks[0], _greyClicks[1]] : null;
         _view.InvalidateVisual();
     }
 
     void OnPicked(Vec2 px)
     {
-        if (_image is null) return;
+        if (_s.Image is null) return;
         if (_pickingGrey)
         {
             _greyClicks.Add(px);
@@ -365,22 +490,23 @@ public sealed class MeasureColourWindow : Window
             {
                 _pickingGrey = false;
                 var (a, b) = (_greyClicks[0], _greyClicks[1]);
-                _balance = ColourMeasure.WhiteBalance(_image, [new(a.X, a.Y), new(b.X, a.Y), new(b.X, b.Y), new(a.X, b.Y)]);
-                if (!_method.Contains("grey card")) _method += " with grey card";
+                _s.Balance = ColourMeasure.WhiteBalance(_s.Image, [new(a.X, a.Y), new(b.X, a.Y), new(b.X, b.Y), new(a.X, b.Y)]);
+                if (!_s.Method.Contains("grey card")) _s.Method += " with grey card";
                 Remeasure();
             }
             UpdateStep();
             return;
         }
-        if (_mmToPx is not null || _corners.Count >= 4) return;
-        _corners.Add(px);
-        if (_corners.Count == 4)
+        if (_s.MmToPx is not null || _s.Corners.Count >= 4) return;
+        _s.Corners.Add(px);
+        if (_s.Corners.Count == 4)
         {
             // Corner squares' centres in the design ↔ where they were clicked.
-            var pairs = CornerCells().Select((c, i) => (c.Cell.Bounds.Center, _corners[i])).ToList();
-            _mmToPx = Homography.Fit(pairs);
-            if (_mmToPx is null) { _corners.Clear(); _status.Text = "Those four points don't make a grid: click the corners again."; }
-            else LearnTurn(_mmToPx.Value, pairs[0].Center);
+            var pairs = CornerCells().Select((c, i) => (c.Cell.Bounds.Center, _s.Corners[i])).ToList();
+            _s.MmToPx = Homography.Fit(pairs);
+            if (_s.MmToPx is null) { _s.Corners.Clear(); _status.Text = "Those four points don't make a grid: click the corners again."; }
+            else LearnTurn(_s.MmToPx.Value, pairs[0].Center);
+            _s.Frame = null; // the straightened view is redone from the new corners
             Remeasure();
         }
         UpdateStep();
@@ -393,7 +519,7 @@ public sealed class MeasureColourWindow : Window
     /// </summary>
     void LearnTurn(Homography h, Vec2 atMm)
     {
-        if (_photoTurn is not { } turned || _machine is null) return;
+        if (_s.PhotoTurn is not { } turned || _machine is null) return;
         var o = h.Apply(atMm);
         var x = h.Apply(atMm + new Vec2(1, 0)) - o;
         var y = h.Apply(atMm + new Vec2(0, 1)) - o;
@@ -411,12 +537,13 @@ public sealed class MeasureColourWindow : Window
     void Remeasure()
     {
         // The squares in this photo are (re)measured; ones measured from earlier photos stay.
-        if (_image is { } img && _mmToPx is { } h)
-            foreach (var s in ColourMeasure.Measure(img, h, _cells.Where(c => InSection(c.Row, c.Col)).ToList(), _balance))
-                _byCell[(s.Row, s.Col)] = s;
-        _measured = _byCell.Values.OrderBy(s => s.Row).ThenBy(s => s.Col).ToList();
+        if (_s.Image is { } img && _s.MmToPx is { } h)
+            foreach (var s in ColourMeasure.Measure(img, h, _cells.Where(c => InSection(c.Row, c.Col)).ToList(), _s.Balance))
+                _s.ByCell[(s.Row, s.Col)] = s;
+        _measured = _s.ByCell.Values.OrderBy(s => s.Row).ThenBy(s => s.Col).ToList();
+        if (_s.MmToPx is not null && _s.Frame is null) MakeFrame();
         // Outlines of the areas read, so a wrong click shows.
-        _view.Regions = _mmToPx is { } m
+        _view.Regions = _s.MmToPx is { } m
             ? _cells.Where(c => InSection(c.Row, c.Col)).Select(c =>
             {
                 var r = c.Bounds;
@@ -480,8 +607,8 @@ public sealed class MeasureColourWindow : Window
             face.PointerPressed += (_, _) =>
             {
                 if (_pickingSection) { PickSection(sw.Row, sw.Col); return; }
-                _byCell[(sw.Row, sw.Col)] = sw with { Use = !sw.Use };
-                _measured = _byCell.Values.OrderBy(x => x.Row).ThenBy(x => x.Col).ToList();
+                _s.ByCell[(sw.Row, sw.Col)] = sw with { Use = !sw.Use };
+                _measured = _s.ByCell.Values.OrderBy(x => x.Row).ThenBy(x => x.Col).ToList();
                 ShowResults();
             };
             Grid.SetRow(face, s.Row);
@@ -489,6 +616,17 @@ public sealed class MeasureColourWindow : Window
             _swatches.Children.Add(face);
         }
 
+        if (Gratings)
+        {
+            _viewsState.Text = string.Join("   ", _shots.Select((s, i) => $"{GratingViews.Short(GratingViews.All[i])} {(s.ByCell.Count == 0 ? "–" : s.ByCell.Count == _cells.Count ? "✓" : $"{s.ByCell.Count}/{_cells.Count}")}"));
+            _save.IsEnabled = _csv.IsEnabled = _shots.Any(s => s.ByCell.Count > 0);
+            var scores = GratingMeasure.Score(ViewResults());
+            _verdict.Text = scores.Count == 0 ? "" :
+                "Strongest squares across the views:\n" + string.Join("\n", scores.Take(5).Select(sc =>
+                    $"• R{sc.Row + 1} C{sc.Col + 1} ({Describe(Cell(sc.Row, sc.Col))}): colour strength {sc.Vividness:0}, " +
+                    (sc.LightsUpAt.Count == 0 ? "weak everywhere" : $"lights up at {string.Join(", ", sc.LightsUpAt.Select(GratingViews.Short))}")));
+            return;
+        }
         if (_measured.Count == 0)
         {
             _verdict.Text = "";
@@ -512,13 +650,13 @@ public sealed class MeasureColourWindow : Window
             UpdateStep();
             return;
         }
-        _section = (Math.Min(first.R, r), Math.Min(first.C, c), Math.Max(first.R, r), Math.Max(first.C, c));
+        _s.Section = (Math.Min(first.R, r), Math.Min(first.C, c), Math.Max(first.R, r), Math.Max(first.C, c));
         _sectionFirst = null;
         _pickingSection = false;
-        _corners.Clear();
-        _mmToPx = null;
+        _s.Corners.Clear();
+        _s.MmToPx = null;
         _view.Regions = [];
-        _status.Text = $"This photo shows R{_section.R0 + 1}–{_section.R1 + 1}, C{_section.C0 + 1}–{_section.C1 + 1}: click its four corner squares.";
+        _status.Text = $"This photo shows R{_s.Section.R0 + 1}–{_s.Section.R1 + 1}, C{_s.Section.C0 + 1}–{_s.Section.C1 + 1}: click its four corner squares.";
         ShowResults();
         UpdateStep();
     }
@@ -547,11 +685,16 @@ public sealed class MeasureColourWindow : Window
             m = new Material { Name = name, Category = "Metal", HighlyReflective = Material.LooksReflective(name) };
         }
         else m = _lib.Materials[_material.SelectedIndex - 1];
+        if (Gratings)
+        {
+            SaveGratings(m);
+            return;
+        }
         var palette = new ColourPalette
         {
             Name = string.IsNullOrWhiteSpace(_paletteName.Text) ? $"Colour test {DateTime.Now:yyyy-MM-dd}" : _paletteName.Text.Trim(),
             FocusMm = _focus,
-            Method = _machine is not null && _method.Contains("camera") ? $"{_method}, lights front {_front.Value:0}% / back {_back.Value:0}%" : _method,
+            Method = _machine is not null && _s.Method.Contains("camera") ? $"{_s.Method}, lights front {_front.Value:0}% / back {_back.Value:0}%" : _s.Method,
             Swatches = [.. _measured],
         };
         _lib.Upsert(m with { Palettes = m.Palettes.Add(palette) });
@@ -559,6 +702,42 @@ public sealed class MeasureColourWindow : Window
         _material.ItemsSource = _lib.Materials.Select(x => x.Label).Prepend("New material…").ToList();
         _material.SelectedIndex = _lib.Materials.FindIndex(x => x.Id == m.Id) + 1;
         _status.Text = $"Saved “{palette.Name}” to {m.Label}: {palette.Swatches.Count} squares, {ColourMeasure.Distinct(palette.Swatches, _distinct.Value).Count} clearly different colours.";
+    }
+
+    /// <summary>Each measured view's squares (with their view).</summary>
+    List<GratingViewResult> ViewResults() => [.. _shots.Select((s, i) => (s, i)).Where(x => x.s.ByCell.Count > 0).Select(x => new GratingViewResult
+    {
+        View = GratingViews.All[x.i],
+        Swatches = [.. x.s.ByCell.Values.OrderBy(v => v.Row).ThenBy(v => v.Col)],
+    })];
+
+    void SaveGratings(Material m)
+    {
+        var id = Guid.NewGuid();
+        var views = new List<GratingViewResult>();
+        foreach (var v in ViewResults())
+        {
+            var shot = _shots[GratingViews.All.ToList().IndexOf(v.View)];
+            string? frame = shot.Frame is { } f ? _lib.SaveFile($"{id:N}-{v.View}.png".ToLowerInvariant(), f.EncodePng()) : null;
+            views.Add(v with { Frame = frame });
+        }
+        var frames = _shots.Where(s => s.Frame is not null).Select(s => s.Frame!).ToList();
+        string? gif = frames.Count > 0 ? _lib.SaveFile($"{id:N}.gif", GifEncoder.Encode(frames, 90)) : null;
+        string lights = _machine is not null ? $"Machine lights front {_front.Value:0}% / back {_back.Value:0}%. " : "";
+        var set = new GratingSet
+        {
+            Id = id,
+            Name = string.IsNullOrWhiteSpace(_paletteName.Text) ? $"Gratings {DateTime.Now:yyyy-MM-dd}" : _paletteName.Text.Trim(),
+            FocusMm = _focus,
+            Notes = (lights + (_notes.Text?.Trim() ?? "")).Trim(),
+            Views = [.. views],
+            Gif = gif,
+        };
+        _lib.Upsert(m with { Gratings = m.Gratings.Add(set) });
+        _lib.Save();
+        _material.ItemsSource = _lib.Materials.Select(x => x.Label).Prepend("New material…").ToList();
+        _material.SelectedIndex = _lib.Materials.FindIndex(x => x.Id == m.Id) + 1;
+        _status.Text = $"Saved “{set.Name}” to {m.Label}: {views.Count} of 5 views.";
     }
 
     async Task ExportCsv()
@@ -572,12 +751,15 @@ public sealed class MeasureColourWindow : Window
         });
         if (file?.TryGetLocalPath() is not { } path) return;
         var inv = CultureInfo.InvariantCulture;
-        var sb = new StringBuilder("row,col,power_pct,speed_mm_s,lines_per_cm,frequency_khz,pulse_ns,L,a,b,sRGB,evenness_dE,used\n");
-        foreach (var s in _measured)
+        var sb = new StringBuilder("view,row,col,power_pct,speed_mm_s,lines_per_cm,frequency_khz,pulse_ns,L,a,b,sRGB,evenness_dE,used\n");
+        var rows = Gratings
+            ? ViewResults().SelectMany(v => v.Swatches.Select(s => (View: GratingViews.Short(v.View), S: s)))
+            : _measured.Select(s => (View: "", S: s));
+        foreach (var (view, s) in rows)
         {
             var (r, g, b) = ColourScience.LabToSrgb(s.Colour);
             var l = s.Settings.Laser;
-            sb.AppendLine(string.Join(",", s.Row + 1, s.Col + 1, l.Power.ToString(inv), l.Speed.ToString(inv), s.Settings.LinesPerCm.ToString(inv), l.FrequencyKhz, l.PulseWidthNs,
+            sb.AppendLine(string.Join(",", view, s.Row + 1, s.Col + 1, l.Power.ToString(inv), l.Speed.ToString(inv), s.Settings.LinesPerCm.ToString(inv), l.FrequencyKhz, l.PulseWidthNs,
                 s.L.ToString("0.00", inv), s.A.ToString("0.00", inv), s.B.ToString("0.00", inv), $"#{r:X2}{g:X2}{b:X2}", s.Spread.ToString("0.00", inv), s.Use ? 1 : 0));
         }
         await File.WriteAllTextAsync(path, sb.ToString());
