@@ -31,7 +31,11 @@ public sealed record BuiltJob(
     IReadOnlyList<BuiltJob.Step> Steps)
 {
     /// <summary>One processed path, in order, for the preview.</summary>
-    public sealed record Step(Guid LayerId, List<Vec2> Points, bool Closed, bool Fill);
+    public sealed record Step(Guid LayerId, List<Vec2> Points, bool Closed, bool Fill)
+    {
+        /// <summary>Fills: the direction the lines are scanned in, degrees (0 = along X).</summary>
+        public double ScanAngleDeg { get; init; }
+    }
 
     /// <summary>A layer's share of the job, in run order: seconds for one pass, and how many passes.</summary>
     public sealed record LayerTime(Guid LayerId, double PassSeconds, int Passes)
@@ -212,7 +216,7 @@ public static class JobBuilder
                     if (second) blocks.Add(cross!);
                     foreach (var p in polys)
                     {
-                        steps.Add(new(layer.Id, p.Points, true, true));
+                        steps.Add(new(layer.Id, p.Points, true, true) { ScanAngleDeg = layer.FillAngleDeg });
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
                     Link(bm, sm);

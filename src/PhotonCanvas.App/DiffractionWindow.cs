@@ -146,6 +146,33 @@ public sealed class DiffractionWindow : Window
         LineSpacingMm = (double)(_spacing.Value ?? 0.06m),
     };
 
+    int _version;
+
+    /// <summary>The marking time, worked out off the UI thread (building the job for a big picture takes a moment); the newest request wins.</summary>
+    async Task EstimateAsync(DiffractionOptions o, string summary)
+    {
+        int v = ++_version;
+        var picture = _picture;
+        var machine = _machine;
+        string time;
+        try
+        {
+            time = await Task.Run(() =>
+            {
+                var s = DocState.New();
+                var layer = Layer.Default(0, LayerMode.Image);
+                s = Ops.AddLayer(s, layer);
+                var copy = new ImageShape { Name = "p", LayerId = layer.Id, Source = picture.Source, SizeMm = picture.SizeMm, Transform = picture.Transform };
+                s = Ops.AddShapes(s, [copy]);
+                var (after, _) = Diffraction.Add(s, copy, o, machine);
+                after = Ops.UpdateLayers(after, after.Layers.Where(l => !l.Name.StartsWith(Diffraction.LayerPrefix)).Select(l => l.Id).ToHashSet(), l => l with { Output = false });
+                return $" About {Duration(JobBuilder.Build(after, new JobOptions { WholeJobPasses = false }).EstimateS)} to mark.";
+            });
+        }
+        catch (JobException e) { time = $" ⚠ {e.Message}"; }
+        if (v == _version) _summary.Text = summary + time;
+    }
+
     void Update()
     {
         var o = Options();
@@ -154,24 +181,17 @@ public sealed class DiffractionWindow : Window
         var map = Diffraction.Map(_picture.Source.Pixels, _picture.SizeMm, o, _machine);
         _preview.Show(map, o.Mode);
         int marked = map.Cells.Count(c => c >= 0);
-        string time = "";
-        try
-        {
-            var s = DocState.New();
-            var layer = Layer.Default(0, LayerMode.Image);
-            s = Ops.AddLayer(s, layer);
-            var copy = new ImageShape { Name = "p", LayerId = layer.Id, Source = _picture.Source, SizeMm = _picture.SizeMm, Transform = _picture.Transform };
-            s = Ops.AddShapes(s, [copy]);
-            var (after, _) = Diffraction.Add(s, copy, o, _machine);
-            after = Ops.UpdateLayers(after, after.Layers.Where(l => !l.Name.StartsWith(Diffraction.LayerPrefix)).Select(l => l.Id).ToHashSet(), l => l with { Output = false });
-            time = $" About {Duration(JobBuilder.Build(after, new JobOptions { WholeJobPasses = false }).EstimateS)} to mark.";
-        }
-        catch (JobException e) { time = $" ⚠ {e.Message}"; }
         var khz = map.Buckets.Select(b => b.FrequencyKhz).DefaultIfEmpty(0).ToList();
         _summary.Text = map.Buckets.Count == 0
             ? "Nothing to mark: every pixel is left bare. Try turning off \"Leave white unmarked\", or the other mode."
             : $"{map.Cols} × {map.Rows} pixels, {marked} marked, as {map.Buckets.Count} layer{(map.Buckets.Count == 1 ? "" : "s")} " +
-              $"({khz.Min()}–{khz.Max()} kHz, pitch {map.Buckets.Min(b => b.PitchUm):0.00}–{map.Buckets.Max(b => b.PitchUm):0.00} µm).{time}";
+              $"({khz.Min()}–{khz.Max()} kHz, pitch {map.Buckets.Min(b => b.PitchUm):0.00}–{map.Buckets.Max(b => b.PitchUm):0.00} µm).";
+        if (map.Buckets.Count > 0)
+        {
+            var summary = _summary.Text;
+            _summary.Text += " Working out the time…";
+            _ = EstimateAsync(o, summary);
+        }
     }
 
     /// <summary>The pixel map: shimmer pixels coloured by direction (a colour wheel), colour pixels by the picture's colour.</summary>

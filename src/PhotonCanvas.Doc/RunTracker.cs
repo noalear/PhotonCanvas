@@ -43,11 +43,16 @@ public static class RunTracker
             head = Along(steps, f);
         else
         {
-            var b = steps.Aggregate(Rect2.Empty, (a, s) => a.Union(Rect2.Bounds(s.Points)));
+            // Lines run along the scan direction and step across it: turn the shapes so the scan
+            // runs along X, find the line f of the way across, turn it back.
+            double rad = steps[0].ScanAngleDeg * Math.PI / 180, cos = Math.Cos(rad), sin = Math.Sin(rad);
+            Vec2 Turn(Vec2 v) => new(v.X * cos + v.Y * sin, -v.X * sin + v.Y * cos);
+            Vec2 Back(Vec2 v) => new(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos);
+            var b = steps.Aggregate(Rect2.Empty, (a, s) => a.Union(Rect2.Bounds(s.Points.Select(Turn).ToList())));
             if (!b.IsEmpty)
             {
                 double y = b.MinY + f * b.Height;
-                sweep = (new Vec2(b.MinX, y), new Vec2(b.MaxX, y));
+                sweep = (Back(new Vec2(b.MinX, y)), Back(new Vec2(b.MaxX, y)));
             }
         }
         return new(done, current, head, sweep, t / total, false);

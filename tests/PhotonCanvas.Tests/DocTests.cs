@@ -509,3 +509,22 @@ public class RunTrackerTests
         Assert.True(RunTracker.At(job, job.Timeline[2].Start + 1).Pausing);
     }
 }
+
+public class RunTrackerAngleTests
+{
+    [Fact]
+    public void TheScanLineFollowsTheFillAngle()
+    {
+        var s = DocState.New();
+        var fill = new Layer { Name = "Engrave", Mode = LayerMode.Fill, Laser = LaserSettings.Blue(30, 400), FillAngleDeg = 90 };
+        s = s with { Layers = [fill] };
+        s = Ops.AddShapes(s, [new PathShape { LayerId = fill.Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }]);
+        var job = JobBuilder.Build(s, new JobOptions());
+        var m = RunTracker.At(job, job.Timeline[0].PassSeconds / 2);
+        var (a, b) = m.Sweep!.Value;
+        // Lines scanned at 90° run up and down, and the scan moves across: a vertical line midway.
+        Assert.Equal(a.X, b.X, 6);
+        Assert.Equal(20, a.X, 1);
+        Assert.Equal(20, Math.Abs(a.Y - b.Y), 6);
+    }
+}

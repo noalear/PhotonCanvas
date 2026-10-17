@@ -11,12 +11,10 @@ namespace PhotonCanvas.App;
 
 /// <summary>
 /// The layers, as cards in run order (top runs first). Each card says what the layer does,
-/// how hard, how fast and how long it takes; the active layer's card opens up to show its
-/// settings (<see cref="Editor"/>), so a layer and its settings are always in one place.
-/// Click a card to make it active (click it again to fold its settings), Ctrl/Shift-click
-/// to edit several together, drag to reorder, double-click to rename; the arrow lists the
-/// layer's shapes. Cards are rebuilt from the document on every change, except the
-/// settings, which stay put so typing in them is never interrupted.
+/// how hard, how fast and how long it takes; the active layer's settings show in the right
+/// column. Click a card to make it active, Ctrl/Shift-click to edit several together, drag
+/// to reorder, double-click to rename; the arrow lists the layer's shapes. Cards are rebuilt
+/// from the document on every change, so the list can never drift out of sync with it.
 /// </summary>
 public sealed class LayersPanel : UserControl
 {
@@ -45,18 +43,7 @@ public sealed class LayersPanel : UserControl
     bool _dragging;
     int _dropIndex = -1;
 
-    // the active layer's settings, docked under its card
-    readonly Border _editorHost;
-    Control? _editor;
-    bool _editorFolded, _wasActive;
     IReadOnlyDictionary<Guid, double> _times = new Dictionary<Guid, double>();
-
-    /// <summary>The settings shown under the active layer's card.</summary>
-    public Control? Editor
-    {
-        get => _editor;
-        set { _editor = value; _editorHost.Child = value; Rebuild(); }
-    }
 
     /// <summary>Each layer's estimated time in seconds (from the job), shown on its card.</summary>
     public void SetTimes(IReadOnlyDictionary<Guid, double> seconds)
@@ -90,15 +77,6 @@ public sealed class LayersPanel : UserControl
         var del = IconButton("IcTrash", "Delete selected layers (shapes move to the layer above)");
         del.Click += (_, _) => DeleteSelected();
 
-        _editorHost = new Border
-        {
-            Background = Res("Bg2"),
-            BorderBrush = Res("Accent"),
-            BorderThickness = new(1, 0, 1, 1),
-            CornerRadius = new(0, 0, 8, 8),
-            Padding = new(10, 8, 10, 10),
-            Margin = new(0, 0, 0, 6),
-        };
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { add, dup, up, down, merge, del } };
         var header = new DockPanel { Margin = new(0, 0, 0, 8) };
         header.Children.Add(new TextBlock { Text = "LAYERS", Classes = { "h" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(0) });
@@ -160,41 +138,24 @@ public sealed class LayersPanel : UserControl
             foreach (var s in state.Shapes)
                 if (_doc.Selection.Contains(s.Id)) _expanded.Add(s.LayerId);
 
-        // Everything but the settings is rebuilt. The settings stay attached (moving them would drop
-        // the keyboard focus mid-typing): cards above the active layer go before them, the rest after.
-        for (int i = _rows.Children.Count - 1; i >= 0; i--)
-            if (_rows.Children[i] != _editorHost) _rows.Children.RemoveAt(i);
-        int activeIndex = state.LayerIndex(_doc.ActiveLayer);
-        bool showEditor = _editor is not null && activeIndex >= 0 && !_editorFolded && !_dragging;
-        if (!_rows.Children.Contains(_editorHost)) _rows.Children.Add(_editorHost);
-        _editorHost.IsVisible = showEditor;
-        int insertAt = 0;
+        _rows.Children.Clear();
         var counts = state.Shapes.GroupBy(s => s.LayerId).ToDictionary(g => g.Key, g => g.Count());
         Control? firstSelected = null;
         for (int i = 0; i < state.Layers.Count; i++)
         {
             var l = state.Layers[i];
             int count = counts.GetValueOrDefault(l.Id);
-            bool open = showEditor && i == activeIndex;
-            var block = new StackPanel { Spacing = 1, Tag = l.Id, Margin = new(0, 0, 0, open ? 0 : 5) };
-            block.Children.Add(Row(l, i, count, open));
-            var shapes = block;
-            if (open)
-            {
-                // The active card's shapes come after its settings.
-                shapes = new StackPanel { Spacing = 1, Margin = new(0, 0, 0, 5) };
-                _rows.Children.Insert(insertAt + 1, shapes);
-            }
-            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(shapes, l, ref firstSelected);
-            if (i <= activeIndex) _rows.Children.Insert(insertAt++, block);
-            else _rows.Children.Add(block);
+            var block = new StackPanel { Spacing = 1, Tag = l.Id, Margin = new(0, 0, 0, 5) };
+            block.Children.Add(Row(l, i, count));
+            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(block, l, ref firstSelected);
+            _rows.Children.Add(block);
         }
         if (newSelection && firstSelected is { } target)
             Avalonia.Threading.Dispatcher.UIThread.Post(() => target.BringIntoView());
         if (changed) SelectionChanged?.Invoke();
     }
 
-    Control Row(Layer l, int index, int count, bool open)
+    Control Row(Layer l, int index, int count)
     {
         bool active = l.Id == _doc.ActiveLayer;
         bool selected = _selected.Contains(l.Id);
@@ -314,7 +275,7 @@ public sealed class LayersPanel : UserControl
         var row = new Border
         {
             Background = active ? Res("Bg3") : selected ? new SolidColorBrush(Color.Parse("#20304A")) : Res("Bg2"),
-            CornerRadius = open ? new(8, 8, 0, 0) : new(8),
+            CornerRadius = new(8),
             BorderThickness = drop ? new(1, 3, 1, 1) : new(1),
             BorderBrush = drop || active || selected ? Res("Accent") : Res("Line"),
             Child = grid,
@@ -324,8 +285,6 @@ public sealed class LayersPanel : UserControl
         // Buttons and the colour bar handle their own presses, so this only fires on the card itself.
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
         row.ContextRequested += (_, e) => { e.Handled = true; RowMenu(l).Open(row); };
-        if (active && _selected.Count == 1 && _editor is not null)
-            ToolTip.SetTip(row, open ? "Click to fold the settings away" : "Click to show this layer's settings");
         return row;
     }
 
@@ -343,10 +302,11 @@ public sealed class LayersPanel : UserControl
             {
                 if (!emittedGroups.Add(g)) continue;
                 var members = shapes.Where(x => x.GroupId == g).ToList();
-                block.Children.Add(GroupRow(members));
+                // Only one of the group on this layer (a group spread across layers): no header.
+                if (members.Count > 1) block.Children.Add(GroupRow(members));
                 foreach (var m in members)
                 {
-                    var row = ShapeRow(m, l, indent: 1);
+                    var row = ShapeRow(m, l, indent: members.Count > 1 ? 1 : 0);
                     if (firstSelected is null && _doc.Selection.Contains(m.Id)) firstSelected = row;
                     block.Children.Add(row);
                     shown++;
@@ -582,9 +542,6 @@ public sealed class LayersPanel : UserControl
         }
         else
         {
-            // Clicking the active card again folds or unfolds its settings (on release, if it wasn't a drag).
-            _wasActive = l.Id == _doc.ActiveLayer && _selected.Count == 1;
-            if (!_wasActive) _editorFolded = false;
             if (!_selected.Contains(l.Id) || _selected.Count == 1) Activate(l.Id);
             else _doc.SetActiveLayer(l.Id);
             // Capture on the container: rows are rebuilt on every change and would lose it.
@@ -602,7 +559,6 @@ public sealed class LayersPanel : UserControl
         var p = e.GetPosition(_rows);
         if (!_dragging && Math.Abs(p.Y - _dragStart.Y) < 6) return;
         _dragging = true;
-        // Only the layer cards count (not the settings or the active layer's shape list).
         int idx = _doc.State.Layers.Count, li = 0;
         foreach (var child in _rows.Children)
         {
@@ -627,12 +583,6 @@ public sealed class LayersPanel : UserControl
         _dragging = false;
         _dropIndex = -1;
         e.Pointer.Capture(null);
-        if (id is { } clicked && !dragging && _wasActive && clicked == _doc.ActiveLayer)
-        {
-            _editorFolded = !_editorFolded;
-            Rebuild();
-        }
-        _wasActive = false;
         if (id is not { } lid || !dragging) return;
         int from = _doc.State.LayerIndex(lid);
         int to = drop > from ? drop - 1 : drop;
