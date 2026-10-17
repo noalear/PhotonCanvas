@@ -102,6 +102,37 @@ public sealed class RasterImage
         return new RasterImage(w, h, dst.Bytes);
     }
 
+    /// <summary>Size of the picture <see cref="Rotated"/> makes from a <paramref name="width"/> × <paramref name="height"/> one.</summary>
+    public static (int Width, int Height) RotatedSize(int width, int height, double degreesClockwise)
+    {
+        double d = (degreesClockwise % 360 + 360) % 360;
+        if (d < 1e-9) return (width, height);
+        double r = d * Math.PI / 180, cos = Math.Abs(Math.Cos(r)), sin = Math.Abs(Math.Sin(r));
+        return ((int)Math.Ceiling(width * cos + height * sin - 1e-6), (int)Math.Ceiling(width * sin + height * cos - 1e-6));
+    }
+
+    /// <summary>Where a point of the original picture lands in its <see cref="Rotated"/> version.</summary>
+    public static Vec2 ToRotated(Vec2 p, int width, int height, double degreesClockwise)
+    {
+        double d = (degreesClockwise % 360 + 360) % 360;
+        if (d < 1e-9) return p;
+        var (w, h) = RotatedSize(width, height, d);
+        double r = d * Math.PI / 180, cos = Math.Cos(r), sin = Math.Sin(r);
+        double x = p.X - width / 2.0, y = p.Y - height / 2.0;
+        return new(x * cos - y * sin + w / 2.0, x * sin + y * cos + h / 2.0);
+    }
+
+    /// <summary>The point of the original picture shown at <paramref name="p"/> in its <see cref="Rotated"/> version.</summary>
+    public static Vec2 FromRotated(Vec2 p, int width, int height, double degreesClockwise)
+    {
+        double d = (degreesClockwise % 360 + 360) % 360;
+        if (d < 1e-9) return p;
+        var (w, h) = RotatedSize(width, height, d);
+        double r = d * Math.PI / 180, cos = Math.Cos(r), sin = Math.Sin(r);
+        double x = p.X - w / 2.0, y = p.Y - h / 2.0;
+        return new(x * cos + y * sin + width / 2.0, -x * sin + y * cos + height / 2.0);
+    }
+
     /// <summary>This image with a caption on a dark band along the bottom (for labelled animation frames).</summary>
     public RasterImage WithCaption(string text)
     {

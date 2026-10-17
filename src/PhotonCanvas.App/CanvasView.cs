@@ -119,6 +119,21 @@ public sealed partial class CanvasView : Control
         }
     }
 
+    (Avalonia.Media.Imaging.Bitmap Image, Rect2 Area)? _closeUp;
+
+    /// <summary>A close-up camera photo, straightened, covering <c>Area</c> of the bed (null hides it).</summary>
+    public (Avalonia.Media.Imaging.Bitmap Image, Rect2 Area)? CloseUpImage
+    {
+        get => _closeUp;
+        set
+        {
+            var old = _closeUp?.Image;
+            _closeUp = value;
+            if (old is not null && !ReferenceEquals(old, value?.Image)) old.Dispose();
+            InvalidateVisual();
+        }
+    }
+
     (BuiltJob Job, RunMarker Marker)? _run;
 
     /// <summary>A running job: what's been marked, what's being marked, and where the laser is (null hides it).</summary>
@@ -266,6 +281,13 @@ public sealed partial class CanvasView : Control
         if (_camera is { } cam)
             using (ctx.PushOpacity(_cameraOpacity))
                 ctx.DrawImage(cam, new Rect(0, 0, cam.PixelSize.Width, cam.PixelSize.Height), field);
+        if (_closeUp is { } cu)
+        {
+            // The close-up photo on top of the overview, where the camera really looks.
+            var r = ToScreen(cu.Area);
+            ctx.DrawImage(cu.Image, new Rect(0, 0, cu.Image.PixelSize.Width, cu.Image.PixelSize.Height), r);
+            ctx.DrawRectangle(new Pen(new SolidColorBrush(AccentColor), 1, new DashStyle([4, 3], 0)), r);
+        }
         if (_showGrid) DrawGrid(ctx, field);
         ctx.DrawRectangle(FieldPen, field.Deflate(0.5));
 

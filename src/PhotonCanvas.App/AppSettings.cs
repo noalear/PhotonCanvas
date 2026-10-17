@@ -25,6 +25,8 @@ public sealed class AppSettings
     public double SvgPxPerInch { get; set; } = 96;
     /// <summary>Clockwise display rotation for the close-up camera (measured on the user's F2 Ultra).</summary>
     public double CloseUpRotationDeg { get; set; } = -148.8;
+    /// <summary>Where the close-up camera looks on the bed, per focus distance (from Measure colours).</summary>
+    public List<CloseUpPlacement> CloseUpPlacements { get; set; } = [];
     public double CameraOpacity { get; set; } = 0.85;
     /// <summary>Show the calibrated camera on the work area (restored on startup).</summary>
     public bool CameraOnWorkArea { get; set; }
@@ -121,4 +123,21 @@ public sealed class AppSettings
         RecentFiles.Insert(0, path);
         if (RecentFiles.Count > 10) RecentFiles.RemoveRange(10, RecentFiles.Count - 10);
     }
+}
+
+/// <summary>
+/// Where the close-up camera looks, at one focus distance: the map from the bed (mm) to the
+/// camera's own picture (pixels, as it comes from the camera). The head doesn't travel, so
+/// this stays put until the focus height changes.
+/// </summary>
+public sealed class CloseUpPlacement
+{
+    public double DistanceMm { get; set; }
+    /// <summary>The homography's eight numbers (H11, H12, H13, H21, H22, H23, H31, H32).</summary>
+    public double[] MmToCamera { get; set; } = [];
+    public DateTime Made { get; set; } = DateTime.Now;
+
+    public PhotonCanvas.Core.Camera.Homography? Map => MmToCamera.Length == 8
+        ? new PhotonCanvas.Core.Camera.Homography(MmToCamera[0], MmToCamera[1], MmToCamera[2], MmToCamera[3], MmToCamera[4], MmToCamera[5], MmToCamera[6], MmToCamera[7])
+        : null;
 }

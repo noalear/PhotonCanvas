@@ -261,6 +261,20 @@ public sealed class MachinePanel : UserControl
     public double CloseUpRotationDeg => _settings.CloseUpRotationDeg;
 
     /// <summary>Remember how far the close-up picture must turn to look straight (learned from a photo of a known grid).</summary>
+    /// <summary>Remember where the close-up camera looks at this focus distance (replaces one within 0.5 mm).</summary>
+    public void SaveCloseUpPlacement(double distanceMm, Homography mmToCamera)
+    {
+        _settings.CloseUpPlacements.RemoveAll(p => Math.Abs(p.DistanceMm - distanceMm) < 0.5);
+        var h = mmToCamera;
+        _settings.CloseUpPlacements.Add(new CloseUpPlacement { DistanceMm = distanceMm, MmToCamera = [h.H11, h.H12, h.H13, h.H21, h.H22, h.H23, h.H31, h.H32] });
+        _settings.Save();
+        Changed();
+    }
+
+    /// <summary>Where the close-up camera looks at the current focus distance (within 0.5 mm), if that's known.</summary>
+    public Homography? CloseUpPlacement() =>
+        Distance is { } d ? _settings.CloseUpPlacements.Where(p => Math.Abs(p.DistanceMm - d) < 0.5).OrderBy(p => Math.Abs(p.DistanceMm - d)).FirstOrDefault()?.Map : null;
+
     public void LearnCloseUpRotation(double degreesClockwise)
     {
         double d = ((degreesClockwise + 180) % 360 + 360) % 360 - 180;

@@ -5,7 +5,10 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using PhotonCanvas.Core;
+using PhotonCanvas.Core.Imaging;
 using static PhotonCanvas.App.UiKit;
+using Bitmap = Avalonia.Media.Imaging.Bitmap;
 
 namespace PhotonCanvas.App;
 
@@ -28,6 +31,9 @@ public sealed class CloseUpView : UserControl
 
     /// <summary>The viewer was closed.</summary>
     public event Action? Closed;
+
+    /// <summary>A close-up photo straightened onto the bed (where the camera's position is known), or null to take it away.</summary>
+    public event Action<RasterImage?, Rect2>? PlacedOnBed;
 
     static Control IconLabel(string icon, string text) => new StackPanel
     {
@@ -94,6 +100,7 @@ public sealed class CloseUpView : UserControl
     {
         if (_m.CloseUpLive) _m.CloseUpLive = false;
         IsVisible = false;
+        PlacedOnBed?.Invoke(null, default);
         Closed?.Invoke();
     }
 
@@ -109,9 +116,32 @@ public sealed class CloseUpView : UserControl
         _photo.IsEnabled = false;
         _note.Text = "Taking a photo…";
         _note.IsVisible = _image.Source is null;
-        try { _lastJpg = await _m.CloseUpPhotoAsync() ?? _lastJpg; }
+        try
+        {
+            _lastJpg = await _m.CloseUpPhotoAsync() ?? _lastJpg;
+            if (_lastJpg is { } jpg && _m.CloseUpPlacement() is { } placed) await PlaceOnBed(jpg, placed);
+        }
         catch (PhotonCanvas.Device.DeviceException e) { _note.Text = $"Couldn't take a photo: {e.Message}"; _note.IsVisible = true; }
         finally { Update(); }
+    }
+
+    /// <summary>The photo, straightened into bed millimetres where the camera looks.</summary>
+    async Task PlaceOnBed(byte[] jpg, PhotonCanvas.Core.Camera.Homography mmToCamera)
+    {
+        var placed = await Task.Run(() =>
+        {
+            var raw = RasterImage.Decode(jpg);
+            // The camera's picture corners, on the bed.
+            var corners = new[] { new Vec2(0, 0), new Vec2(raw.Width, 0), new Vec2(raw.Width, raw.Height), new Vec2(0, raw.Height) };
+            var probe = new[] { new Vec2(0, 0), new Vec2(10, 0), new Vec2(10, 10), new Vec2(0, 10) };
+            if (PhotonCanvas.Core.Camera.Homography.Fit([.. probe.Select(mm => (mmToCamera.Apply(mm), mm))]) is not { } toBed) return ((RasterImage, Rect2)?)null;
+            var area = Rect2.Bounds(corners.Select(toBed.Apply).ToList());
+            area = new Rect2(Math.Max(0, area.MinX), Math.Max(0, area.MinY), Math.Min(PhotonCanvas.Core.MachineProfile.F2Ultra.FieldW, area.MaxX), Math.Min(PhotonCanvas.Core.MachineProfile.F2Ultra.FieldH, area.MaxY));
+            if (area.Width <= 0 || area.Height <= 0) return null;
+            double pxPerMm = Math.Min(40, 1600 / Math.Max(area.Width, area.Height));
+            return (PhotonCanvas.Doc.Colour.GratingMeasure.Straighten(raw, mmToCamera, area, pxPerMm), area);
+        });
+        if (placed is { } p) PlacedOnBed?.Invoke(p.Item1, p.Item2);
     }
 
     async Task SavePhoto()

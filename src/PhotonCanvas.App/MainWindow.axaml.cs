@@ -35,6 +35,12 @@ public partial class MainWindow : Window
         {
             _closeUp = new CloseUpView(_machine);
             _closeUp.Closed += _ribbon.Refresh;
+            _closeUp.PlacedOnBed += (img, area) =>
+            {
+                if (img is null) { Canvas.CloseUpImage = null; return; }
+                using var ms = new MemoryStream(img.EncodePng());
+                Canvas.CloseUpImage = (new Avalonia.Media.Imaging.Bitmap(ms), area);
+            };
             CanvasOverlay.Content = _closeUp;
         }
         _ = Guard(_closeUp.OpenAsync);

@@ -585,3 +585,28 @@ public class DepthHologramTests
         Assert.Contains(Enumerable.Range(0, 19).SelectMany(r => Enumerable.Range(0, 22).Select(c => flipped.Cells[r * flipped.Cols + c])), v => v >= 0);
     }
 }
+
+public class RotationMapTests
+{
+    [Fact]
+    public void PointsFollowTheTurnedPicture()
+    {
+        // A marked pixel in a 40 × 20 picture is found where Rotated put it, and maps back.
+        int w = 40, h = 20;
+        var px = new byte[w * h * 4];
+        for (int i = 0; i < w * h; i++) px[i * 4 + 3] = 255;
+        int mx = 30, my = 5;
+        for (int y = my - 1; y <= my + 1; y++)
+            for (int x = mx - 1; x <= mx + 1; x++) px[(y * w + x) * 4] = 255;
+        foreach (double deg in new[] { 90.0, -148.8, 33 })
+        {
+            var r = new RasterImage(w, h, px).Rotated(deg);
+            Assert.Equal(RasterImage.RotatedSize(w, h, deg), (r.Width, r.Height));
+            var at = RasterImage.ToRotated(new Vec2(mx + 0.5, my + 0.5), w, h, deg);
+            Assert.True(r.Rgba[((int)at.Y * r.Width + (int)at.X) * 4] > 120, $"{deg}°");
+            var back = RasterImage.FromRotated(at, w, h, deg);
+            Assert.Equal(mx + 0.5, back.X, 6);
+            Assert.Equal(my + 0.5, back.Y, 6);
+        }
+    }
+}

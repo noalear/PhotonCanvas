@@ -42,6 +42,7 @@ public sealed class MeasureColourWindow : Window
     readonly Slider _back = new() { Minimum = 0, Maximum = 100, Width = 120, VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock _frontText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center }, _backText = new() { MinWidth = 34, VerticalAlignment = VerticalAlignment.Center };
     readonly Button _block = new() { Content = "Which squares are in this photo?" };
+    readonly Button _place = new() { Content = "Save as the close-up camera's position", IsVisible = false };
     bool _settingLights;
     // The block of squares the current photo shows (rows/columns, inclusive), and picking it on the chart.
     (int R, int C)? _sectionFirst;
@@ -74,6 +75,7 @@ public sealed class MeasureColourWindow : Window
         public readonly List<Vec2> Corners = [];
         public (double R, double G, double B)? Balance;
         public double? PhotoTurn; // a close-up photo, turned this far before showing
+        public (int W, int H)? RawSize; // a close-up photo's size as it came from the camera
         // The block of squares this photo shows (rows/columns, inclusive).
         public (int R0, int C0, int R1, int C1) Section;
         public readonly Dictionary<(int, int), ColourSwatch> ByCell = [];
@@ -180,7 +182,10 @@ public sealed class MeasureColourWindow : Window
 
         var left = new DockPanel();
         var tools = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { closeUp, cam, open } };
-        var tools2 = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _block, reset, _grey } };
+        ToolTip.SetTip(_place, "Only if the plate hasn't moved since it was burned: the corners you clicked tell exactly where the close-up camera looks. " +
+                               "After this, close-up photos at this focus height place themselves (no clicking), and the close-up view shows on the work area.");
+        _place.Click += (_, _) => SavePlacement();
+        var tools2 = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _block, reset, _grey, _place } };
         foreach (var b in tools.Children.OfType<Button>().Concat(tools2.Children.OfType<Button>())) b.HorizontalAlignment = HorizontalAlignment.Left;
         bool lightsOn = machine?.IsConnected == true;
         var lights = new StackPanel
@@ -343,9 +348,21 @@ public sealed class MeasureColourWindow : Window
             {
                 // Turned the way the camera sits, so the grid reads the same way round as on screen.
                 double turn = _machine.CloseUpRotationDeg;
-                var img = await Task.Run(() => RasterImage.Decode(jpg).Rotated(turn));
+                var (img, rawW, rawH) = await Task.Run(() => { var raw = RasterImage.Decode(jpg); return (raw.Rotated(turn), raw.Width, raw.Height); });
                 _s.PhotoTurn = turn;
+                _s.RawSize = (rawW, rawH);
                 SetImage(img, "close-up camera");
+                // Known camera position at this height: the squares are placed without clicking.
+                if (_machine.CloseUpPlacement() is { } placed && _cells.Count > 0)
+                {
+                    var area = _cells.Select(c => c.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+                    var corners = new[] { area.TopLeft, new Vec2(area.MaxX, area.MinY), area.BottomRight, new Vec2(area.MinX, area.MaxY) };
+                    _s.Section = (0, 0, _rows - 1, _cols - 1);
+                    _s.MmToPx = Homography.Fit([.. corners.Select(mm => (mm, RasterImage.ToRotated(placed.Apply(mm), rawW, rawH, turn)))]);
+                    Remeasure();
+                    _status.Text = "Placed from the close-up camera's saved position. If the plate moved since it was burned, click the corners again.";
+                    return;
+                }
                 _status.Text = $"Close-up photo, lights front {_front.Value:0}% / back {_back.Value:0}%. " +
                                (_s.Section == (0, 0, _rows - 1, _cols - 1) ? "If it shows only part of the grid, say which squares first." : "");
             }
@@ -379,6 +396,18 @@ public sealed class MeasureColourWindow : Window
     {
         _frontText.Text = _front.Value < 0.5 ? "off" : $"{_front.Value:0}%";
         _backText.Text = _back.Value < 0.5 ? "off" : $"{_back.Value:0}%";
+    }
+
+    /// <summary>The clicked corners of an unmoved plate tell where the close-up camera looks: remember it for this focus height.</summary>
+    void SavePlacement()
+    {
+        if (_machine is null || _s.MmToPx is not { } h || _s.PhotoTurn is not { } turn || _s.RawSize is not { } raw) return;
+        if (_machine.Distance is not { } distance) { _status.Text = "The focus height isn't known: connect the machine first."; return; }
+        var area = _cells.Select(c => c.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+        var corners = new[] { area.TopLeft, new Vec2(area.MaxX, area.MinY), area.BottomRight, new Vec2(area.MinX, area.MaxY) };
+        if (Homography.Fit([.. corners.Select(mm => (mm, RasterImage.FromRotated(h.Apply(mm), raw.W, raw.H, turn)))]) is not { } toCamera) return;
+        _machine.SaveCloseUpPlacement(distance, toCamera);
+        _status.Text = $"Saved where the close-up camera looks at {distance:0.0} mm focus. Close-up photos at this height now place themselves, and show on the work area.";
     }
 
     void UseCamera()
@@ -476,6 +505,7 @@ public sealed class MeasureColourWindow : Window
         else _step.Text = _s.ByCell.Count < _cells.Count
             ? $"Measured {_s.ByCell.Count} of {_cells.Count} squares. Check the outlines sit inside each square. For the rest, slide the plate, take another photo and say which squares it shows."
             : "All squares measured. Check the outlines sit inside each square; if not, click the corners again.";
+        _place.IsVisible = _machine is not null && _s.PhotoTurn is not null && _s.MmToPx is not null && _s.RawSize is not null;
         _view.Corners = _s.Corners.ToList();
         _view.Grey = _greyClicks.Count == 2 ? [_greyClicks[0], _greyClicks[1]] : null;
         _view.InvalidateVisual();
