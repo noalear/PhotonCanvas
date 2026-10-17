@@ -23,6 +23,41 @@ public enum ImageEngraveMode
     Dither,
     /// <summary>Each dot's power follows the picture's brightness (experimental on this machine).</summary>
     Grayscale,
+    /// <summary>
+    /// The picture is a depth map (dark = deep): engraved as thin slices one after another, each
+    /// covering everything at least that deep, so the material is carved down in steps (relief).
+    /// </summary>
+    Slices,
+}
+
+/// <summary>How a Fill layer covers the inside of its shapes.</summary>
+public enum FillStyle
+{
+    /// <summary>Straight lines back and forth.</summary>
+    Lines,
+    /// <summary>Outlines stepped inward, like contour lines: follows the shape, cleaner edges.</summary>
+    Offset,
+}
+
+/// <summary>Depth-slice (relief) settings of an Image layer: see <see cref="ImageEngraveMode.Slices"/>.</summary>
+public sealed record DepthSlices
+{
+    public const int MaxCount = 255;
+
+    /// <summary>How many slices from the surface to the deepest point (a slice per grey step at most).</summary>
+    public int Count { get; init; } = 32;
+    /// <summary>Light = deep instead of dark = deep.</summary>
+    public bool Negative { get; init; }
+    /// <summary>Lower the focus this much (mm) every <see cref="DropEvery"/> slices, to follow the floor down. 0 = off.</summary>
+    public double DropMm { get; init; }
+    public int DropEvery { get; init; } = 8;
+    /// <summary>A cleanup pass after every this many slices, to clear debris and smooth the floor. 0 = off.</summary>
+    public int CleanupEvery { get; init; }
+    /// <summary>Cleanup power, speed and (MOPA) pulse settings; the source is always the layer's.</summary>
+    public LaserSettings CleanupLaser { get; init; } = new() { Light = LightSource.Red, Power = 20, Speed = 2000, PulseWidthNs = 200, FrequencyKhz = 300 };
+    public double CleanupLinesPerCm { get; init; } = 300;
+    /// <summary>Cleanup covers the whole picture (else only the slice just done).</summary>
+    public bool CleanupWhole { get; init; } = true;
 }
 
 /// <summary>
@@ -71,6 +106,21 @@ public sealed record Layer
     public double FillAngleDeg { get; init; }
     /// <summary>Fill: add a second pass at 90° to the first.</summary>
     public bool Crosshatch { get; init; }
+    /// <summary>Fill: lines or stepped-in outlines.</summary>
+    public FillStyle FillStyle { get; init; }
+    /// <summary>Fill lines and depth slices: turn the scan lines this much more on every pass or slice (degrees, 0 = off).</summary>
+    public double AngleStepDeg { get; init; }
+    /// <summary>Also carry on turning from one run of the job to the next (by <see cref="AngleStepDeg"/>).</summary>
+    public bool TurnEachRun { get; init; }
+    /// <summary>How many times the layer has been run (counted for <see cref="TurnEachRun"/>).</summary>
+    public int RunCount { get; init; }
+    /// <summary>Move the focus this far into the material for this layer (mm): + lowers the head, − raises it.</summary>
+    public double FocusOffsetMm { get; init; }
+    /// <summary>Image layers in <see cref="ImageEngraveMode.Slices"/> mode.</summary>
+    public DepthSlices Slices { get; init; } = new();
+
+    /// <summary>Extra turn of the scan lines for this run (<see cref="TurnEachRun"/>), degrees.</summary>
+    public double RunTurnDeg => TurnEachRun ? RunCount * AngleStepDeg * Math.Max(1, Laser.Passes) * (Mode == LayerMode.Image ? Math.Max(1, Slices.Count) : 1) : 0;
     /// <summary>Fill: extend each scan line this far beyond the shape with the laser off, so the beam is at speed when it burns (mm).</summary>
     public double OverscanMm { get; init; }
 
@@ -241,6 +291,9 @@ public class PathShape : Shape
 /// <summary>The whole editable state. Immutable; every edit produces a new one.</summary>
 public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> Shapes)
 {
+    /// <summary>What fills in the fields of text and codes (serial number, spreadsheet).</summary>
+    public VariableData Vars { get; init; } = new();
+
     public static DocState New()
     {
         var l = Layer.Default(0) with { Name = "Cut" };

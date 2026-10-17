@@ -35,7 +35,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
     readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth)", "Floyd–Steinberg", "Stucki", "Atkinson (contrasty)", "Bayer (pattern)", "Threshold (line art)" } };
     readonly TextBlock _lpcmHint = Hint(), _dpiHint = Hint(), _passHint = Hint(), _freqHint = Hint();
-    readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow;
+    readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow, _imageModeRow;
 
     // more settings
     readonly Expander _more = new() { Header = "More settings", HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new(8, 6) };
@@ -47,7 +47,23 @@ public sealed class LayerEditor : UserControl
     readonly Control _wobbleRows;
     readonly NumericUpDown _fillAngle = Number(-180, 180, 15, "0.#"), _overscan = Number(0, 20, 0.5m, "0.##");
     readonly CheckBox _crosshatch = new() { Content = "Crosshatch (second pass at 90°)" };
-    readonly ComboBox _imageMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots (dithered)", "Greyscale (experimental)" } };
+    readonly Segmented _fillStyle = new(("Lines", null), ("Offset", null));
+    readonly NumericUpDown _angleStep = Number(-180, 180, 1, "0.#");
+    readonly CheckBox _turnRuns = new() { Content = "Keep turning from run to run" };
+    readonly TextBlock _runCount = new() { Classes = { "muted" }, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+    readonly Button _resetRuns = new() { Content = "Start again", Padding = new(8, 2) };
+    readonly Control _fillStyleRow, _lineRows, _runRow;
+    readonly NumericUpDown _focusOff = Number(-10, 10, 0.1m, "0.##");
+    // depth slices
+    readonly NumericUpDown _slices = Number(2, DepthSlices.MaxCount, 1, "0");
+    readonly CheckBox _negative = new() { Content = "Light = deep (negative)" };
+    readonly NumericUpDown _dropMm = Num(0, 2, 0.01m, "0.###"), _dropEvery = Num(1, DepthSlices.MaxCount, 1, "0");
+    readonly NumericUpDown _cleanEvery = Number(0, DepthSlices.MaxCount, 1, "0"), _cleanPower = Num(0, 100, 1, "0.#"), _cleanSpeed = Num(2, 15000, 50, "0");
+    readonly NumericUpDown _cleanLpcm = Num(1, (decimal)FillBlock.MaxLinesPerCm, 10, "0"), _cleanFreq = Number(1, 4000, 5, "0");
+    readonly CheckBox _cleanWhole = new() { Content = "Clean the whole picture (else only the slice just done)" };
+    readonly TextBlock _sliceHint = Hint();
+    readonly Control _sliceExtras, _cleanRows, _cleanFreqRow;
+    readonly ComboBox _imageMode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots (dithered)", "Greyscale (experimental)", "Depth slices (relief)" } };
     readonly NumericUpDown _grayMin = Number(0, 100, 1, "0.#");
     readonly ComboBox _pulse = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _freq = Number(1, 4000, 5, "0");
@@ -102,6 +118,8 @@ public sealed class LayerEditor : UserControl
         _dpiRow = Field("Resolution", _dpi, _dpiHint, "Dots per inch. Higher = finer detail, slower. 150–300 suits most wood.");
         _ditherRow = Field("Dithering", _dither, tip: "How grey tones become dots. Jarvis suits photos; Threshold suits logos and line art.");
         _dotRow = Field("Dot time µs", _dotUs, tip: "How long each dot fires, in microseconds. Longer = darker dots.");
+        _imageModeRow = Field("Picture mode", _imageMode, tip: "Dots: every dot at full power, tone from dot spacing (proven). Greyscale: each dot's power follows the picture (not yet tested on your machine). " +
+                                                              "Depth slices: the picture is a depth map (dark = deep), carved in thin slices one after another: relief on metal with the MOPA, or on wood.");
 
         _cutExtras = new StackPanel
         {
@@ -129,7 +147,11 @@ public sealed class LayerEditor : UserControl
         };
         ((StackPanel)_cutExtras).Children.Add(_wobbleRows);
         ToolTip.SetTip(_wobble, "MOPA only: the beam traces small overlapping circles along the path.");
-        _fillExtras = new StackPanel
+        _fillStyleRow = Field("Fill style", _fillStyle, tip: "Lines: straight back and forth. Offset: the outline stepped inward, like contour lines: follows the shape, so edges come out cleaner (good for text and logos).");
+        ToolTip.SetTip(_resetRuns, "Count runs from 0 again, so the next run starts at the scan angle as set.");
+        _runRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _runCount, _resetRuns } };
+        ToolTip.SetTip(_turnRuns, "Each run of the job starts where the last one's turning left off, so repeating the job doesn't repeat the line pattern.");
+        _lineRows = new StackPanel
         {
             Spacing = 6,
             Children =
@@ -137,22 +159,55 @@ public sealed class LayerEditor : UserControl
                 Field("Scan angle (°)", _fillAngle, tip: "Direction of the fill lines. 0 = left to right."),
                 _crosshatch,
                 Field("Overscan (mm)", _overscan, tip: "Each line starts and ends this far outside the shape with the laser off, so edges burn evenly."),
+                Field("Turn per pass (°)", _angleStep, tip: "Turn the scan lines this much more on every pass (and every depth slice), so the line pattern doesn't build up into stripes or ridges. " +
+                                                              "Something odd like 37° or 23° spreads the angles best. 0 = every pass the same."),
+                _turnRuns,
+                _runRow,
             },
         };
+        _fillExtras = new StackPanel { Spacing = 6, Children = { _fillStyleRow, _lineRows } };
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
+        _cleanFreqRow = Field("Cleanup kHz", _cleanFreq, tip: "MOPA: the cleanup pass's frequency (its pulse width stays the layer's).");
+        _cleanRows = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Row(Labelled("Cleanup %", _cleanPower, "Power of the cleanup pass: gentle, to clear debris and smooth the floor rather than cut deeper."),
+                    Labelled("Speed mm/s", _cleanSpeed, "Speed of the cleanup pass."),
+                    Labelled("Lines / cm", _cleanLpcm, "Line density of the cleanup pass.")),
+                _cleanFreqRow,
+                _cleanWhole,
+            },
+        };
+        _sliceExtras = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Field("Slices", _slices, _sliceHint, "How many steps from the surface to the deepest point. Each slice engraves everything at least that deep. More slices = smoother relief, longer job."),
+                _negative,
+                Row(Labelled("Lower focus mm", _dropMm, "Follow the floor down: lower the focus this much every few slices. About the depth those slices remove. 0 = off."),
+                    Labelled("every … slices", _dropEvery, "How many slices between focus drops.")),
+                Field("Cleanup every", _cleanEvery, tip: "A cleanup pass after every this many slices (0 = none). Clears debris and recast so the next slices cut cleanly."),
+                _cleanRows,
+            },
+        };
+        ToolTip.SetTip(_negative, "For depth maps where light means deep (most are dark = deep).");
         _imageExtras = new StackPanel
         {
             Spacing = 6,
             Children =
             {
-                Field("Picture mode", _imageMode, tip: "Dots: every dot at full power, tone from dot spacing (proven). Greyscale: each dot's power follows the picture (not yet tested on your machine — try it on scrap)."),
                 _grayRow,
                 _dotRow,
+                _sliceExtras,
             },
         };
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _imageExtras, _pulseRow, _freqRow, _moreNothing } };
+        var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _imageExtras, _pulseRow, _freqRow, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
@@ -187,7 +242,7 @@ public sealed class LayerEditor : UserControl
                 _light,
                 trio,
                 _passHint,
-                _lpcmRow, _dpiRow, _ditherRow,
+                _lpcmRow, _dpiRow, _imageModeRow, _ditherRow,
                 Field("Material", _material),
                 _reflective,
                 Field("Saved settings", _recipe),
@@ -220,7 +275,32 @@ public sealed class LayerEditor : UserControl
         _fillAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_fillAngle.Value!.Value }, _fillAngle.Value.HasValue, "fangle");
         _overscan.ValueChanged += (_, _) => EditLayers("Overscan", l => l with { OverscanMm = (double)_overscan.Value!.Value }, _overscan.Value.HasValue, "overscan");
         _crosshatch.IsCheckedChanged += (_, _) => EditLayers("Crosshatch", l => l with { Crosshatch = _crosshatch.IsChecked == true }, _crosshatch.IsChecked.HasValue);
-        _imageMode.SelectionChanged += (_, _) => EditLayers("Picture mode", l => l with { ImageMode = (ImageEngraveMode)Math.Max(0, _imageMode.SelectedIndex) }, _imageMode.SelectedIndex >= 0);
+        _imageMode.SelectionChanged += (_, _) => EditLayers("Picture mode", l =>
+        {
+            var mode = (ImageEngraveMode)Math.Max(0, _imageMode.SelectedIndex);
+            // Slices start turning by an odd angle, so the line pattern doesn't stack up.
+            return l with { ImageMode = mode, AngleStepDeg = mode == ImageEngraveMode.Slices && l.ImageMode != mode && l.AngleStepDeg == 0 ? 37 : l.AngleStepDeg };
+        }, _imageMode.SelectedIndex >= 0);
+        _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
+        _angleStep.ValueChanged += (_, _) => EditLayers("Turn per pass", l => l with { AngleStepDeg = (double)_angleStep.Value!.Value }, _angleStep.Value.HasValue, "anglestep");
+        _turnRuns.IsCheckedChanged += (_, _) => EditLayers("Turn from run to run", l => l with { TurnEachRun = _turnRuns.IsChecked == true }, _turnRuns.IsChecked.HasValue);
+        _resetRuns.Click += (_, _) => EditLayers("Start the turning again", l => l with { RunCount = 0 }, true);
+        _focusOff.ValueChanged += (_, _) => EditLayers("Focus offset", l => l with { FocusOffsetMm = (double)_focusOff.Value!.Value }, _focusOff.Value.HasValue, "focusoff");
+        _slices.ValueChanged += (_, _) => EditLayers("Slices", l => l with { Slices = l.Slices with { Count = (int)_slices.Value!.Value } }, _slices.Value.HasValue, "slices");
+        _negative.IsCheckedChanged += (_, _) => EditLayers("Light = deep", l => l with { Slices = l.Slices with { Negative = _negative.IsChecked == true } }, _negative.IsChecked.HasValue);
+        _dropMm.ValueChanged += (_, _) => EditLayers("Lower focus", l => l with { Slices = l.Slices with { DropMm = (double)_dropMm.Value!.Value } }, _dropMm.Value.HasValue, "dropmm");
+        _dropEvery.ValueChanged += (_, _) => EditLayers("Lower focus every", l => l with { Slices = l.Slices with { DropEvery = (int)_dropEvery.Value!.Value } }, _dropEvery.Value.HasValue, "dropevery");
+        _cleanEvery.ValueChanged += (_, _) => EditLayers("Cleanup every", l => l with { Slices = l.Slices with { CleanupEvery = (int)_cleanEvery.Value!.Value } }, _cleanEvery.Value.HasValue, "cleanevery");
+        _cleanPower.ValueChanged += (_, _) => EditLayers("Cleanup power", l => l with { Slices = l.Slices with { CleanupLaser = l.Slices.CleanupLaser with { Power = (double)_cleanPower.Value!.Value } } }, _cleanPower.Value.HasValue, "cleanpower");
+        _cleanSpeed.ValueChanged += (_, _) => EditLayers("Cleanup speed", l => l with { Slices = l.Slices with { CleanupLaser = l.Slices.CleanupLaser with { Speed = (double)_cleanSpeed.Value!.Value } } }, _cleanSpeed.Value.HasValue, "cleanspeed");
+        _cleanLpcm.ValueChanged += (_, _) => EditLayers("Cleanup lines", l => l with { Slices = l.Slices with { CleanupLinesPerCm = (double)_cleanLpcm.Value!.Value } }, _cleanLpcm.Value.HasValue, "cleanlpcm");
+        _cleanFreq.ValueChanged += (_, _) => EditLayers("Cleanup frequency", l =>
+        {
+            int f = (int)_cleanFreq.Value!.Value;
+            int safe = _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? lim.Safe(f, l.Reflective) : f;
+            return l with { Slices = l.Slices with { CleanupLaser = l.Slices.CleanupLaser with { FrequencyKhz = safe, PulseWidthNs = l.Laser.PulseWidthNs } } };
+        }, _cleanFreq.Value.HasValue, "cleanfreq");
+        _cleanWhole.IsCheckedChanged += (_, _) => EditLayers("Cleanup area", l => l with { Slices = l.Slices with { CleanupWhole = _cleanWhole.IsChecked == true } }, _cleanWhole.IsChecked.HasValue);
         _grayMin.ValueChanged += (_, _) => EditLayers("Lightest power", l => l with { GrayMinPower = (double)_grayMin.Value!.Value }, _grayMin.Value.HasValue, "graymin");
         _pulse.SelectionChanged += (_, _) =>
         {
@@ -294,13 +374,44 @@ public sealed class LayerEditor : UserControl
 
         bool anyFill = ls.Any(l => l.Mode == LayerMode.Fill), anyRed = ls.Any(l => l.Laser.Light == LightSource.Red);
         bool anyImage = ls.Any(l => l.Mode == LayerMode.Image), anyCut = ls.Any(l => l.Mode is LayerMode.Cut or LayerMode.Score);
-        _lpcmRow.IsVisible = anyFill;
-        _dpiRow.IsVisible = _ditherRow.IsVisible = anyImage;
+        bool anySlices = ls.Any(l => l.Mode == LayerMode.Image && l.ImageMode == ImageEngraveMode.Slices);
+        bool allSlices = anyImage && ls.Where(l => l.Mode == LayerMode.Image).All(l => l.ImageMode == ImageEngraveMode.Slices);
+        bool allOffset = anyFill && !anySlices && ls.Where(l => l.Mode == LayerMode.Fill).All(l => l.FillStyle == FillStyle.Offset);
+        _lpcmRow.IsVisible = anyFill || anySlices;
+        _dpiRow.IsVisible = _imageModeRow.IsVisible = anyImage;
+        _ditherRow.IsVisible = _dotRow.IsVisible = anyImage && !allSlices;
         _cutExtras.IsVisible = anyCut;
-        _fillExtras.IsVisible = anyFill;
+        _fillExtras.IsVisible = anyFill || anySlices;
+        _fillStyleRow.IsVisible = anyFill;
+        _lineRows.IsVisible = !allOffset;
+        _crosshatch.IsVisible = anyFill && !allOffset;
         _imageExtras.IsVisible = anyImage;
+        _sliceExtras.IsVisible = anySlices;
+        _cleanRows.IsVisible = anySlices && ls.Any(l => l.Slices.CleanupEvery > 0);
+        _cleanFreqRow.IsVisible = anyRed;
         _pulseRow.IsVisible = _freqRow.IsVisible = anyRed;
-        _moreNothing.IsVisible = !anyCut && !anyFill && !anyImage && !anyRed;
+        _moreNothing.IsVisible = false;
+        _fillStyle.SelectedIndex = Same(l => l.FillStyle) is { } fs ? (int)fs : -1;
+        Num(_angleStep, Same(l => l.AngleStepDeg));
+        _turnRuns.IsChecked = Same(l => l.TurnEachRun);
+        int runs = ls.Max(l => l.RunCount);
+        _runCount.Text = runs == 0 ? "Not run yet" : $"Run {runs} time{(runs == 1 ? "" : "s")} so far";
+        _runRow.IsVisible = ls.Any(l => l.TurnEachRun);
+        _resetRuns.IsEnabled = runs > 0;
+        Num(_focusOff, Same(l => l.FocusOffsetMm));
+        Num(_slices, Same(l => (double)l.Slices.Count));
+        _negative.IsChecked = Same(l => l.Slices.Negative);
+        Num(_dropMm, Same(l => l.Slices.DropMm));
+        Num(_dropEvery, Same(l => (double)l.Slices.DropEvery));
+        Num(_cleanEvery, Same(l => (double)l.Slices.CleanupEvery));
+        Num(_cleanPower, Same(l => l.Slices.CleanupLaser.Power));
+        Num(_cleanSpeed, Same(l => l.Slices.CleanupLaser.Speed));
+        Num(_cleanLpcm, Same(l => l.Slices.CleanupLinesPerCm));
+        Num(_cleanFreq, Same(l => (double)l.Slices.CleanupLaser.FrequencyKhz));
+        _cleanWhole.IsChecked = Same(l => l.Slices.CleanupWhole);
+        _sliceHint.Text = Same(l => l.Slices.Count) is { } sc && Same(l => l.Dpi) is { } sdpi
+            ? $"{sc} slices, depth cells {25.4 / sdpi:0.###} mm. How deep each slice cuts depends on power, speed, lines and passes: try a few on scrap and measure."
+            : "";
         Num(_kerf, Same(l => l.KerfMm));
         Num(_tabs, Same(l => (double)l.TabCount));
         Num(_tabWidth, Same(l => l.TabWidthMm));

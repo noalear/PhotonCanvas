@@ -228,6 +228,18 @@ public partial class MainWindow : Window
         WireWand();
         Canvas.TextRequested += at => CreateText(at);
         Canvas.TextEditRequested += id => { _doc.Select([id]); _props.FocusText(); };
+        Canvas.CodeEditRequested += id => _ = Guard(() => EditCode(id));
+        _props.CodeEditRequested += id => _ = Guard(() => EditCode(id));
+        _props.VariablesRequested += () => _ = Guard(ShowVariables);
+        _job.RunFinished += from =>
+        {
+            // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
+            if (from != _doc.FilePath) return;
+            var next = VariableText.AfterRun(_doc.State, DateTime.Now);
+            if (ReferenceEquals(next, _doc.State)) return;
+            _doc.Commit("Next run: serial number and row", next);
+            if (VariableText.Describe(next) is { } marks) StatusText.Text = $"Ready for the next run: {marks}. (Ctrl+Z goes back.)";
+        };
         void Sync(Tool t) { foreach (var (b, tool) in _toolButtons) b.IsChecked = tool == t; }
         Canvas.ToolChanged += Sync;
         Sync(Canvas.Tool);
@@ -409,6 +421,9 @@ public partial class MainWindow : Window
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
+        var codes = home.Group("Serial & codes");
+        codes.Large("Code", "IcCode", () => _ = Guard(() => EditCode(null)), "QR code, Data Matrix or barcode. It can hold a serial number, the date or a spreadsheet column, new on every run");
+        codes.Small("Variables", "IcVariables", () => _ = Guard(ShowVariables), "Serial number and spreadsheet (CSV) that fill in {fields} in text and codes, moving on after each run");
         var grp = home.Group("Group");
         grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
         grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", HasSel);
@@ -482,7 +497,7 @@ public partial class MainWindow : Window
         var laser = _ribbon.Tab("Laser", "Materials, tests, framing and shipping the job");
         var mat = laser.Group("Materials");
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
-        mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a power × speed test grid to find the right settings for a new material");
+        mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
         var colour = laser.Group("Colour on metal");
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
@@ -831,7 +846,11 @@ public partial class MainWindow : Window
         var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
         {
             Name = $"Relief · {label}",
-            ImageMode = ImageEngraveMode.Grayscale, // darker = deeper: power follows the depth
+            // Darker = deeper, carved in slices; each slice's lines turned to keep the floor smooth.
+            ImageMode = ImageEngraveMode.Slices,
+            Dpi = 254,
+            LinesPerCm = 200,
+            AngleStepDeg = 37,
         };
         state = Ops.AddLayer(state, layer, 0);
         ImageShape shape;
@@ -1502,6 +1521,43 @@ public partial class MainWindow : Window
         var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance, _machine);
         await w.ShowDialog(this);
         _layerEditor.RefreshMaterials();
+    }
+
+    /// <summary>Make a new code (<paramref name="id"/> null) or change one.</summary>
+    async Task EditCode(Guid? id)
+    {
+        var existing = id is { } i ? _doc.State.FindShape(i) as CodeShape : null;
+        if (id is not null && existing is null) return;
+        var w = new CodeWindow(existing?.Spec, _doc.State.Vars, () => _ = Guard(ShowVariables));
+        await w.ShowDialog(this);
+        if (w.Result is not { } spec) return;
+        if (existing is not null)
+        {
+            _doc.Commit("Edit code", Ops.Replace(_doc.State, existing.Edit(spec)), [existing.Id]);
+            return;
+        }
+        // On the active layer if it can take vectors, else a new engrave layer; centred on the work area.
+        var state = _doc.State;
+        var layer = state.FindLayer(_doc.ActiveLayer) is { Visible: true, Locked: false, Mode: LayerMode.Fill } l ? l : null;
+        if (layer is null)
+        {
+            layer = Layer.Default(state.Layers.Count, LayerMode.Fill) with { Name = "Codes", LinesPerCm = 200 };
+            state = Ops.AddLayer(state, layer);
+        }
+        var code = CodeShape.Create(spec, null, layer.Id, Affine.Identity);
+        var b = code.Bounds;
+        var at = new Vec2(Canvas.Machine.FieldW / 2, Canvas.Machine.FieldH / 2);
+        if (!b.IsEmpty) code = (CodeShape)code.With(transform: Affine.Translate(at.X - b.Center.X, at.Y - b.Center.Y));
+        _doc.Commit("Add code", Ops.AddShapes(state, [code]), [code.Id]);
+        _layers.Activate(layer.Id);
+    }
+
+    async Task ShowVariables()
+    {
+        var w = new VariablesWindow(_doc.State.Vars);
+        await w.ShowDialog(this);
+        if (w.Result is not { } v || v == _doc.State.Vars) return;
+        _doc.Commit("Variables", _doc.State with { Vars = v });
     }
 
     async Task AddMaterialTest()

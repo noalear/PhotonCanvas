@@ -13,6 +13,7 @@ licence texts ship inside their NuGet packages and are linked below.
 | [HarfBuzzSharp](https://github.com/mono/SkiaSharp) / HarfBuzz (via Avalonia) | Text shaping | MIT / Old MIT |
 | [Clipper2](https://github.com/AngusJohnson/Clipper2) 1.5 | Offsets and shape operations | Boost Software License 1.0 |
 | [PdfPig](https://github.com/UglyToad/PdfPig) 0.1 | Importing PDF and AI drawings | Apache License 2.0 |
+| [ZXing.Net](https://github.com/micjahn/ZXing.Net) 0.16 | QR codes, Data Matrix and barcodes | Apache License 2.0 |
 | [.NET](https://github.com/dotnet/runtime) runtime | Platform | MIT |
 
 Test-only: xUnit (Apache 2.0), Microsoft.NET.Test.Sdk (MIT), coverlet (MIT).

@@ -181,7 +181,7 @@ public class MaterialTestTests
     public void OneLayerPerSquareWithItsSettings()
     {
         var s0 = DocState.New();
-        var o = new MaterialTestOptions { PowerMin = 10, PowerMax = 90, PowerSteps = 3, SpeedMin = 100, SpeedMax = 300, SpeedSteps = 2 };
+        var o = new MaterialTestOptions { AcrossMin = 10, AcrossMax = 90, AcrossSteps = 3, DownMin = 100, DownMax = 300, DownSteps = 2 };
         var (s, added) = MaterialTest.Add(s0, o);
         var squares = s.Layers.Skip(s0.Layers.Count).Where(l => l.Name.StartsWith("Test ") && l.Name != "Test labels").ToList();
         Assert.Equal(6, squares.Count);

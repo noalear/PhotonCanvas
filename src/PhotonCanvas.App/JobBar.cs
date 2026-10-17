@@ -433,6 +433,7 @@ public sealed class JobBar : UserControl
                     bool finished = mode is "P_WORK_DONE" or "P_FINISH";
                     _sendState = finished ? $"Finished in {Clock(took)}." : "The job ended.";
                     if (finished) LearnTiming(took);
+                    if (finished && _sentJob is not null) RunFinished?.Invoke(_sentFrom);
                 }
                 _follow.Stop();
                 _canvas.ShowRun(null, null);
@@ -626,9 +627,17 @@ public sealed class JobBar : UserControl
         finally { _frameUpdating = false; }
     }
 
+    /// <summary>A job this bar sent finished on the machine (not cancelled): the design it came from, by file.</summary>
+    public event Action<string?>? RunFinished;
+
+    string? _sentFrom;
+
     public async Task Send()
     {
         if (TopLevel.GetTopLevel(this) is not Window owner || _sending) return;
+        // Dates and times as of now (fields are otherwise filled in when the design changes).
+        var fresh = VariableText.Refresh(_doc.State, DateTime.Now);
+        if (!ReferenceEquals(fresh, _doc.State)) _doc.Commit("Update date and time", fresh);
         BuiltJob job;
         try { job = await BuildNow(); }
         catch (JobException e)
@@ -664,14 +673,18 @@ public sealed class JobBar : UserControl
             : "Each path runs all its passes before the next.");
         sb.AppendLine($"Size {job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm · about {Duration(job.EstimateS)}.");
         if (_machine.Distance is { } d) sb.AppendLine($"Machine focus distance: {d:0.0} mm. Make sure this matches your material.");
-        // Step-down lowers the head: never let it come near the material.
+        if (VariableText.Describe(_doc.State) is { } marks) sb.AppendLine($"Fields: {marks}.");
+        // Step-down and focus offsets lower the head: never let it come near the material.
+        double offset = job.Job.Blocks.Select(b => b.FocusOffsetMm).DefaultIfEmpty(0).Max();
         double deepest = JobBuilder.OutputLayers(_doc.State).Where(l => l.Mode is LayerMode.Cut or LayerMode.Score && (l.StepDownMm > 0 || l.StepDownFirstMm > 0))
-            .Select(l => l.StepDownFirstMm + (Math.Max(1, l.Laser.Passes) - 1) * l.StepDownMm).DefaultIfEmpty(0).Max();
+            .Select(l => l.FocusOffsetMm + l.StepDownFirstMm + (Math.Max(1, l.Laser.Passes) - 1) * l.StepDownMm).Append(offset).Max();
         if (deepest > 0 && _machine.Distance is { } focus && deepest > focus - 3)
         {
-            await Dialogs.Message(owner, "Can't send", $"Step-down would lower the head {deepest:0.##} mm, but it's only {focus:0.0} mm from the material. Reduce the step-down or the passes.");
+            await Dialogs.Message(owner, "Can't send", $"Step-down and focus offsets would lower the head {deepest:0.##} mm, but it's only {focus:0.0} mm from the material. Reduce them.");
             return;
         }
+        if (job.Job.Blocks.Any(b => b.FocusOffsetMm != 0))
+            sb.AppendLine($"The head moves for focus offsets (down at most {Math.Max(0, offset):0.##} mm) and comes back at the end.");
         foreach (var w in job.Warnings) sb.AppendLine($"⚠ {w}");
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
@@ -692,6 +705,7 @@ public sealed class JobBar : UserControl
                 name: _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "Untitled");
             _sentEstimate = job.EstimateS;
             _sentJob = job;
+            _sentFrom = _doc.FilePath;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }
         catch (DeviceException e)

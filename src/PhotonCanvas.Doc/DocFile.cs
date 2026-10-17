@@ -58,6 +58,25 @@ public static class DocFile
                 ["wobble"] = l.Wobble,
                 ["wobbleDiameterMm"] = l.WobbleDiameterMm,
                 ["wobbleSpacingMm"] = l.WobbleSpacingMm,
+                ["fillStyle"] = l.FillStyle.ToString(),
+                ["angleStepDeg"] = l.AngleStepDeg,
+                ["turnEachRun"] = l.TurnEachRun,
+                ["runCount"] = l.RunCount,
+                ["focusOffsetMm"] = l.FocusOffsetMm,
+                ["slices"] = new JsonObject
+                {
+                    ["count"] = l.Slices.Count,
+                    ["negative"] = l.Slices.Negative,
+                    ["dropMm"] = l.Slices.DropMm,
+                    ["dropEvery"] = l.Slices.DropEvery,
+                    ["cleanupEvery"] = l.Slices.CleanupEvery,
+                    ["cleanupPower"] = l.Slices.CleanupLaser.Power,
+                    ["cleanupSpeed"] = l.Slices.CleanupLaser.Speed,
+                    ["cleanupPulseWidthNs"] = l.Slices.CleanupLaser.PulseWidthNs,
+                    ["cleanupFrequencyKhz"] = l.Slices.CleanupLaser.FrequencyKhz,
+                    ["cleanupLinesPerCm"] = l.Slices.CleanupLinesPerCm,
+                    ["cleanupWhole"] = l.Slices.CleanupWhole,
+                },
                 ["material"] = l.Material is { } mat ? new JsonObject
                 {
                     ["id"] = mat.MaterialId.ToString(),
@@ -97,6 +116,16 @@ public static class DocFile
                     // The outline too, so the file opens identically even without the font installed.
                     o["d"] = tx.Geometry.ToSvgPathData();
                     break;
+                case CodeShape cs:
+                    o["type"] = "code";
+                    o["kind"] = cs.Spec.Kind.ToString();
+                    o["content"] = cs.Spec.Content;
+                    o["moduleMm"] = cs.Spec.ModuleMm;
+                    o["barHeightMm"] = cs.Spec.BarHeightMm;
+                    o["invert"] = cs.Spec.Invert;
+                    o["quietModules"] = cs.Spec.QuietModules;
+                    o["ecc"] = cs.Spec.Ecc.ToString();
+                    break;
                 case PathShape p:
                     o["type"] = "path";
                     o["d"] = p.Geometry.ToSvgPathData();
@@ -127,6 +156,16 @@ public static class DocFile
             ["machine"] = MachineProfile.F2Ultra.DeviceCode,
             ["layers"] = layers,
             ["shapes"] = shapes,
+            ["variables"] = new JsonObject
+            {
+                ["serial"] = s.Vars.Serial,
+                ["serialStep"] = s.Vars.SerialStep,
+                ["serialEnd"] = s.Vars.SerialEnd,
+                ["advanceAfterRun"] = s.Vars.AdvanceAfterRun,
+                ["csvName"] = s.Vars.CsvName,
+                ["csvText"] = s.Vars.CsvText,
+                ["csvRow"] = s.Vars.CsvRow,
+            },
         };
         return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
@@ -186,6 +225,28 @@ public static class DocFile
                     Wobble = n["wobble"]?.GetValue<bool>() ?? false,
                     WobbleDiameterMm = n["wobbleDiameterMm"]?.GetValue<double>() ?? 0.05,
                     WobbleSpacingMm = n["wobbleSpacingMm"]?.GetValue<double>() ?? 0.015,
+                    FillStyle = Enum.TryParse<FillStyle>(n["fillStyle"]?.GetValue<string>(), true, out var fs) ? fs : FillStyle.Lines,
+                    AngleStepDeg = n["angleStepDeg"]?.GetValue<double>() ?? 0,
+                    TurnEachRun = n["turnEachRun"]?.GetValue<bool>() ?? false,
+                    RunCount = n["runCount"]?.GetValue<int>() ?? 0,
+                    FocusOffsetMm = n["focusOffsetMm"]?.GetValue<double>() ?? 0,
+                    Slices = n["slices"] is JsonObject so ? new DepthSlices
+                    {
+                        Count = so["count"]?.GetValue<int>() ?? 32,
+                        Negative = so["negative"]?.GetValue<bool>() ?? false,
+                        DropMm = so["dropMm"]?.GetValue<double>() ?? 0,
+                        DropEvery = so["dropEvery"]?.GetValue<int>() ?? 8,
+                        CleanupEvery = so["cleanupEvery"]?.GetValue<int>() ?? 0,
+                        CleanupLaser = new DepthSlices().CleanupLaser with
+                        {
+                            Power = so["cleanupPower"]?.GetValue<double>() ?? 20,
+                            Speed = so["cleanupSpeed"]?.GetValue<double>() ?? 2000,
+                            PulseWidthNs = so["cleanupPulseWidthNs"]?.GetValue<int>() ?? 200,
+                            FrequencyKhz = so["cleanupFrequencyKhz"]?.GetValue<int>() ?? 300,
+                        },
+                        CleanupLinesPerCm = so["cleanupLinesPerCm"]?.GetValue<double>() ?? 300,
+                        CleanupWhole = so["cleanupWhole"]?.GetValue<bool>() ?? true,
+                    } : new DepthSlices(),
                     Material = n["material"] is JsonObject mo && Guid.TryParse(mo["id"]?.GetValue<string>(), out var mid)
                         ? new Materials.MaterialRef(mid, mo["label"]?.GetValue<string>() ?? "",
                             Guid.TryParse(mo["recipeId"]?.GetValue<string>(), out var rid) ? rid : null, mo["recipeTitle"]?.GetValue<string>())
@@ -199,7 +260,7 @@ public static class DocFile
             foreach (var n in root["shapes"]?.AsArray() ?? [])
             {
                 var type = n?["type"]?.GetValue<string>();
-                if (n is null || type is not ("path" or "image" or "text")) continue;
+                if (n is null || type is not ("path" or "image" or "text" or "code")) continue;
                 var t = n["transform"]?.AsArray().Select(v => v!.GetValue<double>()).ToArray();
                 var layer = Guid.TryParse(n["layer"]?.GetValue<string>(), out var lid) && layerIds.Contains(lid) ? lid : layers[0].Id;
                 var id = Guid.TryParse(n["id"]?.GetValue<string>(), out var gid) ? gid : Guid.NewGuid();
@@ -229,6 +290,19 @@ public static class DocFile
                     });
                     continue;
                 }
+                if (type == "code")
+                {
+                    var spec = new CodeSpec(
+                        Enum.TryParse<CodeKind>(n["kind"]?.GetValue<string>(), true, out var ck) ? ck : CodeKind.QR,
+                        n["content"]?.GetValue<string>() ?? "",
+                        n["moduleMm"]?.GetValue<double>() ?? 0.5,
+                        n["barHeightMm"]?.GetValue<double>() ?? 12,
+                        n["invert"]?.GetValue<bool>() ?? false,
+                        n["quietModules"]?.GetValue<int>() ?? 0,
+                        Enum.TryParse<CodeEcc>(n["ecc"]?.GetValue<string>(), true, out var ce) ? ce : CodeEcc.M);
+                    shapes.Add(CodeShape.Create(spec, null, layer, transform, id, name, group));
+                    continue;
+                }
                 if (type == "path")
                 {
                     shapes.Add(new PathShape
@@ -251,7 +325,18 @@ public static class DocFile
                         tone?["invert"]?.GetValue<bool>() ?? false),
                 });
             }
-            return new DocState(layers.ToImmutable(), shapes.ToImmutable());
+            var vz = root["variables"];
+            var vars = vz is null ? new VariableData() : new VariableData
+            {
+                Serial = vz["serial"]?.GetValue<long>() ?? 1,
+                SerialStep = vz["serialStep"]?.GetValue<long>() ?? 1,
+                SerialEnd = vz["serialEnd"]?.GetValue<long?>(),
+                AdvanceAfterRun = vz["advanceAfterRun"]?.GetValue<bool>() ?? true,
+                CsvName = vz["csvName"]?.GetValue<string>() ?? "",
+                CsvText = vz["csvText"]?.GetValue<string>() ?? "",
+                CsvRow = vz["csvRow"]?.GetValue<int>() ?? 0,
+            };
+            return new DocState(layers.ToImmutable(), shapes.ToImmutable()) { Vars = vars };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {

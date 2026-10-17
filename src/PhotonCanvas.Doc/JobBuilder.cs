@@ -130,6 +130,7 @@ public static class JobBuilder
     /// <exception cref="JobException">The job cannot be made; the message says why.</exception>
     public static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now = null)
     {
+        if (VariableText.Problems(s).FirstOrDefault() is { } problem) throw new JobException(problem);
         var warnings = new List<string>();
         var blocks = new List<Block>();
         var steps = new List<BuiltJob.Step>();
@@ -170,6 +171,11 @@ public static class JobBuilder
             {
                 layer.Laser.Validate(opt.Machine, layer.Reflective);
                 ValidateExtras(layer);
+                if (layer.Mode == LayerMode.Image && layer.ImageMode == ImageEngraveMode.Slices && layer.Slices.CleanupEvery > 0)
+                {
+                    try { CleanupLaser(layer).Validate(opt.Machine, layer.Reflective); }
+                    catch (JobException e) { throw new JobException($"cleanup pass: {e.Message}"); }
+                }
             }
             catch (JobException e) { throw new JobException($"Layer \"{layer.Name}\": {e.Message}"); }
 
@@ -179,10 +185,41 @@ public static class JobBuilder
             {
                 if (shapes.Count > 0)
                     warnings.Add($"Layer \"{layer.Name}\" is an Image layer, so its {shapes.Count} vector shape(s) were skipped. Move them to a Cut, Score or Fill layer.");
+                if (layer.ImageMode == ImageEngraveMode.Slices)
+                {
+                    var sl = layer.Slices;
+                    if (sl.DropMm > 0 && layer.Laser.Passes > 1)
+                        warnings.Add($"Layer \"{layer.Name}\": the focus follows the slices down, but each of its {layer.Laser.Passes} passes starts again at the surface focus.");
+                    foreach (var img in images)
+                    {
+                        var (masks, _) = DepthSliceMasks(img, layer);
+                        int n = masks.Length;
+                        double turn = layer.AngleStepDeg, start = layer.FillAngleDeg + layer.RunTurnDeg;
+                        var clean = CleanupLaser(layer);
+                        for (int k = 0; k < n; k++)
+                        {
+                            var m = masks[k];
+                            var r = m.FilledBounds();
+                            if (r.IsEmpty) continue;
+                            double angle = start + k * turn;
+                            double focus = layer.FocusOffsetMm + sl.DropMm * (k / Math.Max(1, sl.DropEvery));
+                            int bm = blocks.Count, sm = steps.Count;
+                            // Repeats carry on turning after the last slice.
+                            blocks.Add(new FillBlock([], layer.Laser, layer.LinesPerCm) { Mask = m, AngleDeg = angle, AngleStepDeg = turn * n, OverscanMm = layer.OverscanMm, FocusOffsetMm = focus });
+                            if (sl.CleanupEvery > 0 && (k + 1) % sl.CleanupEvery == 0)
+                                blocks.Add(new FillBlock([], clean, sl.CleanupLinesPerCm) { Mask = sl.CleanupWhole ? masks[0] : m, AngleDeg = angle + 90, FocusOffsetMm = focus });
+                            steps.Add(new(layer.Id, [r.TopLeft, new(r.MaxX, r.MinY), r.BottomRight, new(r.MinX, r.MaxY)], true, true) { ScanAngleDeg = angle });
+                            Link(bm, sm);
+                            bounds = bounds.Union(r);
+                        }
+                    }
+                    continue;
+                }
                 foreach (var img in images)
                 {
-                    var (block, area) = Rasterize(img, layer);
-                    if (block is null) continue;
+                    var (dots, area) = Rasterize(img, layer);
+                    if (dots is null) continue;
+                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm };
                     int bm = blocks.Count, sm = steps.Count;
                     blocks.Add(block);
                     steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));
@@ -195,7 +232,30 @@ public static class JobBuilder
                 warnings.Add($"Layer \"{layer.Name}\" is a {layer.Mode} layer, so its {images.Count} image(s) were skipped. Put images on an Image layer to engrave them, or trace them into vectors.");
             if (shapes.Count == 0) continue;
 
-            if (layer.Mode == LayerMode.Fill)
+            if (layer.Mode == LayerMode.Fill && layer.FillStyle == FillStyle.Offset)
+            {
+                int open = 0;
+                double spacing = 10 / layer.LinesPerCm;
+                foreach (var shape in shapes)
+                {
+                    var closed = new PathGeometry(shape.World.Subpaths.Where(sp => sp.Closed).ToList());
+                    open += shape.World.Subpaths.Count(sp => !sp.Closed);
+                    if (closed.Subpaths.IsEmpty) continue;
+                    var loops = OffsetLoops(closed, spacing, opt.Tolerance, ref pos);
+                    if (loops.Count == 0) continue;
+                    int bm = blocks.Count, sm = steps.Count;
+                    blocks.Add(new LoopsBlock(loops, layer.Laser, spacing) { FocusOffsetMm = layer.FocusOffsetMm });
+                    foreach (var p in closed.Flatten(opt.Tolerance).Where(f => f.Closed && f.Points.Count >= 3))
+                    {
+                        steps.Add(new(layer.Id, p.Points, true, true));
+                        bounds = bounds.Union(Rect2.Bounds(p.Points));
+                    }
+                    Link(bm, sm);
+                }
+                if (open > 0)
+                    warnings.Add($"Layer \"{layer.Name}\": {open} open path(s) can't be filled and were skipped. Close them, or put them on a Cut/Score layer.");
+            }
+            else if (layer.Mode == LayerMode.Fill)
             {
                 int open = 0;
                 foreach (var shape in shapes)
@@ -205,10 +265,12 @@ public static class JobBuilder
                     if (polys.Count == 0) continue;
                     var block = new FillBlock(polys.Select(p => (IReadOnlyList<Vec2>)p.Points).ToList(), layer.Laser, layer.LinesPerCm)
                     {
-                        AngleDeg = layer.FillAngleDeg,
+                        AngleDeg = layer.FillAngleDeg + layer.RunTurnDeg,
+                        AngleStepDeg = layer.AngleStepDeg,
                         OverscanMm = layer.OverscanMm,
+                        FocusOffsetMm = layer.FocusOffsetMm,
                     };
-                    var cross = layer.Crosshatch ? block with { AngleDeg = layer.FillAngleDeg + 90 } : null;
+                    var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + 90 } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
                     if (!first && !second) continue;
                     int bm = blocks.Count, sm = steps.Count;
@@ -216,7 +278,7 @@ public static class JobBuilder
                     if (second) blocks.Add(cross!);
                     foreach (var p in polys)
                     {
-                        steps.Add(new(layer.Id, p.Points, true, true) { ScanAngleDeg = layer.FillAngleDeg });
+                        steps.Add(new(layer.Id, p.Points, true, true) { ScanAngleDeg = block.AngleDeg });
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
                     Link(bm, sm);
@@ -248,7 +310,7 @@ public static class JobBuilder
                             pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
                         }
                         int bm = blocks.Count, sm = steps.Count;
-                        blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop });
+                        blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
                         steps.Add(new(layer.Id, p.Points, p.Closed, false));
                         Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
@@ -417,9 +479,94 @@ public static class JobBuilder
         return (block, area);
     }
 
+    /// <summary>Most offset-fill rings per shape (a 100 mm shape at 0.01 mm spacing needs 5000).</summary>
+    const int MaxOffsetRings = 20_000;
+
+    /// <summary>
+    /// Offset fill: the area's outline stepped inward by <paramref name="spacing"/> (starting half a
+    /// step in) until nothing is left. Outermost first; within a ring, nearest loop next, each
+    /// starting at its point nearest the laser.
+    /// </summary>
+    public static List<IReadOnlyList<Vec2>> OffsetLoops(PathGeometry area, double spacing, double tol, ref Vec2 pos)
+    {
+        var o = new List<IReadOnlyList<Vec2>>();
+        if (!(spacing > 0) || !double.IsFinite(spacing)) return o;
+        double ftol = Math.Min(tol, spacing / 4);
+        for (int ring = 0; ring < MaxOffsetRings; ring++)
+        {
+            var moved = ShapeGeometry.Offset(area, -(ring + 0.5) * spacing, JoinStyle.Round, EndStyle.Flat, tolerance: ftol);
+            var loops = moved.Flatten(ftol).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
+            if (loops.Count == 0) break;
+            while (loops.Count > 0)
+            {
+                int best = 0, at = 0;
+                double bestD = double.PositiveInfinity;
+                for (int k = 0; k < loops.Count; k++)
+                    for (int i = 0; i < loops[k].Count; i++)
+                    {
+                        double d = loops[k][i].Dist(pos);
+                        if (d < bestD) { bestD = d; best = k; at = i; }
+                    }
+                var loop = loops[best];
+                loops.RemoveAt(best);
+                var start = at == 0 ? loop : [.. loop.Skip(at), .. loop.Take(at)];
+                o.Add(start);
+                pos = start[0];
+            }
+        }
+        return o;
+    }
+
+    /// <summary>The cleanup passes' settings for a depth-slice layer (always the layer's source).</summary>
+    static LaserSettings CleanupLaser(Layer l) => l.Slices.CleanupLaser with
+    {
+        Light = l.Laser.Light,
+        Passes = l.Laser.Passes,
+        PulseWidthNs = l.Laser.Light == LightSource.Red ? l.Slices.CleanupLaser.PulseWidthNs : l.Laser.PulseWidthNs,
+        FrequencyKhz = l.Laser.Light == LightSource.Red ? l.Slices.CleanupLaser.FrequencyKhz : l.Laser.FrequencyKhz,
+    };
+
+    /// <summary>
+    /// A depth-map picture as slices: cell levels on a square grid of 25.4 / dpi mm, then one mask
+    /// per slice (slice k covers everything at least k steps deep). Slice 1 is the largest, the
+    /// last the deepest. Cells outside the picture are never engraved.
+    /// </summary>
+    public static (FillMask[] Slices, Rect2 Area) DepthSliceMasks(ImageShape img, Layer layer)
+    {
+        JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
+        int n = Math.Clamp(layer.Slices.Count, 2, DepthSlices.MaxCount);
+        double cell = 25.4 / layer.Dpi;
+        var b = img.Bounds;
+        int cols = Math.Max(1, (int)Math.Floor(b.Width / cell + 1e-9));
+        int rows = Math.Max(1, (int)Math.Floor(b.Height / cell + 1e-9));
+        if ((long)cols * rows > MaxImageCells)
+            throw new JobException($"Image \"{img.Name}\" at {layer.Dpi:0} dpi needs {(long)cols * rows / 1e6:0.#} million cells. Lower the resolution or make it smaller.");
+        if (!img.Transform.IsInvertible) return ([], b);
+        var toLocal = img.Transform.Invert();
+        var tone = img.Tone;
+        bool negative = layer.Slices.Negative;
+        var levels = new byte[cols * rows];
+        Parallel.For(0, rows, r =>
+        {
+            for (int c = 0; c < cols; c++)
+            {
+                var local = toLocal.Apply(new Vec2(b.MinX + (c + 0.5) * cell, b.MinY + (r + 0.5) * cell));
+                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y) continue; // outside the picture
+                var px = img.LocalToPixel(local);
+                double grey = Math.Clamp(tone.Apply(img.Source.SampleLuminance(px.X, px.Y)), 0, 1);
+                double depth = negative ? grey : 1 - grey;
+                levels[r * cols + c] = (byte)Math.Clamp((int)Math.Round(depth * n), 0, n);
+            }
+        });
+        var origin = b.TopLeft;
+        var masks = Enumerable.Range(1, n).Select(k => new FillMask(origin, cell, cols, rows, levels, k)).ToArray();
+        return (masks, new Rect2(origin.X, origin.Y, origin.X + cols * cell, origin.Y + rows * cell));
+    }
+
     /// <summary>Checks the layer's cut, fill and image extras; messages are for the person at the laser.</summary>
     static void ValidateExtras(Layer l)
     {
+        JobException.CheckRange("focus offset", l.FocusOffsetMm, -Job.MaxFocusOffsetMm, Job.MaxFocusOffsetMm, "mm");
         switch (l.Mode)
         {
             case LayerMode.Cut or LayerMode.Score:
@@ -432,7 +579,23 @@ public static class JobBuilder
                 break;
             case LayerMode.Fill:
                 JobException.CheckRange("fill angle", l.FillAngleDeg, -360, 360, "degrees");
+                JobException.CheckRange("turn per pass", l.AngleStepDeg, -180, 180, "degrees");
                 JobException.CheckRange("overscan", l.OverscanMm, 0, 20, "mm");
+                break;
+            case LayerMode.Image when l.ImageMode == ImageEngraveMode.Slices:
+                var sl = l.Slices;
+                JobException.CheckRange("number of slices", sl.Count, 2, DepthSlices.MaxCount, "");
+                JobException.CheckRange("line density", l.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
+                JobException.CheckRange("scan angle", l.FillAngleDeg, -360, 360, "degrees");
+                JobException.CheckRange("turn per slice", l.AngleStepDeg, -180, 180, "degrees");
+                JobException.CheckRange("overscan", l.OverscanMm, 0, 20, "mm");
+                JobException.CheckRange("focus drop", sl.DropMm, 0, StepDown.MaxPerPassMm, "mm");
+                JobException.CheckRange("slices per focus drop", sl.DropEvery, 1, DepthSlices.MaxCount, "");
+                JobException.CheckRange("slices per cleanup", sl.CleanupEvery, 0, DepthSlices.MaxCount, "");
+                if (sl.CleanupEvery > 0) JobException.CheckRange("cleanup line density", sl.CleanupLinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
+                double deepest = l.FocusOffsetMm + sl.DropMm * ((sl.Count - 1) / Math.Max(1, sl.DropEvery));
+                if (deepest > Job.MaxFocusOffsetMm + 1e-9)
+                    throw new JobException($"Following the slices down would lower the focus {deepest:0.##} mm in all; the limit is {Job.MaxFocusOffsetMm:0} mm. Drop less, or less often.");
                 break;
             case LayerMode.Image when l.ImageMode == ImageEngraveMode.Grayscale:
                 if (!double.IsFinite(l.GrayMinPower) || l.GrayMinPower < 0 || l.GrayMinPower > l.Laser.Power)

@@ -28,10 +28,13 @@ straight to the machine over your own network.
 - Draw (text, pen, ellipse, rectangle, polygon, star, line), a shape library with your own saved shapes, edit points, group/combine/break apart, weld/subtract/intersect/exclude, offset, grid and circular arrays, nesting onto the bed or a piece, align and distribute, snapping and a configurable grid
 - Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures; trace pictures into vectors; remove picture backgrounds (offline)
 - Depthmaps for relief engraving with [DepthCharge](#depthcharge), placed straight onto the design
+- Serial numbers, dates and spreadsheet (CSV) columns as `{fields}` in any text or code, moving on after each finished run; QR codes, Data Matrix and barcodes (Code 128, Code 39, EAN-13, UPC-A)
 
 **Layers and materials**
-- Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA; kerf, tabs, overcut, lead-in, step-down per pass, MOPA wobble
-- A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; material test grids and recording their results
+- Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA; kerf, tabs, overcut, lead-in, step-down per pass, MOPA wobble, focus offset per layer
+- Engraving with straight lines or offset (contour) fill; the scan lines can turn on every pass, and from one run to the next, so deep engraving doesn't build up stripes
+- Relief from a depth map in slices (dark = deep): the focus can follow the floor down, with cleanup passes of their own settings
+- A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; test grids (power × speed, focus, line spacing, or any two settings) and recording their results
 - The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (as the stock software does)
 
 **Colour and light on metal (MOPA)** — see [below](#colour-and-gratings-on-metal)
@@ -53,7 +56,7 @@ machine's start button.
 
 ## The workspace
 
-- **Ribbon** along the top: Home (clipboard, select, draw, group, shape builder, outline, import),
+- **Ribbon** along the top: Home (clipboard, select, draw, serial & codes, group, shape builder, outline, import),
   Arrange, Picture, Camera, Laser and View. Labels give way to icons when the window is narrow;
   every button has a tooltip. The **File** button holds files, import/export and Settings.
 - **Machine**, at the right end of the ribbon: connection status (click it to connect), photo,

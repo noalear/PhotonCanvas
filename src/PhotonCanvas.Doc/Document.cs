@@ -71,6 +71,8 @@ public sealed class Document
     {
         if (_editBase is not null) throw new InvalidOperationException("an interactive edit is in progress");
         if (ReferenceEquals(next, State) && select is null) return;
+        // Text and codes with fields show their current values.
+        if (!ReferenceEquals(next, State)) next = VariableText.Refresh(next, DateTime.Now);
         if (!ReferenceEquals(next, State))
         {
             var now = DateTime.UtcNow;
@@ -182,7 +184,7 @@ public sealed class Document
         _undo.Clear();
         _redo.Clear();
         _editBase = null;
-        State = state;
+        State = VariableText.Refresh(state, DateTime.Now);
         Selection = [];
         ActiveLayer = state.Layers.Count > 0 ? state.Layers[0].Id : Guid.Empty;
         FilePath = path;

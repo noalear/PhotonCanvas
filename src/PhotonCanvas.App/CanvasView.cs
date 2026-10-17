@@ -179,6 +179,9 @@ public sealed partial class CanvasView : Control
     /// <summary>A text object was double-clicked: edit its words.</summary>
     public event Action<Guid>? TextEditRequested;
 
+    /// <summary>A code (QR, barcode) was double-clicked: edit it.</summary>
+    public event Action<Guid>? CodeEditRequested;
+
     /// <summary>Polygon tool: number of sides.</summary>
     public int PolygonSides { get; set; } = 6;
     /// <summary>Star tool: number of points.</summary>
@@ -663,6 +666,7 @@ public sealed partial class CanvasView : Control
         if (e.ClickCount >= 2 && HitShape(p) is { } dbl)
         {
             if (dbl is TextShape) TextEditRequested?.Invoke(dbl.Id);
+            else if (dbl is CodeShape) CodeEditRequested?.Invoke(dbl.Id);
             else if (dbl is PathShape)
             {
                 _doc.Select([dbl.Id]);

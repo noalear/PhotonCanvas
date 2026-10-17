@@ -34,7 +34,15 @@ public abstract record PassMode
     public sealed record Rounds(double DelayS) : PassMode;
 }
 
-public abstract record Block(LaserSettings Laser);
+public abstract record Block(LaserSettings Laser)
+{
+    /// <summary>
+    /// Move the focus this far into the material for this block (mm): + lowers the head, − raises
+    /// it. The head moves only when the offset changes from one block to the next, and goes back
+    /// to where it started at the end of the job.
+    /// </summary>
+    public double FocusOffsetMm { get; init; }
+}
 
 public sealed record VectorBlock(Polyline Path, LaserSettings Laser) : Block(Laser)
 {
@@ -97,10 +105,94 @@ public static class Wobble
     }
 }
 
-/// <summary>Zigzag line fill of closed polygons, even-odd rule (holes work).</summary>
+/// <summary>
+/// A grid of cells to fill, square, in line with the machine's axes: cell (0, 0) has its
+/// top-left corner at <see cref="Origin"/>, rows run down. Used for depth slices, where a
+/// picture's area is far too fiddly to trace into outlines.
+/// </summary>
+public sealed class FillMask
+{
+    readonly byte[] _levels;
+    readonly int _threshold;
+    Rect2? _filled;
+
+    /// <summary>Cells that are on: <c>true</c> = fill.</summary>
+    public FillMask(Vec2 origin, double cellMm, int width, int height, bool[] cells)
+        : this(origin, cellMm, width, height, cells.Select(c => c ? (byte)1 : (byte)0).ToArray(), 1) { }
+
+    /// <summary>
+    /// Cells whose level is at least <paramref name="threshold"/> are on. Several masks can share
+    /// one level array (every slice of a depth map uses the same one).
+    /// </summary>
+    public FillMask(Vec2 origin, double cellMm, int width, int height, byte[] levels, int threshold)
+    {
+        Origin = origin;
+        CellMm = cellMm;
+        Width = width;
+        Height = height;
+        _levels = levels;
+        _threshold = Math.Max(1, threshold);
+    }
+
+    public Vec2 Origin { get; }
+    public double CellMm { get; }
+    public int Width { get; }
+    public int Height { get; }
+
+    /// <summary>True when the level data matches the size.</summary>
+    public bool Valid => _levels.Length == Width * Height && Width > 0 && Height > 0;
+
+    /// <summary>Is cell <paramref name="i"/> (row-major) on?</summary>
+    public bool this[int i] => _levels[i] >= _threshold;
+
+    public Rect2 Bounds => new(Origin.X, Origin.Y, Origin.X + Width * CellMm, Origin.Y + Height * CellMm);
+
+    public bool Any() => !FilledBounds().IsEmpty;
+
+    /// <summary>How many cells are on.</summary>
+    public int Count()
+    {
+        int n = 0;
+        for (int i = 0; i < Width * Height; i++) if (_levels[i] >= _threshold) n++;
+        return n;
+    }
+
+    /// <summary>The smallest rectangle around the filled cells (empty if none).</summary>
+    public Rect2 FilledBounds() => _filled ??= FindFilled();
+
+    Rect2 FindFilled()
+    {
+        if (!Valid) return Rect2.Empty;
+        int c0 = Width, c1 = -1, r0 = Height, r1 = -1;
+        for (int r = 0; r < Height; r++)
+            for (int c = 0; c < Width; c++)
+                if (_levels[r * Width + c] >= _threshold)
+                {
+                    if (c < c0) c0 = c;
+                    if (c > c1) c1 = c;
+                    if (r < r0) r0 = r;
+                    r1 = r;
+                }
+        return c1 < 0 ? Rect2.Empty : new(Origin.X + c0 * CellMm, Origin.Y + r0 * CellMm, Origin.X + (c1 + 1) * CellMm, Origin.Y + (r1 + 1) * CellMm);
+    }
+}
+
+/// <summary>Zigzag line fill of closed polygons, even-odd rule (holes work), or of a <see cref="FillMask"/>.</summary>
 public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, LaserSettings Laser, double LinesPerCm)
     : Block(Laser)
 {
+    /// <summary>Fill these cells instead of <see cref="Polygons"/> (depth slices).</summary>
+    public FillMask? Mask { get; init; }
+
+    /// <summary>
+    /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
+    /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
+    /// </summary>
+    public double AngleStepDeg { get; init; }
+
+    /// <summary>The block as run on pass <paramref name="pass"/> (1-based): turned by <see cref="AngleStepDeg"/> per earlier pass.</summary>
+    public FillBlock ForPass(int pass) => AngleStepDeg == 0 || pass <= 1 ? this : this with { AngleDeg = AngleDeg + (pass - 1) * AngleStepDeg, AngleStepDeg = 0 };
+
     /// <summary>
     /// Densest fill: 0.001 mm between lines, the finest the G-code's coordinates can express. The
     /// stock software stops at 0.002 mm; finer works the same way, it just puts in more heat and time.
@@ -120,6 +212,25 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// burned part of each line is unchanged.
     /// </summary>
     public double OverscanMm { get; init; }
+}
+
+/// <summary>
+/// Offset fill: closed loops (outlines stepped inward), burned in this order in one block with
+/// the laser off between them.
+/// </summary>
+public sealed record LoopsBlock(IReadOnlyList<IReadOnlyList<Vec2>> Loops, LaserSettings Laser, double SpacingMm) : Block(Laser)
+{
+    /// <summary>Total length of the loops, mm.</summary>
+    public double Length
+    {
+        get
+        {
+            double l = 0;
+            foreach (var p in Loops)
+                for (int i = 0; i < p.Count; i++) l += p[i].Dist(p[(i + 1) % p.Count]);
+            return l;
+        }
+    }
 }
 
 /// <summary>A 1-bit image, row-major, <c>true</c> = burn. Row 0 is at the smallest Y.</summary>
@@ -175,6 +286,9 @@ public sealed class Job
     /// <summary>Longest fill overscan we accept (mm).</summary>
     public const double MaxOverscanMm = 50;
 
+    /// <summary>Furthest the focus may be moved either way for a block (mm).</summary>
+    public const double MaxFocusOffsetMm = 10;
+
     public MachineProfile Machine { get; }
     public IReadOnlyList<Block> Blocks { get; }
     public PassMode PassMode { get; init; } = new PassMode.PerBlock();
@@ -204,6 +318,8 @@ public sealed class Job
             var block = Blocks[i];
             block.Laser.Validate(Machine);
             var ctx = $" (item {i + 1})";
+            if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > MaxFocusOffsetMm + 1e-9)
+                throw new JobException($"The focus can move at most {MaxFocusOffsetMm:0} mm either way (asked for {block.FocusOffsetMm:0.##} mm).");
             switch (block)
             {
                 case VectorBlock b:
@@ -215,12 +331,23 @@ public sealed class Job
                     break;
                 case FillBlock b:
                     JobException.CheckRange("line density", b.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
-                    if (!double.IsFinite(b.AngleDeg)) throw new JobException("The fill angle is not a valid number.");
+                    if (!double.IsFinite(b.AngleDeg) || !double.IsFinite(b.AngleStepDeg)) throw new JobException("The fill angle is not a valid number.");
                     JobException.CheckRange("overscan", b.OverscanMm, 0, MaxOverscanMm, "mm");
                     foreach (var p in b.Polygons.SelectMany(x => x))
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
                         CheckPoint(p, ctx);
+                    }
+                    if (b.Mask is { } mask)
+                    {
+                        if (!mask.Valid || !(mask.CellMm > 0) || !mask.Origin.IsFinite)
+                            throw new JobException("A depth slice's cells don't match its size.");
+                        var mb = mask.FilledBounds();
+                        if (!mb.IsEmpty)
+                        {
+                            CheckPoint(mb.TopLeft, ctx);
+                            CheckPoint(mb.BottomRight, ctx);
+                        }
                     }
                     var lines = FillLines(b);
                     if (b.OverscanMm > 0)
@@ -231,6 +358,14 @@ public sealed class Job
                             CheckPoint(runOut, $" (fill overscan, item {i + 1})");
                         }
                     anyMotion |= lines.Count > 0;
+                    break;
+                case LoopsBlock b:
+                    foreach (var p in b.Loops.SelectMany(x => x))
+                    {
+                        if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
+                        CheckPoint(p, ctx);
+                    }
+                    anyMotion |= b.Loops.Any(l => l.Count >= 2);
                     break;
                 case DotBlock b:
                     JobException.CheckRange("resolution", b.Dpi, 10, 2540, "dpi");
@@ -270,13 +405,32 @@ public sealed class Job
         Validate();
         var tag = Machine.GcodeTag;
         var lines = Header();
+        double focus = 0; // how far the head is lowered now (mm)
+        void Focus(Block b)
+        {
+            if (Math.Abs(b.FocusOffsetMm - focus) < 1e-6) return;
+            lines.AddRange(ZMove(-(b.FocusOffsetMm - focus)));
+            lines.AddRange(["# MUST", ""]);
+            focus = b.FocusOffsetMm;
+        }
         switch (PassMode)
         {
             case PassMode.PerBlock:
                 foreach (var b in Blocks)
                 {
-                    lines.AddRange(RenderBlock(b, tag, b.Laser.Passes));
-                    lines.Add("");
+                    Focus(b);
+                    if (b is FillBlock { AngleStepDeg: not 0 } f && f.Laser.Passes > 1)
+                        // Each pass turned a little further: written out, the device loop repeats one pattern.
+                        for (int p = 1; p <= f.Laser.Passes; p++)
+                        {
+                            lines.AddRange(RenderBlock(f.ForPass(p), tag, 1));
+                            lines.Add("");
+                        }
+                    else
+                    {
+                        lines.AddRange(RenderBlock(b, tag, b.Laser.Passes));
+                        lines.Add("");
+                    }
                 }
                 break;
             case PassMode.Rounds r:
@@ -291,11 +445,18 @@ public sealed class Job
                     }
                     foreach (var b in Blocks.Where(b => b.Laser.Passes >= round))
                     {
-                        lines.AddRange(RenderBlock(b, tag, 1, round));
+                        Focus(b);
+                        lines.AddRange(RenderBlock(b is FillBlock f ? f.ForPass(round) : b, tag, 1, round));
                         lines.Add("");
                     }
                 }
                 break;
+        }
+        if (Math.Abs(focus) > 1e-6)
+        {
+            // Back to the focus the job started at.
+            lines.AddRange(ZMove(focus));
+            lines.AddRange(["# MUST", ""]);
         }
         lines.AddRange(Tail(tag));
         return string.Join("\n", lines);
@@ -384,6 +545,7 @@ public sealed class Job
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
             FillBlock f => FillLines(f).Sum(s =>
                 (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed),
+            LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
             DotBlock d => d.Bitmap.Bits.Count(v => v) *
                 (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed)),
             _ => 0,
@@ -433,6 +595,7 @@ public sealed class Job
         VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes, round),
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
+        LoopsBlock b => RenderLoops(b, tag, passes),
         DotBlock b => RenderDots(b, tag, passes),
         _ => throw new ArgumentException("unknown block type", nameof(block)),
     };
@@ -537,12 +700,18 @@ public sealed class Job
         return a >= 180 ? 0 : a;
     }
 
-    /// <summary>Every burn segment of a fill, in emission order.</summary>
-    public static List<FillSegment> FillLines(FillBlock b)
+    /// <summary>Lines already worked out, per block instance (blocks are immutable; <c>with</c> makes a new one).</summary>
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FillBlock, List<FillSegment>> LineCache = new();
+
+    /// <summary>Every burn segment of a fill, in emission order. The list is shared: don't change it.</summary>
+    public static List<FillSegment> FillLines(FillBlock b) => LineCache.GetValue(b, MakeFillLines);
+
+    static List<FillSegment> MakeFillLines(FillBlock b)
     {
         double step = 10 / b.LinesPerCm;
         var o = new List<FillSegment>();
         if (!(step > 0) || !double.IsFinite(step)) return o;
+        if (b.Mask is { } mask) return MaskLines(mask, step, FoldAngle(b.AngleDeg));
         double angle = FoldAngle(b.AngleDeg);
         if (angle == 0)
         {
@@ -559,6 +728,95 @@ public sealed class Job
         foreach (var (y, a, c) in Scan(turned, step))
             o.Add(new(y, a, c, Back(a, y), Back(c, y)));
         return o;
+    }
+
+    /// <summary>
+    /// Zigzag lines across a cell mask at <paramref name="angle"/> degrees, <paramref name="step"/> mm
+    /// apart: each line walks the cells it crosses and burns exactly over the filled ones.
+    /// </summary>
+    static List<FillSegment> MaskLines(FillMask m, double step, double angle)
+    {
+        var o = new List<FillSegment>();
+        var box = m.FilledBounds();
+        if (box.IsEmpty) return o;
+        double rad = angle * Math.PI / 180, cos = Math.Cos(rad), sin = Math.Sin(rad);
+        // The scan frame: lines run along x' and step along y'.
+        Vec2[] corners = [box.TopLeft, new(box.MaxX, box.MinY), box.BottomRight, new(box.MinX, box.MaxY)];
+        double y0 = corners.Min(v => -v.X * sin + v.Y * cos), y1 = corners.Max(v => -v.X * sin + v.Y * cos);
+        double x0 = corners.Min(v => v.X * cos + v.Y * sin) - 1, x1 = corners.Max(v => v.X * cos + v.Y * sin) + 1;
+        Vec2 Back(double x, double y) => new(x * cos - y * sin, x * sin + y * cos);
+        var dir = new Vec2(cos, sin);
+        long n = (long)Math.Floor((y1 - y0) / step + 1e-9);
+        var spans = new List<(double, double)>();
+        bool forward = true;
+        for (long i = 0; i <= n; i++)
+        {
+            // Half a line in, so no line grazes a cell edge exactly.
+            double y = y0 + (i + 0.5) * step;
+            if (y > y1) break;
+            spans.Clear();
+            MaskSpans(m, Back(x0, y), dir, 0, x1 - x0, spans);
+            if (spans.Count == 0) continue;
+            if (forward)
+                foreach (var (a, c) in spans) o.Add(new(y, x0 + a, x0 + c, Back(x0 + a, y), Back(x0 + c, y)));
+            else
+                for (int k = spans.Count - 1; k >= 0; k--)
+                {
+                    var (a, c) = spans[k];
+                    o.Add(new(y, x0 + c, x0 + a, Back(x0 + c, y), Back(x0 + a, y)));
+                }
+            forward = !forward;
+        }
+        return o;
+    }
+
+    /// <summary>
+    /// Stretches (t from, t to) of the line <paramref name="p0"/> + t·<paramref name="d"/>, t in
+    /// [<paramref name="t0"/>, <paramref name="t1"/>], that lie over filled cells: the cells are
+    /// walked in the order the line crosses them (Amanatides–Woo).
+    /// </summary>
+    static void MaskSpans(FillMask m, Vec2 p0, Vec2 d, double t0, double t1, List<(double, double)> spans)
+    {
+        var b = m.Bounds;
+        double lo = t0, hi = t1;
+        bool Slab(double p, double dv, double min, double max)
+        {
+            if (Math.Abs(dv) < 1e-12) return p >= min && p < max;
+            double ta = (min - p) / dv, tb = (max - p) / dv;
+            lo = Math.Max(lo, Math.Min(ta, tb));
+            hi = Math.Min(hi, Math.Max(ta, tb));
+            return true;
+        }
+        if (!Slab(p0.X, d.X, b.MinX, b.MaxX) || !Slab(p0.Y, d.Y, b.MinY, b.MaxY) || hi - lo <= 1e-9) return;
+        double c = m.CellMm;
+        double mid = lo + 1e-9;
+        var s = p0 + d * mid;
+        int i = Math.Clamp((int)Math.Floor((s.X - m.Origin.X) / c), 0, m.Width - 1);
+        int j = Math.Clamp((int)Math.Floor((s.Y - m.Origin.Y) / c), 0, m.Height - 1);
+        int stepX = d.X > 0 ? 1 : -1, stepY = d.Y > 0 ? 1 : -1;
+        double tDeltaX = Math.Abs(d.X) < 1e-12 ? double.PositiveInfinity : c / Math.Abs(d.X);
+        double tDeltaY = Math.Abs(d.Y) < 1e-12 ? double.PositiveInfinity : c / Math.Abs(d.Y);
+        double tMaxX = Math.Abs(d.X) < 1e-12 ? double.PositiveInfinity : (m.Origin.X + (i + (stepX > 0 ? 1 : 0)) * c - p0.X) / d.X;
+        double tMaxY = Math.Abs(d.Y) < 1e-12 ? double.PositiveInfinity : (m.Origin.Y + (j + (stepY > 0 ? 1 : 0)) * c - p0.Y) / d.Y;
+        double t = lo, start = 0;
+        bool inside = false;
+        while (t < hi)
+        {
+            bool on = m[j * m.Width + i];
+            if (on && !inside) { inside = true; start = t; }
+            else if (!on && inside)
+            {
+                inside = false;
+                if (t - start > 1e-6) spans.Add((start, t));
+            }
+            double next = Math.Min(Math.Min(tMaxX, tMaxY), hi);
+            t = next;
+            if (t >= hi) break;
+            if (tMaxX < tMaxY) { i += stepX; tMaxX += tDeltaX; }
+            else { j += stepY; tMaxY += tDeltaY; }
+            if (i < 0 || i >= m.Width || j < 0 || j >= m.Height) break;
+        }
+        if (inside && Math.Min(t, hi) - start > 1e-6) spans.Add((start, Math.Min(t, hi)));
     }
 
     /// <summary>Zigzag scan lines (height, from, to) along X, <paramref name="step"/> mm apart.</summary>
@@ -659,6 +917,35 @@ public sealed class Job
                     (lastX, lastY) = (Fixed3(runOut.X), Fixed3(runOut.Y));
                     body.Add($"G1X{lastX}Y{lastY}S0");
                 }
+            }
+        }
+        var v = BitmapHead(tag, l, "M523P40");
+        v.AddRange(PassLoop(passes, body));
+        v.AddRange(BitmapTail(tag));
+        return v;
+    }
+
+    /// <summary>Offset-fill loops: one engraving block, each loop traced closed, the laser off between loops.</summary>
+    static List<string> RenderLoops(LoopsBlock b, string tag, int passes)
+    {
+        var loops = b.Loops.Where(l => l.Count >= 2).ToList();
+        if (loops.Count == 0) return [];
+        var l = b.Laser;
+        long s = l.SValue;
+        var body = new List<string>
+        {
+            BitmapCfg(l.Power / 100, b.SpacingMm > 0 ? 1 / b.SpacingMm : 10, 0, s, "grayscale"), "", "", $"G1F{l.FValue}S0",
+        };
+        bool first = true;
+        foreach (var loop in loops)
+        {
+            string xa = Fixed3(loop[0].X), ya = Fixed3(loop[0].Y);
+            body.Add(first ? $"G0X{xa}Y{ya}" : $"G1X{xa}Y{ya}S0");
+            first = false;
+            for (int i = 1; i <= loop.Count; i++)
+            {
+                var p = loop[i % loop.Count];
+                body.Add($"G1X{Fixed3(p.X)}Y{Fixed3(p.Y)}S{s}");
             }
         }
         var v = BitmapHead(tag, l, "M523P40");

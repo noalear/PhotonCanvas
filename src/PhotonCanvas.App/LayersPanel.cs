@@ -326,6 +326,7 @@ public sealed class LayersPanel : UserControl
     static string Label(Shape s) => s switch
     {
         TextShape t => $"Text “{Trim(t.Text.Replace('\n', ' '), 28)}”",
+        CodeShape c => $"{CodeShape.KindName(c.Spec.Kind)} “{Trim(c.Spec.Content.Replace('\n', ' '), 24)}”",
         ImageShape => string.IsNullOrWhiteSpace(s.Name) ? "Picture" : Trim(s.Name, 34),
         _ => string.IsNullOrWhiteSpace(s.Name) ? "Shape" : Trim(s.Name, 34),
     };

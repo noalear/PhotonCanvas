@@ -61,7 +61,18 @@ public sealed class PropertiesPanel : UserControl
     readonly NumericUpDown _letter = Number(-50, 200, 0.1m, "0.##"), _lineSp = Number(0.5m, 5, 0.1m, "0.##");
     readonly ComboBox _align = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Left", "Centre", "Right" } };
     readonly NumericUpDown _bend = Number(-360, 360, 5, "0.#");
+    readonly TextBlock _fieldsHint = Hint();
     IReadOnlyList<string> _fonts = [];
+
+    // code
+    readonly Border _codeCard;
+    readonly TextBlock _codeInfo = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+
+    /// <summary>The user asked for the serial number and spreadsheet settings.</summary>
+    public event Action? VariablesRequested;
+
+    /// <summary>The user asked to edit the selected code.</summary>
+    public event Action<Guid>? CodeEditRequested;
 
     /// <summary>Put the cursor in the text box (after creating or double-clicking text).</summary>
     public void FocusText(bool selectAll = false)
@@ -135,6 +146,8 @@ public sealed class PropertiesPanel : UserControl
         };
         _textCard = Card("Text",
             _textBox,
+            _fieldsHint,
+            FieldMenu.Create(_textBox, () => _doc.State.Vars, () => VariablesRequested?.Invoke()),
             Field("Font", _font),
             Row(Field2("Size mm", _textSize), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _bold, _italic } }),
             Field("Letter spacing", _letter, tip: "Extra space between letters, mm (negative tightens)."),
@@ -152,7 +165,13 @@ public sealed class PropertiesPanel : UserControl
         _align.SelectionChanged += (_, _) => { if (_align.SelectedIndex >= 0) EditText(t => (t.Text, t.Style with { Align = (TextAlign)_align.SelectedIndex }), null); };
         _bend.ValueChanged += (_, _) => { if (_bend.Value is { } v) EditText(t => (t.Text, t.Style with { BendDeg = (double)v }), "bend"); };
 
-        Content = new ScrollViewer { Content = new StackPanel { Children = { _nothing, _selCard, _textCard, _picCard } } };
+        var editCode = Button("Edit code…", "IcCode", "Change what the code says, its kind, size or margin (or double-click it).");
+        editCode.Click += (_, _) => { if (SelectedCode() is { } c) CodeEditRequested?.Invoke(c.Id); };
+        var vars = Button("Variables…", "IcVariables", "Serial number and spreadsheet that fill in fields.");
+        vars.Click += (_, _) => VariablesRequested?.Invoke();
+        _codeCard = Card("Code", _codeInfo, Row(editCode, vars));
+
+        Content = new ScrollViewer { Content = new StackPanel { Children = { _nothing, _selCard, _textCard, _codeCard, _picCard } } };
         _doc.Changed += _ => Refresh();
         Refresh();
     }
@@ -198,6 +217,9 @@ public sealed class PropertiesPanel : UserControl
         _doc.Commit("Edit text", Ops.Replace(_doc.State, t.Edit(text, style)), coalesceKey: coalesce is null ? null : $"{coalesce}:{t.Id}");
     }
 
+    CodeShape? SelectedCode() =>
+        _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is CodeShape c ? c : null;
+
     ImageShape? SelectedPicture() =>
         _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ImageShape im ? im : null;
 
@@ -216,9 +238,17 @@ public sealed class PropertiesPanel : UserControl
         _picCard.IsVisible = pic is not null;
         var txt = SelectedText();
         _textCard.IsVisible = txt is not null;
+        var code = SelectedCode();
+        _codeCard.IsVisible = code is not null;
+        if (code is not null)
+            _codeInfo.Text = $"{CodeShape.KindName(code.Spec.Kind)}: “{code.Spec.Content}”" +
+                             (code.Shown is { } cs ? $"\nNext run marks “{cs}”." : "") +
+                             (code.Error is { } err ? $"\n⚠ {err}" : "");
         if (txt is not null)
         {
             if (_textBox.Text != txt.Text) _textBox.Text = txt.Text;
+            _fieldsHint.Text = txt.Shown is { } shown ? $"Next run marks: {shown.Replace('\n', ' ')}" : "";
+            _fieldsHint.IsVisible = txt.Shown is not null;
             _font.SelectedItem = _fonts.FirstOrDefault(f => f.Equals(txt.Style.FontFamily, StringComparison.OrdinalIgnoreCase));
             _font.PlaceholderText = txt.Style.FontFamily;
             _textSize.Value = (decimal)txt.Style.SizeMm;

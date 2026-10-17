@@ -28,10 +28,13 @@ public sealed record TextStyle(
 /// </summary>
 public sealed class TextShape : PathShape
 {
+    /// <summary>The words as typed, fields such as <c>{serial}</c> included.</summary>
     public required string Text { get; init; }
     public required TextStyle Style { get; init; }
+    /// <summary>The words with their fields filled in (what is drawn and marked); null when there are no fields.</summary>
+    public string? Shown { get; init; }
 
-    public static TextShape Create(string text, TextStyle style, Guid layerId, Affine transform, Guid? id = null, string? name = null, Guid? groupId = null) => new()
+    public static TextShape Create(string text, TextStyle style, Guid layerId, Affine transform, Guid? id = null, string? name = null, Guid? groupId = null, string? shown = null) => new()
     {
         Id = id ?? Guid.NewGuid(),
         Name = name ?? FirstLine(text),
@@ -40,12 +43,16 @@ public sealed class TextShape : PathShape
         GroupId = groupId,
         Text = text,
         Style = style,
-        Geometry = TextLayout.Build(text, style),
+        Shown = shown,
+        Geometry = TextLayout.Build(shown ?? text, style),
     };
 
-    /// <summary>The same text object with new words and/or style.</summary>
+    /// <summary>The same text object with new words and/or style (fields are filled in again when the edit is committed).</summary>
     public TextShape Edit(string text, TextStyle style) =>
-        Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId);
+        Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId, text == Text ? Shown : null);
+
+    /// <summary>The same text showing other values for its fields.</summary>
+    public TextShape WithShown(string? shown) => Create(Text, Style, LayerId, Transform, Id, Name, GroupId, shown);
 
     static string FirstLine(string t)
     {

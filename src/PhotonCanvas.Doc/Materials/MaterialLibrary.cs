@@ -34,6 +34,10 @@ public sealed record ProcessSettings
     public bool Wobble { get; init; }
     public double WobbleDiameterMm { get; init; } = 0.05;
     public double WobbleSpacingMm { get; init; } = 0.015;
+    public FillStyle FillStyle { get; init; }
+    public double AngleStepDeg { get; init; }
+    public double FocusOffsetMm { get; init; }
+    public DepthSlices Slices { get; init; } = new();
 
     public static ProcessSettings From(Layer l) => new()
     {
@@ -41,6 +45,7 @@ public sealed record ProcessSettings
         ImageMode = l.ImageMode, GrayMinPower = l.GrayMinPower, KerfMm = l.KerfMm, TabCount = l.TabCount, TabWidthMm = l.TabWidthMm,
         OvercutMm = l.OvercutMm, LeadInMm = l.LeadInMm, FillAngleDeg = l.FillAngleDeg, Crosshatch = l.Crosshatch, OverscanMm = l.OverscanMm,
         StepDownMm = l.StepDownMm, StepDownFirstMm = l.StepDownFirstMm, Wobble = l.Wobble, WobbleDiameterMm = l.WobbleDiameterMm, WobbleSpacingMm = l.WobbleSpacingMm,
+        FillStyle = l.FillStyle, AngleStepDeg = l.AngleStepDeg, FocusOffsetMm = l.FocusOffsetMm, Slices = l.Slices,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -49,6 +54,7 @@ public sealed record ProcessSettings
         ImageMode = ImageMode, GrayMinPower = GrayMinPower, KerfMm = KerfMm, TabCount = TabCount, TabWidthMm = TabWidthMm,
         OvercutMm = OvercutMm, LeadInMm = LeadInMm, FillAngleDeg = FillAngleDeg, Crosshatch = Crosshatch, OverscanMm = OverscanMm,
         StepDownMm = StepDownMm, StepDownFirstMm = StepDownFirstMm, Wobble = Wobble, WobbleDiameterMm = WobbleDiameterMm, WobbleSpacingMm = WobbleSpacingMm,
+        FillStyle = FillStyle, AngleStepDeg = AngleStepDeg, FocusOffsetMm = FocusOffsetMm, Slices = Slices ?? new(),
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>
@@ -76,13 +82,31 @@ public sealed record ProcessSettings
         StepDownFirstMm = Math.Clamp(StepDownFirstMm, 0, StepDown.MaxPerPassMm),
         WobbleDiameterMm = Math.Clamp(WobbleDiameterMm, PhotonCanvas.Core.Wobble.MinDiameterMm, PhotonCanvas.Core.Wobble.MaxDiameterMm),
         WobbleSpacingMm = Math.Clamp(WobbleSpacingMm, PhotonCanvas.Core.Wobble.MinSpacingMm, PhotonCanvas.Core.Wobble.MaxSpacingMm),
+        AngleStepDeg = double.IsFinite(AngleStepDeg) ? Math.Clamp(AngleStepDeg, -180, 180) : 0,
+        FocusOffsetMm = double.IsFinite(FocusOffsetMm) ? Math.Clamp(FocusOffsetMm, -Job.MaxFocusOffsetMm, Job.MaxFocusOffsetMm) : 0,
+        Slices = (Slices ?? new()) is var sl ? sl with
+        {
+            Count = Math.Clamp(sl.Count, 2, DepthSlices.MaxCount),
+            DropMm = Math.Clamp(sl.DropMm, 0, StepDown.MaxPerPassMm),
+            DropEvery = Math.Clamp(sl.DropEvery, 1, DepthSlices.MaxCount),
+            CleanupEvery = Math.Clamp(sl.CleanupEvery, 0, DepthSlices.MaxCount),
+            CleanupLinesPerCm = Math.Clamp(sl.CleanupLinesPerCm, 1, FillBlock.MaxLinesPerCm),
+            CleanupLaser = sl.CleanupLaser with { Power = Math.Clamp(sl.CleanupLaser.Power, 0, 100), Speed = Math.Clamp(sl.CleanupLaser.Speed, m.MinSpeed, m.MaxSpeed), Passes = 1 },
+        } : new(),
     };
 
     /// <summary>One line for lists, e.g. "Cut · blue 70% · 40 mm/s ×8".</summary>
     public string Summary()
     {
         string light = Laser.Light == LightSource.Red ? $"MOPA {Laser.PulseWidthNs} ns {Laser.FrequencyKhz} kHz" : "diode";
-        string mode = Mode switch { LayerMode.Fill => $"engrave {LinesPerCm:0} l/cm", LayerMode.Image => $"picture {Dpi:0} dpi", LayerMode.Score => "score", _ => "cut" };
+        string mode = Mode switch
+        {
+            LayerMode.Fill => $"engrave {LinesPerCm:0} l/cm" + (FillStyle == FillStyle.Offset ? " offset" : ""),
+            LayerMode.Image when ImageMode == ImageEngraveMode.Slices => $"relief {Slices.Count} slices {LinesPerCm:0} l/cm",
+            LayerMode.Image => $"picture {Dpi:0} dpi",
+            LayerMode.Score => "score",
+            _ => "cut",
+        };
         return $"{mode} · {light} {Laser.Power:0.#}% · {Laser.Speed:0.#} mm/s" + (Laser.Passes > 1 ? $" ×{Laser.Passes}" : "");
     }
 }

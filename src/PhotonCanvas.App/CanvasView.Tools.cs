@@ -156,7 +156,7 @@ public sealed partial class CanvasView
     {
         if (_doc is null || _doc.Selection.Count != 1) return null;
         var s = _doc.State.FindShape(_doc.Selection.First());
-        if (s is not PathShape ps || s is TextShape) return null;
+        if (s is not PathShape ps || s is TextShape or CodeShape) return null;
         var layer = _doc.State.FindLayer(s.LayerId);
         return layer is { Visible: true, Locked: false } ? ps : null;
     }

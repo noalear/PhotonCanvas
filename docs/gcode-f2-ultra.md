@@ -137,6 +137,15 @@ G25X147.366                   rows alternate direction (zigzag)
 - **Pitch** is 25.4 / dpi in both X and Y. Coordinates are rounded to 3 decimals, which is why steps alternate between 0.141 and 0.142 mm. `blockConfig.density` is dots per mm (180 / 25.4 = 7.0866).
 - **Size:** a 76×57 mm image at 180 dpi gives 404 rows and 116k dot lines. The text file is 1.3 MB.
 
+## Our own additions (not yet run on the machine)
+
+These use only the commands above, put together in ways the captures don't show yet:
+
+- **Focus offset per layer** (and depth slices following the floor down): the same relative Z move as step-down (`G102` / `G91` / `G0Z<mm>F600` / `G90` / `G103` / `G0F180000`, then `# MUST`), written between blocks whenever the next block's offset differs. + offset = head lower (`G0Z-…`). At the end of the job the head goes back by the total.
+- **Turning per pass**: a fill whose lines turn on each pass can't use the `G104`/`G105` loop (it repeats one pattern), so its passes are written out one after another, each at its own angle.
+- **Depth slices**: each slice is an ordinary fill block (`BITMAP HEAD`, `bitmapMode` grayscale, `S` on the burned stretches), with the lines worked out from a grid of cells instead of outlines.
+- **Offset fill**: the loops of one shape go in one fill block, each loop traced closed with `S` on and joined by `S0` moves; `density` is 1 / loop spacing.
+
 ## Still to capture
 
 - Grayscale bitmap mode (variable S per dot or per segment?) and a different dot duration, to confirm the T units.

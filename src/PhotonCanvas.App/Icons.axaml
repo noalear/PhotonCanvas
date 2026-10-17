@@ -61,6 +61,10 @@
   <!-- Artist's palette (colour test) and eyedropper (measure colours) -->
   <StreamGeometry x:Key="IcPalette">F1 M12 2C6.5 2 2 6.1 2 11.2c0 4.4 3.4 8.3 7.6 8.3 1.3 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8h2.2c3.4 0 6.4-2.6 6.4-6C21 5.4 17 2 12 2zM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM9 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM15 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM17.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z</StreamGeometry>
   <StreamGeometry x:Key="IcEyedropper">F1 M19.4 3.2a2.6 2.6 0 0 0-3.7 0l-2.6 2.6-1.4-1.4-1.4 1.4 1.4 1.4-7.3 7.3a2 2 0 0 0-.6 1.4V19l-1.3 1.3 1.4 1.4L5.2 20h3a2 2 0 0 0 1.4-.6l7.3-7.3 1.4 1.4 1.4-1.4-1.4-1.4 2.6-2.6a2.6 2.6 0 0 0 0-3.7zM8.2 18H6v-2.2l7.1-7.1 2.2 2.2z</StreamGeometry>
+  <!-- QR code -->
+  <StreamGeometry x:Key="IcCode">M3 3h8v8H3z M5 5v4h4V5z M6 6h2v2H6z M13 3h8v8h-8z M15 5v4h4V5z M16 6h2v2h-2z M3 13h8v8H3z M5 15v4h4v-4z M6 16h2v2H6z M13 13h3v3h-3z M18 13h3v3h-3z M16 16h2v2h-2z M13 18h3v3h-3z M18 18h3v3h-3z</StreamGeometry>
+  <!-- {x}: fields that change from run to run -->
+  <StreamGeometry x:Key="IcVariables">M8 3H7a3 3 0 0 0-3 3v3a2 2 0 0 1-2 2v2a2 2 0 0 1 2 2v3a3 3 0 0 0 3 3h1v-2H7a1 1 0 0 1-1-1v-3.5A2.5 2.5 0 0 0 4.6 12 2.5 2.5 0 0 0 6 9.5V6a1 1 0 0 1 1-1h1z M16 3h1a3 3 0 0 1 3 3v3a2 2 0 0 0 2 2v2a2 2 0 0 0-2 2v3a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1v-3.5a2.5 2.5 0 0 1 1.4-2.5A2.5 2.5 0 0 1 18 9.5V6a1 1 0 0 0-1-1h-1z M9 8h2l1 2.2L13 8h2l-2 4 2 4h-2l-1-2.2L11 16H9l2-4z</StreamGeometry>
   <!-- Prism splitting light (diffraction) -->
   <StreamGeometry x:Key="IcPrism">M2.5 19.5 9 5l6.5 14.5zM5.6 17.5h6.8L9 9.9zM15.3 9.4l6-2.6.5 1.1-6 2.6zM16 12.1l6.4-.4.1 1.2-6.4.4zM16.6 14.6l5.7 2.6-.5 1.1-5.7-2.6z</StreamGeometry>
 </ResourceDictionary>
