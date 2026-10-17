@@ -450,3 +450,103 @@ public class GratingTests
         finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
     }
 }
+
+public class ColourPictureTests
+{
+    static ColourSwatch Swatch(int col, byte r, byte g, byte b, double power) =>
+        new ColourSwatch { Row = 0, Col = col, Settings = new PhotonCanvas.Doc.Materials.ProcessSettings { Mode = LayerMode.Fill, Laser = LaserSettings.Red(power, 800, 6, 500), LinesPerCm = 5000 } }
+            with { L = ColourScience.SrgbToLab(r, g, b).L, A = ColourScience.SrgbToLab(r, g, b).A, B = ColourScience.SrgbToLab(r, g, b).B };
+
+    static ColourPalette Palette() => new()
+    {
+        Swatches = [Swatch(0, 200, 160, 60, 40), Swatch(1, 40, 70, 170, 25)],
+        BareL = 70, BareA = 0, BareB = 0,
+    };
+
+    static RasterImage Picture(params (byte R, byte G, byte B, byte A)[] columns)
+    {
+        // Columns of solid colour, 20 px wide each, 20 px tall.
+        int w = 20 * columns.Length, h = 20;
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var (r, g, b, a) = columns[x / 20];
+                int i = (y * w + x) * 4;
+                px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = a;
+            }
+        return new RasterImage(w, h, px);
+    }
+
+    [Fact]
+    public void ExactPaletteColoursMapStraightOntoTheirSettings()
+    {
+        var o = new ColourPictureOptions { PixelMm = 1, FitLightness = false, Dither = false };
+        var inks = ColourPicture.Inks(Palette(), o);
+        Assert.Equal(3, inks.Count);
+        Assert.True(inks[0].IsBare);
+        var bare = ColourScience.LabToSrgb(new Lab(70, 0, 0));
+        var map = ColourPicture.Map(Picture((200, 160, 60, 255), (40, 70, 170, 255), (bare.R, bare.G, bare.B, 255), (0, 0, 0, 0)), new Vec2(8, 2), Palette(), o);
+        Assert.Equal(8, map.Cols);
+        int Cell(int c) => map.Cells[c];
+        Assert.Equal(1, Cell(0)); // gold
+        Assert.Equal(2, Cell(3)); // blue
+        Assert.Equal(0, Cell(5)); // bare metal
+        Assert.Equal(-1, Cell(7)); // transparent: outside the picture
+    }
+
+    [Fact]
+    public void ShadesInBetweenAreMixedWithDots()
+    {
+        // A colour halfway between the gold and the blue: dithering uses both.
+        var o = new ColourPictureOptions { PixelMm = 0.25, FitLightness = false, Dither = true, UseBare = false };
+        var mid = ColourScience.LabToSrgb(new Lab(
+            (ColourScience.SrgbToLab(200, 160, 60).L + ColourScience.SrgbToLab(40, 70, 170).L) / 2,
+            (ColourScience.SrgbToLab(200, 160, 60).A + ColourScience.SrgbToLab(40, 70, 170).A) / 2,
+            (ColourScience.SrgbToLab(200, 160, 60).B + ColourScience.SrgbToLab(40, 70, 170).B) / 2));
+        var map = ColourPicture.Map(Picture((mid.R, mid.G, mid.B, 255)), new Vec2(10, 10), Palette(), o);
+        double gold = map.Counts[0], blue = map.Counts[1];
+        Assert.InRange(gold / (gold + blue), 0.3, 0.7);
+    }
+
+    [Fact]
+    public void OneLayerPerColourUsedLeastEnergyFirst()
+    {
+        var img = Picture((200, 160, 60, 255), (40, 70, 170, 255));
+        var src = ImageSource.FromEncoded(img.ToPng());
+        var s = DocState.New();
+        var picLayer = Layer.Default(1, LayerMode.Image);
+        s = Ops.AddLayer(s, picLayer);
+        var pic = new ImageShape { Name = "pic", LayerId = picLayer.Id, Source = src, SizeMm = new Vec2(20, 10), Transform = Affine.Translate(30, 30) };
+        s = Ops.AddShapes(s, [pic]);
+        var (after, added) = ColourPicture.Add(s, pic, Palette(), new ColourPictureOptions { PixelMm = 1, Dither = false, FitLightness = false });
+        Assert.Equal(2, added.Count);
+        var layers = after.Layers.Where(l => l.Name.StartsWith(ColourPicture.LayerPrefix)).ToList();
+        Assert.Equal([25.0, 40.0], layers.Select(l => l.Laser.Power)); // 25% (blue) has less energy: first
+        Assert.All(layers, l => { Assert.Equal(LightSource.Red, l.Laser.Light); Assert.Equal(5000, l.LinesPerCm); });
+        var job = JobBuilder.Build(Ops.UpdateLayers(after, new HashSet<Guid> { picLayer.Id }, l => l with { Output = false }), new JobOptions());
+        Assert.Equal(2, job.LayerTimes.Count);
+    }
+
+    [Fact]
+    public void BareMetalIsReadFromTheGapsBetweenSquares()
+    {
+        var o = new ColourTestOptions { AcrossSteps = 3, DownSteps = 2, CellMm = 6, GapMm = 3 };
+        var (s, _) = ColourTest.Add(DocState.New(), o);
+        var cells = ColourTest.Cells(s);
+        var mmToPx = Homography.Fit([.. new[] { new Vec2(0, 0), new(100, 0), new(100, 100), new(0, 100) }.Select(p => (p, new Vec2(p.X * 8, p.Y * 8)))])!.Value;
+        int w = 800, h = 600;
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var mm = new Vec2((x + 0.5) / 8, (y + 0.5) / 8);
+                bool inSquare = cells.Any(c => c.Bounds.Contains(mm));
+                int i = (y * w + x) * 4;
+                px[i] = (byte)(inSquare ? 40 : 150); px[i + 1] = (byte)(inSquare ? 40 : 152); px[i + 2] = (byte)(inSquare ? 160 : 158); px[i + 3] = 255;
+            }
+        var bare = ColourMeasure.MeasureBare(new RasterImage(w, h, px), mmToPx, cells);
+        Assert.NotNull(bare);
+        Assert.True(ColourScience.DeltaE2000(bare!.Value, ColourScience.SrgbToLab(150, 152, 158)) < 1);
+    }
+}

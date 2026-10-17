@@ -145,35 +145,7 @@ public static class Diffraction
         int layerIndex = s.Layers.Count;
         foreach (var b in map.Buckets.Where(b => b.Pixels > 0).OrderBy(b => b.PitchUm).ThenBy(b => b.AngleDeg))
         {
-            // Strips: runs of this bucket along each row, merged with identical runs in the rows below.
-            var rects = new List<(int C0, int C1, int R0, int R1)>();
-            var open = new Dictionary<(int, int), int>(); // (c0, c1) → index of the strip still growing
-            for (int r = 0; r < map.Rows; r++)
-            {
-                var next = new Dictionary<(int, int), int>();
-                for (int c = 0; c < map.Cols; c++)
-                {
-                    if (map.Cells[r * map.Cols + c] != b.Index) continue;
-                    int c0 = c;
-                    while (c + 1 < map.Cols && map.Cells[r * map.Cols + c + 1] == b.Index) c++;
-                    if (open.TryGetValue((c0, c), out int k) && rects[k].R1 == r)
-                    {
-                        rects[k] = rects[k] with { R1 = r + 1 };
-                        next[(c0, c)] = k;
-                    }
-                    else
-                    {
-                        rects.Add((c0, c, r, r + 1));
-                        next[(c0, c)] = rects.Count - 1;
-                    }
-                }
-                open = next;
-            }
-            var subpaths = rects.Select(q =>
-            {
-                double x0 = q.C0 * cw, x1 = (q.C1 + 1) * cw, y0 = q.R0 * ch, y1 = q.R1 * ch;
-                return PathGeometry.Rect(x0, y0, x1 - x0, y1 - y0).Transform(toWorld).Subpaths;
-            }).SelectMany(x => x).ToList();
+            var subpaths = PixelGrid.Shape(map.Cols, map.Rows, map.Cells, b.Index, cw, ch, toWorld);
             var layer = Layer.Default(layerIndex, LayerMode.Fill) with
             {
                 Name = $"{LayerPrefix}{b.AngleDeg:0.#}° · {b.PitchUm:0.00} µm",
@@ -204,7 +176,7 @@ public static class Diffraction
     }
 
     /// <summary>Average colour of a region of the picture (fractions 0–1), as Lab. Mostly transparent regions count as transparent.</summary>
-    static Lab Average(RasterImage img, double fx0, double fy0, double fx1, double fy1, out bool transparent)
+    internal static Lab Average(RasterImage img, double fx0, double fy0, double fx1, double fy1, out bool transparent)
     {
         int x0 = (int)Math.Floor(fx0 * img.Width), x1 = Math.Max(x0 + 1, (int)Math.Ceiling(fx1 * img.Width));
         int y0 = (int)Math.Floor(fy0 * img.Height), y1 = Math.Max(y0 + 1, (int)Math.Ceiling(fy1 * img.Height));
@@ -227,4 +199,45 @@ public static class Diffraction
         transparent = n == 0 || clear > n;
         return n == 0 ? new(100, 0, 0) : ColourScience.LinearRgbToLab(r / n, g / n, b / n);
     }
+}
+
+/// <summary>Pixel grids made into shapes: each value's pixels as strips (runs along rows, merged down).</summary>
+static class PixelGrid
+{
+    /// <summary>The pixels holding <paramref name="value"/>, as rectangles of whole pixels (columns c0–c1, rows r0 to r1−1).</summary>
+    public static List<(int C0, int C1, int R0, int R1)> Strips(int cols, int rows, int[] cells, int value)
+    {
+        var rects = new List<(int C0, int C1, int R0, int R1)>();
+        var open = new Dictionary<(int, int), int>(); // (c0, c1) → the strip still growing down
+        for (int r = 0; r < rows; r++)
+        {
+            var next = new Dictionary<(int, int), int>();
+            for (int c = 0; c < cols; c++)
+            {
+                if (cells[r * cols + c] != value) continue;
+                int c0 = c;
+                while (c + 1 < cols && cells[r * cols + c + 1] == value) c++;
+                if (open.TryGetValue((c0, c), out int k) && rects[k].R1 == r)
+                {
+                    rects[k] = rects[k] with { R1 = r + 1 };
+                    next[(c0, c)] = k;
+                }
+                else
+                {
+                    rects.Add((c0, c, r, r + 1));
+                    next[(c0, c)] = rects.Count - 1;
+                }
+            }
+            open = next;
+        }
+        return rects;
+    }
+
+    /// <summary>Those strips as closed outlines, pixel size <paramref name="cw"/> × <paramref name="ch"/> mm, placed by <paramref name="toWorld"/>.</summary>
+    public static List<Subpath> Shape(int cols, int rows, int[] cells, int value, double cw, double ch, Affine toWorld) =>
+        Strips(cols, rows, cells, value).SelectMany(q =>
+        {
+            double x0 = q.C0 * cw, x1 = (q.C1 + 1) * cw, y0 = q.R0 * ch, y1 = q.R1 * ch;
+            return PathGeometry.Rect(x0, y0, x1 - x0, y1 - y0).Transform(toWorld).Subpaths;
+        }).ToList();
 }

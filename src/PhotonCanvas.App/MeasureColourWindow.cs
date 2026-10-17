@@ -77,6 +77,7 @@ public sealed class MeasureColourWindow : Window
         // The block of squares this photo shows (rows/columns, inclusive).
         public (int R0, int C0, int R1, int C1) Section;
         public readonly Dictionary<(int, int), ColourSwatch> ByCell = [];
+        public Lab? Bare; // the metal between the squares
         // Gratings: the grid as this view saw it, straightened.
         public RasterImage? Frame;
         public Bitmap? FrameBitmap;
@@ -538,8 +539,12 @@ public sealed class MeasureColourWindow : Window
     {
         // The squares in this photo are (re)measured; ones measured from earlier photos stay.
         if (_s.Image is { } img && _s.MmToPx is { } h)
-            foreach (var s in ColourMeasure.Measure(img, h, _cells.Where(c => InSection(c.Row, c.Col)).ToList(), _s.Balance))
+        {
+            var inSection = _cells.Where(c => InSection(c.Row, c.Col)).ToList();
+            foreach (var s in ColourMeasure.Measure(img, h, inSection, _s.Balance))
                 _s.ByCell[(s.Row, s.Col)] = s;
+            _s.Bare = ColourMeasure.MeasureBare(img, h, inSection, _s.Balance) ?? _s.Bare;
+        }
         _measured = _s.ByCell.Values.OrderBy(s => s.Row).ThenBy(s => s.Col).ToList();
         if (_s.MmToPx is not null && _s.Frame is null) MakeFrame();
         // Outlines of the areas read, so a wrong click shows.
@@ -696,6 +701,9 @@ public sealed class MeasureColourWindow : Window
             FocusMm = _focus,
             Method = _machine is not null && _s.Method.Contains("camera") ? $"{_s.Method}, lights front {_front.Value:0}% / back {_back.Value:0}%" : _s.Method,
             Swatches = [.. _measured],
+            BareL = _s.Bare?.L,
+            BareA = _s.Bare?.A,
+            BareB = _s.Bare?.B,
         };
         _lib.Upsert(m with { Palettes = m.Palettes.Add(palette) });
         _lib.Save();

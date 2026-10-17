@@ -40,6 +40,13 @@ public sealed record ColourPalette
     public string Notes { get; init; } = "";
     public ImmutableList<ColourSwatch> Swatches { get; init; } = [];
     public string Machine { get; init; } = MachineProfile.F2Ultra.DeviceCode;
+    /// <summary>The bare metal between the squares (what unmarked parts of a picture look like), CIELAB; null if not measured.</summary>
+    public double? BareL { get; init; }
+    public double? BareA { get; init; }
+    public double? BareB { get; init; }
+
+    /// <summary>Bare metal's colour, or a plain light grey when it wasn't measured.</summary>
+    public Lab Bare => BareL is { } l ? new(l, BareA ?? 0, BareB ?? 0) : new(68, 0, 1);
 }
 
 /// <summary>Measuring a burned colour test from a picture, and choosing the colours worth using.</summary>
@@ -99,6 +106,36 @@ public static class ColourMeasure
             });
         }
         return result;
+    }
+
+    /// <summary>
+    /// The bare metal between the squares: read halfway between neighbouring squares in each
+    /// row, the middle of the gap. Null if there are no gaps to read (a single column) or the
+    /// picture doesn't cover them.
+    /// </summary>
+    public static Lab? MeasureBare(RasterImage img, Homography mmToPx, IReadOnlyList<ColourTestCell> cells, (double R, double G, double B)? balance = null)
+    {
+        var gains = balance ?? (1, 1, 1);
+        double r = 0, g = 0, b = 0;
+        int n = 0;
+        foreach (var cell in cells)
+        {
+            var right = cells.FirstOrDefault(c => c.Row == cell.Row && c.Col == cell.Col + 1);
+            if (right is null) continue;
+            double gap = right.Bounds.MinX - cell.Bounds.MaxX;
+            if (gap <= 0.2) continue;
+            var mid = new Vec2((cell.Bounds.MaxX + right.Bounds.MinX) / 2, cell.Bounds.Center.Y);
+            // A short strip down the middle of the gap, away from both squares' edges.
+            for (int k = -2; k <= 2; k++)
+            {
+                var px = mmToPx.Apply(mid + new Vec2(0, k * cell.Bounds.Height / 6));
+                var (lr, lg, lb, cnt) = MeanLinear(img, [px], radius: 1);
+                if (cnt == 0) continue;
+                r += lr; g += lg; b += lb;
+                n++;
+            }
+        }
+        return n == 0 ? null : ColourScience.LinearRgbToLab(r / n * gains.R, g / n * gains.G, b / n * gains.B);
     }
 
     /// <summary>
