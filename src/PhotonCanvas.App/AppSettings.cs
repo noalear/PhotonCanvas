@@ -15,6 +15,13 @@ public sealed record Preset(string Name, LayerMode Mode, LaserSettings Laser, do
 /// Per-user settings and presets in %APPDATA%\PhotonCanvas\app.json. Failures to read
 /// or write never stop the app; they just fall back to defaults.
 /// </summary>
+/// <summary>A named G-code snippet for the console.</summary>
+public sealed class Macro
+{
+    public string Name { get; set; } = "";
+    public string Gcode { get; set; } = "";
+}
+
 public sealed class AppSettings
 {
     public List<Preset> Presets { get; set; } = [];
@@ -78,6 +85,22 @@ public sealed class AppSettings
     public string? LibraryAuthor { get; set; }
     /// <summary>Old presets have been moved into the material library.</summary>
     public bool PresetsAdopted { get; set; }
+    /// <summary>Fonts starred in the font manager (shown first).</summary>
+    public List<string> FontFavourites { get; set; } = [];
+    /// <summary>Fonts hidden in the font manager (left out of the font list).</summary>
+    public List<string> FontHidden { get; set; } = [];
+    /// <summary>Keyboard shortcuts changed from their defaults: command id → keys ("" = none).</summary>
+    public Dictionary<string, string> Hotkeys { get; set; } = [];
+    /// <summary>"Flat", "Rotary" or "Conveyor".</summary>
+    public string WorkMode { get; set; } = "Flat";
+    /// <summary>Rotary: 0 RA2 rollers, 1 RA2 chuck, 2 RA3 rollers, 3 RA3 chuck.</summary>
+    public int RotaryAttachment { get; set; }
+    public double RotaryDiameterMm { get; set; } = 60;
+    /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
+    public double ConveyorUMultiple { get; set; } = 0.74592;
+    public double ConveyorAngle { get; set; }
+    /// <summary>G-code snippets saved in the console: name → G-code.</summary>
+    public List<Macro> Macros { get; set; } = [];
 
     static readonly JsonSerializerOptions Json = new()
     {

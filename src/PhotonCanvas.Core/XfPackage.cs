@@ -22,16 +22,20 @@ public static class XfPackage
         /// <summary>One entry per processed item (informational; shown on the machine).</summary>
         public JsonArray Params { get; init; } = [];
         public DateTimeOffset Created { get; init; } = DateTimeOffset.Now;
+        /// <summary>LASER_PLANE (bed), LASER_CYLINDER (rotary) or CONVEYOR_EXTENSION.</summary>
+        public string Mode { get; init; } = "LASER_PLANE";
+        /// <summary>The mechanical axis used ("U" with an attachment, else empty).</summary>
+        public string Axis { get; init; } = "";
     }
 
     public static byte[] Build(Parts parts)
     {
         var desc = new JsonObject
         {
-            ["mode"] = "LASER_PLANE",
+            ["mode"] = parts.Mode,
             ["light"] = parts.Light,
             ["create_time"] = parts.Created.ToString("yyyy/MM/dd HH:mm:ss"),
-            ["axis"] = "",
+            ["axis"] = parts.Axis,
             ["processingParams"] = parts.Params.DeepClone(),
             ["material"] = 1,
         };

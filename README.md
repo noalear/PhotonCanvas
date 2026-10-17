@@ -29,11 +29,14 @@ straight to the machine over your own network.
 - Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures; trace pictures into vectors; remove picture backgrounds (offline)
 - Depthmaps for relief engraving with [DepthCharge](#depthcharge), placed straight onto the design
 - Serial numbers, dates and spreadsheet (CSV) columns as `{fields}` in any text or code, moving on after each finished run; QR codes, Data Matrix and barcodes (Code 128, Code 39, EAN-13, UPC-A)
+- Rounded corners, trim, text on a path, copy along a path, warp (taper, arch, bulge, wave), align by two points, measure, tidy lines from imported drawings (join, close, de-duplicate), select circles by size, lock shapes
+- Undo history, a font manager (star and hide fonts), templates, editable keyboard shortcuts
 
 **Layers and materials**
 - Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA; kerf, tabs, overcut, lead-in, step-down per pass, MOPA wobble, focus offset per layer
 - Engraving with straight lines or offset (contour) fill; the scan lines can turn on every pass, and from one run to the next, so deep engraving doesn't build up stripes
 - Relief from a depth map in slices (dark = deep): the focus can follow the floor down, with cleanup passes of their own settings
+- Picture styles: error-diffusion and ordered dithers, halftone, newsprint, line screen and sketch (edges only); dot width correction
 - A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; test grids (power × speed, focus, line spacing, or any two settings) and recording their results
 - The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (as the stock software does)
 
@@ -50,6 +53,8 @@ straight to the machine over your own network.
 - Connect, auto-focus, set the focus height, lights, live view, pause/resume/stop
 - The job always in view: run order as a timeline sized by time, total time, checks, framing (rectangle or outline), and where the laser is while it runs
 - Jobs are generated locally in the same G-code dialect as the stock software, checked line for line against real exports
+- Designs bigger than the bed in sections; rotary attachment and conveyor work modes (experimental)
+- A G-code console with macros, for advanced use
 
 Jobs are uploaded with `autoStart: 0`: nothing moves or fires until you press the
 machine's start button.

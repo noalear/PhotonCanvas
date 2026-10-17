@@ -91,6 +91,12 @@ public sealed record Layer
     public ImageEngraveMode ImageMode { get; init; } = ImageEngraveMode.Dither;
     /// <summary>Image grayscale only: power (%) used for the lightest burned tone.</summary>
     public double GrayMinPower { get; init; } = 10;
+    /// <summary>Halftone and line screen: screen cells per inch (coarser = fewer, bigger dots).</summary>
+    public double HalftoneCpi { get; init; } = 30;
+    /// <summary>Halftone and line screen: screen angle, degrees.</summary>
+    public double HalftoneAngleDeg { get; init; } = 45;
+    /// <summary>Fill lines and depth slices: dot width correction, mm (every line shorter by about the beam width; 0 = off).</summary>
+    public double DotWidthMm { get; init; }
 
     /// <summary>Cut/Score: beam width (mm). Outlines move out by half of it so parts keep their size; holes shrink to keep theirs.</summary>
     public double KerfMm { get; init; }
@@ -174,8 +180,11 @@ public abstract class Shape
     Guid _layerId;
     Affine _transform = Affine.Identity;
     Guid? _groupId;
+    bool _locked;
 
     public Guid Id { get => _id; init => _id = value; }
+    /// <summary>Can't be picked or changed on the canvas (until unlocked); still marked.</summary>
+    public bool Locked { get => _locked; init => _locked = value; }
     public string Name { get => _name; init => _name = value; }
     public Guid LayerId { get => _layerId; init => _layerId = value; }
     /// <summary>Local → world (machine mm).</summary>
@@ -194,6 +203,14 @@ public abstract class Shape
         c._layerId = layerId ?? _layerId;
         c._transform = transform ?? _transform;
         if (transform is not null) c.ResetCaches();
+        return c;
+    }
+
+    /// <summary>A copy that is locked or unlocked.</summary>
+    public Shape WithLocked(bool locked)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._locked = locked;
         return c;
     }
 
@@ -310,7 +327,7 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public IEnumerable<Shape> Editable()
     {
         var ok = Layers.Where(l => l.Visible && !l.Locked).Select(l => l.Id).ToHashSet();
-        return Shapes.Where(s => ok.Contains(s.LayerId));
+        return Shapes.Where(s => ok.Contains(s.LayerId) && !s.Locked);
     }
 
     public Rect2 Bounds(IEnumerable<Guid> ids)

@@ -68,6 +68,26 @@ public sealed class PropertiesPanel : UserControl
     readonly Border _codeCard;
     readonly TextBlock _codeInfo = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
 
+    /// <summary>The user asked for the font manager.</summary>
+    public event Action? FontsRequested;
+
+    /// <summary>Re-read the fonts: starred ones first, hidden ones left out.</summary>
+    public void RefreshFonts()
+    {
+        var all = TextLayout.FontFamilies();
+        var fav = _settings.FontFavourites.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hidden = _settings.FontHidden.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _fonts = [.. all.Where(f => fav.Contains(f)), .. all.Where(f => !fav.Contains(f) && !hidden.Contains(f))];
+        bool was = _updating;
+        _updating = true;
+        try
+        {
+            _font.ItemsSource = _fonts;
+            if (SelectedText() is { } t) _font.SelectedItem = _fonts.FirstOrDefault(f => f.Equals(t.Style.FontFamily, StringComparison.OrdinalIgnoreCase));
+        }
+        finally { _updating = was; }
+    }
+
     /// <summary>The user asked for the serial number and spreadsheet settings.</summary>
     public event Action? VariablesRequested;
 
@@ -136,8 +156,7 @@ public sealed class PropertiesPanel : UserControl
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
         _invertPic.IsCheckedChanged += (_, _) => EditPicture("Invert picture", t => t with { Invert = _invertPic.IsChecked == true });
         // ---- text card ----
-        _fonts = TextLayout.FontFamilies();
-        _font.ItemsSource = _fonts;
+        RefreshFonts();
         var toPaths = Button("Convert to paths", tip: "Turn the text into ordinary shapes (no longer editable as text).");
         toPaths.Click += (_, _) =>
         {
@@ -149,6 +168,7 @@ public sealed class PropertiesPanel : UserControl
             _fieldsHint,
             FieldMenu.Create(_textBox, () => _doc.State.Vars, () => VariablesRequested?.Invoke()),
             Field("Font", _font),
+            Button("Fonts…", "IcFonts", "Star the fonts you use (they come first) and hide the rest.").With(b => b.Click += (_, _) => FontsRequested?.Invoke()),
             Row(Field2("Size mm", _textSize), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _bold, _italic } }),
             Field("Letter spacing", _letter, tip: "Extra space between letters, mm (negative tightens)."),
             Field("Line spacing", _lineSp, tip: "Line height as a multiple of the size."),

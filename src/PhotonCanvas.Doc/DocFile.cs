@@ -59,6 +59,9 @@ public static class DocFile
                 ["wobbleDiameterMm"] = l.WobbleDiameterMm,
                 ["wobbleSpacingMm"] = l.WobbleSpacingMm,
                 ["fillStyle"] = l.FillStyle.ToString(),
+                ["halftoneCpi"] = l.HalftoneCpi,
+                ["halftoneAngleDeg"] = l.HalftoneAngleDeg,
+                ["dotWidthMm"] = l.DotWidthMm,
                 ["angleStepDeg"] = l.AngleStepDeg,
                 ["turnEachRun"] = l.TurnEachRun,
                 ["runCount"] = l.RunCount,
@@ -97,6 +100,7 @@ public static class DocFile
                 ["transform"] = new JsonArray(t.A, t.B, t.C, t.D, t.E, t.F),
             };
             if (sh.GroupId is { } gid) o["group"] = gid.ToString();
+            if (sh.Locked) o["locked"] = true;
             switch (sh)
             {
                 case TextShape tx:
@@ -112,7 +116,9 @@ public static class DocFile
                         ["lineSpacing"] = tx.Style.LineSpacing,
                         ["align"] = tx.Style.Align.ToString(),
                         ["bendDeg"] = tx.Style.BendDeg,
+                        ["pathShiftMm"] = tx.Style.PathShiftMm,
                     };
+                    if (tx.Guide is { } guide) o["guide"] = guide.ToSvgPathData();
                     // The outline too, so the file opens identically even without the font installed.
                     o["d"] = tx.Geometry.ToSvgPathData();
                     break;
@@ -227,6 +233,9 @@ public static class DocFile
                     WobbleSpacingMm = n["wobbleSpacingMm"]?.GetValue<double>() ?? 0.015,
                     FillStyle = Enum.TryParse<FillStyle>(n["fillStyle"]?.GetValue<string>(), true, out var fs) ? fs : FillStyle.Lines,
                     AngleStepDeg = n["angleStepDeg"]?.GetValue<double>() ?? 0,
+                    HalftoneCpi = n["halftoneCpi"]?.GetValue<double>() ?? 30,
+                    HalftoneAngleDeg = n["halftoneAngleDeg"]?.GetValue<double>() ?? 45,
+                    DotWidthMm = n["dotWidthMm"]?.GetValue<double>() ?? 0,
                     TurnEachRun = n["turnEachRun"]?.GetValue<bool>() ?? false,
                     RunCount = n["runCount"]?.GetValue<int>() ?? 0,
                     FocusOffsetMm = n["focusOffsetMm"]?.GetValue<double>() ?? 0,
@@ -278,13 +287,15 @@ public static class DocFile
                         st?["letterSpacingMm"]?.GetValue<double>() ?? 0,
                         st?["lineSpacing"]?.GetValue<double>() ?? 1.2,
                         Enum.TryParse<TextAlign>(st?["align"]?.GetValue<string>(), true, out var al) ? al : TextAlign.Left,
-                        st?["bendDeg"]?.GetValue<double>() ?? 0);
+                        st?["bendDeg"]?.GetValue<double>() ?? 0,
+                        st?["pathShiftMm"]?.GetValue<double>() ?? 0);
                     var text = n["text"]?.GetValue<string>() ?? "";
                     var saved = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? "");
                     shapes.Add(new TextShape
                     {
                         Id = id, Name = name, LayerId = layer, Transform = transform, GroupId = group,
                         Text = text, Style = style,
+                        Guide = n["guide"]?.GetValue<string>() is { Length: > 0 } gd ? PathGeometry.FromSvgPathData(gd) : null,
                         // Use the saved outline so the design is unchanged even if the font is missing on this PC.
                         Geometry = saved.IsEmpty ? TextLayout.Build(text, style) : saved,
                     });
@@ -336,7 +347,11 @@ public static class DocFile
                 CsvText = vz["csvText"]?.GetValue<string>() ?? "",
                 CsvRow = vz["csvRow"]?.GetValue<int>() ?? 0,
             };
-            return new DocState(layers.ToImmutable(), shapes.ToImmutable()) { Vars = vars };
+            // Locked shapes (saved per shape, set after building each).
+            var locked = (root["shapes"]?.AsArray() ?? []).Where(x => x?["locked"]?.GetValue<bool>() == true)
+                .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
+            var all = shapes.Select(sh => locked.Contains(sh.Id) ? sh.WithLocked(true) : sh).ToImmutableList();
+            return new DocState(layers.ToImmutable(), all) { Vars = vars };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {

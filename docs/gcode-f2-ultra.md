@@ -146,6 +146,20 @@ These use only the commands above, put together in ways the captures don't show 
 - **Depth slices**: each slice is an ordinary fill block (`BITMAP HEAD`, `bitmapMode` grayscale, `S` on the burned stretches), with the lines worked out from a grid of cells instead of outlines.
 - **Offset fill**: the loops of one shape go in one fill block, each loop traced closed with `S` on and joined by `S0` moves; `density` is 1 / loop spacing.
 
+- **Sections** (designs bigger than the field): each block is cut to the section's rectangle and moved into the field. Fills keep their whole outline and are clipped line by line, so the lines meet across sections.
+
+## Rotary and conveyor (from xTool Studio's templates; not yet run)
+
+Both swap one galvo axis for the mechanical **U** axis; the machine coordinates the moves.
+
+- **Rotary** (`LASER_CYLINDER`): design X → galvo `X`, design Y → `U` in mm of the object's surface (we put U 0 at the design's middle row). Head after `G0 X0 Y0`: `M535U<scale>` (rollers 0.59917 on an RA2, ×4 on an RA3; chuck 128 ÷ circumference), `G100`, then the galvo Y parked mid-field. `# gc` keys `["x","u"]`, `rm` −1 for rollers, +1 for the chuck. Moves are `G1X…U…`.
+- **Conveyor** (`CONVEYOR_EXTENSION`, up to 610 mm): design X → `U` (U 0 = mid-field), design Y → galvo `Y`, galvo X parked mid-field. Head: `G100 F9600`, `M535U<0.74592 × 100 ÷ calibration %>`, `M536U<angle compensation>`. Engraving lines run along Y.
+- **Tail** (both): `G0 U0`, `G101` straight after `# … TAIL`, then the usual lines.
+- **Dots**: the attachment steps with `G0U…` between rows; the galvo fires `G25` along its own axis (as in xTool's conveyor calibration program).
+- **Z moves** leave and re-enter U mode: `G101`, the usual Z block, `G100`.
+- `description.json`: `mode` `LASER_CYLINDER` / `CONVEYOR_EXTENSION`, `axis` `U`.
+- Framing with an attachment only traces the galvo's own direction (a thin box mid-field).
+
 ## Still to capture
 
 - Grayscale bitmap mode (variable S per dot or per segment?) and a different dot duration, to confirm the T units.

@@ -11,6 +11,7 @@ public enum TextAlign { Left, Center, Right }
 /// <param name="LetterSpacingMm">Extra space between letters (may be negative).</param>
 /// <param name="LineSpacing">Line height as a multiple of the size.</param>
 /// <param name="BendDeg">Text on an arc: how many degrees of a circle each line spans (+ arches up, − curves down, 0 straight).</param>
+/// <param name="PathShiftMm">Text on a path: slide the words this far along the path (mm).</param>
 public sealed record TextStyle(
     string FontFamily = "Arial",
     double SizeMm = 10,
@@ -19,7 +20,8 @@ public sealed record TextStyle(
     double LetterSpacingMm = 0,
     double LineSpacing = 1.2,
     TextAlign Align = TextAlign.Left,
-    double BendDeg = 0);
+    double BendDeg = 0,
+    double PathShiftMm = 0);
 
 /// <summary>
 /// Editable text. Its outline (<see cref="PathShape.Geometry"/>) is rebuilt
@@ -33,8 +35,10 @@ public sealed class TextShape : PathShape
     public required TextStyle Style { get; init; }
     /// <summary>The words with their fields filled in (what is drawn and marked); null when there are no fields.</summary>
     public string? Shown { get; init; }
+    /// <summary>A path the words follow (in the text's own coordinates), or null for straight lines.</summary>
+    public PathGeometry? Guide { get; init; }
 
-    public static TextShape Create(string text, TextStyle style, Guid layerId, Affine transform, Guid? id = null, string? name = null, Guid? groupId = null, string? shown = null) => new()
+    public static TextShape Create(string text, TextStyle style, Guid layerId, Affine transform, Guid? id = null, string? name = null, Guid? groupId = null, string? shown = null, PathGeometry? guide = null) => new()
     {
         Id = id ?? Guid.NewGuid(),
         Name = name ?? FirstLine(text),
@@ -44,15 +48,21 @@ public sealed class TextShape : PathShape
         Text = text,
         Style = style,
         Shown = shown,
-        Geometry = TextLayout.Build(shown ?? text, style),
+        Guide = guide,
+        Geometry = TextLayout.Build(shown ?? text, style, guide),
     };
 
     /// <summary>The same text object with new words and/or style (fields are filled in again when the edit is committed).</summary>
     public TextShape Edit(string text, TextStyle style) =>
-        Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId, text == Text ? Shown : null);
+        Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId, text == Text ? Shown : null, Guide);
 
     /// <summary>The same text showing other values for its fields.</summary>
-    public TextShape WithShown(string? shown) => Create(Text, Style, LayerId, Transform, Id, Name, GroupId, shown);
+    public TextShape WithShown(string? shown) => Create(Text, Style, LayerId, Transform, Id, Name, GroupId, shown, Guide);
+
+    /// <summary>The same text following a path given in world mm (null: back to straight lines).</summary>
+    public TextShape OnPath(PathGeometry? worldPath) =>
+        Create(Text, Style, LayerId, Transform, Id, Name, GroupId, Shown,
+            worldPath is null || !Transform.IsInvertible ? null : worldPath.Transform(Transform.Invert()));
 
     static string FirstLine(string t)
     {
@@ -74,9 +84,10 @@ public static class TextLayout
     /// Outline of the text in mm. The block's top-left is at (0, 0); for
     /// centred/right alignment lines align within the widest line.
     /// </summary>
-    public static PathGeometry Build(string text, TextStyle style)
+    public static PathGeometry Build(string text, TextStyle style, PathGeometry? guide = null)
     {
         if (string.IsNullOrEmpty(text) || !(style.SizeMm > 0)) return PathGeometry.Empty;
+        if (guide?.Subpaths.FirstOrDefault(s => !s.Segs.IsEmpty) is { } along) return BuildOnPath(text, style, along);
         using var typeface = SKTypeface.FromFamilyName(style.FontFamily,
             style.Bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
             SKFontStyleWidth.Normal,
@@ -134,6 +145,65 @@ public static class TextLayout
                 }
                 else place = Affine.Translate(shift + xs[g], baseline);
                 foreach (var sp in FromSkia(path)) subpaths.Add(sp.Transform(place.Then(Affine.Scale(scale, scale))));
+            }
+        }
+        return new PathGeometry(subpaths);
+    }
+
+    /// <summary>
+    /// Text following a path: each letter's middle sits on the path, turned to its direction.
+    /// Left alignment starts at the path's start, centre centres it, right ends at its end;
+    /// further lines go below the first. On a closed path the words wrap round.
+    /// </summary>
+    static PathGeometry BuildOnPath(string text, TextStyle style, Subpath path)
+    {
+        using var typeface = SKTypeface.FromFamilyName(style.FontFamily,
+            style.Bold ? SKFontStyleWeight.Bold : SKFontStyleWeight.Normal,
+            SKFontStyleWidth.Normal,
+            style.Italic ? SKFontStyleSlant.Italic : SKFontStyleSlant.Upright) ?? SKTypeface.Default;
+        using var font = new SKFont(typeface, Units);
+        double scale = style.SizeMm / Units;
+        var pts = path.Flatten(0.01);
+        if (path.Closed && pts.Count > 1 && pts[0].Dist(pts[^1]) > 1e-9) pts.Add(pts[0]);
+        if (pts.Count < 2) return PathGeometry.Empty;
+        var cum = Geometry.PathTools.CumulativeLengths(pts);
+        double length = cum[^1];
+        if (length < 1e-9) return PathGeometry.Empty;
+        var subpaths = new List<Subpath>();
+        var lines = text.Replace("\r\n", "\n").Split('\n');
+        for (int li = 0; li < lines.Length; li++)
+        {
+            var (glyphs, widths) = Glyphs(font, lines[li]);
+            double x = 0;
+            var xs = new double[glyphs.Length];
+            for (int i = 0; i < glyphs.Length; i++)
+            {
+                xs[i] = x;
+                x += widths[i] * scale + (i < glyphs.Length - 1 ? style.LetterSpacingMm : 0);
+            }
+            double width = x;
+            double start = style.Align switch
+            {
+                TextAlign.Center => (length - width) / 2,
+                TextAlign.Right => length - width,
+                _ => 0,
+            } + style.PathShiftMm;
+            double below = li * style.SizeMm * style.LineSpacing;
+            for (int g = 0; g < glyphs.Length; g++)
+            {
+                using var gp = font.GetGlyphPath(glyphs[g]);
+                if (gp is null || gp.IsEmpty) continue;
+                double w = widths[g] * scale;
+                double s = start + xs[g] + w / 2;
+                if (path.Closed) s = ((s % length) + length) % length;
+                var (p, angle) = Geometry.PathTools.At(pts, cum, s);
+                double rad = angle * Math.PI / 180;
+                var normal = new Vec2(-Math.Sin(rad), Math.Cos(rad));
+                var place = Affine.Scale(scale, scale)
+                    .Then(Affine.Translate(-w / 2, 0))
+                    .Then(Affine.Rotate(angle))
+                    .Then(Affine.Translate(p + normal * below));
+                foreach (var sp in FromSkia(gp)) subpaths.Add(sp.Transform(place));
             }
         }
         return new PathGeometry(subpaths);

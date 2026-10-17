@@ -25,36 +25,28 @@ Target machine: **xTool F2 Ultra** (`GS004-CLASS-4`, dual diode + fiber galvo).
 
 Stack decision is open; see the end of the conversation that created this file.
 
-## To do (from comparing with LightBurn, 2026-10-16)
+## From comparing with LightBurn (2026-10-16/17)
 
-Done from that comparison: changing text and codes (serial numbers, dates, CSV columns, QR /
-Data Matrix / barcodes), depth slices for relief, turning the scan angle per pass and between
-runs, offset fill, focus offset per layer, and focus / line-spacing / any-two-settings test
-grids. Still to do:
+All done:
 
-1. **More picture styles**
-   - Halftone and Newsprint: dots that grow in the dark areas, with cell size (cells per inch) and angle.
-   - Sketch: mark only the hard edges between light and dark (line drawings, handwriting).
-   - Dot width correction: shorten each scan line by about half the beam width, so fills and pictures come out at their true size.
-2. **Shape tools**
-   - Rounded corners (fillet / radius) on selected corners or whole shapes.
-   - Trim: cut a line back to where it crosses another.
-   - Text on a path (any curve, not just the arc bend we have) and copy along a path.
-   - Warp and deform (perspective, envelope).
-   - Two-point align: move, turn and scale a shape so two of its points land on two chosen points.
-   - Measure tool: distance and angle between two points on the work area.
-   - Import cleanup: auto-join ends that nearly touch, close nearly-closed paths, delete duplicate lines (common in DXF and PDF files).
-   - (Tabs/bridges already exist on cut layers.)
-3. **Bigger than the work area, and round things.** Needs the machine's commands first, worked
-   out from the reference software (study only) the way the MOPA limits were:
-   - Split marking: a design bigger than 220 × 220 mm marked in sections, the piece moved between them.
-   - Rotary (RA2 Pro and similar): marking around cylinders and rings.
-   - Conveyor feeder: long pieces and batches.
-4. **Smaller conveniences**
-   - Undo history window (see every step, jump back to any).
-   - Font manager (search, favourites, hide fonts).
-   - Templates: save a design as a template; opening it makes a new file.
-   - Lock single shapes (layers can already be locked).
-   - Select circles by size (or exact size), for jigs with many holes.
-   - Hotkey editor.
-   - G-code console and macros, for advanced users and testing.
+- Changing text and codes: serial numbers, dates, CSV columns; QR / Data Matrix / barcodes.
+- Depth slices for relief; scan angle turning per pass and between runs; offset fill; focus
+  offset per layer; focus / line-spacing / any-two-settings test grids.
+- Picture styles: halftone (cells per inch, angle), newsprint, line screen, sketch (edges);
+  dot width correction on fills and slices.
+- Shape tools: rounded corners, trim, text on a path, copy along a path, warp (taper, arch,
+  bulge, wave), align by two points, measure, tidy lines (join, close, de-duplicate).
+- Undo history window, font manager (star / hide), templates, lock single shapes, select circles
+  by size, keyboard shortcut editor, G-code console with macros.
+- Rotary and conveyor work modes, and marking big designs in sections (material moved by hand).
+
+### Still to confirm on the machine
+
+- **Rotary and conveyor** use the U axis exactly as xTool Studio's templates do (`M535U…`,
+  `G100`, `G0 U0`, `G101`; see docs/gcode-f2-ultra.md), but two details are inferred: the
+  `# gc=` header lines and where the galvo's other axis parks. One rotary job and one conveyor
+  job exported from xTool Studio would settle both.
+- **Console**: `POST /v1/cnc/cmd` with the command in the query parameters, as the stock app
+  sends its pointer moves. Not yet tried.
+- Everything new in G-code (focus offsets, turned passes, slices, offset fill, sections) is built
+  from commands already verified, but hasn't been burned yet.

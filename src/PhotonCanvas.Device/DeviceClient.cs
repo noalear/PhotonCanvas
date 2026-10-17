@@ -1077,6 +1077,21 @@ public sealed class DeviceClient : IAsyncDisposable
         RequestAsync("PUT", "/v1/laser-head/parameter", new JsonObject { ["action"] = "power", ["ctrl"] = "set", ["value"] = value },
             cancellationToken: cancellationToken);
 
+    /// <summary>
+    /// One raw G-code or M-code line, run straight away outside a job (<c>POST /v1/cnc/cmd</c>, the
+    /// command in the query parameters). Returns the machine's reply data as text ("" if none).
+    /// It can move the head or fire the laser: only send what the user typed or chose to run.
+    /// </summary>
+    public async Task<string> SendCommandAsync(string command, CancellationToken cancellationToken = default)
+    {
+        var reply = await RequestAsync("POST", "/v1/cnc/cmd", null, new JsonObject { ["cmd"] = command }, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return reply?.ToJsonString() ?? "";
+    }
+
+    /// <summary>The machine's stored settings (<c>GET /v1/device/configs</c>), e.g. the conveyor's calibration.</summary>
+    public Task<JsonNode?> GetConfigsAsync(CancellationToken cancellationToken = default) =>
+        GetAsync("/v1/device/configs", cancellationToken: cancellationToken);
+
     /// <summary>Whether the machine's beeper sounds (button presses, job start/end). Stored on the machine.</summary>
     public async Task<bool> GetBeeperEnabledAsync(CancellationToken cancellationToken = default)
     {

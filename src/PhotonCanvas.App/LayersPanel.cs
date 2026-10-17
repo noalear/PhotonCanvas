@@ -401,10 +401,23 @@ public sealed class LayersPanel : UserControl
             Margin = new(0, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center,
         };
-        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto") };
+        var grid = new Grid { ColumnDefinitions = new("Auto,*,Auto,Auto") };
         grid.Children.Add(icon);
         Grid.SetColumn(name, 1); grid.Children.Add(name);
         Grid.SetColumn(size, 2); grid.Children.Add(size);
+        if (s.Locked)
+        {
+            // Locked shapes can't be picked on the canvas: unlock from here.
+            var unlock = new Button { Classes = { "icon" }, Padding = new(2), Margin = new(4, 0, 0, 0), Content = new PathIcon { Data = UiKit.Icon("IcLock"), Width = 11, Height = 11 } };
+            ToolTip.SetTip(unlock, "Locked: click to unlock");
+            unlock.Click += (_, e) =>
+            {
+                e.Handled = true;
+                if (_doc.State.FindShape(s.Id) is { } cur) _doc.Commit("Unlock", Ops.Replace(_doc.State, cur.WithLocked(false)));
+            };
+            Grid.SetColumn(unlock, 3);
+            grid.Children.Add(unlock);
+        }
         var row = new Border
         {
             Background = sel ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent,

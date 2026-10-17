@@ -32,13 +32,14 @@ public class ImageTests
     [Fact]
     public void DitheringPreservesAverageTone()
     {
-        foreach (var m in Enum.GetValues<DitherMethod>().Where(m => m != DitherMethod.Threshold))
+        // Sketch marks only edges (a flat grey has none); the screens are checked on their own.
+        foreach (var m in Enum.GetValues<DitherMethod>().Where(m => m is not (DitherMethod.Threshold or DitherMethod.Sketch)))
         {
             var grey = Enumerable.Repeat(0.25f, 100 * 100).ToArray(); // 25 % white = 75 % burn
             var dots = Dither.Apply(grey, 100, 100, m);
             double burn = dots.Count(d => d) / 10000.0;
             // Atkinson deliberately drops 1/4 of the error, so dark tones come out darker.
-            Assert.InRange(burn, 0.7, m == DitherMethod.Atkinson ? 0.9 : 0.8);
+            Assert.True(burn >= 0.7 && burn <= (m == DitherMethod.Atkinson ? 0.9 : 0.8), $"{m}: {burn}");
         }
         Assert.All(Dither.Apply([0.49f, 0.51f], 2, 1, DitherMethod.Threshold).Zip([true, false]), t => Assert.Equal(t.Second, t.First));
     }

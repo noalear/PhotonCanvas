@@ -34,6 +34,33 @@ public abstract record PassMode
     public sealed record Rounds(double DelayS) : PassMode;
 }
 
+/// <summary>
+/// How the design maps onto the machine. On the flat bed the galvo draws X and Y. With an
+/// attachment one direction is mechanical (the "U" axis): the galvo draws the other while U turns
+/// the object or moves the belt, coordinated by the machine. Worked out from xTool Studio's own
+/// templates (head <c>M535U</c>/<c>G100</c>, tail <c>G0 U0</c>/<c>G101</c>): not yet run on a machine.
+/// </summary>
+public abstract record WorkMode
+{
+    public sealed record Flat : WorkMode;
+
+    /// <summary>
+    /// Rotary attachment: design X is the galvo's X; design Y goes round the object (U, in mm of
+    /// its surface, 0 at <paramref name="OriginY"/>). The galvo's Y stays at the middle of the field.
+    /// </summary>
+    /// <param name="UMultiple">Firmware scale (roller 0.59917 on an RA2, ×4 on an RA3; chuck 128 ÷ circumference).</param>
+    /// <param name="Direction">+1 or −1: which way the object turns for increasing design Y.</param>
+    public sealed record Rotary(double UMultiple, int Direction, double CircumferenceMm, double OriginY = 0) : WorkMode;
+
+    /// <summary>
+    /// Conveyor feeder: design X moves the belt (U, mm; the middle of the field is U 0), design Y is
+    /// the galvo's Y; the galvo's X stays at the middle.
+    /// </summary>
+    /// <param name="UMultiple">Firmware scale: 0.74592 × 100 ÷ the belt calibration (%).</param>
+    /// <param name="AngleCompensate">The belt's angle compensation from the machine's own calibration.</param>
+    public sealed record Conveyor(double UMultiple, double AngleCompensate, double LengthMm = 610, double SpeedMmMin = 9600) : WorkMode;
+}
+
 public abstract record Block(LaserSettings Laser)
 {
     /// <summary>
@@ -136,6 +163,9 @@ public sealed class FillMask
 
     public Vec2 Origin { get; }
     public double CellMm { get; }
+
+    /// <summary>The same cells, moved (shares the level data).</summary>
+    public FillMask Shifted(Vec2 d) => new(Origin + d, CellMm, Width, Height, _levels, _threshold);
     public int Width { get; }
     public int Height { get; }
 
@@ -184,11 +214,20 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// <summary>Fill these cells instead of <see cref="Polygons"/> (depth slices).</summary>
     public FillMask? Mask { get; init; }
 
+    /// <summary>Only the parts of the lines inside this rectangle are burned (marking in sections).</summary>
+    public Rect2? ClipRect { get; init; }
+
     /// <summary>
     /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
     /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
     /// </summary>
     public double AngleStepDeg { get; init; }
+
+    /// <summary>
+    /// Dot width correction: every burned line is this much shorter (half at each end), so the
+    /// beam's own width doesn't make fills come out wider than drawn. About the beam width.
+    /// </summary>
+    public double DotWidthMm { get; init; }
 
     /// <summary>The block as run on pass <paramref name="pass"/> (1-based): turned by <see cref="AngleStepDeg"/> per earlier pass.</summary>
     public FillBlock ForPass(int pass) => AngleStepDeg == 0 || pass <= 1 ? this : this with { AngleDeg = AngleDeg + (pass - 1) * AngleStepDeg, AngleStepDeg = 0 };
@@ -220,6 +259,9 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
 /// </summary>
 public sealed record LoopsBlock(IReadOnlyList<IReadOnlyList<Vec2>> Loops, LaserSettings Laser, double SpacingMm) : Block(Laser)
 {
+    /// <summary>The loops close back on themselves (false: open pieces, after cutting into sections).</summary>
+    public bool Closed { get; init; } = true;
+
     /// <summary>Total length of the loops, mm.</summary>
     public double Length
     {
@@ -227,7 +269,7 @@ public sealed record LoopsBlock(IReadOnlyList<IReadOnlyList<Vec2>> Loops, LaserS
         {
             double l = 0;
             foreach (var p in Loops)
-                for (int i = 0; i < p.Count; i++) l += p[i].Dist(p[(i + 1) % p.Count]);
+                for (int i = 0; i < p.Count - (Closed ? 0 : 1); i++) l += p[i].Dist(p[(i + 1) % p.Count]);
             return l;
         }
     }
@@ -295,6 +337,26 @@ public sealed class Job
     public Preamble Preamble { get; init; }
     /// <summary>Written to the <c># date=</c> header line, e.g. <c>2026_10_12_19_02_38</c>.</summary>
     public string Created { get; init; } = "";
+    /// <summary>Flat bed, rotary or conveyor.</summary>
+    public WorkMode Mode { get; init; } = new WorkMode.Flat();
+
+    bool Flat => Mode is WorkMode.Flat;
+
+    /// <summary>A design position as G-code words: X/Y on the bed, X/U on the rotary, U/Y on the conveyor.</summary>
+    string Pos(Vec2 p, Func<double, string> f) => Mode switch
+    {
+        WorkMode.Rotary r => $"X{f(p.X)}U{f((p.Y - r.OriginY) * r.Direction)}",
+        WorkMode.Conveyor => $"U{f(p.X - Machine.FieldW / 2)}Y{f(p.Y)}",
+        _ => $"X{f(p.X)}Y{f(p.Y)}",
+    };
+
+    /// <summary>A Z move; with an attachment the U mode is left for it and entered again, as xTool Studio does.</summary>
+    string[] ZMoveAny(double mm) => Mode switch
+    {
+        WorkMode.Flat => ZMove(mm),
+        WorkMode.Conveyor c => ["G101", .. ZMove(mm), $"G100 F{JsNumber(c.SpeedMmMin)}"],
+        _ => ["G101", .. ZMove(mm), "G100"],
+    };
 
     public Job(MachineProfile machine, IReadOnlyList<Block> blocks)
     {
@@ -333,12 +395,20 @@ public sealed class Job
                     JobException.CheckRange("line density", b.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
                     if (!double.IsFinite(b.AngleDeg) || !double.IsFinite(b.AngleStepDeg)) throw new JobException("The fill angle is not a valid number.");
                     JobException.CheckRange("overscan", b.OverscanMm, 0, MaxOverscanMm, "mm");
+                    JobException.CheckRange("dot width correction", b.DotWidthMm, 0, 1, "mm");
                     foreach (var p in b.Polygons.SelectMany(x => x))
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
-                        CheckPoint(p, ctx);
+                        // Cut to a section: only the lines (checked below) need to be in the work area.
+                        if (b.ClipRect is null) CheckPoint(p, ctx);
                     }
-                    if (b.Mask is { } mask)
+                    if (b.ClipRect is not null)
+                        foreach (var seg in FillLines(b))
+                        {
+                            CheckPoint(seg.Start, ctx);
+                            CheckPoint(seg.End, ctx);
+                        }
+                    if (b.Mask is { } mask && b.ClipRect is null)
                     {
                         if (!mask.Valid || !(mask.CellMm > 0) || !mask.Origin.IsFinite)
                             throw new JobException("A depth slice's cells don't match its size.");
@@ -395,6 +465,17 @@ public sealed class Job
 
     void CheckPoint(Vec2 p, string ctx)
     {
+        switch (Mode)
+        {
+            case WorkMode.Rotary r:
+                if (p.X < 0 || p.X > Machine.FieldW || Math.Abs(p.Y - r.OriginY) > r.CircumferenceMm / 2 + 1e-6)
+                    throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, r.CircumferenceMm, ctx + " (the rotary's area: the field across, once round the object)");
+                return;
+            case WorkMode.Conveyor c:
+                if (p.X < 0 || p.X > c.LengthMm || p.Y < 0 || p.Y > Machine.FieldH)
+                    throw new OutsideWorkAreaException(p.X, p.Y, c.LengthMm, Machine.FieldH, ctx + " (the conveyor's area)");
+                return;
+        }
         if (!Machine.Contains(p.X, p.Y))
             throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, Machine.FieldH, ctx);
     }
@@ -409,7 +490,7 @@ public sealed class Job
         void Focus(Block b)
         {
             if (Math.Abs(b.FocusOffsetMm - focus) < 1e-6) return;
-            lines.AddRange(ZMove(-(b.FocusOffsetMm - focus)));
+            lines.AddRange(ZMoveAny(-(b.FocusOffsetMm - focus)));
             lines.AddRange(["# MUST", ""]);
             focus = b.FocusOffsetMm;
         }
@@ -455,10 +536,10 @@ public sealed class Job
         if (Math.Abs(focus) > 1e-6)
         {
             // Back to the focus the job started at.
-            lines.AddRange(ZMove(focus));
+            lines.AddRange(ZMoveAny(focus));
             lines.AddRange(["# MUST", ""]);
         }
-        lines.AddRange(Tail(tag));
+        lines.AddRange(Tail(tag, Flat));
         return string.Join("\n", lines);
     }
 
@@ -472,10 +553,7 @@ public sealed class Job
             $"# date={Created}",
             "# version=1.9.11",
             "# algorithmVersion=",
-            $"# gc={{\"size\":{{\"w\":{JsNumber(Machine.FieldW)},\"h\":{JsNumber(Machine.FieldH)}}}}}",
-            "# gc={\"offset\":{\"x\":0,\"y\":0}}",
-            "# gc={\"start\":{\"x\":0,\"y\":0.0000}}",
-            "# gc={\"keys\":[\"x\",\"y\"],\"rm\":1,\"is3DMode\":false}",
+            .. GcLines(),
             "# timeConfig=",
             "G90",
             "G0 F3000",
@@ -495,9 +573,34 @@ public sealed class Job
             "M4 S0",
             "G1 F180000",
             "G0 X0 Y0",
+            .. ModeHead(),
             "",
         ];
     }
+
+    /// <summary>The <c># gc=</c> header lines: work area size, start, and which axes the design uses.</summary>
+    IEnumerable<string> GcLines()
+    {
+        static string F4(double v) => v.ToString("0.0000", System.Globalization.CultureInfo.InvariantCulture);
+        var (w, h, sx, sy, keys, rm) = Mode switch
+        {
+            WorkMode.Rotary r => (Machine.FieldW, r.CircumferenceMm, "0", F4(r.OriginY), "\"x\",\"u\"", r.Direction),
+            WorkMode.Conveyor c => (c.LengthMm, Machine.FieldH, JsNumber(Machine.FieldW / 2), "0.0000", "\"u\",\"y\"", 1),
+            _ => (Machine.FieldW, Machine.FieldH, "0", "0.0000", "\"x\",\"y\"", 1),
+        };
+        yield return $"# gc={{\"size\":{{\"w\":{JsNumber(w)},\"h\":{JsNumber(h)}}}}}";
+        yield return "# gc={\"offset\":{\"x\":0,\"y\":0}}";
+        yield return $"# gc={{\"start\":{{\"x\":{sx},\"y\":{sy}}}}}";
+        yield return $"# gc={{\"keys\":[{keys}],\"rm\":{rm},\"is3DMode\":false}}";
+    }
+
+    /// <summary>Entering U mode with an attachment, and parking the galvo's other axis in the middle.</summary>
+    IEnumerable<string> ModeHead() => Mode switch
+    {
+        WorkMode.Rotary r => [$"M535U{JsRounded(r.UMultiple, 5)}", "G100", $"G0Y{Fixed3(Machine.FieldH / 2)}"],
+        WorkMode.Conveyor c => [$"G100 F{JsNumber(c.SpeedMmMin)}", $"M535U{JsRounded(c.UMultiple, 5)}", $"M536U{JsRounded(c.AngleCompensate, 5)}", $"G0X{Fixed3(Machine.FieldW / 2)}"],
+        _ => [],
+    };
 
     /// <summary>
     /// The framing file the machine traces at low power when its frame button
@@ -511,6 +614,16 @@ public sealed class Job
             if (!p.IsFinite) throw new JobException("A frame coordinate is not a valid number.");
             CheckPoint(p, " (frame)");
         }
+        if (!Flat)
+        {
+            // With an attachment the frame only shows the galvo's own direction: a thin box across
+            // the middle of the field (the object or belt doesn't move while framing).
+            var box = Rect2.Bounds(outline);
+            double mid = Mode is WorkMode.Rotary ? Machine.FieldH / 2 : Machine.FieldW / 2;
+            outline = Mode is WorkMode.Rotary
+                ? [new(box.MinX, mid - 0.5), new(box.MaxX, mid - 0.5), new(box.MaxX, mid + 0.5), new(box.MinX, mid + 0.5), new(box.MinX, mid - 0.5)]
+                : [new(mid - 0.5, box.MinY), new(mid + 0.5, box.MinY), new(mid + 0.5, box.MaxY), new(mid - 0.5, box.MaxY), new(mid - 0.5, box.MinY)];
+        }
         var tag = Machine.GcodeTag;
         var lines = new List<string>
         {
@@ -522,7 +635,7 @@ public sealed class Job
         for (int i = 1; i < outline.Count; i++)
             lines.Add($"G1X{Trim3(outline[i].X)}Y{Trim3(outline[i].Y)}" + (i == 1 ? "S64F960000" : ""));
         lines.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
-        lines.AddRange(Tail(tag));
+        lines.AddRange(Tail(tag, true));
         return string.Join("\n", lines);
     }
 
@@ -552,8 +665,9 @@ public sealed class Job
         };
     }
 
-    static string[] Tail(string tag) =>
-        ["# END", $"# {tag} TAIL", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""];
+    static string[] Tail(string tag, bool flat) => flat
+        ? ["# END", $"# {tag} TAIL", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""]
+        : ["# END", $"# {tag} TAIL", "G0 U0", "G101", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""];
 
     internal static List<string> Dwell(double delayS)
     {
@@ -590,17 +704,18 @@ public sealed class Job
         return v;
     }
 
-    static List<string> RenderBlock(Block block, string tag, int passes, int round = 1) => block switch
+    List<string> RenderBlock(Block block, string tag, int passes, int round = 1) => block switch
     {
         VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes, round),
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
         LoopsBlock b => RenderLoops(b, tag, passes),
+        DotBlock b when !Flat => RenderDotsU(b, tag, passes),
         DotBlock b => RenderDots(b, tag, passes),
         _ => throw new ArgumentException("unknown block type", nameof(block)),
     };
 
-    static List<string> RenderVector(VectorBlock b, string tag, int passes)
+    List<string> RenderVector(VectorBlock b, string tag, int passes)
     {
         var pts = b.Path.EmittedPoints();
         if (pts.Count < 2) return []; // nothing to burn
@@ -608,10 +723,10 @@ public sealed class Job
         var body = new List<string>
         {
             $"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}",
-            $"G0X{Trim3(pts[0].X)}Y{Trim3(pts[0].Y)}",
+            $"G0{Pos(pts[0], Trim3)}",
         };
         for (int i = 1; i < pts.Count; i++)
-            body.Add($"G1X{Trim3(pts[i].X)}Y{Trim3(pts[i].Y)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+            body.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
         var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
@@ -629,31 +744,31 @@ public sealed class Job
     /// end, exactly like xTool Studio. With one pass (whole-job rounds) the head is lowered to this
     /// round's depth and raised again straight after, so other layers keep their focus.
     /// </summary>
-    static List<string> RenderSteppedVector(VectorBlock b, string tag, int passes, int round)
+    List<string> RenderSteppedVector(VectorBlock b, string tag, int passes, int round)
     {
         var pts = b.Path.EmittedPoints();
         if (pts.Count < 2) return [];
         var l = b.Laser;
         var drop = b.Drop!;
-        var path = new List<string> { $"G0X{Trim3(pts[0].X)}Y{Trim3(pts[0].Y)}" };
+        var path = new List<string> { $"G0{Pos(pts[0], Trim3)}" };
         for (int i = 1; i < pts.Count; i++)
-            path.Add($"G1X{Trim3(pts[i].X)}Y{Trim3(pts[i].Y)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+            path.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
         var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
         v.Add($"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}");
         double first = passes > 1 ? drop.FirstMm : drop.DepthFor(round);
-        if (first > 0) v.AddRange(ZMove(-first));
+        if (first > 0) v.AddRange(ZMoveAny(-first));
         v.AddRange(["# MUST", path[0]]);
         v.AddRange(path);
         for (int p = 2; p <= passes; p++)
         {
-            if (drop.PerPassMm > 0) v.AddRange(ZMove(-drop.PerPassMm));
+            if (drop.PerPassMm > 0) v.AddRange(ZMoveAny(-drop.PerPassMm));
             v.AddRange(path);
         }
         v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
         double back = passes > 1 ? drop.DepthFor(passes) : first;
-        if (back > 0) v.AddRange([.. ZMove(back), "# MUST"]);
+        if (back > 0) v.AddRange([.. ZMoveAny(back), "# MUST"]);
         return v;
     }
 
@@ -707,6 +822,38 @@ public sealed class Job
     public static List<FillSegment> FillLines(FillBlock b) => LineCache.GetValue(b, MakeFillLines);
 
     static List<FillSegment> MakeFillLines(FillBlock b)
+    {
+        var lines = MakeFullLines(b);
+        if (b.DotWidthMm > 0)
+        {
+            // Shorter by the beam width, half at each end; lines no longer than it are left out.
+            double half = b.DotWidthMm / 2;
+            var o = new List<FillSegment>(lines.Count);
+            foreach (var s in lines)
+            {
+                double len = s.Start.Dist(s.End);
+                if (len <= b.DotWidthMm + 1e-9) continue;
+                var u = (s.End - s.Start) / len;
+                double dir = s.X1 >= s.X0 ? 1 : -1;
+                o.Add(new(s.Y, s.X0 + dir * half, s.X1 - dir * half, s.Start + u * half, s.End - u * half));
+            }
+            lines = o;
+        }
+        if (b.ClipRect is not { } clip) return lines;
+        // Marking in sections: each line cut to the section, in the same order.
+        var cut = new List<FillSegment>(lines.Count);
+        foreach (var s in lines)
+            foreach (var run in Sections.ClipPolyline([s.Start, s.End], clip))
+            {
+                if (run.Count < 2 || run[0].Dist(run[^1]) < 1e-6) continue;
+                double len = s.Start.Dist(s.End);
+                double t0 = len > 0 ? s.Start.Dist(run[0]) / len : 0, t1 = len > 0 ? s.Start.Dist(run[^1]) / len : 1;
+                cut.Add(new(s.Y, s.X0 + (s.X1 - s.X0) * t0, s.X0 + (s.X1 - s.X0) * t1, run[0], run[^1]));
+            }
+        return cut;
+    }
+
+    static List<FillSegment> MakeFullLines(FillBlock b)
     {
         double step = 10 / b.LinesPerCm;
         var o = new List<FillSegment>();
@@ -868,7 +1015,7 @@ public sealed class Job
 
     static string[] BitmapTail(string tag) => ["", $"# {tag} BITMAP TAIL", "# motion_end", ""];
 
-    static List<string> RenderFill(FillBlock b, string tag, int passes)
+    List<string> RenderFill(FillBlock b, string tag, int passes)
     {
         var segs = FillLines(b);
         if (segs.Count == 0) return [];
@@ -879,7 +1026,7 @@ public sealed class Job
         {
             BitmapCfg(l.Power / 100, b.LinesPerCm / 10, 0, s, "grayscale", over), "", "", $"G1F{l.FValue}S0",
         };
-        if (FoldAngle(b.AngleDeg) == 0)
+        if (Flat && FoldAngle(b.AngleDeg) == 0)
         {
             // Horizontal lines: only the coordinates that change are written, as xTool does.
             string? lastX = null;
@@ -902,20 +1049,20 @@ public sealed class Job
         }
         else
         {
-            string? lastX = null, lastY = null;
+            string? last = null;
             foreach (var seg in segs)
             {
                 var (runUp, runOut) = Overscan(seg, over);
-                string xa = Fixed3(runUp.X), ya = Fixed3(runUp.Y);
-                if (lastX is null) body.Add($"G0X{xa}Y{ya}");
-                else if (lastX != xa || lastY != ya) body.Add($"G1X{xa}Y{ya}S0");
-                if (over > 0) body.Add($"G1X{Fixed3(seg.Start.X)}Y{Fixed3(seg.Start.Y)}S0");
-                (lastX, lastY) = (Fixed3(seg.End.X), Fixed3(seg.End.Y));
-                body.Add($"G1X{lastX}Y{lastY}S{s}");
+                string at = Pos(runUp, Fixed3);
+                if (last is null) body.Add($"G0{at}");
+                else if (last != at) body.Add($"G1{at}S0");
+                if (over > 0) body.Add($"G1{Pos(seg.Start, Fixed3)}S0");
+                last = Pos(seg.End, Fixed3);
+                body.Add($"G1{last}S{s}");
                 if (over > 0)
                 {
-                    (lastX, lastY) = (Fixed3(runOut.X), Fixed3(runOut.Y));
-                    body.Add($"G1X{lastX}Y{lastY}S0");
+                    last = Pos(runOut, Fixed3);
+                    body.Add($"G1{last}S0");
                 }
             }
         }
@@ -926,7 +1073,7 @@ public sealed class Job
     }
 
     /// <summary>Offset-fill loops: one engraving block, each loop traced closed, the laser off between loops.</summary>
-    static List<string> RenderLoops(LoopsBlock b, string tag, int passes)
+    List<string> RenderLoops(LoopsBlock b, string tag, int passes)
     {
         var loops = b.Loops.Where(l => l.Count >= 2).ToList();
         if (loops.Count == 0) return [];
@@ -939,14 +1086,11 @@ public sealed class Job
         bool first = true;
         foreach (var loop in loops)
         {
-            string xa = Fixed3(loop[0].X), ya = Fixed3(loop[0].Y);
-            body.Add(first ? $"G0X{xa}Y{ya}" : $"G1X{xa}Y{ya}S0");
+            string at = Pos(loop[0], Fixed3);
+            body.Add(first ? $"G0{at}" : $"G1{at}S0");
             first = false;
-            for (int i = 1; i <= loop.Count; i++)
-            {
-                var p = loop[i % loop.Count];
-                body.Add($"G1X{Fixed3(p.X)}Y{Fixed3(p.Y)}S{s}");
-            }
+            for (int i = 1; i < loop.Count + (b.Closed ? 1 : 0); i++)
+                body.Add($"G1{Pos(loop[i % loop.Count], Fixed3)}S{s}");
         }
         var v = BitmapHead(tag, l, "M523P40");
         v.AddRange(PassLoop(passes, body));
@@ -1002,6 +1146,65 @@ public sealed class Job
             forward = !forward;
         }
         if (first) return []; // blank bitmap
+        var v = BitmapHead(tag, l, "M523P10");
+        v.AddRange(PassLoop(passes, body));
+        v.AddRange(BitmapTail(tag));
+        return v;
+    }
+
+    /// <summary>
+    /// Dots with an attachment: the attachment steps (<c>G0U</c>) between rows of dots that the galvo
+    /// fires along its own axis, as in xTool Studio's conveyor calibration program. On the rotary the
+    /// rows run along X; on the conveyor they run along Y, one column of the picture at a time.
+    /// </summary>
+    List<string> RenderDotsU(DotBlock b, string tag, int passes)
+    {
+        var l = b.Laser;
+        double pitch = 25.4 / b.Dpi;
+        bool rotary = Mode is WorkMode.Rotary;
+        var body = new List<string>
+        {
+            BitmapCfg(l.Power / 100, b.Dpi / 25.4,
+                (long)Math.Round(b.MinPower * 10, MidpointRounding.AwayFromZero), l.SValue, b.Mode),
+            "", "", $"G1F{l.FValue}S0", $"G25T{b.DotUs / 10}",
+        };
+        bool first = true, forward = true;
+        long lastS = l.SValue;
+        var levels = b.Levels;
+        int lines = rotary ? b.Bitmap.Height : b.Bitmap.Width, along = rotary ? b.Bitmap.Width : b.Bitmap.Height;
+        string park = Fixed3(rotary ? Machine.FieldH / 2 : Machine.FieldW / 2);
+        var idx = new List<int>();
+        for (int k = 0; k < lines; k++)
+        {
+            idx.Clear();
+            for (int j = 0; j < along; j++)
+                if (rotary ? b.Bitmap[j, k] : b.Bitmap[k, j]) idx.Add(j);
+            if (idx.Count == 0) continue;
+            if (!forward) idx.Reverse();
+            // Where this row is, on the attachment.
+            var rowPos = rotary ? new Vec2(0, b.Origin.Y + k * pitch) : new Vec2(b.Origin.X + k * pitch, 0);
+            string u = Pos(rowPos, Fixed3);
+            body.Add($"G0{u[u.IndexOf('U')..]}");
+            for (int n = 0; n < idx.Count; n++)
+            {
+                int j = idx[n];
+                string g = Fixed3(rotary ? b.Origin.X + j * pitch : b.Origin.Y + j * pitch);
+                string power = "";
+                if (levels is not null)
+                {
+                    int cell = rotary ? k * b.Bitmap.Width + j : j * b.Bitmap.Width + k;
+                    long sv = b.LevelSValue(levels[cell]);
+                    if (first || sv != lastS) power = $"S{sv}";
+                    lastS = sv;
+                }
+                else if (first) power = $"S{l.SValue}";
+                string pos = rotary ? $"X{g}" : $"Y{g}";
+                body.Add(first ? $"G25{(rotary ? $"X{g}Y{park}" : $"X{park}Y{g}")}{power}" : $"G25{pos}{power}");
+                first = false;
+            }
+            forward = !forward;
+        }
+        if (first) return [];
         var v = BitmapHead(tag, l, "M523P10");
         v.AddRange(PassLoop(passes, body));
         v.AddRange(BitmapTail(tag));

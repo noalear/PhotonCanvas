@@ -38,6 +38,19 @@ public sealed class Document
     public bool CanUndo => _undo.Count > 0 && _editBase is null;
     public bool CanRedo => _redo.Count > 0 && _editBase is null;
     public string? UndoLabel => _undo.Last?.Value.Label;
+
+    /// <summary>What each undo step did, oldest first (the last is the most recent).</summary>
+    public IReadOnlyList<string> UndoLabels => _undo.Select(s => s.Label).ToList();
+
+    /// <summary>What each redo step would do again, next first.</summary>
+    public IReadOnlyList<string> RedoLabels => _redo.Select(s => s.Label).ToList();
+
+    /// <summary>Undo (negative) or redo (positive) this many steps.</summary>
+    public void Step(int steps)
+    {
+        for (; steps < 0 && CanUndo; steps++) Undo();
+        for (; steps > 0 && CanRedo; steps--) Redo();
+    }
     public string? RedoLabel => _redo.Count > 0 ? _redo.Peek().Label : null;
 
     Snapshot Capture(string label) => new(State, Selection, ActiveLayer, label);

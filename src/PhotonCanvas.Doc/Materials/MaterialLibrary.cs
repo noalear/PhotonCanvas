@@ -35,6 +35,9 @@ public sealed record ProcessSettings
     public double WobbleDiameterMm { get; init; } = 0.05;
     public double WobbleSpacingMm { get; init; } = 0.015;
     public FillStyle FillStyle { get; init; }
+    public double HalftoneCpi { get; init; } = 30;
+    public double HalftoneAngleDeg { get; init; } = 45;
+    public double DotWidthMm { get; init; }
     public double AngleStepDeg { get; init; }
     public double FocusOffsetMm { get; init; }
     public DepthSlices Slices { get; init; } = new();
@@ -46,6 +49,7 @@ public sealed record ProcessSettings
         OvercutMm = l.OvercutMm, LeadInMm = l.LeadInMm, FillAngleDeg = l.FillAngleDeg, Crosshatch = l.Crosshatch, OverscanMm = l.OverscanMm,
         StepDownMm = l.StepDownMm, StepDownFirstMm = l.StepDownFirstMm, Wobble = l.Wobble, WobbleDiameterMm = l.WobbleDiameterMm, WobbleSpacingMm = l.WobbleSpacingMm,
         FillStyle = l.FillStyle, AngleStepDeg = l.AngleStepDeg, FocusOffsetMm = l.FocusOffsetMm, Slices = l.Slices,
+        HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -55,6 +59,7 @@ public sealed record ProcessSettings
         OvercutMm = OvercutMm, LeadInMm = LeadInMm, FillAngleDeg = FillAngleDeg, Crosshatch = Crosshatch, OverscanMm = OverscanMm,
         StepDownMm = StepDownMm, StepDownFirstMm = StepDownFirstMm, Wobble = Wobble, WobbleDiameterMm = WobbleDiameterMm, WobbleSpacingMm = WobbleSpacingMm,
         FillStyle = FillStyle, AngleStepDeg = AngleStepDeg, FocusOffsetMm = FocusOffsetMm, Slices = Slices ?? new(),
+        HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>
@@ -83,6 +88,9 @@ public sealed record ProcessSettings
         WobbleDiameterMm = Math.Clamp(WobbleDiameterMm, PhotonCanvas.Core.Wobble.MinDiameterMm, PhotonCanvas.Core.Wobble.MaxDiameterMm),
         WobbleSpacingMm = Math.Clamp(WobbleSpacingMm, PhotonCanvas.Core.Wobble.MinSpacingMm, PhotonCanvas.Core.Wobble.MaxSpacingMm),
         AngleStepDeg = double.IsFinite(AngleStepDeg) ? Math.Clamp(AngleStepDeg, -180, 180) : 0,
+        HalftoneCpi = double.IsFinite(HalftoneCpi) ? Math.Clamp(HalftoneCpi, 2, 500) : 30,
+        HalftoneAngleDeg = double.IsFinite(HalftoneAngleDeg) ? Math.Clamp(HalftoneAngleDeg, -360, 360) : 45,
+        DotWidthMm = double.IsFinite(DotWidthMm) ? Math.Clamp(DotWidthMm, 0, 1) : 0,
         FocusOffsetMm = double.IsFinite(FocusOffsetMm) ? Math.Clamp(FocusOffsetMm, -Job.MaxFocusOffsetMm, Job.MaxFocusOffsetMm) : 0,
         Slices = (Slices ?? new()) is var sl ? sl with
         {

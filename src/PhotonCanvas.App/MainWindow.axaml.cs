@@ -89,6 +89,7 @@ public partial class MainWindow : Window
         _layerEditor.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
         _layerEditor.LibraryRequested += () => _ = Guard(ShowLibrary);
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
+        if (_settings.WorkMode != "Flat") Canvas.Machine = WorkModes.Area(_settings);
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
         _job.LayerClicked += id => _layers.Activate(id);
@@ -231,6 +232,7 @@ public partial class MainWindow : Window
         Canvas.CodeEditRequested += id => _ = Guard(() => EditCode(id));
         _props.CodeEditRequested += id => _ = Guard(() => EditCode(id));
         _props.VariablesRequested += () => _ = Guard(ShowVariables);
+        _props.FontsRequested += () => _ = Guard(ShowFonts);
         _job.RunFinished += from =>
         {
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
@@ -351,11 +353,13 @@ public partial class MainWindow : Window
             Items =
             {
                 AsyncItem("New", NewDoc, "Ctrl+N"),
+                AsyncItem("New from template…", NewFromTemplate),
                 AsyncItem("Open…", OpenDoc, "Ctrl+O"),
                 _recentMenu,
                 new Separator(),
                 AsyncItem("Save", () => Save(false), "Ctrl+S"),
                 AsyncItem("Save as…", () => Save(true), "Ctrl+Shift+S"),
+                AsyncItem("Save as template…", SaveAsTemplate),
                 new Separator(),
                 AsyncItem("Import…", () => ImportAny(byColour: false), "Ctrl+I"),
                 AsyncItem("Import, one layer per colour…", () => ImportAny(byColour: true), "Ctrl+Shift+I"),
@@ -365,6 +369,8 @@ public partial class MainWindow : Window
                 AsyncItem("Export G-code (.gcode)…", () => _job.Export(xf: false)),
                 new Separator(),
                 AsyncItem("Settings…", () => ShowSettings("Machine")),
+                AsyncItem("Keyboard shortcuts…", ShowHotkeys),
+                AsyncItem("Fonts…", ShowFonts),
                 Item("Exit", Close),
             },
         };
@@ -409,6 +415,7 @@ public partial class MainWindow : Window
         select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
         select.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
         select.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
+        select.Small("Circles…", "IcCircles", () => _ = Guard(() => new CirclesWindow(_doc).ShowDialog(this)), "Find the circles in the design by size and select them: all the 3 mm holes, say");
         select.Small("Invert", "IcExclude", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id))), "Select what isn't selected, and the other way round");
         var draw = home.Group("Draw");
         ToolLarge(draw, "Text", "IcText", Tool.Text, "Text (T) · click where the text should go");
@@ -436,6 +443,10 @@ public partial class MainWindow : Window
         boolean.Small("Exclude", "IcExclude", () => BooleanSel(BoolOp.Exclude), "Exclude: remove where they overlap", TwoPaths);
         var outline = home.Group("Outline");
         outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: a new outline a set distance outside or inside (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
+        outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round the sharp corners of the selected shapes", () => SelectedPaths().Count > 0);
+        outline.Small("Text on path", "IcTextPath", TextOnPath, "Select a text and a line or shape: the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
+        ToolSmall(outline, "Trim", "IcTrim", Tool.Trim, "Trim: click a piece of a line between where it crosses others to cut it away");
+        outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy up imported drawings: join ends that nearly meet, close nearly-closed shapes, delete lines lying on top of each other");
         outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
         var import = home.Group("Bring in");
         import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
@@ -468,6 +479,12 @@ public partial class MainWindow : Window
         repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
         repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
         repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
+        repeat.Small("Along a path", "IcAlongPath", () => _ = Guard(CopyAlongSel), "Copies spaced along a path: select what to copy and the path (the longest selected line is the path)", Many);
+        var shapeIt = arrange.Group("Transform");
+        shapeIt.Large("Warp", "IcWarp", () => _ = Guard(() => new WarpWindow(_doc).ShowDialog(this)), "Warp the selection: perspective taper, arch, bulge or wave", () => SelectedPaths().Count > 0);
+        ToolSmall(shapeIt, "Align 2 points", "IcAlign2", Tool.Align2, "Move and turn the selection so two of its points land on two other points (Shift on the last click also resizes)");
+        shapeIt.Small("Lock", "IcLock", () => LockSel(true), "Lock the selected shapes: they stay put and can't be picked until unlocked (still marked)", HasSel);
+        shapeIt.Small("Unlock all", "IcUnlock", () => LockSel(false), "Unlock every locked shape", () => _doc.State.Shapes.Any(s => s.Locked));
 
         // ---- Picture: photos and artwork ----
         var picture = _ribbon.Tab("Picture", "Trace, depthmaps and background removal (lights up when a picture is selected)");
@@ -508,7 +525,11 @@ public partial class MainWindow : Window
         job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
+        var work = laser.Group("Work area");
+        work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings");
+        work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
         var machine = laser.Group("Machine");
+        machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)");
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
 
         // ---- View ----
@@ -523,6 +544,9 @@ public partial class MainWindow : Window
         grid.SmallToggle("Show grid", "IcGrid", on => { _settings.ShowGrid = on; SaveAndApplyGrid(); }, "Show the grid", null, () => _settings.ShowGrid);
         grid.SmallToggle("Snap to grid", "IcGrid", on => { _settings.SnapToGrid = on; SaveAndApplyGrid(); }, "Snap to the grid's minor lines", null, () => _settings.SnapToGrid);
         grid.Small("Grid settings…", "IcSettings", () => _ = Guard(ShowGridSettings), "Grid spacing and colours, snap distance (Ctrl+')");
+        var tools = view.Group("Measure & history");
+        ToolLarge(tools, "Measure", "IcMeasure", Tool.Measure, "Measure: drag between two points (snaps to corners; Shift = 45° steps)");
+        tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
 
@@ -581,88 +605,187 @@ public partial class MainWindow : Window
     bool TextInputFocused() =>
         FocusManager?.GetFocusedElement() is TextBox or NumericUpDown || (FocusManager?.GetFocusedElement() as Visual)?.FindAncestorOfType<NumericUpDown>() is not null;
 
+    List<HotCommand>? _commands;
+
+    /// <summary>Everything that has (or can be given) a keyboard shortcut. Changed ones are in the settings.</summary>
+    IReadOnlyList<HotCommand> Commands() => _commands ??=
+    [
+        new("file.new", "File", "New design", "Ctrl+N", () => _ = Guard(NewDoc), true),
+        new("file.open", "File", "Open…", "Ctrl+O", () => _ = Guard(OpenDoc), true),
+        new("file.save", "File", "Save", "Ctrl+S", () => _ = Guard(() => Save(false)), true),
+        new("file.saveas", "File", "Save as…", "Ctrl+Shift+S", () => _ = Guard(() => Save(true)), true),
+        new("file.import", "File", "Import…", "Ctrl+I", () => _ = Guard(() => ImportAny(false)), true),
+        new("file.importcolour", "File", "Import, one layer per colour…", "Ctrl+Shift+I", () => _ = Guard(() => ImportAny(true)), true),
+        new("file.picture", "File", "Import picture…", "Ctrl+J", () => _ = Guard(ImportImage), true),
+        new("help.keys", "File", "Keyboard shortcuts", "F1", () => _ = Guard(ShowShortcuts), true),
+        new("edit.undo", "Edit", "Undo", "Ctrl+Z", _doc.Undo),
+        new("edit.redo", "Edit", "Redo", "Ctrl+Y|Ctrl+Shift+Z", _doc.Redo),
+        new("edit.history", "Edit", "Undo history", "Ctrl+H", ShowHistory),
+        new("edit.cut", "Edit", "Cut", "Ctrl+X", CutSel),
+        new("edit.copy", "Edit", "Copy", "Ctrl+C", CopySel),
+        new("edit.paste", "Edit", "Paste", "Ctrl+V", Paste),
+        new("edit.duplicate", "Edit", "Duplicate", "Ctrl+D", DuplicateSel),
+        new("edit.delete", "Edit", "Delete", "Delete|Back|Shift+Delete|Shift+Back", DeleteSel),
+        new("select.all", "Select", "Select all", "Ctrl+A", SelectAll),
+        new("select.layer", "Select", "Select the active layer", "Ctrl+Shift+A", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id))),
+        new("select.circles", "Select", "Select circles…", "", () => _ = Guard(() => new CirclesWindow(_doc).ShowDialog(this))),
+        new("shape.group", "Shapes", "Group", "Ctrl+G", GroupSel),
+        new("shape.ungroup", "Shapes", "Ungroup", "Ctrl+Shift+G", UngroupSel),
+        new("shape.combine", "Shapes", "Combine", "Ctrl+K", Combine),
+        new("shape.break", "Shapes", "Break apart", "Ctrl+Shift+K", BreakApart),
+        new("shape.topaths", "Shapes", "Text to paths", "Ctrl+Shift+C", ConvertToPaths),
+        new("shape.weld", "Shapes", "Weld", "Ctrl+Shift+U", () => BooleanSel(BoolOp.Union)),
+        new("shape.subtract", "Shapes", "Subtract", "Ctrl+Shift+M", () => BooleanSel(BoolOp.Subtract)),
+        new("shape.offset", "Shapes", "Offset…", "Ctrl+Shift+O", () => _ = Guard(OffsetSel)),
+        new("shape.round", "Shapes", "Round corners…", "", () => _ = Guard(RoundCornersSel)),
+        new("shape.textpath", "Shapes", "Text on path", "", TextOnPath),
+        new("shape.tidy", "Shapes", "Tidy lines…", "", () => _ = Guard(TidyPaths)),
+        new("shape.along", "Shapes", "Copy along a path…", "", () => _ = Guard(CopyAlongSel)),
+        new("shape.warp", "Shapes", "Warp…", "", () => { if (SelectedPaths().Count > 0) _ = Guard(() => new WarpWindow(_doc).ShowDialog(this)); }),
+        new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
+        new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
+        new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
+        new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
+        new("layer.moveto", "Layers", "Move selection to the active layer", "Ctrl+M", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer))),
+        new("view.zoomin", "View", "Zoom in", "Ctrl+OemPlus|Ctrl+Add", () => Canvas.ZoomBy(1.25)),
+        new("view.zoomout", "View", "Zoom out", "Ctrl+OemMinus|Ctrl+Subtract", () => Canvas.ZoomBy(0.8)),
+        new("view.fit", "View", "Fit work area", "Home|Ctrl+D0|Ctrl+NumPad0", Canvas.FitField),
+        new("view.fitsel", "View", "Fit selection", "F", Canvas.FitSelection),
+        new("tool.select", "Tools", "Select", "V", () => Canvas.Tool = Tool.Select),
+        new("tool.rect", "Tools", "Rectangle", "R", () => Canvas.Tool = Tool.Rect),
+        new("tool.ellipse", "Tools", "Ellipse", "E", () => Canvas.Tool = Tool.Ellipse),
+        new("tool.line", "Tools", "Line", "L", () => Canvas.Tool = Tool.Line),
+        new("tool.polygon", "Tools", "Polygon", "O", () => Canvas.Tool = Tool.Polygon),
+        new("tool.star", "Tools", "Star", "S", () => Canvas.Tool = Tool.Star),
+        new("tool.pen", "Tools", "Pen", "P", () => Canvas.Tool = Tool.Pen),
+        new("tool.text", "Tools", "Text", "T", () => Canvas.Tool = Tool.Text),
+        new("tool.nodes", "Tools", "Edit points", "N", () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; }),
+        new("tool.pan", "Tools", "Pan", "H", () => Canvas.Tool = Tool.Pan),
+        new("tool.wand", "Tools", "Pick piece (camera)", "W", () => Canvas.Tool = Tool.Wand),
+        new("tool.magnetic", "Tools", "Trace edge (camera)", "M", () => Canvas.Tool = Tool.Magnetic),
+        new("tool.shapes", "Tools", "Special shapes", "I", ShowShapes),
+        new("tool.measure", "Tools", "Measure", "", () => Canvas.Tool = Tool.Measure),
+        new("tool.trim", "Tools", "Trim", "", () => Canvas.Tool = Tool.Trim),
+        new("tool.align2", "Tools", "Align by two points", "", () => Canvas.Tool = Tool.Align2),
+        new("job.frame", "Job", "Frame", "", () => _ = Guard(_job.ToggleFrame)),
+        new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(_job.Send); }),
+        new("job.console", "Job", "G-code console", "", ShowConsole),
+    ];
+
+    readonly Dictionary<string, KeyGesture[]> _gestures = [];
+
+    KeyGesture[] Gestures(string keys)
+    {
+        if (_gestures.TryGetValue(keys, out var g)) return g;
+        var list = new List<KeyGesture>();
+        foreach (var part in keys.Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            try { list.Add(KeyGesture.Parse(part)); }
+            catch (ArgumentException) { }
+        return _gestures[keys] = [.. list];
+    }
+
     void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         var m = e.KeyModifiers;
         bool ctrl = m.HasFlag(KeyModifiers.Control), shift = m.HasFlag(KeyModifiers.Shift);
         bool typing = TextInputFocused();
-
-        // File shortcuts work everywhere.
-        Func<Task>? fileAction = (ctrl, shift, e.Key) switch
-        {
-            (true, false, Key.S) => () => Save(false),
-            (true, true, Key.S) => () => Save(true),
-            (true, false, Key.O) => OpenDoc,
-            (true, false, Key.N) => NewDoc,
-            (true, false, Key.I) => () => ImportAny(false),
-            (true, true, Key.I) => () => ImportAny(true),
-            (true, false, Key.J) => ImportImage,
-            (false, false, Key.F1) => ShowShortcuts,
-            _ => null,
-        };
-        if (fileAction is not null)
-        {
-            e.Handled = true;
-            _ = Guard(fileAction);
-            return;
-        }
-        if (typing) return; // let text boxes keep Ctrl+Z, Ctrl+A, Delete, arrows, letters
         // Pen and point editing use these keys themselves.
-        if (Canvas.Tool is Tool.Pen or Tool.Nodes && !ctrl && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S) return;
-
-        Action? action = (ctrl, shift, e.Key) switch
+        bool toolKeys = Canvas.Tool is Tool.Pen or Tool.Nodes && !ctrl && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S;
+        foreach (var c in Commands())
         {
-            (true, false, Key.Z) => _doc.Undo,
-            (true, true, Key.Z) => _doc.Redo,
-            (true, false, Key.Y) => _doc.Redo,
-            (true, false, Key.X) => CutSel,
-            (true, false, Key.C) => CopySel,
-            (true, false, Key.V) => Paste,
-            (true, false, Key.D) => DuplicateSel,
-            (true, false, Key.A) => SelectAll,
-            (true, true, Key.A) => () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)),
-            (true, false, Key.G) => GroupSel,
-            (true, true, Key.G) => UngroupSel,
-            (true, false, Key.K) => Combine,
-            (true, true, Key.K) => BreakApart,
-            (true, true, Key.C) => ConvertToPaths,
-            (true, true, Key.U) => () => BooleanSel(BoolOp.Union),
-            (true, true, Key.M) => () => BooleanSel(BoolOp.Subtract),
-            (true, true, Key.O) => () => { _ = Guard(OffsetSel); },
-            (true, false, Key.T) => () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); },
-            (true, false, Key.L) => _layers.AddLayer,
-            (true, false, Key.M) => () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer)),
-            (true, false, Key.OemPlus or Key.Add) => () => Canvas.ZoomBy(1.25),
-            (true, false, Key.OemMinus or Key.Subtract) => () => Canvas.ZoomBy(0.8),
-            (true, false, Key.D0 or Key.NumPad0) => Canvas.FitField,
-            (false, _, Key.Delete or Key.Back) => DeleteSel,
-            (false, false, Key.Home) => Canvas.FitField,
-            (false, false, Key.F) => Canvas.FitSelection,
-            (false, false, Key.V) => () => Canvas.Tool = Tool.Select,
-            (false, false, Key.R) => () => Canvas.Tool = Tool.Rect,
-            (false, false, Key.E) => () => Canvas.Tool = Tool.Ellipse,
-            (false, false, Key.L) => () => Canvas.Tool = Tool.Line,
-            (false, false, Key.O) => () => Canvas.Tool = Tool.Polygon,
-            (false, false, Key.S) => () => Canvas.Tool = Tool.Star,
-            (false, false, Key.P) => () => Canvas.Tool = Tool.Pen,
-            (false, false, Key.T) => () => Canvas.Tool = Tool.Text,
-            (false, false, Key.N) => () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; },
-            (false, false, Key.H) => () => Canvas.Tool = Tool.Pan,
-            (false, false, Key.W) => () => Canvas.Tool = Tool.Wand,
-            (false, false, Key.I) => ShowShapes,
-            (false, false, Key.M) => () => Canvas.Tool = Tool.Magnetic,
-            _ => null,
-        };
+            // File shortcuts work everywhere; the rest leave text boxes their Ctrl+Z, Ctrl+A, Delete, arrows and letters.
+            if (typing && !c.AlsoWhileTyping) continue;
+            if (toolKeys && !c.AlsoWhileTyping) continue;
+            foreach (var g in Gestures(HotkeysWindow.Keys(c, _settings)))
+            {
+                if (!g.Matches(e)) continue;
+                e.Handled = true;
+                c.Run();
+                return;
+            }
+        }
+        if (typing || toolKeys) return;
         // Ctrl+1…9: move the selection to layer N.
-        if (action is null && ctrl && !shift && e.Key is >= Key.D1 and <= Key.D9)
+        if (ctrl && !shift && e.Key is >= Key.D1 and <= Key.D9)
         {
             int idx = e.Key - Key.D1;
             if (idx < _doc.State.Layers.Count && _doc.Selection.Count > 0)
-                action = () => _doc.Commit($"Move to {_doc.State.Layers[idx].Name}", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.State.Layers[idx].Id));
+            {
+                e.Handled = true;
+                _doc.Commit($"Move to {_doc.State.Layers[idx].Name}", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.State.Layers[idx].Id));
+            }
         }
-        if (action is null) return;
-        e.Handled = true;
-        action();
+    }
+
+    Task ShowHotkeys() => new HotkeysWindow(Commands(), _settings).ShowDialog(this);
+
+    async Task ShowWorkMode()
+    {
+        var w = new WorkModeWindow(_settings, _machine);
+        if (!await w.ShowDialog<bool>(this)) return;
+        ApplyWorkMode();
+        StatusText.Text = $"Work mode: {WorkModes.Describe(_settings)}.";
+    }
+
+    /// <summary>The canvas shows the mode's work area; the job is built for it.</summary>
+    void ApplyWorkMode()
+    {
+        Canvas.Machine = WorkModes.Area(_settings);
+        Canvas.FitField();
+        _job.Refresh();
+        _ribbon.Refresh();
+    }
+
+    SectionsWindow? _sections;
+
+    Task ShowSections()
+    {
+        if (_sections is { } open) { open.Activate(); return Task.CompletedTask; }
+        _sections = new SectionsWindow(_doc, _job);
+        _sections.Closed += (_, _) => _sections = null;
+        _sections.Show(this);
+        return Task.CompletedTask;
+    }
+
+    ConsoleWindow? _console;
+
+    void ShowConsole()
+    {
+        if (_console is { } open) { open.Activate(); return; }
+        _console = new ConsoleWindow(_machine, _settings);
+        _console.Closed += (_, _) => _console = null;
+        _console.Show(this);
+    }
+
+    string TemplatesFolder => Path.Combine(AppIdentity.DataDir, "templates");
+
+    async Task NewFromTemplate()
+    {
+        if (!await ConfirmDiscard()) return;
+        var w = new TemplatesWindow(TemplatesFolder);
+        await w.ShowDialog(this);
+        if (w.Chosen is not { } path) return;
+        DocState state;
+        try { state = DocFile.Load(path); }
+        catch (Exception ex) when (ex is IOException or FormatException) { await Dialogs.Message(this, "Can't open the template", ex.Message); return; }
+        // A new, untitled design: saving asks for a name, so the template stays as it was.
+        _doc.Reset(state, null);
+        _layers.Activate(_doc.ActiveLayer);
+        Canvas.FitField();
+        StatusText.Text = $"New design from the template \"{Path.GetFileNameWithoutExtension(path)}\".";
+    }
+
+    async Task SaveAsTemplate()
+    {
+        var suggested = _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "My template";
+        var name = await Dialogs.Prompt(this, "Save as template", "Template name", suggested);
+        if (string.IsNullOrWhiteSpace(name)) return;
+        var safe = string.Concat(name.Trim().Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        Directory.CreateDirectory(TemplatesFolder);
+        var path = Path.Combine(TemplatesFolder, safe + DocFile.Extension);
+        if (File.Exists(path) && !await Dialogs.Confirm(this, "Replace template?", $"There's already a template called \"{safe}\". Replace it?", "Replace", "Cancel")) return;
+        DocFile.Save(_doc.State, path);
+        StatusText.Text = $"Saved as the template \"{safe}\": File → New from template starts a design from it.";
     }
 
     // ---- right-click menus ----------------------------------------------------
@@ -719,8 +842,14 @@ public partial class MainWindow : Window
             Do("Combine into one shape (compound)", Combine, paths.Count > 1, "Ctrl+K"),
             Do("Break apart", BreakApart, compound, "Ctrl+Shift+K"),
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
+            Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked))),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
+                DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
+                Do(anyText && paths.Count == 1 && paths[0] is TextShape { Guide: not null } ? "Straighten text" : "Text on path", TextOnPath, anyText),
+                DoAsync("Copy along path…", CopyAlongSel, n > 1),
+                DoAsync("Warp…", () => new WarpWindow(_doc).ShowDialog(this), paths.Count > 0),
+                DoAsync("Tidy lines…", TidyPaths, paths.Count > 0),
                 new Separator(),
                 Do("Weld (union)", () => BooleanSel(BoolOp.Union), paths.Count > 1),
                 Do("Subtract (bottom minus the rest)", () => BooleanSel(BoolOp.Subtract), paths.Count > 1),
@@ -1234,6 +1363,101 @@ public partial class MainWindow : Window
 
     void UngroupSel() => _doc.Commit("Ungroup", Ops.Ungroup(_doc.State, _doc.Selection));
 
+    // ---- more shape tools ---------------------------------------------------------------
+
+    /// <summary>A plain path in place of <paramref name="p"/>, with this outline in world mm.</summary>
+    static PathShape Plain(PathShape p, Doc.PathGeometry world) =>
+        new() { Id = p.Id, Name = p.Name, LayerId = p.LayerId, GroupId = p.GroupId, Geometry = world };
+
+    string _lastRadius = "2";
+
+    async Task RoundCornersSel()
+    {
+        var paths = SelectedPaths();
+        if (paths.Count == 0) return;
+        var input = await Dialogs.Prompt(this, "Round corners", "Corner radius (mm). Corners whose edges are too short get the biggest radius that fits.", _lastRadius);
+        if (input is null || !double.TryParse(input.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var r) || r <= 0) return;
+        _lastRadius = input;
+        var s = _doc.State;
+        int total = 0;
+        foreach (var p in paths)
+        {
+            var (g, n) = PathTools.RoundCorners(p.World, r);
+            if (n == 0) continue;
+            total += n;
+            s = Ops.Replace(s, Plain(p, g));
+        }
+        if (total == 0) { StatusText.Text = "No sharp corners between straight edges to round (curves are left as they are)."; return; }
+        _doc.Commit($"Round corners {r:0.##} mm", s);
+        StatusText.Text = $"Rounded {total} corner{(total == 1 ? "" : "s")}." + (paths.Any(p => p is TextShape or CodeShape) ? " Text and codes became plain outlines." : "");
+    }
+
+    async Task TidyPaths()
+    {
+        var targets = (_doc.Selection.Count > 0 ? SelectedPaths() : _doc.State.Editable().OfType<PathShape>().ToList())
+            .Where(p => p is not (TextShape or CodeShape)).ToList();
+        if (targets.Count == 0) return;
+        var input = await Dialogs.Prompt(this, "Tidy lines", $"Join ends closer than (mm). Works on {(_doc.Selection.Count > 0 ? "the selection" : "the whole design")}.", "0.05");
+        if (input is null || !double.TryParse(input.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var tol) || tol < 0) return;
+        var r = PathTools.Cleanup([.. targets.Select(t => t.World)], tol);
+        if (!r.Changed) { StatusText.Text = "Nothing to tidy: no ends to join, nothing nearly closed, no duplicates."; return; }
+        var s = _doc.State;
+        var gone = new HashSet<Guid>();
+        for (int i = 0; i < targets.Count; i++)
+        {
+            if (r.Geometries[i].IsEmpty) gone.Add(targets[i].Id);
+            else s = Ops.Replace(s, Plain(targets[i], r.Geometries[i]));
+        }
+        if (gone.Count > 0) s = Ops.Delete(s, gone);
+        _doc.Commit("Tidy lines", s);
+        StatusText.Text = $"Joined {r.Joined}, closed {r.Closed}, removed {r.Duplicates} duplicate{(r.Duplicates == 1 ? "" : "s")} and {r.Tiny} zero-length piece{(r.Tiny == 1 ? "" : "s")}.";
+    }
+
+    /// <summary>A text and a path selected: the text follows the path. A text alone on a path: straight again.</summary>
+    void TextOnPath()
+    {
+        var sel = SelectedPaths();
+        var text = sel.OfType<TextShape>().FirstOrDefault();
+        if (text is null) return;
+        var guide = sel.Where(p => p is not (TextShape or CodeShape)).OrderByDescending(p => p.Bounds.Width + p.Bounds.Height).FirstOrDefault();
+        if (guide is null)
+        {
+            if (text.Guide is null) { StatusText.Text = "Select the text and the line or shape it should follow."; return; }
+            _doc.Commit("Straighten text", Ops.Replace(_doc.State, text.OnPath(null)), [text.Id]);
+            return;
+        }
+        _doc.Commit("Text on path", Ops.Replace(_doc.State, text.OnPath(guide.World)), [text.Id]);
+        StatusText.Text = "The text follows the path. Alignment picks the start, middle or end; the path itself is still there (delete it or turn its layer's output off if it shouldn't be marked).";
+    }
+
+    async Task CopyAlongSel()
+    {
+        var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
+        var guide = sel.OfType<PathShape>().Where(p => p is not (TextShape or CodeShape) && !p.World.IsEmpty)
+            .OrderByDescending(p => p.World.Flatten(0.05).Sum(f => PathTools.CumulativeLengths(f.Points)[^1])).FirstOrDefault();
+        if (guide is null || sel.Count < 2) { StatusText.Text = "Select what to copy and the path to copy it along."; return; }
+        await new CopyAlongWindow(_doc, guide).ShowDialog(this);
+    }
+
+    void LockSel(bool locked)
+    {
+        var s = _doc.State;
+        IReadOnlySet<Guid> ids = locked ? _doc.Selection : s.Shapes.Where(x => x.Locked).Select(x => x.Id).ToHashSet();
+        if (ids.Count == 0) return;
+        var shapes = s.Shapes.Select(x => ids.Contains(x.Id) && x.Locked != locked ? x.WithLocked(locked) : x);
+        _doc.Commit(locked ? "Lock" : "Unlock all", s with { Shapes = System.Collections.Immutable.ImmutableList.CreateRange(shapes) }, locked ? [] : ids);
+    }
+
+    HistoryWindow? _history;
+
+    void ShowHistory()
+    {
+        if (_history is { } open) { open.Activate(); return; }
+        _history = new HistoryWindow(_doc);
+        _history.Closed += (_, _) => _history = null;
+        _history.Show(this);
+    }
+
     void ConvertToPaths()
     {
         var state = _doc.State;
@@ -1422,17 +1646,29 @@ public partial class MainWindow : Window
         }
     }
 
-    Task ShowShortcuts() => Dialogs.Message(this, "Keyboard shortcuts", string.Join("\n",
-        "V select · R rectangle · E ellipse · O polygon · S star · L line · P pen · T text · N edit points · H pan",
-        "Space or middle mouse: pan · wheel: zoom · Shift+wheel: scroll sideways",
-        "Home: fit work area · F: fit selection",
-        "Arrows: nudge 1 mm (Shift 10 mm, Ctrl 0.1 mm)",
-        "Drag left→right: select inside · right→left: select touching",
-        "Corner handles keep proportions (Shift = free) · Alt = from centre",
-        "Rotate handle: Shift snaps to 15° · hold Ctrl while dragging to turn snapping off",
-        "Ctrl+D duplicate · Ctrl+G group · Ctrl+Shift+G ungroup · Ctrl+K combine · Ctrl+Shift+K break apart",
-        "Ctrl+1…9 move selection to layer 1…9 · Ctrl+M to the active layer",
-        "Ctrl+Z / Ctrl+Y undo / redo · Esc cancel / deselect"));
+    async Task ShowShortcuts()
+    {
+        var keys = Commands().Select(c => (c, k: HotkeysWindow.Keys(c, _settings))).Where(x => x.k.Length > 0)
+            .GroupBy(x => x.c.Group).Select(g => $"{g.Key}: " + string.Join(" · ", g.Select(x => $"{x.k.Split('|')[0]} {x.c.Name.ToLowerInvariant()}")));
+        var text = string.Join("\n", keys.Concat(
+        [
+            "",
+            "Space or middle mouse: pan · wheel: zoom · Shift+wheel: scroll sideways",
+            "Arrows: nudge 1 mm (Shift 10 mm, Ctrl 0.1 mm) · Ctrl+1…9: move the selection to layer 1…9",
+            "Drag left→right: select inside · right→left: select touching",
+            "Corner handles keep proportions (Shift = free) · Alt = from centre",
+            "Rotate handle: Shift snaps to 15° · hold Ctrl while dragging to turn snapping off",
+            "Esc: cancel / deselect",
+        ]));
+        if (await Dialogs.Confirm(this, "Keyboard shortcuts", text, "Change shortcuts…", "Close")) await ShowHotkeys();
+    }
+
+    async Task ShowFonts()
+    {
+        var w = new FontWindow(_settings);
+        w.FontsChanged += _props.RefreshFonts;
+        await w.ShowDialog(this);
+    }
 
     Task ShowGettingStarted() => new WelcomeWindow(firstRun: false, _machine.SetUpKeys, () => _machine.HasKeys).ShowDialog(this);
 

@@ -33,7 +33,9 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _lpcm = Number(1, (decimal)FillBlock.MaxLinesPerCm, 10, "0.#");
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
     readonly NumericUpDown _dotUs = Number(10, 10000, 10, "0");
-    readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth)", "Floyd–Steinberg", "Stucki", "Atkinson (contrasty)", "Bayer (pattern)", "Threshold (line art)" } };
+    readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth)", "Floyd–Steinberg", "Stucki", "Atkinson (contrasty)", "Bayer (pattern)", "Threshold (line art)", "Halftone (dots)", "Newsprint (coarse dots)", "Line screen (engraved lines)", "Sketch (edges only)" } };
+    readonly NumericUpDown _cpi = Num(2, 500, 1, "0.#"), _screenAngle = Num(-180, 180, 15, "0.#"), _dotWidth = Number(0, 1, 0.005m, "0.###");
+    readonly Control _screenRow;
     readonly TextBlock _lpcmHint = Hint(), _dpiHint = Hint(), _passHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow, _imageModeRow;
 
@@ -118,6 +120,8 @@ public sealed class LayerEditor : UserControl
         _dpiRow = Field("Resolution", _dpi, _dpiHint, "Dots per inch. Higher = finer detail, slower. 150–300 suits most wood.");
         _ditherRow = Field("Dithering", _dither, tip: "How grey tones become dots. Jarvis suits photos; Threshold suits logos and line art.");
         _dotRow = Field("Dot time µs", _dotUs, tip: "How long each dot fires, in microseconds. Longer = darker dots.");
+        _screenRow = Row(Labelled("Cells / inch", _cpi, "How many screen cells per inch: fewer = bigger, bolder dots or lines. Must be well under the resolution (dpi)."),
+                         Labelled("Screen angle °", _screenAngle, "Direction of the screen. 45° hides the pattern best for dots; any angle for lines."));
         _imageModeRow = Field("Picture mode", _imageMode, tip: "Dots: every dot at full power, tone from dot spacing (proven). Greyscale: each dot's power follows the picture (not yet tested on your machine). " +
                                                               "Depth slices: the picture is a depth map (dark = deep), carved in thin slices one after another: relief on metal with the MOPA, or on wood.");
 
@@ -159,6 +163,7 @@ public sealed class LayerEditor : UserControl
                 Field("Scan angle (°)", _fillAngle, tip: "Direction of the fill lines. 0 = left to right."),
                 _crosshatch,
                 Field("Overscan (mm)", _overscan, tip: "Each line starts and ends this far outside the shape with the laser off, so edges burn evenly."),
+                Field("Dot width (mm)", _dotWidth, tip: "Dot width correction: each burned line is made shorter by this much (half at each end), so the beam's width doesn't make fills wider than drawn. About the beam width: 0.03–0.08 mm. 0 = off."),
                 Field("Turn per pass (°)", _angleStep, tip: "Turn the scan lines this much more on every pass (and every depth slice), so the line pattern doesn't build up into stripes or ridges. " +
                                                               "Something odd like 37° or 23° spreads the angles best. 0 = every pass the same."),
                 _turnRuns,
@@ -242,7 +247,7 @@ public sealed class LayerEditor : UserControl
                 _light,
                 trio,
                 _passHint,
-                _lpcmRow, _dpiRow, _imageModeRow, _ditherRow,
+                _lpcmRow, _dpiRow, _imageModeRow, _ditherRow, _screenRow,
                 Field("Material", _material),
                 _reflective,
                 Field("Saved settings", _recipe),
@@ -282,6 +287,9 @@ public sealed class LayerEditor : UserControl
             return l with { ImageMode = mode, AngleStepDeg = mode == ImageEngraveMode.Slices && l.ImageMode != mode && l.AngleStepDeg == 0 ? 37 : l.AngleStepDeg };
         }, _imageMode.SelectedIndex >= 0);
         _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
+        _cpi.ValueChanged += (_, _) => EditLayers("Screen cells", l => l with { HalftoneCpi = (double)_cpi.Value!.Value }, _cpi.Value.HasValue, "cpi");
+        _screenAngle.ValueChanged += (_, _) => EditLayers("Screen angle", l => l with { HalftoneAngleDeg = (double)_screenAngle.Value!.Value }, _screenAngle.Value.HasValue, "sangle");
+        _dotWidth.ValueChanged += (_, _) => EditLayers("Dot width correction", l => l with { DotWidthMm = (double)_dotWidth.Value!.Value }, _dotWidth.Value.HasValue, "dotwidth");
         _angleStep.ValueChanged += (_, _) => EditLayers("Turn per pass", l => l with { AngleStepDeg = (double)_angleStep.Value!.Value }, _angleStep.Value.HasValue, "anglestep");
         _turnRuns.IsCheckedChanged += (_, _) => EditLayers("Turn from run to run", l => l with { TurnEachRun = _turnRuns.IsChecked == true }, _turnRuns.IsChecked.HasValue);
         _resetRuns.Click += (_, _) => EditLayers("Start the turning again", l => l with { RunCount = 0 }, true);
@@ -380,6 +388,10 @@ public sealed class LayerEditor : UserControl
         _lpcmRow.IsVisible = anyFill || anySlices;
         _dpiRow.IsVisible = _imageModeRow.IsVisible = anyImage;
         _ditherRow.IsVisible = _dotRow.IsVisible = anyImage && !allSlices;
+        _screenRow.IsVisible = anyImage && !allSlices && ls.Any(l => l.Mode == LayerMode.Image && l.ImageMode == ImageEngraveMode.Dither && l.Dither is DitherMethod.Halftone or DitherMethod.LineScreen);
+        Num(_cpi, Same(l => l.HalftoneCpi));
+        Num(_screenAngle, Same(l => l.HalftoneAngleDeg));
+        Num(_dotWidth, Same(l => l.DotWidthMm));
         _cutExtras.IsVisible = anyCut;
         _fillExtras.IsVisible = anyFill || anySlices;
         _fillStyleRow.IsVisible = anyFill;

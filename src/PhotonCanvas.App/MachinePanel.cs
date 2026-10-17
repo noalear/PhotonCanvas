@@ -407,6 +407,22 @@ public sealed class MachinePanel : UserControl
     /// <summary>Machine mode changed (P_IDLE, P_WORK, P_WORKING, P_PAUSE…). On the UI thread.</summary>
     public event Action<string>? ModeChanged;
 
+    /// <summary>Run one command line the user typed or chose (console, macros). Returns the reply, or throws <see cref="DeviceException"/>.</summary>
+    public async Task<string> SendCommandAsync(string command)
+    {
+        if (_client is not { } c) throw new DeviceException(DeviceException.ProtocolErrorCode, "Not connected.");
+        Log($"Console: {command}");
+        return await c.SendCommandAsync(command);
+    }
+
+    /// <summary>The machine's stored settings, or null when not connected or it won't say.</summary>
+    public async Task<System.Text.Json.Nodes.JsonNode?> GetConfigsAsync()
+    {
+        if (_client is not { } c) return null;
+        try { return await c.GetConfigsAsync(); }
+        catch (DeviceException) { return null; }
+    }
+
     public Task PauseJobAsync() => _client?.PauseJobAsync() ?? Task.CompletedTask;
     public Task ResumeJobAsync() => _client?.ResumeJobAsync() ?? Task.CompletedTask;
     public Task StopJobAsync() => _client?.StopJobAsync() ?? Task.CompletedTask;

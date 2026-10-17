@@ -17,6 +17,44 @@ public sealed record JobOptions
     /// <summary>Maximum deviation of the cut path from the true curve, in mm.</summary>
     public double Tolerance { get; init; } = 0.01;
     public MachineProfile Machine { get; init; } = MachineProfile.F2Ultra;
+    /// <summary>Flat bed, rotary or conveyor (for the rotary, the origin is set from the design).</summary>
+    public WorkMode Mode { get; init; } = new WorkMode.Flat();
+    /// <summary>Mark only this section of a design bigger than the work area, moved into it.</summary>
+    public Section? Section { get; init; }
+}
+
+/// <summary>One section of a design bigger than the work area.</summary>
+/// <param name="Clip">The part of the design (design mm).</param>
+/// <param name="Shift">How far it is moved to land in the work area.</param>
+/// <param name="MaterialMove">How far to move the material from where it was for the first section (mm; + = right/down on the work area).</param>
+public sealed record Section(int Index, int Count, int Row, int Col, Rect2 Clip, Vec2 Shift, Vec2 MaterialMove)
+{
+    public string Label => $"section {Index + 1} of {Count}";
+
+    /// <summary>
+    /// The sections for a design: a grid of rectangles no bigger than <paramref name="width"/> ×
+    /// <paramref name="height"/> mm covering it, row by row, each placed at the same spot in the
+    /// work area (so the material is moved between them, never the design).
+    /// </summary>
+    public static List<Section> Plan(Rect2 design, double width, double height, MachineProfile m)
+    {
+        var o = new List<Section>();
+        if (design.IsEmpty) return o;
+        width = Math.Clamp(width, 5, m.FieldW);
+        height = Math.Clamp(height, 5, m.FieldH);
+        int cols = Math.Max(1, (int)Math.Ceiling(design.Width / width - 1e-9));
+        int rows = Math.Max(1, (int)Math.Ceiling(design.Height / height - 1e-9));
+        // Where each section lands: the middle of the work area, the same for all.
+        var at = new Vec2((m.FieldW - width) / 2, (m.FieldH - height) / 2);
+        int n = rows * cols;
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                var clip = new Rect2(design.MinX + c * width, design.MinY + r * height, design.MinX + (c + 1) * width, design.MinY + (r + 1) * height);
+                o.Add(new Section(r * cols + c, n, r, c, clip, at - clip.TopLeft, new Vec2(-c * width, -r * height)));
+            }
+        return o;
+    }
 }
 
 /// <summary>A job ready to send, plus everything the UI shows about it.</summary>
@@ -205,7 +243,7 @@ public static class JobBuilder
                             double focus = layer.FocusOffsetMm + sl.DropMm * (k / Math.Max(1, sl.DropEvery));
                             int bm = blocks.Count, sm = steps.Count;
                             // Repeats carry on turning after the last slice.
-                            blocks.Add(new FillBlock([], layer.Laser, layer.LinesPerCm) { Mask = m, AngleDeg = angle, AngleStepDeg = turn * n, OverscanMm = layer.OverscanMm, FocusOffsetMm = focus });
+                            blocks.Add(new FillBlock([], layer.Laser, layer.LinesPerCm) { Mask = m, AngleDeg = angle, AngleStepDeg = turn * n, OverscanMm = layer.OverscanMm, FocusOffsetMm = focus, DotWidthMm = layer.DotWidthMm });
                             if (sl.CleanupEvery > 0 && (k + 1) % sl.CleanupEvery == 0)
                                 blocks.Add(new FillBlock([], clean, sl.CleanupLinesPerCm) { Mask = sl.CleanupWhole ? masks[0] : m, AngleDeg = angle + 90, FocusOffsetMm = focus });
                             steps.Add(new(layer.Id, [r.TopLeft, new(r.MaxX, r.MinY), r.BottomRight, new(r.MinX, r.MaxY)], true, true) { ScanAngleDeg = angle });
@@ -269,6 +307,7 @@ public static class JobBuilder
                         AngleStepDeg = layer.AngleStepDeg,
                         OverscanMm = layer.OverscanMm,
                         FocusOffsetMm = layer.FocusOffsetMm,
+                        DotWidthMm = layer.DotWidthMm,
                     };
                     var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + 90 } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
@@ -319,6 +358,32 @@ public static class JobBuilder
             }
         }
 
+        if (opt.Section is { } sec)
+        {
+            // One section of a bigger design: every block cut to it and moved into the work area.
+            var cutBlocks = new List<Block>();
+            var cutSteps = new List<(int First, int Count)>();
+            var newIndex = new int[blocks.Count + 1];
+            for (int i = 0; i < blocks.Count; i++)
+            {
+                newIndex[i] = cutBlocks.Count;
+                foreach (var piece in Sections.Cut(blocks[i], sec.Clip, sec.Shift))
+                {
+                    cutBlocks.Add(piece);
+                    cutSteps.Add(blockSteps[i]);
+                }
+            }
+            newIndex[blocks.Count] = cutBlocks.Count;
+            for (int i = 0; i < starts.Count; i++) starts[i] = (starts[i].Layer, newIndex[starts[i].Start]);
+            blocks = cutBlocks;
+            blockSteps = cutSteps;
+            for (int i = 0; i < steps.Count; i++)
+                steps[i] = steps[i] with { Points = [.. steps[i].Points.Select(p => p + sec.Shift)] };
+            var b0 = new Rect2(Math.Max(bounds.MinX, sec.Clip.MinX), Math.Max(bounds.MinY, sec.Clip.MinY), Math.Min(bounds.MaxX, sec.Clip.MaxX), Math.Min(bounds.MaxY, sec.Clip.MaxY));
+            bounds = b0.MaxX > b0.MinX && b0.MaxY > b0.MinY ? new Rect2(b0.MinX + sec.Shift.X, b0.MinY + sec.Shift.Y, b0.MaxX + sec.Shift.X, b0.MaxY + sec.Shift.Y) : Rect2.Empty;
+            if (blocks.Count == 0) throw new JobException($"There's nothing to mark in {sec.Label}.");
+        }
+
         for (int i = 0; i < starts.Count; i++)
         {
             var (layer, start) = starts[i];
@@ -331,10 +396,28 @@ public static class JobBuilder
                 ? "There is nothing on the canvas to process."
                 : "No shapes are on an enabled, visible layer.");
 
+        var mode = opt.Mode switch
+        {
+            // Round the object from the middle of the design: what faces the laser at the start is the design's middle row.
+            WorkMode.Rotary r => r with { OriginY = (bounds.MinY + bounds.MaxY) / 2 },
+            _ => opt.Mode,
+        };
+        if (mode is WorkMode.Conveyor)
+        {
+            // Lines run along the galvo's Y and step along the belt, so the belt doesn't shuttle back and forth.
+            if (blocks.OfType<FillBlock>().Any(f => FoldTo180(f.AngleDeg) != 90 || f.AngleStepDeg != 0))
+                warnings.Add("On the conveyor, engraving lines always run across the belt (90°), so scan angles and turning per pass are left out.");
+            blocks = [.. blocks.Select(b => b is FillBlock f ? f with { AngleDeg = 90, AngleStepDeg = 0 } : b)];
+        }
+        if (mode is WorkMode.Rotary or WorkMode.Conveyor)
+            warnings.Add(mode is WorkMode.Rotary
+                ? "Rotary attachment: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first."
+                : "Conveyor: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first.");
         var job = new Job(opt.Machine, blocks)
         {
             PassMode = opt.WholeJobPasses ? new PassMode.Rounds(opt.PassDelayS) : new PassMode.PerBlock(),
             Created = (now ?? DateTimeOffset.Now).ToString("yyyy_MM_dd_HH_mm_ss"),
+            Mode = mode,
         };
         var motion = job.Render();
         Vec2[] frame = [bounds.TopLeft, new(bounds.MaxX, bounds.MinY), bounds.BottomRight, new(bounds.MinX, bounds.MaxY), bounds.TopLeft];
@@ -366,6 +449,8 @@ public static class JobBuilder
             PreviewJpeg = XfPackage.PreviewJpeg(steps.Select(st => (IReadOnlyList<Vec2>)(st.Closed ? [.. st.Points, st.Points[0]] : st.Points))),
             Light = light,
             Params = prms,
+            Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => "LASER_PLANE" },
+            Axis = mode is WorkMode.Flat ? "" : "U",
             Created = now ?? DateTimeOffset.Now,
         });
         return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps)
@@ -409,6 +494,8 @@ public static class JobBuilder
             }
         return spans;
     }
+
+    static double FoldTo180(double deg) => ((deg % 180) + 180) % 180;
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
 
@@ -471,7 +558,7 @@ public static class JobBuilder
                 Levels = levels,
             }, area);
         }
-        var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither);
+        var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither, new Screen(layer.Dpi / Math.Max(1, layer.HalftoneCpi), layer.HalftoneAngleDeg));
         if (!dots.Any(d => d)) return (null, b);
         Array.Copy(dots, bitmap.Bits, dots.Length);
         var block = new DotBlock(bitmap, origin, layer.Laser, layer.Dpi, layer.DotUs,
@@ -581,6 +668,13 @@ public static class JobBuilder
                 JobException.CheckRange("fill angle", l.FillAngleDeg, -360, 360, "degrees");
                 JobException.CheckRange("turn per pass", l.AngleStepDeg, -180, 180, "degrees");
                 JobException.CheckRange("overscan", l.OverscanMm, 0, 20, "mm");
+                JobException.CheckRange("dot width correction", l.DotWidthMm, 0, 1, "mm");
+                if (l.DotWidthMm >= 10 / l.LinesPerCm && l.DotWidthMm > 0)
+                    throw new JobException($"Dot width correction ({l.DotWidthMm:0.###} mm) must be less than the line spacing ({10 / l.LinesPerCm:0.###} mm).");
+                break;
+            case LayerMode.Image when l.Dither is DitherMethod.Halftone or DitherMethod.LineScreen && l.ImageMode == ImageEngraveMode.Dither:
+                JobException.CheckRange("screen cells per inch", l.HalftoneCpi, 2, l.Dpi / 2, "cells/inch");
+                JobException.CheckRange("screen angle", l.HalftoneAngleDeg, -360, 360, "degrees");
                 break;
             case LayerMode.Image when l.ImageMode == ImageEngraveMode.Slices:
                 var sl = l.Slices;

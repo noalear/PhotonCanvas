@@ -223,6 +223,12 @@ M6 P1
 
 There is no signing or encryption. Integrity checks are the MD5 on file transfers and CRC16 per frame.
 
+## Raw commands and stored settings (from the stock app; not yet tried)
+
+- `POST /v1/cnc/cmd` with `{cmd: "<one G-code line>"}` as the **query parameters** (not the body) runs one command at once, outside a job. The stock app uses it to point the galvo (`G0X…Y…F60000`) and to stop the U axis (`M108U0`). PhotonCanvas's console uses it, only for what the user types or runs.
+- `GET /v1/device/configs` returns the machine's stored settings, e.g. `ConveyorURate` (0.7459 × 100 ÷ calibration %) and `ConveyorAngleCompensate`.
+- Conveyor belt moves outside a job: `PUT /v1/peripheral/param?type=conveyor` `{u: mm, action: "goto" | "stop" | "lock" | "free", speed: 9600}` (not used by PhotonCanvas yet).
+
 ## Camera
 
 - **Two cameras:** stream 0 is the "main" overview camera, and stream 1 is the "deep" close-up camera. The close-up is used with the IR LED for height measurement.
