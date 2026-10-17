@@ -550,3 +550,38 @@ public class ColourPictureTests
         Assert.True(ColourScience.DeltaE2000(bare!.Value, ColourScience.SrgbToLab(150, 152, 158)) < 1);
     }
 }
+
+public class DepthHologramTests
+{
+    [Fact]
+    public void PointsInFrontBecomeArcsBelowThemAndBehindAbove()
+    {
+        // 60 × 60 px depth map over 30 × 30 mm: white (nothing) with a light square (in front)
+        // on the left and a dark square (behind) on the right.
+        int w = 60, h = 60;
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int i = (y * w + x) * 4;
+                byte v = 255;
+                if (y >= 20 && y < 30 && x >= 5 && x < 20) v = 230;  // in front
+                if (y >= 20 && y < 30 && x >= 40 && x < 55) v = 25;  // behind
+                px[i] = px[i + 1] = px[i + 2] = v; px[i + 3] = 255;
+            }
+        var o = new DiffractionOptions { Mode = DiffractionMode.Depth, PixelMm = 0.5, DepthMm = 4, DepthPointMm = 1, AngleSteps = 12 };
+        var map = Diffraction.Map(new RasterImage(w, h, px), new Vec2(30, 30), o);
+        Assert.True(map.Buckets.Count >= 6); // arcs cover many directions
+        int Rows(int c0, int c1, Func<int, bool> rowWanted) =>
+            Enumerable.Range(0, map.Rows).Where(rowWanted).Sum(r => Enumerable.Range(c0, c1 - c0).Count(c => map.Cells[r * map.Cols + c] >= 0));
+        // Square rows 20–30 px = 10–15 mm = grating rows 20–30. Front square (cols 5–20 px → 5–20): arcs hang below.
+        Assert.True(Rows(0, 22, r => r > 31) > 0);
+        Assert.Equal(0, Rows(0, 22, r => r < 19));
+        // Behind square (cols 40–55 px → 40–55): arcs rise above.
+        Assert.True(Rows(38, 60, r => r < 19) > 0);
+        Assert.Equal(0, Rows(38, 60, r => r > 31));
+        // Flipping swaps them.
+        var flipped = Diffraction.Map(new RasterImage(w, h, px), new Vec2(30, 30), o with { DepthFlip = true });
+        Assert.Contains(Enumerable.Range(0, 19).SelectMany(r => Enumerable.Range(0, 22).Select(c => flipped.Cells[r * flipped.Cols + c])), v => v >= 0);
+    }
+}

@@ -10,6 +10,13 @@ public enum DiffractionMode
     Shimmer,
     /// <summary>Hue sets each pixel's grating pitch: the colours show at one particular lighting and viewing angle.</summary>
     Colour,
+    /// <summary>
+    /// A depth map (light = in front, mid-grey = on the surface, dark = behind, white = nothing)
+    /// as an "almost-hologram": each outline point becomes an arc of grating pixels, as wide as
+    /// the point is deep, so its glint slides along the arc as the plate tilts and the point
+    /// seems to float in front of or behind the metal. Experimental.
+    /// </summary>
+    Depth,
 }
 
 /// <summary>
@@ -34,6 +41,14 @@ public sealed record DiffractionOptions
     public bool SkipLight { get; init; } = true;
     /// <summary>Colour: leave greys and near-black unmarked (a grating can't show them).</summary>
     public bool SkipGrey { get; init; } = true;
+    /// <summary>Depth: arc radius for the nearest and farthest points, mm (the strength of the 3D).</summary>
+    public double DepthMm { get; init; } = 6;
+    /// <summary>Depth: distance between the points that get arcs, mm.</summary>
+    public double DepthPointMm { get; init; } = 2;
+    /// <summary>Depth: only outlines and sudden depth changes get arcs (for line art and stepped shapes); off = points all over (smooth reliefs).</summary>
+    public bool DepthOutlines { get; init; }
+    /// <summary>Depth: swap in front and behind (if it looks inside out under your light).</summary>
+    public bool DepthFlip { get; init; }
 
     // The marking (what has worked on polished stainless: 60 ns, 300 mm/s, lines 0.06 mm apart, low power).
     public double Power { get; init; } = 32;
@@ -97,6 +112,11 @@ public static class Diffraction
         }
 
         int angleSteps = Math.Clamp(o.AngleSteps, 2, 72), colourSteps = Math.Clamp(o.ColourSteps, 2, 32);
+        if (o.Mode == DiffractionMode.Depth)
+        {
+            DepthArcs(img, cols, rows, px, o, angleSteps, cells, (step, angle) => Bucket(step, angle, o.GreenPitchUm, new Lab(50, 0, 0)));
+            goto done;
+        }
         for (int r = 0; r < rows; r++)
             for (int c = 0; c < cols; c++)
             {
@@ -121,6 +141,7 @@ public static class Diffraction
                 }
                 cells[r * cols + c] = cell;
             }
+        done:
         var list = buckets.Select((b, i) =>
         {
             var mean = new Lab(b.Sum.L / b.N, b.Sum.A / b.N, b.Sum.B / b.N);
@@ -128,6 +149,100 @@ public static class Diffraction
             return new GratingBucket(i, b.Angle, b.Pitch, b.Khz, b.Count, (uint)(rr << 16 | gg << 8 | bb));
         }).ToList();
         return new(cols, rows, cells, list, px);
+    }
+
+    /// <summary>
+    /// The depth map as arcs of grating pixels (abrasion-hologram style). A point at depth z
+    /// (−1 behind … +1 in front) becomes a half circle of radius |z| × <see cref="DiffractionOptions.DepthMm"/>
+    /// below it (in front) or above it (behind); each arc pixel's grating points away from the
+    /// centre, so the glint travels round the arc as the plate tilts. Where arcs cross, the
+    /// nearer point wins.
+    /// </summary>
+    static void DepthArcs(RasterImage img, int cols, int rows, double px, DiffractionOptions o, int angleSteps, int[] cells, Func<int, double, int> bucket)
+    {
+        // Depth per pixel: grey 0–255 → −1…+1 (white is "nothing here").
+        var depth = new double?[cols * rows];
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                var grey = DepthGrey(img, (double)c / cols, (double)r / rows, (double)(c + 1) / cols, (double)(r + 1) / rows);
+                depth[r * cols + c] = grey is not { } g ? null : Math.Clamp((g - 127.5) / 127.5, -1, 1) * (o.DepthFlip ? -1 : 1);
+            }
+        Array.Fill(cells, -1);
+        var nearest = new double[cols * rows];
+        Array.Fill(nearest, double.NegativeInfinity);
+        int every = Math.Max(1, (int)Math.Round(o.DepthPointMm / px));
+        double maxR = Math.Max(0.1, o.DepthMm) / px; // in pixels
+        bool Edge(int c, int r)
+        {
+            var z = depth[r * cols + c]!.Value;
+            foreach (var (dc, dr) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                int cc = c + dc, rr = r + dr;
+                if (cc < 0 || rr < 0 || cc >= cols || rr >= rows) return true;
+                if (depth[rr * cols + cc] is not { } z2 || Math.Abs(z2 - z) > 0.25) return true; // the outline, or a real jump in depth
+            }
+            return false;
+        }
+        for (int r = 0; r < rows; r++)
+            for (int c = 0; c < cols; c++)
+            {
+                if (depth[r * cols + c] is not { } z) continue;
+                // Points on a lattice (outlines are kept wherever they fall, thinned along the lattice too).
+                bool onLattice = r % every == 0 && c % every == 0;
+                if (o.DepthOutlines ? !(Edge(c, r) && (r % every == 0 || c % every == 0)) : !onLattice) continue;
+                double rad = Math.Abs(z) * maxR;
+                int sign = z >= 0 ? 1 : -1; // in front: arc below the point; behind: above
+                if (rad < 0.75)
+                {
+                    // On the surface: no movement; a plain grating straight across.
+                    Set(c, r, 0, z);
+                    continue;
+                }
+                int n = Math.Max(8, (int)Math.Ceiling(Math.PI * rad * 1.5));
+                for (int k = 0; k <= n; k++)
+                {
+                    double phi = Math.PI * k / n; // 0…180°
+                    int pc = (int)Math.Round(c + rad * Math.Cos(phi)), pr = (int)Math.Round(r + sign * rad * Math.Sin(phi));
+                    Set(pc, pr, phi * 180 / Math.PI, z);
+                }
+            }
+
+        void Set(int c, int r, double angleDeg, double z)
+        {
+            if (c < 0 || r < 0 || c >= cols || r >= rows) return;
+            int i = r * cols + c;
+            if (z < nearest[i]) return;
+            nearest[i] = z;
+            // The grating points away from the arc's centre: its line direction, 0–180°.
+            double a = (angleDeg % 180 + 180) % 180;
+            int step = (int)Math.Round(a / 180 * angleSteps) % angleSteps;
+            cells[i] = bucket(step, 180.0 * step / angleSteps);
+        }
+    }
+
+    /// <summary>
+    /// A depth map's grey (0–255) over a region, leaving out "nothing here" pixels (white or
+    /// transparent): averaging them in would make an object's outline look like it stands out.
+    /// Null when most of the region is nothing.
+    /// </summary>
+    static double? DepthGrey(RasterImage img, double fx0, double fy0, double fx1, double fy1)
+    {
+        int x0 = (int)Math.Floor(fx0 * img.Width), x1 = Math.Min(img.Width, Math.Max((int)Math.Floor(fx0 * img.Width) + 1, (int)Math.Ceiling(fx1 * img.Width)));
+        int y0 = (int)Math.Floor(fy0 * img.Height), y1 = Math.Min(img.Height, Math.Max((int)Math.Floor(fy0 * img.Height) + 1, (int)Math.Ceiling(fy1 * img.Height)));
+        int stepX = Math.Max(1, (x1 - x0) / 8), stepY = Math.Max(1, (y1 - y0) / 8);
+        double sum = 0;
+        int n = 0, nothing = 0;
+        for (int y = y0; y < y1; y += stepY)
+            for (int x = x0; x < x1; x += stepX)
+            {
+                int i = (y * img.Width + x) * 4;
+                double g = 0.2126 * img.Rgba[i] + 0.7152 * img.Rgba[i + 1] + 0.0722 * img.Rgba[i + 2];
+                if (img.Rgba[i + 3] < 128 || g >= 250) { nothing++; continue; }
+                sum += g;
+                n++;
+            }
+        return n == 0 || nothing > n ? null : sum / n;
     }
 
     /// <summary>

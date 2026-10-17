@@ -18,7 +18,11 @@ public sealed class DiffractionWindow : Window
 {
     readonly ImageShape _picture;
     readonly MachineProfile _machine = MachineProfile.F2Ultra;
-    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Shimmer: brightness → direction", "Colour: hue → pitch" }, SelectedIndex = 0 };
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Shimmer: brightness → direction", "Colour: hue → pitch", "3D: depth map → floating points (experimental)" }, SelectedIndex = 0 };
+    readonly NumericUpDown _depthMm = Number(0.5m, 30, 0.5m, "0.#"), _depthPoint = Number(0.2m, 10, 0.1m, "0.#");
+    readonly CheckBox _depthOutlines = new() { Content = "Outlines and depth steps only (line art, stepped shapes)" };
+    readonly CheckBox _depthFlip = new() { Content = "Swap in front and behind" };
+    readonly Control _depthRows;
     readonly NumericUpDown _pixel = Number(0.1m, 5, 0.1m, "0.##");
     readonly NumericUpDown _angleSteps = Number(2, 36, 1, "0"), _colourSteps = Number(2, 24, 1, "0");
     readonly NumericUpDown _colourAngle = Number(0, 179, 15, "0");
@@ -59,6 +63,23 @@ public sealed class DiffractionWindow : Window
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
         _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == d.PulseWidthNs);
 
+        _depthMm.Value = 6;
+        _depthPoint.Value = 2;
+        _depthRows = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                Field("3D strength (mm)", _depthMm, tip: "How wide the arcs grow for the nearest and farthest points: more = deeper 3D, but busier."),
+                Field("Point spacing (mm)", _depthPoint, tip: "Distance between the points that get arcs."),
+                _depthOutlines,
+                _depthFlip,
+                Hint("Use a depth map: light = in front, mid-grey = on the surface, dark = behind, white = nothing (Picture → Depthmap makes one). " +
+                     "Each point becomes an arc whose glint slides as you tilt the plate, so it seems to float. If it looks inside out under your light, swap."),
+            },
+        };
+        foreach (var c in new[] { _depthOutlines, _depthFlip }) c.IsCheckedChanged += (_, _) => Later();
+        foreach (var n in new[] { _depthMm, _depthPoint }) n.ValueChanged += (_, _) => Later();
         _angleRow = Field("Directions", _angleSteps, tip: "How many grating directions brightness is shared out over (0–180°). More = smoother shimmer, more layers.");
         _colourRows = new StackPanel
         {
@@ -98,6 +119,7 @@ public sealed class DiffractionWindow : Window
                 Field("Pixel (mm)", _pixel, tip: "Size of one grating pixel. Smaller = more detail, more stop-starts."),
                 _angleRow,
                 _colourRows,
+                _depthRows,
                 Field("Pitch for green µm", _greenPitch),
                 _skipLight,
                 _skipGreyRow,
@@ -132,7 +154,11 @@ public sealed class DiffractionWindow : Window
 
     DiffractionOptions Options() => new()
     {
-        Mode = _mode.SelectedIndex == 1 ? DiffractionMode.Colour : DiffractionMode.Shimmer,
+        Mode = _mode.SelectedIndex switch { 1 => DiffractionMode.Colour, 2 => DiffractionMode.Depth, _ => DiffractionMode.Shimmer },
+        DepthMm = (double)(_depthMm.Value ?? 6),
+        DepthPointMm = (double)(_depthPoint.Value ?? 1),
+        DepthOutlines = _depthOutlines.IsChecked == true,
+        DepthFlip = _depthFlip.IsChecked == true,
         PixelMm = (double)(_pixel.Value ?? 0.5m),
         AngleSteps = (int)(_angleSteps.Value ?? 12),
         ColourSteps = (int)(_colourSteps.Value ?? 10),
@@ -176,7 +202,8 @@ public sealed class DiffractionWindow : Window
     void Update()
     {
         var o = Options();
-        _angleRow.IsVisible = o.Mode == DiffractionMode.Shimmer;
+        _angleRow.IsVisible = o.Mode is DiffractionMode.Shimmer or DiffractionMode.Depth;
+        _depthRows.IsVisible = o.Mode == DiffractionMode.Depth;
         _colourRows.IsVisible = _skipGreyRow.IsVisible = o.Mode == DiffractionMode.Colour;
         var map = Diffraction.Map(_picture.Source.Pixels, _picture.SizeMm, o, _machine);
         _preview.Show(map, o.Mode);
@@ -221,7 +248,7 @@ public sealed class DiffractionWindow : Window
             double s = Math.Min((Bounds.Width - 20) / map.Cols, (Bounds.Height - 20) / map.Rows);
             double ox = (Bounds.Width - map.Cols * s) / 2, oy = (Bounds.Height - map.Rows * s) / 2;
             ctx.DrawRectangle(new SolidColorBrush(Color.Parse("#9DA3AC")), null, new Rect(ox, oy, map.Cols * s, map.Rows * s)); // bare steel
-            var brushes = map.Buckets.Select(b => (IBrush)new SolidColorBrush(_mode == DiffractionMode.Shimmer
+            var brushes = map.Buckets.Select(b => (IBrush)new SolidColorBrush(_mode != DiffractionMode.Colour
                 ? Wheel(b.AngleDeg)
                 : Color.FromRgb((byte)(b.Preview >> 16), (byte)(b.Preview >> 8), (byte)b.Preview))).ToList();
             for (int r = 0; r < map.Rows; r++)
