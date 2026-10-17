@@ -24,18 +24,77 @@ straight to the machine over your own network.
 
 ## Features
 
-- Draw (rectangles, ellipses, polygons, stars, lines, pen, text), edit points, offset, weld/subtract, arrays, align, snapping and a configurable grid
-- Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures, and trace pictures into vectors
-- Layers that cut, score, engrave areas, or engrave pictures (dithered), with blue diode and red fiber settings
-- Material test generator (power × speed grid)
-- Depthmaps for relief engraving with [DepthCharge](#depthcharge) (your own local DA3 / Depth Pro app), placed straight onto the design
-- Calibrated overview camera laid over the work area, at any material height
-- Draw from the camera: fit a design onto a real piece (move/turn/resize), pick a piece's outline with a magic wand (tolerance, smoothness, corners, speck filter), or trace edges with a magnetic pen
-- Auto-focus, camera lights, beeper, job pause/resume/stop and progress
+**Design**
+- Draw (text, pen, ellipse, rectangle, polygon, star, line), a shape library with your own saved shapes, edit points, group/combine/break apart, weld/subtract/intersect/exclude, offset, grid and circular arrays, nesting onto the bed or a piece, align and distribute, snapping and a configurable grid
+- Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures; trace pictures into vectors; remove picture backgrounds (offline)
+- Depthmaps for relief engraving with [DepthCharge](#depthcharge), placed straight onto the design
+
+**Layers and materials**
+- Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA; kerf, tabs, overcut, lead-in, step-down per pass, MOPA wobble
+- A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; material test grids and recording their results
+- The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (as the stock software does)
+
+**Colour and light on metal (MOPA)** — see [below](#colour-and-gratings-on-metal)
+- Oxide colour tests, measured from close-up camera photos into a palette of the colours your plate really makes; colour pictures in those colours
+- Diffraction gratings: grating tests measured from five fixed views, rainbow "shimmer" pictures, hue-as-pitch colour pictures, and an experimental depth-map "almost-hologram"
+
+**Camera**
+- The calibrated overview camera under your design at any material height; live view
+- The close-up camera in the laser head, on the work area, placed where it really looks once its position is known
+- Draw from the camera: fit a design onto a real piece, pick a piece's outline with a magic wand, or trace an edge with a magnetic pen
+
+**The machine and the job**
+- Connect, auto-focus, set the focus height, lights, live view, pause/resume/stop
+- The job always in view: run order as a timeline sized by time, total time, checks, framing (rectangle or outline), and where the laser is while it runs
 - Jobs are generated locally in the same G-code dialect as the stock software, checked line for line against real exports
 
 Jobs are uploaded with `autoStart: 0`: nothing moves or fires until you press the
 machine's start button.
+
+## The workspace
+
+- **Ribbon** along the top: Home (clipboard, select, draw, group, shape builder, outline, import),
+  Arrange, Picture, Camera, Laser and View. Labels give way to icons when the window is narrow;
+  every button has a tooltip. The **File** button holds files, import/export and Settings.
+- **Machine**, at the right end of the ribbon: connection status (click it to connect), photo,
+  camera picture on/off, live view, close-up, lights, and the focus height (▼ ▲ or type it) with Auto-focus.
+- **Layers** on the left, as cards: what each does, how hard and fast, and how long it takes.
+- **Right column**: the selection (size, position, angle, text, picture) on top; the active
+  layer's settings below.
+- **Job bar** under the work area: **Ship It**, Frame, the run order, total time, pass mode,
+  checks, and export.
+- **Settings** (gear): machine connection and options, camera calibration, libraries, help.
+
+## Colour and gratings on metal
+
+These work with the MOPA on stainless steel (and titanium). Results depend on the plate,
+its finish and the focus height, so everything starts from a test on your own plate.
+
+**Oxide colours.** A thin oxide layer's thickness, set by the energy put in, decides the colour.
+1. Laser → **Colour test**: a grid sweeping two settings (by default frequency across, power down,
+   at 6 ns, 800 mm/s, lines 0.002 mm apart). Focus on the plate first and keep that focus.
+2. Laser → **Measure colours**: take a **close-up photo** (the truest colour), set the lights so
+   there's no glare stripe, click the four corner squares (named by the labels burned on the plate).
+   Big grids can be measured in sections. Save the result as a palette on the material.
+3. Picture → **Colour on metal**: the picture in the palette's colours, dithered for the shades
+   between, one layer per colour with the settings that made it.
+
+The palette shows how many clearly different colours your plate gives. Colours shift with the
+viewing angle; expect tens of usable colours, not a full spectrum.
+
+**Diffraction gratings.** The laser's pulses land a set distance apart (speed ÷ frequency:
+300 mm/s at 300 kHz = 1 µm), and a row of them splits light into colours like a grating.
+1. Laser → Colour test → **Diffraction gratings** on polished stainless: pitch across, power down.
+2. Measure colours in **Gratings** mode: five fixed views (straight, and 45° from each side, the
+   lamp kept still). The views play together as an animation (saved as a GIF) and the strongest
+   squares are ranked.
+3. Picture → **Diffraction**: *Shimmer* (brightness → grating direction), *Colour* (hue → pitch, for
+   one viewing angle), or *3D* (a depth map → arcs that seem to float; experimental).
+
+The grating and colour methods follow those published by Ben Krasnow (Applied Science):
+[MOPA_Laser_Diffraction_Gratings](https://github.com/benkrasnow/MOPA_Laser_Diffraction_Gratings),
+[MOPA_Laser_Stainless_Colors](https://github.com/benkrasnow/MOPA_Laser_Stainless_Colors). PhotonCanvas's
+code is its own.
 
 ## Getting started
 
@@ -61,8 +120,8 @@ The ? menu at the top right → Getting started shows the short tour again.
 
 PhotonCanvas can turn a picture into a relief depthmap with **DepthCharge**, a separate
 local app that runs depth models (DA3, Depth Pro) on your graphics card. Install DepthCharge
-first (its `DepthCharge-Setup.exe`, or a set-up folder in Documents). Then right-click a
-picture → **Depthmap with DepthCharge…** (or Tools, or the Picture card). PhotonCanvas starts
+first (its `DepthCharge-Setup.exe`, or a set-up folder in Documents). Then select a picture and
+click Picture → **Depthmap** (or right-click it → Depthmap with DepthCharge…). PhotonCanvas starts
 DepthCharge in the background if needed, talks to it on 127.0.0.1 only, and stops it again on
 exit if it started it. Crops and masks made in DepthCharge's own editor (**Open in DepthCharge**)
 are used too. DepthCharge is not part of PhotonCanvas; its models keep their own licences
@@ -70,9 +129,10 @@ are used too. DepthCharge is not part of PhotonCanvas; its models keep their own
 
 ## Where things are kept
 
-Everything lives in `%APPDATA%\PhotonCanvas`: `app.json` (settings and presets),
-`camera.json` (camera calibration), `keys.json` (connection keys), `state.json`
-(pairing token) and `logs\`.
+Everything lives in `%APPDATA%\PhotonCanvas`: `app.json` (settings, including the close-up
+camera's angle and position), `camera.json` (overview camera calibration), `keys.json`
+(connection keys), `state.json` (pairing token), `materials\` (the material library: recipes,
+colour palettes, grating sets and their photos), `shapes\` (your saved shapes) and `logs\`.
 
 ## For developers
 
