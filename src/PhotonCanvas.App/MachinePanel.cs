@@ -633,6 +633,10 @@ public sealed class MachinePanel : UserControl
         return Distance;
     }
 
+    /// <summary>A plain overview photo for a time-lapse: nothing else is touched while a job runs.</summary>
+    public Task<byte[]> TimeLapseFrameAsync() =>
+        _client is { IsConnected: true } c ? c.SnapshotAsync(0) : throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+
     /// <summary>One camera photo (0 = overview, 1 = close-up), pausing live view and the pointer lights around it.</summary>
     public async Task<byte[]> SnapshotAsync(int stream)
     {

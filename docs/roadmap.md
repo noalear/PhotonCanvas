@@ -156,7 +156,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Z-axis homing (xTool)
 - [x] Keep a job on the machine, to run again from its screen (xTool; needs the touchscreen controller)
 - [x] Resume after a power cut: offered on connecting (xTool)
-- [ ] Time-lapse of a job from camera photos (xTool has the words for it but not the feature on the F2 Ultra)
+- [x] Time-lapse of a job from camera photos, made into a video with ffmpeg when it's installed (xTool has the words for it but not the feature on the F2 Ultra)
 - [x] Task and measurement history (xTool)
 - [ ] Firmware updates from a file (xTool; downloading them is *online*)
 - [x] Wi-Fi setup (scan, join) and finding the machine over a USB or Ethernet cable (xTool)
@@ -179,3 +179,5 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Interlock status; the alarm messages (emergency stop is the safe one to try).
 - Place on every piece: pieces found on the real bed; the bed's honeycomb not mistaken for pieces.
 - Cut order, start points, tabs, lead-out, perforation and dot mode on scrap.
+- Time-lapse: photos while a job runs don't disturb it.
+- Read the squares: on a real burned test grid.

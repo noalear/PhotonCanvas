@@ -49,6 +49,9 @@ public sealed class AppSettings
     public int PolygonSides { get; set; } = 6;
     public int StarPoints { get; set; } = 5;
     public double StarInnerPercent { get; set; } = 50;
+    /// <summary>Take a camera photo every few seconds while a job runs, and make a video of it.</summary>
+    public bool TimeLapse { get; set; }
+    public double TimeLapseSeconds { get; set; } = 5;
     /// <summary>"Dark" or "Light" (used from the next start).</summary>
     public string Theme { get; set; } = "Dark";
     /// <summary>Show lengths in inches instead of millimetres.</summary>
