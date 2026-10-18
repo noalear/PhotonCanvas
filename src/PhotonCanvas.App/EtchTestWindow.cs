@@ -227,12 +227,18 @@ public sealed class EtchTestWindow : Window
         {
             var c = EtchTest.FromDepths(readings);
             lines.Add($"From the depths: {c.FirstPassMm:0.###} mm on the first pass, {c.AverageMm:0.###} mm a pass on average" +
-                      (readings.Count >= 3 ? $", slowing by {c.SlowdownPercent:0}% by the deepest reading" + (readings.Count >= 4 ? $" (the readings fit within ±{c.RmsMm:0.00} mm)." : ".") : "."));
+                      (readings.Count >= 3 ? $", {Trend(c)} by the deepest reading" + (readings.Count >= 4 ? $" (the readings fit within ±{c.RmsMm:0.00} mm)." : ".") : "."));
+            if (readings.Count >= 3 && c.SlowdownPercent < -10)
+                lines.Add("Getting faster deeper is unusual: often the shallow holes read low (char in the bottom, or the gauge not reaching the floor). Worth measuring those again.");
         }
         _result.Text = string.Join("\n", lines);
         _save.IsEnabled = rate is { MmPerPass: > 0 } || readings.Count > 0;
         _save.Tag = (rate, readings);
     }
+
+    /// <summary>"slowing by 30%" or "getting faster by 52%" (a negative slowdown).</summary>
+    static string Trend(EtchCurve c) => Math.Abs(c.SlowdownPercent) < 5 ? "about the same all the way"
+        : c.SlowdownPercent > 0 ? $"slowing by {c.SlowdownPercent:0}%" : $"getting faster by {-c.SlowdownPercent:0}%";
 
     void RefreshMaterials()
     {
@@ -271,7 +277,9 @@ public sealed class EtchTestWindow : Window
         double perPass = rate is { MmPerPass: > 0 } r ? r.MmPerPass : curve!.AverageMm;
         var notes = new List<string>();
         if (rate is { MmPerPass: > 0 } rr) notes.Add($"Etch test on {_thick.Value:0.##} mm: {rr.Basis} ({rr.LowMm:0.###}–{rr.HighMm:0.###} mm per pass).");
-        if (curve is not null) notes.Add($"Depths: first pass {curve.FirstPassMm:0.###} mm, slowing {curve.SlowdownPercent:0}% going down.");
+        if (curve is not null)
+            notes.Add($"Depths ({string.Join(", ", readings.OrderBy(x => x.Item1).Select(x => $"{x.Item1} passes {x.Item2:0.##} mm"))}): first pass {curve.FirstPassMm:0.###} mm, " +
+                      (readings.Count >= 3 ? $"{Trend(curve)} going down." : "too few readings to tell how it changes going down."));
         var recipe = new Recipe
         {
             Purpose = RecipePurpose.Engrave,
