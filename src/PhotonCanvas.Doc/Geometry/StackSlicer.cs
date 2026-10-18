@@ -27,6 +27,9 @@ public sealed record SliceOptions
     public double ThicknessMm { get; init; } = 3;
     /// <summary>The model's height (along "up") in mm; the other sizes follow.</summary>
     public double HeightMm { get; init; } = 60;
+    /// <summary>The model's width (X) and depth (Y) standing this way up, mm; 0 = in proportion to the height.</summary>
+    public double WidthMm { get; init; }
+    public double DepthMm { get; init; }
     public SliceUp Up { get; init; } = SliceUp.Z;
     /// <summary>Turn round the up direction (degrees), to lay the slices out differently.</summary>
     public double TurnDeg { get; init; }
@@ -237,7 +240,15 @@ public static class StackSlicer
     }
 
     /// <summary>The model stood the chosen way up, turned, sized to the height, and moved to start at 0, 0, 0.</summary>
-    static List<Tri> Orient(IReadOnlyList<Tri> mesh, SliceOptions o)
+    /// <summary>The model's size standing the chosen way up and turned, before any scaling (its own units).</summary>
+    public static (double X, double Y, double Z) NaturalSize(IReadOnlyList<Tri> mesh, SliceUp up, double turnDeg)
+    {
+        var o = Orient(mesh, new SliceOptions { Up = up, TurnDeg = turnDeg, HeightMm = 1 }, scale: false);
+        var all = o.SelectMany(x => new[] { x.A, x.B, x.C }).ToList();
+        return (all.Max(v => v.X) - all.Min(v => v.X), all.Max(v => v.Y) - all.Min(v => v.Y), all.Max(v => v.Z) - all.Min(v => v.Z));
+    }
+
+    static List<Tri> Orient(IReadOnlyList<Tri> mesh, SliceOptions o, bool scale = true)
     {
         V3 Up(V3 v) => o.Up switch
         {
@@ -253,8 +264,12 @@ public static class StackSlicer
         var tris = mesh.Select(x => new Tri(Map(x.A), Map(x.B), Map(x.C))).ToList();
         var all = tris.SelectMany(x => new[] { x.A, x.B, x.C }).ToList();
         double minX = all.Min(v => v.X), minY = all.Min(v => v.Y), minZ = all.Min(v => v.Z), maxZ = all.Max(v => v.Z);
-        double k = o.HeightMm / Math.Max(1e-9, maxZ - minZ);
-        V3 Fit(V3 v) => new((v.X - minX) * k, (v.Y - minY) * k, (v.Z - minZ) * k);
+        double maxX = all.Max(v => v.X), maxY = all.Max(v => v.Y);
+        // Height sets the scale; width and depth stretch or squash on their own when given.
+        double k = scale ? o.HeightMm / Math.Max(1e-9, maxZ - minZ) : 1;
+        double kx = scale && o.WidthMm > 0 ? o.WidthMm / Math.Max(1e-9, maxX - minX) : k;
+        double ky = scale && o.DepthMm > 0 ? o.DepthMm / Math.Max(1e-9, maxY - minY) : k;
+        V3 Fit(V3 v) => new((v.X - minX) * kx, (v.Y - minY) * ky, (v.Z - minZ) * k);
         return [.. tris.Select(x => new Tri(Fit(x.A), Fit(x.B), Fit(x.C)))];
     }
 

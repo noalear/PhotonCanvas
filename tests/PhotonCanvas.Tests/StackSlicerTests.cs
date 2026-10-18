@@ -194,4 +194,16 @@ public class StackSlicerTests
         var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 3, HeightMm = 30 });
         Assert.DoesNotContain(stack.Parts, p => p.Floating);
     }
+
+    [Fact]
+    public void EachAxisCanBeSizedOnItsOwn()
+    {
+        // A 4 mm cylinder 10 mm tall, stretched to 8 mm across X and 2 mm along Y: an ellipse in every slice.
+        var stack = StackSlicer.Slice(Cylinder(2, 10), new SliceOptions { ThicknessMm = 2, HeightMm = 10, WidthMm = 8, DepthMm = 2 });
+        Assert.Equal(5, stack.Slices);
+        var b = stack.Layers[2].Bounds();
+        Assert.Equal(8, b.Width, 1);
+        Assert.Equal(2, b.Height, 1);
+        Assert.Equal((4.0, 4.0, 10.0), StackSlicer.NaturalSize(Cylinder(2, 10), SliceUp.Z, 0) is var n ? (Math.Round(n.X, 1), Math.Round(n.Y, 1), Math.Round(n.Z, 1)) : default);
+    }
 }

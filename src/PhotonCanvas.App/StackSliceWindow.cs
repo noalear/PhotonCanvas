@@ -36,6 +36,10 @@ public sealed class StackSliceWindow : Window
     readonly TextBlock _range = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 120 };
     readonly TextBlock _file = new() { Text = "No model yet.", TextWrapping = TextWrapping.Wrap };
     readonly ComboBox _up = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Z up (as made)", "Z down", "Y up", "Y down", "X up", "X down" }, SelectedIndex = 0 };
+    readonly NumericUpDown _width = Number(1, 2000, 5, "0.#"), _depth = Number(1, 2000, 5, "0.#");
+    readonly CheckBox _keepProportions = new() { Content = "Keep proportions", IsChecked = true };
+    (double X, double Y, double Z) _natural = (1, 1, 1);
+    bool _sizing;
     readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#"), _pin = Number(0, 20, 0.5m, "0.#");
     readonly ComboBox _outline = new()
     {
@@ -64,8 +68,13 @@ public sealed class StackSliceWindow : Window
         var open = Button("Open a 3D model…", tip: "STL or OBJ, from a 3D printing site, Fusion, Blender…");
         open.Click += async (_, _) => await Open();
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Reslice(); };
-        foreach (var n in new[] { _turn, _height, _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
-        foreach (var c in new[] { _up, _outline }) c.SelectionChanged += (_, _) => Later();
+        foreach (var n in new[] { _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
+        _outline.SelectionChanged += (_, _) => Later();
+        // Turning or standing it another way changes what X, Y and Z are: sizes follow (height kept).
+        _up.SelectionChanged += (_, _) => { Natural(); Resize(_height); };
+        _turn.ValueChanged += (_, _) => { Natural(); Resize(_height); };
+        foreach (var n in new[] { _width, _depth, _height }) n.ValueChanged += (_, _) => Resize(n);
+        _keepProportions.IsCheckedChanged += (_, _) => { if (_keepProportions.IsChecked == true) Resize(_height); };
         _joined.IsCheckedChanged += (_, _) => Later();
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
@@ -81,7 +90,10 @@ public sealed class StackSliceWindow : Window
                 open, _file,
                 Field("Stands with", _up),
                 Field("Turned (°)", _turn, tip: "Round the up direction: changes how the slices lie on the bed, not the model."),
-                Field("Height (mm)", _height, tip: "The model's height standing this way up; the other sizes follow."),
+                Field("Width X (mm)", _width, tip: "Across, left to right, standing the chosen way up."),
+                Field("Depth Y (mm)", _depth, tip: "Front to back, standing the chosen way up."),
+                Field("Height Z (mm)", _height, tip: "Up: this sets how many slices there are."),
+                _keepProportions,
                 Field("Material (mm)", _thick, tip: "One slice per thickness of material."),
                 Field("Outline", _outline),
                 Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
@@ -139,7 +151,8 @@ public sealed class StackSliceWindow : Window
         _mesh = mesh;
         _name = name;
         _file.Text = $"{name}: {mesh.Count:N0} triangles.";
-        _ = Reslice();
+        Natural();
+        Resize(_height);
     }
 
     static Control Col(Control c, int col)
@@ -159,6 +172,35 @@ public sealed class StackSliceWindow : Window
         _view.To = (int)_to.Value;
         int n = (int)_to.Maximum;
         _range.Text = _from.Value <= 1 && _to.Value >= n ? $"All {n} slices" : $"Slices {_from.Value:0}–{_to.Value:0} of {n}";
+    }
+
+    /// <summary>The model's own size standing the chosen way up (for keeping proportions).</summary>
+    void Natural()
+    {
+        if (_mesh is not { } mesh) return;
+        var n = StackSlicer.NaturalSize(mesh, (SliceUp)Math.Max(0, _up.SelectedIndex), (double)(_turn.Value ?? 0));
+        _natural = (Math.Max(1e-9, n.X), Math.Max(1e-9, n.Y), Math.Max(1e-9, n.Z));
+    }
+
+    /// <summary>One size changed: with proportions kept, the other two follow it.</summary>
+    void Resize(NumericUpDown changed)
+    {
+        if (_sizing) return;
+        _sizing = true;
+        try
+        {
+            if (_keepProportions.IsChecked == true)
+            {
+                double k = changed == _width ? (double)(_width.Value ?? 1) / _natural.X
+                    : changed == _depth ? (double)(_depth.Value ?? 1) / _natural.Y
+                    : (double)(_height.Value ?? 1) / _natural.Z;
+                if (changed != _width) _width.Value = (decimal)Math.Round(_natural.X * k, 1);
+                if (changed != _depth) _depth.Value = (decimal)Math.Round(_natural.Y * k, 1);
+                if (changed != _height) _height.Value = (decimal)Math.Round(_natural.Z * k, 1);
+            }
+        }
+        finally { _sizing = false; }
+        Later();
     }
 
     void Later()
@@ -184,6 +226,8 @@ public sealed class StackSliceWindow : Window
         Up = (SliceUp)Math.Max(0, _up.SelectedIndex),
         TurnDeg = (double)(_turn.Value ?? 0),
         HeightMm = (double)(_height.Value ?? 60),
+        WidthMm = (double)(_width.Value ?? 0),
+        DepthMm = (double)(_depth.Value ?? 0),
         ThicknessMm = (double)(_thick.Value ?? 3),
         Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
         DowelMm = (double)(_dowel.Value ?? 0),
