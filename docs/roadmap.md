@@ -138,7 +138,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] A light theme, inches (xTool, LightBurn); every button already has a tip
 - [ ] Other languages (LightBurn, xTool)
 - [ ] Movable, dockable panels (LightBurn)
-- [ ] Mac and Linux builds (LightBurn)
+- [x] Mac and Linux builds (LightBurn): `tools/publish.sh`; built and packaged, not yet run on a Mac or Linux machine
 - [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
 
 ### Material library and tests

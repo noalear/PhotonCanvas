@@ -312,15 +312,25 @@ public sealed class JobBar : UserControl
     /// <summary>The job as built now (null when it can't be built).</summary>
     public BuiltJob? CurrentJob => _job;
 
-    /// <summary>A short sound when a job finishes (Windows; elsewhere silent).</summary>
+    /// <summary>A short sound when a job finishes (the system's own sound player on a Mac or Linux).</summary>
     static void Chime()
     {
         _ = Task.Run(() =>
         {
-            if (!OperatingSystem.IsWindows()) return;
-            try { Console.Beep(880, 140); Console.Beep(1320, 220); }
-            catch (Exception e) when (e is IOException or PlatformNotSupportedException or InvalidOperationException) { }
+            try
+            {
+                if (OperatingSystem.IsWindows()) { Console.Beep(880, 140); Console.Beep(1320, 220); }
+                else if (OperatingSystem.IsMacOS()) Play("afplay", "/System/Library/Sounds/Glass.aiff");
+                else if (OperatingSystem.IsLinux()) Play("canberra-gtk-play", "--id=complete");
+            }
+            catch (Exception e) when (e is IOException or PlatformNotSupportedException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
         });
+
+        static void Play(string program, string arg)
+        {
+            using var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(program, arg) { UseShellExecute = false, CreateNoWindow = true });
+            p?.WaitForExit(3000);
+        }
     }
 
     /// <summary>The work mode or attachment changed: build again.</summary>

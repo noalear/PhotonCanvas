@@ -161,6 +161,19 @@ dotnet test
 
 The tests never need the real connection keys or a machine.
 
+### Ready-to-run builds (Windows, macOS, Linux)
+
+```bash
+tools/publish.sh                # every platform, into dist/
+tools/publish.sh osx-arm64      # or one: win-x64, win-arm64, osx-arm64, osx-x64, linux-x64, linux-arm64
+```
+
+Each build carries its own .NET runtime. The Mac build is a `PhotonCanvas.app` bundle (not
+signed: right-click → Open the first time); the Linux build is a folder with a `.desktop`
+file. On macOS and Linux the settings folder is `~/.config/PhotonCanvas` instead of
+`%APPDATA%\PhotonCanvas`. Finding the machine needs the firewall to allow the program on any
+system.
+
 ### Ground rules
 
 - `reference/` (gitignored) is for studying xTool Studio's behaviour and formats,

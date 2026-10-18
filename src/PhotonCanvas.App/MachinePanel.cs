@@ -29,7 +29,7 @@ public sealed class MachinePanel : UserControl
 
     readonly TextBox _ip = new() { Watermark = "Machine IP address, e.g. 192.168.1.50" };
     readonly ComboBox _found = new() { HorizontalAlignment = HorizontalAlignment.Stretch, PlaceholderText = "Machines found on the network", IsVisible = false };
-    readonly Button _find = Button("Find machines", tip: $"Search the local network (needs Windows Firewall to allow {AppIdentity.ProductName}).");
+    readonly Button _find = Button("Find machines", tip: $"Search the local network (your firewall must allow {AppIdentity.ProductName}).");
     readonly Button _connect = new() { Classes = { "primary" }, Content = "Connect" };
     readonly TextBlock _connState = Hint();
     readonly CheckBox _autoConnect = new() { Content = "Connect automatically when the program starts" };
@@ -730,7 +730,7 @@ public sealed class MachinePanel : UserControl
             if (items.Count > 0) _found.SelectedIndex = 0;
             _connState.Text = items.Count switch
             {
-                0 => $"No machines answered. Check the machine is on and on this network, and that Windows Firewall allows {AppIdentity.ProductName}. You can also type the IP address.",
+                0 => $"No machines answered. Check the machine is on and on this network, and that your firewall allows {AppIdentity.ProductName}. You can also type the IP address.",
                 1 => "Found 1 machine.",
                 _ => $"Found {items.Count} machines.",
             };
