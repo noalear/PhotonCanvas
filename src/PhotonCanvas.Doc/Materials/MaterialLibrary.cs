@@ -163,12 +163,20 @@ public sealed record Recipe
     public string Notes { get; init; } = "";
     /// <summary>Measured with an etch-rate test: how deep each pass of these settings goes (mm).</summary>
     public double? EtchMmPerPass { get; init; }
+    /// <summary>The etch-rate test behind it: thickness, where it went through, and any depths read.</summary>
+    public EtchRecord? Etch { get; init; }
     /// <summary>File name of a photo of the result, in the library's photo folder.</summary>
     public string? Photo { get; init; }
     /// <summary>Machine it was made on (device code), e.g. GS004-CLASS-4.</summary>
     public string Machine { get; init; } = MachineProfile.F2Ultra.DeviceCode;
     public DateTime Updated { get; init; } = DateTime.Now;
 }
+
+/// <summary>What an etch-rate test found, kept so it can be charted again.</summary>
+public sealed record EtchRecord(double ThicknessMm, int? ThroughAt, int? NotThroughAt, IReadOnlyList<EtchReading> Depths);
+
+/// <summary>A depth read after so many passes.</summary>
+public sealed record EtchReading(int Passes, double DepthMm);
 
 public sealed record Material
 {

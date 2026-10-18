@@ -24,6 +24,7 @@ public sealed class EtchTestWindow : Window
     readonly Func<Task> _updatePhoto;
     readonly Func<double, ImageMapChoiceInfo?> _cameraFor;
     readonly TextBlock _photoNote = new() { TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
+    readonly EtchChart _chart = new();
 
     // Making the test
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Diode (blue)", "MOPA (red)" }, SelectedIndex = 0 };
@@ -99,6 +100,7 @@ public sealed class EtchTestWindow : Window
                 Row(update, none),
                 _photoNote,
                 new ScrollViewer { Content = _circles, MaxHeight = 360 },
+                _chart,
                 _result, _status, _save,
             },
         };
@@ -232,6 +234,9 @@ public sealed class EtchTestWindow : Window
                 lines.Add("Getting faster deeper is unusual: often the shallow holes read low (char in the bottom, or the gauge not reaching the floor). Worth measuring those again.");
         }
         _result.Text = string.Join("\n", lines);
+        int? notThrough = _firstThrough is { } ft ? circles.Where(x => x.Passes < ft).Select(x => (int?)x.Passes).LastOrDefault() : null;
+        _chart.Show(t, circles.Count > 0 ? circles[^1].Passes : 20, _firstThrough, notThrough, readings,
+            readings.Count > 0 ? EtchTest.FromDepths(readings) : null);
         _save.IsEnabled = rate is { MmPerPass: > 0 } || readings.Count > 0;
         _save.Tag = (rate, readings);
     }
@@ -288,6 +293,9 @@ public sealed class EtchTestWindow : Window
             Tested = true,
             TestedOn = DateTime.Now,
             EtchMmPerPass = perPass,
+            Etch = new EtchRecord((double)(_thick.Value ?? 0), _firstThrough,
+                _firstThrough is { } ft ? circles.Where(x => x.Passes < ft).Select(x => (int?)x.Passes).LastOrDefault() : null,
+                [.. readings.OrderBy(x => x.Item1).Select(x => new EtchReading(x.Item1, x.Item2))]),
             Notes = string.Join(" ", notes),
         };
         _lib.Upsert(m with { Recipes = m.Recipes.Add(recipe) });

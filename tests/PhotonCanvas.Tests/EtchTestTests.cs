@@ -45,4 +45,22 @@ public class EtchTestTests
         // Two readings: a straight line.
         Assert.Equal(0.15, EtchTest.FromDepths([(2, 0.3), (4, 0.6)]).FirstPassMm, 6);
     }
+
+    [Fact]
+    public void TheTestIsKeptWithTheRecipe()
+    {
+        var dir = Directory.CreateTempSubdirectory("pc-etch-");
+        try
+        {
+            var lib = new PhotonCanvas.Doc.Materials.MaterialLibrary(dir.FullName);
+            var etch = new PhotonCanvas.Doc.Materials.EtchRecord(2.75, 16, 15, [new(5, 0.8), new(10, 1.7)]);
+            lib.Upsert(new PhotonCanvas.Doc.Materials.Material { Name = "Basswood", ThicknessMm = 2.75, Recipes = [new PhotonCanvas.Doc.Materials.Recipe { Title = "Etch", EtchMmPerPass = 0.177, Etch = etch }] });
+            lib.Save();
+            var back = PhotonCanvas.Doc.Materials.MaterialLibrary.Load(dir.FullName).Materials.Single().Recipes.Single();
+            Assert.Equal(0.177, back.EtchMmPerPass);
+            Assert.Equal(16, back.Etch!.ThroughAt);
+            Assert.Equal([5, 10], back.Etch.Depths.Select(d => d.Passes));
+        }
+        finally { dir.Delete(true); }
+    }
 }
