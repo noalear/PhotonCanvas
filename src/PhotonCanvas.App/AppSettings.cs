@@ -88,6 +88,8 @@ public sealed class AppSettings
     public double WandIgnoreMm2 { get; set; } = 2;
     /// <summary>The user's DepthCharge folder, if it isn't in a usual place.</summary>
     public string? DepthChargeFolder { get; set; }
+    /// <summary>Where the 3D model browser last looked.</summary>
+    public string? ModelFolder { get; set; }
     /// <summary>Name shown on materials you share.</summary>
     public string? LibraryAuthor { get; set; }
     /// <summary>Old presets have been moved into the material library.</summary>

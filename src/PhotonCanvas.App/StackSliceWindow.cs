@@ -53,8 +53,11 @@ public sealed class StackSliceWindow : Window
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _make = new() { Content = "Make the slices", Classes = { "primary" }, IsEnabled = false, MinWidth = 150 };
 
-    public StackSliceWindow(Document doc, MachineProfile machine)
+    readonly AppSettings? _settings;
+
+    public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null)
     {
+        _settings = settings;
         _doc = doc;
         _machine = machine;
         Title = "Stacked slices";
@@ -211,12 +214,24 @@ public sealed class StackSliceWindow : Window
 
     async Task Open()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        string? path;
+        if (_settings is not null)
         {
-            Title = "3D model to slice",
-            FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ)") { Patterns = ["*.stl", "*.obj"] }],
-        });
-        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+            // Pick by sight: thumbnails of every model in the folder.
+            var browser = new ModelBrowserWindow(_settings);
+            await browser.ShowDialog(this);
+            path = browser.Chosen;
+        }
+        else
+        {
+            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "3D model to slice",
+                FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ)") { Patterns = ["*.stl", "*.obj"] }],
+            });
+            path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        }
+        if (path is null) return;
         try { Load(await Task.Run(() => StlDepth.Load(path)), Path.GetFileNameWithoutExtension(path)); }
         catch (Exception e) when (e is FormatException or IOException or UnauthorizedAccessException) { _file.Text = $"Couldn't read it: {e.Message}"; }
     }

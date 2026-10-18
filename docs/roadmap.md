@@ -84,6 +84,8 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 ### Machine modes
 - [x] Stacked slices: a 3D model (STL, OBJ) sliced into layers of the material's thickness, any way up; middle, outer (sand back) or inner (fill) outlines; each part numbered from the bottom, the next slice's place marked on it, optional dowel holes; laid out bed by bed on pages (our own idea; Autodesk's discontinued Slicer for Fusion 360 did the slicing, no laser software does)
 - [ ] Stacked slices: shaping the edges (chamfers, fillets) by engraving them down in steps, once the etch depth per setting is measured
+- [ ] Stacked slices: open STEP (.stp, .step) CAD files as well as STL and OBJ (needs a CAD geometry engine to turn the exact surfaces into triangles)
+- [x] Stacked slices: a model browser with shaded thumbnails of every STL and OBJ in a folder (Windows shows none for them)
 - [x] Curved surface: measure it with the pointer and the close-up camera (up to 40 × 40 points, bad points found and left out), or type in a cylinder or slatted drum; fit as any shape, cylinder, drum of flat slats or slanted plane; 3D preview; marked in 0.2 mm height bands as xTool Studio does (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)
