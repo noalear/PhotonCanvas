@@ -19,6 +19,24 @@ public static class DocFile
 
     public static string Serialize(DocState s)
     {
+        var root = Body(s);
+        if (s.OtherPages.Count > 0 || s.PageName != "Page 1")
+        {
+            root["pageName"] = s.PageName;
+            root["pageIndex"] = s.PageIndex;
+            root["pages"] = new JsonArray([.. s.OtherPages.Select(p =>
+            {
+                var b = Body(new DocState(p.Layers, p.Shapes) { Guides = p.Guides });
+                b["name"] = p.Name;
+                return (JsonNode)b;
+            })]);
+        }
+        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    /// <summary>One page: its layers, shapes and guides (and the project's fields).</summary>
+    static JsonObject Body(DocState s)
+    {
         var layers = new JsonArray();
         foreach (var l in s.Layers)
             layers.Add(new JsonObject
@@ -210,7 +228,7 @@ public static class DocFile
                 ["csvRow"] = s.Vars.CsvRow,
             },
         };
-        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        return root;
     }
 
     /// <exception cref="FormatException">The file is not a readable PhotonCanvas project.</exception>
@@ -222,7 +240,23 @@ public static class DocFile
         if (root?["format"]?.GetValue<string>() is not ("photoncanvas" or "ytool")) throw new FormatException("This is not a PhotonCanvas project file.");
         int version = root["version"]?.GetValue<int>() ?? 0;
         if (version > Version) throw new FormatException($"This project was saved by a newer version of {AppIdentity.ProductName}.");
+        var main = FromRoot(root);
+        if (root["pages"] is not JsonArray pages) return main;
+        var others = pages.OfType<JsonNode>().Select(n =>
+        {
+            var p = FromRoot(n);
+            return new DesignPage(n["name"]?.GetValue<string>() ?? "Page", p.Layers, p.Shapes, p.Guides);
+        }).ToImmutableList();
+        return main with
+        {
+            PageName = root["pageName"]?.GetValue<string>() ?? "Page 1",
+            PageIndex = Math.Clamp(root["pageIndex"]?.GetValue<int>() ?? 0, 0, others.Count),
+            OtherPages = others,
+        };
+    }
 
+    static DocState FromRoot(JsonNode root)
+    {
         try
         {
             var layers = ImmutableList.CreateBuilder<Layer>();

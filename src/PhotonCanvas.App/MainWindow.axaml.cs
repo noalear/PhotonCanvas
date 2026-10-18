@@ -101,6 +101,7 @@ public partial class MainWindow : Window
         LayersHost.Content = _layers;
         InspectorHost.Content = _props;
         JobHost.Content = _job;
+        PagesHost.Content = new PagesBar(_doc, this);
         LayerSettingsHost.Content = _layerEditor;
         _ribbon.SetBodyTrail(_hud);
         RibbonHost.Content = _ribbon;

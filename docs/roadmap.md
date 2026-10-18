@@ -111,7 +111,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Generators: living hinges, earrings
 - [x] Multi-size copies (xTool)
 - [ ] Map designer (xTool; needs map data, so likely *online*)
-- [ ] Several canvases (pages) in one project (xTool)
+- [x] Several canvases (pages) in one project (xTool)
 
 ### Pictures
 - [x] Sharpen (LightBurn enhance, xTool sharpness)

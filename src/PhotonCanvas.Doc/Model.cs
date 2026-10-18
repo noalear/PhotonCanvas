@@ -392,6 +392,12 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public VariableData Vars { get; init; } = new();
     /// <summary>Guidelines dragged out from the rulers (shapes snap to them; never marked).</summary>
     public ImmutableList<Guide> Guides { get; init; } = [];
+    /// <summary>The name of the page on screen.</summary>
+    public string PageName { get; init; } = "Page 1";
+    /// <summary>Where the page on screen sits among all the pages.</summary>
+    public int PageIndex { get; init; }
+    /// <summary>The project's other pages, in order (without the one on screen). See <see cref="Pages"/>.</summary>
+    public ImmutableList<DesignPage> OtherPages { get; init; } = [];
 
     public static DocState New()
     {

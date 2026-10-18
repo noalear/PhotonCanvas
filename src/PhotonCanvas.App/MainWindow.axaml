@@ -58,6 +58,8 @@
             <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
           </StackPanel>
         </Border>
+        <!-- The project's pages -->
+        <ContentControl x:Name="PagesHost" DockPanel.Dock="Top" />
         <!-- The job, always in view under the work area -->
         <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
         <Panel>
