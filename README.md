@@ -26,18 +26,20 @@ straight to the machine over your own network.
 
 **Design**
 - Draw (text, pen, ellipse, rectangle, polygon, star, line), a shape library with your own saved shapes, edit points, group/combine/break apart, weld/subtract/intersect/exclude, offset, grid and circular arrays, nesting onto the bed or a piece, align and distribute, snapping and a configurable grid
-- Import SVG, DXF, PDF/AI, xTool `.xs`/`.xcs` and pictures; trace pictures into vectors; remove picture backgrounds (offline)
+- Import SVG, DXF, PDF/AI, EPS (with Ghostscript installed), HPGL/PLT, LightBurn `.lbrn2`, xTool `.xs`/`.xcs` and pictures, shape by shape, grouped, in separate pieces or as one picture; trace pictures into vectors (outlines or centre lines); remove picture backgrounds (offline)
+- Several pages in one project; export SVG, DXF and PNG; autosave, crash recovery and earlier versions
 - Depthmaps for relief engraving with [DepthCharge](#depthcharge), placed straight onto the design
 - Serial numbers, dates and spreadsheet (CSV) columns as `{fields}` in any text or code, moving on after each finished run; QR codes, Data Matrix and barcodes (Code 128, Code 39, EAN-13, UPC-A)
-- Rounded corners, trim, text on a path, copy along a path, warp (taper, arch, bulge, wave), align by two points, measure, tidy lines from imported drawings (join, close, de-duplicate), select circles by size, lock shapes
-- Undo history, a font manager (star and hide fonts), templates, editable keyboard shortcuts
+- Rounded corners, trim, scissors, extend lines, text on a path, copy along a path, warp (taper, arch, bulge, wave, four corners), align by two points, measure, tidy lines from imported drawings (join, close, de-duplicate), remove overlapping lines, tangent circles, shadows, select by type, size or layer, lock shapes
+- Shapes that stay editable (corner radius, sides, star points), guidelines dragged from the rulers, text that fits a box, single-line text, generators (finger-jointed boxes, keychains, living hinges, earrings), multi-size copies
+- Undo history, a font manager (star and hide fonts), templates, editable keyboard shortcuts, a light theme and inches
 
 **Layers and materials**
-- Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA; kerf, tabs, overcut, lead-in, step-down per pass, MOPA wobble, focus offset per layer
+- Layers that cut, score, engrave areas or engrave pictures, with the 40 W diode or the 60 W MOPA, and sub-layers on the same shapes; kerf, tabs (spaced or placed by hand), overcut, lead-in and lead-out, perforation, dot mode, step-down per pass, MOPA wobble, focus offset per layer; cut order (optimised, as drawn, back to front) and start points
 - Engraving with straight lines or offset (contour) fill; the scan lines can turn on every pass, and from one run to the next, so deep engraving doesn't build up stripes
 - Relief from a depth map in slices (dark = deep): the focus can follow the floor down, with cleanup passes of their own settings
 - Picture styles: error-diffusion and ordered dithers, halftone, newsprint, line screen and sketch (edges only); dot width correction
-- A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; test grids (power × speed, focus, line spacing, or any two settings) and recording their results
+- A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; test grids (power × speed, focus, line spacing, or any two settings), read from the photo afterwards to point out the best square
 - The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (as the stock software does)
 
 **Colour and light on metal (MOPA)** — see [below](#colour-and-gratings-on-metal)
@@ -47,13 +49,15 @@ straight to the machine over your own network.
 **Camera**
 - The calibrated overview camera under your design at any material height; live view
 - The close-up camera in the laser head, on the work area, placed where it really looks once its position is known
-- Draw from the camera: fit a design onto a real piece, pick a piece's outline with a magic wand, or trace an edge with a magnetic pen
+- Draw from the camera: fit a design onto a real piece, put a copy on every piece on the bed (each with the next serial number or spreadsheet row), pick a piece's outline with a magic wand, or trace an edge with a magnetic pen
 
 **The machine and the job**
 - Connect, auto-focus, set the focus height, lights, live view, pause/resume/stop
 - The job always in view: run order as a timeline sized by time, total time, checks, framing (rectangle or outline), and where the laser is while it runs
 - Jobs are generated locally in the same G-code dialect as the stock software, checked line for line against real exports
 - Designs bigger than the bed in sections; rotary attachment and conveyor work modes (experimental)
+- The machine's own settings: name, alarms, exhaust run-on, sleep, galvo timing, Wi-Fi, interlocks, keeping a job on the machine; carrying on after a power cut; finding it over a USB cable
+- Time-lapse videos of jobs (with ffmpeg installed), job history and a job-done sound
 - A G-code console with macros, for advanced use
 
 Jobs are uploaded with `autoStart: 0`: nothing moves or fires until you press the

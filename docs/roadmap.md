@@ -143,7 +143,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
 
 ### Material library and tests
-- [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB) under its AppData folder, so this needs a LevelDB reader
+- [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB, values in V8's serialization format) under its AppData folder. The format is readable; reading that folder waits on the owner's go-ahead, since it also holds xTool's account and device records
 - [x] Copy and paste layer settings (xTool)
 - [x] Single-point test: one square at chosen settings (xTool)
 - [x] Read a burned test grid from a photo and point out the best square: darkest even mark or lightest clear one, measured against the bare material (xTool does it *online* with AI)
