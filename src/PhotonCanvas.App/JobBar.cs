@@ -279,7 +279,21 @@ public sealed class JobBar : UserControl
         PassDelayS = (double)(_delay.Value ?? 0),
         Mode = WorkModes.From(_settings),
         Section = _section,
+        OnlyLayer = _onlyLayer,
     };
+
+    Guid? _onlyLayer;
+
+    /// <summary>Mark only this layer (layer by layer: one screen or one colour at a time); null = all.</summary>
+    public Guid? OnlyLayer
+    {
+        get => _onlyLayer;
+        set
+        {
+            _onlyLayer = value;
+            Schedule();
+        }
+    }
 
     Section? _section;
 
@@ -360,7 +374,8 @@ public sealed class JobBar : UserControl
             _estimate.Text = Clock(j.EstimateS);
             int layers = j.LayerTimes.Count;
             int rounds = j.LayerTimes.Count == 0 ? 1 : j.LayerTimes.Max(t => t.Passes);
-            _summary.Text = (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") + (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat" ? $"{_settings.WorkMode} · " : "") +
+            _summary.Text = (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") +
+                            (_onlyLayer is { } ol && _doc.State.FindLayer(ol) is { } oll ? $"Only {oll.Name} · " : "") + (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat" ? $"{_settings.WorkMode} · " : "") +
                             $"{layers} layer{(layers == 1 ? "" : "s")} · {j.Steps.Count} path{(j.Steps.Count == 1 ? "" : "s")}" +
                             (j.RoundDelayS is not null && rounds > 1 ? $" · {rounds} rounds" : "") +
                             $" · {j.Bounds.Width:0.#} × {j.Bounds.Height:0.#} mm at {j.Bounds.MinX:0.#}, {j.Bounds.MinY:0.#}";
@@ -723,6 +738,7 @@ public sealed class JobBar : UserControl
         if (VariableText.Describe(_doc.State) is { } marks) sb.AppendLine($"Fields: {marks}.");
         if (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat") sb.AppendLine($"Work mode: {WorkModes.Describe(_settings)} (experimental).");
         if (_section is { } sec) sb.AppendLine($"Marking {sec.Label} only. Is the material where it should be for it?");
+        if (_onlyLayer is { } only && _doc.State.FindLayer(only) is { } ol) sb.AppendLine($"Marking the layer \"{ol.Name}\" only.");
         // Step-down and focus offsets lower the head: never let it come near the material.
         double offset = job.Job.Blocks.Select(b => b.FocusOffsetMm).DefaultIfEmpty(0).Max();
         double deepest = JobBuilder.OutputLayers(_doc.State).Where(l => l.Mode is LayerMode.Cut or LayerMode.Score && (l.StepDownMm > 0 || l.StepDownFirstMm > 0))

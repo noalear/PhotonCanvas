@@ -132,6 +132,7 @@ public static class DocFile
                         ["bendDeg"] = tx.Style.BendDeg,
                         ["pathShiftMm"] = tx.Style.PathShiftMm,
                         ["weld"] = tx.Style.Weld,
+                        ["singleLine"] = tx.Style.SingleLine,
                     };
                     if (tx.Guide is { } guide) o["guide"] = guide.ToSvgPathData();
                     // The outline too, so the file opens identically even without the font installed.
@@ -321,7 +322,8 @@ public static class DocFile
                         Enum.TryParse<TextAlign>(st?["align"]?.GetValue<string>(), true, out var al) ? al : TextAlign.Left,
                         st?["bendDeg"]?.GetValue<double>() ?? 0,
                         st?["pathShiftMm"]?.GetValue<double>() ?? 0,
-                        st?["weld"]?.GetValue<bool>() ?? false);
+                        st?["weld"]?.GetValue<bool>() ?? false,
+                        st?["singleLine"]?.GetValue<bool>() ?? false);
                     var text = n["text"]?.GetValue<string>() ?? "";
                     var saved = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? "");
                     shapes.Add(new TextShape

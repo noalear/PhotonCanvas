@@ -197,6 +197,50 @@ public sealed class WorkModeWindow : Window
 }
 
 /// <summary>
+/// Layer by layer (screen printing, several colours or materials): pick a layer, ship it, change
+/// the screen or material, pick the next. The job bar marks only the picked layer.
+/// </summary>
+public sealed class LayerByLayerWindow : Window
+{
+    readonly JobBar _job;
+    readonly StackPanel _list = new() { Spacing = 4 };
+    readonly List<Layer> _layers;
+
+    public LayerByLayerWindow(Document doc, JobBar job)
+    {
+        _job = job;
+        _layers = [.. JobBuilder.OutputLayers(doc.State).Where(l => l.ParentId is null && doc.State.ShapesFor(l).Any())];
+        Title = "Layer by layer";
+        Width = 420;
+        Height = 520;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Background = Brush("Bg1");
+        var top = Hint("Pick a layer and Ship It: only that layer (and its sub-layers) is marked. Then change the screen, colour or material and pick the next. For screen printing, flip the design (Arrange → Flip across) first.");
+        DockPanel.SetDock(top, Dock.Top);
+        var close = new Button { Content = "Done", IsCancel = true, MinWidth = 90, HorizontalAlignment = HorizontalAlignment.Right, Margin = new(0, 10, 0, 0) };
+        close.Click += (_, _) => Close();
+        DockPanel.SetDock(close, Dock.Bottom);
+        Content = new DockPanel { Margin = new Thickness(14), Children = { top, close, new ScrollViewer { Content = _list, Margin = new(0, 10, 0, 0) } } };
+        Closed += (_, _) => _job.OnlyLayer = null;
+        for (int i = 0; i < _layers.Count; i++)
+        {
+            var l = _layers[i];
+            var b = new Button { Content = $"{i + 1}. {l.Name}", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left };
+            b.Click += (_, _) => Pick(l);
+            _list.Children.Add(b);
+        }
+        if (_layers.Count > 0) Pick(_layers[0]);
+    }
+
+    void Pick(Layer l)
+    {
+        _job.OnlyLayer = l.Id;
+        for (int i = 0; i < _list.Children.Count; i++)
+            if (_list.Children[i] is Button b) b.Classes.Set("primary", _layers[i].Id == l.Id);
+    }
+}
+
+/// <summary>
 /// Mark a design bigger than the work area in sections: pick one, mark it, move the material by
 /// the amount shown, pick the next. The job bar marks whichever section is picked.
 /// </summary>

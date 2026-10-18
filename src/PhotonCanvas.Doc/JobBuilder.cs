@@ -21,6 +21,8 @@ public sealed record JobOptions
     public WorkMode Mode { get; init; } = new WorkMode.Flat();
     /// <summary>Mark only this section of a design bigger than the work area, moved into it.</summary>
     public Section? Section { get; init; }
+    /// <summary>Mark only this layer (and its sub-layers): one layer at a time, e.g. one screen per colour.</summary>
+    public Guid? OnlyLayer { get; init; }
 }
 
 /// <summary>One section of a design bigger than the work area.</summary>
@@ -182,7 +184,7 @@ public static class JobBuilder
         }
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
-        var layers = OutputLayers(s).ToList();
+        var layers = OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).ToList();
         var times = new List<BuiltJob.LayerTime>();
 
         foreach (var (a, b) in StackedShapes(s).Take(3))

@@ -58,7 +58,7 @@ public sealed class PropertiesPanel : UserControl
     readonly TextBox _textBox = new() { AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 60 };
     readonly ComboBox _font = new() { HorizontalAlignment = HorizontalAlignment.Stretch, MaxDropDownHeight = 420 };
     readonly NumericUpDown _textSize = Number(0.5m, 500, 1, "0.##");
-    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" }, _weld = new() { Content = "Weld letters together" };
+    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" }, _weld = new() { Content = "Weld letters together" }, _single = new() { Content = "Single line (one stroke)" };
     readonly NumericUpDown _letter = Number(-50, 200, 0.1m, "0.##"), _lineSp = Number(0.5m, 5, 0.1m, "0.##");
     readonly ComboBox _align = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Left", "Centre", "Right" } };
     readonly NumericUpDown _bend = Number(-360, 360, 5, "0.#");
@@ -177,6 +177,7 @@ public sealed class PropertiesPanel : UserControl
             Field("Line spacing", _lineSp, tip: "Line height as a multiple of the size."),
             Field("Align", _align),
             _weld,
+            _single,
             Field("Curve (°)", _bend, tip: "Bend each line along an arc: how many degrees of a circle it covers. Positive arches up, negative curves down, 0 straight."),
             toPaths);
         _textBox.TextChanged += (_, _) => EditText(t => (_textBox.Text ?? "", t.Style), "text");
@@ -185,6 +186,8 @@ public sealed class PropertiesPanel : UserControl
         _bold.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Bold = _bold.IsChecked == true }), null);
         _italic.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Italic = _italic.IsChecked == true }), null);
         _weld.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Weld = _weld.IsChecked == true }), null);
+        _single.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { SingleLine = _single.IsChecked == true }), null);
+        ToolTip.SetTip(_single, "One line down the middle of each letter's strokes instead of its outline: much faster engraving with a clean, pen-drawn look. Put it on a Score layer. Works best with plain, even-weight fonts.");
         ToolTip.SetTip(_weld, "Merge letters that touch or overlap into one outline (script fonts, tight letter spacing), so the laser doesn't cut where they meet.");
         _letter.ValueChanged += (_, _) => { if (_letter.Value is { } v) EditText(t => (t.Text, t.Style with { LetterSpacingMm = (double)v }), "letter"); };
         _lineSp.ValueChanged += (_, _) => { if (_lineSp.Value is { } v) EditText(t => (t.Text, t.Style with { LineSpacing = (double)v }), "line"); };
@@ -281,6 +284,7 @@ public sealed class PropertiesPanel : UserControl
             _bold.IsChecked = txt.Style.Bold;
             _italic.IsChecked = txt.Style.Italic;
             _weld.IsChecked = txt.Style.Weld;
+            _single.IsChecked = txt.Style.SingleLine;
             _letter.Value = (decimal)txt.Style.LetterSpacingMm;
             _lineSp.Value = (decimal)txt.Style.LineSpacing;
             _align.SelectedIndex = (int)txt.Style.Align;

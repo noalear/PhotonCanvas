@@ -529,6 +529,14 @@ public partial class MainWindow : Window
         var pclip = picture.Group("Shape");
         pclip.Large("Clip to shape", "IcIntersect", ClipPicture, "Select a picture and a closed shape: only the part of the picture inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
         pclip.Small("Remove clip", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove clip", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Show and engrave the whole picture again", () => SelectedPicture() is { Clip: not null });
+        var pedit = picture.Group("Edit");
+        pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
+        pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
+        pedit.Small("CMYK split", "IcLayers", () => { if (SelectedPicture() is { } im) SplitCmyk(im); }, "Four pictures, one per ink (cyan, magenta, yellow, black), each on its own layer: for screen printing", HasPicture);
+        pedit.Small("Centre-line trace", "IcPen", () => { if (SelectedPicture() is { } im) _ = Guard(() => CentrelineTrace(im)); }, "One line down the middle of each stroke (handwriting, line art), on a Score layer", HasPicture);
+        var prelief = picture.Group("Relief");
+        prelief.Large("3D model", "IcDepth", () => _ = Guard(AddStl), "A 3D model (STL) as a depth map, on a depth-slices layer");
+        prelief.Small("Relief preview", "IcEye", () => { if (SelectedPicture() is { } im) new ReliefPreviewWindow(im).Show(this); }, "See a depth map as the lit relief it will carve", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
@@ -563,6 +571,7 @@ public partial class MainWindow : Window
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
+        work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
         var machine = laser.Group("Machine");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
@@ -885,6 +894,95 @@ public partial class MainWindow : Window
         }
         var pic = new ImageShape { Name = "Shapes as a picture", LayerId = layer.Id, Source = src, SizeMm = new Vec2(area.Width, area.Height), Transform = Affine.Translate(area.MinX, area.MinY) };
         _doc.Commit("Shapes to picture", Ops.AddShapes(state, [pic]), [pic.Id]);
+    }
+
+    /// <summary>The same picture shape with a new picture (same place and size, unless given).</summary>
+    static ImageShape Repicture(ImageShape im, Core.Imaging.RasterImage img, Vec2? size = null, Affine? transform = null) => new()
+    {
+        Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = transform ?? im.Transform,
+        SizeMm = size ?? im.SizeMm, Tone = im.Tone, Source = ImageSource.FromEncoded(img.EncodePng()),
+    };
+
+    async Task FilterPicture(ImageShape im)
+    {
+        var w = new PictureFilterWindow(im.Source.Pixels);
+        await w.ShowDialog(this);
+        if (w.Result is { } r) _doc.Commit("Picture filter", Ops.Replace(_doc.State, Repicture(im, r)), [im.Id]);
+    }
+
+    async Task CropPicture(ImageShape im)
+    {
+        var src = im.Source.Pixels;
+        var w = new CropWindow(src);
+        await w.ShowDialog(this);
+        if (w.Result is not { } c) return;
+        var cropped = Core.Imaging.PictureTools.Crop(src, c.X, c.Y, c.W, c.H);
+        double kx = im.SizeMm.X / src.Width, ky = im.SizeMm.Y / src.Height;
+        var size = new Vec2(c.W * kx, c.H * ky);
+        var t = Affine.Translate(c.X * kx, c.Y * ky).Then(im.Transform);
+        _doc.Commit("Crop picture", Ops.Replace(_doc.State, Repicture(im, cropped, size, t)), [im.Id]);
+    }
+
+    void SplitCmyk(ImageShape im)
+    {
+        var plates = Core.Imaging.PictureTools.CmykSplit(im.Source.Pixels);
+        var state = _doc.State;
+        var made = new List<Shape>();
+        uint[] colours = [0x00A3E0, 0xE0007A, 0xF2C800, 0x222222];
+        for (int i = 0; i < plates.Length; i++)
+        {
+            var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = $"{plates[i].Ink} · {im.Name}", Color = colours[i], Dither = Core.Imaging.DitherMethod.Halftone, HalftoneAngleDeg = new[] { 15.0, 75, 0, 45 }[i] };
+            state = Ops.AddLayer(state, layer);
+            var plate = new ImageShape { Name = $"{plates[i].Ink} plate", LayerId = layer.Id, Source = ImageSource.FromEncoded(plates[i].Plate.EncodePng()), SizeMm = im.SizeMm, Transform = im.Transform };
+            made.Add(plate);
+        }
+        _doc.Commit("CMYK split", Ops.AddShapes(state, made), made.Select(m => m.Id));
+        StatusText.Text = "Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Laser → Job can ship them one layer at a time.";
+    }
+
+    async Task CentrelineTrace(ImageShape im)
+    {
+        var src = im.Source.Pixels;
+        var tone = im.Tone;
+        var (geometry, n) = await Task.Run(() =>
+        {
+            var ink = new bool[src.Width * src.Height];
+            for (int i = 0; i < ink.Length; i++)
+            {
+                double lum = (0.2126 * src.Rgba[i * 4] + 0.7152 * src.Rgba[i * 4 + 1] + 0.0722 * src.Rgba[i * 4 + 2]) / 255;
+                ink[i] = src.Rgba[i * 4 + 3] > 127 && tone.Apply(lum) < 0.5;
+            }
+            var lines = Doc.Tracing.Centreline.Trace(ink, src.Width, src.Height);
+            return (Doc.Tracing.Centreline.ToGeometry(lines, im.PixelToWorld), lines.Count);
+        });
+        if (n == 0) { StatusText.Text = "No dark strokes found to trace."; return; }
+        var state = _doc.State;
+        var layer = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Score && l.Visible && !l.Locked);
+        if (layer is null)
+        {
+            layer = Layer.Default(state.Layers.Count, LayerMode.Score) with { Name = "Centre lines" };
+            state = Ops.AddLayer(state, layer);
+        }
+        var shape = new PathShape { Name = $"Centre lines · {im.Name}", LayerId = layer.Id, Geometry = geometry };
+        _doc.Commit("Centre-line trace", Ops.AddShapes(state, [shape]), [shape.Id]);
+        StatusText.Text = $"Traced {n} line{(n == 1 ? "" : "s")} down the middle of the strokes.";
+    }
+
+    async Task AddStl()
+    {
+        var w = new StlWindow();
+        await w.ShowDialog(this);
+        if (w.Result is not { } r) return;
+        var state = _doc.State;
+        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
+        {
+            Name = $"Relief · {r.Name}", ImageMode = ImageEngraveMode.Slices, Dpi = 254, LinesPerCm = 200, AngleStepDeg = 37,
+        };
+        state = Ops.AddLayer(state, layer);
+        var at = new Vec2(Canvas.Machine.FieldW / 2 - r.SizeMm.X / 2, Canvas.Machine.FieldH / 2 - r.SizeMm.Y / 2);
+        var pic = new ImageShape { Name = r.Name, LayerId = layer.Id, Source = ImageSource.FromEncoded(r.Depth.EncodePng()), SizeMm = r.SizeMm, Transform = Affine.Translate(at) };
+        _doc.Commit("3D model relief", Ops.AddShapes(state, [pic]), [pic.Id]);
+        _layers.Activate(layer.Id);
     }
 
     async Task HomeZ()

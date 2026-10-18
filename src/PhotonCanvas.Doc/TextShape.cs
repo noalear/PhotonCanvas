@@ -13,6 +13,7 @@ public enum TextAlign { Left, Center, Right }
 /// <param name="BendDeg">Text on an arc: how many degrees of a circle each line spans (+ arches up, − curves down, 0 straight).</param>
 /// <param name="PathShiftMm">Text on a path: slide the words this far along the path (mm).</param>
 /// <param name="Weld">Merge letters that touch or overlap into one outline (script fonts, tight spacing), so no line is cut twice.</param>
+/// <param name="SingleLine">One line down the middle of each stroke instead of an outline: fast, clean engraving (put it on a Score layer).</param>
 public sealed record TextStyle(
     string FontFamily = "Arial",
     double SizeMm = 10,
@@ -23,7 +24,8 @@ public sealed record TextStyle(
     TextAlign Align = TextAlign.Left,
     double BendDeg = 0,
     double PathShiftMm = 0,
-    bool Weld = false);
+    bool Weld = false,
+    bool SingleLine = false);
 
 /// <summary>
 /// Editable text. Its outline (<see cref="PathShape.Geometry"/>) is rebuilt
@@ -89,6 +91,7 @@ public static class TextLayout
     public static PathGeometry Build(string text, TextStyle style, PathGeometry? guide = null)
     {
         var g = BuildLetters(text, style, guide);
+        if (style.SingleLine && !g.IsEmpty) return SingleLines(g);
         if (!style.Weld || g.IsEmpty) return g;
         // Each letter on its own (keeping its holes), then all merged.
         var letters = new List<PathGeometry>();
@@ -105,6 +108,43 @@ public static class TextLayout
         }
         if (current.Count > 0) letters.Add(new PathGeometry(current));
         return Geometry.ShapeGeometry.Union(letters, 0.005);
+    }
+
+    /// <summary>The letters' strokes as single centre lines: the outlines are drawn filled, then thinned.</summary>
+    static PathGeometry SingleLines(PathGeometry outlines)
+    {
+        var box = Rect2.Bounds(outlines.Flatten(0.02).SelectMany(f => f.Points).ToList());
+        if (box.IsEmpty) return outlines;
+        // About 30 pixels per mm, fewer for big text so it stays quick.
+        double k = Math.Min(30, 2400 / Math.Max(box.Width, box.Height));
+        int w = Math.Max(1, (int)Math.Ceiling(box.Width * k) + 4), h = Math.Max(1, (int)Math.Ceiling(box.Height * k) + 4);
+        using var bmp = new SKBitmap(w, h, SKColorType.Gray8, SKAlphaType.Opaque);
+        using (var c = new SKCanvas(bmp))
+        {
+            c.Clear(SKColors.Black);
+            c.Translate(2, 2);
+            c.Scale((float)k);
+            c.Translate((float)-box.MinX, (float)-box.MinY);
+            using var path = new SKPath { FillType = SKPathFillType.EvenOdd };
+            foreach (var sp in outlines.Subpaths.Where(s => !s.Segs.IsEmpty))
+            {
+                path.MoveTo((float)sp.Start.X, (float)sp.Start.Y);
+                foreach (var seg in sp.Segs)
+                {
+                    if (seg.Kind == SegKind.Line) path.LineTo((float)seg.To.X, (float)seg.To.Y);
+                    else path.CubicTo((float)seg.C1.X, (float)seg.C1.Y, (float)seg.C2.X, (float)seg.C2.Y, (float)seg.To.X, (float)seg.To.Y);
+                }
+                path.Close();
+            }
+            using var paint = new SKPaint { Color = SKColors.White, IsAntialias = false, Style = SKPaintStyle.Fill };
+            c.DrawPath(path, paint);
+        }
+        var ink = new bool[w * h];
+        var px = bmp.GetPixelSpan();
+        for (int i = 0; i < ink.Length; i++) ink[i] = px[i] > 127;
+        var lines = Tracing.Centreline.Trace(ink, w, h, minLengthPx: k * 0.3, smoothPx: Math.Max(0.5, k * 0.02));
+        var toMm = Affine.Translate(-2, -2).Then(Affine.Scale(1 / k, 1 / k)).Then(Affine.Translate(box.MinX, box.MinY));
+        return Tracing.Centreline.ToGeometry(lines, toMm);
     }
 
     static Rect2 LetterBox(List<Subpath> subs) => subs.Select(s => Rect2.Bounds(s.Flatten(0.05))).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
