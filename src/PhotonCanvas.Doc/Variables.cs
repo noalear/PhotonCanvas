@@ -244,7 +244,7 @@ public static class VariableText
             if (used.Contains("serial")) v = v with { Serial = v.Serial + v.SerialStep };
             if (UsesCsv(v, used)) v = v with { CsvRow = v.CsvRow + 1 };
         }
-        var run = JobBuilder.OutputLayers(s).Where(l => l.TurnEachRun && s.ShapesOn(l.Id).Any()).Select(l => l.Id).ToHashSet();
+        var run = JobBuilder.OutputLayers(s).Where(l => l.TurnEachRun && s.ShapesFor(l).Any()).Select(l => l.Id).ToHashSet();
         var layers = run.Count == 0 ? s.Layers : s.Layers.Select(l => run.Contains(l.Id) ? l with { RunCount = l.RunCount + 1 } : l).ToImmutableList();
         if (v == s.Vars && run.Count == 0) return s;
         return Refresh(s with { Vars = v, Layers = layers }, now);

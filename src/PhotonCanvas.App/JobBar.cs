@@ -668,7 +668,7 @@ public sealed class JobBar : UserControl
         }
 
         var sb = new StringBuilder();
-        var sent = JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesOn(l.Id).Any()).ToList();
+        var sent = JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesFor(l).Any()).ToList();
         static string Line(Layer l)
         {
             var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";

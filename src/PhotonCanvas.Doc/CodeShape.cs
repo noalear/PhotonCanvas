@@ -7,7 +7,7 @@ using ZXing.QrCode.Internal;
 namespace PhotonCanvas.Doc;
 
 /// <summary>The kinds of machine-readable code that can be marked.</summary>
-public enum CodeKind { QR, DataMatrix, Code128, Code39, Ean13, UpcA }
+public enum CodeKind { QR, DataMatrix, Code128, Code39, Ean13, UpcA, Ean8, UpcE, Itf, Code93, Codabar, Pdf417, Aztec }
 
 /// <summary>QR error correction: how much of the code can be damaged and still read (L 7%, M 15%, Q 25%, H 30%).</summary>
 public enum CodeEcc { L, M, Q, H }
@@ -27,7 +27,10 @@ public sealed record CodeSpec(
     int QuietModules = 0,
     CodeEcc Ecc = CodeEcc.M)
 {
-    public bool IsBarcode => Kind is CodeKind.Code128 or CodeKind.Code39 or CodeKind.Ean13 or CodeKind.UpcA;
+    public bool IsBarcode => Kind is CodeKind.Code128 or CodeKind.Code39 or CodeKind.Ean13 or CodeKind.UpcA or CodeKind.Ean8 or CodeKind.UpcE or CodeKind.Itf or CodeKind.Code93 or CodeKind.Codabar;
+
+    /// <summary>Codes drawn as a grid of modules (not one row of bars).</summary>
+    public bool IsMatrix => !IsBarcode;
 }
 
 /// <summary>
@@ -49,7 +52,14 @@ public sealed class CodeShape : PathShape
         CodeKind.Code128 => "Code 128",
         CodeKind.Code39 => "Code 39",
         CodeKind.Ean13 => "EAN-13",
-        _ => "UPC-A",
+        CodeKind.UpcA => "UPC-A",
+        CodeKind.Ean8 => "EAN-8",
+        CodeKind.UpcE => "UPC-E",
+        CodeKind.Itf => "ITF (Interleaved 2 of 5)",
+        CodeKind.Code93 => "Code 93",
+        CodeKind.Codabar => "Codabar",
+        CodeKind.Pdf417 => "PDF417",
+        _ => "Aztec",
     };
 
     public static CodeShape Create(CodeSpec spec, string? shown, Guid layerId, Affine transform, Guid? id = null, string? name = null, Guid? groupId = null)
@@ -112,11 +122,34 @@ public sealed class CodeShape : PathShape
             case CodeKind.Ean13:
                 m = new ZXing.OneD.EAN13Writer().encode(text, BarcodeFormat.EAN_13, 0, 1, hints);
                 break;
-            default:
+            case CodeKind.UpcA:
                 m = new ZXing.OneD.UPCAWriter().encode(text, BarcodeFormat.UPC_A, 0, 1, hints);
                 break;
+            case CodeKind.Ean8:
+                m = new ZXing.OneD.EAN8Writer().encode(text, BarcodeFormat.EAN_8, 0, 1, hints);
+                break;
+            case CodeKind.UpcE:
+                m = new ZXing.OneD.UPCEWriter().encode(text, BarcodeFormat.UPC_E, 0, 1, hints);
+                break;
+            case CodeKind.Itf:
+                m = new ZXing.OneD.ITFWriter().encode(text, BarcodeFormat.ITF, 0, 1, hints);
+                break;
+            case CodeKind.Code93:
+                m = new ZXing.OneD.Code93Writer().encode(text.ToUpperInvariant(), BarcodeFormat.CODE_93, 0, 1, hints);
+                break;
+            case CodeKind.Codabar:
+                m = new ZXing.OneD.CodaBarWriter().encode(text.ToUpperInvariant(), BarcodeFormat.CODABAR, 0, 1, hints);
+                break;
+            case CodeKind.Pdf417:
+                hints[EncodeHintType.CHARACTER_SET] = "UTF-8";
+                m = new ZXing.PDF417.PDF417Writer().encode(text, BarcodeFormat.PDF_417, 0, 0, hints);
+                break;
+            default:
+                hints[EncodeHintType.CHARACTER_SET] = "UTF-8";
+                m = new ZXing.Aztec.AztecWriter().encode(text, BarcodeFormat.AZTEC, 0, 0, hints);
+                break;
         }
-        int rows = kind is CodeKind.QR or CodeKind.DataMatrix ? m.Height : 1;
+        int rows = kind is CodeKind.QR or CodeKind.DataMatrix or CodeKind.Pdf417 or CodeKind.Aztec ? m.Height : 1;
         var dark = new bool[m.Width * rows];
         for (int y = 0; y < rows; y++)
             for (int x = 0; x < m.Width; x++)
@@ -139,6 +172,11 @@ public sealed class CodeShape : PathShape
                 CodeKind.UpcA => "UPC-A needs 11 digits (the 12th, the check digit, is worked out).",
                 CodeKind.Code39 => "Code 39 takes only A–Z, 0–9, space and - . $ / + %.",
                 CodeKind.Code128 => "Code 128 takes only plain (ASCII) characters.",
+                CodeKind.Ean8 => "EAN-8 needs 7 digits (the 8th, the check digit, is worked out).",
+                CodeKind.UpcE => "UPC-E needs 7 digits starting with 0 or 1 (the check digit is worked out).",
+                CodeKind.Itf => "ITF takes an even number of digits only.",
+                CodeKind.Code93 => "Code 93 takes only A–Z, 0–9, space and - . $ / + %.",
+                CodeKind.Codabar => "Codabar takes digits and - $ : / . +, optionally between start/stop letters A–D.",
                 _ => $"it can't be encoded ({e.Message}).",
             });
         }

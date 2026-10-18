@@ -56,6 +56,27 @@ public sealed class ImageShape : Shape
     public required Vec2 SizeMm { get; init; }
     /// <summary>Brightness/contrast/gamma/invert used when engraving.</summary>
     public ToneAdjust Tone { get; init; } = ToneAdjust.None;
+    /// <summary>Only the part inside this outline (the picture's own mm) is shown and engraved; null = all of it.</summary>
+    public PathGeometry? Clip { get; init; }
+
+    /// <summary>Is this local point (mm) inside the clip outline (or is there none)?</summary>
+    public bool InClip(Vec2 local)
+    {
+        if (Clip is null) return true;
+        _clipFlat ??= [.. Clip.Flatten(0.02).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points)];
+        int n = 0;
+        foreach (var poly in _clipFlat) if (Geom.Inside(poly, local)) n++;
+        return n % 2 == 1;
+    }
+
+    List<List<Vec2>>? _clipFlat;
+
+    /// <summary>The same picture clipped to an outline given in world mm (null removes the clip).</summary>
+    public ImageShape WithClip(PathGeometry? world) => new()
+    {
+        Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = Tone,
+        Clip = world is null || !Transform.IsInvertible ? null : world.Transform(Transform.Invert()),
+    };
 
     Vec2[]? _corners;
     Rect2? _bounds;
@@ -85,7 +106,7 @@ public sealed class ImageShape : Shape
 
     public ImageShape WithTone(ToneAdjust tone) => new()
     {
-        Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone,
+        Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone, Clip = Clip,
     };
 
     /// <summary>Local mm → pixel coordinates.</summary>

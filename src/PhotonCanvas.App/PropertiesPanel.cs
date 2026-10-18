@@ -39,6 +39,7 @@ public sealed class PropertiesPanel : UserControl
     readonly Slider _contrast = new() { Minimum = -1, Maximum = 1 };
     readonly Slider _gamma = new() { Minimum = 0.2, Maximum = 3, Value = 1 };
     readonly CheckBox _invertPic = new() { Content = "Invert (for dark materials)" };
+    readonly Slider _sharpen = new() { Minimum = 0, Maximum = 3 };
 
     /// <summary>The user asked to trace a picture.</summary>
     public event Action<ImageShape>? TraceRequested;
@@ -57,7 +58,7 @@ public sealed class PropertiesPanel : UserControl
     readonly TextBox _textBox = new() { AcceptsReturn = true, TextWrapping = Avalonia.Media.TextWrapping.Wrap, MinHeight = 60 };
     readonly ComboBox _font = new() { HorizontalAlignment = HorizontalAlignment.Stretch, MaxDropDownHeight = 420 };
     readonly NumericUpDown _textSize = Number(0.5m, 500, 1, "0.##");
-    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" };
+    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" }, _weld = new() { Content = "Weld letters together" };
     readonly NumericUpDown _letter = Number(-50, 200, 0.1m, "0.##"), _lineSp = Number(0.5m, 5, 0.1m, "0.##");
     readonly ComboBox _align = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Left", "Centre", "Right" } };
     readonly NumericUpDown _bend = Number(-360, 360, 5, "0.#");
@@ -147,7 +148,7 @@ public sealed class PropertiesPanel : UserControl
         var resetTone = Button("Reset");
         resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
         _picCard = Card("Picture",
-            Slider("Brightness", _bright), Slider("Contrast", _contrast), Slider("Gamma", _gamma), _invertPic,
+            Slider("Brightness", _bright), Slider("Contrast", _contrast), Slider("Gamma", _gamma), Slider("Sharpen", _sharpen), _invertPic,
             Hint("These change how the picture engraves (Image layers), not the file."),
             Row(trace, depth),
             Row(removeBg, resetTone));
@@ -155,6 +156,8 @@ public sealed class PropertiesPanel : UserControl
         _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
         _invertPic.IsCheckedChanged += (_, _) => EditPicture("Invert picture", t => t with { Invert = _invertPic.IsChecked == true });
+        _sharpen.ValueChanged += (_, _) => EditPicture("Sharpen picture", t => t with { Sharpen = _sharpen.Value }, "sharpen");
+        ToolTip.SetTip(_sharpen, "Bring out edges and fine detail before engraving (unsharp mask). 0 = off; about 1 is a good start.");
         // ---- text card ----
         RefreshFonts();
         var toPaths = Button("Convert to paths", tip: "Turn the text into ordinary shapes (no longer editable as text).");
@@ -173,6 +176,7 @@ public sealed class PropertiesPanel : UserControl
             Field("Letter spacing", _letter, tip: "Extra space between letters, mm (negative tightens)."),
             Field("Line spacing", _lineSp, tip: "Line height as a multiple of the size."),
             Field("Align", _align),
+            _weld,
             Field("Curve (°)", _bend, tip: "Bend each line along an arc: how many degrees of a circle it covers. Positive arches up, negative curves down, 0 straight."),
             toPaths);
         _textBox.TextChanged += (_, _) => EditText(t => (_textBox.Text ?? "", t.Style), "text");
@@ -180,6 +184,8 @@ public sealed class PropertiesPanel : UserControl
         _textSize.ValueChanged += (_, _) => { if (_textSize.Value is { } v) EditText(t => (t.Text, t.Style with { SizeMm = (double)v }), "tsize"); };
         _bold.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Bold = _bold.IsChecked == true }), null);
         _italic.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Italic = _italic.IsChecked == true }), null);
+        _weld.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Weld = _weld.IsChecked == true }), null);
+        ToolTip.SetTip(_weld, "Merge letters that touch or overlap into one outline (script fonts, tight letter spacing), so the laser doesn't cut where they meet.");
         _letter.ValueChanged += (_, _) => { if (_letter.Value is { } v) EditText(t => (t.Text, t.Style with { LetterSpacingMm = (double)v }), "letter"); };
         _lineSp.ValueChanged += (_, _) => { if (_lineSp.Value is { } v) EditText(t => (t.Text, t.Style with { LineSpacing = (double)v }), "line"); };
         _align.SelectionChanged += (_, _) => { if (_align.SelectedIndex >= 0) EditText(t => (t.Text, t.Style with { Align = (TextAlign)_align.SelectedIndex }), null); };
@@ -274,6 +280,7 @@ public sealed class PropertiesPanel : UserControl
             _textSize.Value = (decimal)txt.Style.SizeMm;
             _bold.IsChecked = txt.Style.Bold;
             _italic.IsChecked = txt.Style.Italic;
+            _weld.IsChecked = txt.Style.Weld;
             _letter.Value = (decimal)txt.Style.LetterSpacingMm;
             _lineSp.Value = (decimal)txt.Style.LineSpacing;
             _align.SelectedIndex = (int)txt.Style.Align;
@@ -285,6 +292,7 @@ public sealed class PropertiesPanel : UserControl
             _contrast.Value = pic.Tone.Contrast;
             _gamma.Value = pic.Tone.Gamma;
             _invertPic.IsChecked = pic.Tone.Invert;
+            _sharpen.Value = pic.Tone.Sharpen;
         }
         _selCard.IsVisible = sel.Count > 0;
         _nothing.IsVisible = sel.Count == 0;

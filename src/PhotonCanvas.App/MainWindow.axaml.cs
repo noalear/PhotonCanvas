@@ -426,7 +426,18 @@ public partial class MainWindow : Window
         select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
         select.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
         select.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
-        select.Small("Circles…", "IcCircles", () => _ = Guard(() => new CirclesWindow(_doc).ShowDialog(this)), "Find the circles in the design by size and select them: all the 3 mm holes, say");
+        var selectBy = select.Small("Select by…", "IcCircles", () => { }, "Select open lines, shapes the same size, shapes inside another, circles by size…");
+        selectBy.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                Item("Circles by size…", () => _ = Guard(() => new CirclesWindow(_doc).ShowDialog(this))),
+                Item("Open lines (not closed)", SelectOpen),
+                Item("The same size as the selection", SelectSameSize),
+                Item("Everything inside the selected shape", SelectInside),
+                Item("On the same layers as the selection", () => { var ls = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).Select(s => s.LayerId).ToHashSet(); _doc.Select(_doc.State.Editable().Where(s => ls.Contains(s.LayerId)).Select(s => s.Id)); }),
+            },
+        };
         select.Small("Invert", "IcExclude", () => _doc.Select(_doc.State.Editable().Select(s => s.Id).Where(id => !_doc.Selection.Contains(id))), "Select what isn't selected, and the other way round");
         var draw = home.Group("Draw");
         ToolLarge(draw, "Text", "IcText", Tool.Text, "Text (T) · click where the text should go");
@@ -457,6 +468,8 @@ public partial class MainWindow : Window
         outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round the sharp corners of the selected shapes", () => SelectedPaths().Count > 0);
         outline.Small("Text on path", "IcTextPath", TextOnPath, "Select a text and a line or shape: the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
         ToolSmall(outline, "Trim", "IcTrim", Tool.Trim, "Trim: click a piece of a line between where it crosses others to cut it away");
+        outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Count > 0);
+        outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
         outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy up imported drawings: join ends that nearly meet, close nearly-closed shapes, delete lines lying on top of each other");
         outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
         var import = home.Group("Bring in");
@@ -506,6 +519,9 @@ public partial class MainWindow : Window
         _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
         _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
+        var pclip = picture.Group("Shape");
+        pclip.Large("Clip to shape", "IcIntersect", ClipPicture, "Select a picture and a closed shape: only the part of the picture inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
+        pclip.Small("Remove clip", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove clip", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Show and engrave the whole picture again", () => SelectedPicture() is { Clip: not null });
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
 
@@ -1459,6 +1475,17 @@ public partial class MainWindow : Window
         StatusText.Text = "The text follows the path. Alignment picks the start, middle or end; the path itself is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }
 
+    /// <summary>A picture and a closed shape selected: the picture is clipped to the shape (the shape stays, as a guide).</summary>
+    void ClipPicture()
+    {
+        var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
+        var pic = sel.OfType<ImageShape>().FirstOrDefault();
+        var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
+        if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to clip it to."; return; }
+        _doc.Commit("Clip picture", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
+        StatusText.Text = "Clipped: only the part inside the shape is engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
+    }
+
     async Task CopyAlongSel()
     {
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
@@ -1466,6 +1493,59 @@ public partial class MainWindow : Window
             .OrderByDescending(p => p.World.Flatten(0.05).Sum(f => PathTools.CumulativeLengths(f.Points)[^1])).FirstOrDefault();
         if (guide is null || sel.Count < 2) { StatusText.Text = "Select what to copy and the path to copy it along."; return; }
         await new CopyAlongWindow(_doc, guide).ShowDialog(this);
+    }
+
+    void SelectOpen() => _doc.Select(_doc.State.Editable().OfType<PathShape>().Where(p => p.World.Subpaths.Any(sp => !sp.Closed && !sp.Segs.IsEmpty)).Select(p => p.Id));
+
+    void SelectSameSize()
+    {
+        var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).Select(s => s.Bounds).ToList();
+        if (sel.Count == 0) return;
+        bool Same(Rect2 a, Rect2 b) => Math.Abs(a.Width - b.Width) < 0.05 && Math.Abs(a.Height - b.Height) < 0.05;
+        _doc.Select(_doc.State.Editable().Where(s => sel.Any(b => Same(b, s.Bounds))).Select(s => s.Id));
+    }
+
+    void SelectInside()
+    {
+        var outer = SelectedPaths().Where(p => p.World.Subpaths.Any(sp => sp.Closed)).ToList();
+        if (outer.Count == 0) return;
+        var polys = outer.SelectMany(o => o.World.Flatten(0.05).Where(f => f.Closed).Select(f => f.Points)).ToList();
+        bool Inside(Shape s) => s.Bounds is var b && !b.IsEmpty && polys.Any(p => new[] { b.TopLeft, b.BottomRight, new Vec2(b.MinX, b.MaxY), new Vec2(b.MaxX, b.MinY) }.All(c => Geom.Inside(p, c)));
+        var ids = outer.Select(o => o.Id).ToHashSet();
+        _doc.Select(_doc.State.Editable().Where(s => !ids.Contains(s.Id) && Inside(s)).Select(s => s.Id));
+    }
+
+    async Task SimplifySel()
+    {
+        var paths = SelectedPaths().Where(p => p is not (TextShape or CodeShape)).ToList();
+        if (paths.Count == 0) return;
+        var input = await Dialogs.Prompt(this, "Simplify", "Stay within (mm) of the original outline", "0.02");
+        if (input is null || !double.TryParse(input.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var tol) || tol <= 0) return;
+        var s = _doc.State;
+        int before = 0, after = 0;
+        foreach (var p in paths)
+        {
+            var (g, b, a) = PathTools.Simplify(p.World, tol);
+            before += b;
+            after += a;
+            if (a < b) s = Ops.Replace(s, Plain(p, g));
+        }
+        if (after >= before) { StatusText.Text = "Already as simple as it gets at that accuracy."; return; }
+        _doc.Commit("Simplify", s);
+        StatusText.Text = $"Simplified: {before} pieces → {after}.";
+    }
+
+    void CutShapesSel()
+    {
+        var paths = SelectedPaths().Where(p => p is not (TextShape or CodeShape)).ToList();
+        if (paths.Count < 2) return;
+        var pieces = PathTools.CutShapes([.. paths.Select(p => p.World)]);
+        if (pieces.Count == 0) return;
+        var layer = paths[0].LayerId;
+        var made = pieces.Select((g, i) => (Shape)new PathShape { Name = $"Piece {i + 1}", LayerId = layer, Geometry = g }).ToList();
+        var s = Ops.AddShapes(Ops.Delete(_doc.State, paths.Select(p => p.Id).ToHashSet()), made);
+        _doc.Commit("Cut shapes", s, made.Select(m => m.Id));
+        StatusText.Text = $"Cut into {made.Count} pieces.";
     }
 
     void LockSel(bool locked)

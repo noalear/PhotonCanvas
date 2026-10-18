@@ -12,6 +12,7 @@ public enum TextAlign { Left, Center, Right }
 /// <param name="LineSpacing">Line height as a multiple of the size.</param>
 /// <param name="BendDeg">Text on an arc: how many degrees of a circle each line spans (+ arches up, − curves down, 0 straight).</param>
 /// <param name="PathShiftMm">Text on a path: slide the words this far along the path (mm).</param>
+/// <param name="Weld">Merge letters that touch or overlap into one outline (script fonts, tight spacing), so no line is cut twice.</param>
 public sealed record TextStyle(
     string FontFamily = "Arial",
     double SizeMm = 10,
@@ -21,7 +22,8 @@ public sealed record TextStyle(
     double LineSpacing = 1.2,
     TextAlign Align = TextAlign.Left,
     double BendDeg = 0,
-    double PathShiftMm = 0);
+    double PathShiftMm = 0,
+    bool Weld = false);
 
 /// <summary>
 /// Editable text. Its outline (<see cref="PathShape.Geometry"/>) is rebuilt
@@ -85,6 +87,29 @@ public static class TextLayout
     /// centred/right alignment lines align within the widest line.
     /// </summary>
     public static PathGeometry Build(string text, TextStyle style, PathGeometry? guide = null)
+    {
+        var g = BuildLetters(text, style, guide);
+        if (!style.Weld || g.IsEmpty) return g;
+        // Each letter on its own (keeping its holes), then all merged.
+        var letters = new List<PathGeometry>();
+        var current = new List<Subpath>();
+        foreach (var sp in g.Subpaths)
+        {
+            // A new letter starts with an outline that isn't inside the previous one's box.
+            if (current.Count > 0 && !LetterBox(current).Contains(Rect2.Bounds(sp.Flatten(0.05))))
+            {
+                letters.Add(new PathGeometry(current));
+                current = [];
+            }
+            current.Add(sp);
+        }
+        if (current.Count > 0) letters.Add(new PathGeometry(current));
+        return Geometry.ShapeGeometry.Union(letters, 0.005);
+    }
+
+    static Rect2 LetterBox(List<Subpath> subs) => subs.Select(s => Rect2.Bounds(s.Flatten(0.05))).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+
+    static PathGeometry BuildLetters(string text, TextStyle style, PathGeometry? guide)
     {
         if (string.IsNullOrEmpty(text) || !(style.SizeMm > 0)) return PathGeometry.Empty;
         if (guide?.Subpaths.FirstOrDefault(s => !s.Segs.IsEmpty) is { } along) return BuildOnPath(text, style, along);

@@ -50,3 +50,112 @@ All done:
   sends its pointer moves. Not yet tried.
 - Everything new in G-code (focus offsets, turned passes, slices, offset fill, sections) is built
   from commands already verified, but hasn't been burned yet.
+
+## Everything the others have that we don't (2026-10-17)
+
+Compared against xTool Studio (from the installed copy: its modes, settings and menu text),
+LightBurn (its documentation), EZCad (the usual galvo software) and others. `[x]` = done,
+`[ ]` = to do. Items marked *online* need an account or a cloud service: they're listed so the
+list is complete, but we stay offline, so only offline equivalents would be built.
+
+### Layers and processing
+- [x] Sub-layers: several operations on the same shapes (LightBurn sub-layers, EZCad stacked hatches)
+- [x] One-way fill lines (xTool "one way", LightBurn bi-directional off)
+- [x] Fill all of a layer's shapes in one scan (LightBurn fill grouping)
+- [x] Perforation: dash and gap along cuts (LightBurn)
+- [x] Dot mode along lines: one pulse every N mm (LightBurn dot mode)
+- [x] Ramp for threshold pictures: sloped sides for stamps (LightBurn)
+- [x] Pass-through pictures: the file's own pixels (LightBurn)
+- [ ] Cross hatch at any angle together with the main fill (xTool cross angle; we have 90° and turn-per-pass)
+- [ ] Dwell between scan lines against heat build-up (xTool "dwell time")
+- [ ] Outline after fill to hide ragged edges (xTool "outline tracing"; a sub-layer does it by hand)
+- [ ] Fill planning (separate, grouped, smart) and scan direction (top to bottom or bottom to top) (xTool)
+- [ ] Path order by layer, priority or as drawn; best start points and direction; remove overlapping lines automatically (LightBurn optimisation settings)
+- [ ] Lead-out, and choosing each shape's start point (LightBurn)
+- [ ] "Evade smoke": an order that keeps away from the smoke plume (xTool)
+- [ ] Same-direction processing for two-sided work (xTool)
+- [ ] Kerf that tells holes from parts when a drawing's directions are mixed (xTool odd-even kerf)
+- [ ] Tabs: click an outline to put a tab exactly there; tab cut power (xTool)
+- [ ] Framing: polygon frame, framing power and speed, framing that follows edits live (xTool)
+- [ ] Incise (xTool "Intaglio"): a vector fill carved down in slices with the focus following, no depth map
+- [ ] Relief: noise reduction (slices in reverse order) and more cleanup options (xTool)
+
+### Machine modes
+- [ ] Curved surface: measure the surface with the camera and the pointer (a grid of points), then follow it in Z (xTool "Curved material")
+- [ ] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
+- [ ] Batch on the conveyor: photograph the items, find each one, put the design on it, mark, move on (xTool batch; their recognition is *online* or a downloaded model, ours would be our own shape matching)
+- [ ] Variables batch: a different spreadsheet row on each item found (xTool)
+- [ ] Quick processing: closing the lid focuses, photographs, finds the material, centres the design and starts (xTool)
+
+### Shapes, text and editing
+- [x] Simplify shapes: fewer points (LightBurn optimise, xTool simplify)
+- [x] Cut overlapping shapes into pieces (LightBurn cut shapes)
+- [x] Weld a text's letters together (LightBurn weld)
+- [x] Select open lines, the same size, inside a shape, the same layers (LightBurn)
+- [x] Round-object correction without a rotary (LightBurn cylinder correction)
+- [ ] Remove overlap between shapes (xTool)
+- [ ] Node types (sharp, symmetric, asymmetric), fillet a single corner, extend lines (xTool, LightBurn)
+- [ ] Scissors: cut a path at a point; auto-split (xTool)
+- [ ] Dashed lines and stroke width (xTool)
+- [ ] Shapes that stay editable: rectangle corner radius, polygon sides, star points after drawing (LightBurn)
+- [ ] Guidelines dragged from the rulers, with snapping (LightBurn, xTool)
+- [ ] Tangent circles from three circles (LightBurn)
+- [ ] Taper warp for cones (LightBurn)
+- [ ] Free-form warp: drag the four corners, mesh deform (LightBurn)
+- [ ] Text in a fixed-size box (shrinks to fit), fixed height, variable text that fits itself (xTool)
+- [ ] Single-line (stroke) fonts: one line per stroke, fast and clean on a galvo (xTool, LightBurn, EZCad)
+- [ ] Text shadow and 3D shadow effects (xTool)
+- [ ] Generators: finger-jointed boxes, keychains, earrings, living hinges (xTool; LightBurn by plugins)
+- [ ] Multi-size templates; map designer (xTool)
+- [ ] Several canvases (pages) in one project (xTool)
+
+### Pictures
+- [x] Sharpen (LightBurn enhance, xTool sharpness)
+- [x] Clip a picture to a shape (LightBurn apply mask, xTool clipping mask)
+- [ ] Crop by ratio or size; eraser (xTool)
+- [ ] Saturation and greyscale, picture filters: sketch, comic, emboss, grid, black-and-white (xTool)
+- [ ] Turn shapes into a picture (LightBurn convert to bitmap)
+- [ ] Centre-line tracing, and tracing by colour into layers (xTool)
+- [ ] CMYK split for screen printing (xTool)
+- [ ] 3D model (STL) to depth map; 3D preview of a relief (xTool)
+- [ ] Lenticular pictures (xTool; probably not useful on a galvo)
+
+### Files and workflow
+- [ ] Autosave and crash recovery; version history (xTool, LightBurn)
+- [ ] Paste pictures and SVG from other programs (LightBurn)
+- [ ] Export the design as SVG, DXF and PNG (LightBurn, xTool)
+- [ ] Import HPGL/PLT, LightBurn files (.lbrn2) and EPS (LightBurn)
+- [ ] Import options: by element or as one picture, exploded files (xTool)
+- [ ] Settings backup and restore (LightBurn)
+- [ ] Job preview that plays the run with a time slider (LightBurn)
+- [ ] Job history and work log with times; a "job done" sound (xTool, LightBurn)
+- [ ] Function tips, a light theme, inches (xTool, LightBurn)
+- [ ] Other languages (LightBurn, xTool)
+- [ ] Movable, dockable panels (LightBurn)
+- [ ] Mac and Linux builds (LightBurn)
+- [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
+
+### Material library and tests
+- [ ] xTool's own tested F2 Ultra settings, imported from the installed copy when the app runs, never kept in our repo (xTool's live library is *online*)
+- [ ] Copy and paste layer settings (xTool)
+- [ ] Single-point test: one square at chosen settings (xTool)
+- [ ] Read a burned test grid from a photo and point out the best square (xTool does it *online* with AI; ours would measure it, as Measure colours does)
+
+### Machine and device
+- [ ] Device settings page: name and versions, flame alarm and sensitivity, stop when moved, exhaust time after a job, sleep, laser overheat alarm (xTool)
+- [ ] Galvo timing per laser: laser on/off delays, corner and jump delays (xTool, EZCad, LightBurn galvo)
+- [ ] Calibrations: MOPA-to-blue alignment (engrave crosses, line them up on the camera), thickness measurement, focus, conveyor angle and X, pointer alignment (xTool)
+- [ ] Focus: aimed measure (pick the point) and quick measure (xTool)
+- [ ] Z-axis homing (xTool)
+- [ ] Back up a job to the machine, to run again from its screen (xTool)
+- [ ] Resume after a power cut (xTool)
+- [ ] Time-lapse video of a job from the camera (xTool)
+- [ ] Task and measurement history (xTool)
+- [ ] Firmware updates from a file (xTool; downloading them is *online*)
+- [ ] Wi-Fi setup and USB connection (xTool)
+- [ ] Access key and room interlock, emergency-stop dialog, purifier and air-assist accessories (xTool)
+
+### Online only (not planned; listed for completeness)
+- Accounts and linking the machine to one; cloud projects and sharing; cloud fonts
+- AI image generation and editing (AImake, cutout, enhance, expand, restyle, magic eraser), AI emboss, AI material recognition and suggested settings, AI test-grid reading, AI assistant
+- Online design library and publishing; warranty lookup; telemetry

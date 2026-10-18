@@ -32,7 +32,9 @@ public readonly record struct Screen(double CellPx = 8, double AngleDeg = 45);
 /// <param name="Contrast">−1 … +1 (0 = unchanged).</param>
 /// <param name="Gamma">0.2 … 5 (1 = unchanged; &gt;1 brightens mid-tones).</param>
 /// <param name="Invert">Swap light and dark (e.g. for dark materials).</param>
-public sealed record ToneAdjust(double Brightness = 0, double Contrast = 0, double Gamma = 1, bool Invert = false)
+/// <param name="Sharpen">Unsharp-mask amount, 0 (off) … 3: crisper edges and detail.</param>
+/// <param name="SharpenRadiusMm">How wide the edges it brings out are, mm.</param>
+public sealed record ToneAdjust(double Brightness = 0, double Contrast = 0, double Gamma = 1, bool Invert = false, double Sharpen = 0, double SharpenRadiusMm = 0.3)
 {
     public static readonly ToneAdjust None = new();
 
@@ -50,6 +52,40 @@ public sealed record ToneAdjust(double Brightness = 0, double Contrast = 0, doub
 
 public static class Dither
 {
+    /// <summary>
+    /// Unsharp mask on a brightness grid: each value pushed away from its blurred neighbourhood
+    /// by <paramref name="amount"/> (box blur of <paramref name="radius"/> cells, run three times ≈ Gaussian).
+    /// </summary>
+    public static void Sharpen(float[] v, int w, int h, double amount, int radius)
+    {
+        if (!(amount > 0) || radius < 1 || v.Length != w * h) return;
+        var blur = (float[])v.Clone();
+        var tmp = new float[v.Length];
+        for (int pass = 0; pass < 3; pass++)
+        {
+            BoxBlur(blur, tmp, w, h, radius, horizontal: true);
+            BoxBlur(tmp, blur, w, h, radius, horizontal: false);
+        }
+        for (int i = 0; i < v.Length; i++)
+            if (v[i] < 1f) v[i] = (float)Math.Clamp(v[i] + amount * (v[i] - blur[i]), 0, 0.999);
+    }
+
+    static void BoxBlur(float[] src, float[] dst, int w, int h, int r, bool horizontal)
+    {
+        int lines = horizontal ? h : w, len = horizontal ? w : h;
+        for (int l = 0; l < lines; l++)
+        {
+            double sum = 0;
+            int Idx(int k) => horizontal ? l * w + Math.Clamp(k, 0, len - 1) : Math.Clamp(k, 0, len - 1) * w + l;
+            for (int k = -r; k <= r; k++) sum += src[Idx(k)];
+            for (int k = 0; k < len; k++)
+            {
+                dst[horizontal ? l * w + k : k * w + l] = (float)(sum / (2 * r + 1));
+                sum += src[Idx(k + r + 1)] - src[Idx(k - r)];
+            }
+        }
+    }
+
     /// <summary>
     /// Turn brightness (0 black … 1 white, row-major) into burn dots
     /// (<c>true</c> = burn). Error diffusion runs serpentine (alternate rows

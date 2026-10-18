@@ -144,10 +144,10 @@ public sealed class LayersPanel : UserControl
         for (int i = 0; i < state.Layers.Count; i++)
         {
             var l = state.Layers[i];
-            int count = counts.GetValueOrDefault(l.Id);
-            var block = new StackPanel { Spacing = 1, Tag = l.Id, Margin = new(0, 0, 0, 5) };
+            int count = counts.GetValueOrDefault(state.Owner(l.Id));
+            var block = new StackPanel { Spacing = 1, Tag = l.Id, Margin = new(l.ParentId is null ? 0 : 18, 0, 0, 5) };
             block.Children.Add(Row(l, i, count));
-            if (count > 0 && _expanded.Contains(l.Id)) AddShapeRows(block, l, ref firstSelected);
+            if (count > 0 && l.ParentId is null && _expanded.Contains(l.Id)) AddShapeRows(block, l, ref firstSelected);
             _rows.Children.Add(block);
         }
         if (newSelection && firstSelected is { } target)
@@ -197,7 +197,13 @@ public sealed class LayersPanel : UserControl
         else
         {
             var title = new TextBlock { Text = l.Name, FontWeight = active ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis, Opacity = live ? 1 : 0.6, VerticalAlignment = VerticalAlignment.Center };
-            var n = new TextBlock { Text = count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes", Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0) };
+            var parent = l.ParentId is { } pid ? _doc.State.FindLayer(pid) : null;
+            var n = new TextBlock
+            {
+                Text = parent is not null ? $"↳ {parent.Name}'s shapes" : count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes",
+                Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0),
+            };
+            if (parent is not null) ToolTip.SetTip(n, $"A sub-layer: another operation on the shapes of \"{parent.Name}\", with its own settings.");
             var g = new Grid { ColumnDefinitions = new("Auto,Auto"), VerticalAlignment = VerticalAlignment.Center };
             g.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
             g.ColumnDefinitions[0].MaxWidth = 150;
@@ -219,7 +225,7 @@ public sealed class LayersPanel : UserControl
         {
             Classes = { "icon" }, MinWidth = 18, MinHeight = 20, Padding = new(0), Margin = new(0, 0, 2, 0),
             Content = new TextBlock { Text = count == 0 ? "" : shapesOpen ? "▾" : "▸", FontSize = 13, VerticalAlignment = VerticalAlignment.Center },
-            IsEnabled = count > 0, VerticalAlignment = VerticalAlignment.Center,
+            IsEnabled = count > 0 && l.ParentId is null, VerticalAlignment = VerticalAlignment.Center,
         };
         ToolTip.SetTip(chevron, shapesOpen ? "Hide this layer's shapes" : "Show this layer's shapes");
         chevron.Click += (_, _) => { if (!_expanded.Remove(l.Id)) _expanded.Add(l.Id); Rebuild(); };
@@ -628,6 +634,9 @@ public sealed class LayersPanel : UserControl
                 Item("Hide all layers' shapes", () => { _expanded.Clear(); Rebuild(); }),
                 Item($"Move selected shapes here ({sel.Count})", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, sel, l.Id)), sel.Count > 0),
                 new Separator(),
+                l.ParentId is null
+                    ? Item("Add sub-layer (another operation on these shapes)", () => AddSubLayer(l))
+                    : Item("Make it a normal layer (with no shapes)", () => _doc.Commit("Make normal layer", Ops.UpdateLayers(_doc.State, new HashSet<Guid> { l.Id }, x => x with { ParentId = null }))),
                 Item("Rename", () => { _renaming = l.Id; Rebuild(); }),
                 Item("Duplicate with shapes", DuplicateLayer),
                 Item("Show only this layer", () => _doc.Commit("Solo layer", Ops.UpdateLayers(_doc.State, _doc.State.Layers.Select(x => x.Id).ToHashSet(), x => x with { Visible = x.Id == l.Id }))),
@@ -669,6 +678,27 @@ public sealed class LayersPanel : UserControl
         var layer = Layer.Default(i) with { Color = Layer.Palette.FirstOrDefault(c => !used.Contains(c), Layer.Palette[i % Layer.Palette.Count]) };
         int at = state.LayerIndex(_doc.ActiveLayer) + 1;
         _doc.Commit("Add layer", Ops.AddLayer(state, layer, at));
+        Activate(layer.Id);
+    }
+
+    /// <summary>A sub-layer right after the layer (and its other sub-layers): a different operation on the same shapes.</summary>
+    public void AddSubLayer(Layer parent)
+    {
+        var state = _doc.State;
+        if (parent.ParentId is not null) return;
+        var mode = parent.Mode switch { LayerMode.Fill => LayerMode.Score, LayerMode.Image => LayerMode.Image, _ => LayerMode.Fill };
+        var used = state.Layers.Select(l => l.Color).ToHashSet();
+        var layer = Layer.Default(state.Layers.Count, mode) with
+        {
+            Name = $"{parent.Name} · {(mode == LayerMode.Score ? "outline" : mode == LayerMode.Fill ? "fill" : "second pass")}",
+            ParentId = parent.Id,
+            Color = parent.Color,
+            Laser = Layer.Default(0, mode).Laser with { Light = parent.Laser.Light },
+            Material = parent.Material,
+            Reflective = parent.Reflective,
+        };
+        int at = state.LayerIndex(parent.Id) + 1 + state.SubLayers(parent.Id).Count();
+        _doc.Commit("Add sub-layer", Ops.AddLayer(state, layer, at));
         Activate(layer.Id);
     }
 

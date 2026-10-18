@@ -69,6 +69,11 @@ public sealed record Layer
 {
     public Guid Id { get; init; } = Guid.NewGuid();
     public string Name { get; init; } = "Layer";
+    /// <summary>
+    /// A sub-layer: another operation on its parent layer's shapes (an outline after a fill, a
+    /// second fill at another angle…). It has no shapes of its own. Null for a normal layer.
+    /// </summary>
+    public Guid? ParentId { get; init; }
     /// <summary>Display colour, 0xRRGGBB.</summary>
     public uint Color { get; init; } = 0x3B82F6;
     /// <summary>Shown on the canvas.</summary>
@@ -114,6 +119,19 @@ public sealed record Layer
     public bool Crosshatch { get; init; }
     /// <summary>Fill: lines or stepped-in outlines.</summary>
     public FillStyle FillStyle { get; init; }
+    /// <summary>Fill lines: burn in both directions (off: always the same way, back unlit).</summary>
+    public bool Bidirectional { get; init; } = true;
+    /// <summary>Fill lines: all the layer's shapes in one scan instead of shape by shape (fewer jumps; overlaps cancel out).</summary>
+    public bool FillTogether { get; init; }
+    /// <summary>Cut/Score: perforate: burn this many mm, then skip <see cref="PerforateGapMm"/> (0 = a continuous line).</summary>
+    public double PerforateMm { get; init; }
+    public double PerforateGapMm { get; init; } = 1;
+    /// <summary>Cut/Score: dot mode: a single pulse (of <see cref="DotUs"/>) every this many mm instead of a line (0 = off).</summary>
+    public double DotModeMm { get; init; }
+    /// <summary>Picture, threshold: power ramps up over this distance from each edge, for sloped sides (rubber stamps). 0 = off.</summary>
+    public double RampMm { get; init; }
+    /// <summary>Picture: engrave the file's own pixels one for one (its size sets the resolution).</summary>
+    public bool PassThrough { get; init; }
     /// <summary>Fill lines and depth slices: turn the scan lines this much more on every pass or slice (degrees, 0 = off).</summary>
     public double AngleStepDeg { get; init; }
     /// <summary>Also carry on turning from one run of the job to the next (by <see cref="AngleStepDeg"/>).</summary>
@@ -322,6 +340,15 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public int LayerIndex(Guid id) => Layers.FindIndex(l => l.Id == id);
 
     public IEnumerable<Shape> ShapesOn(Guid layerId) => Shapes.Where(s => s.LayerId == layerId);
+
+    /// <summary>The shapes a layer processes: its own, or for a sub-layer its parent's.</summary>
+    public IEnumerable<Shape> ShapesFor(Layer l) => ShapesOn(Owner(l.Id));
+
+    /// <summary>The layer that holds the shapes for <paramref name="layerId"/> (its parent, for a sub-layer).</summary>
+    public Guid Owner(Guid layerId) => FindLayer(layerId) is { ParentId: { } p } && FindLayer(p) is not null ? p : layerId;
+
+    /// <summary>The sub-layers of a layer, in order.</summary>
+    public IEnumerable<Layer> SubLayers(Guid layerId) => Layers.Where(l => l.ParentId == layerId);
 
     /// <summary>Shapes that can be picked on the canvas (layer visible and unlocked).</summary>
     public IEnumerable<Shape> Editable()

@@ -217,6 +217,9 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// <summary>Only the parts of the lines inside this rectangle are burned (marking in sections).</summary>
     public Rect2? ClipRect { get; init; }
 
+    /// <summary>Burn every line in the same direction (the beam travels back unlit): more even on some materials, slower.</summary>
+    public bool Unidirectional { get; init; }
+
     /// <summary>
     /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
     /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
@@ -274,6 +277,9 @@ public sealed record LoopsBlock(IReadOnlyList<IReadOnlyList<Vec2>> Loops, LaserS
         }
     }
 }
+
+/// <summary>Single laser pulses of <see cref="DotUs"/> at these points, in this order (dot mode along a path).</summary>
+public sealed record PointsBlock(IReadOnlyList<Vec2> Points, LaserSettings Laser, int DotUs) : Block(Laser);
 
 /// <summary>A 1-bit image, row-major, <c>true</c> = burn. Row 0 is at the smallest Y.</summary>
 public sealed class Bitmap(int width, int height)
@@ -428,6 +434,15 @@ public sealed class Job
                             CheckPoint(runOut, $" (fill overscan, item {i + 1})");
                         }
                     anyMotion |= lines.Count > 0;
+                    break;
+                case PointsBlock b:
+                    JobException.CheckRange("dot duration", b.DotUs, 10, 100_000, "µs");
+                    foreach (var p in b.Points)
+                    {
+                        if (!p.IsFinite) throw new JobException("A dot position is not a valid number.");
+                        CheckPoint(p, ctx);
+                    }
+                    anyMotion |= b.Points.Count > 0;
                     break;
                 case LoopsBlock b:
                     foreach (var p in b.Loops.SelectMany(x => x))
@@ -659,6 +674,7 @@ public sealed class Job
             FillBlock f => FillLines(f).Sum(s =>
                 (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed),
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
+            PointsBlock p => p.Points.Count * p.DotUs * 1e-6 + Enumerable.Range(1, Math.Max(0, p.Points.Count - 1)).Sum(i => p.Points[i - 1].Dist(p.Points[i])) / Math.Max(1, p.Laser.Speed),
             DotBlock d => d.Bitmap.Bits.Count(v => v) *
                 (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed)),
             _ => 0,
@@ -710,6 +726,7 @@ public sealed class Job
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
         LoopsBlock b => RenderLoops(b, tag, passes),
+        PointsBlock b => RenderPoints(b, tag, passes),
         DotBlock b when !Flat => RenderDotsU(b, tag, passes),
         DotBlock b => RenderDots(b, tag, passes),
         _ => throw new ArgumentException("unknown block type", nameof(block)),
@@ -824,6 +841,9 @@ public sealed class Job
     static List<FillSegment> MakeFillLines(FillBlock b)
     {
         var lines = MakeFullLines(b);
+        if (b.Unidirectional)
+            // Every line burned the same way: the ones that ran backwards are turned round.
+            lines = [.. lines.Select(s => s.X1 >= s.X0 ? s : new FillSegment(s.Y, s.X1, s.X0, s.End, s.Start))];
         if (b.DotWidthMm > 0)
         {
             // Shorter by the beam width, half at each end; lines no longer than it are left out.
@@ -1146,6 +1166,40 @@ public sealed class Job
             forward = !forward;
         }
         if (first) return []; // blank bitmap
+        var v = BitmapHead(tag, l, "M523P10");
+        v.AddRange(PassLoop(passes, body));
+        v.AddRange(BitmapTail(tag));
+        return v;
+    }
+
+    /// <summary>Dot mode along a path: a pulse at each point, the beam moving unlit between them.</summary>
+    List<string> RenderPoints(PointsBlock b, string tag, int passes)
+    {
+        if (b.Points.Count == 0) return [];
+        var l = b.Laser;
+        var body = new List<string>
+        {
+            BitmapCfg(l.Power / 100, 1, 0, l.SValue, "Threshold"), "", "", $"G1F{l.FValue}S0", $"G25T{b.DotUs / 10}",
+        };
+        bool first = true;
+        foreach (var p in b.Points)
+        {
+            string at = Pos(p, Fixed3);
+            if (Flat)
+            {
+                if (first) { body.Add($"G0{at}"); body.Add(""); }
+                body.Add($"G25{at}" + (first ? $"S{l.SValue}" : ""));
+            }
+            else
+            {
+                // The attachment moves first, then the galvo fires on its own axis.
+                int u = at.IndexOf('U');
+                string galvo = Mode is WorkMode.Rotary ? at[..u] + $"Y{Fixed3(Machine.FieldH / 2)}" : $"X{Fixed3(Machine.FieldW / 2)}" + at[(at.IndexOf('Y'))..];
+                body.Add($"G0{at[u..].Split('Y')[0]}");
+                body.Add($"G25{galvo}" + (first ? $"S{l.SValue}" : ""));
+            }
+            first = false;
+        }
         var v = BitmapHead(tag, l, "M523P10");
         v.AddRange(PassLoop(passes, body));
         v.AddRange(BitmapTail(tag));

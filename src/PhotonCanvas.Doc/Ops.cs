@@ -13,7 +13,8 @@ public static class Ops
 {
     public static DocState AddShapes(DocState s, IEnumerable<Shape> shapes)
     {
-        var list = shapes.ToList();
+        // Shapes belong to normal layers: one aimed at a sub-layer goes to its parent.
+        var list = shapes.Select(x => s.Owner(x.LayerId) is var o && o != x.LayerId ? x.With(layerId: o) : x).ToList();
         return list.Count == 0 ? s : s with { Shapes = s.Shapes.AddRange(list) };
     }
 
@@ -120,6 +121,7 @@ public static class Ops
     public static DocState MoveToLayer(DocState s, IReadOnlySet<Guid> ids, Guid layerId)
     {
         if (s.FindLayer(layerId) is null) return s;
+        layerId = s.Owner(layerId);
         bool any = false;
         var shapes = s.Shapes.Select(x =>
         {
@@ -356,6 +358,8 @@ public static class Ops
     /// </summary>
     public static DocState DeleteLayers(DocState s, IReadOnlySet<Guid> ids, Guid? moveShapesTo)
     {
+        // A layer's sub-layers go with it.
+        ids = ids.Concat(s.Layers.Where(l => l.ParentId is { } p && ids.Contains(p)).Select(l => l.Id)).ToHashSet();
         var remaining = s.Layers.RemoveAll(l => ids.Contains(l.Id));
         if (remaining.Count == s.Layers.Count) return s;
         if (remaining.Count == 0) remaining = [Layer.Default(0)];

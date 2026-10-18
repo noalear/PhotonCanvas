@@ -35,6 +35,13 @@ public sealed record ProcessSettings
     public double WobbleDiameterMm { get; init; } = 0.05;
     public double WobbleSpacingMm { get; init; } = 0.015;
     public FillStyle FillStyle { get; init; }
+    public bool Bidirectional { get; init; } = true;
+    public bool FillTogether { get; init; }
+    public double PerforateMm { get; init; }
+    public double PerforateGapMm { get; init; } = 1;
+    public double DotModeMm { get; init; }
+    public double RampMm { get; init; }
+    public bool PassThrough { get; init; }
     public double HalftoneCpi { get; init; } = 30;
     public double HalftoneAngleDeg { get; init; } = 45;
     public double DotWidthMm { get; init; }
@@ -50,6 +57,8 @@ public sealed record ProcessSettings
         StepDownMm = l.StepDownMm, StepDownFirstMm = l.StepDownFirstMm, Wobble = l.Wobble, WobbleDiameterMm = l.WobbleDiameterMm, WobbleSpacingMm = l.WobbleSpacingMm,
         FillStyle = l.FillStyle, AngleStepDeg = l.AngleStepDeg, FocusOffsetMm = l.FocusOffsetMm, Slices = l.Slices,
         HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
+        Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
+        DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -60,6 +69,8 @@ public sealed record ProcessSettings
         StepDownMm = StepDownMm, StepDownFirstMm = StepDownFirstMm, Wobble = Wobble, WobbleDiameterMm = WobbleDiameterMm, WobbleSpacingMm = WobbleSpacingMm,
         FillStyle = FillStyle, AngleStepDeg = AngleStepDeg, FocusOffsetMm = FocusOffsetMm, Slices = Slices ?? new(),
         HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
+        Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
+        DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>

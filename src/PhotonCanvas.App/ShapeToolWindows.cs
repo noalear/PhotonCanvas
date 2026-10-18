@@ -20,7 +20,10 @@ public sealed class WarpWindow : Window
     readonly DocState _base;
     readonly List<PathShape> _shapes;
     readonly Rect2 _box;
-    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Perspective (taper)", "Arch", "Bulge or pinch", "Wave" } };
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Perspective (taper)", "Arch", "Bulge or pinch", "Wave", "Round object (no rotary)" } };
+    readonly NumericUpDown _diameter = Number(5, 500, 1, "0.#");
+    readonly CheckBox _across = new() { Content = "The object lies across (its axis left–right)" };
+    readonly Control _cylRow;
     readonly Slider _a = new() { Minimum = -100, Maximum = 100, Value = 30 }, _b = new() { Minimum = -100, Maximum = 100, Value = 0 };
     readonly NumericUpDown _waves = Number(0.5m, 20, 0.5m, "0.#");
     readonly TextBlock _aLabel = new() { Classes = { "muted" } }, _bLabel = new() { Classes = { "muted" } }, _info = Hint();
@@ -43,6 +46,17 @@ public sealed class WarpWindow : Window
         _waves.Value = 2;
         _bRow = new StackPanel { Children = { _bLabel, _b } };
         _wavesRow = Field("Waves across", _waves);
+        _diameter.Value = 70;
+        _cylRow = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Field("Object Ø (mm)", _diameter, tip: "The diameter of the round object where the design goes (a mug, a pen, a bottle)."),
+                _across,
+                Hint("Marking a curved object without a rotary: the design is squeezed towards its edges so that, wrapped round the curve, it comes out at its true size. Keep it within about a third of the way round; focus is sharpest along the top."),
+            },
+        };
 
         var ok = new Button { Content = "Warp", IsDefault = true, Classes = { "primary" }, MinWidth = 100 };
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 90 };
@@ -61,6 +75,7 @@ public sealed class WarpWindow : Window
                     new StackPanel { Children = { _aLabel, _a } },
                     _bRow,
                     _wavesRow,
+                    _cylRow,
                     _info,
                     Hint("Text and codes become plain outlines. Curves are followed to within 0.02 mm."),
                     new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, ok } },
@@ -71,6 +86,8 @@ public sealed class WarpWindow : Window
         _a.ValueChanged += (_, _) => Preview();
         _b.ValueChanged += (_, _) => Preview();
         _waves.ValueChanged += (_, _) => Preview();
+        _diameter.ValueChanged += (_, _) => Preview();
+        _across.IsCheckedChanged += (_, _) => Preview();
         _doc.BeginEdit();
         Labels();
         Opened += (_, _) => Preview();
@@ -83,6 +100,8 @@ public sealed class WarpWindow : Window
         _bLabel.Text = "Narrow the left (−: the right)";
         _bRow.IsVisible = m == 0;
         _wavesRow.IsVisible = m == 3;
+        _cylRow.IsVisible = m == 4;
+        _aLabel.IsVisible = _a.IsVisible = m != 4;
     }
 
     /// <summary>The warp as a point mapping over the selection's box.</summary>
@@ -90,6 +109,8 @@ public sealed class WarpWindow : Window
     {
         var b = _box;
         double a = _a.Value / 100, k = _b.Value / 100, n = (double)(_waves.Value ?? 2);
+        double radius = (double)(_diameter.Value ?? 70) / 2;
+        bool across = _across.IsChecked == true;
         var c = b.Center;
         int mode = _mode.SelectedIndex;
         return p =>
@@ -106,8 +127,12 @@ public sealed class WarpWindow : Window
                     double du = (u - 0.5) * 2, dv = (v - 0.5) * 2, r2 = Math.Min(1, du * du + dv * dv);
                     double f = 1 + 0.5 * a * (1 - r2);
                     return c + (p - c) * f;
-                default:
+                case 3:
                     return new Vec2(p.X, p.Y + a * b.Height * 0.25 * Math.Sin(2 * Math.PI * n * u));
+                default:
+                    // Arc length round the object → where it is seen from above (the laser looks straight down).
+                    static double Squeeze(double d, double r) => r * Math.Sin(Math.Clamp(d / r, -Math.PI / 2, Math.PI / 2));
+                    return across ? new Vec2(p.X, c.Y + Squeeze(p.Y - c.Y, radius)) : new Vec2(c.X + Squeeze(p.X - c.X, radius), p.Y);
             }
         };
     }

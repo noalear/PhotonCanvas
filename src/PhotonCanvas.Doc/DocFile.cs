@@ -25,6 +25,7 @@ public static class DocFile
             {
                 ["id"] = l.Id.ToString(),
                 ["name"] = l.Name,
+                ["parent"] = l.ParentId?.ToString(),
                 ["color"] = $"#{l.Color:x6}",
                 ["visible"] = l.Visible,
                 ["locked"] = l.Locked,
@@ -60,6 +61,13 @@ public static class DocFile
                 ["wobbleSpacingMm"] = l.WobbleSpacingMm,
                 ["fillStyle"] = l.FillStyle.ToString(),
                 ["halftoneCpi"] = l.HalftoneCpi,
+                ["bidirectional"] = l.Bidirectional,
+                ["fillTogether"] = l.FillTogether,
+                ["perforateMm"] = l.PerforateMm,
+                ["perforateGapMm"] = l.PerforateGapMm,
+                ["dotModeMm"] = l.DotModeMm,
+                ["rampMm"] = l.RampMm,
+                ["passThrough"] = l.PassThrough,
                 ["halftoneAngleDeg"] = l.HalftoneAngleDeg,
                 ["dotWidthMm"] = l.DotWidthMm,
                 ["angleStepDeg"] = l.AngleStepDeg,
@@ -117,6 +125,7 @@ public static class DocFile
                         ["align"] = tx.Style.Align.ToString(),
                         ["bendDeg"] = tx.Style.BendDeg,
                         ["pathShiftMm"] = tx.Style.PathShiftMm,
+                        ["weld"] = tx.Style.Weld,
                     };
                     if (tx.Guide is { } guide) o["guide"] = guide.ToSvgPathData();
                     // The outline too, so the file opens identically even without the font installed.
@@ -146,7 +155,10 @@ public static class DocFile
                         ["contrast"] = im.Tone.Contrast,
                         ["gamma"] = im.Tone.Gamma,
                         ["invert"] = im.Tone.Invert,
+                        ["sharpen"] = im.Tone.Sharpen,
+                        ["sharpenRadiusMm"] = im.Tone.SharpenRadiusMm,
                     };
+                    if (im.Clip is { } clip) o["clip"] = clip.ToSvgPathData();
                     // The original file, so nothing is lost by saving.
                     o["data"] = Convert.ToBase64String(im.Source.Encoded);
                     break;
@@ -206,6 +218,7 @@ public static class DocFile
                 {
                     Id = Guid.Parse(n["id"]!.GetValue<string>()),
                     Name = n["name"]?.GetValue<string>() ?? "Layer",
+                    ParentId = Guid.TryParse(n["parent"]?.GetValue<string>(), out var pid) ? pid : null,
                     Color = SvgImport.ParseColor(n["color"]?.GetValue<string>() ?? "") ?? 0x3B82F6,
                     Visible = n["visible"]?.GetValue<bool>() ?? true,
                     Locked = n["locked"]?.GetValue<bool>() ?? false,
@@ -234,6 +247,13 @@ public static class DocFile
                     FillStyle = Enum.TryParse<FillStyle>(n["fillStyle"]?.GetValue<string>(), true, out var fs) ? fs : FillStyle.Lines,
                     AngleStepDeg = n["angleStepDeg"]?.GetValue<double>() ?? 0,
                     HalftoneCpi = n["halftoneCpi"]?.GetValue<double>() ?? 30,
+                    Bidirectional = n["bidirectional"]?.GetValue<bool>() ?? true,
+                    FillTogether = n["fillTogether"]?.GetValue<bool>() ?? false,
+                    PerforateMm = n["perforateMm"]?.GetValue<double>() ?? 0,
+                    PerforateGapMm = n["perforateGapMm"]?.GetValue<double>() ?? 1,
+                    DotModeMm = n["dotModeMm"]?.GetValue<double>() ?? 0,
+                    RampMm = n["rampMm"]?.GetValue<double>() ?? 0,
+                    PassThrough = n["passThrough"]?.GetValue<bool>() ?? false,
                     HalftoneAngleDeg = n["halftoneAngleDeg"]?.GetValue<double>() ?? 45,
                     DotWidthMm = n["dotWidthMm"]?.GetValue<double>() ?? 0,
                     TurnEachRun = n["turnEachRun"]?.GetValue<bool>() ?? false,
@@ -288,7 +308,8 @@ public static class DocFile
                         st?["lineSpacing"]?.GetValue<double>() ?? 1.2,
                         Enum.TryParse<TextAlign>(st?["align"]?.GetValue<string>(), true, out var al) ? al : TextAlign.Left,
                         st?["bendDeg"]?.GetValue<double>() ?? 0,
-                        st?["pathShiftMm"]?.GetValue<double>() ?? 0);
+                        st?["pathShiftMm"]?.GetValue<double>() ?? 0,
+                        st?["weld"]?.GetValue<bool>() ?? false);
                     var text = n["text"]?.GetValue<string>() ?? "";
                     var saved = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? "");
                     shapes.Add(new TextShape
@@ -333,7 +354,10 @@ public static class DocFile
                         tone?["brightness"]?.GetValue<double>() ?? 0,
                         tone?["contrast"]?.GetValue<double>() ?? 0,
                         tone?["gamma"]?.GetValue<double>() ?? 1,
-                        tone?["invert"]?.GetValue<bool>() ?? false),
+                        tone?["invert"]?.GetValue<bool>() ?? false,
+                        tone?["sharpen"]?.GetValue<double>() ?? 0,
+                        tone?["sharpenRadiusMm"]?.GetValue<double>() ?? 0.3),
+                    Clip = n["clip"]?.GetValue<string>() is { Length: > 0 } cd ? PathGeometry.FromSvgPathData(cd) : null,
                 });
             }
             var vz = root["variables"];

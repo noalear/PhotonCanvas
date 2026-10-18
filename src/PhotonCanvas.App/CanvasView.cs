@@ -273,6 +273,24 @@ public sealed partial class CanvasView : Control
 
     static Point P(Vec2 v) => new(v.X, v.Y);
 
+    static StreamGeometry ClipGeometry(PhotonCanvas.Doc.PathGeometry g)
+    {
+        var sg = new StreamGeometry();
+        using var c = sg.Open();
+        c.SetFillRule(FillRule.EvenOdd);
+        foreach (var sp in g.Subpaths.Where(s => !s.Segs.IsEmpty))
+        {
+            c.BeginFigure(P(sp.Start), true);
+            foreach (var seg in sp.Segs)
+            {
+                if (seg.Kind == SegKind.Line) c.LineTo(P(seg.To));
+                else c.CubicBezierTo(P(seg.C1), P(seg.C2), P(seg.To));
+            }
+            c.EndFigure(true);
+        }
+        return sg;
+    }
+
     static Color LayerColor(Layer l, byte alpha = 255) =>
         Color.FromArgb(alpha, (byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color);
 
@@ -354,7 +372,11 @@ public sealed partial class CanvasView : Control
         var t = im.Transform;
         using (ctx.PushTransform(new Matrix(t.A, t.B, t.C, t.D, t.E, t.F)))
         using (ctx.PushOpacity(layer.Output ? 1 : 0.5))
+        {
+            // A clipped picture shows only what's inside its outline.
+            using var clip = im.Clip is { } c0 ? ctx.PushGeometryClip(ClipGeometry(c0)) : default(DrawingContext.PushedState?);
             ctx.DrawImage(bmp, new Rect(0, 0, bmp.PixelSize.Width, bmp.PixelSize.Height), new Rect(0, 0, im.SizeMm.X, im.SizeMm.Y));
+        }
         var c = im.Corners;
         var g = new StreamGeometry();
         using (var gc = g.Open())

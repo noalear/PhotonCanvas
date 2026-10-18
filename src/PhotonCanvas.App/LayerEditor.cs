@@ -36,6 +36,11 @@ public sealed class LayerEditor : UserControl
     readonly ComboBox _dither = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Jarvis (smooth)", "Floyd–Steinberg", "Stucki", "Atkinson (contrasty)", "Bayer (pattern)", "Threshold (line art)", "Halftone (dots)", "Newsprint (coarse dots)", "Line screen (engraved lines)", "Sketch (edges only)" } };
     readonly NumericUpDown _cpi = Num(2, 500, 1, "0.#"), _screenAngle = Num(-180, 180, 15, "0.#"), _dotWidth = Number(0, 1, 0.005m, "0.###");
     readonly Control _screenRow;
+    readonly CheckBox _bidir = new() { Content = "Burn in both directions" }, _together = new() { Content = "All shapes in one scan" };
+    readonly NumericUpDown _perf = Num(0, 100, 0.5m, "0.##"), _perfGap = Num(0.05m, 100, 0.5m, "0.##"), _dotMode = Number(0, 50, 0.1m, "0.###");
+    readonly NumericUpDown _ramp = Number(0, 10, 0.1m, "0.##");
+    readonly CheckBox _passThrough = new() { Content = "Pass-through (the file's own pixels)" };
+    readonly Control _rampRow;
     readonly TextBlock _lpcmHint = Hint(), _dpiHint = Hint(), _passHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow, _imageModeRow;
 
@@ -135,6 +140,9 @@ public sealed class LayerEditor : UserControl
                 Field("Tab width (mm)", _tabWidth),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
                 Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
+                Row(Labelled("Perforate: burn mm", _perf, "Perforation: burn this far, then skip the gap, along every line (fold lines, tear-off). 0 = a continuous line."),
+                    Labelled("then skip mm", _perfGap, "The gap between perforation dashes.")),
+                Field("Dot mode every", _dotMode, tip: "Dot mode: a single pulse every this many mm instead of a line (stippled marks, dotted lines). The dot time is set under the picture settings' Dot time. 0 = off."),
                 Field("Step down/pass", _stepDown, tip: "Lower the head this many mm before each pass after the first, so the focus follows the cut into thick material. The head goes back up afterwards. 0 = off."),
                 Field("First step down", _stepFirst, tip: "With step-down: also lower the head this much before the first pass (mm)."),
                 _wobble,
@@ -163,6 +171,8 @@ public sealed class LayerEditor : UserControl
                 Field("Scan angle (°)", _fillAngle, tip: "Direction of the fill lines. 0 = left to right."),
                 _crosshatch,
                 Field("Overscan (mm)", _overscan, tip: "Each line starts and ends this far outside the shape with the laser off, so edges burn evenly."),
+                _bidir,
+                _together,
                 Field("Dot width (mm)", _dotWidth, tip: "Dot width correction: each burned line is made shorter by this much (half at each end), so the beam's width doesn't make fills wider than drawn. About the beam width: 0.03–0.08 mm. 0 = off."),
                 Field("Turn per pass (°)", _angleStep, tip: "Turn the scan lines this much more on every pass (and every depth slice), so the line pattern doesn't build up into stripes or ridges. " +
                                                               "Something odd like 37° or 23° spreads the angles best. 0 = every pass the same."),
@@ -172,6 +182,10 @@ public sealed class LayerEditor : UserControl
         };
         _fillExtras = new StackPanel { Spacing = 6, Children = { _fillStyleRow, _lineRows } };
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
+        _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
+        ToolTip.SetTip(_bidir, "Off: every line burns in the same direction and the beam returns unlit. More even on some materials, a little slower.");
+        ToolTip.SetTip(_together, "Scan all of this layer's shapes in one go instead of one shape at a time: fewer jumps for lots of small shapes. Where shapes overlap they cancel out.");
+        ToolTip.SetTip(_passThrough, "Engrave the picture's own pixels, one dot each: its size and pixel count set the resolution (prepared pictures, no resampling).");
         _cleanFreqRow = Field("Cleanup kHz", _cleanFreq, tip: "MOPA: the cleanup pass's frequency (its pulse width stays the layer's).");
         _cleanRows = new StackPanel
         {
@@ -205,6 +219,8 @@ public sealed class LayerEditor : UserControl
             Children =
             {
                 _grayRow,
+                _rampRow,
+                _passThrough,
                 _dotRow,
                 _sliceExtras,
             },
@@ -287,6 +303,13 @@ public sealed class LayerEditor : UserControl
             return l with { ImageMode = mode, AngleStepDeg = mode == ImageEngraveMode.Slices && l.ImageMode != mode && l.AngleStepDeg == 0 ? 37 : l.AngleStepDeg };
         }, _imageMode.SelectedIndex >= 0);
         _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
+        _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
+        _together.IsCheckedChanged += (_, _) => EditLayers("All shapes in one scan", l => l with { FillTogether = _together.IsChecked == true }, _together.IsChecked.HasValue);
+        _perf.ValueChanged += (_, _) => EditLayers("Perforation", l => l with { PerforateMm = (double)_perf.Value!.Value }, _perf.Value.HasValue, "perf");
+        _perfGap.ValueChanged += (_, _) => EditLayers("Perforation gap", l => l with { PerforateGapMm = (double)_perfGap.Value!.Value }, _perfGap.Value.HasValue, "perfgap");
+        _dotMode.ValueChanged += (_, _) => EditLayers("Dot mode", l => l with { DotModeMm = (double)_dotMode.Value!.Value }, _dotMode.Value.HasValue, "dotmode");
+        _ramp.ValueChanged += (_, _) => EditLayers("Ramp", l => l with { RampMm = (double)_ramp.Value!.Value }, _ramp.Value.HasValue, "ramp");
+        _passThrough.IsCheckedChanged += (_, _) => EditLayers("Pass-through", l => l with { PassThrough = _passThrough.IsChecked == true }, _passThrough.IsChecked.HasValue);
         _cpi.ValueChanged += (_, _) => EditLayers("Screen cells", l => l with { HalftoneCpi = (double)_cpi.Value!.Value }, _cpi.Value.HasValue, "cpi");
         _screenAngle.ValueChanged += (_, _) => EditLayers("Screen angle", l => l with { HalftoneAngleDeg = (double)_screenAngle.Value!.Value }, _screenAngle.Value.HasValue, "sangle");
         _dotWidth.ValueChanged += (_, _) => EditLayers("Dot width correction", l => l with { DotWidthMm = (double)_dotWidth.Value!.Value }, _dotWidth.Value.HasValue, "dotwidth");
@@ -392,6 +415,17 @@ public sealed class LayerEditor : UserControl
         Num(_cpi, Same(l => l.HalftoneCpi));
         Num(_screenAngle, Same(l => l.HalftoneAngleDeg));
         Num(_dotWidth, Same(l => l.DotWidthMm));
+        _bidir.IsChecked = Same(l => l.Bidirectional);
+        _together.IsChecked = Same(l => l.FillTogether);
+        _bidir.IsVisible = _together.IsVisible = anyFill && !allOffset;
+        Num(_perf, Same(l => l.PerforateMm));
+        Num(_perfGap, Same(l => l.PerforateGapMm));
+        Num(_dotMode, Same(l => l.DotModeMm));
+        Num(_ramp, Same(l => l.RampMm));
+        _rampRow.IsVisible = anyImage && ls.Any(l => l.Dither == DitherMethod.Threshold && l.ImageMode == ImageEngraveMode.Dither);
+        _passThrough.IsChecked = Same(l => l.PassThrough);
+        _passThrough.IsVisible = anyImage && !allSlices;
+        if (anyCut && ls.Any(l => l.DotModeMm > 0)) _dotRow.IsVisible = true;
         _cutExtras.IsVisible = anyCut;
         _fillExtras.IsVisible = anyFill || anySlices;
         _fillStyleRow.IsVisible = anyFill;

@@ -527,6 +527,66 @@ public static class PathTools
         return o;
     }
 
+    // ---- simplify and cut shapes -------------------------------------------------------
+
+    /// <summary>
+    /// Fewer points: the outline followed to within <paramref name="tol"/> mm and turned back into
+    /// as few lines and curves as that allows (imports and traces often have thousands).
+    /// Returns the geometry and the point counts before and after.
+    /// </summary>
+    public static (PathGeometry Geometry, int Before, int After) Simplify(PathGeometry world, double tol)
+    {
+        int before = world.Subpaths.Sum(s => s.Segs.Length), after = 0;
+        var subs = new List<Subpath>();
+        foreach (var sp in world.Subpaths.Where(s => !s.Segs.IsEmpty))
+        {
+            var pts = sp.Flatten(tol / 4);
+            Subpath next;
+            if (sp.Closed && pts.Count >= 4)
+            {
+                if (pts[0].Dist(pts[^1]) < 1e-9) pts.RemoveAt(pts.Count - 1);
+                next = CurveFit.Closed(pts, tol);
+            }
+            else
+            {
+                var simple = Simplify(pts, tol);
+                next = new Subpath(simple[0], [.. simple.Skip(1).Select(Seg.Line)], sp.Closed);
+            }
+            // Never make it worse.
+            if (next.Segs.Length >= sp.Segs.Length) next = sp;
+            after += next.Segs.Length;
+            subs.Add(next);
+        }
+        return (new PathGeometry(subs), before, after);
+    }
+
+    /// <summary>
+    /// Cut overlapping shapes into separate pieces where they cross (each overlap becomes its own
+    /// piece, and what's left of each shape another). Pieces come back in world mm.
+    /// </summary>
+    public static List<PathGeometry> CutShapes(IReadOnlyList<PathGeometry> shapes, double tol = 0.01)
+    {
+        var pieces = new List<PathGeometry>();
+        foreach (var raw in shapes)
+        {
+            var s = new PathGeometry(raw.Subpaths.Where(sp => sp.Closed));
+            if (s.IsEmpty) continue;
+            var next = new List<PathGeometry>();
+            var rest = s;
+            foreach (var p in pieces)
+            {
+                var both = ShapeGeometry.Boolean(p, s, BoolOp.Intersect, tol);
+                var only = ShapeGeometry.Boolean(p, s, BoolOp.Subtract, tol);
+                if (!both.IsEmpty) next.Add(both);
+                if (!only.IsEmpty) next.Add(only);
+                rest = ShapeGeometry.Boolean(rest, p, BoolOp.Subtract, tol);
+            }
+            if (!rest.IsEmpty) next.Add(rest);
+            pieces = next;
+        }
+        return pieces;
+    }
+
     // ---- circles ---------------------------------------------------------------------------
 
     /// <summary>The circle this outline is (centre and diameter, mm), or null if it isn't one closed circle.</summary>

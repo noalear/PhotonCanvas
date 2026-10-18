@@ -14,7 +14,7 @@ namespace PhotonCanvas.App;
 /// </summary>
 public sealed class CodeWindow : Window
 {
-    static readonly CodeKind[] Kinds = [CodeKind.QR, CodeKind.DataMatrix, CodeKind.Code128, CodeKind.Code39, CodeKind.Ean13, CodeKind.UpcA];
+    static readonly CodeKind[] Kinds = [CodeKind.QR, CodeKind.DataMatrix, CodeKind.Aztec, CodeKind.Pdf417, CodeKind.Code128, CodeKind.Code39, CodeKind.Code93, CodeKind.Ean13, CodeKind.Ean8, CodeKind.UpcA, CodeKind.UpcE, CodeKind.Itf, CodeKind.Codabar];
 
     readonly ComboBox _kind = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = Kinds.Select(CodeShape.KindName).ToList() };
     readonly TextBox _content = new() { AcceptsReturn = false, Watermark = "https://… or Part {serial:0000}" };

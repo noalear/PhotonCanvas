@@ -48,6 +48,10 @@ public static class Sections
                 }
                 if (pieces.Count > 0) yield return l with { Loops = pieces, Closed = allIn && l.Closed };
                 break;
+            case PointsBlock p:
+                var inPts = p.Points.Where(clip.Contains).Select(x => x + shift).ToList();
+                if (inPts.Count > 0) yield return p with { Points = inPts };
+                break;
             case DotBlock d:
                 double pitch = 25.4 / d.Dpi;
                 int c0 = Math.Max(0, (int)Math.Ceiling((clip.MinX - d.Origin.X) / pitch - 1e-9));

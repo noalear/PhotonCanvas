@@ -186,23 +186,23 @@ public static class JobBuilder
         foreach (var (a, b) in StackedShapes(s).Take(3))
             warnings.Add($"\"{Label(a)}\" and \"{Label(b)}\" are the same size and in the same place, so both will be processed. If one is an old copy, delete it (ungroup first if they're grouped).");
 
-        foreach (var shiny in layers.Where(l => l.Reflective && s.ShapesOn(l.Id).Any()).Take(1))
+        foreach (var shiny in layers.Where(l => l.Reflective && s.ShapesFor(l).Any()).Take(1))
             warnings.Add($"\"{shiny.Name}\" is on highly reflective material and may throw reflections. Put it near the exhaust fan, or coat it with anti-reflective black marking spray.");
 
-        foreach (var hidden in s.Layers.Where(l => l.Output && !l.Visible && s.ShapesOn(l.Id).Any()))
+        foreach (var hidden in s.Layers.Where(l => l.Output && !l.Visible && s.ShapesFor(l).Any()))
             warnings.Add($"Layer \"{hidden.Name}\" is hidden, so it will not be processed.");
 
         // Cutting before engraving lets parts shift or drop before they are engraved.
-        int firstCut = layers.FindIndex(l => l.Mode == LayerMode.Cut && s.ShapesOn(l.Id).Any());
+        int firstCut = layers.FindIndex(l => l.Mode == LayerMode.Cut && s.ShapesFor(l).Any());
         if (firstCut >= 0)
-            foreach (var later in layers.Skip(firstCut + 1).Where(l => l.Mode != LayerMode.Cut && s.ShapesOn(l.Id).Any()))
+            foreach (var later in layers.Skip(firstCut + 1).Where(l => l.Mode != LayerMode.Cut && s.ShapesFor(l).Any()))
                 warnings.Add($"\"{later.Name}\" runs after the cut layer \"{layers[firstCut].Name}\". Parts may move or drop before it is processed; consider moving it above.");
 
         // Where each layer's blocks start, for the per-layer times.
         var starts = new List<(Layer Layer, int Start)>();
         foreach (var layer in layers)
         {
-            var onLayer = s.ShapesOn(layer.Id).ToList();
+            var onLayer = s.ShapesFor(layer).ToList();
             if (onLayer.Count == 0) continue;
             starts.Add((layer, blocks.Count));
             try
@@ -296,7 +296,11 @@ public static class JobBuilder
             else if (layer.Mode == LayerMode.Fill)
             {
                 int open = 0;
-                foreach (var shape in shapes)
+                // All the shapes in one scan: one combined "shape" of every outline.
+                var groups = layer.FillTogether
+                    ? [new PathShape { LayerId = layer.Id, Geometry = new PathGeometry(shapes.SelectMany(sh => sh.World.Subpaths)) }]
+                    : shapes;
+                foreach (var shape in groups)
                 {
                     var polys = shape.World.Flatten(opt.Tolerance).Where(f => f.Closed && f.Points.Count >= 3).ToList();
                     open += shape.World.Subpaths.Count(sp => !sp.Closed);
@@ -308,6 +312,7 @@ public static class JobBuilder
                         OverscanMm = layer.OverscanMm,
                         FocusOffsetMm = layer.FocusOffsetMm,
                         DotWidthMm = layer.DotWidthMm,
+                        Unidirectional = !layer.Bidirectional,
                     };
                     var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + 90 } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
@@ -342,6 +347,29 @@ public static class JobBuilder
                     {
                         var pl = p.Closed ? Polyline.Loop(p.Points) : Polyline.Open(p.Points);
                         if (!pl.HasExtent) continue;
+                        if (layer.DotModeMm > 0)
+                        {
+                            // Dot mode: a pulse every so often along the path, instead of a line.
+                            var dots = DotsAlong(pl.EmittedPoints(), layer.DotModeMm);
+                            int dbm = blocks.Count, dsm = steps.Count;
+                            blocks.Add(new PointsBlock(dots, layer.Laser, layer.DotUs) { FocusOffsetMm = layer.FocusOffsetMm });
+                            steps.Add(new(layer.Id, p.Points, p.Closed, false));
+                            Link(dbm, dsm);
+                            bounds = bounds.Union(Rect2.Bounds(p.Points));
+                            continue;
+                        }
+                        if (layer.PerforateMm > 0)
+                        {
+                            // Perforation: dashes with gaps.
+                            int pbm = blocks.Count, psm = steps.Count;
+                            foreach (var dash in Dashes(pl.EmittedPoints(), layer.PerforateMm, layer.PerforateGapMm))
+                                if (dash.Count >= 2) blocks.Add(new VectorBlock(Polyline.Open(dash), layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
+                            if (blocks.Count == pbm) continue;
+                            steps.Add(new(layer.Id, p.Points, p.Closed, false));
+                            Link(pbm, psm);
+                            bounds = bounds.Union(Rect2.Bounds(p.Points));
+                            continue;
+                        }
                         if (wobble)
                         {
                             if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
@@ -426,7 +454,7 @@ public static class JobBuilder
         var lights = blocks.Select(b => b.Laser.Light).Distinct().ToList();
         var light = lights.Count > 1 ? "mixed" : lights[0].Wire();
         var prms = new JsonArray();
-        foreach (var l in layers.Where(l => s.ShapesOn(l.Id).Any()))
+        foreach (var l in layers.Where(l => s.ShapesFor(l).Any()))
             prms.Add(new JsonObject
             {
                 ["processingType"] = l.Mode switch
@@ -510,7 +538,9 @@ public static class JobBuilder
     public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer)
     {
         JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
-        double pitch = 25.4 / layer.Dpi;
+        // Pass-through: one dot per pixel of the file.
+        double dpi = layer.PassThrough ? Math.Clamp(25.4 * img.Source.Width / Math.Max(1e-6, img.SizeMm.X * img.Transform.ScaleX), 10, 2540) : layer.Dpi;
+        double pitch = 25.4 / dpi;
         var b = img.Bounds;
         int cols = Math.Max(1, (int)Math.Floor(b.Width / pitch + 1e-9));
         int rows = Math.Max(1, (int)Math.Floor(b.Height / pitch + 1e-9));
@@ -527,7 +557,7 @@ public static class JobBuilder
             {
                 var local = toLocal.Apply(new Vec2(origin.X + c * pitch, origin.Y + r * pitch));
                 float v;
-                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y) v = 1f; // outside the picture
+                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y || !img.InClip(local)) v = 1f; // outside the picture
                 else
                 {
                     var px = img.LocalToPixel(local);
@@ -537,6 +567,7 @@ public static class JobBuilder
             }
         });
         var area = new Rect2(origin.X, origin.Y, origin.X + (cols - 1) * pitch, origin.Y + (rows - 1) * pitch);
+        if (tone.Sharpen > 0) Core.Imaging.Dither.Sharpen(grey, cols, rows, tone.Sharpen, Math.Max(1, (int)Math.Round(tone.SharpenRadiusMm / pitch)));
         var bitmap = new Bitmap(cols, rows);
         if (layer.ImageMode == ImageEngraveMode.Grayscale)
         {
@@ -553,15 +584,33 @@ public static class JobBuilder
                 any = true;
             }
             if (!any) return (null, b);
-            return (new DotBlock(bitmap, origin, layer.Laser, layer.Dpi, layer.DotUs, layer.GrayMinPower, "grayscale")
+            return (new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs, layer.GrayMinPower, "grayscale")
             {
                 Levels = levels,
             }, area);
         }
-        var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither, new Screen(layer.Dpi / Math.Max(1, layer.HalftoneCpi), layer.HalftoneAngleDeg));
+        if (layer.Dither == DitherMethod.Threshold && layer.RampMm > 0)
+        {
+            // Ramp: power rises from the lightest power at an edge to full power RampMm inside it.
+            var on = new bool[grey.Length];
+            for (int i = 0; i < grey.Length; i++) on[i] = grey[i] < 0.5f;
+            var dist = EdgeDistance(on, cols, rows);
+            var levels = new byte[grey.Length];
+            bool any = false;
+            for (int i = 0; i < grey.Length; i++)
+            {
+                if (!on[i]) continue;
+                bitmap.Bits[i] = true;
+                levels[i] = (byte)Math.Clamp((int)Math.Round(255 * Math.Min(1, dist[i] * pitch / layer.RampMm)), 0, 255);
+                any = true;
+            }
+            if (!any) return (null, b);
+            return (new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs, Math.Min(layer.GrayMinPower, layer.Laser.Power), "grayscale") { Levels = levels }, area);
+        }
+        var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither, new Screen(dpi / Math.Max(1, layer.HalftoneCpi), layer.HalftoneAngleDeg));
         if (!dots.Any(d => d)) return (null, b);
         Array.Copy(dots, bitmap.Bits, dots.Length);
-        var block = new DotBlock(bitmap, origin, layer.Laser, layer.Dpi, layer.DotUs,
+        var block = new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs,
             Math.Min(1, layer.Laser.Power), Core.Imaging.Dither.WireName(layer.Dither));
         return (block, area);
     }
@@ -638,7 +687,7 @@ public static class JobBuilder
             for (int c = 0; c < cols; c++)
             {
                 var local = toLocal.Apply(new Vec2(b.MinX + (c + 0.5) * cell, b.MinY + (r + 0.5) * cell));
-                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y) continue; // outside the picture
+                if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y || !img.InClip(local)) continue; // outside the picture
                 var px = img.LocalToPixel(local);
                 double grey = Math.Clamp(tone.Apply(img.Source.SampleLuminance(px.X, px.Y)), 0, 1);
                 double depth = negative ? grey : 1 - grey;
@@ -648,6 +697,79 @@ public static class JobBuilder
         var origin = b.TopLeft;
         var masks = Enumerable.Range(1, n).Select(k => new FillMask(origin, cell, cols, rows, levels, k)).ToArray();
         return (masks, new Rect2(origin.X, origin.Y, origin.X + cols * cell, origin.Y + rows * cell));
+    }
+
+    /// <summary>For each burned cell, how many cells it is from the nearest unburned one (chamfer distance).</summary>
+    static double[] EdgeDistance(bool[] on, int w, int h)
+    {
+        var d = new double[on.Length];
+        const double Diag = 1.41421356;
+        for (int i = 0; i < d.Length; i++) d[i] = on[i] ? double.PositiveInfinity : 0;
+        double At(int x, int y) => x < 0 || y < 0 || x >= w || y >= h ? 0 : d[y * w + x];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if (on[y * w + x])
+                    d[y * w + x] = Math.Min(d[y * w + x], Math.Min(Math.Min(At(x - 1, y) + 1, At(x, y - 1) + 1), Math.Min(At(x - 1, y - 1) + Diag, At(x + 1, y - 1) + Diag)));
+        for (int y = h - 1; y >= 0; y--)
+            for (int x = w - 1; x >= 0; x--)
+                if (on[y * w + x])
+                    d[y * w + x] = Math.Min(d[y * w + x], Math.Min(Math.Min(At(x + 1, y) + 1, At(x, y + 1) + 1), Math.Min(At(x + 1, y + 1) + Diag, At(x - 1, y + 1) + Diag)));
+        return d;
+    }
+
+    /// <summary>Perforation: the path as dashes of <paramref name="on"/> mm with <paramref name="off"/> mm gaps.</summary>
+    public static List<List<Vec2>> Dashes(IReadOnlyList<Vec2> pts, double on, double off)
+    {
+        var o = new List<List<Vec2>>();
+        if (pts.Count < 2 || !(on > 0) || off < 0) return o;
+        double phase = 0; // how far into the current dash (0…on) or gap (on…on+off)
+        List<Vec2>? dash = null;
+        for (int i = 1; i < pts.Count; i++)
+        {
+            var a = pts[i - 1];
+            var b = pts[i];
+            double len = a.Dist(b), t = 0;
+            while (len - t > 1e-9)
+            {
+                bool burning = phase < on;
+                double remain = burning ? on - phase : on + off - phase;
+                double step = Math.Min(len - t, remain);
+                var p1 = Vec2.Lerp(a, b, (t + step) / len);
+                if (burning)
+                {
+                    if (dash is null) { dash = [Vec2.Lerp(a, b, t / len)]; o.Add(dash); }
+                    dash.Add(p1);
+                }
+                t += step;
+                phase += step;
+                if (phase >= on - 1e-9 && burning && step >= remain - 1e-9) { dash = null; phase = on; }
+                if (phase >= on + off - 1e-9) phase = 0;
+            }
+        }
+        return o;
+    }
+
+    /// <summary>Dot mode: points every <paramref name="spacing"/> mm along the path, from its start.</summary>
+    public static List<Vec2> DotsAlong(IReadOnlyList<Vec2> pts, double spacing)
+    {
+        var o = new List<Vec2>();
+        if (pts.Count == 0 || !(spacing > 0)) return o;
+        o.Add(pts[0]);
+        double carry = 0;
+        for (int i = 1; i < pts.Count; i++)
+        {
+            var a = pts[i - 1];
+            var b = pts[i];
+            double len = a.Dist(b);
+            double t = spacing - carry;
+            while (t <= len + 1e-12)
+            {
+                o.Add(Vec2.Lerp(a, b, len > 0 ? t / len : 0));
+                t += spacing;
+            }
+            carry = len - (t - spacing);
+        }
+        return o;
     }
 
     /// <summary>Checks the layer's cut, fill and image extras; messages are for the person at the laser.</summary>
@@ -663,6 +785,8 @@ public static class JobBuilder
                 if (l.TabCount > 0) JobException.CheckRange("tab width", l.TabWidthMm, 0.1, 10, "mm");
                 JobException.CheckRange("overcut", l.OvercutMm, 0, 10, "mm");
                 JobException.CheckRange("lead-in", l.LeadInMm, 0, 10, "mm");
+                if (l.PerforateMm > 0) { JobException.CheckRange("perforation dash", l.PerforateMm, 0.05, 100, "mm"); JobException.CheckRange("perforation gap", l.PerforateGapMm, 0.05, 100, "mm"); }
+                if (l.DotModeMm > 0) { JobException.CheckRange("dot spacing", l.DotModeMm, 0.01, 50, "mm"); JobException.CheckRange("dot time", l.DotUs, 10, 100_000, "µs"); }
                 break;
             case LayerMode.Fill:
                 JobException.CheckRange("fill angle", l.FillAngleDeg, -360, 360, "degrees");
