@@ -19,12 +19,12 @@ public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes,
 public sealed partial class CanvasView : Control
 {
     // ---- appearance -----------------------------------------------------------
-    static readonly IBrush BgBrush = new SolidColorBrush(Color.Parse("#0E1014"));
-    static readonly IBrush FieldBrush = new SolidColorBrush(Color.Parse("#161920"));
-    static readonly IPen FieldPen = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
-    static readonly IBrush RulerBrush = new SolidColorBrush(Color.Parse("#15181E"));
-    static readonly IBrush RulerText = new SolidColorBrush(Color.Parse("#7D8694"));
-    static readonly IPen RulerTick = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
+    static IBrush BgBrush = new SolidColorBrush(Color.Parse("#0E1014"));
+    static IBrush FieldBrush = new SolidColorBrush(Color.Parse("#161920"));
+    static IPen FieldPen = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
+    static IBrush RulerBrush = new SolidColorBrush(Color.Parse("#15181E"));
+    static IBrush RulerText = new SolidColorBrush(Color.Parse("#7D8694"));
+    static IPen RulerTick = new Pen(new SolidColorBrush(Color.Parse("#3A4150")), 1);
     static readonly Color AccentColor = Color.Parse("#4F8CFF");
     static readonly IPen SelBoxPen = new Pen(new SolidColorBrush(AccentColor), 1, new DashStyle([4, 3], 0));
     static readonly IBrush HandleFill = Brushes.White;
@@ -182,6 +182,18 @@ public sealed partial class CanvasView : Control
 
     /// <summary>A code (QR, barcode) was double-clicked: edit it.</summary>
     public event Action<Guid>? CodeEditRequested;
+
+    /// <summary>The light theme's work area: a white bed on a grey surround.</summary>
+    public static void UseLightColours()
+    {
+        BgBrush = new SolidColorBrush(Color.Parse("#D3D8DF"));
+        FieldBrush = new SolidColorBrush(Color.Parse("#FFFFFF"));
+        FieldPen = new Pen(new SolidColorBrush(Color.Parse("#98A1AE")), 1);
+        RulerBrush = new SolidColorBrush(Color.Parse("#EEF1F4"));
+        RulerText = new SolidColorBrush(Color.Parse("#5B6472"));
+        RulerTick = new Pen(new SolidColorBrush(Color.Parse("#AEB6C1")), 1);
+        GridSettings.Default = new(10, 1, Color.Parse("#D2D8E0"), Color.Parse("#EBEEF2"));
+    }
 
     /// <summary>Picture eraser: brush width (mm).</summary>
     public double EraserMm { get; set; } = 3;
@@ -495,7 +507,7 @@ public sealed partial class CanvasView : Control
         ctx.DrawEllipse(HandleFill, HandlePen, rot, 5, 5);
 
         // Size label under the selection.
-        var label = $"{b.Width:0.##} × {b.Height:0.##} mm";
+        var label = $"{Units.Num(b.Width)} × {Units.Num(b.Height)} {Units.Name}";
         var ft = Text(label, 11, Brushes.White);
         var lr = new Rect(r.Center.X - ft.Width / 2 - 6, r.Bottom + 8, ft.Width + 12, ft.Height + 4);
         ctx.FillRectangle(new SolidColorBrush(AccentColor), lr, 4);
@@ -522,23 +534,25 @@ public sealed partial class CanvasView : Control
         var h = Bounds.Height;
         ctx.FillRectangle(RulerBrush, new Rect(0, 0, w, RulerSize));
         ctx.FillRectangle(RulerBrush, new Rect(0, 0, RulerSize, h));
-        double[] steps = [1, 2, 5, 10, 20, 50, 100];
-        double label = steps.FirstOrDefault(s => s * _scale >= 50, 100);
-        double tick = label / 5;
+        // Ruler steps in the unit shown (millimetres, or inches split in quarters).
+        double unit = Units.PerUnit;
+        double[] steps = Units.Inches ? [0.125, 0.25, 0.5, 1, 2, 5, 10] : [1, 2, 5, 10, 20, 50, 100];
+        double label = steps.FirstOrDefault(s => s * unit * _scale >= 50, steps[^1]);
+        double tick = label / (Units.Inches ? 4 : 5);
         // Horizontal
-        var x0 = Math.Floor(ToWorld(new Point(RulerSize, 0)).X / tick) * tick;
-        for (double x = x0; ToScreen(new Vec2(x, 0)).X < w; x += tick)
+        var x0 = Math.Floor(ToWorld(new Point(RulerSize, 0)).X / unit / tick) * tick;
+        for (double x = x0; ToScreen(new Vec2(x * unit, 0)).X < w; x += tick)
         {
-            double sx = Math.Round(ToScreen(new Vec2(x, 0)).X) + 0.5;
+            double sx = Math.Round(ToScreen(new Vec2(x * unit, 0)).X) + 0.5;
             if (sx < RulerSize) continue;
             bool major = Math.Abs(x / label - Math.Round(x / label)) < 1e-6;
             ctx.DrawLine(RulerTick, new(sx, major ? 6 : 15), new(sx, RulerSize));
             if (major) ctx.DrawText(Text(Fmt(x), 10, RulerText), new(sx + 3, 2));
         }
-        var y0 = Math.Floor(ToWorld(new Point(0, RulerSize)).Y / tick) * tick;
-        for (double y = y0; ToScreen(new Vec2(0, y)).Y < h; y += tick)
+        var y0 = Math.Floor(ToWorld(new Point(0, RulerSize)).Y / unit / tick) * tick;
+        for (double y = y0; ToScreen(new Vec2(0, y * unit)).Y < h; y += tick)
         {
-            double sy = Math.Round(ToScreen(new Vec2(0, y)).Y) + 0.5;
+            double sy = Math.Round(ToScreen(new Vec2(0, y * unit)).Y) + 0.5;
             if (sy < RulerSize) continue;
             bool major = Math.Abs(y / label - Math.Round(y / label)) < 1e-6;
             ctx.DrawLine(RulerTick, new(major ? 6 : 15, sy), new(RulerSize, sy));

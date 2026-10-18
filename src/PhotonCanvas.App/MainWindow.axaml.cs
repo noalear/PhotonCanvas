@@ -108,7 +108,7 @@ public partial class MainWindow : Window
         BuildRibbon();
         WireTools();
         ApplyGrid();
-        Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {v.X:0.00}   Y {v.Y:0.00} mm" : "";
+        Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {Units.Num(v.X)}   Y {Units.Num(v.Y)} {Units.Name}" : "";
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
@@ -500,6 +500,16 @@ public partial class MainWindow : Window
         import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
         import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
+        var importMore = import.Small("Import as…", "IcMore", () => { }, "Import a drawing grouped, in separate pieces, or as one picture");
+        importMore.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                AsyncItem("Import, each file grouped…", () => ImportAny(false, ImportHow.Grouped)),
+                AsyncItem("Import with every piece separate…", () => ImportAny(false, ImportHow.Pieces)),
+                AsyncItem("Import as one picture…", () => ImportAny(false, ImportHow.Picture)),
+            },
+        };
 
         // ---- Arrange: position, align, order, repeat ----
         var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate, order and repeat");
@@ -668,7 +678,7 @@ public partial class MainWindow : Window
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
                 new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
             ]),
-        ], [("Equipment", equipment)]);
+        ], [("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); }))]);
         await w.ShowDialog(this);
         _ribbon.Refresh();
     }
@@ -1621,7 +1631,10 @@ public partial class MainWindow : Window
         return true;
     }
 
-    async Task ImportAny(bool byColour)
+    /// <summary>How a drawing comes in: shape by shape, grouped per file, broken into every piece, or drawn into one picture.</summary>
+    enum ImportHow { Shapes, Grouped, Pieces, Picture }
+
+    async Task ImportAny(bool byColour, ImportHow how = ImportHow.Shapes)
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
@@ -1633,10 +1646,10 @@ public partial class MainWindow : Window
         var pictures = paths.Where(IsPicture).ToList();
         var drawings = paths.Where(p => !IsPicture(p)).ToList();
         if (pictures.Count > 0) await ImportPictures(pictures);
-        if (drawings.Count > 0) await ImportPaths(drawings, byColour);
+        if (drawings.Count > 0) await ImportPaths(drawings, byColour, how);
     }
 
-    async Task ImportPaths(IReadOnlyList<string> paths, bool byColour)
+    async Task ImportPaths(IReadOnlyList<string> paths, bool byColour, ImportHow how = ImportHow.Shapes)
     {
         var state = _doc.State;
         var newIds = new List<Guid>();
@@ -1672,9 +1685,31 @@ public partial class MainWindow : Window
             if (b.Width > field.Width || b.Height > field.Height)
                 warnings.Add($"{Path.GetFileName(path)} is {b.Width:0.#} × {b.Height:0.#} mm, larger than the {field.Width:0} × {field.Height:0} mm work area. Scale it down before sending.");
 
+            if (how == ImportHow.Picture)
+            {
+                // The drawing as one picture (0.1 mm pixels): closed shapes filled, lines drawn.
+                var drawn = r.Paths.Select(ip => new PathShape { LayerId = Guid.Empty, Geometry = ip.Geometry.Transform(move) }).ToList();
+                var area = drawn.Aggregate(Rect2.Empty, (acc, d) => acc.Union(d.Bounds));
+                if (!area.IsEmpty)
+                {
+                    area = area.Inflate(0.5);
+                    var png = await Task.Run(() => Doc.Export.DesignExport.ShapesToPng(drawn, area, 254));
+                    var picLayer0 = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Image && l.Visible && !l.Locked);
+                    if (picLayer0 is null)
+                    {
+                        picLayer0 = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = "Pictures" };
+                        state = Ops.AddLayer(state, picLayer0, 0);
+                    }
+                    var whole = new ImageShape { Name = Path.GetFileNameWithoutExtension(path), LayerId = picLayer0.Id, Source = ImageSource.FromEncoded(png), SizeMm = new Vec2(area.Width, area.Height), Transform = Affine.Translate(area.MinX, area.MinY) };
+                    state = Ops.AddShapes(state, [whole]);
+                    newIds.Add(whole.Id);
+                }
+                if (r.Images.Count > 0) warnings.Add($"{Path.GetFileName(path)}: its pictures came in on their own, on top of the drawing.");
+            }
+            var fileIds = new List<Guid>();
             // xTool projects name their colour layers; keep those names.
             bool named = r.LayerNames.Count > 0;
-            foreach (var ip in r.Paths)
+            foreach (var ip in how == ImportHow.Picture ? [] : r.Paths)
             {
                 Guid layerId;
                 if (byColour || named)
@@ -1690,9 +1725,18 @@ public partial class MainWindow : Window
                     layerId = existing.Id;
                 }
                 else layerId = target!.Value;
-                var shape = new PathShape { Name = ip.Name, LayerId = layerId, Geometry = ip.Geometry.Transform(move) };
-                state = Ops.AddShapes(state, [shape]);
-                newIds.Add(shape.Id);
+                var geometry = ip.Geometry.Transform(move);
+                // Every piece separate: each outline its own shape (holes too).
+                var pieces = how == ImportHow.Pieces && geometry.Subpaths.Length > 1
+                    ? geometry.Subpaths.Select(sp => new Doc.PathGeometry([sp])).ToList()
+                    : [geometry];
+                foreach (var piece in pieces)
+                {
+                    var shape = new PathShape { Name = ip.Name, LayerId = layerId, Geometry = piece };
+                    state = Ops.AddShapes(state, [shape]);
+                    newIds.Add(shape.Id);
+                    fileIds.Add(shape.Id);
+                }
             }
             foreach (var im in r.Images)
             {
@@ -1708,7 +1752,9 @@ public partial class MainWindow : Window
                 var pic = new ImageShape { Name = im.Name, LayerId = picLayer.Id, Source = src, SizeMm = im.SizeMm, Transform = im.Transform.Then(move) };
                 state = Ops.AddShapes(state, [pic]);
                 newIds.Add(pic.Id);
+                fileIds.Add(pic.Id);
             }
+            if (how == ImportHow.Grouped && fileIds.Count > 1) state = Ops.Group(state, fileIds.ToHashSet()).Item1;
         }
         if (newIds.Count > 0)
         {

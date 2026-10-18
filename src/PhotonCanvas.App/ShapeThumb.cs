@@ -34,7 +34,7 @@ public sealed class ShapeThumb : Control
     public override void Render(DrawingContext ctx)
     {
         var box = new Rect(0, 0, Bounds.Width, Bounds.Height);
-        ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(255, 14, 16, 20)), null, box, 3, 3);
+        ctx.DrawRectangle(UiKit.Brush("Bg0"), null, box, 3, 3);
         const double Pad = 2;
         if (_shape is ImageShape im)
         {

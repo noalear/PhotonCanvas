@@ -131,11 +131,11 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Export the design as SVG, DXF and PNG (LightBurn, xTool)
 - [x] Import HPGL/PLT and LightBurn files (.lbrn2, .lbrn) (LightBurn)
 - [ ] Import EPS (LightBurn; needs Ghostscript, which we don't ship)
-- [ ] Import options: by element or as one picture, exploded files (xTool)
+- [x] Import options: shape by shape, grouped, every piece separate, or as one picture (xTool)
 - [x] Settings backup and restore (LightBurn)
 - [x] Job preview that plays the run with a time slider (LightBurn)
 - [x] Job history and work log with times; a "job done" sound (xTool, LightBurn)
-- [ ] Function tips, a light theme, inches (xTool, LightBurn)
+- [x] A light theme, inches (xTool, LightBurn); every button already has a tip
 - [ ] Other languages (LightBurn, xTool)
 - [ ] Movable, dockable panels (LightBurn)
 - [ ] Mac and Linux builds (LightBurn)

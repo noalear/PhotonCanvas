@@ -86,7 +86,7 @@ public sealed partial class CanvasView
         // Whole and half millimetres are easy to land on.
         if (!SnapSuspended) at = Math.Round(at * 2) / 2;
         _guideDrag = d with { At = at };
-        Hint?.Invoke(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Guide at {(d.Vertical ? "X" : "Y")} = {at:0.##} mm. Drop it back on the ruler to remove it."));
+        Hint?.Invoke(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Guide at {(d.Vertical ? "X" : "Y")} = {Units.Len(at)}. Drop it back on the ruler to remove it."));
         InvalidateVisual();
     }
 
@@ -290,7 +290,7 @@ public sealed partial class CanvasView
     {
         var d = b - a;
         double ang = Math.Atan2(-d.Y, d.X) * 180 / Math.PI;
-        return string.Create(CultureInfo.InvariantCulture, $"{d.Length:0.###} mm  (Δx {d.X:0.###}, Δy {d.Y:0.###}, {ang:0.#}°)");
+        return string.Create(CultureInfo.InvariantCulture, $"{Units.Len(d.Length)}  (Δx {Units.Num(d.X)}, Δy {Units.Num(d.Y)}, {ang:0.#}°)");
     }
 
     /// <summary>The path nearest the cursor, if it's within reach and can be trimmed.</summary>

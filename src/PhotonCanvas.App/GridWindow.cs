@@ -114,6 +114,7 @@ public sealed class GridWindow : Window
     /// <summary>The grid described by the settings.</summary>
     public static GridSettings From(AppSettings s) => new(
         s.GridMajorMm, s.GridMinorMm,
-        Parse(s.GridMajorColor, GridSettings.Default.MajorColor),
-        Parse(s.GridMinorColor, GridSettings.Default.MinorColor));
+        // The dark theme's own colours follow the theme; colours someone picked are kept.
+        s.GridMajorColor == "#2A303B" ? GridSettings.Default.MajorColor : Parse(s.GridMajorColor, GridSettings.Default.MajorColor),
+        s.GridMinorColor == "#1D2129" ? GridSettings.Default.MinorColor : Parse(s.GridMinorColor, GridSettings.Default.MinorColor));
 }

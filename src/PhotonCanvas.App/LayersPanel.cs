@@ -280,7 +280,7 @@ public sealed class LayersPanel : UserControl
         bool drop = _dragging && _dropIndex == index;
         var row = new Border
         {
-            Background = active ? Res("Bg3") : selected ? new SolidColorBrush(Color.Parse("#20304A")) : Res("Bg2"),
+            Background = active ? Res("Bg3") : selected ? Res("SelBg") : Res("Bg2"),
             CornerRadius = new(8),
             BorderThickness = drop ? new(1, 3, 1, 1) : new(1),
             BorderBrush = drop || active || selected ? Res("Accent") : Res("Line"),
@@ -344,7 +344,7 @@ public sealed class LayersPanel : UserControl
         bool all = members.All(m => _doc.Selection.Contains(m.Id));
         var row = new Border
         {
-            Background = all ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent,
+            Background = all ? Res("SelBg") : Brushes.Transparent,
             CornerRadius = new(4),
             Margin = new(30, 0, 0, 0),
             Padding = new(6, 2),
@@ -400,7 +400,7 @@ public sealed class LayersPanel : UserControl
         var size = new TextBlock
         {
             Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0),
-            Text = b.IsEmpty ? "" : $"{b.Width:0.#} × {b.Height:0.#}",
+            Text = b.IsEmpty ? "" : Units.Inches ? $"{Units.Num(b.Width)} × {Units.Num(b.Height)}" : $"{b.Width:0.#} × {b.Height:0.#}",
         };
         var icon = new ShapeThumb(s, Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color), l.Mode == LayerMode.Fill)
         {
@@ -426,7 +426,7 @@ public sealed class LayersPanel : UserControl
         }
         var row = new Border
         {
-            Background = sel ? new SolidColorBrush(Color.Parse("#20304A")) : Brushes.Transparent,
+            Background = sel ? Res("SelBg") : Brushes.Transparent,
             BorderBrush = sel ? Res("Accent") : Brushes.Transparent,
             BorderThickness = new(2, 0, 0, 0),
             CornerRadius = new(4),
@@ -435,7 +435,7 @@ public sealed class LayersPanel : UserControl
             Child = grid,
             Opacity = l.Visible ? 1 : 0.55,
         };
-        ToolTip.SetTip(row, b.IsEmpty ? Label(s) : $"{Label(s)}\n{b.Width:0.##} × {b.Height:0.##} mm at X {b.MinX:0.##}, Y {b.MinY:0.##}");
+        ToolTip.SetTip(row, b.IsEmpty ? Label(s) : $"{Label(s)}\n{Units.Num(b.Width)} × {Units.Num(b.Height)} {Units.Name} at X {Units.Num(b.MinX)}, Y {Units.Num(b.MinY)}");
         row.PointerEntered += (_, _) => ShapeHovered?.Invoke(s.Id);
         row.PointerExited += (_, _) => ShapeHovered?.Invoke(null);
         row.PointerPressed += (_, e) => OnShapePressed(s, l, e);

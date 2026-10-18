@@ -49,6 +49,10 @@ public sealed class AppSettings
     public int PolygonSides { get; set; } = 6;
     public int StarPoints { get; set; } = 5;
     public double StarInnerPercent { get; set; } = 50;
+    /// <summary>"Dark" or "Light" (used from the next start).</summary>
+    public string Theme { get; set; } = "Dark";
+    /// <summary>Show lengths in inches instead of millimetres.</summary>
+    public bool Inches { get; set; }
     public double GridMajorMm { get; set; } = 10;
     public double GridMinorMm { get; set; } = 1;
     public string GridMajorColor { get; set; } = "#2A303B";

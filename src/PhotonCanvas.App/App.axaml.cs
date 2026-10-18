@@ -15,6 +15,10 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            // Colours and units first: every window picks them up as it's made.
+            var settings = AppSettings.Load();
+            AppTheme.Apply(this, settings.Theme == "Light");
+            Units.Inches = settings.Inches;
             var window = new MainWindow();
             desktop.MainWindow = window;
             if (desktop.Args is [var path, ..] && File.Exists(path)) window.OpenPathOnStartup = path;

@@ -19,6 +19,11 @@
       <SolidColorBrush x:Key="AccentDeep" Color="#2F5DB3" />
       <SolidColorBrush x:Key="AccentSoft" Color="#22324F" />
       <SolidColorBrush x:Key="AccentLine" Color="#3E5F99" />
+      <SolidColorBrush x:Key="AccentHover" Color="#2A3D5F" />
+      <SolidColorBrush x:Key="OnAccentSoft" Color="White" />
+      <SolidColorBrush x:Key="ContextText" Color="#7FB0FF" />
+      <SolidColorBrush x:Key="HudBg" Color="#E615181E" />
+      <SolidColorBrush x:Key="SelBg" Color="#20304A" />
       <!-- The theme's own accent (check boxes, sliders, focus) matches ours rather than the Windows accent. -->
       <Color x:Key="SystemAccentColor">#4C7BD9</Color>
       <Color x:Key="SystemAccentColorDark1">#4170C9</Color>
@@ -78,28 +83,28 @@
       <Setter Property="Icon" Value="/Assets/photoncanvas.ico" />
     </Style>
     <Style Selector="Window">
-      <Setter Property="Background" Value="{StaticResource Bg0}" />
+      <Setter Property="Background" Value="{DynamicResource Bg0}" />
       <Setter Property="FontSize" Value="13" />
     </Style>
     <Style Selector="TextBlock.h">
       <Setter Property="FontSize" Value="11" />
       <Setter Property="FontWeight" Value="SemiBold" />
-      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
       <Setter Property="Margin" Value="0,0,0,6" />
       <Setter Property="LetterSpacing" Value="0.6" />
     </Style>
     <Style Selector="TextBlock.muted">
-      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
       <Setter Property="FontSize" Value="12" />
     </Style>
     <Style Selector="TextBlock.hint">
-      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
       <Setter Property="FontSize" Value="11" />
       <Setter Property="TextWrapping" Value="Wrap" />
     </Style>
     <Style Selector="Border.card">
-      <Setter Property="Background" Value="{StaticResource Bg2}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Background" Value="{DynamicResource Bg2}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="8" />
       <Setter Property="Padding" Value="12" />
@@ -127,11 +132,11 @@
       <Setter Property="Height" Value="18" />
     </Style>
     <Style Selector="ToggleButton.tool:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="{DynamicResource Accent}" />
     </Style>
     <Style Selector="Button.primary">
-      <Setter Property="Background" Value="{StaticResource AccentDeep}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
+      <Setter Property="Background" Value="{DynamicResource AccentDeep}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="Foreground" Value="White" />
       <Setter Property="FontWeight" Value="SemiBold" />
@@ -160,13 +165,13 @@
       <Setter Property="MinHeight" Value="0" />
     </Style>
     <Style Selector="ToggleButton.rb:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccentSoft}" />
     </Style>
     <Style Selector="ToggleButton.rb:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2A3D5F" />
-      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
+      <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
     </Style>
     <Style Selector="Button.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.rb:disabled /template/ ContentPresenter#PART_ContentPresenter, Button.icon:disabled /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="Transparent" />
@@ -180,26 +185,26 @@
       <Setter Property="CornerRadius" Value="0" />
       <Setter Property="Padding" Value="14,5" />
       <Setter Property="FontSize" Value="13" />
-      <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMuted}" />
     </Style>
     <Style Selector="ToggleButton.rbtab:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource Bg2}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
-      <Setter Property="Foreground" Value="{StaticResource TextMain}" />
+      <Setter Property="Background" Value="{DynamicResource Bg2}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
     </Style>
     <Style Selector="ToggleButton.rbtab:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource Bg3}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Accent}" />
-      <Setter Property="Foreground" Value="{StaticResource TextMain}" />
+      <Setter Property="Background" Value="{DynamicResource Bg3}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMain}" />
     </Style>
     <Style Selector="ToggleButton.rbtab.context">
-      <Setter Property="Foreground" Value="#7FB0FF" />
+      <Setter Property="Foreground" Value="{DynamicResource ContextText}" />
     </Style>
 
     <!-- Segmented choices (layer mode, laser) -->
     <Style Selector="ToggleButton.seg">
-      <Setter Property="Background" Value="{StaticResource Bg1}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Background" Value="{DynamicResource Bg1}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="0" />
       <Setter Property="Padding" Value="4,5" />
@@ -214,28 +219,28 @@
       <Setter Property="CornerRadius" Value="0,6,6,0" />
     </Style>
     <Style Selector="ToggleButton.seg:checked /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{StaticResource AccentSoft}" />
-      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccentSoft}" />
     </Style>
     <Style Selector="ToggleButton.seg:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="#2A3D5F" />
-      <Setter Property="BorderBrush" Value="{StaticResource AccentLine}" />
-      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Background" Value="{DynamicResource AccentHover}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentLine}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccentSoft}" />
     </Style>
 
     <!-- Floating panels over the work area -->
     <Style Selector="Border.hud">
-      <Setter Property="Background" Value="#E615181E" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Background" Value="{DynamicResource HudBg}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="10" />
       <Setter Property="Padding" Value="8" />
       <Setter Property="BoxShadow" Value="0 4 18 0 #66000000" />
     </Style>
     <Style Selector="Button.chip, ToggleButton.chip">
-      <Setter Property="Background" Value="{StaticResource Bg2}" />
-      <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+      <Setter Property="Background" Value="{DynamicResource Bg2}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Line}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="14" />
       <Setter Property="Padding" Value="10,4" />

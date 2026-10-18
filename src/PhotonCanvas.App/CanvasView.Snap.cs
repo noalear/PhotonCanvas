@@ -8,7 +8,8 @@ namespace PhotonCanvas.App;
 /// <summary>Grid spacing (real millimetres) and colours.</summary>
 public sealed record GridSettings(double MajorMm, double MinorMm, Color MajorColor, Color MinorColor)
 {
-    public static readonly GridSettings Default = new(10, 1, Color.Parse("#2A303B"), Color.Parse("#1D2129"));
+    /// <summary>The usual grid (lighter in the light theme).</summary>
+    public static GridSettings Default { get; set; } = new(10, 1, Color.Parse("#2A303B"), Color.Parse("#1D2129"));
 }
 
 /// <summary>

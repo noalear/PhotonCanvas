@@ -236,7 +236,7 @@ public sealed class PropertiesPanel : UserControl
 
     // ---- refresh -------------------------------------------------------------
 
-    void Refresh()
+    public void Refresh()
     {
         _updating = true;
         try
@@ -350,10 +350,10 @@ public sealed class PropertiesPanel : UserControl
         }
         var b = _doc.State.Bounds(sel);
         if (b.IsEmpty) return;
-        Set(_x, b.MinX);
-        Set(_y, b.MinY);
-        Set(_w, Math.Max(0.01, b.Width));
-        Set(_h, Math.Max(0.01, b.Height));
+        Set(_x, Units.FromMm(b.MinX));
+        Set(_y, Units.FromMm(b.MinY));
+        Set(_w, Units.FromMm(Math.Max(0.01, b.Width)));
+        Set(_h, Units.FromMm(Math.Max(0.01, b.Height)));
         _w.IsEnabled = b.Width > 1e-6;
         _h.IsEnabled = b.Height > 1e-6;
         var picked = _doc.State.Shapes.Where(s => sel.Contains(s.Id)).ToList();
@@ -396,7 +396,7 @@ public sealed class PropertiesPanel : UserControl
     {
         if (_updating || _doc.Selection.Count == 0 || _x.Value is null || _y.Value is null) return;
         var b = _doc.State.Bounds(_doc.Selection);
-        double dx = (double)_x.Value.Value - b.MinX, dy = (double)_y.Value.Value - b.MinY;
+        double dx = Units.ToMm((double)_x.Value.Value) - b.MinX, dy = Units.ToMm((double)_y.Value.Value) - b.MinY;
         if (Math.Abs(dx) < 1e-9 && Math.Abs(dy) < 1e-9) return;
         _doc.Commit("Move", Ops.Move(_doc.State, _doc.Selection, dx, dy), coalesceKey: "pos");
     }
@@ -405,8 +405,8 @@ public sealed class PropertiesPanel : UserControl
     {
         if (_updating || _doc.Selection.Count == 0 || _w.Value is null || _h.Value is null) return;
         var b = _doc.State.Bounds(_doc.Selection);
-        double sx = b.Width > 1e-9 ? (double)_w.Value.Value / b.Width : 1;
-        double sy = b.Height > 1e-9 ? (double)_h.Value.Value / b.Height : 1;
+        double sx = b.Width > 1e-9 ? Units.ToMm((double)_w.Value.Value) / b.Width : 1;
+        double sy = b.Height > 1e-9 ? Units.ToMm((double)_h.Value.Value) / b.Height : 1;
         if (_lockRatio.IsChecked == true)
         {
             if (widthChanged) sy = b.Height > 1e-9 ? sx : 1;

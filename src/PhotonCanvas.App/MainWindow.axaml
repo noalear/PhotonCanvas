@@ -10,7 +10,7 @@
     <ContentControl x:Name="RibbonHost" DockPanel.Dock="Top" />
 
     <!-- Status line -->
-    <Border DockPanel.Dock="Bottom" Background="{StaticResource Bg0}" Padding="12,2">
+    <Border DockPanel.Dock="Bottom" Background="{DynamicResource Bg0}" Padding="12,2">
       <StackPanel Orientation="Horizontal" Spacing="18">
         <TextBlock x:Name="CursorText" Classes="muted" FontSize="11" MinWidth="150" />
         <TextBlock x:Name="ZoomText" Classes="muted" FontSize="11" MinWidth="50" />
@@ -20,14 +20,14 @@
 
     <Grid ColumnDefinitions="280,4,*,4,300">
       <!-- Layers, each with its settings -->
-      <Border Grid.Column="0" Background="{StaticResource Bg1}" Padding="10,10,6,0">
+      <Border Grid.Column="0" Background="{DynamicResource Bg1}" Padding="10,10,6,0">
         <ContentControl x:Name="LayersHost" />
       </Border>
-      <GridSplitter Grid.Column="1" Background="{StaticResource Line}" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="1" Background="{DynamicResource Line}" ResizeDirection="Columns" />
 
       <!-- Work area -->
       <DockPanel Grid.Column="2">
-        <Border x:Name="ToolOptions" DockPanel.Dock="Top" Background="{StaticResource Bg1}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="False">
+        <Border x:Name="ToolOptions" DockPanel.Dock="Top" Background="{DynamicResource Bg1}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="False">
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock x:Name="ToolOptionsLabel" VerticalAlignment="Center" Classes="muted" />
             <NumericUpDown x:Name="ToolCorners" Minimum="3" Maximum="64" Increment="1" FormatString="0" Width="110" />
@@ -66,13 +66,13 @@
         </Panel>
       </DockPanel>
 
-      <GridSplitter Grid.Column="3" Background="{StaticResource Line}" ResizeDirection="Columns" />
+      <GridSplitter Grid.Column="3" Background="{DynamicResource Line}" ResizeDirection="Columns" />
       <!-- What's selected (top) and how its layer is processed (bottom) -->
-      <Grid Grid.Column="4" RowDefinitions="*,4,*" Background="{StaticResource Bg1}">
+      <Grid Grid.Column="4" RowDefinitions="*,4,*" Background="{DynamicResource Bg1}">
         <Border Grid.Row="0" Padding="10,10,10,0">
           <ContentControl x:Name="InspectorHost" />
         </Border>
-        <GridSplitter Grid.Row="1" Background="{StaticResource Line}" ResizeDirection="Rows" />
+        <GridSplitter Grid.Row="1" Background="{DynamicResource Line}" ResizeDirection="Rows" />
         <Border Grid.Row="2" Padding="10,10,10,0">
           <ScrollViewer>
             <ContentControl x:Name="LayerSettingsHost" Margin="0,0,0,10" />
