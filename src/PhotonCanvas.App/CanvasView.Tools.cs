@@ -259,6 +259,22 @@ public sealed partial class CanvasView
             case Key.S when target is not null && _node is { } n:
                 _doc.Commit("Smooth/sharp point", Ops.Replace(_doc.State, WithGeometry(target, NodeEdit.ToggleSmooth(target.Geometry, n))));
                 return true;
+            case Key.Y when target is not null && _node is { } n:
+                _doc.Commit("Symmetric point", Ops.Replace(_doc.State, WithGeometry(target, NodeEdit.Symmetric(target.Geometry, n))));
+                return true;
+            case Key.R when target is not null && _node is { } n:
+            {
+                // The radius in the shape's own units (it may be scaled on the work area).
+                double scale = Math.Max(1e-9, target.Transform.MeanScale);
+                _doc.Commit("Round corner", Ops.Replace(_doc.State, WithGeometry(target, NodeEdit.RoundCorner(target.Geometry, n, CornerRadiusMm / scale))));
+                _node = null;
+                return true;
+            }
+            case Key.B when target is not null && _node is { } n:
+                if (PhotonCanvas.Doc.Geometry.EditTools.SplitAt(target.Geometry, NodeEdit.Anchor(target.Geometry, n)) is { } split)
+                    _doc.Commit("Break at point", Ops.Replace(_doc.State, WithGeometry(target, split)));
+                _node = null;
+                return true;
         }
         return false;
     }

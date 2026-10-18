@@ -361,14 +361,25 @@ public static class JobBuilder
                 var paths = layer.KerfMm != 0
                     ? ApplyKerf(shapes, layer, opt.Tolerance, warnings)
                     : shapes.SelectMany(sh => sh.World.Flatten(opt.Tolerance)).Where(f => f.Points.Count >= 2).ToList();
-                var extras = new CutExtras(layer);
+                if (layer.RemoveOverlaps)
+                {
+                    // Shared edges cut once: the doubled stretches come out as open lines.
+                    var geoms = paths.Select(f => PathGeometry.Polyline(f.Points, f.Closed)).ToList();
+                    var (cleaned, removedMm) = EditTools.RemoveOverlaps(geoms);
+                    if (removedMm > 0.01)
+                    {
+                        paths = [.. cleaned.SelectMany(g => g.Flatten(opt.Tolerance)).Where(f => f.Points.Count >= 2)];
+                        warnings.Add($"Layer \"{layer.Name}\": {removedMm:0.#} mm of lines lying on top of each other will be cut only once.");
+                    }
+                }
+                var extras = new CutExtras(layer) { ManualTabs = [.. shapes.SelectMany(sh => sh.ManualTabs)] };
                 StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
                 bool wobble = layer.Wobble && layer.Laser.Light == LightSource.Red;
                 if (layer.Wobble && !wobble)
                     warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
-                foreach (var (path, depth) in Order(paths, ref pos))
+                foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest))
                     foreach (var p in extras.Pieces(path, depth))
                     {
                         var pl = p.Closed ? Polyline.Loop(p.Points) : Polyline.Open(p.Points);
@@ -815,6 +826,7 @@ public static class JobBuilder
                 JobException.CheckRange("tab power", l.TabPowerPct, 0, 100, "%");
                 JobException.CheckRange("overcut", l.OvercutMm, 0, 10, "mm");
                 JobException.CheckRange("lead-in", l.LeadInMm, 0, 10, "mm");
+                JobException.CheckRange("lead-out", l.LeadOutMm, 0, 10, "mm");
                 if (l.PerforateMm > 0) { JobException.CheckRange("perforation dash", l.PerforateMm, 0.05, 100, "mm"); JobException.CheckRange("perforation gap", l.PerforateGapMm, 0.05, 100, "mm"); }
                 if (l.DotModeMm > 0) { JobException.CheckRange("dot spacing", l.DotModeMm, 0.01, 50, "mm"); JobException.CheckRange("dot time", l.DotUs, 10, 100_000, "µs"); }
                 break;
@@ -930,13 +942,38 @@ public static class JobBuilder
     public static List<FlatPath> OrderForCutting(List<FlatPath> paths, ref Vec2 pos) =>
         Order(paths, ref pos).Select(x => x.Path).ToList();
 
+    /// <summary>A closed loop started at its point nearest <paramref name="p"/>.</summary>
+    static FlatPath StartAt(FlatPath loop, Vec2 p)
+    {
+        if (!loop.Closed || loop.Points.Count < 3) return loop;
+        var pts = loop.Points;
+        if (pts[0].Dist(pts[^1]) < 1e-9) pts = pts.Take(pts.Count - 1).ToList();
+        int best = 0;
+        for (int i = 1; i < pts.Count; i++) if (pts[i].Dist(p) < pts[best].Dist(p)) best = i;
+        return best == 0 ? loop : loop with { Points = [.. pts.Skip(best), .. pts.Take(best)] };
+    }
+
     /// <summary><see cref="OrderForCutting"/>, with each path's nesting depth (even = part outline, odd = hole).</summary>
-    static List<(FlatPath Path, int Depth)> Order(List<FlatPath> paths, ref Vec2 pos)
+    static List<(FlatPath Path, int Depth)> Order(List<FlatPath> paths, ref Vec2 pos, PathOrder order = PathOrder.Optimised, bool startNearest = false)
     {
         int n = paths.Count;
         var depth = Depths(paths);
         var o = new List<(FlatPath, int)>(n);
-        foreach (var group in Enumerable.Range(0, n).GroupBy(i => depth[i]).OrderByDescending(g => g.Key))
+        if (order == PathOrder.AsDrawn)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                var p = startNearest ? StartAt(paths[i], pos) : paths[i];
+                o.Add((p, depth[i]));
+                if (p.Points.Count > 0) pos = p.Closed ? p.Points[0] : p.Points[^1];
+            }
+            return o;
+        }
+        // Back to front: bands 10 mm deep, from the top of the work area down.
+        IEnumerable<IGrouping<(int, int), int>> groups = order == PathOrder.BackToFront
+            ? Enumerable.Range(0, n).GroupBy(i => (-depth[i], (int)Math.Floor(Rect2.Bounds(paths[i].Points).MinY / 10))).OrderBy(g => g.Key.Item1).ThenBy(g => g.Key.Item2)
+            : Enumerable.Range(0, n).GroupBy(i => (-depth[i], 0)).OrderBy(g => g.Key.Item1);
+        foreach (var group in groups)
         {
             var left = group.ToList();
             while (left.Count > 0)
@@ -956,9 +993,11 @@ public static class JobBuilder
                     }
                 }
                 var pick = paths[left[best]];
+                int pickDepth = depth[left[best]];
                 left.RemoveAt(best);
                 if (reverse) pick = pick with { Points = Enumerable.Reverse(pick.Points).ToList() };
-                o.Add((pick, group.Key));
+                if (startNearest) pick = StartAt(pick, pos);
+                o.Add((pick, pickDepth));
                 pos = pick.Closed ? pick.Points[0] : pick.Points[^1];
             }
         }
@@ -973,6 +1012,9 @@ public static class JobBuilder
 
         readonly bool _cut = layer.Mode == LayerMode.Cut;
         int _tooShort, _tabbed;
+
+        /// <summary>Tabs placed by hand (world mm): outlines they sit on get exactly those.</summary>
+        public List<Vec2> ManualTabs { get; init; } = [];
         readonly List<List<Vec2>> _tabGaps = [];
 
         /// <summary>The tab bridges of the outline just split (when tabs are cut at low power), once.</summary>
@@ -991,6 +1033,13 @@ public static class JobBuilder
             if (loop.Count < 2) return [path];
             var cum = Cumulative(loop);
             double perimeter = cum[^1];
+            // Hand-placed tabs on this outline (within half a millimetre of it).
+            var mine = ManualTabs.Select(t => PathTools.Nearest([.. loop, loop[0]], t)).Where(x => x.Distance < 0.5).Select(x => x.Along).OrderBy(a => a).ToList();
+            if (mine.Count > 0)
+            {
+                _tabbed++;
+                return TabsAt(loop, cum, mine);
+            }
             if (layer.TabCount > 0)
             {
                 if (perimeter >= layer.TabCount * layer.TabWidthMm * 3)
@@ -1000,12 +1049,14 @@ public static class JobBuilder
                 }
                 _tooShort++;
             }
-            if (layer.LeadInMm <= 0 && layer.OvercutMm <= 0) return [path];
+            if (layer.LeadInMm <= 0 && layer.OvercutMm <= 0 && layer.LeadOutMm <= 0) return [path];
             var pts = new List<Vec2>(loop.Count + 8);
             if (layer.LeadInMm > 0) pts.Add(LeadIn(loop, depth, layer.LeadInMm));
             pts.AddRange(loop);
             pts.Add(loop[0]);
             if (layer.OvercutMm > 0) pts.AddRange(Along(loop, cum, 0, Math.Min(layer.OvercutMm, perimeter)).Skip(1));
+            // Lead-out: away from the part into the waste, the same side as a lead-in.
+            if (layer.LeadOutMm > 0) pts.Add(pts[^1] + (LeadIn(loop, depth, 1) - loop[0]) * layer.LeadOutMm);
             return [new FlatPath(pts, false)];
         }
 
@@ -1015,6 +1066,21 @@ public static class JobBuilder
                 warnings.Add($"Layer \"{layer.Name}\": {_tooShort} outline(s) are too short for {layer.TabCount} tabs of {Num(layer.TabWidthMm)} mm and were cut without tabs.");
             if (_tabbed > 0 && (layer.LeadInMm > 0 || layer.OvercutMm > 0))
                 warnings.Add($"Layer \"{layer.Name}\": outlines with tabs get no lead-in or overcut.");
+        }
+
+        /// <summary>The loop cut into pieces with gaps of TabWidth centred on the given distances along it.</summary>
+        List<FlatPath> TabsAt(List<Vec2> loop, double[] cum, List<double> centres)
+        {
+            double perimeter = cum[^1], w = layer.TabWidthMm > 0 ? layer.TabWidthMm : 0.5;
+            var o = new List<FlatPath>(centres.Count);
+            for (int k = 0; k < centres.Count; k++)
+            {
+                double from = centres[k] + w / 2;
+                double to = (k + 1 < centres.Count ? centres[k + 1] : centres[0] + perimeter) - w / 2;
+                if (to - from > 1e-6) o.Add(new FlatPath(Along(loop, cum, from, to), false));
+                if (layer.TabPowerPct > 0) _tabGaps.Add(Along(loop, cum, centres[k] - w / 2, centres[k] + w / 2));
+            }
+            return o;
         }
 
         /// <summary>

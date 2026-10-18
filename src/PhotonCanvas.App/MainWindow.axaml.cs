@@ -59,10 +59,10 @@ public partial class MainWindow : Window
     public bool ConnectOnOpen { get; init; } = true;
 
     static readonly FilePickerFileType ProjectType = new("PhotonCanvas project") { Patterns = ["*.pcanvas", "*.ytool"] };
-    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs"] };
+    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool, LightBurn, HPGL)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl"] };
     static readonly FilePickerFileType AnyImportable = new("Everything that can be imported")
     {
-        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
+        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
     };
 
     public MainWindow()
@@ -231,7 +231,7 @@ public partial class MainWindow : Window
                 Tool.Text => "Click where the text should start, then type in the Text panel on the right.",
                 Tool.Wand => "Click inside a piece on the camera picture to outline it. The sliders refine the last pick.",
                 Tool.Magnetic => "Click along an edge on the camera picture. Click the first point to close; Enter or double-click to finish; Backspace undoes a point.",
-                Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S makes it smooth or sharp. Alt-drag a handle to break a smooth point. Esc to finish.",
+                Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S smooth or sharp; Y symmetric; R rounds the corner; B breaks the path there. Alt-drag a handle to break a smooth point. Esc to finish.",
                 _ => "",
             };
             WandPanel.IsVisible = t is Tool.Wand or Tool.Magnetic;
@@ -479,6 +479,7 @@ public partial class MainWindow : Window
         outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Count > 0);
         outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
         ToolSmall(outline, "Scissors", "IcCut", Tool.Scissors, "Scissors: click a line or outline to cut it there");
+        ToolSmall(outline, "Place tabs", "IcBreak", Tool.Tabs, "Click outlines to put tabs exactly where you want them (Shift+click removes one); used on Cut layers");
         var moreOutline = outline.Small("More…", "IcMore", () => { }, "Remove overlapping lines, tangent circles, shadows");
         moreOutline.Flyout = new MenuFlyout
         {

@@ -30,6 +30,17 @@ public enum ImageEngraveMode
     Slices,
 }
 
+/// <summary>The order a Cut or Score layer's paths run in.</summary>
+public enum PathOrder
+{
+    /// <summary>Insides before outsides, then the nearest next: least travel, parts held while their holes are cut.</summary>
+    Optimised,
+    /// <summary>In the order they were drawn or imported.</summary>
+    AsDrawn,
+    /// <summary>From the back of the work area to the front, so smoke drifts over what's done, not what's still to cut (insides still first).</summary>
+    BackToFront,
+}
+
 /// <summary>How a Fill layer covers the inside of its shapes.</summary>
 public enum FillStyle
 {
@@ -129,6 +140,14 @@ public sealed record Layer
     public bool ScanReverse { get; init; }
     /// <summary>Cut: tabs are cut at this power (%) instead of left uncut: thin bridges that snap out easily. 0 = uncut tabs.</summary>
     public double TabPowerPct { get; init; }
+    /// <summary>Cut/Score: the order the paths run in.</summary>
+    public PathOrder Order { get; init; }
+    /// <summary>Cut/Score: each closed outline starts at its point nearest where the laser already is (less travel).</summary>
+    public bool StartNearest { get; init; }
+    /// <summary>Cut/Score: lines lying on top of each other are cut once (shared edges of shapes side by side).</summary>
+    public bool RemoveOverlaps { get; init; }
+    /// <summary>Cut: end each closed outline with a short exit line of this length, outside the part (mm).</summary>
+    public double LeadOutMm { get; init; }
     /// <summary>Fill: lines or stepped-in outlines.</summary>
     public FillStyle FillStyle { get; init; }
     /// <summary>Fill lines: burn in both directions (off: always the same way, back unlit).</summary>
@@ -270,6 +289,9 @@ public class PathShape : Shape
 
     public required PathGeometry Geometry { get; init; }
 
+    /// <summary>Tabs placed by hand on this shape's outlines (world mm): used instead of evenly spaced ones on a Cut layer with tabs.</summary>
+    public ImmutableList<Vec2> ManualTabs { get; private set; } = [];
+
     PathGeometry? _world;
     List<FlatPath>? _flat;
     Rect2? _bounds;
@@ -289,6 +311,14 @@ public class PathShape : Shape
         _world = null;
         _flat = null;
         _bounds = null;
+    }
+
+    /// <summary>The same shape with these hand-placed tabs.</summary>
+    public PathShape WithTabs(ImmutableList<Vec2> tabs)
+    {
+        var c = (PathShape)MemberwiseClone();
+        c.ManualTabs = tabs;
+        return c;
     }
 
     /// <summary>Bake the transform into the geometry (used by flatten-style ops). Text becomes plain paths.</summary>

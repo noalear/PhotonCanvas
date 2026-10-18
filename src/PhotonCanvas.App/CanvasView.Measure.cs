@@ -6,6 +6,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
 using PathGeometry = PhotonCanvas.Doc.PathGeometry;
+using System.Collections.Immutable;
 
 namespace PhotonCanvas.App;
 
@@ -122,6 +123,45 @@ public sealed partial class CanvasView
                 ctx.DrawLine(GuideLinePen, new Point(RulerSize, y), new Point(Bounds.Width, y));
             }
         }
+    }
+
+    // ---- hand-placed tabs ---------------------------------------------------------------
+
+    void TabPressed(Point p, bool remove)
+    {
+        if (_doc is null || TrimTarget(p) is not { } target) { Hint?.Invoke("Click on an outline to put a tab there (Shift+click a tab to remove it)."); return; }
+        var w = ToWorld(p);
+        var (_, seg, _, d) = EditTools.Nearest(target.World, w);
+        if (seg < 0) return;
+        ImmutableList<Vec2> tabs;
+        if (remove)
+        {
+            if (target.ManualTabs.Count == 0) return;
+            var nearest = target.ManualTabs.MinBy(t => t.Dist(w));
+            if (nearest.Dist(w) > 8 / _scale) return;
+            tabs = target.ManualTabs.Remove(nearest);
+        }
+        else
+        {
+            var flat = PathTools.Polylines(target.World);
+            var on = flat.Select(f => (f, PathTools.Nearest(f, w))).MinBy(x => x.Item2.Distance);
+            var cum = PathTools.CumulativeLengths(on.f);
+            tabs = target.ManualTabs.Add(PathTools.At(on.f, cum, on.Item2.Along).Point);
+        }
+        _doc.Commit(remove ? "Remove tab" : "Add tab", Ops.Replace(_doc.State, target.WithTabs(tabs)));
+        Hint?.Invoke($"{tabs.Count} tab{(tabs.Count == 1 ? "" : "s")} on this shape. They're used on a Cut layer (width from the layer's tab width).");
+    }
+
+    void DrawTabs(DrawingContext ctx)
+    {
+        if (_doc is null) return;
+        var pen = new Pen(ToolInk, 3);
+        foreach (var s in _doc.State.Shapes.OfType<PathShape>())
+            foreach (var t in s.ManualTabs)
+            {
+                var c = ToScreen(t);
+                ctx.DrawRectangle(ToolInk, pen, new Rect(c.X - 3, c.Y - 3, 6, 6));
+            }
     }
 
     // ---- scissors -----------------------------------------------------------------------

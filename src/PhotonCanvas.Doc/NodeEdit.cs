@@ -100,6 +100,60 @@ public static class NodeEdit
         return Replace(g, n.Sub, new Subpath(sp.Start, segs.ToImmutable(), sp.Closed));
     }
 
+    /// <summary>Symmetric: both handles in line and the same length (the average of the two).</summary>
+    public static PathGeometry Symmetric(PathGeometry g, NodeRef n)
+    {
+        var (hin, hout) = Handles(g, n);
+        if (hin is not { } a || hout is not { } b) return g;
+        var p = Anchor(g, n);
+        var dir = b - a;
+        if (dir.Length < Same) return g;
+        dir /= dir.Length;
+        double len = (p.Dist(a) + p.Dist(b)) / 2;
+        var sp = g.Subpaths[n.Sub];
+        var segs = sp.Segs.ToBuilder();
+        if (Incoming(sp, n.Index) is { } i) segs[i] = segs[i] with { C2 = p - dir * len };
+        if (Outgoing(sp, n.Index) is { } o) segs[o] = segs[o] with { C1 = p + dir * len };
+        return Replace(g, n.Sub, new Subpath(sp.Start, segs.ToImmutable(), sp.Closed));
+    }
+
+    /// <summary>Round this one corner (between two straight edges) with an arc of <paramref name="radius"/> (smaller if the edges are short).</summary>
+    public static PathGeometry RoundCorner(PathGeometry g, NodeRef n, double radius)
+    {
+        var sp = g.Subpaths[n.Sub];
+        var segs = sp.Segs.ToList();
+        if (sp.Closed && !ClosesOnStart(sp)) segs.Add(Seg.Line(sp.Start));
+        var norm = new Subpath(sp.Start, [.. segs], sp.Closed);
+        if (Incoming(norm, n.Index) is not { } a || Outgoing(norm, n.Index) is not { } b) return g;
+        if (segs[a].Kind != SegKind.Line || segs[b].Kind != SegKind.Line) return g;
+        var p = n.Index == 0 ? sp.Start : segs[n.Index - 1].To;
+        var prev = a == 0 ? sp.Start : segs[a - 1].To;
+        var next = segs[b].To;
+        double la = prev.Dist(p), lb = next.Dist(p);
+        if (la < Same || lb < Same) return g;
+        var u = (prev - p) / la;
+        var w = (next - p) / lb;
+        double theta = Math.Acos(Math.Clamp(u.Dot(w), -1, 1));
+        if (theta > Math.PI - 1e-3 || theta < 1e-3) return g;
+        double t = radius / Math.Tan(theta / 2), r = radius;
+        double room = Math.Min(la, lb) / 2;
+        if (t > room) { t = room; r = t * Math.Tan(theta / 2); }
+        double k = 4.0 / 3 * Math.Tan((Math.PI - theta) / 4) * r;
+        var t1 = p + u * t;
+        var t2 = p + w * t;
+        var arc = Seg.Cubic(t1 - u * k, t2 - w * k, t2);
+        var start = sp.Start;
+        segs[a] = Seg.Line(t1);
+        if (a == segs.Count - 1 && n.Index == 0)
+        {
+            // The corner is the start of a closed outline: it now starts where the arc ends.
+            segs.Add(arc);
+            start = t2;
+        }
+        else segs.Insert(a + 1, arc);
+        return Replace(g, n.Sub, new Subpath(start, [.. segs], sp.Closed));
+    }
+
     /// <summary>True when both handles exist and line up through the anchor.</summary>
     public static bool IsSmooth(PathGeometry g, NodeRef n)
     {

@@ -67,6 +67,10 @@ public static class DocFile
                 ["outlineAfter"] = l.OutlineAfter,
                 ["scanReverse"] = l.ScanReverse,
                 ["tabPowerPct"] = l.TabPowerPct,
+                ["order"] = l.Order.ToString(),
+                ["startNearest"] = l.StartNearest,
+                ["removeOverlaps"] = l.RemoveOverlaps,
+                ["leadOutMm"] = l.LeadOutMm,
                 ["fillTogether"] = l.FillTogether,
                 ["perforateMm"] = l.PerforateMm,
                 ["perforateGapMm"] = l.PerforateGapMm,
@@ -115,6 +119,7 @@ public static class DocFile
             };
             if (sh.GroupId is { } gid) o["group"] = gid.ToString();
             if (sh.Locked) o["locked"] = true;
+            if (sh is PathShape { ManualTabs.Count: > 0 } mt) o["tabs"] = new JsonArray([.. mt.ManualTabs.Select(t => (JsonNode)new JsonArray(t.X, t.Y))]);
             switch (sh)
             {
                 case TextShape tx:
@@ -272,6 +277,10 @@ public static class DocFile
                     OutlineAfter = n["outlineAfter"]?.GetValue<bool>() ?? false,
                     ScanReverse = n["scanReverse"]?.GetValue<bool>() ?? false,
                     TabPowerPct = n["tabPowerPct"]?.GetValue<double>() ?? 0,
+                    Order = Enum.TryParse<PathOrder>(n["order"]?.GetValue<string>(), true, out var po) ? po : PathOrder.Optimised,
+                    StartNearest = n["startNearest"]?.GetValue<bool>() ?? false,
+                    RemoveOverlaps = n["removeOverlaps"]?.GetValue<bool>() ?? false,
+                    LeadOutMm = n["leadOutMm"]?.GetValue<double>() ?? 0,
                     FillTogether = n["fillTogether"]?.GetValue<bool>() ?? false,
                     PerforateMm = n["perforateMm"]?.GetValue<double>() ?? 0,
                     PerforateGapMm = n["perforateGapMm"]?.GetValue<double>() ?? 1,
@@ -411,6 +420,11 @@ public static class DocFile
             var locked = (root["shapes"]?.AsArray() ?? []).Where(x => x?["locked"]?.GetValue<bool>() == true)
                 .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
             var all = shapes.Select(sh => locked.Contains(sh.Id) ? sh.WithLocked(true) : sh).ToImmutableList();
+            // Hand-placed tabs, saved per shape.
+            var tabs = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["tabs"] is JsonArray)
+                .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty,
+                    x => x["tabs"]!.AsArray().OfType<JsonArray>().Select(p => new Vec2(p[0]!.GetValue<double>(), p[1]!.GetValue<double>())).ToImmutableList());
+            if (tabs.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && tabs.TryGetValue(sh.Id, out var t) ? ps.WithTabs(t) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
             return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides };

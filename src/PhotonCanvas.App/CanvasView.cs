@@ -10,7 +10,7 @@ using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
 namespace PhotonCanvas.App;
 
-public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors, Tabs }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
@@ -183,6 +183,9 @@ public sealed partial class CanvasView : Control
     /// <summary>A code (QR, barcode) was double-clicked: edit it.</summary>
     public event Action<Guid>? CodeEditRequested;
 
+    /// <summary>Point editing: the radius R gives a corner (mm).</summary>
+    public double CornerRadiusMm { get; set; } = 2;
+
     /// <summary>Polygon tool: number of sides.</summary>
     public int PolygonSides { get; set; } = 6;
     /// <summary>Star tool: number of points.</summary>
@@ -331,6 +334,7 @@ public sealed partial class CanvasView : Control
             DrawPointTools(ctx);
             DrawSection(ctx);
             DrawGuidelines(ctx);
+            DrawTabs(ctx);
             if (_drag == Drag.Box) DrawBox(ctx);
             if (_drag != Drag.None) DrawGuides(ctx);
         }
@@ -601,7 +605,7 @@ public sealed partial class CanvasView : Control
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
         else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic or Tool.Measure or Tool.Align2) c = StandardCursorType.Cross;
-        else if (_tool is Tool.Trim or Tool.Scissors) c = StandardCursorType.Hand;
+        else if (_tool is Tool.Trim or Tool.Scissors or Tool.Tabs) c = StandardCursorType.Hand;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
         else if (screen is { } p && _drag == Drag.None)
         {
@@ -684,6 +688,7 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Trim) { TrimPressed(p); return; }
         if (_tool == Tool.Align2) { AlignPressed(); return; }
         if (_tool == Tool.Scissors) { ScissorsPressed(p); return; }
+        if (_tool == Tool.Tabs) { TabPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
         if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;

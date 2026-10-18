@@ -41,6 +41,10 @@ public sealed record ProcessSettings
     public bool OutlineAfter { get; init; }
     public bool ScanReverse { get; init; }
     public double TabPowerPct { get; init; }
+    public PathOrder Order { get; init; }
+    public bool StartNearest { get; init; }
+    public bool RemoveOverlaps { get; init; }
+    public double LeadOutMm { get; init; }
     public bool FillTogether { get; init; }
     public double PerforateMm { get; init; }
     public double PerforateGapMm { get; init; } = 1;
@@ -65,6 +69,7 @@ public sealed record ProcessSettings
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
         CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
+        Order = l.Order, StartNearest = l.StartNearest, RemoveOverlaps = l.RemoveOverlaps, LeadOutMm = l.LeadOutMm,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -78,6 +83,7 @@ public sealed record ProcessSettings
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
         CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
+        Order = Order, StartNearest = StartNearest, RemoveOverlaps = RemoveOverlaps, LeadOutMm = LeadOutMm,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>

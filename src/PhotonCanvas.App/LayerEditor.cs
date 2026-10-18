@@ -40,6 +40,9 @@ public sealed class LayerEditor : UserControl
     readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _deepestFirst = new() { Content = "Deepest slice first" };
     readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
     readonly Control _crossRow, _stepRows;
+    readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)" } };
+    readonly CheckBox _startNearest = new() { Content = "Start outlines nearest the laser" }, _removeOverlaps = new() { Content = "Cut shared edges once" };
+    readonly NumericUpDown _leadOut = Number(0, 10, 0.5m, "0.##");
     readonly NumericUpDown _perf = Num(0, 100, 0.5m, "0.##"), _perfGap = Num(0.05m, 100, 0.5m, "0.##"), _dotMode = Number(0, 50, 0.1m, "0.###");
     readonly NumericUpDown _ramp = Number(0, 10, 0.1m, "0.##");
     readonly CheckBox _passThrough = new() { Content = "Pass-through (the file's own pixels)" };
@@ -143,6 +146,10 @@ public sealed class LayerEditor : UserControl
                 Field("Tab width (mm)", _tabWidth),
                 Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
+                Field("Lead-out (mm)", _leadOut, tip: "End each outline with a short exit line into the waste, so the end mark isn't on the part either."),
+                Field("Order", _order, tip: "Least travel: holes and insides first, then the nearest next. As drawn: the order you drew or imported them. Back to front: from the top of the work area down, so smoke drifts over what's finished."),
+                _startNearest,
+                _removeOverlaps,
                 Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
                 Row(Labelled("Perforate: burn mm", _perf, "Perforation: burn this far, then skip the gap, along every line (fold lines, tear-off). 0 = a continuous line."),
                     Labelled("then skip mm", _perfGap, "The gap between perforation dashes.")),
@@ -324,6 +331,12 @@ public sealed class LayerEditor : UserControl
             return l with { ImageMode = mode, AngleStepDeg = mode == ImageEngraveMode.Slices && l.ImageMode != mode && l.AngleStepDeg == 0 ? 37 : l.AngleStepDeg };
         }, _imageMode.SelectedIndex >= 0);
         _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
+        _order.SelectionChanged += (_, _) => EditLayers("Path order", l => l with { Order = (PathOrder)Math.Max(0, _order.SelectedIndex) }, _order.SelectedIndex >= 0);
+        _startNearest.IsCheckedChanged += (_, _) => EditLayers("Start nearest", l => l with { StartNearest = _startNearest.IsChecked == true }, _startNearest.IsChecked.HasValue);
+        _removeOverlaps.IsCheckedChanged += (_, _) => EditLayers("Cut shared edges once", l => l with { RemoveOverlaps = _removeOverlaps.IsChecked == true }, _removeOverlaps.IsChecked.HasValue);
+        _leadOut.ValueChanged += (_, _) => EditLayers("Lead-out", l => l with { LeadOutMm = (double)_leadOut.Value!.Value }, _leadOut.Value.HasValue, "leadout");
+        ToolTip.SetTip(_startNearest, "Each closed outline starts where the laser already is: less travel. Off: outlines start where they were drawn.");
+        ToolTip.SetTip(_removeOverlaps, "Where two shapes share an edge (parts side by side), cut it only once: cleaner edges, less time, less scorching.");
         _crossAngle.ValueChanged += (_, _) => EditLayers("Crosshatch angle", l => l with { CrossAngleDeg = (double)_crossAngle.Value!.Value }, _crossAngle.Value.HasValue, "crossangle");
         _dwell.ValueChanged += (_, _) => EditLayers("Pause per line", l => l with { LineDwellMs = (int)_dwell.Value!.Value }, _dwell.Value.HasValue, "dwell");
         _tabPower.ValueChanged += (_, _) => EditLayers("Tab power", l => l with { TabPowerPct = (double)_tabPower.Value!.Value }, _tabPower.Value.HasValue, "tabpower");
@@ -449,6 +462,10 @@ public sealed class LayerEditor : UserControl
         _crossRow.IsVisible = anyFill && ls.Any(l => l.Crosshatch);
         _stepRows.IsVisible = anyCut || anyFill;
         Num(_crossAngle, Same(l => l.CrossAngleDeg));
+        _order.SelectedIndex = Same(l => l.Order) is { } od ? (int)od : -1;
+        _startNearest.IsChecked = Same(l => l.StartNearest);
+        _removeOverlaps.IsChecked = Same(l => l.RemoveOverlaps);
+        Num(_leadOut, Same(l => l.LeadOutMm));
         Num(_dwell, Same(l => (double)l.LineDwellMs));
         Num(_tabPower, Same(l => l.TabPowerPct));
         _outlineAfter.IsChecked = Same(l => l.OutlineAfter);

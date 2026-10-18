@@ -54,7 +54,7 @@ public sealed record ImportResult(List<ImportedPath> Paths, List<ImportedImage> 
 public static class Importer
 {
     /// <summary>File extensions (lower case, with the dot) that <see cref="Load"/> understands.</summary>
-    public static IReadOnlyList<string> Extensions { get; } = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs"];
+    public static IReadOnlyList<string> Extensions { get; } = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs", ".plt", ".hpgl", ".hpg", ".lbrn2", ".lbrn"];
 
     /// <summary>Whether <paramref name="path"/> has an extension <see cref="Load"/> can open.</summary>
     public static bool CanLoad(string path) =>
@@ -80,6 +80,8 @@ public static class Importer
             ".pdf" => PdfImport.Load(path),
             ".ai" => PdfImport.LoadIllustrator(path),
             ".xs" or ".xcs" => XsImport.Load(path),
+            ".plt" or ".hpgl" or ".hpg" => HpglImport.Load(path),
+            ".lbrn2" or ".lbrn" => LbrnImport.Load(path),
             "" => throw new FormatException(
                 $"\"{Path.GetFileName(path)}\" has no file extension, so its type is unknown. Supported: {string.Join(", ", Extensions)}."),
             _ => throw new FormatException(
