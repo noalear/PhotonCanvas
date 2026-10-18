@@ -22,6 +22,8 @@ public sealed class EtchTestWindow : Window
     readonly MachineProfile _machine;
     readonly Func<CameraPhoto?> _photo;
     readonly Func<Task> _updatePhoto;
+    readonly Func<double, ImageMapChoiceInfo?> _cameraFor;
+    readonly TextBlock _photoNote = new() { TextWrapping = TextWrapping.Wrap, Classes = { "hint" } };
 
     // Making the test
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Diode (blue)", "MOPA (red)" }, SelectedIndex = 0 };
@@ -40,13 +42,18 @@ public sealed class EtchTestWindow : Window
     int? _firstThrough;
     bool _noneThrough;
 
-    public EtchTestWindow(Document doc, MaterialLibrary lib, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults)
+    /// <summary>How well the camera picture lines up at a material height: exact or not, and why.</summary>
+    public sealed record ImageMapChoiceInfo(bool Exact, string Description);
+
+    public EtchTestWindow(Document doc, MaterialLibrary lib, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults,
+        Func<double, ImageMapChoiceInfo?>? cameraFor = null)
     {
         _doc = doc;
         _lib = lib;
         _machine = machine;
         _photo = photo;
         _updatePhoto = updatePhoto;
+        _cameraFor = cameraFor ?? (_ => null);
         Title = "Etch rate test";
         Width = 760;
         Height = 760;
@@ -71,6 +78,7 @@ public sealed class EtchTestWindow : Window
                 _plan,
                 Hint("Run it round by round (the job bar's Passes setting) so every circle cools between passes. Put scrap under the material: circles that go through keep burning into what's below. Stay with it: deep passes can flare up."),
                 add,
+                Hint("Adding the test closes this window so you can move it, frame it and send it. When that job finishes, this window opens again on Read the results (or open it with Laser → Etch rate)."),
             },
         };
 
@@ -89,6 +97,7 @@ public sealed class EtchTestWindow : Window
                 Field("Material", _material), _newName, Field("Thickness (mm)", _thick, tip: "Measure it with calipers: the result is only as good as this."),
                 Hint("Click the first circle that went right through (hold it up to the light). Optionally, type the depth of some shallower ones (a depth gauge or the calipers' tail) to see how much it slows down deeper."),
                 Row(update, none),
+                _photoNote,
                 new ScrollViewer { Content = _circles, MaxHeight = 360 },
                 _result, _status, _save,
             },
@@ -140,8 +149,9 @@ public sealed class EtchTestWindow : Window
         var at = new Vec2(_machine.FieldW / 2 - size.Width / 2, _machine.FieldH / 2 - size.Height / 2);
         var (s, added) = EtchTest.Add(_doc.State, o with { Origin = at });
         _doc.Commit("Etch rate test", s, added);
-        _status.Text = "Added. Burn it, then come back to Read the results.";
-        BuildCircles();
+        AppLog.Write("etch", $"Test added: {o.Ladder.Count} circles, {o.Ladder[0]}–{o.Ladder[^1]} passes, {o.Laser.Power:0.#}% {o.Laser.Speed:0.#} mm/s.");
+        // Out of the way, so the test can be moved, framed and sent.
+        Close();
     }
 
     List<(Layer Layer, int Passes, Rect2 Bounds)> Circles() =>
@@ -155,6 +165,10 @@ public sealed class EtchTestWindow : Window
         foreach (var row in _circles.Children.OfType<StackPanel>()) row.Children.Clear();
         _circles.Children.Clear();
         var photo = _photo();
+        // The photo only lines up where the camera is calibrated for the material's height.
+        _photoNote.Text = photo is { DistanceMm: { } dist } && _cameraFor(dist) is { Exact: false } cam
+            ? $"⚠ The photo may show the wrong spot: the camera is {cam.Description}. Calibrate the camera at this material's height (Camera → Calibrate), or at a second height so any height can be worked out."
+            : "";
         foreach (var (layer, passes, bounds) in Circles())
         {
             Control face = new TextBlock { Text = $"{passes}", HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 16 };
@@ -228,14 +242,27 @@ public sealed class EtchTestWindow : Window
 
     void Save()
     {
+        AppLog.Write("etch", $"Save pressed. Library file: {_lib.FilePath}");
+        try { SaveCore(); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException or InvalidOperationException or ArgumentException or NotSupportedException)
+        {
+            AppLog.Error("etch save", e);
+            _status.Text = $"Couldn't save: {e.Message} ({_lib.FilePath})";
+            _status.Foreground = Brush("Warn");
+        }
+    }
+
+    void SaveCore()
+    {
         var circles = Circles();
-        if (circles.Count == 0 || _save.Tag is not ValueTuple<EtchRate?, List<(int, double)>> tag) return;
+        if (circles.Count == 0) { _status.Text = "There's no etch test in the design to save."; AppLog.Write("etch", "Not saved: no etch test in the design."); return; }
+        if (_save.Tag is not ValueTuple<EtchRate?, List<(int, double)>> tag) { _status.Text = "Pick the first circle that went through (or type depths) first."; AppLog.Write("etch", $"Not saved: no result (tag {_save.Tag?.GetType().Name ?? "null"})."); return; }
         var (rate, readings) = tag;
         Material m;
         if (_material.SelectedIndex <= 0)
         {
             var name = _newName.Text?.Trim();
-            if (string.IsNullOrEmpty(name)) { _status.Text = "Give the material a name."; return; }
+            if (string.IsNullOrEmpty(name)) { _status.Text = "Give the material a name."; AppLog.Write("etch", "Not saved: the new material has no name."); return; }
             m = new Material { Name = name, Category = "Other", ThicknessMm = (double)(_thick.Value ?? 0), HighlyReflective = Material.LooksReflective(name) };
         }
         else m = _lib.Materials[_material.SelectedIndex - 1];
@@ -257,7 +284,12 @@ public sealed class EtchTestWindow : Window
         };
         _lib.Upsert(m with { Recipes = m.Recipes.Add(recipe) });
         _lib.Save();
-        _status.Text = $"Saved to {m.Label}.";
+        // Read it back from the file, so "saved" means it's really there.
+        var check = MaterialLibrary.Load(_lib.Folder).Materials.FirstOrDefault(x => x.Id == m.Id)?.Recipes.Any(x => x.Id == recipe.Id) == true;
+        var info = new FileInfo(_lib.FilePath);
+        AppLog.Write("etch", $"Saved \"{recipe.Title}\" to {m.Label} in {info.FullName} ({(info.Exists ? info.Length : 0)} bytes, written {(info.Exists ? info.LastWriteTime.ToString("HH:mm:ss") : "never")}); read back: {(check ? "found" : "MISSING")}.");
+        _status.Text = check ? $"Saved to {m.Label} ({info.FullName})." : $"⚠ Saving to {m.Label} didn't stick: it isn't in {info.FullName}. Details are in the log.";
+        _status.Foreground = check ? Brush("Ok") : Brush("Warn");
         RefreshMaterials();
     }
 }

@@ -221,7 +221,8 @@ public sealed class MaterialLibrary
     public List<Material> Materials { get; } = [];
     public string Folder { get; }
     public string PhotoFolder => Path.Combine(Folder, "photos");
-    string FilePath => Path.Combine(Folder, "library.json");
+    /// <summary>The library file.</summary>
+    public string FilePath => Path.Combine(Folder, "library.json");
 
     public MaterialLibrary(string folder) => Folder = folder;
 

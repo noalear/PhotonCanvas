@@ -250,6 +250,8 @@ public partial class MainWindow : Window
         _props.FontsRequested += () => _ = Guard(ShowFonts);
         _job.RunFinished += from =>
         {
+            // An etch test just finished: straight to its results.
+            if (_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowEtchTest(true)));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
             if (from != _doc.FilePath) return;
             var next = VariableText.AfterRun(_doc.State, DateTime.Now);
@@ -591,7 +593,7 @@ public partial class MainWindow : Window
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
-        mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => new EtchTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, _doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null)).ShowDialog(this)), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
+        mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => ShowEtchTest(_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null))), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
         var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
         colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
@@ -2288,6 +2290,10 @@ public partial class MainWindow : Window
             ? "This copy marks the design's own serial number / row again."
             : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
     }
+
+    Task ShowEtchTest(bool results) =>
+        new EtchTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results,
+            d => _machine.CameraMapFor(d) is { } c ? new EtchTestWindow.ImageMapChoiceInfo(c.Exact, c.Description) : null).ShowDialog(this);
 
     async Task PlaceOnEveryPiece()
     {
