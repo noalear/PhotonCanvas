@@ -20,7 +20,10 @@ public sealed class WarpWindow : Window
     readonly DocState _base;
     readonly List<PathShape> _shapes;
     readonly Rect2 _box;
-    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Perspective (taper)", "Arch", "Bulge or pinch", "Wave", "Round object (no rotary)" } };
+    readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Perspective (taper)", "Arch", "Bulge or pinch", "Wave", "Round object (no rotary)", "Cone (tapered tumbler)", "Four corners" } };
+    readonly NumericUpDown _topD = Number(5, 500, 1, "0.#"), _bottomD = Number(5, 500, 1, "0.#");
+    readonly NumericUpDown[] _corner = [.. Enumerable.Range(0, 8).Select(_ => Number(-500, 500, 1, "0.##"))];
+    readonly Control _coneRow, _cornersRow;
     readonly NumericUpDown _diameter = Number(5, 500, 1, "0.#");
     readonly CheckBox _across = new() { Content = "The object lies across (its axis left–right)" };
     readonly Control _cylRow;
@@ -47,6 +50,25 @@ public sealed class WarpWindow : Window
         _bRow = new StackPanel { Children = { _bLabel, _b } };
         _wavesRow = Field("Waves across", _waves);
         _diameter.Value = 70;
+        _topD.Value = 80;
+        _bottomD.Value = 65;
+        _coneRow = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Row(Field("Top Ø", _topD), Field("Bottom Ø", _bottomD)),
+                Hint("For tapered tumblers and cups marked from above: each row is corrected for the diameter at its height, so the design wraps at its true size."),
+            },
+        };
+        foreach (var n in _corner) { n.Value = 0; n.ShowButtonSpinner = false; n.ValueChanged += (_, _) => Preview(); }
+        string[] names = ["Top-left", "Top-right", "Bottom-right", "Bottom-left"];
+        var cornerGrid = new StackPanel { Spacing = 4 };
+        for (int i = 0; i < 4; i++)
+            cornerGrid.Children.Add(Row(new TextBlock { Text = names[i], VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _corner[i * 2], _corner[i * 2 + 1]));
+        _cornersRow = new StackPanel { Spacing = 6, Children = { Hint("Move each corner by X / Y (mm): the design stretches with them."), cornerGrid } };
+        _topD.ValueChanged += (_, _) => Preview();
+        _bottomD.ValueChanged += (_, _) => Preview();
         _cylRow = new StackPanel
         {
             Spacing = 6,
@@ -76,6 +98,8 @@ public sealed class WarpWindow : Window
                     _bRow,
                     _wavesRow,
                     _cylRow,
+                    _coneRow,
+                    _cornersRow,
                     _info,
                     Hint("Text and codes become plain outlines. Curves are followed to within 0.02 mm."),
                     new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, ok } },
@@ -101,7 +125,9 @@ public sealed class WarpWindow : Window
         _bRow.IsVisible = m == 0;
         _wavesRow.IsVisible = m == 3;
         _cylRow.IsVisible = m == 4;
-        _aLabel.IsVisible = _a.IsVisible = m != 4;
+        _coneRow.IsVisible = m == 5;
+        _cornersRow.IsVisible = m == 6;
+        _aLabel.IsVisible = _a.IsVisible = m < 4;
     }
 
     /// <summary>The warp as a point mapping over the selection's box.</summary>
@@ -111,6 +137,8 @@ public sealed class WarpWindow : Window
         double a = _a.Value / 100, k = _b.Value / 100, n = (double)(_waves.Value ?? 2);
         double radius = (double)(_diameter.Value ?? 70) / 2;
         bool across = _across.IsChecked == true;
+        double rTop = (double)(_topD.Value ?? 80) / 2, rBottom = (double)(_bottomD.Value ?? 65) / 2;
+        var cd = _corner.Select(n => (double)(n.Value ?? 0)).ToArray();
         var c = b.Center;
         int mode = _mode.SelectedIndex;
         return p =>
@@ -129,6 +157,19 @@ public sealed class WarpWindow : Window
                     return c + (p - c) * f;
                 case 3:
                     return new Vec2(p.X, p.Y + a * b.Height * 0.25 * Math.Sin(2 * Math.PI * n * u));
+                case 5:
+                {
+                    double rr = rTop + (rBottom - rTop) * v;
+                    return new Vec2(c.X + rr * Math.Sin(Math.Clamp((p.X - c.X) / rr, -Math.PI / 2, Math.PI / 2)), p.Y);
+                }
+                case 6:
+                {
+                    // Bilinear: each corner moved, everything in between in proportion.
+                    Vec2 tl = new(b.MinX + cd[0], b.MinY + cd[1]), tr = new(b.MaxX + cd[2], b.MinY + cd[3]), br = new(b.MaxX + cd[4], b.MaxY + cd[5]), bl = new(b.MinX + cd[6], b.MaxY + cd[7]);
+                    var top = Vec2.Lerp(tl, tr, u);
+                    var bottom = Vec2.Lerp(bl, br, u);
+                    return Vec2.Lerp(top, bottom, v);
+                }
                 default:
                     // Arc length round the object → where it is seen from above (the laser looks straight down).
                     static double Squeeze(double d, double r) => r * Math.Sin(Math.Clamp(d / r, -Math.PI / 2, Math.PI / 2));

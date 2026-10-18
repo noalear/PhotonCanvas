@@ -454,6 +454,7 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
+        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, and the selection in several sizes");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
@@ -477,6 +478,19 @@ public partial class MainWindow : Window
         ToolSmall(outline, "Trim", "IcTrim", Tool.Trim, "Trim: click a piece of a line between where it crosses others to cut it away");
         outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Count > 0);
         outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
+        ToolSmall(outline, "Scissors", "IcCut", Tool.Scissors, "Scissors: click a line or outline to cut it there");
+        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Remove overlapping lines, tangent circles, shadows");
+        moreOutline.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                Item("Remove overlapping lines", RemoveOverlapsSel),
+                Item("Tangent circles (select three circles)", TangentCirclesSel),
+                AsyncItem("Drop shadow…", () => ShadowSel(false)),
+                AsyncItem("3D shadow…", () => ShadowSel(true)),
+                Item("Clear all guides", () => { if (_doc.State.Guides.Count > 0) _doc.Commit("Clear guides", _doc.State with { Guides = [] }); }),
+            },
+        };
         outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy up imported drawings: join ends that nearly meet, close nearly-closed shapes, delete lines lying on top of each other");
         outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
         var import = home.Group("Bring in");
@@ -1818,6 +1832,50 @@ public partial class MainWindow : Window
         await new CopyAlongWindow(_doc, guide).ShowDialog(this);
     }
 
+    void RemoveOverlapsSel()
+    {
+        var paths = (_doc.Selection.Count > 0 ? SelectedPaths() : _doc.State.Editable().OfType<PathShape>().ToList()).Where(p => p is not (TextShape or CodeShape)).ToList();
+        if (paths.Count == 0) return;
+        var (geoms, removed) = EditTools.RemoveOverlaps([.. paths.Select(p => p.World)]);
+        if (removed < 1e-3) { StatusText.Text = "No lines lie on top of each other."; return; }
+        var s = _doc.State;
+        for (int i = 0; i < paths.Count; i++)
+            s = geoms[i].IsEmpty ? Ops.Delete(s, new HashSet<Guid> { paths[i].Id }) : Ops.Replace(s, Plain(paths[i], geoms[i]));
+        _doc.Commit("Remove overlapping lines", s);
+        StatusText.Text = $"Removed {removed:0.#} mm of doubled lines: they're cut once now.";
+    }
+
+    void TangentCirclesSel()
+    {
+        var circles = SelectedPaths().Select(p => PathTools.Circle(p.World)).OfType<(Vec2 Centre, double Diameter)>().ToList();
+        if (circles.Count != 3) { StatusText.Text = "Select exactly three circles."; return; }
+        var found = EditTools.TangentCircles((circles[0].Centre, circles[0].Diameter / 2), (circles[1].Centre, circles[1].Diameter / 2), (circles[2].Centre, circles[2].Diameter / 2));
+        if (found.Count == 0) { StatusText.Text = "No circle touches all three."; return; }
+        var layer = SelectedPaths()[0].LayerId;
+        var made = found.Select(f => (Shape)ParamShape.Create(ParamKind.Ellipse, 2 * f.Radius, 2 * f.Radius, 0, 0, 0.5, layer, Affine.Translate(f.Centre.X - f.Radius, f.Centre.Y - f.Radius), name: "Tangent circle")).ToList();
+        _doc.Commit("Tangent circles", Ops.AddShapes(_doc.State, made), made.Select(m => m.Id));
+        StatusText.Text = $"{made.Count} circles touch all three (delete the ones you don't want).";
+    }
+
+    async Task ShadowSel(bool solid)
+    {
+        var paths = SelectedPaths();
+        if (paths.Count == 0) return;
+        var input = await Dialogs.Prompt(this, solid ? "3D shadow" : "Drop shadow", "Offset X, Y (mm)", "1.5, 1.5");
+        if (input is null) return;
+        var parts = input.Split(',', ';', ' ').Where(x => x.Length > 0).Select(x => double.TryParse(x, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : double.NaN).ToArray();
+        if (parts.Length < 2 || parts.Any(double.IsNaN)) return;
+        var made = new List<Shape>();
+        foreach (var p in paths)
+        {
+            var g = EditTools.Shadow(p.World, parts[0], parts[1], solid ? 24 : 1);
+            if (!g.IsEmpty) made.Add(new PathShape { Name = $"Shadow · {p.Name}", LayerId = p.LayerId, Geometry = g });
+        }
+        if (made.Count == 0) { StatusText.Text = "Shadows need closed shapes."; return; }
+        _doc.Commit(solid ? "3D shadow" : "Drop shadow", Ops.AddShapes(_doc.State, made), made.Select(m => m.Id));
+        StatusText.Text = "Shadow added on the same layer: move it to another layer for different settings.";
+    }
+
     void SelectOpen() => _doc.Select(_doc.State.Editable().OfType<PathShape>().Where(p => p.World.Subpaths.Any(sp => !sp.Closed && !sp.Segs.IsEmpty)).Select(p => p.Id));
 
     void SelectSameSize()
@@ -1893,7 +1951,7 @@ public partial class MainWindow : Window
     void ConvertToPaths()
     {
         var state = _doc.State;
-        foreach (var t in state.Shapes.OfType<TextShape>().Where(t => _doc.Selection.Contains(t.Id)).ToList())
+        foreach (var t in state.Shapes.OfType<PathShape>().Where(t => t is TextShape or CodeShape or ParamShape && _doc.Selection.Contains(t.Id)).ToList())
             state = Ops.Replace(state, new PathShape { Id = t.Id, Name = t.Name, LayerId = t.LayerId, GroupId = t.GroupId, Transform = t.Transform, Geometry = t.Geometry });
         _doc.Commit("Convert to paths", state);
     }

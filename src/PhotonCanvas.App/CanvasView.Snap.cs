@@ -57,6 +57,11 @@ public sealed partial class CanvasView
             foreach (var y in new[] { b.MinY, b.Center.Y, b.MaxY }) _snapY.Add(new(y, b.MinX, b.MaxX));
         }
         double w = _machine.FieldW, h = _machine.FieldH;
+        foreach (var g in _doc.State.Guides)
+        {
+            if (g.Vertical) _snapX.Add(new(g.At, 0, h));
+            else _snapY.Add(new(g.At, 0, w));
+        }
         foreach (var x in new[] { 0, w / 2, w }) _snapX.Add(new(x, 0, h));
         foreach (var y in new[] { 0, h / 2, h }) _snapY.Add(new(y, 0, w));
     }

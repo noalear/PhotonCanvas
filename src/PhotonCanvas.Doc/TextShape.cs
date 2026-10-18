@@ -13,6 +13,8 @@ public enum TextAlign { Left, Center, Right }
 /// <param name="BendDeg">Text on an arc: how many degrees of a circle each line spans (+ arches up, − curves down, 0 straight).</param>
 /// <param name="PathShiftMm">Text on a path: slide the words this far along the path (mm).</param>
 /// <param name="Weld">Merge letters that touch or overlap into one outline (script fonts, tight spacing), so no line is cut twice.</param>
+/// <param name="FitWidthMm">Shrink or grow the text to exactly this width (0 = off): variable text that always fits.</param>
+/// <param name="FitHeightMm">Shrink or grow the text to this height (0 = off); with both, it fits inside the box.</param>
 /// <param name="SingleLine">One line down the middle of each stroke instead of an outline: fast, clean engraving (put it on a Score layer).</param>
 public sealed record TextStyle(
     string FontFamily = "Arial",
@@ -25,7 +27,9 @@ public sealed record TextStyle(
     double BendDeg = 0,
     double PathShiftMm = 0,
     bool Weld = false,
-    bool SingleLine = false);
+    bool SingleLine = false,
+    double FitWidthMm = 0,
+    double FitHeightMm = 0);
 
 /// <summary>
 /// Editable text. Its outline (<see cref="PathShape.Geometry"/>) is rebuilt
@@ -89,6 +93,20 @@ public static class TextLayout
     /// centred/right alignment lines align within the widest line.
     /// </summary>
     public static PathGeometry Build(string text, TextStyle style, PathGeometry? guide = null)
+    {
+        var g = BuildShaped(text, style, guide);
+        if (!(style.FitWidthMm > 0 || style.FitHeightMm > 0) || g.IsEmpty || guide is not null) return g;
+        // Fitted: scaled evenly to the box, top-left kept at (0, 0).
+        var b = Rect2.Bounds(g.Flatten(0.02).SelectMany(f => f.Points).ToList());
+        if (b.IsEmpty) return g;
+        double k = double.PositiveInfinity;
+        if (style.FitWidthMm > 0 && b.Width > 1e-9) k = Math.Min(k, style.FitWidthMm / b.Width);
+        if (style.FitHeightMm > 0 && b.Height > 1e-9) k = Math.Min(k, style.FitHeightMm / b.Height);
+        if (!double.IsFinite(k)) return g;
+        return g.Transform(Affine.Translate(-b.MinX, -b.MinY).Then(Affine.Scale(k, k)));
+    }
+
+    static PathGeometry BuildShaped(string text, TextStyle style, PathGeometry? guide)
     {
         var g = BuildLetters(text, style, guide);
         if (style.SingleLine && !g.IsEmpty) return SingleLines(g);

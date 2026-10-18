@@ -10,7 +10,7 @@ using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
 namespace PhotonCanvas.App;
 
-public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2 }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
@@ -330,6 +330,7 @@ public sealed partial class CanvasView : Control
             else DrawSelection(ctx, doc);
             DrawPointTools(ctx);
             DrawSection(ctx);
+            DrawGuidelines(ctx);
             if (_drag == Drag.Box) DrawBox(ctx);
             if (_drag != Drag.None) DrawGuides(ctx);
         }
@@ -600,7 +601,7 @@ public sealed partial class CanvasView : Control
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
         else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic or Tool.Measure or Tool.Align2) c = StandardCursorType.Cross;
-        else if (_tool == Tool.Trim) c = StandardCursorType.Hand;
+        else if (_tool is Tool.Trim or Tool.Scissors) c = StandardCursorType.Hand;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
         else if (screen is { } p && _drag == Drag.None)
         {
@@ -652,6 +653,7 @@ public sealed partial class CanvasView : Control
         }
         if (!pt.Properties.IsLeftButtonPressed) return;
         e.Pointer.Capture(this);
+        if (GuidePressed(p)) return;
 
         if (_tool == Tool.Text)
         {
@@ -681,6 +683,7 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Measure) { MeasurePressed(); return; }
         if (_tool == Tool.Trim) { TrimPressed(p); return; }
         if (_tool == Tool.Align2) { AlignPressed(); return; }
+        if (_tool == Tool.Scissors) { ScissorsPressed(p); return; }
         if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;
@@ -750,13 +753,14 @@ public sealed partial class CanvasView : Control
         var mods = e.KeyModifiers;
         _lastMods = mods;
 
+        if (_guideDrag is not null) { GuideMoved(p); _lastScreen = p; return; }
         switch (_drag)
         {
             case Drag.None:
                 if (_tool == Tool.Pen && _pen.Count > 0) InvalidateVisual();
                 if (_tool == Tool.Wand) ScheduleWandPreview(w);
                 if (_tool == Tool.Measure) MeasureMoved(w);
-                if (_tool == Tool.Trim) TrimHover(p);
+                if (_tool == Tool.Trim || _tool == Tool.Scissors) TrimHover(p);
                 var hov = _tool is Tool.Select or Tool.Nodes ? HitShape(p)?.Id : null;
                 if (hov != _hover) _hover = hov;
                 UpdateCursor(p);
@@ -846,6 +850,7 @@ public sealed partial class CanvasView : Control
         _guides.Clear();
         e.Pointer.Capture(null);
         if (_doc is null) return;
+        if (_guideDrag is not null) { GuideReleased(p); return; }
         if (_tool == Tool.Measure) MeasureReleased();
         switch (drag)
         {
@@ -977,7 +982,15 @@ public sealed partial class CanvasView : Control
         if (g is null || bounds is not { } bb || Math.Max(bb.Width, bb.Height) < 0.05) return;
         if (DrawLayer() is not { } lay) return;
         var name = _tool switch { Tool.Rect => "Rectangle", Tool.Ellipse => "Ellipse", Tool.Polygon => "Polygon", Tool.Star => "Star", _ => "Line" };
-        var shape = new PathShape { Name = name, LayerId = lay.Id, Geometry = g };
+        // Rectangles, ellipses, polygons and stars stay editable (size, corners, sides).
+        PathShape shape = _tool switch
+        {
+            Tool.Rect => ParamShape.Create(ParamKind.Rectangle, bb.Width, bb.Height, 0, 4, 0.5, lay.Id, Affine.Translate(bb.MinX, bb.MinY)),
+            Tool.Ellipse => ParamShape.Create(ParamKind.Ellipse, bb.Width, bb.Height, 0, 0, 0.5, lay.Id, Affine.Translate(bb.MinX, bb.MinY)),
+            Tool.Polygon => ParamShape.Create(ParamKind.Polygon, bb.Width, bb.Height, 0, Math.Clamp(PolygonSides, 3, 64), 0.5, lay.Id, Affine.Translate(bb.MinX, bb.MinY)),
+            Tool.Star => ParamShape.Create(ParamKind.Star, bb.Width, bb.Height, 0, Math.Clamp(StarPoints, 3, 64), Math.Clamp(StarInner, 0.05, 0.95), lay.Id, Affine.Translate(bb.MinX, bb.MinY)),
+            _ => new PathShape { Name = name, LayerId = lay.Id, Geometry = g },
+        };
         _doc.Commit($"Draw {name.ToLowerInvariant()}", Ops.AddShapes(_doc.State, [shape]), [shape.Id]);
         Tool = Tool.Select;
     }

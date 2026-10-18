@@ -65,6 +65,12 @@ public sealed class PropertiesPanel : UserControl
     readonly TextBlock _fieldsHint = Hint();
     IReadOnlyList<string> _fonts = [];
 
+    // editable shape
+    readonly Border _paramCard;
+    readonly NumericUpDown _pw = Number(0.01m, 2000, 1, "0.##"), _ph = Number(0.01m, 2000, 1, "0.##"), _pCorner = Number(0, 1000, 0.5m, "0.##"), _pSides = Number(3, 64, 1, "0"), _pInner = Number(5, 95, 5, "0");
+    readonly Control _cornerRow, _sidesRow, _innerRow;
+    readonly NumericUpDown _fitW = Number(0, 2000, 1, "0.##"), _fitH = Number(0, 2000, 1, "0.##");
+
     // code
     readonly Border _codeCard;
     readonly TextBlock _codeInfo = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
@@ -178,6 +184,7 @@ public sealed class PropertiesPanel : UserControl
             Field("Align", _align),
             _weld,
             _single,
+            Row(Field2("Fit W", _fitW), Field2("Fit H", _fitH)),
             Field("Curve (°)", _bend, tip: "Bend each line along an arc: how many degrees of a circle it covers. Positive arches up, negative curves down, 0 straight."),
             toPaths);
         _textBox.TextChanged += (_, _) => EditText(t => (_textBox.Text ?? "", t.Style), "text");
@@ -186,6 +193,10 @@ public sealed class PropertiesPanel : UserControl
         _bold.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Bold = _bold.IsChecked == true }), null);
         _italic.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Italic = _italic.IsChecked == true }), null);
         _weld.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { Weld = _weld.IsChecked == true }), null);
+        ToolTip.SetTip(_fitW, "Make the text exactly this wide (mm), whatever it says: variable text that always fits its space. 0 = off.");
+        ToolTip.SetTip(_fitH, "Make the text this tall (mm). With both, it fits inside the box. 0 = off.");
+        _fitW.ValueChanged += (_, _) => { if (_fitW.Value is { } v) EditText(t => (t.Text, t.Style with { FitWidthMm = (double)v }), "fitw"); };
+        _fitH.ValueChanged += (_, _) => { if (_fitH.Value is { } v) EditText(t => (t.Text, t.Style with { FitHeightMm = (double)v }), "fith"); };
         _single.IsCheckedChanged += (_, _) => EditText(t => (t.Text, t.Style with { SingleLine = _single.IsChecked == true }), null);
         ToolTip.SetTip(_single, "One line down the middle of each letter's strokes instead of its outline: much faster engraving with a clean, pen-drawn look. Put it on a Score layer. Works best with plain, even-weight fonts.");
         ToolTip.SetTip(_weld, "Merge letters that touch or overlap into one outline (script fonts, tight letter spacing), so the laser doesn't cut where they meet.");
@@ -200,7 +211,14 @@ public sealed class PropertiesPanel : UserControl
         vars.Click += (_, _) => VariablesRequested?.Invoke();
         _codeCard = Card("Code", _codeInfo, Row(editCode, vars));
 
-        Content = new ScrollViewer { Content = new StackPanel { Children = { _nothing, _selCard, _textCard, _codeCard, _picCard } } };
+        _cornerRow = Field("Corner radius", _pCorner, tip: "Rounded corners, mm (0 = square).");
+        _sidesRow = Field("Sides / points", _pSides);
+        _innerRow = Field("Point depth %", _pInner, tip: "How far in the star's inner corners are, as a share of its size: smaller = spikier.");
+        _paramCard = Card("Shape", Row(Field2("W", _pw), Field2("H", _ph)), _cornerRow, _sidesRow, _innerRow,
+            Hint("Stays editable until you edit its points (convert it to a path first: Ctrl+Shift+C)."));
+        foreach (var n in new[] { _pw, _ph, _pCorner, _pSides, _pInner }) n.ValueChanged += (_, _) => EditParam();
+
+        Content = new ScrollViewer { Content = new StackPanel { Children = { _nothing, _selCard, _textCard, _paramCard, _codeCard, _picCard } } };
         _doc.Changed += _ => Refresh();
         Refresh();
     }
@@ -246,6 +264,13 @@ public sealed class PropertiesPanel : UserControl
         _doc.Commit("Edit text", Ops.Replace(_doc.State, t.Edit(text, style)), coalesceKey: coalesce is null ? null : $"{coalesce}:{t.Id}");
     }
 
+    void EditParam()
+    {
+        if (_updating || _doc.Selection.Count != 1 || _doc.State.FindShape(_doc.Selection.First()) is not ParamShape p) return;
+        var next = p.Edit((double)(_pw.Value ?? 10), (double)(_ph.Value ?? 10), (double)(_pCorner.Value ?? 0), (int)(_pSides.Value ?? 6), (double)(_pInner.Value ?? 50) / 100);
+        _doc.Commit($"Edit {ParamShape.KindName(p.Kind).ToLowerInvariant()}", Ops.Replace(_doc.State, next), coalesceKey: $"param:{p.Id}");
+    }
+
     CodeShape? SelectedCode() =>
         _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is CodeShape c ? c : null;
 
@@ -267,6 +292,20 @@ public sealed class PropertiesPanel : UserControl
         _picCard.IsVisible = pic is not null;
         var txt = SelectedText();
         _textCard.IsVisible = txt is not null;
+        var param = _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ParamShape ps0 ? ps0 : null;
+        _paramCard.IsVisible = param is not null;
+        if (param is not null)
+        {
+            var (sw, sh) = param.SeenSize;
+            _pw.Value = (decimal)Math.Round(sw, 3);
+            _ph.Value = (decimal)Math.Round(sh, 3);
+            _pCorner.Value = (decimal)param.CornerMm;
+            _pSides.Value = param.Sides;
+            _pInner.Value = (decimal)Math.Round(param.Inner * 100);
+            _cornerRow.IsVisible = param.Kind == ParamKind.Rectangle;
+            _sidesRow.IsVisible = param.Kind is ParamKind.Polygon or ParamKind.Star;
+            _innerRow.IsVisible = param.Kind == ParamKind.Star;
+        }
         var code = SelectedCode();
         _codeCard.IsVisible = code is not null;
         if (code is not null)
@@ -285,6 +324,8 @@ public sealed class PropertiesPanel : UserControl
             _italic.IsChecked = txt.Style.Italic;
             _weld.IsChecked = txt.Style.Weld;
             _single.IsChecked = txt.Style.SingleLine;
+            _fitW.Value = (decimal)txt.Style.FitWidthMm;
+            _fitH.Value = (decimal)txt.Style.FitHeightMm;
             _letter.Value = (decimal)txt.Style.LetterSpacingMm;
             _lineSp.Value = (decimal)txt.Style.LineSpacing;
             _align.SelectedIndex = (int)txt.Style.Align;

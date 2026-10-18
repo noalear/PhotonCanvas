@@ -133,10 +133,21 @@ public static class DocFile
                         ["pathShiftMm"] = tx.Style.PathShiftMm,
                         ["weld"] = tx.Style.Weld,
                         ["singleLine"] = tx.Style.SingleLine,
+                        ["fitWidthMm"] = tx.Style.FitWidthMm,
+                        ["fitHeightMm"] = tx.Style.FitHeightMm,
                     };
                     if (tx.Guide is { } guide) o["guide"] = guide.ToSvgPathData();
                     // The outline too, so the file opens identically even without the font installed.
                     o["d"] = tx.Geometry.ToSvgPathData();
+                    break;
+                case ParamShape ps:
+                    o["type"] = "param";
+                    o["kind"] = ps.Kind.ToString();
+                    o["w"] = ps.WidthMm;
+                    o["h"] = ps.HeightMm;
+                    o["corner"] = ps.CornerMm;
+                    o["sides"] = ps.Sides;
+                    o["inner"] = ps.Inner;
                     break;
                 case CodeShape cs:
                     o["type"] = "code";
@@ -181,6 +192,7 @@ public static class DocFile
             ["machine"] = MachineProfile.F2Ultra.DeviceCode,
             ["layers"] = layers,
             ["shapes"] = shapes,
+            ["guides"] = new JsonArray([.. s.Guides.Select(g => (JsonNode)new JsonObject { ["vertical"] = g.Vertical, ["at"] = g.At })]),
             ["variables"] = new JsonObject
             {
                 ["serial"] = s.Vars.Serial,
@@ -302,7 +314,7 @@ public static class DocFile
             foreach (var n in root["shapes"]?.AsArray() ?? [])
             {
                 var type = n?["type"]?.GetValue<string>();
-                if (n is null || type is not ("path" or "image" or "text" or "code")) continue;
+                if (n is null || type is not ("path" or "image" or "text" or "code" or "param")) continue;
                 var t = n["transform"]?.AsArray().Select(v => v!.GetValue<double>()).ToArray();
                 var layer = Guid.TryParse(n["layer"]?.GetValue<string>(), out var lid) && layerIds.Contains(lid) ? lid : layers[0].Id;
                 var id = Guid.TryParse(n["id"]?.GetValue<string>(), out var gid) ? gid : Guid.NewGuid();
@@ -323,7 +335,9 @@ public static class DocFile
                         st?["bendDeg"]?.GetValue<double>() ?? 0,
                         st?["pathShiftMm"]?.GetValue<double>() ?? 0,
                         st?["weld"]?.GetValue<bool>() ?? false,
-                        st?["singleLine"]?.GetValue<bool>() ?? false);
+                        st?["singleLine"]?.GetValue<bool>() ?? false,
+                        st?["fitWidthMm"]?.GetValue<double>() ?? 0,
+                        st?["fitHeightMm"]?.GetValue<double>() ?? 0);
                     var text = n["text"]?.GetValue<string>() ?? "";
                     var saved = PathGeometry.FromSvgPathData(n["d"]?.GetValue<string>() ?? "");
                     shapes.Add(new TextShape
@@ -334,6 +348,14 @@ public static class DocFile
                         // Use the saved outline so the design is unchanged even if the font is missing on this PC.
                         Geometry = saved.IsEmpty ? TextLayout.Build(text, style) : saved,
                     });
+                    continue;
+                }
+                if (type == "param")
+                {
+                    shapes.Add(ParamShape.Create(
+                        Enum.TryParse<ParamKind>(n["kind"]?.GetValue<string>(), true, out var pk) ? pk : ParamKind.Rectangle,
+                        n["w"]?.GetValue<double>() ?? 10, n["h"]?.GetValue<double>() ?? 10, n["corner"]?.GetValue<double>() ?? 0,
+                        n["sides"]?.GetValue<int>() ?? 6, n["inner"]?.GetValue<double>() ?? 0.5, layer, transform, id, name, group));
                     continue;
                 }
                 if (type == "code")
@@ -389,7 +411,9 @@ public static class DocFile
             var locked = (root["shapes"]?.AsArray() ?? []).Where(x => x?["locked"]?.GetValue<bool>() == true)
                 .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
             var all = shapes.Select(sh => locked.Contains(sh.Id) ? sh.WithLocked(true) : sh).ToImmutableList();
-            return new DocState(layers.ToImmutable(), all) { Vars = vars };
+            var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
+                .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
+            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {

@@ -54,6 +54,86 @@ public sealed partial class CanvasView
         return snapped;
     }
 
+    // ---- guides ------------------------------------------------------------------------
+
+    static readonly IPen GuideLinePen = new Pen(new SolidColorBrush(Color.Parse("#3DD6F5")), 1, new DashStyle([6, 4], 0));
+    (bool Vertical, int Index, double At)? _guideDrag;
+
+    /// <summary>A press on a ruler starts a new guide; a press on a guide picks it up. True if handled.</summary>
+    bool GuidePressed(Point p)
+    {
+        if (_doc is null) return false;
+        var w = ToWorld(p);
+        if (p.Y < RulerSize && p.X > RulerSize) { _guideDrag = (false, -1, w.Y); return true; }
+        if (p.X < RulerSize && p.Y > RulerSize) { _guideDrag = (true, -1, w.X); return true; }
+        if (_tool != Tool.Select) return false;
+        var guides = _doc.State.Guides;
+        for (int i = 0; i < guides.Count; i++)
+        {
+            var g = guides[i];
+            double screen = g.Vertical ? ToScreen(new Vec2(g.At, 0)).X : ToScreen(new Vec2(0, g.At)).Y;
+            if (Math.Abs((g.Vertical ? p.X : p.Y) - screen) <= 4 && HitShape(p) is null) { _guideDrag = (g.Vertical, i, g.At); return true; }
+        }
+        return false;
+    }
+
+    void GuideMoved(Point p)
+    {
+        if (_guideDrag is not { } d) return;
+        var w = ToWorld(p);
+        double at = d.Vertical ? w.X : w.Y;
+        // Whole and half millimetres are easy to land on.
+        if (!SnapSuspended) at = Math.Round(at * 2) / 2;
+        _guideDrag = d with { At = at };
+        Hint?.Invoke(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Guide at {(d.Vertical ? "X" : "Y")} = {at:0.##} mm. Drop it back on the ruler to remove it."));
+        InvalidateVisual();
+    }
+
+    void GuideReleased(Point p)
+    {
+        if (_guideDrag is not { } d || _doc is null) return;
+        _guideDrag = null;
+        bool onRuler = d.Vertical ? p.X < RulerSize : p.Y < RulerSize;
+        var guides = _doc.State.Guides;
+        if (onRuler)
+        {
+            if (d.Index >= 0) _doc.Commit("Remove guide", _doc.State with { Guides = guides.RemoveAt(d.Index) });
+        }
+        else if (d.Index >= 0) _doc.Commit("Move guide", _doc.State with { Guides = guides.SetItem(d.Index, new PhotonCanvas.Doc.Guide(d.Vertical, d.At)) });
+        else _doc.Commit("Add guide", _doc.State with { Guides = guides.Add(new PhotonCanvas.Doc.Guide(d.Vertical, d.At)) });
+        InvalidateVisual();
+    }
+
+    void DrawGuidelines(DrawingContext ctx)
+    {
+        if (_doc is null) return;
+        var lines = _doc.State.Guides.Select((g, i) => (g.Vertical, _guideDrag is { Index: var k } dd && k == i ? dd.At : g.At)).ToList();
+        if (_guideDrag is { Index: -1 } nd) lines.Add((nd.Vertical, nd.At));
+        foreach (var (vertical, at) in lines)
+        {
+            if (vertical)
+            {
+                double x = Math.Round(ToScreen(new Vec2(at, 0)).X) + 0.5;
+                ctx.DrawLine(GuideLinePen, new Point(x, RulerSize), new Point(x, Bounds.Height));
+            }
+            else
+            {
+                double y = Math.Round(ToScreen(new Vec2(0, at)).Y) + 0.5;
+                ctx.DrawLine(GuideLinePen, new Point(RulerSize, y), new Point(Bounds.Width, y));
+            }
+        }
+    }
+
+    // ---- scissors -----------------------------------------------------------------------
+
+    void ScissorsPressed(Point p)
+    {
+        if (_doc is null || TrimTarget(p) is not { } target) { Hint?.Invoke("Click on a line or outline to cut it there."); return; }
+        if (EditTools.SplitAt(target.World, ToWorld(p)) is not { } g) return;
+        _doc.Commit("Cut with scissors", Ops.Replace(_doc.State, new PathShape { Id = target.Id, Name = target.Name, LayerId = target.LayerId, GroupId = target.GroupId, Geometry = g }));
+        Hint?.Invoke("Cut. Closed outlines open at the cut; lines become two. Click again to cut somewhere else.");
+    }
+
     void ResetPointTools()
     {
         _measureA = _measureB = null;
@@ -183,6 +263,13 @@ public sealed partial class CanvasView
             Dot(ctx, pa);
             Dot(ctx, pb);
             Label(ctx, MeasureText(a, b), new Point((pa.X + pb.X) / 2 + 8, (pa.Y + pb.Y) / 2 + 8));
+        }
+        if (_tool == Tool.Scissors && _cursor is { } sc && _doc is not null)
+        {
+            // Where the cut will be.
+            var target = _doc.State.Shapes.OfType<PathShape>().Where(s => s.Bounds.Inflate(5 / _scale).Contains(sc))
+                .Select(s => (s, EditTools.Nearest(s.World, sc))).Where(x => x.Item2.Distance < 6 / _scale).OrderBy(x => x.Item2.Distance).FirstOrDefault();
+            if (target.s is not null) Dot(ctx, ToScreen(sc));
         }
         if (_tool == Tool.Trim && _trim is { } t && t.Removed.Count >= 2)
         {

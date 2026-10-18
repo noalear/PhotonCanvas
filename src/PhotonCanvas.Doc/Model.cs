@@ -335,11 +335,16 @@ public class PathShape : Shape
     }
 }
 
+/// <summary>A guideline: vertical at X = <see cref="At"/>, or horizontal at Y = <see cref="At"/> (mm).</summary>
+public sealed record Guide(bool Vertical, double At);
+
 /// <summary>The whole editable state. Immutable; every edit produces a new one.</summary>
 public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> Shapes)
 {
     /// <summary>What fills in the fields of text and codes (serial number, spreadsheet).</summary>
     public VariableData Vars { get; init; } = new();
+    /// <summary>Guidelines dragged out from the rulers (shapes snap to them; never marked).</summary>
+    public ImmutableList<Guide> Guides { get; init; } = [];
 
     public static DocState New()
     {
