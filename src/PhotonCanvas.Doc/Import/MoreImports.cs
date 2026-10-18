@@ -257,3 +257,57 @@ public static class LbrnImport
 
     static IEnumerable<char> PrimKinds(string prim) => prim.Where(c => c is 'L' or 'B');
 }
+
+/// <summary>
+/// EPS and PostScript files, through Ghostscript when it's installed on this computer (it isn't
+/// shipped with us): turned into a PDF in a temporary folder, then read like any PDF. Ghostscript
+/// runs in its safe mode, so the file can't read or write anything else.
+/// </summary>
+public static class EpsImport
+{
+    /// <summary>Ghostscript's command-line program, or null when it isn't installed.</summary>
+    public static string? FindGhostscript()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (var root in new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86) })
+            {
+                var gs = Path.Combine(root, "gs");
+                if (!Directory.Exists(gs)) continue;
+                // The newest version first.
+                foreach (var dir in Directory.GetDirectories(gs).OrderByDescending(d => d, StringComparer.OrdinalIgnoreCase))
+                    foreach (var exe in new[] { "gswin64c.exe", "gswin32c.exe" })
+                        if (File.Exists(Path.Combine(dir, "bin", exe))) return Path.Combine(dir, "bin", exe);
+            }
+        }
+        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+                     .Concat(["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]))
+            foreach (var name in OperatingSystem.IsWindows() ? new[] { "gswin64c.exe", "gswin32c.exe" } : ["gs"])
+                if (File.Exists(Path.Combine(dir, name))) return Path.Combine(dir, name);
+        return null;
+    }
+
+    public static ImportResult Load(string path)
+    {
+        var gs = FindGhostscript() ?? throw new FormatException("EPS files need Ghostscript (free, from ghostscript.com). Install it, then import again — or save the file as PDF or SVG.");
+        var dir = Directory.CreateTempSubdirectory("pc-eps-");
+        try
+        {
+            var pdf = Path.Combine(dir.FullName, "drawing.pdf");
+            var psi = new System.Diagnostics.ProcessStartInfo(gs) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+            // Safe mode; the drawing's own bounding box as the page; vector output.
+            foreach (var a in new[] { "-dSAFER", "-dBATCH", "-dNOPAUSE", "-dQUIET", "-dEPSCrop", "-sDEVICE=pdfwrite", $"-sOutputFile={pdf}", path })
+                psi.ArgumentList.Add(a);
+            using var p = System.Diagnostics.Process.Start(psi) ?? throw new FormatException("Ghostscript didn't start.");
+            var err = p.StandardError.ReadToEndAsync();
+            _ = p.StandardOutput.ReadToEndAsync();
+            if (!p.WaitForExit(60_000)) { try { p.Kill(true); } catch (InvalidOperationException) { } throw new FormatException("Ghostscript took too long with this file."); }
+            if (p.ExitCode != 0 || !File.Exists(pdf)) throw new FormatException($"Ghostscript couldn't read this file. {err.Result.Trim()}".Trim());
+            return PdfImport.Load(pdf);
+        }
+        finally
+        {
+            try { dir.Delete(true); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
+    }
+}

@@ -130,7 +130,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Paste pictures and SVG from other programs (LightBurn)
 - [x] Export the design as SVG, DXF and PNG (LightBurn, xTool)
 - [x] Import HPGL/PLT and LightBurn files (.lbrn2, .lbrn) (LightBurn)
-- [ ] Import EPS (LightBurn; needs Ghostscript, which we don't ship)
+- [x] Import EPS and PostScript (LightBurn), through Ghostscript when it's installed (we don't ship it)
 - [x] Import options: shape by shape, grouped, every piece separate, or as one picture (xTool)
 - [x] Settings backup and restore (LightBurn)
 - [x] Job preview that plays the run with a time slider (LightBurn)

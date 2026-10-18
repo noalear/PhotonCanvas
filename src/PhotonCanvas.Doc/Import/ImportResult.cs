@@ -54,7 +54,7 @@ public sealed record ImportResult(List<ImportedPath> Paths, List<ImportedImage> 
 public static class Importer
 {
     /// <summary>File extensions (lower case, with the dot) that <see cref="Load"/> understands.</summary>
-    public static IReadOnlyList<string> Extensions { get; } = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs", ".plt", ".hpgl", ".hpg", ".lbrn2", ".lbrn"];
+    public static IReadOnlyList<string> Extensions { get; } = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs", ".plt", ".hpgl", ".hpg", ".lbrn2", ".lbrn", ".eps", ".ps"];
 
     /// <summary>Whether <paramref name="path"/> has an extension <see cref="Load"/> can open.</summary>
     public static bool CanLoad(string path) =>
@@ -78,6 +78,7 @@ public static class Importer
             ".svg" => FromSvg(SvgImport.Load(path, new SvgImportOptions { PxPerInch = svgPxPerInch })),
             ".dxf" => DxfImport.Load(path),
             ".pdf" => PdfImport.Load(path),
+            ".eps" or ".ps" => EpsImport.Load(path),
             ".ai" => PdfImport.LoadIllustrator(path),
             ".xs" or ".xcs" => XsImport.Load(path),
             ".plt" or ".hpgl" or ".hpg" => HpglImport.Load(path),

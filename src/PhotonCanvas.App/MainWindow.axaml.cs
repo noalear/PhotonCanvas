@@ -59,10 +59,10 @@ public partial class MainWindow : Window
     public bool ConnectOnOpen { get; init; } = true;
 
     static readonly FilePickerFileType ProjectType = new("PhotonCanvas project") { Patterns = ["*.pcanvas", "*.ytool"] };
-    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, xTool, LightBurn, HPGL)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl"] };
+    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, EPS, xTool, LightBurn, HPGL)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.eps", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl"] };
     static readonly FilePickerFileType AnyImportable = new("Everything that can be imported")
     {
-        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
+        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl", "*.eps", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
     };
 
     public MainWindow()

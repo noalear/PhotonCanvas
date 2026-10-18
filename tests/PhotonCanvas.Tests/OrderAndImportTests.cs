@@ -208,4 +208,21 @@ public class OrderAndImportTests
         var cb = Rect2.Bounds(moved.Clip!.Transform(moved.Transform).Flatten(0.01).SelectMany(f => f.Points).ToList());
         Assert.Equal(new Rect2(100, 100, 110, 110), cb);
     }
+
+    [Fact]
+    public void EpsImportsThroughGhostscript()
+    {
+        if (EpsImport.FindGhostscript() is null) return; // not installed on this computer
+        var dir = Directory.CreateTempSubdirectory("pc-eps-test-");
+        try
+        {
+            var eps = Path.Combine(dir.FullName, "square.eps");
+            File.WriteAllText(eps, "%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 72 72\nnewpath 0 0 moveto 72 0 lineto 72 72 lineto 0 72 lineto closepath 1 setlinewidth stroke\nshowpage\n");
+            var r = Importer.Load(eps, 96);
+            Assert.NotEmpty(r.Paths);
+            var b = r.Bounds;
+            Assert.InRange(b.Width, 25, 26.5); // 72 points = 25.4 mm
+        }
+        finally { dir.Delete(true); }
+    }
 }
