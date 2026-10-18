@@ -146,7 +146,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB) under its AppData folder, so this needs a LevelDB reader
 - [x] Copy and paste layer settings (xTool)
 - [x] Single-point test: one square at chosen settings (xTool)
-- [ ] Read a burned test grid from a photo and point out the best square (xTool does it *online* with AI; ours would measure it, as Measure colours does)
+- [x] Read a burned test grid from a photo and point out the best square: darkest even mark or lightest clear one, measured against the bare material (xTool does it *online* with AI)
 
 ### Machine and device
 - [x] Device settings page: name and versions, job counts, flame alarm, stop when moved, stop when the lid opens, exhaust run-on, sleep, MOPA overheat alarm, beeper (xTool; the F2 Ultra has no flame sensitivity setting)

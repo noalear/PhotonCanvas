@@ -35,6 +35,9 @@ public sealed class RecordTestWindow : Window
     readonly TextBox _notes = new() { Watermark = "Notes for the chosen squares (optional)" };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _save = new() { Content = "Save chosen squares", Classes = { "primary" }, IsEnabled = false, MinWidth = 170 };
+    readonly ComboBox _goal = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "The darkest even mark", "The lightest clear mark (least heat)" }, SelectedIndex = 0 };
+    readonly Dictionary<Cell, Core.Imaging.SquareReading?> _readings = [];
+    Cell? _best;
 
     public RecordTestWindow(DocState state, MaterialLibrary lib, CameraPhoto? photo, Func<Task> updatePhoto, Func<CameraPhoto?> currentPhoto, double? focusMm)
     {
@@ -73,6 +76,8 @@ public sealed class RecordTestWindow : Window
             _status.Text = _photo() is null ? "No camera picture yet: connect, calibrate the camera and turn on Camera on work area." : "Click the squares that came out well.";
         };
         _save.Click += (_, _) => Save();
+        var read = Button("Read the squares", "IcEye", "Measure every square on the photo (how much darker than the bare material, and how even) and pick the best for the goal.");
+        read.Click += (_, _) => ReadSquares();
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
         close.Click += (_, _) => Close();
 
@@ -90,7 +95,8 @@ public sealed class RecordTestWindow : Window
                 _newRows,
                 Field("How good", _rating),
                 _notes,
-                update,
+                Field("Best is", _goal),
+                Row(update, read),
                 _status,
             },
         };
@@ -109,6 +115,27 @@ public sealed class RecordTestWindow : Window
             update.IsEnabled = false;
         }
         else _status.Text = photo is null ? "Burn the test, then click Update photo." : "Click the squares that came out well (Update photo first if this picture is from before the burn).";
+        BuildGrid();
+    }
+
+    /// <summary>Measure every square on the current photo; the best one for the goal is picked.</summary>
+    void ReadSquares()
+    {
+        if (_photo() is not { } photo) { _status.Text = "No camera picture yet: click Update photo after burning the test."; return; }
+        _readings.Clear();
+        foreach (var c in _cells) _readings[c] = Core.Imaging.TestGridReader.Read(photo.Image, photo.Area, photo.MmPerPx, c.Bounds);
+        var goal = _goal.SelectedIndex == 1 ? Core.Imaging.TestGoal.LightestVisible : Core.Imaging.TestGoal.DarkestEven;
+        int i = Core.Imaging.TestGridReader.Best([.. _cells.Select(c => _readings[c])], goal);
+        _best = i >= 0 ? _cells[i] : null;
+        if (_best is { } b)
+        {
+            _picked.Add(b);
+            var r = _readings[b]!;
+            _status.Text = $"Best: {b.Power:0.#}% at {b.Speed:0.#} mm/s ({Math.Abs(r.Contrast):0} darker than the material, unevenness {r.Spread:0}). It's picked; add or remove others, then save. " +
+                           "Each square shows how much darker it is (▲) and how uneven (~).";
+        }
+        else _status.Text = "No square is clearly visible and even on this photo. Check the photo is from after the burn and the camera is calibrated at this height.";
+        _save.IsEnabled = _picked.Count > 0;
         BuildGrid();
     }
 
@@ -141,6 +168,19 @@ public sealed class RecordTestWindow : Window
             try { using var ms = new MemoryStream(jpg); face = new Image { Source = new Bitmap(ms), Stretch = Stretch.UniformToFill }; }
             catch (ArgumentException) { }
         }
+        if (_readings.TryGetValue(cell, out var reading) && reading is not null)
+            face = new Panel
+            {
+                Children =
+                {
+                    face,
+                    new Border
+                    {
+                        Background = Brush("HudBg"), VerticalAlignment = VerticalAlignment.Bottom, Padding = new(3, 1),
+                        Child = new TextBlock { Text = (cell == _best ? "★ " : "") + $"▲{Math.Abs(reading.Contrast):0} ~{reading.Spread:0}", FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center },
+                    },
+                },
+            };
         var b = new Button
         {
             Width = 84, Height = 84, Padding = new(2), Margin = new(3),
