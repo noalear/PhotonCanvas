@@ -40,6 +40,7 @@ public sealed class StackSliceWindow : Window
     };
     readonly CheckBox _numbers = new() { Content = "Number each slice (light mark, 1 at the bottom)", IsChecked = true };
     readonly CheckBox _marks = new() { Content = "Mark where the next slice sits", IsChecked = true };
+    readonly CheckBox _joined = new() { Content = "Keep every slice joined", IsChecked = true };
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _make = new() { Content = "Make the slices", Classes = { "primary" }, IsEnabled = false, MinWidth = 150 };
 
@@ -60,6 +61,8 @@ public sealed class StackSliceWindow : Window
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Reslice(); };
         foreach (var n in new[] { _turn, _height, _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
         foreach (var c in new[] { _up, _outline }) c.SelectionChanged += (_, _) => Later();
+        _joined.IsCheckedChanged += (_, _) => Later();
+        ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
         close.Click += (_, _) => Close();
@@ -77,7 +80,7 @@ public sealed class StackSliceWindow : Window
                 Field("Material (mm)", _thick, tip: "One slice per thickness of material."),
                 Field("Outline", _outline),
                 Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
-                _numbers, _marks,
+                _numbers, _marks, _joined,
                 Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
                 Hint("A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's kerf so the pins fit snugly; pins need only be twice the material thick."),
                 Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
@@ -133,6 +136,7 @@ public sealed class StackSliceWindow : Window
         Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
         DowelMm = (double)(_dowel.Value ?? 0),
         PinMm = (double)(_pin.Value ?? 0),
+        KeepJoined = _joined.IsChecked == true,
     };
 
     async Task Reslice()
@@ -155,6 +159,8 @@ public sealed class StackSliceWindow : Window
             _summary.Text = $"{stack.Slices} slices of {o.ThicknessMm:0.##} mm: the stack stands {stack.StackHeightMm:0.#} mm tall, {stack.ModelWidthMm:0.#} × {stack.ModelDepthMm:0.#} mm across. " +
                             $"{parts} part{(parts == 1 ? "" : "s")} to cut" + (parts > stack.Slices ? " (some slices are in several pieces)" : "") + "." +
                             (stack.LeftOut > 0 ? $" {stack.LeftOut} sliver{(stack.LeftOut == 1 ? " was" : "s were")} too small to cut and left out." : "") +
+                            (stack.Joined > 0 ? $" {stack.Joined} steep spot{(stack.Joined == 1 ? " was" : "s were")} widened so the slices there overlap: sand back to the shape." : "") +
+                            (stack.Parts.Count(p => p.Floating) is var fl and > 0 ? $"\n⚠ {fl} part{(fl == 1 ? "" : "s")} touch nothing above or below (red in the preview): separate pieces of the model, to glue on by eye or leave out." : "") +
                             (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
                             (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on the bed: make the model smaller.");

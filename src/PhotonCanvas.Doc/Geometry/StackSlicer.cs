@@ -40,13 +40,24 @@ public sealed record SliceOptions
     /// part below it, both get matching holes, so a short pin through both lines them up.
     /// </summary>
     public double PinMm { get; init; }
+    /// <summary>
+    /// Where the model is joined but two slices barely touch (steep slopes: a trunk, an ear), add
+    /// the shape where they meet to both, so they overlap enough to glue and pin.
+    /// </summary>
+    public bool KeepJoined { get; init; } = true;
+    /// <summary>The least overlap (mm²) two joined parts should have to glue them.</summary>
+    public double MinJoinMm2 { get; init; } = 6;
     /// <summary>Parts smaller than this (mm²), or thinner than <see cref="MinPartWidthMm"/>, are left out: slivers too small to cut or handle.</summary>
     public double MinPartMm2 { get; init; } = 1;
     public double MinPartWidthMm { get; init; } = 1;
 }
 
 /// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
-public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, double LabelRoomMm, IReadOnlyList<IReadOnlyList<Vec2>> NextMarks);
+public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, double LabelRoomMm, IReadOnlyList<IReadOnlyList<Vec2>> NextMarks)
+{
+    /// <summary>Touches nothing in the slices above or below: a separate piece of the model, glued on by eye.</summary>
+    public bool Floating { get; init; }
+}
 
 /// <summary>The result: every part, bottom slice first, in model millimetres (laid flat, top view).</summary>
 public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, double StackHeightMm, double ModelWidthMm, double ModelDepthMm,
@@ -54,6 +65,8 @@ public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, doub
 {
     /// <summary>Slivers left out for being too small.</summary>
     public int LeftOut { get; init; }
+    /// <summary>Joints where the shape where the slices meet was added so they overlap enough to glue.</summary>
+    public int Joined { get; init; }
     /// <summary>Pins joining neighbouring slices: where each goes, and the slice it rises from (it sits in that slice and the one above).</summary>
     public IReadOnlyList<(int Slice, Vec2 At)> Pins { get; init; } = [];
 }
@@ -90,6 +103,30 @@ public static class StackSlicer
             }
             layers.Add(PathTools.Simplify(layer, 0.01).Geometry);
         }
+        // Steep slopes: where the model is joined between two slices but they barely overlap, both
+        // get the model's shape at the plane where they meet (always shared, so they overlap).
+        int joined = 0;
+        if (o.KeepJoined)
+            for (int i = 0; i + 1 < n; i++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var meet = Section(tris, (i + 1) * slab);
+                if (meet.IsEmpty) continue;
+                var shared = ShapeGeometry.Boolean(layers[i], layers[i + 1], BoolOp.Intersect);
+                var add = new List<PathGeometry>();
+                foreach (var piece in Islands(meet))
+                {
+                    if (Area(piece) < 0.5) continue; // a point of contact: nothing to glue
+                    // How much of this meeting place the two slices already share.
+                    var near = ShapeGeometry.Offset(piece, 1, JoinStyle.Round, EndStyle.Round);
+                    if (Area(ShapeGeometry.Boolean(shared, near, BoolOp.Intersect)) >= Math.Min(o.MinJoinMm2, Area(piece) * 0.8)) continue;
+                    add.Add(piece);
+                }
+                if (add.Count == 0) continue;
+                joined += add.Count;
+                layers[i] = ShapeGeometry.Union([layers[i], .. add]);
+                layers[i + 1] = ShapeGeometry.Union([layers[i + 1], .. add]);
+            }
         // Dowels: two holes in the part every slice has in common (when there is one).
         var dowels = new List<Vec2>();
         if (o.DowelMm > 0 && layers.All(l => !l.IsEmpty))
@@ -128,6 +165,23 @@ public static class StackSlicer
                             pins.Add((i + 1, p));
                         }
                     }
+        // Groups of parts joined to each other through the slices; anything not joined to the biggest
+        // group is a separate piece of the model (an eye, a tusk modelled on its own).
+        var ids = new Dictionary<(int, int), int>();
+        foreach (var (i, list) in islands.Select((l, i) => (i, l)))
+            for (int k = 0; k < list.Count; k++) ids[(i, k)] = ids.Count;
+        var parent = Enumerable.Range(0, ids.Count).ToArray();
+        int Find(int x) => parent[x] == x ? x : parent[x] = Find(parent[x]);
+        for (int i = 0; i + 1 < n; i++)
+            for (int a = 0; a < islands[i].Count; a++)
+                for (int b = 0; b < islands[i + 1].Count; b++)
+                    if (Area(ShapeGeometry.Boolean(islands[i][a], islands[i + 1][b], BoolOp.Intersect)) > 0.5)
+                        parent[Find(ids[(i, a)])] = Find(ids[(i + 1, b)]);
+        var groupArea = new Dictionary<int, double>();
+        foreach (var ((i, k), id) in ids)
+            groupArea[Find(id)] = groupArea.GetValueOrDefault(Find(id)) + Area(islands[i][k]);
+        int main = groupArea.Count == 0 ? -1 : groupArea.MaxBy(g => g.Value).Key;
+        bool Touches(int i, int k) => Find(ids[(i, k)]) == main;
         var parts = new List<SlicePart>();
         for (int i = 0; i < n; i++)
         {
@@ -142,12 +196,15 @@ public static class StackSlicer
                 var loops = Loops(part);
                 var (at, room) = Pole(loops);
                 var marks = next is null ? [] : MarksInside(next, loops, 0.6);
-                parts.Add(new SlicePart(i + 1, part, at, room, marks));
+                parts.Add(new SlicePart(i + 1, part, at, room, marks) { Floating = n > 1 && !Touches(i, k) });
             }
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
-        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins };
+        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined };
     }
+
+    /// <summary>Area covered (outlines minus holes), mm².</summary>
+    static double Area(PathGeometry g) => g.IsEmpty ? 0 : Math.Abs(Loops(g).Sum(Geom.SignedArea));
 
     static List<List<Vec2>> Loops(PathGeometry g) => [.. g.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points)];
 

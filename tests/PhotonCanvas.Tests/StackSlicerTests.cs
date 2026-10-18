@@ -61,7 +61,7 @@ public class StackSlicerTests
     [Fact]
     public void APyramidSteps()
     {
-        var o = new SliceOptions { ThicknessMm = 3, HeightMm = 30 };
+        var o = new SliceOptions { ThicknessMm = 3, HeightMm = 30, KeepJoined = false };
         var mid = StackSlicer.Slice(Pyramid(30, 30), o);
         Assert.Equal(10, mid.Slices);
         var areas = mid.Layers.Select(Area).ToList();
@@ -145,5 +145,44 @@ public class StackSlicerTests
             var centres = part.Outline.Subpaths.Skip(1).Select(sp => new Vec2(sp.Flatten(0.05).Average(q => q.X), sp.Flatten(0.05).Average(q => q.Y))).ToList();
             Assert.All(centres, a => Assert.All(centres.Where(b => b != a), b => Assert.True(a.Dist(b) > 3)));
         }
+    }
+
+    /// <summary>A bar leaning over: square, <paramref name="w"/> across, shifted <paramref name="lean"/> along X from bottom to top.</summary>
+    static List<Tri> LeaningBar(double x0, double w, double h, double lean)
+    {
+        V3 P(double x, double y, double z) => new(x + lean * z / h, y, z);
+        return
+        [
+            .. Quad(P(x0, 0, 0), P(x0 + w, 0, 0), P(x0 + w, w, 0), P(x0, w, 0)), .. Quad(P(x0, 0, h), P(x0, w, h), P(x0 + w, w, h), P(x0 + w, 0, h)),
+            .. Quad(P(x0, 0, 0), P(x0, 0, h), P(x0 + w, 0, h), P(x0 + w, 0, 0)), .. Quad(P(x0, w, 0), P(x0 + w, w, 0), P(x0 + w, w, h), P(x0, w, h)),
+            .. Quad(P(x0, 0, 0), P(x0, w, 0), P(x0, w, h), P(x0, 0, h)), .. Quad(P(x0 + w, 0, 0), P(x0 + w, 0, h), P(x0 + w, w, h), P(x0 + w, w, 0)),
+        ];
+    }
+
+    [Fact]
+    public void SteepSlopesStayJoined()
+    {
+        // A 4 mm bar leaning 4 mm sideways per 2 mm slice: half-way sections of neighbouring slices miss each other.
+        var bar = LeaningBar(0, 4, 20, 40);
+        var o = new SliceOptions { ThicknessMm = 2, HeightMm = 20, KeepJoined = false };
+        var loose = StackSlicer.Slice(bar, o);
+        static double Overlap(SliceStack st, int a, int b) => Area(ShapeGeometry.Boolean(st.Layers[a], st.Layers[b], BoolOp.Intersect));
+        Assert.True(Overlap(loose, 4, 5) < 0.5);
+        var joined = StackSlicer.Slice(bar, o with { KeepJoined = true });
+        Assert.True(joined.Joined >= 9);
+        Assert.All(Enumerable.Range(0, 9), i => Assert.True(Overlap(joined, i, i + 1) >= 6, $"slices {i + 1} and {i + 2}"));
+        Assert.DoesNotContain(joined.Parts, p => p.Floating);
+    }
+
+    [Fact]
+    public void SeparatePiecesAreFlagged()
+    {
+        // A post and, beside it, a block floating in the air (a separate piece of the model).
+        var mesh = new List<Tri>([.. Box(0, 0, 0, 20, 20, 30), .. Box(40, 0, 10, 50, 10, 20)]);
+        var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 3, HeightMm = 30 });
+        var floating = stack.Parts.Where(p => p.Floating).ToList();
+        Assert.NotEmpty(floating);
+        Assert.All(floating, p => Assert.True(p.Outline.Bounds().MinX > 35));
+        Assert.All(stack.Parts.Where(p => p.Outline.Bounds().MaxX < 25), p => Assert.False(p.Floating));
     }
 }
