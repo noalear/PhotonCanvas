@@ -69,7 +69,22 @@ public abstract record Block(LaserSettings Laser)
     /// to where it started at the end of the job.
     /// </summary>
     public double FocusOffsetMm { get; init; }
+
+    /// <summary>Curved surfaces: the head's height for the whole block (absolute, machine Z), set before it runs. Null = as the job goes.</summary>
+    public double? HeadZ { get; init; }
 }
+
+/// <summary>Part of a path at one height of the head (curved surfaces).</summary>
+public sealed record BandPiece(double HeadZ, IReadOnlyList<Vec2> Points);
+
+/// <summary>
+/// Lines on a curved surface: the paths cut into pieces by height band and run one band at a time,
+/// highest first, the head moving to each band's height in between (as xTool Studio does).
+/// </summary>
+public sealed record BandedVectorBlock(IReadOnlyList<BandPiece> Pieces, LaserSettings Laser) : Block(Laser);
+
+/// <summary>A fill on a curved surface: its scan lines cut by height band, one band at a time.</summary>
+public sealed record BandedFillBlock(FillBlock Fill, IReadOnlyList<(double HeadZ, IReadOnlyList<Job.FillSegment> Segments)> Bands) : Block(Fill.Laser);
 
 public sealed record VectorBlock(Polyline Path, LaserSettings Laser) : Block(Laser)
 {
@@ -352,6 +367,24 @@ public sealed class Job
     /// <summary>Flat bed, rotary or conveyor.</summary>
     public WorkMode Mode { get; init; } = new WorkMode.Flat();
 
+    /// <summary>
+    /// The head follows a curved surface: its height is set absolutely by the blocks (see
+    /// <see cref="Block.HeadZ"/>, <see cref="BandedVectorBlock"/>), inside <c>G102</c> … <c>G103</c>.
+    /// </summary>
+    public bool FollowsSurface => SurfaceHeight is not null;
+
+    /// <summary>Curved surfaces: the material's height (mm above the bed) anywhere on the bed. Null = flat.</summary>
+    public Func<Vec2, double>? SurfaceHeight { get; init; }
+
+    /// <summary>Curved surfaces: how far apart the head's heights are (mm). xTool Studio uses 0.2.</summary>
+    public double BandMm { get; init; } = 0.2;
+
+    /// <summary>The blocks as they're written: split into height bands on a curved surface.</summary>
+    public IReadOnlyList<Block> OutputBlocks() => SurfaceHeight is { } h && Flat ? SurfaceBanding.Apply(Blocks, h, BandMm) : Blocks;
+
+    /// <summary>The head's travel (machine Z, mm).</summary>
+    public const double MinHeadZ = 6, MaxHeadZ = 156;
+
     bool Flat => Mode is WorkMode.Flat;
 
     /// <summary>A design position as G-code words: X/Y on the bed, X/U on the rotary, U/Y on the conveyor.</summary>
@@ -394,8 +427,27 @@ public sealed class Job
             var ctx = $" (item {i + 1})";
             if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > MaxFocusOffsetMm + 1e-9)
                 throw new JobException($"The focus can move at most {MaxFocusOffsetMm:0} mm either way (asked for {block.FocusOffsetMm:0.##} mm).");
+            foreach (var z in HeadHeights(block))
+                if (!double.IsFinite(z) || z < MinHeadZ - 1e-9 || z > MaxHeadZ + 1e-9)
+                    throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");
             switch (block)
             {
+                case BandedVectorBlock b:
+                    foreach (var piece in b.Pieces)
+                    {
+                        foreach (var p in piece.Points) CheckPoint(p, ctx);
+                        anyMotion |= piece.Points.Count >= 2;
+                    }
+                    break;
+                case BandedFillBlock b:
+                    foreach (var (_, segs) in b.Bands)
+                        foreach (var seg in segs)
+                        {
+                            CheckPoint(seg.Start, ctx);
+                            CheckPoint(seg.End, ctx);
+                            anyMotion = true;
+                        }
+                    break;
                 case VectorBlock b:
                     b.Path.Validate();
                     b.Drop?.Validate(PassMode is PassMode.Rounds ? Rounds : b.Laser.Passes);
@@ -502,15 +554,41 @@ public sealed class Job
             throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, Machine.FieldH, ctx);
     }
 
+    /// <summary>Every head height a block asks for (curved surfaces).</summary>
+    static IEnumerable<double> HeadHeights(Block b) => b switch
+    {
+        BandedVectorBlock v => v.Pieces.Select(p => p.HeadZ),
+        BandedFillBlock f => f.Bands.Select(x => x.HeadZ),
+        _ => b.HeadZ is { } z ? [z] : [],
+    };
+
     /// <summary>The complete motion file. Validates first.</summary>
     public string Render()
     {
         Validate();
+        if (FollowsSurface && !Flat) throw new JobException("Curved surfaces work on the flat bed only (not with the rotary or conveyor).");
+        var blocks = OutputBlocks();
+        if (FollowsSurface)
+            foreach (var z in blocks.SelectMany(HeadHeights))
+                if (!double.IsFinite(z) || z < MinHeadZ - 1e-9 || z > MaxHeadZ + 1e-9)
+                    throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");
         var tag = Machine.GcodeTag;
         var lines = Header();
         double focus = 0; // how far the head is lowered now (mm)
+        double? headZ = null; // curved surfaces: where the head is now
         void Focus(Block b)
         {
+            if (FollowsSurface)
+            {
+                // Blocks with one height move the head before they start; banded ones move it themselves.
+                if (b.HeadZ is { } z && (headZ is not { } now || Math.Abs(now - z) > 1e-6))
+                {
+                    lines.AddRange([$"G0Z{Trim3(z)}F600", "# MUST", ""]);
+                    headZ = z;
+                }
+                else if (b is BandedVectorBlock or BandedFillBlock) headZ = HeadHeights(b).LastOrDefault();
+                return;
+            }
             if (Math.Abs(b.FocusOffsetMm - focus) < 1e-6) return;
             lines.AddRange(ZMoveAny(-(b.FocusOffsetMm - focus)));
             lines.AddRange(["# MUST", ""]);
@@ -519,7 +597,7 @@ public sealed class Job
         switch (PassMode)
         {
             case PassMode.PerBlock:
-                foreach (var b in Blocks)
+                foreach (var b in blocks)
                 {
                     Focus(b);
                     if (b is FillBlock { AngleStepDeg: not 0 } f && f.Laser.Passes > 1)
@@ -546,7 +624,7 @@ public sealed class Job
                         lines.AddRange(Dwell(r.DelayS));
                         lines.Add("");
                     }
-                    foreach (var b in Blocks.Where(b => b.Laser.Passes >= round))
+                    foreach (var b in blocks.Where(b => b.Laser.Passes >= round))
                     {
                         Focus(b);
                         lines.AddRange(RenderBlock(b is FillBlock f ? f.ForPass(round) : b, tag, 1, round));
@@ -555,13 +633,16 @@ public sealed class Job
                 }
                 break;
         }
-        if (Math.Abs(focus) > 1e-6)
+        if (!FollowsSurface && Math.Abs(focus) > 1e-6)
         {
             // Back to the focus the job started at.
             lines.AddRange(ZMoveAny(focus));
             lines.AddRange(["# MUST", ""]);
         }
-        lines.AddRange(Tail(tag, Flat));
+        var tail = Tail(tag, Flat);
+        // Curved: leave Z mode at the start of the tail, as xTool Studio does.
+        if (FollowsSurface) tail.Insert(tail.IndexOf($"# {tag} TAIL") + 1, "G103");
+        lines.AddRange(tail);
         return string.Join("\n", lines);
     }
 
@@ -596,6 +677,7 @@ public sealed class Job
             "G1 F180000",
             "G0 X0 Y0",
             .. ModeHead(),
+            .. FollowsSurface ? new[] { "G102" } : [],
             "",
         ];
     }
@@ -684,6 +766,10 @@ public sealed class Job
         return b switch
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
+            // Each band: the head's move at 10 mm/s, then the pieces.
+            BandedVectorBlock bv => bv.Pieces.Sum(p => PathLength(p.Points) / bv.Laser.Speed + 10 / Jump)
+                + bv.Pieces.Select(p => p.HeadZ).Distinct().Count() * 0.25,
+            BandedFillBlock bf => bf.Bands.Sum(x => x.Segments.Sum(s => s.Start.Dist(s.End) / bf.Laser.Speed + 10 / bf.Fill.LinesPerCm / bf.Laser.Speed) + 0.25),
             FillBlock f => FillLines(f).Sum(s =>
                 (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed + f.LineDwellMs / 1000.0),
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
@@ -694,7 +780,7 @@ public sealed class Job
         };
     }
 
-    static string[] Tail(string tag, bool flat) => flat
+    static List<string> Tail(string tag, bool flat) => flat
         ? ["# END", $"# {tag} TAIL", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""]
         : ["# END", $"# {tag} TAIL", "G0 U0", "G101", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""];
 
@@ -733,8 +819,69 @@ public sealed class Job
         return v;
     }
 
+    static double PathLength(IReadOnlyList<Vec2> pts)
+    {
+        double s = 0;
+        for (int i = 1; i < pts.Count; i++) s += pts[i - 1].Dist(pts[i]);
+        return s;
+    }
+
+    /// <summary>A curved surface's lines: one vector block, the head moving between bands (as xTool Studio writes it).</summary>
+    List<string> RenderBandedVector(BandedVectorBlock b, string tag, int passes)
+    {
+        var l = b.Laser;
+        var body = new List<string> { $"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}", "" };
+        double? z = null;
+        foreach (var piece in b.Pieces.Where(p => p.Points.Count >= 2))
+        {
+            if (z is not { } now || Math.Abs(now - piece.HeadZ) > 1e-6)
+            {
+                body.Add($"G0Z{Trim3(piece.HeadZ)}F600");
+                z = piece.HeadZ;
+            }
+            body.Add($"G0{Pos(piece.Points[0], Trim3)}F180000");
+            for (int i = 1; i < piece.Points.Count; i++)
+                body.Add($"G1{Pos(piece.Points[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+        }
+        if (z is null) return [];
+        var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
+        v.AddRange(SourceLines(l, true));
+        v.AddRange(["M523P40", "", ""]);
+        v.AddRange(PassLoop(passes, body));
+        v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
+        return v;
+    }
+
+    /// <summary>A curved surface's fill: one engraving block, the head moving between bands with the laser off.</summary>
+    List<string> RenderBandedFill(BandedFillBlock bf, string tag, int passes)
+    {
+        var b = bf.Fill;
+        var l = b.Laser;
+        long s = l.SValue;
+        var body = new List<string> { BitmapCfg(l.Power / 100, b.LinesPerCm / 10, 0, s, "grayscale", 0), "", "", $"G1F{l.FValue}S0" };
+        bool first = true;
+        foreach (var (z, segs) in bf.Bands)
+        {
+            if (segs.Count == 0) continue;
+            body.Add($"G1 Z{Trim3(z)} F600 S0");
+            foreach (var seg in segs)
+            {
+                body.Add(first ? $"G0{Pos(seg.Start, Fixed3)}" : $"G1{Pos(seg.Start, Fixed3)}S0");
+                first = false;
+                body.Add($"G1{Pos(seg.End, Fixed3)}S{s}");
+            }
+        }
+        if (first) return [];
+        var v = BitmapHead(tag, l, "M523P40");
+        v.AddRange(PassLoop(passes, body));
+        v.AddRange(BitmapTail(tag));
+        return v;
+    }
+
     List<string> RenderBlock(Block block, string tag, int passes, int round = 1) => block switch
     {
+        BandedVectorBlock b => RenderBandedVector(b, tag, passes),
+        BandedFillBlock b => RenderBandedFill(b, tag, passes),
         VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes, round),
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
