@@ -51,6 +51,9 @@ public sealed class StackSliceWindow : Window
     readonly CheckBox _numbers = new() { Content = "Number each slice (light mark, 1 at the bottom)", IsChecked = true };
     readonly CheckBox _marks = new() { Content = "Mark where the next slice sits", IsChecked = true };
     readonly CheckBox _joined = new() { Content = "Keep every slice joined", IsChecked = true };
+    readonly ComboBox _method = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Stacked layers (solid)", "Egg crate (slotted grid)", "Radial (fins on rings)" }, SelectedIndex = 0 };
+    readonly NumericUpDown _sheetsX = Number(1, 60, 1, "0"), _sheetsY = Number(1, 60, 1, "0"), _fins = Number(3, 72, 1, "0"), _rings = Number(1, 20, 1, "0"), _core = Number(0, 50, 0.5m, "0.#"), _fit = Number(-0.5m, 1, 0.05m, "0.##");
+    StackPanel _stackedPanel = null!, _eggPanel = null!, _radialPanel = null!;
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _make = new() { Content = "Make the slices", Classes = { "primary" }, IsEnabled = false, MinWidth = 150 };
 
@@ -68,6 +71,9 @@ public sealed class StackSliceWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
         _height.Value = 60; _thick.Value = 3; _dowel.Value = 0; _turn.Value = 0; _pin.Value = 2;
+        _sheetsX.Value = 6; _sheetsY.Value = 4; _fins.Value = 12; _rings.Value = 3; _core.Value = 6; _fit.Value = 0.1m;
+        foreach (var n in new[] { _sheetsX, _sheetsY, _fins, _rings, _core, _fit }) n.ValueChanged += (_, _) => Later();
+        _method.SelectionChanged += (_, _) => { ShowMethod(); Later(); };
 
         var open = Button("Open a 3D model…", tip: "STL or OBJ, from a 3D printing site, Fusion, Blender…");
         open.Click += async (_, _) => await Open();
@@ -101,12 +107,43 @@ public sealed class StackSliceWindow : Window
                 _keepProportions,
                 _ownSize,
                 Field("Material (mm)", _thick, tip: "One slice per thickness of material."),
-                Field("Outline", _outline),
-                Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
-                _numbers, _marks, _joined,
-                Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
-                Hint("A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's kerf so the pins fit snugly; pins need only be twice the material thick."),
-                Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
+                Field("Build as", _method),
+                (_stackedPanel = new StackPanel
+                {
+                    Spacing = 10,
+                    Children =
+                    {
+                        Field("Outline", _outline),
+                        Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
+                        _marks, _joined,
+                        Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
+                        Hint("A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's kerf so the pins fit snugly; pins need only be twice the material thick."),
+                        Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
+                    },
+                }),
+                (_eggPanel = new StackPanel
+                {
+                    Spacing = 10,
+                    Children =
+                    {
+                        Hint("Upright sheets across the model both ways, slotted half-way where they cross so they slide together: an open grid of the model's shape. Few parts, little material."),
+                        Field("Sheets across X", _sheetsX, tip: "Sheets standing across the model's width, evenly spaced."),
+                        Field("Sheets across Y", _sheetsY, tip: "Sheets standing across its depth."),
+                    },
+                }),
+                (_radialPanel = new StackPanel
+                {
+                    Spacing = 10,
+                    Children =
+                    {
+                        Hint("Fins standing round an upright axis through the middle, slotted onto flat rings at a few heights. Best for round things: heads, vases, pumpkins."),
+                        Field("Fins", _fins, tip: "Fins round the axis, evenly spaced."),
+                        Field("Rings", _rings, tip: "Flat rings at even heights that hold the fins."),
+                        Field("Centre hole Ø", _core, tip: "A hole up the middle of the rings (for a dowel); the fins start this far out. 0 = none."),
+                    },
+                }),
+                _numbers,
+                Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
                 _summary,
             },
         };
@@ -149,6 +186,7 @@ public sealed class StackSliceWindow : Window
         root.Children.Add(buttons);
         root.Children.Add(grid);
         Content = root;
+        ShowMethod();
     }
 
     /// <summary>Show a model already read (and slice it).</summary>
@@ -159,6 +197,15 @@ public sealed class StackSliceWindow : Window
         _file.Text = $"{name}: {mesh.Count:N0} triangles.";
         Natural();
         OwnSize();
+    }
+
+    /// <summary>Only the settings for the chosen way of building.</summary>
+    void ShowMethod()
+    {
+        _stackedPanel.IsVisible = _method.SelectedIndex == 0;
+        _eggPanel.IsVisible = _method.SelectedIndex == 1;
+        _radialPanel.IsVisible = _method.SelectedIndex == 2;
+        _numbers.Content = _method.SelectedIndex == 0 ? "Number each slice (light mark, 1 at the bottom)" : "Name each sheet and mark what goes in each slot";
     }
 
     static Control Col(Control c, int col)
@@ -177,7 +224,8 @@ public sealed class StackSliceWindow : Window
         _view.From = (int)_from.Value;
         _view.To = (int)_to.Value;
         int n = (int)_to.Maximum;
-        _range.Text = _from.Value <= 1 && _to.Value >= n ? $"All {n} slices" : $"Slices {_from.Value:0}–{_to.Value:0} of {n}";
+        var what = _method.SelectedIndex == 0 ? "slices" : "sheets";
+        _range.Text = _from.Value <= 1 && _to.Value >= n ? $"All {n} {what}" : $"{char.ToUpperInvariant(what[0])}{what[1..]} {_from.Value:0}–{_to.Value:0} of {n}";
     }
 
     /// <summary>The model's own size standing the chosen way up (for keeping proportions).</summary>
@@ -267,6 +315,13 @@ public sealed class StackSliceWindow : Window
         DowelMm = (double)(_dowel.Value ?? 0),
         PinMm = (double)(_pin.Value ?? 0),
         KeepJoined = _joined.IsChecked == true,
+        Method = (SliceMethod)Math.Max(0, _method.SelectedIndex),
+        SheetsX = (int)(_sheetsX.Value ?? 6),
+        SheetsY = (int)(_sheetsY.Value ?? 4),
+        Fins = (int)(_fins.Value ?? 12),
+        Rings = (int)(_rings.Value ?? 3),
+        CoreMm = (double)(_core.Value ?? 6),
+        SlotFitMm = (double)(_fit.Value ?? 0.1m),
     };
 
     async Task Reslice()
@@ -292,6 +347,19 @@ public sealed class StackSliceWindow : Window
             var biggest = stack.Parts.Select(p => p.Outline.Bounds()).Where(b => !b.IsEmpty).DefaultIfEmpty(Rect2.Empty).MaxBy(b => b.Width * b.Height);
             int parts = stack.Parts.Count;
             bool fits = stack.Parts.All(p => p.Outline.Bounds() is var b && b.Width + 6 <= _machine.FieldW && b.Height + 6 <= _machine.FieldH);
+            if (o.Method != SliceMethod.Stacked)
+            {
+                int slots = stack.Parts.Sum(p => p.Notes.Count) / 2;
+                _summary.Text = $"{parts} sheet{(parts == 1 ? "" : "s")} of {o.ThicknessMm:0.##} mm, {stack.ModelWidthMm:0.#} × {stack.ModelDepthMm:0.#} × {stack.StackHeightMm:0.#} mm overall, " +
+                                $"slotted together at {slots} crossing{(slots == 1 ? "" : "s")} (slots {o.ThicknessMm + o.SlotFitMm:0.##} mm wide). " +
+                                (o.Method == SliceMethod.EggCrate
+                                    ? "Each slot is marked with the sheet that goes in it: X sheets slide down from the top onto the Y sheets."
+                                    : "Each slot is marked with the part that goes in it: slide the rings down over the fins from the top, smallest first" + (o.CoreMm > 0 ? $", with a {o.CoreMm:0.#} mm dowel up the middle." : ".")) +
+                                (stack.LeftOut > 0 ? $" {stack.LeftOut} tiny piece{(stack.LeftOut == 1 ? " was" : "s were")} left out." : "") +
+                                (fits ? "" : $"\n⚠ The biggest sheet ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on the bed: make the model smaller.");
+                _make.IsEnabled = fits && parts > 0;
+                return;
+            }
             _summary.Text = $"{stack.Slices} slices of {o.ThicknessMm:0.##} mm: the stack stands {stack.StackHeightMm:0.#} mm tall, {stack.ModelWidthMm:0.#} × {stack.ModelDepthMm:0.#} mm across. " +
                             $"{parts} part{(parts == 1 ? "" : "s")} to cut" + (parts > stack.Slices ? " (some slices are in several pieces)" : "") + "." +
                             (stack.LeftOut > 0 ? $" {stack.LeftOut} sliver{(stack.LeftOut == 1 ? " was" : "s were")} too small to cut and left out." : "") +
@@ -304,6 +372,12 @@ public sealed class StackSliceWindow : Window
         }
         catch (OperationCanceledException) { }
         catch (ArgumentException e) { _summary.Text = e.Message; }
+        catch (Exception e)
+        {
+            // Never leave the window silently blank: say what went wrong, and keep the details.
+            AppLog.Error("slicing", e);
+            _summary.Text = $"Couldn't slice this model: {e.Message}";
+        }
     }
 
     void Make()
@@ -311,7 +385,7 @@ public sealed class StackSliceWindow : Window
         if (_stack is not { } stack) return;
         try
         {
-            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true);
+            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name);
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} bed{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area)." : ".") +
                             " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\".";

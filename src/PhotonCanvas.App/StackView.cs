@@ -77,6 +77,9 @@ public sealed class StackView : Control
         return new View(st.ModelWidthMm / 2, st.ModelDepthMm / 2, st.StackHeightMm / 2, Math.Min(w, h) * 0.78 / Math.Max(1, span), w, h, _yaw * Math.PI / 180, _pitch * Math.PI / 180);
     }
 
+    /// <summary>Slotted sheets (egg crate, radial) rather than a stack of slices.</summary>
+    static bool Sheets(SliceStack st) => st.Parts.Any(p => p.Label is not null);
+
     IEnumerable<SlicePart> Shown(SliceStack st) => st.Parts.Where(p => p.Slice >= From && p.Slice <= Math.Min(To, st.Slices));
 
     public override void Render(DrawingContext ctx)
@@ -91,7 +94,7 @@ public sealed class StackView : Control
         if (Look == StackLook.Solid) RenderSolid(ctx, st);
         else RenderLines(ctx, st);
         int last = Math.Min(To, st.Slices);
-        Caption(ctx, (From > 1 || last < st.Slices ? $"Slices {From}–{last} of {st.Slices}" : $"{st.Slices} slices") + " · drag to turn", new Point(8, b.Height - 14));
+        Caption(ctx, (Sheets(st) ? From > 1 || last < st.Slices ? $"Sheets {From}–{last} of {st.Slices}" : $"{st.Slices} sheets" : From > 1 || last < st.Slices ? $"Slices {From}–{last} of {st.Slices}" : $"{st.Slices} slices") + " · drag to turn", new Point(8, b.Height - 14));
     }
 
     static void Caption(DrawingContext ctx, string text, Point at, bool centre = false)
@@ -105,24 +108,25 @@ public sealed class StackView : Control
     void RenderLines(DrawingContext ctx, SliceStack st)
     {
         var v = MakeView(st, Bounds.Width, Bounds.Height);
-        Point P(Vec2 xy, double z) { var (x, y, _) = v.Project(xy.X, xy.Y, z); return new Point(x, y); }
         foreach (var part in Shown(st).OrderBy(p => p.Slice))
         {
+            var f = part.Frame;
+            Point P(Vec2 uv, double s) { var q = f.At(uv.X, uv.Y, s); var (x, y, _) = v.Project(q.X, q.Y, q.Z); return new Point(x, y); }
             var shade = part.Floating ? Color.Parse("#E5484D") : part.Slice % 2 == 0 ? Color.Parse("#C9A27A") : Color.Parse("#A9825C");
             var pen = new Pen(new SolidColorBrush(shade), 1.2);
             var faint = new Pen(new SolidColorBrush(Color.FromArgb(90, shade.R, shade.G, shade.B)), 1);
-            double z0 = (part.Slice - 1) * _t, z1 = part.Slice * _t;
-            foreach (var l in part.Outline.Flatten(0.2).Where(f => f.Closed).Select(f => f.Points))
+            double s0 = -_t / 2, s1 = _t / 2;
+            foreach (var l in part.Outline.Flatten(0.2).Where(fp => fp.Closed).Select(fp => fp.Points))
             {
                 for (int k = 0; k < l.Count; k++)
                 {
                     var a = l[k];
                     var c = l[(k + 1) % l.Count];
-                    ctx.DrawLine(pen, P(a, z1), P(c, z1));
-                    ctx.DrawLine(faint, P(a, z0), P(c, z0));
+                    ctx.DrawLine(pen, P(a, s1), P(c, s1));
+                    ctx.DrawLine(faint, P(a, s0), P(c, s0));
                 }
                 int step = Math.Max(1, l.Count / 12);
-                for (int k = 0; k < l.Count; k += step) ctx.DrawLine(faint, P(l[k], z0), P(l[k], z1));
+                for (int k = 0; k < l.Count; k += step) ctx.DrawLine(faint, P(l[k], s0), P(l[k], s1));
             }
         }
     }
@@ -160,19 +164,21 @@ public sealed class StackView : Control
             return 0.38 + 0.62 * lam;
         }
 
-        bool fromAbove = _pitch > 0;
         foreach (var part in Shown(st))
         {
-            double z0 = (part.Slice - 1) * _t, z1 = part.Slice * _t;
-            var loops = part.Outline.Flatten(0.15).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
+            var f = part.Frame;
+            double s0 = -_t / 2, s1 = _t / 2;
+            (double X, double Y, double D) Pr(Vec2 uv, double s) { var q = f.At(uv.X, uv.Y, s); return v.Project(q.X, q.Y, q.Z); }
+            var loops = part.Outline.Flatten(0.15).Where(fp => fp.Closed && fp.Points.Count >= 3).Select(fp => fp.Points).ToList();
             var tint = part.Floating ? Color.Parse("#E5484D") : (Color?)null;
 
-            // The top (or, seen from below, the bottom) face: flat, so its depth follows a plane.
-            double faceZ = fromAbove ? z1 : z0;
-            var nf = v.Turn(0, 0, fromAbove ? 1 : -1);
+            // The face turned towards us (the sheet's two faces are its thickness apart along N).
+            var nUp = v.Turn(f.N.X, f.N.Y, f.N.Z);
+            bool front = nUp.D >= 0;
+            var nf = front ? nUp : (-nUp.X, -nUp.Y, -nUp.D);
             double faceLight = Lit(nf, out double faceSpec);
             uint faceColour = Shade(tint ?? look.Top, faceLight, faceSpec);
-            FillFace(loops, faceZ, v, w, h, px, depth, faceColour);
+            FillFace(loops, uv => Pr(uv, front ? s1 : s0), w, h, px, depth, faceColour);
 
             // The edges all round: a strip of quads per outline, facing outwards.
             foreach (var l in loops)
@@ -187,13 +193,15 @@ public sealed class StackView : Control
                     var c = l[(k + 1) % l.Count];
                     double ex = c.X - a.X, ey = c.Y - a.Y, len = Math.Sqrt(ex * ex + ey * ey);
                     if (len < 1e-9) continue;
-                    var n = v.Turn(side * ey / len, -side * ex / len, 0);
+                    // The outward direction in the sheet, turned into the model.
+                    double nu = side * ey / len, nv = -side * ex / len;
+                    var n = v.Turn(nu * f.U.X + nv * f.V.X, nu * f.U.Y + nv * f.V.Y, nu * f.U.Z + nv * f.V.Z);
                     if (n.D <= 0) continue; // facing away
                     double lit = Lit(n, out double spec);
-                    var p0 = v.Project(a.X, a.Y, z0);
-                    var p1 = v.Project(c.X, c.Y, z0);
-                    var p2 = v.Project(c.X, c.Y, z1);
-                    var p3 = v.Project(a.X, a.Y, z1);
+                    var p0 = Pr(a, s0);
+                    var p1 = Pr(c, s0);
+                    var p2 = Pr(c, s1);
+                    var p3 = Pr(a, s1);
                     Triangle(p0, p1, p2, 0, 0, 1, w, h, px, depth, look, tint, lit, spec);
                     Triangle(p0, p2, p3, 0, 1, 1, w, h, px, depth, look, tint, lit, spec);
                 }
@@ -232,20 +240,39 @@ public sealed class StackView : Control
         return 0xFF000000u | (uint)Ch(c.R) << 16 | (uint)Ch(c.G) << 8 | Ch(c.B);
     }
 
-    /// <summary>A flat horizontal face (outlines with holes, even-odd) at height <paramref name="z"/>, depth-tested.</summary>
-    static void FillFace(List<List<Vec2>> loops, double z, View v, int w, int h, uint[] px, float[] depth, uint colour)
+    /// <summary>A flat face (outlines with holes, even-odd) on the screen, depth-tested; its depth follows the face's plane.</summary>
+    static void FillFace(List<List<Vec2>> loops, Func<Vec2, (double X, double Y, double D)> project, int w, int h, uint[] px, float[] depth, uint colour)
     {
-        if (Math.Abs(Math.Sin(v.Pitch)) < 0.03) return; // edge-on: nothing to see
+        if (loops.Count == 0) return;
+        // The plane on screen: depth = a·x + b·y + c, from three corners well apart.
+        var pts = loops[0];
+        var p0 = project(pts[0]);
+        var p1 = project(pts[pts.Count / 3]);
+        var p2 = project(pts[2 * pts.Count / 3]);
+        // Corners in a line: use the outline's extremes instead.
+        double det = (p1.X - p0.X) * (p2.Y - p0.Y) - (p2.X - p0.X) * (p1.Y - p0.Y);
+        if (Math.Abs(det) < 1e-6)
+        {
+            var all = loops.SelectMany(l => l).Select(project).ToList();
+            p0 = all.MinBy(p => p.X); p1 = all.MaxBy(p => p.X); p2 = all.MaxBy(p => Math.Abs((p1.X - p0.X) * (p.Y - p0.Y) - (p.X - p0.X) * (p1.Y - p0.Y)));
+            det = (p1.X - p0.X) * (p2.Y - p0.Y) - (p2.X - p0.X) * (p1.Y - p0.Y);
+            if (Math.Abs(det) < 1e-6) return; // edge-on: nothing to see
+        }
+        double da = ((p1.D - p0.D) * (p2.Y - p0.Y) - (p2.D - p0.D) * (p1.Y - p0.Y)) / det;
+        double db = ((p1.X - p0.X) * (p2.D - p0.D) - (p2.X - p0.X) * (p1.D - p0.D)) / det;
+        double dc = p0.D - da * p0.X - db * p0.Y;
         using var path = new SKPath { FillType = SKPathFillType.EvenOdd };
         double minX = double.MaxValue, minY = double.MaxValue, maxX = double.MinValue, maxY = double.MinValue;
         foreach (var l in loops)
+        {
             for (int k = 0; k < l.Count; k++)
             {
-                var (x, y, _) = v.Project(l[k].X, l[k].Y, z);
+                var (x, y, _) = project(l[k]);
                 if (k == 0) path.MoveTo((float)x, (float)y); else path.LineTo((float)x, (float)y);
                 minX = Math.Min(minX, x); minY = Math.Min(minY, y); maxX = Math.Max(maxX, x); maxY = Math.Max(maxY, y);
             }
-        path.Close();
+            path.Close();
+        }
         int x0 = Math.Max(0, (int)Math.Floor(minX)), y0 = Math.Max(0, (int)Math.Floor(minY));
         int x1 = Math.Min(w - 1, (int)Math.Ceiling(maxX)), y1 = Math.Min(h - 1, (int)Math.Ceiling(maxY));
         if (x1 < x0 || y1 < y0) return;
@@ -260,16 +287,13 @@ public sealed class StackView : Control
         }
         var bytes = mask.Bytes;
         int stride = mask.RowBytes;
-        // Depth on a horizontal plane: from the screen row back to the model's y, then to depth.
-        double sinP = Math.Sin(v.Pitch), cosP = Math.Cos(v.Pitch), dz = z - v.Cz;
         for (int y = 0; y < bh; y++)
         {
-            double ry = ((y + y0 + 0.5 - v.H / 2) / v.Scale + dz * cosP) / sinP;
-            float d = (float)(ry * cosP + dz * sinP + 1e-3); // a hair in front of its own edges
             for (int x = 0; x < bw; x++)
             {
                 if (bytes[y * stride + x] < 128) continue;
                 int i = (y + y0) * w + x + x0;
+                float d = (float)(da * (x + x0 + 0.5) + db * (y + y0 + 0.5) + dc + 1e-3); // a hair in front of its own edges
                 if (d <= depth[i]) continue;
                 depth[i] = d;
                 px[i] = colour;

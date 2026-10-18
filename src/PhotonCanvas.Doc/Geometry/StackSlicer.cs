@@ -18,6 +18,23 @@ public enum SliceOutline
     Inner,
 }
 
+/// <summary>How the model is built from flat sheets.</summary>
+public enum SliceMethod
+{
+    /// <summary>Flat layers glued one on another: solid, stepped.</summary>
+    Stacked,
+    /// <summary>Upright sheets across X and across Y, slotted together where they cross (an egg crate).</summary>
+    EggCrate,
+    /// <summary>Upright fins round a central axis, slotted onto flat rings at a few heights.</summary>
+    Radial,
+}
+
+/// <summary>Where a flat part sits in the model: its outline's (u, v) map to Origin + u·U + v·V, its thickness along N.</summary>
+public readonly record struct Frame3(V3 Origin, V3 U, V3 V, V3 N)
+{
+    public V3 At(double u, double v, double s) => new(Origin.X + u * U.X + v * V.X + s * N.X, Origin.Y + u * U.Y + v * V.Y + s * N.Y, Origin.Z + u * U.Z + v * V.Z + s * N.Z);
+}
+
 /// <summary>Which way up the model stands while it's sliced.</summary>
 public enum SliceUp { Z, MinusZ, Y, MinusY, X, MinusX }
 
@@ -50,6 +67,17 @@ public sealed record SliceOptions
     public bool KeepJoined { get; init; } = true;
     /// <summary>The least overlap (mm²) two joined parts should have to glue them.</summary>
     public double MinJoinMm2 { get; init; } = 6;
+    public SliceMethod Method { get; init; } = SliceMethod.Stacked;
+    /// <summary>Egg crate: sheets across X (cut at even steps along X) and across Y.</summary>
+    public int SheetsX { get; init; } = 6;
+    public int SheetsY { get; init; } = 4;
+    /// <summary>Radial: fins round the axis, and rings at even heights.</summary>
+    public int Fins { get; init; } = 12;
+    public int Rings { get; init; } = 3;
+    /// <summary>Radial: the hole up the middle (for a dowel); fins start this far out.</summary>
+    public double CoreMm { get; init; } = 6;
+    /// <summary>Slots are the material's thickness plus this (mm), so the sheets slide together.</summary>
+    public double SlotFitMm { get; init; } = 0.1;
     /// <summary>Parts smaller than this (mm²), or thinner than <see cref="MinPartWidthMm"/>, are left out: slivers too small to cut or handle.</summary>
     public double MinPartMm2 { get; init; } = 1;
     public double MinPartWidthMm { get; init; } = 1;
@@ -58,6 +86,12 @@ public sealed record SliceOptions
 /// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
 public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, double LabelRoomMm, IReadOnlyList<IReadOnlyList<Vec2>> NextMarks)
 {
+    /// <summary>Where it sits in the model (for the 3D view).</summary>
+    public Frame3 Frame { get; init; }
+    /// <summary>Its name, marked on it ("X3", "Fin 2"); null = its slice number.</summary>
+    public string? Label { get; init; }
+    /// <summary>Small notes marked on it: beside each slot, the name of the sheet that goes in it.</summary>
+    public IReadOnlyList<(string Text, Vec2 At)> Notes { get; init; } = [];
     /// <summary>Not joined, through the slices, to anything resting on the bottom slice: it starts in mid-air with nothing under it (glue it on by eye).</summary>
     public bool Floating { get; init; }
 }
@@ -86,6 +120,7 @@ public static class StackSlicer
         if (mesh.Count == 0) throw new ArgumentException("The model has no triangles.", nameof(mesh));
         if (!(o.ThicknessMm > 0) || !(o.HeightMm > 0)) throw new ArgumentException("Thickness and height must be above zero.");
         var tris = Orient(mesh, o);
+        if (o.Method != SliceMethod.Stacked) return Sheets(tris, o, ct);
         double h = tris.Max(t => Math.Max(t.A.Z, Math.Max(t.B.Z, t.C.Z)));
         int n = Math.Max(1, (int)Math.Round(h / o.ThicknessMm));
         double slab = h / n;
@@ -197,11 +232,175 @@ public static class StackSlicer
                 var loops = Loops(part);
                 var (at, room) = Pole(loops);
                 var marks = next is null ? [] : MarksInside(next, loops, 0.6);
-                parts.Add(new SlicePart(i + 1, part, at, room, marks) { Floating = n > 1 && !Touches(i, k) });
+                parts.Add(new SlicePart(i + 1, part, at, room, marks)
+                {
+                    Floating = n > 1 && !Touches(i, k),
+                    Frame = new Frame3(new V3(0, 0, (i + 0.5) * o.ThicknessMm), new V3(1, 0, 0), new V3(0, 1, 0), new V3(0, 0, 1)),
+                });
             }
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
         return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined };
+    }
+
+    // ---- egg crate and radial ------------------------------------------------------------------
+
+    /// <summary>The model cut by a plane: its outline in the plane's own (u, v), thickness direction N.</summary>
+    static PathGeometry PlaneSection(IReadOnlyList<Tri> tris, Frame3 f)
+    {
+        V3 Map(V3 p)
+        {
+            double dx = p.X - f.Origin.X, dy = p.Y - f.Origin.Y, dz = p.Z - f.Origin.Z;
+            return new(dx * f.U.X + dy * f.U.Y + dz * f.U.Z, dx * f.V.X + dy * f.V.Y + dz * f.V.Z, dx * f.N.X + dy * f.N.Y + dz * f.N.Z);
+        }
+        return Section([.. tris.Select(t => new Tri(Map(t.A), Map(t.B), Map(t.C)))], 0);
+    }
+
+    /// <summary>Where a line across an outline (u = <paramref name="at"/>, or v = at when <paramref name="alongU"/>) is inside it: the spans, in order.</summary>
+    static List<(double From, double To)> Spans(PathGeometry outline, double at, bool alongU)
+    {
+        var hits = new List<double>();
+        foreach (var l in Loops(outline))
+            for (int i = 0; i < l.Count; i++)
+            {
+                var a = l[i];
+                var b = l[(i + 1) % l.Count];
+                double pa = alongU ? a.Y : a.X, pb = alongU ? b.Y : b.X;
+                if ((pa - at) * (pb - at) >= 0 && !(pa == at && pb != at)) continue;
+                double t = (at - pa) / (pb - pa);
+                hits.Add(alongU ? a.X + (b.X - a.X) * t : a.Y + (b.Y - a.Y) * t);
+            }
+        hits.Sort();
+        var o = new List<(double, double)>();
+        for (int i = 0; i + 1 < hits.Count; i += 2) if (hits[i + 1] - hits[i] > 1e-6) o.Add((hits[i], hits[i + 1]));
+        return o;
+    }
+
+    static PathGeometry Box(double u0, double v0, double u1, double v1) => PathGeometry.Rect(Math.Min(u0, u1), Math.Min(v0, v1), Math.Abs(u1 - u0), Math.Abs(v1 - v0));
+
+    /// <summary>A slot along a direction in a flat part: from <paramref name="a"/> to <paramref name="b"/>, <paramref name="width"/> wide.</summary>
+    static PathGeometry Slot(Vec2 a, Vec2 b, double width)
+    {
+        var d = b - a;
+        double len = Math.Max(1e-9, d.Length);
+        var n = new Vec2(-d.Y / len, d.X / len) * (width / 2);
+        return PathGeometry.Polyline([a + n, b + n, b - n, a - n], true);
+    }
+
+    sealed class Sheet(string label, Frame3 frame, PathGeometry outline)
+    {
+        public string Label = label;
+        public Frame3 Frame = frame;
+        public PathGeometry Outline = outline;
+        public readonly List<PathGeometry> Cuts = [];
+        public readonly List<(string, Vec2)> Notes = [];
+    }
+
+    /// <summary>Egg crate or radial: upright sheets slotted together.</summary>
+    static SliceStack Sheets(List<Tri> tris, SliceOptions o, CancellationToken ct)
+    {
+        double maxX = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), maxY = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
+        double maxZ = tris.Max(t => Math.Max(t.A.Z, Math.Max(t.B.Z, t.C.Z)));
+        double w = o.ThicknessMm + Math.Max(0, o.SlotFitMm);
+        var up = new V3(0, 0, -1); // v runs down the part, so the model's top is at the top of the part as laid on the bed
+        var sheets = new List<Sheet>();
+        if (o.Method == SliceMethod.EggCrate)
+        {
+            int nx = Math.Clamp(o.SheetsX, 1, 60), ny = Math.Clamp(o.SheetsY, 1, 60);
+            // Evenly inside the model, not on its very ends.
+            var xs = Enumerable.Range(0, nx).Select(i => maxX * (i + 0.5) / nx).ToList();
+            var ys = Enumerable.Range(0, ny).Select(j => maxY * (j + 0.5) / ny).ToList();
+            var xSheets = xs.Select((x, i) => new Sheet($"X{i + 1}", new Frame3(new V3(x, 0, 0), new V3(0, 1, 0), up, new V3(1, 0, 0)), PathGeometry.Empty)).ToList();
+            var ySheets = ys.Select((y, j) => new Sheet($"Y{j + 1}", new Frame3(new V3(0, y, 0), new V3(1, 0, 0), up, new V3(0, 1, 0)), PathGeometry.Empty)).ToList();
+            foreach (var s in xSheets.Concat(ySheets)) { ct.ThrowIfCancellationRequested(); s.Outline = PlaneSection(tris, s.Frame); }
+            // Each crossing: the model's spans up the line where the two meet (the same for both sheets).
+            // The X sheet is slotted from the top down to half-way, the Y sheet from the bottom up.
+            for (int i = 0; i < nx; i++)
+                for (int j = 0; j < ny; j++)
+                {
+                    var xs_ = xSheets[i];
+                    var ys_ = ySheets[j];
+                    foreach (var (v0, v1) in Spans(xs_.Outline, ys[j], alongU: false))
+                    {
+                        if (v1 - v0 < 2 * w + 2) continue; // too short to slot
+                        double mid = (v0 + v1) / 2; // v is downwards: v0 is the top
+                        xs_.Cuts.Add(Box(ys[j] - w / 2, v0 - 3 * w, ys[j] + w / 2, mid));
+                        ys_.Cuts.Add(Box(xs[i] - w / 2, mid, xs[i] + w / 2, v1 + 3 * w));
+                        xs_.Notes.Add((ys_.Label, new Vec2(ys[j], mid + 2.5)));
+                        ys_.Notes.Add((xs_.Label, new Vec2(xs[i], mid - 2.5)));
+                    }
+                }
+            sheets.AddRange(xSheets);
+            sheets.AddRange(ySheets);
+        }
+        else
+        {
+            int fins = Math.Clamp(o.Fins, 3, 72), rings = Math.Clamp(o.Rings, 1, 20);
+            double core = Math.Max(0, o.CoreMm) / 2;
+            var c = new V3(maxX / 2, maxY / 2, 0);
+            var finSheets = new List<(Sheet S, double Angle)>();
+            for (int k = 0; k < fins; k++)
+            {
+                double a = 2 * Math.PI * k / fins, ca = Math.Cos(a), sa = Math.Sin(a);
+                var f = new Sheet($"Fin {k + 1}", new Frame3(c, new V3(ca, sa, 0), up, new V3(-sa, ca, 0)), PathGeometry.Empty);
+                ct.ThrowIfCancellationRequested();
+                // Only the half on this side of the axis, from the core out.
+                var full = PlaneSection(tris, f.Frame);
+                f.Outline = full.IsEmpty ? full : ShapeGeometry.Boolean(full, Box(core, -maxZ - 10, Math.Max(maxX, maxY) * 2, maxZ + 10), BoolOp.Intersect);
+                finSheets.Add((f, a));
+            }
+            var ringSheets = new List<(Sheet S, double Z)>();
+            for (int r = 0; r < rings; r++)
+            {
+                double z = maxZ * (r + 1) / (rings + 1);
+                var ring = new Sheet($"Ring {r + 1}", new Frame3(new V3(0, 0, z), new V3(1, 0, 0), new V3(0, 1, 0), new V3(0, 0, 1)), PathGeometry.Empty);
+                ring.Outline = Section(tris, z);
+                if (core > 0 && !ring.Outline.IsEmpty) ring.Cuts.Add(PathGeometry.Ellipse(c.X, c.Y, core, core));
+                ringSheets.Add((ring, z));
+            }
+            // Each fin meets each ring along a line out from the axis: the fin is slotted from its inner
+            // edge out to half-way, the ring from its outer edge in.
+            foreach (var (fin, a) in finSheets)
+                foreach (var (ring, z) in ringSheets)
+                    foreach (var (r0, r1) in Spans(fin.Outline, -z, alongU: true))
+                    {
+                        if (r1 - r0 < 2 * w + 2) continue;
+                        double mid = (r0 + r1) / 2;
+                        fin.Cuts.Add(Box(r0 - 3 * w, -z - w / 2, mid, -z + w / 2));
+                        var dir = new Vec2(Math.Cos(a), Math.Sin(a));
+                        var centre = new Vec2(c.X, c.Y);
+                        ring.Cuts.Add(Slot(centre + dir * mid, centre + dir * (r1 + 3 * w), w));
+                        fin.Notes.Add((ring.Label, new Vec2(mid + 3, -z - w / 2 - 2)));
+                        ring.Notes.Add((fin.Label, centre + dir * (mid - 3)));
+                    }
+            sheets.AddRange(finSheets.Select(f => f.S));
+            sheets.AddRange(ringSheets.Select(r => r.S));
+        }
+
+        var parts = new List<SlicePart>();
+        int index = 0, leftOut = 0;
+        foreach (var s in sheets)
+        {
+            index++;
+            if (s.Outline.IsEmpty) continue;
+            var cut = s.Cuts.Count == 0 ? s.Outline : ShapeGeometry.Boolean(s.Outline, ShapeGeometry.Union(s.Cuts), BoolOp.Subtract);
+            var islands = Islands(cut);
+            for (int k = 0; k < islands.Count; k++)
+            {
+                var island = islands[k];
+                var loops = Loops(island);
+                if (Math.Abs(loops.Sum(Geom.SignedArea)) < Math.Max(o.MinPartMm2, 4)) { leftOut++; continue; }
+                var (at, room) = Pole(loops);
+                var notes = s.Notes.Where(n => InsideEvenOdd(loops, n.Item2)).Select(n => (n.Item1, n.Item2)).ToList();
+                parts.Add(new SlicePart(index, island, at, room, [])
+                {
+                    Frame = s.Frame,
+                    Label = islands.Count > 1 ? $"{s.Label}{(char)('a' + Math.Min(k, 25))}" : s.Label,
+                    Notes = notes,
+                });
+            }
+        }
+        return new SliceStack(parts, sheets.Count, maxZ, maxX, maxY, [], []) { LeftOut = leftOut };
     }
 
     /// <summary>Area covered (outlines minus holes), mm².</summary>
@@ -440,8 +639,11 @@ public static class StackLayout
     /// marked on a Score layer, packed in number order. Parts that don't fit go on new pages
     /// ("Slices 2", …). Returns the design (showing the first page used) and how many beds it takes.
     /// </summary>
-    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3)
+    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices")
     {
+        title = string.IsNullOrWhiteSpace(title) ? "Slices" : title.Trim();
+        // Never on top of what's already there: a page of their own if this one has anything on it.
+        if (s.Shapes.Count > 0) s = Pages.Add(s, title);
         int firstPage = s.PageIndex;
         int sheets = 1;
         (Layer Cut, Layer Marks) Layers(ref DocState st)
@@ -473,22 +675,31 @@ public static class StackLayout
             if (y + box.Height + gapMm > machine.FieldH)
             {
                 // A new bed-full on its own page.
-                s = Pages.Add(s, $"Slices {++sheets}");
+                s = Pages.Add(s, $"{title} {++sheets}");
                 (cutLayer, markLayer) = Layers(ref s);
                 x = gapMm; y = gapMm; rowH = 0;
             }
             var move = Affine.Translate(x - box.MinX, y - box.MinY);
-            var shapes = new List<Shape> { new PathShape { Name = $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
+            var shapes = new List<Shape> { new PathShape { Name = part.Label is { } nm ? nm : $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
             if (marks && part.NextMarks.Count > 0)
                 shapes.Add(new PathShape { Name = $"Where slice {part.Slice + 1} goes", LayerId = markLayer.Id, Geometry = new PathGeometry(part.NextMarks.SelectMany(m => PathGeometry.Polyline(m, false).Subpaths)).Transform(move) });
             if (numbers && part.LabelRoomMm > 0.6)
             {
                 double size = Math.Clamp(part.LabelRoomMm * 0.9, 1.2, 6);
-                var text = TextShape.Create($"{part.Slice}", new TextStyle("Arial", size), markLayer.Id, Affine.Identity);
+                var text = TextShape.Create(part.Label ?? $"{part.Slice}", new TextStyle("Arial", size), markLayer.Id, Affine.Identity);
                 var tb = text.Bounds;
                 var at = move.Apply(part.LabelAt);
                 shapes.Add(text.With(transform: Affine.Translate(at.X - tb.Center.X, at.Y - tb.Center.Y)));
             }
+            if (numbers)
+                foreach (var (note, where) in part.Notes)
+                {
+                    // Beside each slot: the sheet that goes in it.
+                    var t = TextShape.Create(note, new TextStyle("Arial", 2), markLayer.Id, Affine.Identity);
+                    var tb = t.Bounds;
+                    var at = move.Apply(where);
+                    shapes.Add(t.With(transform: Affine.Translate(at.X - tb.Center.X, at.Y - tb.Center.Y)));
+                }
             s = Ops.AddShapes(s, shapes);
             if (shapes.Count > 1) s = Ops.Group(s, shapes.Select(sh => sh.Id).ToHashSet()).Item1;
             x += box.Width + gapMm;

@@ -86,6 +86,9 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Stacked slices: shaping the edges (chamfers, fillets) by engraving them down in steps, once the etch depth per setting is measured
 - [ ] Stacked slices: open STEP (.stp, .step) CAD files as well as STL and OBJ (needs a CAD geometry engine to turn the exact surfaces into triangles)
 - [x] Stacked slices: a model browser with shaded thumbnails of every STL and OBJ in a folder (Windows shows none for them)
+- [x] Egg crate: upright sheets across the model both ways, slotted half-way where they cross; each sheet named and every slot marked with the sheet that goes in it; slot fit setting
+- [x] Radial: fins round an upright axis slotted onto flat rings, with an optional centre hole for a dowel; preview shows the sheets standing in place
+- [x] Slices go on pages of their own (named after the model) when the current page already has something on it
 - [x] Curved surface: measure it with the pointer and the close-up camera (up to 40 × 40 points, bad points found and left out), or type in a cylinder or slatted drum; fit as any shape, cylinder, drum of flat slats or slanted plane; 3D preview; marked in 0.2 mm height bands as xTool Studio does (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)
@@ -188,3 +191,4 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Curved surface: calibrate the pointer on a flat board (are the photos dark enough to see the dot? xTool lowers the camera exposure); measure the slatted drum at 20 × 20; mark a test on it; check the job is accepted as CURVE_PROCESS.
 - Read the squares: on a real burned test grid.
 - Etch rate: a 3 mm board, 30 circles; does the through-hole show clearly enough to pick the first one?
+- Egg crate / radial: cut a small set in 3 mm basswood; do the slots slide together at 0.1 mm fit with the cut layer's kerf?

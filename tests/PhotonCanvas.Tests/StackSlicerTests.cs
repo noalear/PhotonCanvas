@@ -109,6 +109,13 @@ public class StackSlicerTests
         var cuts = s.Shapes.OfType<PathShape>().Where(p => p.Name.StartsWith("Slice ") && p is not TextShape).ToList();
         Assert.All(cuts, c => Assert.True(c.Bounds.MinX >= 0 && c.Bounds.MaxX <= 220 && c.Bounds.MaxY <= 220));
         Assert.All(cuts, a => Assert.All(cuts.Where(b => b != a), b => Assert.False(a.Bounds.Intersects(b.Bounds))));
+        // A page with something on it already: the slices get pages of their own, named after the model.
+        var busy = DocState.New();
+        busy = Ops.AddShapes(busy, [new PathShape { LayerId = busy.Layers[0].Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }]);
+        var (s2, _) = StackLayout.Place(busy, stack, MachineProfile.F2Ultra, numbers: true, marks: true, title: "drum");
+        Assert.Equal(["Page 1", "drum", "drum 2", "drum 3", "drum 4", "drum 5"], Pages.Names(s2));
+        Assert.Equal(1, s2.PageIndex);
+        Assert.Single(Pages.SwitchTo(s2, 0).Shapes);
     }
 
     [Fact]
@@ -205,5 +212,60 @@ public class StackSlicerTests
         Assert.Equal(8, b.Width, 1);
         Assert.Equal(2, b.Height, 1);
         Assert.Equal((4.0, 4.0, 10.0), StackSlicer.NaturalSize(Cylinder(2, 10), SliceUp.Z, 0) is var n ? (Math.Round(n.X, 1), Math.Round(n.Y, 1), Math.Round(n.Z, 1)) : default);
+    }
+
+    static bool In(SlicePart p, Vec2 at) => p.Outline.Flatten(0.02).Where(f => f.Closed).Count(f => Geom.Inside(f.Points, at)) % 2 == 1;
+
+    [Fact]
+    public void EggCrateSheetsSlotTogether()
+    {
+        // A 40 × 30 × 20 block, 3 sheets across X and 2 across Y.
+        var stack = StackSlicer.Slice(Box(0, 0, 0, 40, 30, 20), new SliceOptions { Method = SliceMethod.EggCrate, ThicknessMm = 3, HeightMm = 20, SheetsX = 3, SheetsY = 2, SlotFitMm = 0.1 });
+        var xs = stack.Parts.Where(p => p.Label!.StartsWith('X')).ToList();
+        var ys = stack.Parts.Where(p => p.Label!.StartsWith('Y')).ToList();
+        Assert.Equal(3, xs.Count);
+        Assert.Equal(2, ys.Count);
+        // X sheets: 30 wide (the model's depth), 20 tall; Y sheets 40 wide.
+        Assert.Equal(30, xs[0].Outline.Bounds().Width, 1);
+        Assert.Equal(40, ys[0].Outline.Bounds().Width, 1);
+        // Every crossing: the X sheet keeps only the bottom half there, the Y sheet only the top half (v runs down: top is −20).
+        double[] xAt = [40.0 / 6, 20, 40 - 40.0 / 6], yAt = [7.5, 22.5];
+        foreach (var x in xs)
+            foreach (var y in yAt)
+            {
+                Assert.False(In(x, new Vec2(y, -18)));
+                Assert.True(In(x, new Vec2(y, -2)));
+            }
+        foreach (var y in ys)
+            foreach (var x in xAt)
+            {
+                Assert.True(In(y, new Vec2(x, -18)));
+                Assert.False(In(y, new Vec2(x, -2)));
+            }
+        // Each slot says what goes in it.
+        Assert.All(xs, x => Assert.Equal(["Y1", "Y2"], x.Notes.Select(n => n.Text).Order()));
+        Assert.All(ys, y => Assert.Equal(3, y.Notes.Count));
+    }
+
+    [Fact]
+    public void RadialFinsSlotOntoRings()
+    {
+        // A 40 mm round column 30 mm tall: 8 fins, 2 rings, a 6 mm hole up the middle.
+        var stack = StackSlicer.Slice(Cylinder(20, 30), new SliceOptions { Method = SliceMethod.Radial, ThicknessMm = 3, HeightMm = 30, Fins = 8, Rings = 2, CoreMm = 6 });
+        var fins = stack.Parts.Where(p => p.Label!.StartsWith("Fin")).ToList();
+        var rings = stack.Parts.Where(p => p.Label!.StartsWith("Ring")).ToList();
+        Assert.Equal(8, fins.Count);
+        Assert.Equal(2, rings.Count);
+        // A fin runs from the core (3 mm out) to the edge (20 mm), and is notched from its inner edge at each ring (heights 10 and 20).
+        var b = fins[0].Outline.Bounds();
+        Assert.Equal(3, b.MinX, 1);
+        Assert.Equal(20, b.MaxX, 0);
+        Assert.False(In(fins[0], new Vec2(5, -10)));
+        Assert.True(In(fins[0], new Vec2(18, -10)));
+        // Rings: the centre hole, and a slot from the outer edge in at each fin (so 1 + 8 holes and notches in all).
+        Assert.False(In(rings[0], new Vec2(20, 20)));            // centre hole (axis at the model's middle)
+        Assert.False(In(rings[0], new Vec2(20 + 18, 20)));       // fin 1's slot near the edge
+        Assert.True(In(rings[0], new Vec2(20 + 5, 20)));         // whole near the middle
+        Assert.Equal(8, rings[0].Notes.Count);
     }
 }
