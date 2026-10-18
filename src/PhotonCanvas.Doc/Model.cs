@@ -58,6 +58,8 @@ public sealed record DepthSlices
     public double CleanupLinesPerCm { get; init; } = 300;
     /// <summary>Cleanup covers the whole picture (else only the slice just done).</summary>
     public bool CleanupWhole { get; init; } = true;
+    /// <summary>Deepest slice first (smaller areas first): a smoother result on some materials ("noise reduction").</summary>
+    public bool DeepestFirst { get; init; }
 }
 
 /// <summary>
@@ -115,8 +117,18 @@ public sealed record Layer
     public double LeadInMm { get; init; }
     /// <summary>Fill: scan-line direction in degrees (0 = left–right).</summary>
     public double FillAngleDeg { get; init; }
-    /// <summary>Fill: add a second pass at 90° to the first.</summary>
+    /// <summary>Fill: add a second pass at <see cref="CrossAngleDeg"/> to the first.</summary>
     public bool Crosshatch { get; init; }
+    /// <summary>Fill crosshatch: the second pass's angle from the first (degrees).</summary>
+    public double CrossAngleDeg { get; init; } = 90;
+    /// <summary>Fill lines: pause before each line (ms), against heat build-up. 0 = none.</summary>
+    public int LineDwellMs { get; init; }
+    /// <summary>Fill: trace each shape's outline after filling it, for clean edges.</summary>
+    public bool OutlineAfter { get; init; }
+    /// <summary>Fill lines: scan from the other side (bottom to top).</summary>
+    public bool ScanReverse { get; init; }
+    /// <summary>Cut: tabs are cut at this power (%) instead of left uncut: thin bridges that snap out easily. 0 = uncut tabs.</summary>
+    public double TabPowerPct { get; init; }
     /// <summary>Fill: lines or stepped-in outlines.</summary>
     public FillStyle FillStyle { get; init; }
     /// <summary>Fill lines: burn in both directions (off: always the same way, back unlit).</summary>

@@ -36,6 +36,11 @@ public sealed record ProcessSettings
     public double WobbleSpacingMm { get; init; } = 0.015;
     public FillStyle FillStyle { get; init; }
     public bool Bidirectional { get; init; } = true;
+    public double CrossAngleDeg { get; init; } = 90;
+    public int LineDwellMs { get; init; }
+    public bool OutlineAfter { get; init; }
+    public bool ScanReverse { get; init; }
+    public double TabPowerPct { get; init; }
     public bool FillTogether { get; init; }
     public double PerforateMm { get; init; }
     public double PerforateGapMm { get; init; } = 1;
@@ -59,6 +64,7 @@ public sealed record ProcessSettings
         HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
+        CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -71,6 +77,7 @@ public sealed record ProcessSettings
         HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
+        CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>

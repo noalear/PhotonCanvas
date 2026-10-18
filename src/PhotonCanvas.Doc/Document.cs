@@ -184,6 +184,13 @@ public sealed class Document
         Changed?.Invoke(false);
     }
 
+    /// <summary>Mark as having unsaved changes (a design restored after a crash).</summary>
+    public void MarkDirty()
+    {
+        Dirty = true;
+        Changed?.Invoke(false);
+    }
+
     public void MarkSaved(string path)
     {
         FilePath = path;

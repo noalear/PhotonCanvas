@@ -18,7 +18,7 @@ public sealed class MaterialTestWindow : Window
     static readonly TestParam[] Params = [TestParam.Power, TestParam.Speed, TestParam.LineInterval, TestParam.Focus, TestParam.Frequency, TestParam.PulseWidth, TestParam.Passes];
     static readonly string[] ParamNames = ["Power %", "Speed mm/s", "Line gap mm", "Focus mm", "Frequency kHz (MOPA)", "Pulse width ns (MOPA)", "Passes"];
 
-    readonly ComboBox _preset = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Power × speed", "Focus: find the sharpest height", "Line spacing: how close the fill lines go", "Any two settings" } };
+    readonly ComboBox _preset = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Power × speed", "Focus: find the sharpest height", "Line spacing: how close the fill lines go", "Any two settings", "One square at chosen settings" } };
     readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Engrave (filled squares)", "Score (outlines)", "Cut (outlines)" }, SelectedIndex = 0 };
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Blue diode (wood, leather, acrylic, paper…)", "MOPA (metals, some plastics)" }, SelectedIndex = 0 };
     readonly ComboBox _across = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames }, _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = ParamNames };
@@ -148,6 +148,7 @@ public sealed class MaterialTestWindow : Window
                 1 => "Sparse lines at different focus heights: the thinnest, sharpest lines are in focus. Use that offset as the layer's focus offset, or move the head by it.",
                 2 => "Fills with the lines closer and closer together. Look for where the lines just merge into an even tone: closer than that only adds heat and time.",
                 3 => "Pick any two settings to sweep, one across and one down; the rest stay as set below.",
+                4 => "A single square at the settings below, with its settings written next to it: to check one idea quickly.",
                 _ => "Not sure what power and speed to use? Burn this on a scrap of your material: power goes up left to right, speed down top to bottom. Pick the square you like and use its numbers.",
             };
             _axisRows.IsEnabled = true;
@@ -160,6 +161,7 @@ public sealed class MaterialTestWindow : Window
             _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == o.PulseWidthNs);
             if (_pulse.SelectedIndex < 0) _pulse.SelectedIndex = _machine.Mopa.Count - 1;
             if (_preset.SelectedIndex is 1 or 2) _mode.SelectedIndex = 0;
+            if (_preset.SelectedIndex == 4) { Set(_aSteps, 1); Set(_dSteps, 1); }
         }
         finally { _setting = false; }
         Update();

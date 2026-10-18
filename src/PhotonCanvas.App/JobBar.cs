@@ -65,6 +65,7 @@ public sealed class JobBar : UserControl
 
     // framing
     readonly SplitButton _frame = new() { Height = 54, Width = 96 };
+    readonly NumericUpDown _framePower = UiKit.Number(0.5m, (decimal)PhotonCanvas.Core.Job.FramePowerMax, 0.5m, "0.#"), _frameSpeed = UiKit.Number(100, 20000, 500, "0");
     readonly RadioButton _frameRect = new() { Content = "Rectangle around everything", GroupName = "frame" };
     readonly RadioButton _frameOutline = new() { Content = "Snug outline (round or angled designs)", GroupName = "frame" };
     bool _frameConfirmed, _frameUpdating, _frameDirty;
@@ -126,6 +127,10 @@ public sealed class JobBar : UserControl
             },
         };
         (_settings.FrameOutline ? _frameOutline : _frameRect).IsChecked = true;
+        _framePower.Value = (decimal)Math.Clamp(_settings.FramePowerPct, 0.5, PhotonCanvas.Core.Job.FramePowerMax);
+        _frameSpeed.Value = (decimal)Math.Clamp(_settings.FrameSpeedMmS, 100, 20000);
+        _framePower.ValueChanged += (_, _) => { _settings.FramePowerPct = (double)(_framePower.Value ?? 6.4m); _settings.Save(); _ = UpdateFrame(); };
+        _frameSpeed.ValueChanged += (_, _) => { _settings.FrameSpeedMmS = (double)(_frameSpeed.Value ?? 16000); _settings.Save(); _ = UpdateFrame(); };
         _frameRect.IsCheckedChanged += (_, _) => FrameShapeChanged();
         _frame.Flyout = new Flyout
         {
@@ -137,7 +142,9 @@ public sealed class JobBar : UserControl
                 {
                     new TextBlock { Text = "WHAT TO TRACE", Classes = { "h" } },
                     _frameRect, _frameOutline,
-                    Hint("The head traces around the job with a faint laser dot, over and over, until you stop it. Move the design and the frame follows."),
+                    new TextBlock { Text = "TRACE", Classes = { "h" }, Margin = new(0, 6, 0, 0) },
+                    UiKit.Row(UiKit.Field("Power %", _framePower), UiKit.Field("mm/s", _frameSpeed)),
+                    Hint("The head traces around the job with a faint laser dot, over and over, until you stop it. Move the design and the frame follows. Keep the power low: it's the real laser."),
                 },
             },
         };
@@ -286,6 +293,20 @@ public sealed class JobBar : UserControl
             _canvas.SectionArea = value?.Clip;
             Schedule();
         }
+    }
+
+    /// <summary>The job as built now (null when it can't be built).</summary>
+    public BuiltJob? CurrentJob => _job;
+
+    /// <summary>A short sound when a job finishes (Windows; elsewhere silent).</summary>
+    static void Chime()
+    {
+        _ = Task.Run(() =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            try { Console.Beep(880, 140); Console.Beep(1320, 220); }
+            catch (Exception e) when (e is IOException or PlatformNotSupportedException or InvalidOperationException) { }
+        });
     }
 
     /// <summary>The work mode or attachment changed: build again.</summary>
@@ -453,6 +474,11 @@ public sealed class JobBar : UserControl
                     bool finished = mode is "P_WORK_DONE" or "P_FINISH";
                     _sendState = finished ? $"Finished in {Clock(took)}." : "The job ended.";
                     if (finished) LearnTiming(took);
+                    if (_sentJob is { } sj)
+                    {
+                        JobHistory.Add(new JobRecord(DateTime.Now, _sentFrom is { } f ? Path.GetFileNameWithoutExtension(f) : "Untitled", sj.EstimateS, took, finished, sj.LayerTimes.Count, sj.Bounds.Width, sj.Bounds.Height));
+                        if (finished) Chime();
+                    }
                     if (finished && _sentJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
                 }
                 _follow.Stop();
@@ -618,7 +644,7 @@ public sealed class JobBar : UserControl
         ShowCaption();
         try
         {
-            await _machine.StartFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape));
+            await _machine.StartFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape, _settings.FramePowerPct, _settings.FrameSpeedMmS));
             _sendState = "Framing. Move the design to adjust; click Stop framing when it's where you want it.";
         }
         catch (DeviceException e)
@@ -640,7 +666,7 @@ public sealed class JobBar : UserControl
             {
                 _frameDirty = false;
                 if (_job is not { } job) break;
-                try { await _machine.UpdateFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape)); }
+                try { await _machine.UpdateFrameAsync(JobBuilder.FrameGcode(job, CurrentFrameShape, _settings.FramePowerPct, _settings.FrameSpeedMmS)); }
                 catch (DeviceException e) { _sendState = $"Couldn't move the frame: {e.Message}"; ShowCaption(); break; }
             } while (_frameDirty && _machine.IsFraming);
         }

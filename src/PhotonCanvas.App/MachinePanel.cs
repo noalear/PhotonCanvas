@@ -407,6 +407,21 @@ public sealed class MachinePanel : UserControl
     /// <summary>Machine mode changed (P_IDLE, P_WORK, P_WORKING, P_PAUSE…). On the UI thread.</summary>
     public event Action<string>? ModeChanged;
 
+    /// <summary>Home the Z axis (the head goes all the way up and finds its zero). Returns an error message, or null.</summary>
+    public async Task<string?> HomeZAsync()
+    {
+        if (_client is not { } c) return "Not connected.";
+        if (Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "")) return $"The machine is busy ({Describe(Mode)}).";
+        Log("Homing the Z axis.");
+        try
+        {
+            double z = await c.HomeZAsync();
+            ShowStatus("P_IDLE", z - _machine.ZOffset);
+            return null;
+        }
+        catch (DeviceException e) { Log($"Z homing: {e.Message}"); return e.Message; }
+    }
+
     /// <summary>Run one command line the user typed or chose (console, macros). Returns the reply, or throws <see cref="DeviceException"/>.</summary>
     public async Task<string> SendCommandAsync(string command)
     {

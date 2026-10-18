@@ -154,8 +154,11 @@ public partial class MainWindow : Window
                 _settings.Save();
                 ApplyEquipment();
             }
+            if (ConnectOnOpen) await OfferRecovery();
             if (ConnectOnOpen) _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
+            _autosave.Tick += (_, _) => Autosave();
+            if (ConnectOnOpen) _autosave.Start();
         };
         Closing += OnClosing;
         UpdateChrome();
@@ -371,6 +374,7 @@ public partial class MainWindow : Window
                 AsyncItem("Save", () => Save(false), "Ctrl+S"),
                 AsyncItem("Save as…", () => Save(true), "Ctrl+Shift+S"),
                 AsyncItem("Save as template…", SaveAsTemplate),
+                AsyncItem("Earlier versions…", ShowVersions),
                 new Separator(),
                 AsyncItem("Import…", () => ImportAny(byColour: false), "Ctrl+I"),
                 AsyncItem("Import, one layer per colour…", () => ImportAny(byColour: true), "Ctrl+Shift+I"),
@@ -378,6 +382,9 @@ public partial class MainWindow : Window
                 new Separator(),
                 AsyncItem("Export job package (.xf)…", () => _job.Export(xf: true)),
                 AsyncItem("Export G-code (.gcode)…", () => _job.Export(xf: false)),
+                AsyncItem("Export design as SVG…", () => ExportDesign("svg")),
+                AsyncItem("Export design as DXF…", () => ExportDesign("dxf")),
+                AsyncItem("Export design as PNG…", () => ExportDesign("png")),
                 new Separator(),
                 AsyncItem("Settings…", () => ShowSettings("Machine")),
                 AsyncItem("Keyboard shortcuts…", ShowHotkeys),
@@ -522,6 +529,7 @@ public partial class MainWindow : Window
         var pclip = picture.Group("Shape");
         pclip.Large("Clip to shape", "IcIntersect", ClipPicture, "Select a picture and a closed shape: only the part of the picture inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
         pclip.Small("Remove clip", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove clip", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Show and engrave the whole picture again", () => SelectedPicture() is { Clip: not null });
+        pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
 
@@ -551,6 +559,7 @@ public partial class MainWindow : Window
         job.Large("Ship It", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
         job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
+        job.Small("Preview run", "IcPreview", () => { if (_job.CurrentJob is { } bj) new RunPreviewWindow(bj, Canvas).Show(this); }, "Play the job back on the work area, sped up: what's marked when", () => _job.CurrentJob is not null);
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
@@ -616,6 +625,14 @@ public partial class MainWindow : Window
             [
                 new("Connection keys…", "The one-time setup that lets this program talk to the machine.", async () => await _machine.SetUpKeys()),
                 new("Calibrate camera…", "Line the camera picture up with where the laser marks (once per material height).", _machine.CalibrateAsync),
+            ]),
+            ("Tools",
+            [
+                new("Home the Z axis", "Send the head up to find its zero again (if the focus height seems off).", HomeZ),
+                new("Job history…", "Every job run from here: when, which design, how long.", () => new JobHistoryWindow().ShowDialog(this)),
+                new("G-code console…", "Send commands straight to the machine, and keep macros (advanced).", () => { ShowConsole(); return Task.CompletedTask; }),
+                new("Back up settings…", "Save your settings, material library, shapes and templates in one file.", BackupSettings),
+                new("Restore settings…", "Bring back a backup (replaces the current settings, library, shapes and templates).", RestoreSettings),
             ]),
             ("Help",
             [
@@ -761,6 +778,173 @@ public partial class MainWindow : Window
         Canvas.Machine = WorkModes.Area(_settings);
         _job.Refresh();
         _ribbon.Refresh();
+    }
+
+    // ---- autosave, versions, export, backup --------------------------------------------
+
+    readonly DispatcherTimer _autosave = new() { Interval = TimeSpan.FromMinutes(2) };
+    static string AutosaveDir => Path.Combine(AppIdentity.DataDir, "autosave");
+    static string AutosaveFile => Path.Combine(AutosaveDir, "unsaved" + DocFile.Extension);
+    static string AutosaveFrom => Path.Combine(AutosaveDir, "from.txt");
+
+    /// <summary>Every two minutes, unsaved changes are kept aside, in case the program or the computer stops.</summary>
+    void Autosave()
+    {
+        if (!_doc.Dirty) return;
+        try
+        {
+            Directory.CreateDirectory(AutosaveDir);
+            DocFile.Save(_doc.State, AutosaveFile);
+            File.WriteAllText(AutosaveFrom, _doc.FilePath ?? "");
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
+    }
+
+    static void ClearAutosave()
+    {
+        try
+        {
+            if (File.Exists(AutosaveFile)) File.Delete(AutosaveFile);
+            if (File.Exists(AutosaveFrom)) File.Delete(AutosaveFrom);
+        }
+        catch (IOException) { }
+    }
+
+    /// <summary>A design was left unsaved when the program last stopped: offer it back.</summary>
+    async Task OfferRecovery()
+    {
+        if (!File.Exists(AutosaveFile)) return;
+        var from = File.Exists(AutosaveFrom) ? File.ReadAllText(AutosaveFrom).Trim() : "";
+        string name = from.Length > 0 ? Path.GetFileName(from) : "an unsaved design";
+        var when = File.GetLastWriteTime(AutosaveFile);
+        if (await Dialogs.Confirm(this, "Bring back unsaved work?",
+                $"{AppIdentity.ProductName} stopped without saving changes to {name}. A copy from {when:g} was kept.\n\nOpen it? (Save it to keep it.)", "Open the copy", "Discard it"))
+        {
+            try
+            {
+                _doc.Reset(DocFile.Load(AutosaveFile), from.Length > 0 ? from : null);
+                _doc.MarkDirty();
+                _layers.Activate(_doc.ActiveLayer);
+                Canvas.FitField();
+                StatusText.Text = "Unsaved work brought back: save it to keep it.";
+                return;
+            }
+            catch (Exception e) when (e is IOException or FormatException) { await Dialogs.Message(this, "Couldn't open the copy", e.Message); }
+        }
+        ClearAutosave();
+    }
+
+    async Task ShowVersions()
+    {
+        if (_doc.FilePath is not { } path) { await Dialogs.Message(this, "Earlier versions", "Save the design first: a copy is kept each time you save over it."); return; }
+        var w = new VersionsWindow(path);
+        await w.ShowDialog(this);
+        if (w.Chosen is not { } v || !await ConfirmDiscard()) return;
+        _doc.Reset(DocFile.Load(v), null);
+        _layers.Activate(_doc.ActiveLayer);
+        StatusText.Text = $"Opened the version from {Path.GetFileNameWithoutExtension(v)} as a new design.";
+    }
+
+    async Task ExportDesign(string kind)
+    {
+        var baseName = _doc.FilePath is { } p ? Path.GetFileNameWithoutExtension(p) : "design";
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = $"Export design as {kind.ToUpperInvariant()}",
+            DefaultExtension = kind,
+            SuggestedFileName = $"{baseName}.{kind}",
+            FileTypeChoices = [new FilePickerFileType(kind.ToUpperInvariant()) { Patterns = [$"*.{kind}"] }],
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+        var state = _doc.State;
+        switch (kind)
+        {
+            case "svg": await File.WriteAllTextAsync(path, Doc.Export.DesignExport.Svg(state)); break;
+            case "dxf": await File.WriteAllTextAsync(path, Doc.Export.DesignExport.Dxf(state)); break;
+            default: await File.WriteAllBytesAsync(path, await Task.Run(() => Doc.Export.DesignExport.Png(state, 300))); break;
+        }
+        StatusText.Text = $"Exported {Path.GetFileName(path)}.";
+    }
+
+    async Task ShapesToPicture()
+    {
+        var paths = SelectedPaths();
+        if (paths.Count == 0) return;
+        var input = await Dialogs.Prompt(this, "Shapes to picture", "Resolution (dpi)", "300");
+        if (input is null || !double.TryParse(input, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var dpi) || dpi < 25 || dpi > 2540) return;
+        var area = _doc.State.Bounds(paths.Select(p => p.Id));
+        var png = await Task.Run(() => Doc.Export.DesignExport.ShapesToPng(paths, area, dpi));
+        var src = ImageSource.FromEncoded(png);
+        var state = _doc.State;
+        var layer = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Image && l.Visible && !l.Locked);
+        if (layer is null)
+        {
+            layer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = "Pictures" };
+            state = Ops.AddLayer(state, layer);
+        }
+        var pic = new ImageShape { Name = "Shapes as a picture", LayerId = layer.Id, Source = src, SizeMm = new Vec2(area.Width, area.Height), Transform = Affine.Translate(area.MinX, area.MinY) };
+        _doc.Commit("Shapes to picture", Ops.AddShapes(state, [pic]), [pic.Id]);
+    }
+
+    async Task HomeZ()
+    {
+        if (!await Dialogs.Confirm(this, "Home the Z axis?", "The head moves all the way up to find its zero, then you set the focus again (or auto-focus). Keep hands clear of the head.", "Home it", "Cancel")) return;
+        StatusText.Text = await _machine.HomeZAsync() is { } err ? $"Z homing: {err}" : "Z axis homed. Set the focus height again before marking.";
+    }
+
+    static readonly string[] BackupItems = ["settings.json", "materials", "shapes", "templates"];
+
+    async Task BackupSettings()
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Back up settings",
+            DefaultExtension = "pcbackup",
+            SuggestedFileName = $"{AppIdentity.ProductName} backup {DateTime.Now:yyyy-MM-dd}.pcbackup",
+            FileTypeChoices = [new FilePickerFileType("Settings backup") { Patterns = ["*.pcbackup"] }],
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+        _settings.Save();
+        await Task.Run(() =>
+        {
+            if (File.Exists(path)) File.Delete(path);
+            using var zip = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Create);
+            foreach (var item in BackupItems)
+            {
+                var full = Path.Combine(AppIdentity.DataDir, item);
+                if (File.Exists(full)) System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(zip, full, item);
+                else if (Directory.Exists(full))
+                    foreach (var f in Directory.GetFiles(full, "*", SearchOption.AllDirectories))
+                        System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(zip, f, Path.GetRelativePath(AppIdentity.DataDir, f).Replace('\\', '/'));
+            }
+        });
+        StatusText.Text = $"Backed up to {Path.GetFileName(path)}.";
+    }
+
+    async Task RestoreSettings()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Restore settings",
+            FileTypeFilter = [new FilePickerFileType("Settings backup") { Patterns = ["*.pcbackup"] }],
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        if (!await Dialogs.Confirm(this, "Restore settings?", "This replaces your current settings, material library, shapes and templates with the backup's. Restart the program afterwards.", "Restore", "Cancel")) return;
+        await Task.Run(() =>
+        {
+            using var zip = System.IO.Compression.ZipFile.OpenRead(path);
+            var root = Path.GetFullPath(AppIdentity.DataDir);
+            foreach (var e in zip.Entries)
+            {
+                if (!BackupItems.Any(i => e.FullName == i || e.FullName.StartsWith(i + "/", StringComparison.Ordinal))) continue;
+                var target = Path.GetFullPath(Path.Combine(root, e.FullName));
+                if (!target.StartsWith(root, StringComparison.OrdinalIgnoreCase) || e.FullName.EndsWith('/')) continue; // nothing outside the data folder
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                System.IO.Compression.ZipFileExtensions.ExtractToFile(e, target, overwrite: true);
+            }
+        });
+        await Dialogs.Message(this, "Restored", "Settings restored. Close and open the program again to use them.");
     }
 
     async Task ShowWorkMode()
@@ -1139,6 +1323,8 @@ public partial class MainWindow : Window
         if (_doc.Selection.Count == 0) return;
         _clipboard = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
         _pasteCount = 0;
+        // Tell other programs' pictures from ours when pasting.
+        if (Clipboard is { } cb) _ = cb.SetTextAsync(ClipMarker);
     }
 
     void CutSel()
@@ -1147,7 +1333,44 @@ public partial class MainWindow : Window
         if (_doc.Selection.Count > 0) _doc.Commit("Cut", Ops.Delete(_doc.State, _doc.Selection));
     }
 
-    void Paste()
+    /// <summary>Marker put on the system clipboard when shapes are copied here, so pasting knows they're ours.</summary>
+    const string ClipMarker = "PhotonCanvas shapes";
+
+    /// <summary>Paste: a picture or SVG copied in another program, or shapes copied here.</summary>
+    void Paste() => _ = Guard(PasteAsync);
+
+    async Task PasteAsync()
+    {
+        if (Clipboard is { } cb)
+        {
+            string? text = null;
+            try { text = await Avalonia.Input.Platform.ClipboardExtensions.TryGetTextAsync(cb); } catch (Exception e) when (e is InvalidOperationException or System.Runtime.InteropServices.COMException) { }
+            if (text != ClipMarker)
+            {
+                if (text is { } t && t.TrimStart().StartsWith('<') && t.Contains("<svg", StringComparison.OrdinalIgnoreCase))
+                {
+                    var tmp = Path.Combine(Path.GetTempPath(), $"pasted-{Guid.NewGuid():N}.svg");
+                    await File.WriteAllTextAsync(tmp, t);
+                    await ImportPaths([tmp], false);
+                    return;
+                }
+                try
+                {
+                    if (await Avalonia.Input.Platform.ClipboardExtensions.TryGetBitmapAsync(cb) is { } bmp)
+                    {
+                        var tmp = Path.Combine(Path.GetTempPath(), $"pasted-{Guid.NewGuid():N}.png");
+                        bmp.Save(tmp);
+                        await ImportPaths([tmp], false);
+                        return;
+                    }
+                }
+                catch (Exception e) when (e is InvalidOperationException or System.Runtime.InteropServices.COMException or NotSupportedException) { }
+            }
+        }
+        PasteInternal();
+    }
+
+    void PasteInternal()
     {
         if (_clipboard.Count == 0) return;
         _pasteCount++;
@@ -1275,8 +1498,10 @@ public partial class MainWindow : Window
             path = file?.TryGetLocalPath();
             if (path is null) return false;
         }
+        VersionsWindow.Keep(path);
         DocFile.Save(_doc.State, path);
         _doc.MarkSaved(path);
+        ClearAutosave();
         _settings.AddRecent(path);
         _settings.Save();
         RefreshRecent();
@@ -1743,6 +1968,7 @@ public partial class MainWindow : Window
     {
         if (_closeConfirmed || !_doc.Dirty)
         {
+            ClearAutosave();
             _machine.Shutdown();
             _depthCharge.Dispose(); // stops DepthCharge only if this program started it
             return;

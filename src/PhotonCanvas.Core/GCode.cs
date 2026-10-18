@@ -220,6 +220,12 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// <summary>Burn every line in the same direction (the beam travels back unlit): more even on some materials, slower.</summary>
     public bool Unidirectional { get; init; }
 
+    /// <summary>Scan from the far side back (bottom to top in the scan direction).</summary>
+    public bool ReverseOrder { get; init; }
+
+    /// <summary>Pause this long before each line after the first (ms), so heat can leave (acrylic, thin stock). 0 = none.</summary>
+    public int LineDwellMs { get; init; }
+
     /// <summary>
     /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
     /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
@@ -402,6 +408,7 @@ public sealed class Job
                     if (!double.IsFinite(b.AngleDeg) || !double.IsFinite(b.AngleStepDeg)) throw new JobException("The fill angle is not a valid number.");
                     JobException.CheckRange("overscan", b.OverscanMm, 0, MaxOverscanMm, "mm");
                     JobException.CheckRange("dot width correction", b.DotWidthMm, 0, 1, "mm");
+                    JobException.CheckRange("pause between lines", b.LineDwellMs, 0, 60_000, "ms");
                     foreach (var p in b.Polygons.SelectMany(x => x))
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
@@ -621,8 +628,14 @@ public sealed class Job
     /// The framing file the machine traces at low power when its frame button
     /// is used. <paramref name="outline"/> is usually the job's bounding box or hull.
     /// </summary>
-    public string Border(IReadOnlyList<Vec2> outline)
+    /// <summary>Framing power (%) and speed (mm/s) as the stock software uses them: a faint, fast trace.</summary>
+    public const double FramePowerDefault = 6.4, FrameSpeedDefault = 16000, FramePowerMax = 15;
+
+    public string Border(IReadOnlyList<Vec2> outline, double powerPct = FramePowerDefault, double speedMmS = FrameSpeedDefault)
     {
+        powerPct = Math.Clamp(powerPct, 0.5, FramePowerMax);
+        speedMmS = Math.Clamp(speedMmS, 100, 20000);
+        long sv = (long)Math.Round(powerPct * 10), fv = (long)Math.Round(speedMmS * 60);
         if (outline.Count < 2) throw new JobException("The frame outline needs at least two points.");
         foreach (var p in outline)
         {
@@ -644,11 +657,11 @@ public sealed class Job
         {
             $"# {tag} HEAD", "G0 F180000", "M4 S0", "G1 F180000", "M114 S1", "", "",
             $"# {tag} VECTOR HEAD", "# motion_start", "", "G21", "G90", "", "", "", "",
-            "# blockConfig={\"powerFactor\":0.064,\"isVector\":true,\"crossDot\":false}",
+            $"# blockConfig={{\"powerFactor\":{JsRounded(powerPct / 100, 6)},\"isVector\":true,\"crossDot\":false}}",
             $"G0X{Trim3(outline[0].X)}Y{Trim3(outline[0].Y)}",
         };
         for (int i = 1; i < outline.Count; i++)
-            lines.Add($"G1X{Trim3(outline[i].X)}Y{Trim3(outline[i].Y)}" + (i == 1 ? "S64F960000" : ""));
+            lines.Add($"G1X{Trim3(outline[i].X)}Y{Trim3(outline[i].Y)}" + (i == 1 ? $"S{sv}F{fv}" : ""));
         lines.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
         lines.AddRange(Tail(tag, true));
         return string.Join("\n", lines);
@@ -672,7 +685,7 @@ public sealed class Job
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
             FillBlock f => FillLines(f).Sum(s =>
-                (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed),
+                (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed + f.LineDwellMs / 1000.0),
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
             PointsBlock p => p.Points.Count * p.DotUs * 1e-6 + Enumerable.Range(1, Math.Max(0, p.Points.Count - 1)).Sum(i => p.Points[i - 1].Dist(p.Points[i])) / Math.Max(1, p.Laser.Speed),
             DotBlock d => d.Bitmap.Bits.Count(v => v) *
@@ -841,6 +854,11 @@ public sealed class Job
     static List<FillSegment> MakeFillLines(FillBlock b)
     {
         var lines = MakeFullLines(b);
+        if (b.ReverseOrder)
+        {
+            // From the far side: the lines in reverse order, each run the other way so the zigzag still joins up.
+            lines = [.. Enumerable.Reverse(lines).Select(s => new FillSegment(s.Y, s.X1, s.X0, s.End, s.Start))];
+        }
         if (b.Unidirectional)
             // Every line burned the same way: the ones that ran backwards are turned round.
             lines = [.. lines.Select(s => s.X1 >= s.X0 ? s : new FillSegment(s.Y, s.X1, s.X0, s.End, s.Start))];
@@ -1046,7 +1064,22 @@ public sealed class Job
         {
             BitmapCfg(l.Power / 100, b.LinesPerCm / 10, 0, s, "grayscale", over), "", "", $"G1F{l.FValue}S0",
         };
-        if (Flat && FoldAngle(b.AngleDeg) == 0)
+        if (b.LineDwellMs > 0)
+        {
+            // A pause before each line: written out in full, one move at a time.
+            string? at0 = null;
+            foreach (var seg in segs)
+            {
+                var (runUp, runOut) = Overscan(seg, over);
+                if (at0 is not null) body.Add($"G4P{b.LineDwellMs}");
+                at0 = Pos(runUp, Fixed3);
+                body.Add(body.Count <= 4 ? $"G0{at0}" : $"G1{at0}S0");
+                if (over > 0) body.Add($"G1{Pos(seg.Start, Fixed3)}S0");
+                body.Add($"G1{Pos(seg.End, Fixed3)}S{s}");
+                if (over > 0) body.Add($"G1{Pos(runOut, Fixed3)}S0");
+            }
+        }
+        else if (Flat && FoldAngle(b.AngleDeg) == 0)
         {
             // Horizontal lines: only the coordinates that change are written, as xTool does.
             string? lastX = null;

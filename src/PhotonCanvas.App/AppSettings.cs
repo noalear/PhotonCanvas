@@ -106,6 +106,10 @@ public sealed class AppSettings
     /// <summary>Any attachment that gives a work mode besides the flat bed.</summary>
     public bool OwnsAttachment => OwnsRa2 || OwnsRa3 || OwnsConveyor;
 
+    /// <summary>Framing: power (%) and speed (mm/s) of the faint trace.</summary>
+    public double FramePowerPct { get; set; } = 6.4;
+    public double FrameSpeedMmS { get; set; } = 16000;
+
     /// <summary>"Flat", "Rotary" or "Conveyor".</summary>
     public string WorkMode { get; set; } = "Flat";
     /// <summary>Rotary: 0 RA2 rollers, 1 RA2 chuck, 2 RA3 rollers, 3 RA3 chuck.</summary>

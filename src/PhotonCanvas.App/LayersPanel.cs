@@ -637,6 +637,8 @@ public sealed class LayersPanel : UserControl
                 l.ParentId is null
                     ? Item("Add sub-layer (another operation on these shapes)", () => AddSubLayer(l))
                     : Item("Make it a normal layer (with no shapes)", () => _doc.Commit("Make normal layer", Ops.UpdateLayers(_doc.State, new HashSet<Guid> { l.Id }, x => x with { ParentId = null }))),
+                Item("Copy settings", () => { _copiedSettings = Doc.Materials.ProcessSettings.From(l); }),
+                Item("Paste settings", () => { if (_copiedSettings is { } ps) _doc.Commit("Paste settings", Ops.UpdateLayers(_doc.State, _selected.Contains(l.Id) ? _selected : new HashSet<Guid> { l.Id }, x => ps.ApplyTo(x))); }, _copiedSettings is not null),
                 Item("Rename", () => { _renaming = l.Id; Rebuild(); }),
                 Item("Duplicate with shapes", DuplicateLayer),
                 Item("Show only this layer", () => _doc.Commit("Solo layer", Ops.UpdateLayers(_doc.State, _doc.State.Layers.Select(x => x.Id).ToHashSet(), x => x with { Visible = x.Id == l.Id }))),
@@ -682,6 +684,8 @@ public sealed class LayersPanel : UserControl
     }
 
     /// <summary>A sub-layer right after the layer (and its other sub-layers): a different operation on the same shapes.</summary>
+    static Doc.Materials.ProcessSettings? _copiedSettings;
+
     public void AddSubLayer(Layer parent)
     {
         var state = _doc.State;

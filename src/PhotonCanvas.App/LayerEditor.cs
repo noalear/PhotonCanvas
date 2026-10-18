@@ -37,6 +37,9 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _cpi = Num(2, 500, 1, "0.#"), _screenAngle = Num(-180, 180, 15, "0.#"), _dotWidth = Number(0, 1, 0.005m, "0.###");
     readonly Control _screenRow;
     readonly CheckBox _bidir = new() { Content = "Burn in both directions" }, _together = new() { Content = "All shapes in one scan" };
+    readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _deepestFirst = new() { Content = "Deepest slice first" };
+    readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
+    readonly Control _crossRow, _stepRows;
     readonly NumericUpDown _perf = Num(0, 100, 0.5m, "0.##"), _perfGap = Num(0.05m, 100, 0.5m, "0.##"), _dotMode = Number(0, 50, 0.1m, "0.###");
     readonly NumericUpDown _ramp = Number(0, 10, 0.1m, "0.##");
     readonly CheckBox _passThrough = new() { Content = "Pass-through (the file's own pixels)" };
@@ -138,13 +141,13 @@ public sealed class LayerEditor : UserControl
                 Field("Kerf (mm)", _kerf, tip: "Width of the cut line. Outlines move out by half of it so parts come out at their drawn size (holes stay true too). 0 = off."),
                 Field("Tabs", _tabs, tip: "Small uncut bridges in each closed outline so parts stay in the sheet. 0 = none."),
                 Field("Tab width (mm)", _tabWidth),
+                Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
                 Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
                 Row(Labelled("Perforate: burn mm", _perf, "Perforation: burn this far, then skip the gap, along every line (fold lines, tear-off). 0 = a continuous line."),
                     Labelled("then skip mm", _perfGap, "The gap between perforation dashes.")),
                 Field("Dot mode every", _dotMode, tip: "Dot mode: a single pulse every this many mm instead of a line (stippled marks, dotted lines). The dot time is set under the picture settings' Dot time. 0 = off."),
-                Field("Step down/pass", _stepDown, tip: "Lower the head this many mm before each pass after the first, so the focus follows the cut into thick material. The head goes back up afterwards. 0 = off."),
-                Field("First step down", _stepFirst, tip: "With step-down: also lower the head this much before the first pass (mm)."),
+
                 _wobble,
             },
         };
@@ -163,6 +166,7 @@ public sealed class LayerEditor : UserControl
         ToolTip.SetTip(_resetRuns, "Count runs from 0 again, so the next run starts at the scan angle as set.");
         _runRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _runCount, _resetRuns } };
         ToolTip.SetTip(_turnRuns, "Each run of the job starts where the last one's turning left off, so repeating the job doesn't repeat the line pattern.");
+        _crossRow = Field("Second pass at (°)", _crossAngle, tip: "Crosshatch: the second pass's angle from the first. 90° is the classic crosshatch; others give finer patterns.");
         _lineRows = new StackPanel
         {
             Spacing = 6,
@@ -171,8 +175,12 @@ public sealed class LayerEditor : UserControl
                 Field("Scan angle (°)", _fillAngle, tip: "Direction of the fill lines. 0 = left to right."),
                 _crosshatch,
                 Field("Overscan (mm)", _overscan, tip: "Each line starts and ends this far outside the shape with the laser off, so edges burn evenly."),
+                _crossRow,
                 _bidir,
                 _together,
+                _scanReverse,
+                _outlineAfter,
+                Field("Pause per line (ms)", _dwell, tip: "Wait this long before each line, so heat can leave (acrylic, thin or heat-sensitive material). 0 = none."),
                 Field("Dot width (mm)", _dotWidth, tip: "Dot width correction: each burned line is made shorter by this much (half at each end), so the beam's width doesn't make fills wider than drawn. About the beam width: 0.03–0.08 mm. 0 = off."),
                 Field("Turn per pass (°)", _angleStep, tip: "Turn the scan lines this much more on every pass (and every depth slice), so the line pattern doesn't build up into stripes or ridges. " +
                                                               "Something odd like 37° or 23° spreads the angles best. 0 = every pass the same."),
@@ -181,6 +189,18 @@ public sealed class LayerEditor : UserControl
             },
         };
         _fillExtras = new StackPanel { Spacing = 6, Children = { _fillStyleRow, _lineRows } };
+        _stepRows = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Field("Step down/pass", _stepDown, tip: "Lower the head this many mm before each pass after the first, so the focus follows the cut or engraving down (thick material, deep engraving). The head goes back up afterwards. 0 = off."),
+                Field("First step down", _stepFirst, tip: "With step-down: also lower the head this much before the first pass (mm)."),
+            },
+        };
+        ToolTip.SetTip(_outlineAfter, "After filling each shape, trace its outline at the same settings: hides ragged edges.");
+        ToolTip.SetTip(_scanReverse, "Fill from the far side back (bottom to top): keeps the smoke away from what's still to engrave, depending on how your air flows.");
+        ToolTip.SetTip(_deepestFirst, "Engrave the deepest (smallest) slices first and the widest last: often a smoother floor (noise reduction).");
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
         ToolTip.SetTip(_bidir, "Off: every line burns in the same direction and the beam returns unlit. More even on some materials, a little slower.");
@@ -208,6 +228,7 @@ public sealed class LayerEditor : UserControl
                 _negative,
                 Row(Labelled("Lower focus mm", _dropMm, "Follow the floor down: lower the focus this much every few slices. About the depth those slices remove. 0 = off."),
                     Labelled("every … slices", _dropEvery, "How many slices between focus drops.")),
+                _deepestFirst,
                 Field("Cleanup every", _cleanEvery, tip: "A cleanup pass after every this many slices (0 = none). Clears debris and recast so the next slices cut cleanly."),
                 _cleanRows,
             },
@@ -228,7 +249,7 @@ public sealed class LayerEditor : UserControl
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _imageExtras, _pulseRow, _freqRow, focusRow, _moreNothing } };
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _pulseRow, _freqRow, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
@@ -303,6 +324,12 @@ public sealed class LayerEditor : UserControl
             return l with { ImageMode = mode, AngleStepDeg = mode == ImageEngraveMode.Slices && l.ImageMode != mode && l.AngleStepDeg == 0 ? 37 : l.AngleStepDeg };
         }, _imageMode.SelectedIndex >= 0);
         _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
+        _crossAngle.ValueChanged += (_, _) => EditLayers("Crosshatch angle", l => l with { CrossAngleDeg = (double)_crossAngle.Value!.Value }, _crossAngle.Value.HasValue, "crossangle");
+        _dwell.ValueChanged += (_, _) => EditLayers("Pause per line", l => l with { LineDwellMs = (int)_dwell.Value!.Value }, _dwell.Value.HasValue, "dwell");
+        _tabPower.ValueChanged += (_, _) => EditLayers("Tab power", l => l with { TabPowerPct = (double)_tabPower.Value!.Value }, _tabPower.Value.HasValue, "tabpower");
+        _outlineAfter.IsCheckedChanged += (_, _) => EditLayers("Outline after fill", l => l with { OutlineAfter = _outlineAfter.IsChecked == true }, _outlineAfter.IsChecked.HasValue);
+        _scanReverse.IsCheckedChanged += (_, _) => EditLayers("Scan direction", l => l with { ScanReverse = _scanReverse.IsChecked == true }, _scanReverse.IsChecked.HasValue);
+        _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
         _together.IsCheckedChanged += (_, _) => EditLayers("All shapes in one scan", l => l with { FillTogether = _together.IsChecked == true }, _together.IsChecked.HasValue);
         _perf.ValueChanged += (_, _) => EditLayers("Perforation", l => l with { PerforateMm = (double)_perf.Value!.Value }, _perf.Value.HasValue, "perf");
@@ -417,7 +444,16 @@ public sealed class LayerEditor : UserControl
         Num(_dotWidth, Same(l => l.DotWidthMm));
         _bidir.IsChecked = Same(l => l.Bidirectional);
         _together.IsChecked = Same(l => l.FillTogether);
-        _bidir.IsVisible = _together.IsVisible = anyFill && !allOffset;
+        _bidir.IsVisible = _together.IsVisible = _scanReverse.IsVisible = anyFill && !allOffset;
+        _outlineAfter.IsVisible = anyFill;
+        _crossRow.IsVisible = anyFill && ls.Any(l => l.Crosshatch);
+        _stepRows.IsVisible = anyCut || anyFill;
+        Num(_crossAngle, Same(l => l.CrossAngleDeg));
+        Num(_dwell, Same(l => (double)l.LineDwellMs));
+        Num(_tabPower, Same(l => l.TabPowerPct));
+        _outlineAfter.IsChecked = Same(l => l.OutlineAfter);
+        _scanReverse.IsChecked = Same(l => l.ScanReverse);
+        _deepestFirst.IsChecked = Same(l => l.Slices.DeepestFirst);
         Num(_perf, Same(l => l.PerforateMm));
         Num(_perfGap, Same(l => l.PerforateGapMm));
         Num(_dotMode, Same(l => l.DotModeMm));

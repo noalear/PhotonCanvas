@@ -116,12 +116,14 @@ public static class JobBuilder
     /// G-code for framing <paramref name="job"/>: the same border format as inside the job
     /// package (which is what xTool Studio frames with), around the rectangle or the outline.
     /// </summary>
-    public static string FrameGcode(BuiltJob job, FrameShape shape)
+    public static string FrameGcode(BuiltJob job, FrameShape shape, double powerPct = Job.FramePowerDefault, double speedMmS = Job.FrameSpeedDefault)
     {
-        if (shape == FrameShape.Rectangle) return job.Border;
+        var b = job.Bounds;
+        Vec2[] box = [b.TopLeft, new(b.MaxX, b.MinY), b.BottomRight, new(b.MinX, b.MaxY), b.TopLeft];
+        if (shape == FrameShape.Rectangle) return job.Job.Border(box, powerPct, speedMmS);
         var hull = ConvexHull(job.Steps.SelectMany(st => st.Points));
-        if (hull.Count < 3) return job.Border;
-        return job.Job.Border([.. hull, hull[0]]);
+        if (hull.Count < 3) return job.Job.Border(box, powerPct, speedMmS);
+        return job.Job.Border([.. hull, hull[0]], powerPct, speedMmS);
     }
 
     /// <summary>Convex hull (monotone chain), counter-clockwise, without repeating the first point.</summary>
@@ -234,8 +236,9 @@ public static class JobBuilder
                         int n = masks.Length;
                         double turn = layer.AngleStepDeg, start = layer.FillAngleDeg + layer.RunTurnDeg;
                         var clean = CleanupLaser(layer);
-                        for (int k = 0; k < n; k++)
+                        for (int kk = 0; kk < n; kk++)
                         {
+                            int k = sl.DeepestFirst ? n - 1 - kk : kk;
                             var m = masks[k];
                             var r = m.FilledBounds();
                             if (r.IsEmpty) continue;
@@ -314,12 +317,33 @@ public static class JobBuilder
                         DotWidthMm = layer.DotWidthMm,
                         Unidirectional = !layer.Bidirectional,
                     };
-                    var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + 90 } : null;
+                    block = block with { LineDwellMs = layer.LineDwellMs, ReverseOrder = layer.ScanReverse };
+                    var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + layer.CrossAngleDeg } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
                     if (!first && !second) continue;
                     int bm = blocks.Count, sm = steps.Count;
-                    if (first) blocks.Add(block);
-                    if (second) blocks.Add(cross!);
+                    var main = new List<Block>();
+                    if (first) main.Add(block);
+                    if (second) main.Add(cross!);
+                    if (layer.OutlineAfter)
+                        // The outline traced after the fill, at the same settings: clean edges.
+                        foreach (var p in polys) main.Add(new VectorBlock(Polyline.Loop(p.Points), layer.Laser) { FocusOffsetMm = layer.FocusOffsetMm });
+                    if (layer.StepDownMm > 0 || layer.StepDownFirstMm > 0)
+                    {
+                        // Carving deeper: each pass is its own copy, the focus lowered a little more each time.
+                        int passes = Math.Max(1, layer.Laser.Passes);
+                        for (int pass = 1; pass <= passes; pass++)
+                        {
+                            double drop = layer.StepDownFirstMm + (pass - 1) * layer.StepDownMm;
+                            foreach (var mb in main)
+                                blocks.Add(mb switch
+                                {
+                                    FillBlock fb => fb.ForPass(pass) with { Laser = fb.Laser with { Passes = 1 }, FocusOffsetMm = layer.FocusOffsetMm + drop },
+                                    _ => mb with { Laser = mb.Laser with { Passes = 1 }, FocusOffsetMm = layer.FocusOffsetMm + drop },
+                                });
+                        }
+                    }
+                    else blocks.AddRange(main);
                     foreach (var p in polys)
                     {
                         steps.Add(new(layer.Id, p.Points, true, true) { ScanAngleDeg = block.AngleDeg });
@@ -378,6 +402,9 @@ public static class JobBuilder
                         }
                         int bm = blocks.Count, sm = steps.Count;
                         blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
+                        // Tabs cut at low power, right after their outline's pieces.
+                        foreach (var gap in extras.TakeTabGaps())
+                            blocks.Add(new VectorBlock(Polyline.Open(gap), layer.Laser with { Power = Math.Min(layer.Laser.Power, layer.TabPowerPct) }) { FocusOffsetMm = layer.FocusOffsetMm });
                         steps.Add(new(layer.Id, p.Points, p.Closed, false));
                         Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
@@ -783,6 +810,7 @@ public static class JobBuilder
                 if (l.Mode == LayerMode.Score) break;
                 JobException.CheckRange("number of tabs", l.TabCount, 0, MaxTabs, "");
                 if (l.TabCount > 0) JobException.CheckRange("tab width", l.TabWidthMm, 0.1, 10, "mm");
+                JobException.CheckRange("tab power", l.TabPowerPct, 0, 100, "%");
                 JobException.CheckRange("overcut", l.OvercutMm, 0, 10, "mm");
                 JobException.CheckRange("lead-in", l.LeadInMm, 0, 10, "mm");
                 if (l.PerforateMm > 0) { JobException.CheckRange("perforation dash", l.PerforateMm, 0.05, 100, "mm"); JobException.CheckRange("perforation gap", l.PerforateGapMm, 0.05, 100, "mm"); }
@@ -793,6 +821,10 @@ public static class JobBuilder
                 JobException.CheckRange("turn per pass", l.AngleStepDeg, -180, 180, "degrees");
                 JobException.CheckRange("overscan", l.OverscanMm, 0, 20, "mm");
                 JobException.CheckRange("dot width correction", l.DotWidthMm, 0, 1, "mm");
+                JobException.CheckRange("crosshatch angle", l.CrossAngleDeg, -180, 180, "degrees");
+                JobException.CheckRange("pause between lines", l.LineDwellMs, 0, 60_000, "ms");
+                if (l.StepDownMm > 0 || l.StepDownFirstMm > 0)
+                    new StepDown(l.StepDownFirstMm, l.StepDownMm).Validate(Math.Max(1, l.Laser.Passes));
                 if (l.DotWidthMm >= 10 / l.LinesPerCm && l.DotWidthMm > 0)
                     throw new JobException($"Dot width correction ({l.DotWidthMm:0.###} mm) must be less than the line spacing ({10 / l.LinesPerCm:0.###} mm).");
                 break;
@@ -939,6 +971,15 @@ public static class JobBuilder
 
         readonly bool _cut = layer.Mode == LayerMode.Cut;
         int _tooShort, _tabbed;
+        readonly List<List<Vec2>> _tabGaps = [];
+
+        /// <summary>The tab bridges of the outline just split (when tabs are cut at low power), once.</summary>
+        public List<List<Vec2>> TakeTabGaps()
+        {
+            var o = new List<List<Vec2>>(_tabGaps);
+            _tabGaps.Clear();
+            return o;
+        }
 
         /// <summary>What the laser actually follows for one path: the path itself, or open pieces.</summary>
         public IEnumerable<FlatPath> Pieces(FlatPath path, int depth)
@@ -1013,6 +1054,7 @@ public static class JobBuilder
                 double from = centres[k] + w / 2;
                 double to = (k + 1 < count ? centres[k + 1] : centres[0] + perimeter) - w / 2;
                 if (to - from > 1e-6) o.Add(new FlatPath(Along(loop, cum, from, to), false));
+                if (layer.TabPowerPct > 0) _tabGaps.Add(Along(loop, cum, centres[k] - w / 2, centres[k] + w / 2));
             }
             return o;
         }

@@ -1088,6 +1088,10 @@ public sealed class DeviceClient : IAsyncDisposable
         return reply?.ToJsonString() ?? "";
     }
 
+    /// <summary>Send the head up to its home (top) and back to the bottom of its travel, as the stock app's "Z-axis homing" does.</summary>
+    public Task<double> HomeZAsync(TimeSpan? timeout = null, CancellationToken cancellationToken = default) =>
+        FocusAsync(new JsonObject { ["action"] = "goTo", ["autoHome"] = 1, ["stopFirst"] = 1, ["Z"] = 6 }, "Homing the Z axis", timeout, cancellationToken);
+
     /// <summary>The machine's stored settings (<c>GET /v1/device/configs</c>), e.g. the conveyor's calibration.</summary>
     public Task<JsonNode?> GetConfigsAsync(CancellationToken cancellationToken = default) =>
         GetAsync("/v1/device/configs", cancellationToken: cancellationToken);
