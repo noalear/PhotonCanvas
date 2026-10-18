@@ -100,22 +100,43 @@ public class StackSlicerTests
         var stack = StackSlicer.Slice(Cylinder(30, 120), new SliceOptions { ThicknessMm = 3, HeightMm = 120 });
         Assert.Equal(40, stack.Slices);
         var (s, sheets) = StackLayout.Place(DocState.New(), stack, MachineProfile.F2Ultra, numbers: true, marks: true);
-        Assert.Equal(5, sheets);
-        Assert.Equal(["Page 1", "Slices 2", "Slices 3", "Slices 4", "Slices 5"], Pages.Names(s));
+        // Nested, not in rows: at least as tight as 3 × 3 discs a bed (40 slices = 5 beds).
+        Assert.InRange(sheets, 3, 5);
+        Assert.Equal(["Page 1", .. Enumerable.Range(2, sheets - 1).Select(i => $"Slices {i}")], Pages.Names(s));
         Assert.Equal(0, s.PageIndex);
-        var texts = s.Shapes.OfType<TextShape>().Select(t => t.Text).ToList();
-        Assert.Equal(Enumerable.Range(1, 9).Select(i => $"{i}"), texts);
-        // Everything inside the bed, nothing overlapping.
-        var cuts = s.Shapes.OfType<PathShape>().Where(p => p.Name.StartsWith("Slice ") && p is not TextShape).ToList();
-        Assert.All(cuts, c => Assert.True(c.Bounds.MinX >= 0 && c.Bounds.MaxX <= 220 && c.Bounds.MaxY <= 220));
-        Assert.All(cuts, a => Assert.All(cuts.Where(b => b != a), b => Assert.False(a.Bounds.Intersects(b.Bounds))));
+        // Every slice once, across the pages.
+        var texts = Enumerable.Range(0, sheets).SelectMany(i => Pages.SwitchTo(s, i).Shapes.OfType<TextShape>().Select(t => t.Text)).ToList();
+        Assert.Equal(Enumerable.Range(1, 40).Select(i => $"{i}").Order(), texts.Order());
+        for (int i = 0; i < sheets; i++)
+        {
+            var page = Pages.SwitchTo(s, i);
+            // Each number stays inside its own slice (they moved together).
+            Assert.All(page.Shapes.Where(x => x.GroupId is not null).GroupBy(x => x.GroupId), g => Assert.Equal(2, g.Count()));
+            // Everything inside the bed, nothing overlapping (the discs keep the gap between them).
+            var cuts = page.Shapes.OfType<PathShape>().Where(p => p.Name.StartsWith("Slice ") && p is not TextShape).ToList();
+            Assert.All(cuts, c => Assert.True(c.Bounds.MinX >= 2.9 && c.Bounds.MinY >= 2.9 && c.Bounds.MaxX <= 217.1 && c.Bounds.MaxY <= 217.1));
+            Assert.All(cuts, a => Assert.All(cuts.Where(b => b != a), b => Assert.True((a.Bounds.Center - b.Bounds.Center).Length >= 60 + 2.5)));
+        }
         // A page with something on it already: the slices get pages of their own, named after the model.
         var busy = DocState.New();
         busy = Ops.AddShapes(busy, [new PathShape { LayerId = busy.Layers[0].Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }]);
-        var (s2, _) = StackLayout.Place(busy, stack, MachineProfile.F2Ultra, numbers: true, marks: true, title: "drum");
-        Assert.Equal(["Page 1", "drum", "drum 2", "drum 3", "drum 4", "drum 5"], Pages.Names(s2));
+        var (s2, n2) = StackLayout.Place(busy, stack, MachineProfile.F2Ultra, numbers: true, marks: true, title: "drum");
+        Assert.Equal(["Page 1", "drum", .. Enumerable.Range(2, n2 - 1).Select(i => $"drum {i}")], Pages.Names(s2));
         Assert.Equal(1, s2.PageIndex);
         Assert.Single(Pages.SwitchTo(s2, 0).Shapes);
+    }
+
+    [Fact]
+    public void BigAndSmallPartsShareABed()
+    {
+        // Three big parts (two to a bed, turned) and twelve small ones in the room left over: two beds.
+        var mesh = new List<Tri>();
+        for (int i = 0; i < 3; i++) mesh.AddRange(Box(i * 200, 0, 0, i * 200 + 120, 100, 3));
+        for (int i = 0; i < 12; i++) mesh.AddRange(Box(i * 30, 300, 0, i * 30 + 20, 330, 3));
+        var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 3, HeightMm = 3, KeepJoined = false, WidthMm = 0 });
+        var (s, sheets) = StackLayout.Place(DocState.New(), stack, MachineProfile.F2Ultra, numbers: false, marks: false);
+        Assert.Equal(15, Enumerable.Range(0, sheets).Sum(i => Pages.SwitchTo(s, i).Shapes.Count));
+        Assert.Equal(2, sheets);
     }
 
     [Fact]

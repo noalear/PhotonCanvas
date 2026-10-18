@@ -636,10 +636,11 @@ public static class StackLayout
 {
     /// <summary>
     /// Every part on a Cut layer, its number (and the next slice's outline, when asked) lightly
-    /// marked on a Score layer, packed in number order. Parts that don't fit go on new pages
+    /// marked on a Score layer, nested by true shape (biggest first, quarter turns, small parts in
+    /// the gaps) to fill each bed before starting the next. Parts that don't fit go on new pages
     /// ("Slices 2", …). Returns the design (showing the first page used) and how many beds it takes.
     /// </summary>
-    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices")
+    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices", CancellationToken ct = default)
     {
         title = string.IsNullOrWhiteSpace(title) ? "Slices" : title.Trim();
         // Never on top of what's already there: a page of their own if this one has anything on it.
@@ -664,22 +665,15 @@ public static class StackLayout
             return (cut, mk);
         }
         var (cutLayer, markLayer) = Layers(ref s);
-        double x = gapMm, y = gapMm, rowH = 0;
+        // Each part with its marks, made at the bed's corner; the nesting moves it into place.
+        var units = new List<List<Shape>>();
         foreach (var part in stack.Parts)
         {
             var box = part.Outline.Bounds();
             if (box.IsEmpty) continue;
-            if (box.Width + 2 * gapMm > machine.FieldW || box.Height + 2 * gapMm > machine.FieldH)
-                throw new InvalidOperationException($"Slice {part.Slice} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
-            if (x + box.Width + gapMm > machine.FieldW) { x = gapMm; y += rowH + gapMm; rowH = 0; }
-            if (y + box.Height + gapMm > machine.FieldH)
-            {
-                // A new bed-full on its own page.
-                s = Pages.Add(s, $"{title} {++sheets}");
-                (cutLayer, markLayer) = Layers(ref s);
-                x = gapMm; y = gapMm; rowH = 0;
-            }
-            var move = Affine.Translate(x - box.MinX, y - box.MinY);
+            if (Math.Min(box.Width, box.Height) + 2 * gapMm > Math.Min(machine.FieldW, machine.FieldH) || Math.Max(box.Width, box.Height) + 2 * gapMm > Math.Max(machine.FieldW, machine.FieldH))
+                throw new InvalidOperationException($"{part.Label ?? $"Slice {part.Slice}"} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
+            var move = Affine.Translate(gapMm - box.MinX, gapMm - box.MinY);
             var shapes = new List<Shape> { new PathShape { Name = part.Label is { } nm ? nm : $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
             if (marks && part.NextMarks.Count > 0)
                 shapes.Add(new PathShape { Name = $"Where slice {part.Slice + 1} goes", LayerId = markLayer.Id, Geometry = new PathGeometry(part.NextMarks.SelectMany(m => PathGeometry.Polyline(m, false).Subpaths)).Transform(move) });
@@ -700,10 +694,32 @@ public static class StackLayout
                     var at = move.Apply(where);
                     shapes.Add(t.With(transform: Affine.Translate(at.X - tb.Center.X, at.Y - tb.Center.Y)));
                 }
-            s = Ops.AddShapes(s, shapes);
-            if (shapes.Count > 1) s = Ops.Group(s, shapes.Select(sh => sh.Id).ToHashSet()).Item1;
-            x += box.Width + gapMm;
-            rowH = Math.Max(rowH, box.Height);
+            if (shapes.Count > 1)
+            {
+                var g = Guid.NewGuid();
+                shapes = [.. shapes.Select(sh => sh.WithGroup(g))];
+            }
+            units.Add(shapes);
+        }
+
+        // Bed by bed: everything left goes on the page, the nesting places what fits, the rest moves on.
+        var options = new NestOptions { SpacingMm = gapMm, MarginMm = gapMm, RotationStepDeg = 90, ResolutionMm = 0.5 };
+        while (units.Count > 0)
+        {
+            // Each page has its own layers: the cut outline is first in its part, the rest are marks.
+            var onPage = units.Select(u => u.Select((sh, k) => sh.With(layerId: k == 0 ? cutLayer.Id : markLayer.Id)).ToList()).ToList();
+            s = Ops.AddShapes(s, onPage.SelectMany(u => u));
+            var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
+            var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
+            if (report.Placed == 0)
+                throw new InvalidOperationException("A part doesn't fit on the bed with the spacing around it. Make the model smaller.");
+            var unplaced = report.Unplaced.ToHashSet();
+            s = Ops.Delete(nested, unplaced);
+            units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
+            if (units.Count == 0) break;
+            // A new bed-full on its own page.
+            s = Pages.Add(s, $"{title} {++sheets}");
+            (cutLayer, markLayer) = Layers(ref s);
         }
         return (Pages.SwitchTo(s, firstPage), sheets);
     }

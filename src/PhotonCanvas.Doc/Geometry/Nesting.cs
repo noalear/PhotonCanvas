@@ -53,6 +53,22 @@ public static class Nesting
             var all = Enumerable.Range(0, Cells.Length).Where(i => Cells[i]).ToList();
             return Set = [.. all.Where(Edge), .. all.Where(i => !Edge(i))];
         }
+        public (int Row, int Lo, int Hi)[]? Runs; // the set cells, row by row, as runs
+        public (int Row, int Lo, int Hi)[] RunList()
+        {
+            if (Runs is not null) return Runs;
+            var runs = new List<(int, int, int)>();
+            for (int y = 0; y < H; y++)
+                for (int x = 0; x < W; x++)
+                {
+                    if (!Cells[y * W + x]) continue;
+                    int lo = x;
+                    while (x + 1 < W && Cells[y * W + x + 1]) x++;
+                    runs.Add((y, lo, x));
+                }
+            // The widest runs first: they hit whatever is in the way soonest.
+            return Runs = [.. runs.OrderByDescending(r => r.Item3 - r.Item2)];
+        }
     }
 
     sealed record Variant(double AngleDeg, Mask Grown, Mask Body, Vec2 Origin);
@@ -114,36 +130,40 @@ public static class Nesting
         // Biggest first packs best.
         var order = Enumerable.Range(0, units.Count).OrderByDescending(i => variants[i][0].Body.SetList().Length).ToList();
 
-        int[] Sat(bool[] g)
+        // For each cell, the last blocked cell at or left of it in its row (-1 = none): a run of a
+        // part's cells is clear exactly when the last blocked cell before its right end is left of it.
+        void Last(bool[] g, int[] last, int y0, int y1)
         {
-            var t = new int[(W + 1) * (H + 1)];
-            for (int y = 0; y < H; y++)
+            for (int y = y0; y < y1; y++)
             {
-                int row = 0;
+                int run = -1;
                 for (int x = 0; x < W; x++)
                 {
-                    row += g[y * W + x] ? 1 : 0;
-                    t[(y + 1) * (W + 1) + x + 1] = t[y * (W + 1) + x + 1] + row;
+                    if (g[y * W + x]) run = x;
+                    last[y * W + x] = run;
                 }
             }
-            return t;
         }
-        int SumBox(int[] t, int x0, int y0, int x1, int y1) => // cells [x0,x1) × [y0,y1)
-            t[y1 * (W + 1) + x1] - t[y0 * (W + 1) + x1] - t[y1 * (W + 1) + x0] + t[y0 * (W + 1) + x0];
-        var edgeSat = Sat(edge);
-        var occSat = Sat(occupied);
+        var edgeLast = new int[W * H];
+        var occLast = new int[W * H];
+        Last(edge, edgeLast, 0, H);
+        Last(occupied, occLast, 0, H);
 
-        bool Fits(Variant v, int x, int y)
+        // -1 when the part fits at (x, y); otherwise the next x worth trying in this row (every spot
+        // before it overlaps the same blocked cell).
+        int Blocked(Variant v, int x, int y)
         {
-            var g = v.Grown;
-            // Quick yes when the whole frame is clear; otherwise check cell by cell.
-            if (SumBox(edgeSat, x, y, x + g.W, y + g.H) != 0)
-                foreach (var i in v.Body.SetList())
-                    if (edge[(y + i / g.W) * W + x + i % g.W]) return false;
-            if (SumBox(occSat, x, y, x + g.W, y + g.H) != 0)
-                foreach (var i in g.SetList())
-                    if (occupied[(y + i / g.W) * W + x + i % g.W]) return false;
-            return true;
+            foreach (var (row, lo, hi) in v.Body.RunList())
+            {
+                int b = edgeLast[(y + row) * W + x + hi];
+                if (b >= x + lo) return b - lo + 1;
+            }
+            foreach (var (row, lo, hi) in v.Grown.RunList())
+            {
+                int b = occLast[(y + row) * W + x + hi];
+                if (b >= x + lo) return b - lo + 1;
+            }
+            return -1;
         }
 
         (int X, int Y, Variant V)? FindSpot(List<Variant> vs)
@@ -155,10 +175,11 @@ public static class Nesting
                 for (int y = 0; y + g.H <= H; y++)
                 {
                     if (best is { } b && y > b.Y) break;
-                    for (int x = 0; x + g.W <= W; x++)
+                    for (int x = 0; x + g.W <= W;)
                     {
                         if (best is { } bb && y == bb.Y && x >= bb.X) break;
-                        if (!Fits(v, x, y)) continue;
+                        int next = Blocked(v, x, y);
+                        if (next >= 0) { x = Math.Max(next, x + 1); continue; }
                         best = (x, y, v);
                         break;
                     }
@@ -173,7 +194,7 @@ public static class Nesting
             // Mark the part itself; the next part's grown outline keeps the spacing from it.
             var body = v.Body;
             foreach (var i in body.SetList()) occupied[(y + i / body.W) * W + x + i % body.W] = true;
-            occSat = Sat(occupied);
+            Last(occupied, occLast, y, y + body.H);
         }
 
         Affine Placement(int ui, int x, int y, Variant v)
