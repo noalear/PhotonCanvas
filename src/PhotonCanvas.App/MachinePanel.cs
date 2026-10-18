@@ -668,13 +668,20 @@ public sealed class MachinePanel : UserControl
     async Task PointersOffAsync()
     {
         if (++_pointersOff > 1 || _pointersAreOff || _client is not { } c || !c.IsConnected) return;
-        if (Mode is not ("P_IDLE" or "P_WORK" or "")) return;
+        // Idle, a job loaded, or one just finished (the calibration photo comes right after its burn).
+        // Not while running, framing or focusing.
+        if (Mode is not ("P_IDLE" or "P_WORK" or "P_WORK_DONE" or "P_FINISH" or ""))
+        {
+            AppLog.Write("machine", $"Photo taken with the pointer on: the machine is busy ({Mode}).");
+            return;
+        }
         try
         {
             _focusPower ??= await c.GetFocusPowerAsync();
             await c.SetIrLedAsync(false);
             // Without knowing its brightness we couldn't put the pointer back, so leave it alone.
             if (_focusPower is not null) await c.SetPointerPowerAsync(0);
+            else AppLog.Write("machine", "Photo taken with the pointer on: couldn't read its brightness to put it back afterwards.");
             _pointersAreOff = true;
             await Task.Delay(100); // let them go dark before the shutter
         }
