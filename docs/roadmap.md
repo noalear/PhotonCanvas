@@ -143,26 +143,39 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
 
 ### Material library and tests
-- [ ] xTool's own tested F2 Ultra settings, imported from the installed copy when the app runs, never kept in our repo (xTool's live library is *online*)
+- [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB) under its AppData folder, so this needs a LevelDB reader
 - [x] Copy and paste layer settings (xTool)
 - [x] Single-point test: one square at chosen settings (xTool)
 - [ ] Read a burned test grid from a photo and point out the best square (xTool does it *online* with AI; ours would measure it, as Measure colours does)
 
 ### Machine and device
-- [ ] Device settings page: name and versions, flame alarm and sensitivity, stop when moved, exhaust time after a job, sleep, laser overheat alarm (xTool)
-- [ ] Galvo timing per laser: laser on/off delays, corner and jump delays (xTool, EZCad, LightBurn galvo)
+- [x] Device settings page: name and versions, job counts, flame alarm, stop when moved, stop when the lid opens, exhaust run-on, sleep, MOPA overheat alarm, beeper (xTool; the F2 Ultra has no flame sensitivity setting)
+- [x] Galvo timing per laser: laser on/off delays, corner and jump delays, factory reset (xTool, EZCad, LightBurn galvo)
 - [ ] Calibrations: MOPA-to-blue alignment (engrave crosses, line them up on the camera), thickness measurement, focus, conveyor angle and X, pointer alignment (xTool)
-- [ ] Focus: aimed measure (pick the point) and quick measure (xTool)
+- [ ] Focus: aimed measure with the camera and the red pointer (xTool's fallback; the F2 Ultra has no separate quick-measure sensor)
 - [x] Z-axis homing (xTool)
-- [ ] Back up a job to the machine, to run again from its screen (xTool)
-- [ ] Resume after a power cut (xTool)
-- [ ] Time-lapse video of a job from the camera (xTool)
+- [x] Keep a job on the machine, to run again from its screen (xTool; needs the touchscreen controller)
+- [x] Resume after a power cut: offered on connecting (xTool)
+- [ ] Time-lapse of a job from camera photos (xTool has the words for it but not the feature on the F2 Ultra)
 - [x] Task and measurement history (xTool)
 - [ ] Firmware updates from a file (xTool; downloading them is *online*)
-- [ ] Wi-Fi setup and USB connection (xTool)
-- [ ] Access key and room interlock, emergency-stop dialog, purifier and air-assist accessories (xTool)
+- [x] Wi-Fi setup (scan, join) and finding the machine over a USB or Ethernet cable (xTool)
+- [x] Interlock status (lid, safety key, exhaust fan, emergency stop) and alarm messages for the emergency stop, flame, tilt and overheating (xTool)
+- [ ] Purifier and duct-fan accessory control (fan speed) (xTool)
 
 ### Online only (not planned; listed for completeness)
 - Accounts and linking the machine to one; cloud projects and sharing; cloud fonts
 - AI image generation and editing (AImake, cutout, enhance, expand, restyle, magic eraser), AI emboss, AI material recognition and suggested settings, AI test-grid reading, AI assistant
 - Online design library and publishing; warranty lookup; telemetry
+
+### To check at the machine test
+
+Built from xTool Studio's own requests but not yet tried on the machine:
+- Device settings: every switch reads back what the machine shows; renaming; exhaust run-on.
+- Galvo timing: values read match xTool Studio's (shown ×10); saving one value; factory reset.
+- Power-cut resume: the offer appears after pulling the plug mid-job (scrap material), and Carry on waits for the button.
+- Keep a job on the machine (needs the touchscreen controller).
+- Wi-Fi scan and join; finding the machine over a USB cable.
+- Interlock status; the alarm messages (emergency stop is the safe one to try).
+- Place on every piece: pieces found on the real bed; the bed's honeycomb not mistaken for pieces.
+- Cut order, start points, tabs, lead-out, perforation and dot mode on scrap.

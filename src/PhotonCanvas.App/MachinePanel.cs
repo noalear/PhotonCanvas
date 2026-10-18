@@ -38,6 +38,7 @@ public sealed class MachinePanel : UserControl
     readonly TextBlock _distance = Hint();
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
     readonly CheckBox _beeper = new() { Content = "Beeper on", IsEnabled = false };
+    readonly Button _deviceSettings = Button("Device settings…", tip: "Settings stored on the machine: name, alarms, exhaust run-on, sleep, galvo timing, Wi-Fi, interlocks, keeping a job on it.");
     readonly Button _focus = new() { Content = "Auto-focus", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
     readonly TextBlock _focusState = Hint();
     readonly ToggleSwitch _live = new() { OnContent = "Live view on", OffContent = "Live view off", IsEnabled = false };
@@ -100,6 +101,11 @@ public sealed class MachinePanel : UserControl
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
+        _deviceSettings.IsEnabled = false;
+        _deviceSettings.Click += async (_, _) =>
+        {
+            if (_client is { } dc && Owner is { } w) { await new DeviceSettingsWindow(dc).ShowDialog(w); await RefreshBeeper(); }
+        };
         _frontLight.ValueChanged += async (_, _) => await LightsChanged();
         _backLight.ValueChanged += async (_, _) => await LightsChanged();
         _focus.Click += async (_, _) => await AutoFocus();
@@ -156,7 +162,7 @@ public sealed class MachinePanel : UserControl
                 Children =
                 {
                     Card("Connection", _keysState, _keysButton, _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
-                    Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper),
+                    Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper, _deviceSettings),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera lights", LightRow("Front", _frontLight, _frontText), LightRow("Back", _backLight, _backText),
                         Hint("Brightness of the machine's fill lights for the cameras. Saved on the machine.")),
@@ -720,6 +726,16 @@ public sealed class MachinePanel : UserControl
         try
         {
             var found = await Discovery.DiscoverAsync(_keys, TimeSpan.FromSeconds(4));
+            if (found.Count == 0)
+            {
+                // Nothing on the network: try a USB cable (the machine is a small network over USB at a fixed
+                // address: 172.25.3.1 seen from Windows, 172.25.4.1 from a Mac) and a direct Ethernet cable.
+                _connState.Text = "Nothing on the network; trying a USB or Ethernet cable…";
+                var direct = new List<DiscoveredDevice>();
+                foreach (var ip in new[] { "172.25.3.1", "172.25.4.1", "169.254.2.1" })
+                    direct.AddRange(await Discovery.DiscoverAsync(_keys, TimeSpan.FromSeconds(1.5), System.Net.IPAddress.Parse(ip)));
+                found = [.. direct.DistinctBy(d => d.Ip)];
+            }
             var items = found.Select(d => new ComboBoxItem
             {
                 Content = $"{d.Name ?? "xTool"} · {d.DeviceCode ?? "?"} · {d.Ip}",
@@ -820,7 +836,7 @@ public sealed class MachinePanel : UserControl
             _connState.Text = $"Connected to {ip}.";
             _connect.Content = "Disconnect";
             _connect.Classes.Remove("primary");
-            _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = _focus.IsEnabled = true;
+            _lidOpen.IsEnabled = _beeper.IsEnabled = _live.IsEnabled = _focus.IsEnabled = _deviceSettings.IsEnabled = true;
             await RefreshLid();
             await RefreshBeeper();
             await RefreshLights();
@@ -830,6 +846,7 @@ public sealed class MachinePanel : UserControl
             StartPolling();
             ConnectionChanged?.Invoke();
             if (_onCanvas.IsChecked == true) _ = RefreshOverlay(); // camera was on last time
+            _ = OfferPowerResume(client);
             return true;
         }
         catch (DeviceException e)
@@ -882,7 +899,7 @@ public sealed class MachinePanel : UserControl
         Mode = "";
         _updatingLid = true;
         _lidOpen.IsEnabled = false;
-        _beeper.IsEnabled = false;
+        _beeper.IsEnabled = _deviceSettings.IsEnabled = false;
         _focus.IsEnabled = false;
         _frontLight.IsEnabled = _backLight.IsEnabled = false;
         _focusState.Text = "";
@@ -1049,6 +1066,16 @@ public sealed class MachinePanel : UserControl
         };
         if (ev.Module == "GAP") text = $"Lid {(ev.Type == "OPEN" ? "opened" : ev.Type == "CLOSE" ? "closed" : ev.Type)}.";
         Log(text);
+        // The machine's own alarms: shown straight away, whatever window is open.
+        string? alarm = (ev.Module, ev.Type) switch
+        {
+            (_, "PRESS_DOWN") when (ev.Module ?? "").Contains("EMERGENCY", StringComparison.OrdinalIgnoreCase) => "The emergency stop was pressed. Release it (turn it) once it's safe, then check the job.",
+            (_, "FIRE_RECOGNITION" or "FIND_EXCEPTION") => "The machine's flame alarm went off and it stopped. Check the material for flames or embers before doing anything else.",
+            (_, "MACHINE_TILTED") => "The machine was moved or tilted and stopped. Put it back level and check the material hasn't shifted.",
+            (_, "TMP_HIGH") => "The MOPA laser is too hot and the job stopped. Let it cool down before carrying on.",
+            _ => null,
+        };
+        if (alarm is not null && Owner is { } owner) _ = Dialogs.Message(owner, "Machine alarm", alarm);
         DeviceEventReceived?.Invoke(ev);
     }
 
@@ -1127,6 +1154,22 @@ public sealed class MachinePanel : UserControl
         }
         catch (DeviceException e) { Log($"Couldn't change the beeper setting: {e.Message}"); }
         await RefreshBeeper();
+    }
+
+    /// <summary>A job cut short by a power cut: offer to carry on (it starts with the machine's button) or forget it.</summary>
+    async Task OfferPowerResume(DeviceClient c)
+    {
+        try
+        {
+            if (!await c.HasInterruptedJobAsync() || Owner is not { } owner) return;
+            bool resume = await Dialogs.Confirm(owner, "Carry on after the power cut?",
+                "A job was cut short when the power went off. The machine can carry on from where it stopped.\n\n" +
+                "Check the material hasn't moved first. After you choose Carry on, press the machine's button to start.",
+                "Carry on", "Forget the job");
+            if (resume) { await c.ArmInterruptedJobAsync(); Log("Interrupted job ready: press the machine's button to carry on."); }
+            else { await c.DropInterruptedJobAsync(); Log("Interrupted job forgotten."); }
+        }
+        catch (DeviceException e) { AppLog.Write("power-resume", e.Message); }
     }
 
     async Task SetLidOpen()
