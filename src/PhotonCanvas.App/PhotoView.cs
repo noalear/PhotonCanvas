@@ -59,6 +59,21 @@ public sealed class PhotoView : Control
         Focusable = true;
     }
 
+    /// <summary>Where the next click is expected (normalised), drawn as a dashed ring with a label; null = none.</summary>
+    public (Vec2 At, string Label)? Expect { get => _expect; set { _expect = value; InvalidateVisual(); } }
+    (Vec2 At, string Label)? _expect;
+
+    /// <summary>Zoom in on <paramref name="n"/> (normalised) so about <paramref name="widthFraction"/> of the photo's width fills the view.</summary>
+    public void ZoomTo(Vec2 n, double widthFraction)
+    {
+        if (_imageSize is not { } s || Bounds.Width < 10) return;
+        double fit = Math.Min(Bounds.Width / s.Width, Bounds.Height / s.Height);
+        _zoom = Math.Clamp(Bounds.Width / (s.Width * Math.Clamp(widthFraction, 0.02, 1)), fit, 8);
+        _offset = new(Bounds.Width / 2 - n.X * s.Width * _zoom, Bounds.Height / 2 - n.Y * s.Height * _zoom);
+        _fitted = true;
+        InvalidateVisual();
+    }
+
     public void Fit()
     {
         if (_imageSize is not { } s || Bounds.Width < 10) return;
@@ -113,6 +128,17 @@ public sealed class PhotoView : Control
                 ctx.FillRectangle(new SolidColorBrush(Color.FromArgb(200, m.Color.R, m.Color.G, m.Color.B)), box, 3);
                 ctx.DrawText(t, new Point(box.X + 4, box.Y + 1));
             }
+        }
+        if (_expect is { } ex)
+        {
+            // The expected spot: a big dashed ring, so the mark itself stays visible inside it.
+            var p = ToScreen(ex.At);
+            var pen = new Pen(new SolidColorBrush(Color.Parse("#3DD6F5")), 2, new DashStyle([5, 4], 0));
+            ctx.DrawEllipse(null, pen, p, 34, 34);
+            var t = new FormattedText(ex.Label, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, new Typeface("Inter", FontStyle.Normal, FontWeight.SemiBold), 13, Brushes.Black);
+            var box = new Rect(p.X - t.Width / 2 - 6, p.Y - 34 - t.Height - 8, t.Width + 12, t.Height + 4);
+            ctx.FillRectangle(new SolidColorBrush(Color.Parse("#3DD6F5")), box, 4);
+            ctx.DrawText(t, new Point(box.X + 6, box.Y + 2));
         }
     }
 

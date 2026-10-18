@@ -300,13 +300,62 @@ public sealed class CalibrationWindow : Window
 
     // ---- 3: locate ---------------------------------------------------------------------
 
-    static readonly string[] CornerPrompts =
-    [
-        "Click the corner mark that has ONE small dot beside it (top-left of the work area).",
-        "Click the corner mark that has TWO small dots beside it (top-right).",
-        "Click the corner mark diagonally opposite the first one (bottom-right).",
-        "Click the last corner mark (bottom-left).",
-    ];
+    static readonly string[] CornerNames = ["Top Left", "Top Right", "Bottom Right", "Bottom Left"];
+    static readonly string[] CornerPrompts = [.. CornerNames.Select(n => $"{n}: click the centre of the {n} mark.")];
+
+    /// <summary>
+    /// Where corner <paramref name="k"/> should be in the photo (normalised), and how much of the
+    /// photo to show around it: from the corners already clicked when there are enough, else from
+    /// the camera's saved calibration, else that corner's quarter of the photo.
+    /// </summary>
+    (Vec2 At, double Width) ExpectedCorner(int k)
+    {
+        var clicked = _cornerClicks.Select(Norm).ToList();
+        double ratio = _imgW > 0 ? (double)_imgH / _imgW : 1;
+        // Two corners clicked: the square's other corners follow (a quarter turn of the top edge).
+        if (clicked.Count >= 2)
+        {
+            Vec2 tl = clicked[0], tr = clicked[1];
+            // Work in units of the photo's width, so a square stays square.
+            var edge = new Vec2(tr.X - tl.X, (tr.Y - tl.Y) * ratio);
+            var down = new Vec2(-edge.Y, edge.X);
+            var br = clicked.Count >= 3 ? clicked[2] : new Vec2(tr.X + down.X, tr.Y + down.Y / ratio);
+            var bl = new Vec2(tl.X + (br.X - tr.X), tl.Y + (br.Y - tr.Y));
+            double width = Math.Max(0.15, edge.Length * 0.45);
+            return (k == 2 ? br : bl, width);
+        }
+        if (_machine.CameraMapFor((double)(_distance.Value ?? 0)) is { } choice)
+        {
+            var at = choice.Map.ToImage(_grid[CalibrationMarks.Corners[k]]);
+            var nearby = choice.Map.ToImage(_grid[CalibrationMarks.Corners[k]] + new Vec2(40, 0));
+            // A known first click moves the guess for the second by the same amount.
+            if (clicked.Count == 1)
+            {
+                var was = choice.Map.ToImage(_grid[CalibrationMarks.Corners[0]]);
+                at = new Vec2(at.X + clicked[0].X - was.X, at.Y + clicked[0].Y - was.Y);
+            }
+            // About 70 mm of the bed around it, so the neighbouring marks show too if the guess is off.
+            if (at.X is > -0.1 and < 1.1 && at.Y is > -0.1 and < 1.1) return (at, Math.Clamp(Math.Abs(nearby.X - at.X) * 1.8, 0.2, 0.6));
+        }
+        // Nothing to go on: that corner's quarter of the photo.
+        return (new Vec2(k is 0 or 3 ? 0.25 : 0.75, k is 0 or 1 ? 0.25 : 0.75), 0.5);
+    }
+
+    /// <summary>Show where the next corner is expected, zoomed in on it; the whole photo once all four are in.</summary>
+    void PromptCorner()
+    {
+        if (_gray is null) { _photo.Expect = null; return; }
+        int k = _cornerClicks.Count;
+        if (k >= 4)
+        {
+            _photo.Expect = null;
+            _photo.Fit();
+            return;
+        }
+        var (at, width) = ExpectedCorner(k);
+        _photo.Expect = (at, CornerNames[k]);
+        _photo.ZoomTo(at, width);
+    }
 
     void ResetMarks()
     {
@@ -321,6 +370,8 @@ public sealed class CalibrationWindow : Window
         _result.Text = "";
         _instruction.Text = _gray is null ? "Take or open a photo first." : CornerPrompts[0];
         UpdateView();
+        // After the photo view has its size.
+        Avalonia.Threading.Dispatcher.UIThread.Post(PromptCorner, Avalonia.Threading.DispatcherPriority.Background);
     }
 
     Vec2 Px(Vec2 norm) => new(norm.X * _imgW, norm.Y * _imgH);
@@ -357,6 +408,7 @@ public sealed class CalibrationWindow : Window
             if (_cornerClicks.Count < 4) _instruction.Text = CornerPrompts[_cornerClicks.Count];
             else LocateAll();
             UpdateView();
+            PromptCorner();
             return;
         }
         // Select a marker, or move the selected one here.
