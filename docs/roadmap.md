@@ -84,8 +84,9 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 ### Machine modes
 - [ ] Curved surface: measure the surface with the camera and the pointer (a grid of points), then follow it in Z (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
-- [ ] Batch on the conveyor: photograph the items, find each one, put the design on it, mark, move on (xTool batch; their recognition is *online* or a downloaded model, ours would be our own shape matching)
-- [ ] Variables batch: a different spreadsheet row on each item found (xTool)
+- [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)
+- [ ] The same on the conveyor: mark, move on, photograph again (needs the conveyor)
+- [x] Variables batch: a different serial number or spreadsheet row on each item found, or on each copy of an array (xTool)
 - [ ] Quick processing: closing the lid focuses, photographs, finds the material, centres the design and starts (xTool)
 
 ### Shapes, text and editing

@@ -77,7 +77,7 @@ public sealed class ParamShape : PathShape
     {
         double sx = Math.Max(1e-9, Transform.ScaleX), sy = Math.Max(1e-9, Math.Abs(Transform.ScaleY));
         var unscaled = Affine.Scale(1 / sx, 1 / sy).Then(Transform);
-        return Create(Kind, w, h, corner, sides, inner, LayerId, unscaled, Id, Name, GroupId);
+        return Keep(Create(Kind, w, h, corner, sides, inner, LayerId, unscaled, Id, Name, GroupId));
     }
 
     /// <summary>The size as seen on the work area (the drawn size times any stretching).</summary>

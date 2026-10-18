@@ -462,6 +462,7 @@ public partial class MainWindow : Window
         var codes = home.Group("Serial & codes");
         codes.Large("Code", "IcCode", () => _ = Guard(() => EditCode(null)), "QR code, Data Matrix or barcode. It can hold a serial number, the date or a spreadsheet column, new on every run");
         codes.Small("Variables", "IcVariables", () => _ = Guard(ShowVariables), "Serial number and spreadsheet (CSV) that fill in {fields} in text and codes, moving on after each run");
+        codes.Small("Number copies", "IcArrayGrid", NumberCopies, "Selected copies (groups or single shapes) each mark the next serial number or spreadsheet row, back to front and left to right; select one to set it back", HasSel);
         var grp = home.Group("Group");
         grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
         grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", HasSel);
@@ -579,6 +580,7 @@ public partial class MainWindow : Window
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
+        fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
 
@@ -2262,6 +2264,49 @@ public partial class MainWindow : Window
                 .Then(Affine.RotateAbout(fit.Center, fit.AngleDeg))
                 .Then(Affine.Translate(fit.Offset));
             _doc.Commit("Fit to camera", Ops.Transform(_doc.State, ids, move), ids);
+        });
+        await w.ShowDialog(this);
+    }
+
+    /// <summary>Each selected copy (a group, or a shape on its own) marks the next number, in reading order.</summary>
+    void NumberCopies()
+    {
+        var picked = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
+        if (picked.Count == 0) return;
+        var units = picked.GroupBy(s => s.GroupId ?? s.Id).Select(g => (Ids: g.Select(x => x.Id).ToHashSet(), Box: _doc.State.Bounds(g.Select(x => x.Id).ToHashSet()))).ToList();
+        double row = Math.Max(1, units.Average(u => u.Box.Height) / 2);
+        var ordered = units.Count == 1 ? units : [.. units.OrderBy(u => Math.Round(u.Box.Center.Y / row)).ThenBy(u => u.Box.Center.X)];
+        var s = _doc.State;
+        for (int i = 0; i < ordered.Count; i++)
+            s = s with { Shapes = [.. s.Shapes.Select(x => ordered[i].Ids.Contains(x.Id) ? x.WithVarOffset(units.Count == 1 ? 0 : i) : x)] };
+        _doc.Commit("Number copies", s);
+        StatusText.Text = units.Count == 1
+            ? "This copy marks the design's own serial number / row again."
+            : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
+    }
+
+    async Task PlaceOnEveryPiece()
+    {
+        var outline = SelectedOutline();
+        if (outline.Count == 0) { await Dialogs.Message(this, "Every piece", "Select the design to put on each piece first."); return; }
+        if (!_machine.IsConnected) { await Dialogs.Message(this, "Every piece", "Connect to the machine first: finding the pieces needs a fresh camera photo."); return; }
+        var ids = _doc.Selection;
+        var w = new BatchPlaceWindow(_machine, outline, placements =>
+        {
+            // One copy per piece (each its own group); the copies' fields count up in reading order.
+            var originals = _doc.State.Shapes.Where(s => ids.Contains(s.Id)).ToList();
+            var made = new List<Shape>();
+            var s = _doc.State;
+            for (int i = 0; i < placements.Count; i++)
+            {
+                var copy = Ops.CopyAsUnit(originals, placements[i].Move).Select(c => c.WithVarOffset(i)).ToList();
+                s = Ops.AddShapes(s, copy);
+                if (copy.Count > 1) s = Ops.Group(s, copy.Select(c => c.Id).ToHashSet()).Item1;
+                made.AddRange(copy);
+            }
+            s = Ops.Delete(s, ids);
+            _doc.Commit("Place on every piece", s, made.Select(m => m.Id));
+            StatusText.Text = $"A copy on each of {placements.Count} pieces." + (VariableText.Used(_doc.State).Count > 0 ? " Each one marks the next serial number / spreadsheet row." : "");
         });
         await w.ShowDialog(this);
     }

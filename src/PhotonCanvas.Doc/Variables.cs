@@ -210,16 +210,24 @@ public static class VariableText
     static bool UsesCsv(VariableData v, IReadOnlySet<string> used) =>
         used.Contains("row") || used.Any(k => k is not ("serial" or "date" or "time") && v.Table.Column(k) >= 0);
 
+    /// <summary>The values a copy <paramref name="n"/> steps ahead marks.</summary>
+    public static VariableData Ahead(VariableData v, int n) => n == 0 ? v : v with { Serial = v.Serial + n * v.SerialStep, CsvRow = v.CsvRow + n };
+
+    /// <summary>How many items one run marks: one more than the furthest-ahead copy with fields.</summary>
+    public static int ItemsPerRun(DocState s) =>
+        1 + s.Shapes.Where(sh => Template(sh) is { } t && HasFields(t)).Select(sh => sh.VarOffset).DefaultIfEmpty(0).Max();
+
     /// <summary>Fill in every text and code with fields, for this moment. The same state comes back if nothing changed.</summary>
     public static DocState Refresh(DocState s, DateTime now)
     {
         ImmutableList<Shape>.Builder? b = null;
         for (int i = 0; i < s.Shapes.Count; i++)
         {
-            Shape? next = s.Shapes[i] switch
+            var sh = s.Shapes[i];
+            Shape? next = sh switch
             {
-                TextShape t => Want(t.Text) is var w && w != t.Shown ? t.WithShown(w) : null,
-                CodeShape c => Want(c.Spec.Content) is var w && w != c.Shown ? c.WithShown(w) : null,
+                TextShape t => Want(t.Text, sh.VarOffset) is var w && w != t.Shown ? t.WithShown(w) : null,
+                CodeShape c => Want(c.Spec.Content, sh.VarOffset) is var w && w != c.Shown ? c.WithShown(w) : null,
                 _ => null,
             };
             if (next is null) continue;
@@ -228,7 +236,7 @@ public static class VariableText
         }
         return b is null ? s : s with { Shapes = b.ToImmutable() };
 
-        string? Want(string template) => HasFields(template) ? Resolve(template, s.Vars, now) : null;
+        string? Want(string template, int ahead) => HasFields(template) ? Resolve(template, Ahead(s.Vars, ahead), now) : null;
     }
 
     /// <summary>
@@ -241,8 +249,10 @@ public static class VariableText
         var v = s.Vars;
         if (v.AdvanceAfterRun)
         {
-            if (used.Contains("serial")) v = v with { Serial = v.Serial + v.SerialStep };
-            if (UsesCsv(v, used)) v = v with { CsvRow = v.CsvRow + 1 };
+            // Past every item this run marked (copies numbered ahead included).
+            int items = ItemsPerRun(s);
+            if (used.Contains("serial")) v = v with { Serial = v.Serial + items * v.SerialStep };
+            if (UsesCsv(v, used)) v = v with { CsvRow = v.CsvRow + items };
         }
         var run = JobBuilder.OutputLayers(s).Where(l => l.TurnEachRun && s.ShapesFor(l).Any()).Select(l => l.Id).ToHashSet();
         var layers = run.Count == 0 ? s.Layers : s.Layers.Select(l => run.Contains(l.Id) ? l with { RunCount = l.RunCount + 1 } : l).ToImmutableList();
@@ -257,8 +267,9 @@ public static class VariableText
         if (used.Count == 0) return null;
         var v = s.Vars;
         var parts = new List<string>();
-        if (used.Contains("serial")) parts.Add($"serial {v.Serial}");
-        if (UsesCsv(v, used) && v.HasCsv) parts.Add($"row {v.CsvRow + 1} of {v.Table.Rows.Length}");
+        int items = ItemsPerRun(s);
+        if (used.Contains("serial")) parts.Add(items > 1 ? $"serials {v.Serial}–{Ahead(v, items - 1).Serial}" : $"serial {v.Serial}");
+        if (UsesCsv(v, used) && v.HasCsv) parts.Add(items > 1 ? $"rows {v.CsvRow + 1}–{v.CsvRow + items} of {v.Table.Rows.Length}" : $"row {v.CsvRow + 1} of {v.Table.Rows.Length}");
         if (used.Contains("date") || used.Contains("time")) parts.Add("today's date/time");
         return parts.Count == 0 ? null : string.Join(" · ", parts);
     }
@@ -272,11 +283,15 @@ public static class VariableText
         {
             if (used.Contains("serial") && v.SerialEnd is { } end && (v.SerialStep >= 0 ? v.Serial > end : v.Serial < end))
                 yield return $"The serial number {v.Serial} is past the last one ({end}). Change it in Variables.";
+            else if (used.Contains("serial") && v.SerialEnd is { } end2 && Ahead(v, ItemsPerRun(s) - 1).Serial is var lastSerial && (v.SerialStep >= 0 ? lastSerial > end2 : lastSerial < end2))
+                yield return $"The copies would go up to serial {lastSerial}, past the last one ({end2}). Remove some copies or change it in Variables.";
             if (UsesCsv(v, used))
             {
                 if (!v.HasCsv) yield return "The design uses {row} but no spreadsheet is loaded. Load one in Variables.";
                 else if (v.CsvRow >= v.Table.Rows.Length)
                     yield return $"All {v.Table.Rows.Length} rows of {(v.CsvName.Length > 0 ? v.CsvName : "the spreadsheet")} have been marked. Pick a row in Variables to carry on.";
+                else if (v.CsvRow + ItemsPerRun(s) > v.Table.Rows.Length)
+                    yield return $"The copies need rows {v.CsvRow + 1}–{v.CsvRow + ItemsPerRun(s)}, but the spreadsheet has {v.Table.Rows.Length}. Remove some copies or pick an earlier row.";
             }
             foreach (var k in used.Where(k => k is not ("serial" or "date" or "time" or "row") && v.Table.Column(k) < 0))
                 yield return v.HasCsv

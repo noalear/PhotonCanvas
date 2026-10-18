@@ -72,11 +72,11 @@ public sealed class ImageShape : Shape
     List<List<Vec2>>? _clipFlat;
 
     /// <summary>The same picture clipped to an outline given in world mm (null removes the clip).</summary>
-    public ImageShape WithClip(PathGeometry? world) => new()
+    public ImageShape WithClip(PathGeometry? world) => Keep(new ImageShape
     {
         Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = Tone,
         Clip = world is null || !Transform.IsInvertible ? null : world.Transform(Transform.Invert()),
-    };
+    });
 
     Vec2[]? _corners;
     Rect2? _bounds;
@@ -111,11 +111,11 @@ public sealed class ImageShape : Shape
     public ImageShape WithPicture(ImageSource source, Vec2? size = null, Affine? transform = null)
     {
         var t = transform ?? Transform;
-        return new()
+        return Keep(new ImageShape
         {
             Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = t, Source = source, SizeMm = size ?? SizeMm, Tone = Tone,
             Clip = Clip is null || transform is null ? Clip : t.IsInvertible ? Clip.Transform(Transform.Then(t.Invert())) : null,
-        };
+        });
     }
 
     /// <summary>
@@ -155,10 +155,10 @@ public sealed class ImageShape : Shape
         return new RasterImage(w, h, rgba);
     }
 
-    public ImageShape WithTone(ToneAdjust tone) => new()
+    public ImageShape WithTone(ToneAdjust tone) => Keep(new ImageShape
     {
         Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone, Clip = Clip,
-    };
+    });
 
     /// <summary>Local mm → pixel coordinates.</summary>
     public Vec2 LocalToPixel(Vec2 local) => new(local.X / SizeMm.X * Source.Width, local.Y / SizeMm.Y * Source.Height);

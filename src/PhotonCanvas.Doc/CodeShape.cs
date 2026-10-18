@@ -86,10 +86,10 @@ public sealed class CodeShape : PathShape
     }
 
     /// <summary>The same code object (place, layer, group) with new settings.</summary>
-    public CodeShape Edit(CodeSpec spec) => Create(spec, null, LayerId, Transform, Id, Name == DefaultName(Spec) ? null : Name, GroupId);
+    public CodeShape Edit(CodeSpec spec) => Keep(Create(spec, null, LayerId, Transform, Id, Name == DefaultName(Spec) ? null : Name, GroupId));
 
     /// <summary>The same code showing other values for its fields.</summary>
-    public CodeShape WithShown(string? shown) => Create(Spec, shown, LayerId, Transform, Id, Name, GroupId);
+    public CodeShape WithShown(string? shown) => Keep(Create(Spec, shown, LayerId, Transform, Id, Name, GroupId));
 
     /// <summary>The code's modules, dark = true: columns × rows (one row for barcodes).</summary>
     public static (int Cols, int Rows, bool[] Dark) Encode(CodeKind kind, string text, CodeEcc ecc = CodeEcc.M)

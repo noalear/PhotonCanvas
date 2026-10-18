@@ -62,15 +62,15 @@ public sealed class TextShape : PathShape
 
     /// <summary>The same text object with new words and/or style (fields are filled in again when the edit is committed).</summary>
     public TextShape Edit(string text, TextStyle style) =>
-        Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId, text == Text ? Shown : null, Guide);
+        Keep(Create(text, style, LayerId, Transform, Id, Name == FirstLine(Text) ? null : Name, GroupId, text == Text ? Shown : null, Guide));
 
     /// <summary>The same text showing other values for its fields.</summary>
-    public TextShape WithShown(string? shown) => Create(Text, Style, LayerId, Transform, Id, Name, GroupId, shown, Guide);
+    public TextShape WithShown(string? shown) => Keep(Create(Text, Style, LayerId, Transform, Id, Name, GroupId, shown, Guide));
 
     /// <summary>The same text following a path given in world mm (null: back to straight lines).</summary>
     public TextShape OnPath(PathGeometry? worldPath) =>
-        Create(Text, Style, LayerId, Transform, Id, Name, GroupId, Shown,
-            worldPath is null || !Transform.IsInvertible ? null : worldPath.Transform(Transform.Invert()));
+        Keep(Create(Text, Style, LayerId, Transform, Id, Name, GroupId, Shown,
+            worldPath is null || !Transform.IsInvertible ? null : worldPath.Transform(Transform.Invert())));
 
     static string FirstLine(string t)
     {

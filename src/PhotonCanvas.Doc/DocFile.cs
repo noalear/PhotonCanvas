@@ -137,6 +137,7 @@ public static class DocFile
             };
             if (sh.GroupId is { } gid) o["group"] = gid.ToString();
             if (sh.Locked) o["locked"] = true;
+            if (sh.VarOffset > 0) o["varOffset"] = sh.VarOffset;
             if (sh is PathShape { ManualTabs.Count: > 0 } mt) o["tabs"] = new JsonArray([.. mt.ManualTabs.Select(t => (JsonNode)new JsonArray(t.X, t.Y))]);
             if (sh is PathShape { StartPoint: { } sp }) o["start"] = new JsonArray(sp.X, sp.Y);
             switch (sh)
@@ -455,6 +456,10 @@ public static class DocFile
             var locked = (root["shapes"]?.AsArray() ?? []).Where(x => x?["locked"]?.GetValue<bool>() == true)
                 .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
             var all = shapes.Select(sh => locked.Contains(sh.Id) ? sh.WithLocked(true) : sh).ToImmutableList();
+            // Copies numbered ahead (each marks a different item).
+            var ahead = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["varOffset"] is not null)
+                .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty, x => x["varOffset"]!.GetValue<int>());
+            if (ahead.Count > 0) all = [.. all.Select(sh => ahead.TryGetValue(sh.Id, out var n) ? sh.WithVarOffset(n) : sh)];
             // Hand-placed tabs, saved per shape.
             var tabs = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["tabs"] is JsonArray)
                 .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty,

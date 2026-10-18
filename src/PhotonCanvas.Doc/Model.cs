@@ -234,6 +234,12 @@ public abstract class Shape
     public Guid Id { get => _id; init => _id = value; }
     /// <summary>Can't be picked or changed on the canvas (until unlocked); still marked.</summary>
     public bool Locked { get => _locked; init => _locked = value; }
+
+    /// <summary>
+    /// For copies that each mark a different item: this copy's text and codes are this many steps
+    /// ahead (serial + n × step, spreadsheet row + n). 0 = the design's own values.
+    /// </summary>
+    public int VarOffset { get; private set; }
     public string Name { get => _name; init => _name = value; }
     public Guid LayerId { get => _layerId; init => _layerId = value; }
     /// <summary>Local → world (machine mm).</summary>
@@ -260,6 +266,33 @@ public abstract class Shape
     {
         var c = (Shape)MemberwiseClone();
         c._locked = locked;
+        return c;
+    }
+
+    /// <summary>
+    /// A shape rebuilt from this one (new words, filled-in fields, new settings) keeps what was set
+    /// on it by hand: its lock, its copy number, and its tabs and start point (kept where they were
+    /// on the work area, even if the rebuild changed its own coordinates).
+    /// </summary>
+    protected internal T Keep<T>(T rebuilt) where T : Shape
+    {
+        rebuilt._locked = _locked;
+        rebuilt.VarOffset = VarOffset;
+        if (this is PathShape from && rebuilt is PathShape to && (from.ManualTabs.Count > 0 || from.StartPoint is not null))
+        {
+            bool same = Transform == rebuilt.Transform;
+            Vec2 Move(Vec2 p) => same || !rebuilt.Transform.IsInvertible ? p : rebuilt.Transform.Invert().Apply(Transform.Apply(p));
+            to.ManualTabs = [.. from.ManualTabs.Select(Move)];
+            to.StartPoint = from.StartPoint is { } sp ? Move(sp) : null;
+        }
+        return rebuilt;
+    }
+
+    /// <summary>A copy whose fields are <paramref name="n"/> steps ahead (see <see cref="VarOffset"/>).</summary>
+    public Shape WithVarOffset(int n)
+    {
+        var c = (Shape)MemberwiseClone();
+        c.VarOffset = Math.Max(0, n);
         return c;
     }
 
@@ -290,10 +323,10 @@ public class PathShape : Shape
     public required PathGeometry Geometry { get; init; }
 
     /// <summary>Tabs placed by hand on this shape's outlines (the shape's own mm, so they move with it): used instead of evenly spaced ones on a Cut layer with tabs.</summary>
-    public ImmutableList<Vec2> ManualTabs { get; private set; } = [];
+    public ImmutableList<Vec2> ManualTabs { get; internal set; } = [];
 
     /// <summary>Where cutting starts on this shape's outline (the shape's own mm); null = wherever the cut order picks.</summary>
-    public Vec2? StartPoint { get; private set; }
+    public Vec2? StartPoint { get; internal set; }
 
     /// <summary>The hand-placed tabs on the work area.</summary>
     public IEnumerable<Vec2> TabsWorld => ManualTabs.Select(Transform.Apply);
