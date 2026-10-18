@@ -140,6 +140,24 @@ public static class ShapeGeometry
         }
     }
 
+    /// <summary>
+    /// The area the closed subpaths cover by the non-zero rule: outlines that run the same way
+    /// add up (overlapping solids merge), ones that run the other way cut holes.
+    /// </summary>
+    public static PathGeometry FillNonZero(PathGeometry g, double tolerance = 0.01)
+    {
+        try
+        {
+            double tol = Tol(tolerance);
+            var closed = ToPaths(g, tol).Closed;
+            return closed.Count == 0 ? PathGeometry.Empty : ToGeometry(Clipper.Union(closed, FillRule.NonZero), tol);
+        }
+        catch (Exception)
+        {
+            return PathGeometry.Empty;
+        }
+    }
+
     static double Tol(double t) => double.IsFinite(t) && t > 0 ? Math.Clamp(t, 1e-3, 10) : 0.01;
 
     static JoinType Joins(JoinStyle j) => j switch

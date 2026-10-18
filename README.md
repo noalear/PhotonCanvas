@@ -29,6 +29,8 @@ straight to the machine over your own network.
 - Import SVG, DXF, PDF/AI, EPS (with Ghostscript installed), HPGL/PLT, LightBurn `.lbrn2`, xTool `.xs`/`.xcs` and pictures, shape by shape, grouped, in separate pieces or as one picture; trace pictures into vectors (outlines or centre lines); remove picture backgrounds (offline)
 - Several pages in one project; export SVG, DXF and PNG; autosave, crash recovery and earlier versions
 - Depthmaps for relief engraving with [DepthCharge](#depthcharge), placed straight onto the design
+- Stacked slices: a 3D model (STL, OBJ) cut into numbered layers of your material, with where each next layer sits marked, to glue up into the model
+- Curved surfaces: measured with the pointer and the close-up camera, or a cylinder or slatted drum typed in; the head follows them in height steps
 - Serial numbers, dates and spreadsheet (CSV) columns as `{fields}` in any text or code, moving on after each finished run; QR codes, Data Matrix and barcodes (Code 128, Code 39, EAN-13, UPC-A)
 - Rounded corners, trim, scissors, extend lines, text on a path, copy along a path, warp (taper, arch, bulge, wave, four corners), align by two points, measure, tidy lines from imported drawings (join, close, de-duplicate), remove overlapping lines, tangent circles, shadows, select by type, size or layer, lock shapes
 - Shapes that stay editable (corner radius, sides, star points), guidelines dragged from the rulers, text that fits a box, single-line text, generators (finger-jointed boxes, keychains, living hinges, earrings), multi-size copies

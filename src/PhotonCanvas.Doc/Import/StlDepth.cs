@@ -17,6 +17,33 @@ public static class StlDepth
     public readonly record struct Triangle(Vec3 A, Vec3 B, Vec3 C);
     public readonly record struct Vec3(double X, double Y, double Z);
 
+    /// <summary>A 3D model file by its extension: STL (binary or text) or OBJ.</summary>
+    /// <exception cref="FormatException">Not a readable model.</exception>
+    public static List<Triangle> Load(string path) =>
+        Path.GetExtension(path).Equals(".obj", StringComparison.OrdinalIgnoreCase) ? ParseObj(File.ReadAllText(path)) : Parse(File.ReadAllBytes(path));
+
+    /// <summary>Wavefront OBJ: "v x y z" corners and "f a b c …" faces (faces with more corners are fanned into triangles).</summary>
+    public static List<Triangle> ParseObj(string text)
+    {
+        var v = new List<Vec3>();
+        var tris = new List<Triangle>();
+        foreach (var raw in text.Split('\n'))
+        {
+            var p = raw.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (p.Length >= 4 && p[0] == "v")
+                v.Add(new(double.Parse(p[1], CultureInfo.InvariantCulture), double.Parse(p[2], CultureInfo.InvariantCulture), double.Parse(p[3], CultureInfo.InvariantCulture)));
+            else if (p.Length >= 4 && p[0] == "f")
+            {
+                // "7", "7/2", "7//3" or negative (counted from the end).
+                var idx = p.Skip(1).Select(x => int.Parse(x.Split('/')[0], CultureInfo.InvariantCulture)).Select(i => i < 0 ? v.Count + i : i - 1).ToList();
+                if (idx.Any(i => i < 0 || i >= v.Count)) throw new FormatException("The OBJ file has a face with a corner that doesn't exist.");
+                for (int k = 1; k + 1 < idx.Count; k++) tris.Add(new(v[idx[0]], v[idx[k]], v[idx[k + 1]]));
+            }
+        }
+        if (tris.Count == 0) throw new FormatException("The OBJ file has no faces.");
+        return tris;
+    }
+
     /// <exception cref="FormatException">Not a readable STL file.</exception>
     public static List<Triangle> Parse(byte[] data)
     {

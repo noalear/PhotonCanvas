@@ -1,0 +1,361 @@
+using PhotonCanvas.Core;
+using PhotonCanvas.Doc.Import;
+using Tri = PhotonCanvas.Doc.Import.StlDepth.Triangle;
+using V3 = PhotonCanvas.Doc.Import.StlDepth.Vec3;
+
+namespace PhotonCanvas.Doc.Geometry;
+
+/// <summary>
+/// The outline is the same all through a cut slice, but the model's isn't: which one to cut.
+/// </summary>
+public enum SliceOutline
+{
+    /// <summary>The model's shape half-way through the slice: steps stick out as much as they cut in.</summary>
+    Middle,
+    /// <summary>Everything the model covers anywhere in the slice: sand the steps back to the shape.</summary>
+    Outer,
+    /// <summary>Only what the model covers all through the slice: nothing sticks out, fill the steps.</summary>
+    Inner,
+}
+
+/// <summary>Which way up the model stands while it's sliced.</summary>
+public enum SliceUp { Z, MinusZ, Y, MinusY, X, MinusX }
+
+public sealed record SliceOptions
+{
+    /// <summary>The material's thickness: one slice each.</summary>
+    public double ThicknessMm { get; init; } = 3;
+    /// <summary>The model's height (along "up") in mm; the other sizes follow.</summary>
+    public double HeightMm { get; init; } = 60;
+    public SliceUp Up { get; init; } = SliceUp.Z;
+    /// <summary>Turn round the up direction (degrees), to lay the slices out differently.</summary>
+    public double TurnDeg { get; init; }
+    public SliceOutline Outline { get; init; } = SliceOutline.Middle;
+    /// <summary>Cross-sections taken through each slice for Outer and Inner.</summary>
+    public int Samples { get; init; } = 5;
+    /// <summary>Dowel holes through every slice for lining them up (0 = none).</summary>
+    public double DowelMm { get; init; }
+    /// <summary>Parts smaller than this (mm²), or thinner than <see cref="MinPartWidthMm"/>, are left out: slivers too small to cut or handle.</summary>
+    public double MinPartMm2 { get; init; } = 1;
+    public double MinPartWidthMm { get; init; } = 1;
+}
+
+/// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
+public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, double LabelRoomMm, IReadOnlyList<IReadOnlyList<Vec2>> NextMarks);
+
+/// <summary>The result: every part, bottom slice first, in model millimetres (laid flat, top view).</summary>
+public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, double StackHeightMm, double ModelWidthMm, double ModelDepthMm,
+    IReadOnlyList<PathGeometry> Layers, IReadOnlyList<Vec2> Dowels)
+{
+    /// <summary>Slivers left out for being too small.</summary>
+    public int LeftOut { get; init; }
+}
+
+/// <summary>
+/// Stacked slices: a 3D model cut into flat layers of the material's thickness. Each layer is cut
+/// out (several parts where the model branches, like an animal's legs), numbered from the bottom
+/// up, and marked with where the next layer sits, so they glue up in order into the model.
+/// </summary>
+public static class StackSlicer
+{
+    public static SliceStack Slice(IReadOnlyList<Tri> mesh, SliceOptions o, CancellationToken ct = default)
+    {
+        if (mesh.Count == 0) throw new ArgumentException("The model has no triangles.", nameof(mesh));
+        if (!(o.ThicknessMm > 0) || !(o.HeightMm > 0)) throw new ArgumentException("Thickness and height must be above zero.");
+        var tris = Orient(mesh, o);
+        double h = tris.Max(t => Math.Max(t.A.Z, Math.Max(t.B.Z, t.C.Z)));
+        int n = Math.Max(1, (int)Math.Round(h / o.ThicknessMm));
+        double slab = h / n;
+        var layers = new List<PathGeometry>();
+        for (int i = 0; i < n; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            double z0 = i * slab, z1 = (i + 1) * slab;
+            PathGeometry layer;
+            if (o.Outline == SliceOutline.Middle) layer = Section(tris, (z0 + z1) / 2);
+            else
+            {
+                int k = Math.Max(2, o.Samples);
+                var cuts = Enumerable.Range(0, k).Select(j => Section(tris, z0 + slab * (0.02 + 0.96 * j / (k - 1)))).Where(g => !g.IsEmpty).ToList();
+                layer = cuts.Count == 0 ? PathGeometry.Empty
+                    : o.Outline == SliceOutline.Outer ? ShapeGeometry.Union(cuts)
+                    : cuts.Skip(1).Aggregate(cuts[0], (a, b) => ShapeGeometry.Boolean(a, b, BoolOp.Intersect));
+            }
+            layers.Add(PathTools.Simplify(layer, 0.01).Geometry);
+        }
+        // Dowels: two holes in the part every slice has in common (when there is one).
+        var dowels = new List<Vec2>();
+        if (o.DowelMm > 0 && layers.All(l => !l.IsEmpty))
+        {
+            var common = layers.Skip(1).Aggregate(layers[0], (a, b) => ShapeGeometry.Boolean(a, b, BoolOp.Intersect));
+            var room = ShapeGeometry.Offset(common, -(o.DowelMm / 2 + 1.5), JoinStyle.Round, EndStyle.Round);
+            dowels = TwoPointsInside(room);
+        }
+        var parts = new List<SlicePart>();
+        int leftOut = 0;
+        for (int i = 0; i < n; i++)
+        {
+            var layer = layers[i];
+            if (dowels.Count > 0)
+                layer = ShapeGeometry.Boolean(layer, new PathGeometry(dowels.SelectMany(d => PathGeometry.Ellipse(d.X, d.Y, o.DowelMm / 2, o.DowelMm / 2).Subpaths)), BoolOp.Subtract);
+            var next = i + 1 < n ? layers[i + 1] : null;
+            foreach (var island in Islands(layer))
+            {
+                var loops = island.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
+                if (Math.Abs(loops.Sum(Geom.SignedArea)) < o.MinPartMm2) { leftOut++; continue; }
+                var (at, room) = Pole(loops);
+                if (room * 2 < o.MinPartWidthMm) { leftOut++; continue; }
+                var marks = next is null ? [] : MarksInside(next, loops, 0.6);
+                parts.Add(new SlicePart(i + 1, island, at, room, marks));
+            }
+        }
+        double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
+        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut };
+    }
+
+    /// <summary>The model stood the chosen way up, turned, sized to the height, and moved to start at 0, 0, 0.</summary>
+    static List<Tri> Orient(IReadOnlyList<Tri> mesh, SliceOptions o)
+    {
+        V3 Up(V3 v) => o.Up switch
+        {
+            SliceUp.MinusZ => new(v.X, -v.Y, -v.Z),
+            SliceUp.Y => new(v.X, -v.Z, v.Y),
+            SliceUp.MinusY => new(v.X, v.Z, -v.Y),
+            SliceUp.X => new(v.Y, v.Z, v.X),
+            SliceUp.MinusX => new(-v.Y, v.Z, -v.X),
+            _ => v,
+        };
+        double t = o.TurnDeg * Math.PI / 180, c = Math.Cos(t), s = Math.Sin(t);
+        V3 Map(V3 v) { var u = Up(v); return new(u.X * c - u.Y * s, u.X * s + u.Y * c, u.Z); }
+        var tris = mesh.Select(x => new Tri(Map(x.A), Map(x.B), Map(x.C))).ToList();
+        var all = tris.SelectMany(x => new[] { x.A, x.B, x.C }).ToList();
+        double minX = all.Min(v => v.X), minY = all.Min(v => v.Y), minZ = all.Min(v => v.Z), maxZ = all.Max(v => v.Z);
+        double k = o.HeightMm / Math.Max(1e-9, maxZ - minZ);
+        V3 Fit(V3 v) => new((v.X - minX) * k, (v.Y - minY) * k, (v.Z - minZ) * k);
+        return [.. tris.Select(x => new Tri(Fit(x.A), Fit(x.B), Fit(x.C)))];
+    }
+
+    /// <summary>The model's cross-section at height <paramref name="z"/>: triangle edges crossing it, joined into closed outlines.</summary>
+    public static PathGeometry Section(IReadOnlyList<Tri> tris, double z)
+    {
+        z += 1e-7; // never exactly on a vertex
+        var segs = new List<(Vec2 A, Vec2 B)>();
+        foreach (var t in tris)
+        {
+            var pts = new List<Vec2>(2);
+            void Edge(V3 p, V3 q)
+            {
+                if ((p.Z - z) * (q.Z - z) >= 0) return;
+                double f = (z - p.Z) / (q.Z - p.Z);
+                pts.Add(new Vec2(p.X + (q.X - p.X) * f, p.Y + (q.Y - p.Y) * f));
+            }
+            Edge(t.A, t.B); Edge(t.B, t.C); Edge(t.C, t.A);
+            if (pts.Count != 2 || pts[0].Dist(pts[1]) <= 1e-9) continue;
+            // Run each piece with the solid on its left (outward normal on the right), so outlines
+            // come out anticlockwise and holes clockwise, whatever order the triangle's edges cut.
+            double nx = (t.B.Y - t.A.Y) * (t.C.Z - t.A.Z) - (t.B.Z - t.A.Z) * (t.C.Y - t.A.Y);
+            double ny = (t.B.Z - t.A.Z) * (t.C.X - t.A.X) - (t.B.X - t.A.X) * (t.C.Z - t.A.Z);
+            var d = pts[1] - pts[0];
+            segs.Add(d.Y * nx - d.X * ny >= 0 ? (pts[0], pts[1]) : (pts[1], pts[0]));
+        }
+        // Join the pieces end to end (ends matched to a micron).
+        static (long, long) Key(Vec2 p) => ((long)Math.Round(p.X * 1000), (long)Math.Round(p.Y * 1000));
+        // Pieces by where they start: each one carries on from the end of the last.
+        var at = new Dictionary<(long, long), List<int>>();
+        for (int i = 0; i < segs.Count; i++)
+        {
+            if (!at.TryGetValue(Key(segs[i].A), out var l)) at[Key(segs[i].A)] = l = [];
+            l.Add(i);
+        }
+        var used = new bool[segs.Count];
+        var loops = new List<Subpath>();
+        for (int s0 = 0; s0 < segs.Count; s0++)
+        {
+            if (used[s0]) continue;
+            used[s0] = true;
+            var loop = new List<Vec2> { segs[s0].A, segs[s0].B };
+            while (true)
+            {
+                var end = loop[^1];
+                int nxt = at.TryGetValue(Key(end), out var cand) ? cand.FirstOrDefault(j => !used[j], -1) : -1;
+                if (nxt < 0) break;
+                used[nxt] = true;
+                loop.Add(segs[nxt].B);
+                if (Key(loop[^1]) == Key(loop[0])) break;
+            }
+            if (Key(loop[^1]) == Key(loop[0])) loop.RemoveAt(loop.Count - 1);
+            if (loop.Count >= 3 && Math.Abs(Geom.SignedArea(loop)) > 1e-4)
+                loops.Add(PathGeometry.Polyline(loop, true).Subpaths[0]);
+        }
+        // Non-zero: overlapping solids in the model merge, holes (running the other way) stay holes.
+        return loops.Count == 0 ? PathGeometry.Empty : ShapeGeometry.FillNonZero(new PathGeometry(loops));
+    }
+
+    /// <summary>Each separate piece of a layer (an outline with the holes inside it).</summary>
+    static List<PathGeometry> Islands(PathGeometry layer)
+    {
+        var loops = layer.Subpaths.Where(sp => sp.Closed).Select(sp => (Sp: sp, Pts: sp.Flatten(0.05))).Where(x => x.Pts.Count >= 3).ToList();
+        int Depth(int i) => loops.Where((_, j) => j != i).Count(o => Geom.Inside(o.Pts, loops[i].Pts[0]));
+        var depth = loops.Select((_, i) => Depth(i)).ToList();
+        var outers = Enumerable.Range(0, loops.Count).Where(i => depth[i] % 2 == 0).ToList();
+        var o = outers.ToDictionary(i => i, i => new List<Subpath> { loops[i].Sp });
+        for (int i = 0; i < loops.Count; i++)
+        {
+            if (depth[i] % 2 == 0) continue;
+            // A hole belongs to the smallest outline round it.
+            var owner = outers.Where(j => Geom.Inside(loops[j].Pts, loops[i].Pts[0])).OrderBy(j => Math.Abs(Geom.SignedArea(loops[j].Pts))).FirstOrDefault(-1);
+            if (owner >= 0) o[owner].Add(loops[i].Sp);
+        }
+        return [.. o.Values.Select(l => new PathGeometry(l))];
+    }
+
+    static bool InsideEvenOdd(IReadOnlyList<List<Vec2>> loops, Vec2 p) => loops.Count(l => Geom.Inside(l, p)) % 2 == 1;
+
+    static double EdgeDistance(IReadOnlyList<List<Vec2>> loops, Vec2 p)
+    {
+        double best = double.PositiveInfinity;
+        foreach (var l in loops)
+            for (int i = 0; i < l.Count; i++)
+            {
+                var a = l[i];
+                var b = l[(i + 1) % l.Count];
+                var ab = b - a;
+                double len2 = ab.Dot(ab), t = len2 < 1e-18 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
+                best = Math.Min(best, p.Dist(a + ab * t));
+            }
+        return best;
+    }
+
+    /// <summary>The point inside furthest from any edge (where the number fits best), and how far that is.</summary>
+    static (Vec2 At, double Room) Pole(List<List<Vec2>> loops)
+    {
+        var box = Rect2.Bounds(loops.SelectMany(l => l));
+        (Vec2, double) best = (box.Center, 0);
+        double cell = Math.Max(box.Width, box.Height) / 24;
+        var centre = box.Center;
+        for (int pass = 0; pass < 3 && cell > 1e-3; pass++)
+        {
+            var start = best.Item2 > 0 ? best.Item1 : centre;
+            double span = pass == 0 ? Math.Max(box.Width, box.Height) : cell * 4;
+            for (double x = start.X - span / 2; x <= start.X + span / 2; x += cell)
+                for (double y = start.Y - span / 2; y <= start.Y + span / 2; y += cell)
+                {
+                    var p = new Vec2(x, y);
+                    if (!InsideEvenOdd(loops, p)) continue;
+                    double d = EdgeDistance(loops, p);
+                    if (d > best.Item2) best = (p, d);
+                }
+            cell /= 4;
+        }
+        return best;
+    }
+
+    /// <summary>The next layer's outline, only where it lies inside this part (clear of its edge by <paramref name="margin"/>).</summary>
+    static List<IReadOnlyList<Vec2>> MarksInside(PathGeometry next, List<List<Vec2>> part, double margin)
+    {
+        var o = new List<IReadOnlyList<Vec2>>();
+        foreach (var f in next.Flatten(0.05).Where(f => f.Closed))
+        {
+            var pts = f.Points;
+            var run = new List<Vec2>();
+            int count = pts.Count;
+            for (int i = 0; i <= count; i++)
+            {
+                var a = pts[i % count];
+                var b = pts[(i + 1) % count];
+                int steps = Math.Max(1, (int)Math.Ceiling(a.Dist(b) / 0.25));
+                for (int k = 0; k < steps && !(i == count && k > 0); k++)
+                {
+                    var p = Vec2.Lerp(a, b, (double)k / steps);
+                    if (InsideEvenOdd(part, p) && EdgeDistance(part, p) > margin) run.Add(p);
+                    else { if (run.Count >= 3) o.Add(run); run = []; }
+                }
+            }
+            if (run.Count >= 3) o.Add(run);
+        }
+        return o;
+    }
+
+    /// <summary>Two points inside an area, far apart (for dowels), or none.</summary>
+    static List<Vec2> TwoPointsInside(PathGeometry area)
+    {
+        var loops = area.Flatten(0.1).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
+        if (loops.Count == 0) return [];
+        var box = Rect2.Bounds(loops.SelectMany(l => l));
+        var inside = new List<Vec2>();
+        double cell = Math.Max(0.5, Math.Max(box.Width, box.Height) / 40);
+        for (double x = box.MinX; x <= box.MaxX; x += cell)
+            for (double y = box.MinY; y <= box.MaxY; y += cell)
+                if (InsideEvenOdd(loops, new Vec2(x, y))) inside.Add(new Vec2(x, y));
+        if (inside.Count < 2) return [];
+        var a = inside.MaxBy(p => p.Dist(box.Center));
+        var b = inside.MaxBy(p => p.Dist(a));
+        return a.Dist(b) < 3 ? [] : [a, b];
+    }
+}
+
+/// <summary>Stacked slices laid out on the bed, ready to cut: a page per bed-full.</summary>
+public static class StackLayout
+{
+    /// <summary>
+    /// Every part on a Cut layer, its number (and the next slice's outline, when asked) lightly
+    /// marked on a Score layer, packed in number order. Parts that don't fit go on new pages
+    /// ("Slices 2", …). Returns the design (showing the first page used) and how many beds it takes.
+    /// </summary>
+    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3)
+    {
+        int firstPage = s.PageIndex;
+        int sheets = 1;
+        (Layer Cut, Layer Marks) Layers(ref DocState st)
+        {
+            var cut = st.Layers.FirstOrDefault(l => l.Name == "Slices · cut");
+            var mk = st.Layers.FirstOrDefault(l => l.Name == "Slices · marks");
+            if (cut is null)
+            {
+                cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = "Slices · cut" };
+                st = Ops.AddLayer(st, cut);
+            }
+            if (mk is null)
+            {
+                var score = Layer.Default(st.Layers.Count, LayerMode.Score);
+                mk = score with { Name = "Slices · marks", Laser = score.Laser with { Power = Math.Min(score.Laser.Power, 15) } };
+                st = Ops.AddLayer(st, mk);
+            }
+            return (cut, mk);
+        }
+        var (cutLayer, markLayer) = Layers(ref s);
+        double x = gapMm, y = gapMm, rowH = 0;
+        foreach (var part in stack.Parts)
+        {
+            var box = part.Outline.Bounds();
+            if (box.IsEmpty) continue;
+            if (box.Width + 2 * gapMm > machine.FieldW || box.Height + 2 * gapMm > machine.FieldH)
+                throw new InvalidOperationException($"Slice {part.Slice} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
+            if (x + box.Width + gapMm > machine.FieldW) { x = gapMm; y += rowH + gapMm; rowH = 0; }
+            if (y + box.Height + gapMm > machine.FieldH)
+            {
+                // A new bed-full on its own page.
+                s = Pages.Add(s, $"Slices {++sheets}");
+                (cutLayer, markLayer) = Layers(ref s);
+                x = gapMm; y = gapMm; rowH = 0;
+            }
+            var move = Affine.Translate(x - box.MinX, y - box.MinY);
+            var shapes = new List<Shape> { new PathShape { Name = $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
+            if (marks && part.NextMarks.Count > 0)
+                shapes.Add(new PathShape { Name = $"Where slice {part.Slice + 1} goes", LayerId = markLayer.Id, Geometry = new PathGeometry(part.NextMarks.SelectMany(m => PathGeometry.Polyline(m, false).Subpaths)).Transform(move) });
+            if (numbers && part.LabelRoomMm > 0.6)
+            {
+                double size = Math.Clamp(part.LabelRoomMm * 0.9, 1.2, 6);
+                var text = TextShape.Create($"{part.Slice}", new TextStyle("Arial", size), markLayer.Id, Affine.Identity);
+                var tb = text.Bounds;
+                var at = move.Apply(part.LabelAt);
+                shapes.Add(text.With(transform: Affine.Translate(at.X - tb.Center.X, at.Y - tb.Center.Y)));
+            }
+            s = Ops.AddShapes(s, shapes);
+            if (shapes.Count > 1) s = Ops.Group(s, shapes.Select(sh => sh.Id).ToHashSet()).Item1;
+            x += box.Width + gapMm;
+            rowH = Math.Max(rowH, box.Height);
+        }
+        return (Pages.SwitchTo(s, firstPage), sheets);
+    }
+}
