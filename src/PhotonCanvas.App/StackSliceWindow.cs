@@ -28,7 +28,12 @@ public sealed class StackSliceWindow : Window
     CancellationTokenSource? _cts;
     readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(350) };
 
-    readonly StackView _view = new() { MinHeight = 420 };
+    readonly StackView _view = new() { MinHeight = 380 };
+    readonly ComboBox _look = new() { ItemsSource = new[] { "Solid", "Outlines" }, SelectedIndex = 0, Width = 120 };
+    readonly ComboBox _material = new() { ItemsSource = new[] { "Basswood", "Birch plywood", "Walnut", "MDF", "Cardboard", "White acrylic", "Black acrylic" }, SelectedIndex = 0, Width = 150 };
+    readonly Slider _from = new() { Minimum = 1, Maximum = 1, Value = 1, IsSnapToTickEnabled = true, TickFrequency = 1 };
+    readonly Slider _to = new() { Minimum = 1, Maximum = 1, Value = 1, IsSnapToTickEnabled = true, TickFrequency = 1 };
+    readonly TextBlock _range = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 120 };
     readonly TextBlock _file = new() { Text = "No model yet.", TextWrapping = TextWrapping.Wrap };
     readonly ComboBox _up = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Z up (as made)", "Z down", "Y up", "Y down", "X up", "X down" }, SelectedIndex = 0 };
     readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#"), _pin = Number(0, 20, 0.5m, "0.#");
@@ -89,7 +94,35 @@ public sealed class StackSliceWindow : Window
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new(0, 10, 0, 0), Children = { close, _make } };
         var grid = new Grid { ColumnDefinitions = new("*,16,360") };
-        grid.Children.Add(new Border { CornerRadius = new(8), ClipToBounds = true, Child = _view });
+        _look.SelectionChanged += (_, _) => { _view.Look = _look.SelectedIndex == 1 ? StackLook.Lines : StackLook.Solid; _material.IsEnabled = _look.SelectedIndex == 0; };
+        _material.SelectionChanged += (_, _) => _view.Material = (StackMaterial)Math.Max(0, _material.SelectedIndex);
+        _from.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Range(fromMoved: true); };
+        _to.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Range(fromMoved: false); };
+        var controls = new StackPanel
+        {
+            Spacing = 8, Margin = new(0, 8, 0, 0),
+            Children =
+            {
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { new TextBlock { Text = "View", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _look, _material } },
+                new Grid
+                {
+                    ColumnDefinitions = new("Auto,*,Auto,*,Auto"), ColumnSpacing = 8,
+                    Children =
+                    {
+                        new TextBlock { Text = "From", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } },
+                        Col(_from, 1),
+                        Col(new TextBlock { Text = "to", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, 2),
+                        Col(_to, 3),
+                        Col(_range, 4),
+                    },
+                },
+            },
+        };
+        var left = new DockPanel();
+        DockPanel.SetDock(controls, Dock.Bottom);
+        left.Children.Add(controls);
+        left.Children.Add(new Border { CornerRadius = new(8), ClipToBounds = true, Child = _view });
+        grid.Children.Add(left);
         var scroll = new ScrollViewer { Content = side };
         Grid.SetColumn(scroll, 2);
         grid.Children.Add(scroll);
@@ -107,6 +140,25 @@ public sealed class StackSliceWindow : Window
         _name = name;
         _file.Text = $"{name}: {mesh.Count:N0} triangles.";
         _ = Reslice();
+    }
+
+    static Control Col(Control c, int col)
+    {
+        Grid.SetColumn(c, col);
+        return c;
+    }
+
+    /// <summary>The slices shown: the two sliders never cross.</summary>
+    void Range(bool fromMoved)
+    {
+        if (_from.Value > _to.Value)
+        {
+            if (fromMoved) _to.Value = _from.Value; else _from.Value = _to.Value;
+        }
+        _view.From = (int)_from.Value;
+        _view.To = (int)_to.Value;
+        int n = (int)_to.Maximum;
+        _range.Text = _from.Value <= 1 && _to.Value >= n ? $"All {n} slices" : $"Slices {_from.Value:0}–{_to.Value:0} of {n}";
     }
 
     void Later()
@@ -153,6 +205,12 @@ public sealed class StackSliceWindow : Window
             if (cts.IsCancellationRequested) return;
             _stack = stack;
             _view.Show(stack, o.ThicknessMm);
+            // The range slider spans the new stack (all of it, unless a range was already picked within it).
+            bool all = _to.Value >= _to.Maximum && _from.Value <= 1;
+            _from.Maximum = _to.Maximum = Math.Max(1, stack.Slices);
+            if (all || _to.Value > stack.Slices) _to.Value = stack.Slices;
+            if (_from.Value > _to.Value) _from.Value = 1;
+            Range(true);
             var biggest = stack.Parts.Select(p => p.Outline.Bounds()).Where(b => !b.IsEmpty).DefaultIfEmpty(Rect2.Empty).MaxBy(b => b.Width * b.Height);
             int parts = stack.Parts.Count;
             bool fits = stack.Parts.All(p => p.Outline.Bounds() is var b && b.Width + 6 <= _machine.FieldW && b.Height + 6 <= _machine.FieldH);
@@ -181,78 +239,5 @@ public sealed class StackSliceWindow : Window
                             " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\".";
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }
-    }
-}
-
-/// <summary>The slices stacked up in 3D, as they'll be glued. Drag to turn.</summary>
-public sealed class StackView : Control
-{
-    SliceStack? _stack;
-    double _t = 3, _yaw = -30, _pitch = 25;
-    Point? _drag;
-
-    public void Show(SliceStack stack, double thickness)
-    {
-        _stack = stack;
-        _t = thickness;
-        InvalidateVisual();
-    }
-
-    protected override void OnPointerPressed(PointerPressedEventArgs e) { _drag = e.GetPosition(this); e.Pointer.Capture(this); }
-    protected override void OnPointerReleased(PointerReleasedEventArgs e) { _drag = null; e.Pointer.Capture(null); }
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        if (_drag is not { } from) return;
-        var p = e.GetPosition(this);
-        _yaw += (p.X - from.X) * 0.5;
-        _pitch = Math.Clamp(_pitch + (p.Y - from.Y) * 0.4, -10, 89);
-        _drag = p;
-        InvalidateVisual();
-    }
-
-    public override void Render(DrawingContext ctx)
-    {
-        var b = Bounds;
-        ctx.FillRectangle(UiKit.Brush("Bg0"), new Rect(b.Size));
-        if (_stack is not { } st)
-        {
-            var hint = new FormattedText("Open a 3D model to see it in slices.", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 12, UiKit.Brush("TextMuted"));
-            ctx.DrawText(hint, new Point((b.Width - hint.Width) / 2, b.Height / 2 - 8));
-            return;
-        }
-        double cx = st.ModelWidthMm / 2, cy = st.ModelDepthMm / 2, cz = st.StackHeightMm / 2;
-        double span = Math.Max(Math.Max(st.ModelWidthMm, st.ModelDepthMm), st.StackHeightMm);
-        double scale = Math.Min(b.Width, b.Height) * 0.8 / Math.Max(1, span);
-        double yaw = _yaw * Math.PI / 180, pitch = _pitch * Math.PI / 180;
-        Point P(Vec2 xy, double z)
-        {
-            double x = xy.X - cx, y = xy.Y - cy, zz = z - cz;
-            double rx = x * Math.Cos(yaw) - y * Math.Sin(yaw), ry = x * Math.Sin(yaw) + y * Math.Cos(yaw);
-            return new Point(b.Width / 2 + rx * scale, b.Height / 2 + (ry * Math.Sin(pitch) - zz * Math.Cos(pitch)) * scale);
-        }
-        // Bottom to top, each slice's top and bottom edge, alternating shades like plywood.
-        for (int i = 0; i < st.Layers.Count; i++)
-        {
-            var loops = st.Layers[i].Flatten(0.2).Where(f => f.Closed).Select(f => f.Points).ToList();
-            var shade = i % 2 == 0 ? Color.Parse("#C9A27A") : Color.Parse("#A9825C");
-            var pen = new Pen(new SolidColorBrush(shade), 1.2);
-            var faint = new Pen(new SolidColorBrush(Color.FromArgb(90, shade.R, shade.G, shade.B)), 1);
-            double z0 = i * _t, z1 = (i + 1) * _t;
-            foreach (var l in loops)
-            {
-                for (int k = 0; k < l.Count; k++)
-                {
-                    var a = l[k];
-                    var c = l[(k + 1) % l.Count];
-                    ctx.DrawLine(pen, P(a, z1), P(c, z1));
-                    ctx.DrawLine(faint, P(a, z0), P(c, z0));
-                }
-                // A few uprights so the thickness shows.
-                int step = Math.Max(1, l.Count / 12);
-                for (int k = 0; k < l.Count; k += step) ctx.DrawLine(faint, P(l[k], z0), P(l[k], z1));
-            }
-        }
-        var label = new FormattedText($"{st.Slices} slices · drag to turn", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
-        ctx.DrawText(label, new Point(8, b.Height - 20));
     }
 }
