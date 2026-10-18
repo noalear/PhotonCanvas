@@ -38,6 +38,7 @@ public sealed class StackSliceWindow : Window
     readonly ComboBox _up = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Z up (as made)", "Z down", "Y up", "Y down", "X up", "X down" }, SelectedIndex = 0 };
     readonly NumericUpDown _width = Number(1, 2000, 5, "0.#"), _depth = Number(1, 2000, 5, "0.#");
     readonly CheckBox _keepProportions = new() { Content = "Keep proportions", IsChecked = true };
+    readonly Button _ownSize = Button("Model's own size", tip: "Back to the size the model was made at (one model unit = 1 mm, as almost every STL and OBJ is).");
     (double X, double Y, double Z) _natural = (1, 1, 1);
     bool _sizing;
     readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#"), _pin = Number(0, 20, 0.5m, "0.#");
@@ -78,6 +79,7 @@ public sealed class StackSliceWindow : Window
         _turn.ValueChanged += (_, _) => { Natural(); Resize(_height); };
         foreach (var n in new[] { _width, _depth, _height }) n.ValueChanged += (_, _) => Resize(n);
         _keepProportions.IsCheckedChanged += (_, _) => { if (_keepProportions.IsChecked == true) Resize(_height); };
+        _ownSize.Click += (_, _) => OwnSize();
         _joined.IsCheckedChanged += (_, _) => Later();
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
@@ -97,6 +99,7 @@ public sealed class StackSliceWindow : Window
                 Field("Depth Y (mm)", _depth, tip: "Front to back, standing the chosen way up."),
                 Field("Height Z (mm)", _height, tip: "Up: this sets how many slices there are."),
                 _keepProportions,
+                _ownSize,
                 Field("Material (mm)", _thick, tip: "One slice per thickness of material."),
                 Field("Outline", _outline),
                 Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
@@ -155,7 +158,7 @@ public sealed class StackSliceWindow : Window
         _name = name;
         _file.Text = $"{name}: {mesh.Count:N0} triangles.";
         Natural();
-        Resize(_height);
+        OwnSize();
     }
 
     static Control Col(Control c, int col)
@@ -183,6 +186,22 @@ public sealed class StackSliceWindow : Window
         if (_mesh is not { } mesh) return;
         var n = StackSlicer.NaturalSize(mesh, (SliceUp)Math.Max(0, _up.SelectedIndex), (double)(_turn.Value ?? 0));
         _natural = (Math.Max(1e-9, n.X), Math.Max(1e-9, n.Y), Math.Max(1e-9, n.Z));
+    }
+
+    /// <summary>The size the model was made at (its units taken as millimetres), standing the chosen way up.</summary>
+    void OwnSize()
+    {
+        if (_mesh is null) return;
+        _sizing = true;
+        try
+        {
+            static decimal Mm(double v) => (decimal)Math.Clamp(Math.Round(v, 1), 1, 2000);
+            _width.Value = Mm(_natural.X);
+            _depth.Value = Mm(_natural.Y);
+            _height.Value = Mm(_natural.Z);
+        }
+        finally { _sizing = false; }
+        Later();
     }
 
     /// <summary>One size changed: with proportions kept, the other two follow it.</summary>
