@@ -91,6 +91,21 @@ public sealed class AppSettings
     public List<string> FontHidden { get; set; } = [];
     /// <summary>Keyboard shortcuts changed from their defaults: command id → keys ("" = none).</summary>
     public Dictionary<string, string> Hotkeys { get; set; } = [];
+    // What the user has, so features that need something they don't have stay out of the way.
+    /// <summary>The equipment question has been answered (asked once, at the first start).</summary>
+    public bool EquipmentAsked { get; set; }
+    public bool OwnsRa2 { get; set; }
+    public bool OwnsRa3 { get; set; }
+    public bool OwnsConveyor { get; set; }
+    /// <summary>Colour tests, measuring colours and colour pictures on metal.</summary>
+    public bool ShowColourOnMetal { get; set; } = true;
+    /// <summary>Diffraction gratings, shimmer pictures and the depth-map almost-hologram.</summary>
+    public bool ShowDiffraction { get; set; } = true;
+    public bool ShowConsole { get; set; } = true;
+
+    /// <summary>Any attachment that gives a work mode besides the flat bed.</summary>
+    public bool OwnsAttachment => OwnsRa2 || OwnsRa3 || OwnsConveyor;
+
     /// <summary>"Flat", "Rotary" or "Conveyor".</summary>
     public string WorkMode { get; set; } = "Flat";
     /// <summary>Rotary: 0 RA2 rollers, 1 RA2 chuck, 2 RA3 rollers, 3 RA3 chuck.</summary>

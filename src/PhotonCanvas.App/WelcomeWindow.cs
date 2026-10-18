@@ -49,7 +49,7 @@ public sealed class WelcomeWindow : Window
     /// <summary>True when the user accepted the safety notice and terms.</summary>
     public bool Accepted { get; private set; }
 
-    public WelcomeWindow(bool firstRun, Func<Task<bool>> setUpKeys, Func<bool> hasKeys)
+    public WelcomeWindow(bool firstRun, Func<Task<bool>> setUpKeys, Func<bool> hasKeys, AppSettings? equipment = null)
     {
         _firstRun = firstRun;
         _setUpKeys = setUpKeys;
@@ -64,6 +64,17 @@ public sealed class WelcomeWindow : Window
         _pages.Add(WelcomePage);
         if (firstRun) _pages.Add(SafetyPage);
         _pages.Add(KeysPage);
+        if (equipment is not null)
+            _pages.Add(() => new StackPanel
+            {
+                Spacing = 10,
+                Children =
+                {
+                    Title2("Your equipment"),
+                    Para("Tick any attachments you have, so the features that need them appear. You can change this any time in Settings → Equipment."),
+                    new EquipmentPanel(equipment),
+                },
+            });
         _pages.Add(HowPage);
 
         _accept.IsCheckedChanged += (_, _) => UpdateButtons();

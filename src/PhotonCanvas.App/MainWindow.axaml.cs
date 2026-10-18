@@ -89,6 +89,7 @@ public partial class MainWindow : Window
         _layerEditor.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
         _layerEditor.LibraryRequested += () => _ = Guard(ShowLibrary);
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
+        if (!WorkModes.Usable(_settings)) _settings.WorkMode = "Flat";
         if (_settings.WorkMode != "Flat") Canvas.Machine = WorkModes.Area(_settings);
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
@@ -132,7 +133,7 @@ public partial class MainWindow : Window
             Canvas.Focus();
             if (ConnectOnOpen && _settings.AcceptedTermsVersion < WelcomeWindow.TermsVersion)
             {
-                var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys);
+                var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys, _settings);
                 await welcome.ShowDialog(this);
                 if (!welcome.Accepted)
                 {
@@ -141,7 +142,17 @@ public partial class MainWindow : Window
                     return;
                 }
                 _settings.AcceptedTermsVersion = WelcomeWindow.TermsVersion;
+                _settings.EquipmentAsked = true;
                 _settings.Save();
+                ApplyEquipment();
+            }
+            if (ConnectOnOpen && !_settings.EquipmentAsked)
+            {
+                // Once: what attachments there are, so features that need them can stay hidden.
+                await new EquipmentWindow(_settings).ShowDialog(this);
+                _settings.EquipmentAsked = true;
+                _settings.Save();
+                ApplyEquipment();
             }
             if (ConnectOnOpen) _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
@@ -492,8 +503,8 @@ public partial class MainWindow : Window
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
-        pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture);
-        pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture);
+        _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
+        _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclean = picture.Group("Clean up");
         pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
@@ -516,7 +527,7 @@ public partial class MainWindow : Window
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
-        var colour = laser.Group("Colour on metal");
+        var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
         colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
         var job = laser.Group("Job");
@@ -526,10 +537,10 @@ public partial class MainWindow : Window
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
         var work = laser.Group("Work area");
-        work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings");
+        _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
         var machine = laser.Group("Machine");
-        machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)");
+        _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
 
         // ---- View ----
@@ -571,6 +582,8 @@ public partial class MainWindow : Window
     /// <summary>The settings window, opened at a page; the machine panel moves into it while it's open.</summary>
     async Task ShowSettings(string page)
     {
+        var equipment = new EquipmentPanel(_settings);
+        equipment.Changed += ApplyEquipment;
         var w = new SettingsWindow(_machine, page,
         [
             ("Workspace",
@@ -595,7 +608,7 @@ public partial class MainWindow : Window
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
                 new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
             ]),
-        ]);
+        ], [("Equipment", equipment)]);
         await w.ShowDialog(this);
         _ribbon.Refresh();
     }
@@ -719,6 +732,21 @@ public partial class MainWindow : Window
 
     Task ShowHotkeys() => new HotkeysWindow(Commands(), _settings).ShowDialog(this);
 
+    /// <summary>The equipment or shown features changed: the ribbon and the work mode follow.</summary>
+    void ApplyEquipment()
+    {
+        if (!WorkModes.Usable(_settings))
+        {
+            // A work mode for an attachment that's no longer ticked: back to the flat bed.
+            _settings.WorkMode = "Flat";
+            _settings.Save();
+            StatusText.Text = "Work mode: flat bed (the attachment it used isn't in your equipment).";
+        }
+        Canvas.Machine = WorkModes.Area(_settings);
+        _job.Refresh();
+        _ribbon.Refresh();
+    }
+
     async Task ShowWorkMode()
     {
         var w = new WorkModeWindow(_settings, _machine);
@@ -751,6 +779,7 @@ public partial class MainWindow : Window
 
     void ShowConsole()
     {
+        if (!_settings.ShowConsole) return;
         if (_console is { } open) { open.Activate(); return; }
         _console = new ConsoleWindow(_machine, _settings);
         _console.Closed += (_, _) => _console = null;

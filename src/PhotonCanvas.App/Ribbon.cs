@@ -70,6 +70,7 @@ public sealed class Ribbon : UserControl
     readonly List<RibbonTab> _tabs = [];
     readonly List<(Control Control, Func<bool> Enabled)> _conditional = [];
     readonly List<(ToggleButton Button, Func<bool> Checked)> _checked = [];
+    readonly List<(Control Control, Func<bool> Visible)> _shown = [];
     RibbonTab? _current;
     bool _folded;
 
@@ -172,6 +173,30 @@ public sealed class Ribbon : UserControl
     {
         foreach (var (c, enabled) in _conditional) c.IsEnabled = enabled();
         foreach (var (b, on) in _checked) b.IsChecked = on();
+        bool changed = false;
+        foreach (var (c, visible) in _shown)
+        {
+            bool v = visible();
+            if (c.IsVisible == v) continue;
+            c.IsVisible = v;
+            changed = true;
+        }
+        if (!changed) return;
+        // Widths change with what's shown: measure the tabs again.
+        foreach (var t in _tabs)
+        {
+            t.Widths = null;
+            t.SetLevel(-1);
+        }
+        FitLater();
+    }
+
+    /// <summary>Show <paramref name="c"/> only while <paramref name="visible"/> says so (checked on <see cref="Refresh"/>).</summary>
+    public T ShowWhen<T>(T c, Func<bool> visible) where T : Control
+    {
+        _shown.Add((c, visible));
+        c.IsVisible = visible();
+        return c;
     }
 
     internal void Track(Control c, Func<bool>? enabled)
@@ -221,11 +246,12 @@ public sealed class RibbonTab
         Header = header;
     }
 
-    public RibbonGroup Group(string title)
+    public RibbonGroup Group(string title, Func<bool>? visible = null)
     {
         var g = new RibbonGroup(_ribbon, this, title);
         Panel.Children.Add(g.Root);
         Groups.Add(g);
+        if (visible is not null) _ribbon.ShowWhen(g.Root, visible);
         return g;
     }
 }

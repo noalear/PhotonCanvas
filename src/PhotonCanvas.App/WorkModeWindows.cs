@@ -16,8 +16,20 @@ public static class WorkModes
     /// <summary>Longest unrolled length the rotary takes (xTool Studio's limit).</summary>
     public const double MaxCircumferenceMm = 375;
 
+    /// <summary>Is this attachment (index into <see cref="Attachments"/>) one the user has?</summary>
+    public static bool Owned(AppSettings s, int attachment) => attachment >= 2 ? s.OwnsRa3 : s.OwnsRa2;
+
+    /// <summary>The work mode in the settings is one the user's equipment can do (else the flat bed is used).</summary>
+    public static bool Usable(AppSettings s) => s.WorkMode switch
+    {
+        "Rotary" => Owned(s, s.RotaryAttachment),
+        "Conveyor" => s.OwnsConveyor,
+        _ => true,
+    };
+
     public static WorkMode From(AppSettings s)
     {
+        if (!Usable(s)) return new WorkMode.Flat();
         switch (s.WorkMode)
         {
             case "Rotary":
@@ -40,7 +52,7 @@ public static class WorkModes
         _ => MachineProfile.F2Ultra,
     };
 
-    public static string Describe(AppSettings s) => From(s) switch
+    public static string Describe(AppSettings s) => !Usable(s) ? "Flat bed" : From(s) switch
     {
         WorkMode.Rotary r => $"Rotary ({Attachments[Math.Clamp(s.RotaryAttachment, 0, 3)]}), Ø {s.RotaryDiameterMm:0.#} mm: {MachineProfile.F2Ultra.FieldW:0} × {r.CircumferenceMm:0.#} mm unrolled",
         WorkMode.Conveyor c => $"Conveyor: {c.LengthMm:0} × {MachineProfile.F2Ultra.FieldH:0} mm",
@@ -53,8 +65,10 @@ public sealed class WorkModeWindow : Window
 {
     readonly AppSettings _settings;
     readonly MachinePanel _machine;
-    readonly Segmented _mode = new(("Flat bed", null), ("Rotary", "IcRotary"), ("Conveyor", "IcConveyor"));
-    readonly ComboBox _attach = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = WorkModes.Attachments };
+    readonly Segmented _mode;
+    readonly List<string> _modes = ["Flat"];
+    readonly List<int> _attachments;
+    readonly ComboBox _attach = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _diameter = Number(2, 200, 1, "0.##"), _rate = Number(90, 105, 0.1m, "0.##"), _angle = Number(-10, 10, 0.01m, "0.###");
     readonly Control _rotary, _conveyor;
     readonly TextBlock _info = Hint();
@@ -63,14 +77,20 @@ public sealed class WorkModeWindow : Window
     {
         _settings = settings;
         _machine = machine;
+        // Only what the user has (Settings → Equipment).
+        if (settings.OwnsRa2 || settings.OwnsRa3) _modes.Add("Rotary");
+        if (settings.OwnsConveyor) _modes.Add("Conveyor");
+        _mode = new([.. _modes.Select(m => m switch { "Rotary" => ("Rotary", (string?)"IcRotary"), "Conveyor" => ("Conveyor", "IcConveyor"), _ => ("Flat bed", (string?)null) })]);
+        _attachments = [.. Enumerable.Range(0, WorkModes.Attachments.Length).Where(i => WorkModes.Owned(settings, i))];
+        _attach.ItemsSource = _attachments.Select(i => WorkModes.Attachments[i]).ToList();
         Title = "Work mode";
         Width = 460;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
-        _mode.SelectedIndex = settings.WorkMode switch { "Rotary" => 1, "Conveyor" => 2, _ => 0 };
-        _attach.SelectedIndex = Math.Clamp(settings.RotaryAttachment, 0, 3);
+        _mode.SelectedIndex = Math.Max(0, _modes.IndexOf(WorkModes.Usable(settings) ? settings.WorkMode : "Flat"));
+        _attach.SelectedIndex = Math.Max(0, _attachments.IndexOf(settings.RotaryAttachment));
         _diameter.Value = (decimal)settings.RotaryDiameterMm;
         _rate.Value = (decimal)Math.Round(100 * 0.74592 / Math.Max(0.01, settings.ConveyorUMultiple), 2);
         _angle.Value = (decimal)settings.ConveyorAngle;
@@ -105,7 +125,7 @@ public sealed class WorkModeWindow : Window
             Child = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
-                Text = "Rotary and conveyor are experimental: the commands follow xTool Studio's own (mechanical axis U), but haven't been run on your machine yet. " +
+                Text = "Attachment work modes are experimental: the commands follow xTool Studio's own (mechanical axis U), but haven't been run on your machine yet. " +
                        "Fit the attachment as xTool describes, and try a small mark on scrap first.",
             },
         };
@@ -134,21 +154,22 @@ public sealed class WorkModeWindow : Window
 
     void Update()
     {
-        _rotary.IsVisible = _mode.SelectedIndex == 1;
-        _conveyor.IsVisible = _mode.SelectedIndex == 2;
+        string mode = _modes[Math.Max(0, _mode.SelectedIndex)];
+        _rotary.IsVisible = mode == "Rotary";
+        _conveyor.IsVisible = mode == "Conveyor";
         double circ = Math.PI * (double)(_diameter.Value ?? 60);
-        _info.Text = _mode.SelectedIndex switch
+        _info.Text = mode switch
         {
-            1 => $"Once round: {circ:0.#} mm" + (circ > WorkModes.MaxCircumferenceMm ? $" (only the first {WorkModes.MaxCircumferenceMm:0} mm can be used)." : "."),
-            2 => "",
+            "Rotary" => $"Once round: {circ:0.#} mm" + (circ > WorkModes.MaxCircumferenceMm ? $" (only the first {WorkModes.MaxCircumferenceMm:0} mm can be used)." : "."),
+            "Conveyor" => "",
             _ => "The usual 220 × 220 mm work area.",
         };
     }
 
     void Save()
     {
-        _settings.WorkMode = _mode.SelectedIndex switch { 1 => "Rotary", 2 => "Conveyor", _ => "Flat" };
-        _settings.RotaryAttachment = Math.Max(0, _attach.SelectedIndex);
+        _settings.WorkMode = _modes[Math.Max(0, _mode.SelectedIndex)];
+        if (_attach.SelectedIndex >= 0 && _attach.SelectedIndex < _attachments.Count) _settings.RotaryAttachment = _attachments[_attach.SelectedIndex];
         _settings.RotaryDiameterMm = (double)(_diameter.Value ?? 60);
         _settings.ConveyorUMultiple = 100 * 0.74592 / Math.Max(1, (double)(_rate.Value ?? 100));
         _settings.ConveyorAngle = (double)(_angle.Value ?? 0);

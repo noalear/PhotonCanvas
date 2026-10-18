@@ -18,7 +18,8 @@ public sealed class SettingsWindow : Window
 
     public sealed record Item(string Label, string Tip, Func<Task> Run);
 
-    public SettingsWindow(MachinePanel machine, string startPage, IReadOnlyList<(string Section, IReadOnlyList<Item> Actions)> pages)
+    public SettingsWindow(MachinePanel machine, string startPage, IReadOnlyList<(string Section, IReadOnlyList<Item> Actions)> pages,
+        IReadOnlyList<(string Section, Control Page)>? panels = null)
     {
         _machine = machine;
         Title = "Settings";
@@ -31,6 +32,7 @@ public sealed class SettingsWindow : Window
 
         var nav = new ListBox { Background = Brushes.Transparent, Width = 180, Margin = new(8, 12, 0, 12) };
         var names = new List<string> { "Machine" };
+        foreach (var p in panels ?? []) names.Add(p.Section);
         names.AddRange(pages.Select(p => p.Section));
         nav.ItemsSource = names;
         nav.SelectionChanged += (_, _) =>
@@ -42,6 +44,11 @@ public sealed class SettingsWindow : Window
                 return;
             }
             _page.Content = null;
+            if (panels?.FirstOrDefault(p => p.Section == name) is { Page: { } panel })
+            {
+                _page.Content = new ScrollViewer { Content = panel };
+                return;
+            }
             var (section, actions) = pages.First(p => p.Section == name);
             var list = new StackPanel { Spacing = 10, Margin = new(0, 4, 0, 0) };
             list.Children.Add(new TextBlock { Text = section.ToUpperInvariant(), Classes = { "h" } });

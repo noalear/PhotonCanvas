@@ -71,7 +71,7 @@ machine's start button.
   layer's settings below.
 - **Job bar** under the work area: **Ship It**, Frame, the run order, total time, pass mode,
   checks, and export.
-- **Settings** (gear): machine connection and options, camera calibration, libraries, help.
+- **Settings** (gear): machine connection and options, your equipment (attachments, and which specialist features to show), camera calibration, libraries, help. Features that need an attachment you don't have stay hidden.
 
 ## Colour and gratings on metal
 
