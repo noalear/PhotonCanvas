@@ -35,6 +35,11 @@ public sealed record SliceOptions
     public int Samples { get; init; } = 5;
     /// <summary>Dowel holes through every slice for lining them up (0 = none).</summary>
     public double DowelMm { get; init; }
+    /// <summary>
+    /// Pin holes between each pair of neighbouring slices (0 = none): wherever a part sits on the
+    /// part below it, both get matching holes, so a short pin through both lines them up.
+    /// </summary>
+    public double PinMm { get; init; }
     /// <summary>Parts smaller than this (mm²), or thinner than <see cref="MinPartWidthMm"/>, are left out: slivers too small to cut or handle.</summary>
     public double MinPartMm2 { get; init; } = 1;
     public double MinPartWidthMm { get; init; } = 1;
@@ -49,6 +54,8 @@ public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, doub
 {
     /// <summary>Slivers left out for being too small.</summary>
     public int LeftOut { get; init; }
+    /// <summary>Pins joining neighbouring slices: where each goes, and the slice it rises from (it sits in that slice and the one above).</summary>
+    public IReadOnlyList<(int Slice, Vec2 At)> Pins { get; init; } = [];
 }
 
 /// <summary>
@@ -91,26 +98,87 @@ public static class StackSlicer
             var room = ShapeGeometry.Offset(common, -(o.DowelMm / 2 + 1.5), JoinStyle.Round, EndStyle.Round);
             dowels = TwoPointsInside(room);
         }
-        var parts = new List<SlicePart>();
+        // Every slice's parts first (slivers left out), so the pins can join them up.
         int leftOut = 0;
+        var islands = new List<List<PathGeometry>>();
         for (int i = 0; i < n; i++)
         {
-            var layer = layers[i];
-            if (dowels.Count > 0)
-                layer = ShapeGeometry.Boolean(layer, new PathGeometry(dowels.SelectMany(d => PathGeometry.Ellipse(d.X, d.Y, o.DowelMm / 2, o.DowelMm / 2).Subpaths)), BoolOp.Subtract);
-            var next = i + 1 < n ? layers[i + 1] : null;
-            foreach (var island in Islands(layer))
+            var keep = new List<PathGeometry>();
+            foreach (var island in Islands(layers[i]))
             {
-                var loops = island.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
-                if (Math.Abs(loops.Sum(Geom.SignedArea)) < o.MinPartMm2) { leftOut++; continue; }
+                var loops = Loops(island);
+                if (Math.Abs(loops.Sum(Geom.SignedArea)) < o.MinPartMm2 || Pole(loops).Room * 2 < o.MinPartWidthMm) { leftOut++; continue; }
+                keep.Add(island);
+            }
+            islands.Add(keep);
+        }
+        // Pins: wherever a part overlaps the part above it, matching holes in both.
+        var holes = islands.Select(l => l.Select(_ => new List<Vec2>()).ToList()).ToList();
+        var pins = new List<(int, Vec2)>();
+        if (o.PinMm > 0)
+            for (int i = 0; i + 1 < n; i++)
+                for (int a = 0; a < islands[i].Count; a++)
+                    for (int b = 0; b < islands[i + 1].Count; b++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        foreach (var p in PinSpots(islands[i][a], islands[i + 1][b], i > 0 ? layers[i - 1] : null, i + 2 < n ? layers[i + 2] : null, o.PinMm, holes[i][a]))
+                        {
+                            holes[i][a].Add(p);
+                            holes[i + 1][b].Add(p);
+                            pins.Add((i + 1, p));
+                        }
+                    }
+        var parts = new List<SlicePart>();
+        for (int i = 0; i < n; i++)
+        {
+            var next = i + 1 < n ? layers[i + 1] : null;
+            for (int k = 0; k < islands[i].Count; k++)
+            {
+                var part = islands[i][k];
+                var cut = dowels.Select(p => (p, o.DowelMm)).Concat(holes[i][k].Select(p => (p, o.PinMm))).ToList();
+                if (cut.Count > 0)
+                    part = ShapeGeometry.Boolean(part, new PathGeometry(cut.SelectMany(c => PathGeometry.Ellipse(c.p.X, c.p.Y, c.Item2 / 2, c.Item2 / 2).Subpaths)), BoolOp.Subtract);
+                // The number goes clear of the holes and edges.
+                var loops = Loops(part);
                 var (at, room) = Pole(loops);
-                if (room * 2 < o.MinPartWidthMm) { leftOut++; continue; }
                 var marks = next is null ? [] : MarksInside(next, loops, 0.6);
-                parts.Add(new SlicePart(i + 1, island, at, room, marks));
+                parts.Add(new SlicePart(i + 1, part, at, room, marks));
             }
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
-        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut };
+        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins };
+    }
+
+    static List<List<Vec2>> Loops(PathGeometry g) => [.. g.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points)];
+
+    /// <summary>
+    /// Where pins go between a part and the part above it: inside both, clear of their edges, and
+    /// where the slices below and above cover the holes too (so they don't show) if there's room.
+    /// Two pins, far apart, when there's room for both (that stops the parts turning); else one.
+    /// </summary>
+    static List<Vec2> PinSpots(PathGeometry lower, PathGeometry upper, PathGeometry? below, PathGeometry? above, double pinMm, IReadOnlyList<Vec2> taken)
+    {
+        var overlap = ShapeGeometry.Boolean(lower, upper, BoolOp.Intersect);
+        if (overlap.IsEmpty) return [];
+        double clear = pinMm / 2 + 1.2;
+        var hidden = overlap;
+        if (below is not null) hidden = ShapeGeometry.Boolean(hidden, below, BoolOp.Intersect);
+        if (above is not null) hidden = ShapeGeometry.Boolean(hidden, above, BoolOp.Intersect);
+        foreach (var area in new[] { hidden, overlap })
+        {
+            if (area.IsEmpty) continue;
+            var room = ShapeGeometry.Offset(area, -clear, JoinStyle.Round, EndStyle.Round);
+            // Clear of the holes already in the lower part (its pins from the joint below).
+            if (taken.Count > 0 && !room.IsEmpty)
+                room = ShapeGeometry.Boolean(room, new PathGeometry(taken.SelectMany(t => PathGeometry.Ellipse(t.X, t.Y, pinMm * 1.5 + 1, pinMm * 1.5 + 1).Subpaths)), BoolOp.Subtract);
+            if (room.IsEmpty) continue;
+            var two = TwoPointsInside(room);
+            // Two pins only where they can be well apart (small parts: one, plus the outline mark).
+            if (two.Count == 2 && two[0].Dist(two[1]) >= Math.Max(pinMm * 4, 12)) return two;
+            var loops = Loops(room);
+            if (loops.Count > 0 && Pole(loops) is { Room: > 0 } pole) return [pole.At];
+        }
+        return [];
     }
 
     /// <summary>The model stood the chosen way up, turned, sized to the height, and moved to start at 0, 0, 0.</summary>

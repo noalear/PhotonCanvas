@@ -120,4 +120,30 @@ public class StackSlicerTests
         Assert.Single(layer.Subpaths);
         Assert.Equal(400 + 400 - 100, Area(layer), 1);
     }
+
+    [Fact]
+    public void PinsJoinEachSliceToTheNext()
+    {
+        // Two legs under a body: each leg slice pins to the next, the leg tops to the body.
+        var legs = new List<Tri>([.. Box(0, 0, 0, 12, 12, 10), .. Box(30, 0, 0, 42, 12, 10), .. Box(0, 0, 10, 42, 12, 20)]);
+        var stack = StackSlicer.Slice(legs, new SliceOptions { ThicknessMm = 5, HeightMm = 20, PinMm = 2 });
+        Assert.Equal(4, stack.Slices);
+        // Joints: slice 1→2 (two legs), 2→3 (each leg to the body), 3→4 (body): pins in all of them.
+        Assert.All(new[] { 1, 2, 3 }, j => Assert.Contains(stack.Pins, p => p.Slice == j));
+        Assert.Contains(stack.Pins, p => p.Slice == 2 && p.At.X < 20);
+        Assert.Contains(stack.Pins, p => p.Slice == 2 && p.At.X > 20);
+        foreach (var (slice, at) in stack.Pins)
+        {
+            // The same hole in the part below and the part above.
+            foreach (var s in new[] { slice, slice + 1 })
+                Assert.Contains(stack.Parts.Where(p => p.Slice == s), p => p.Outline.Subpaths.Any(sp => sp.Flatten(0.05).Average(q => q.X) is var cx && Math.Abs(cx - at.X) < 0.05
+                    && Math.Abs(sp.Flatten(0.05).Average(q => q.Y) - at.Y) < 0.05));
+        }
+        // No two holes in one part run into each other.
+        foreach (var part in stack.Parts)
+        {
+            var centres = part.Outline.Subpaths.Skip(1).Select(sp => new Vec2(sp.Flatten(0.05).Average(q => q.X), sp.Flatten(0.05).Average(q => q.Y))).ToList();
+            Assert.All(centres, a => Assert.All(centres.Where(b => b != a), b => Assert.True(a.Dist(b) > 3)));
+        }
+    }
 }

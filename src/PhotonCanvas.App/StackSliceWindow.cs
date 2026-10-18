@@ -31,7 +31,7 @@ public sealed class StackSliceWindow : Window
     readonly StackView _view = new() { MinHeight = 420 };
     readonly TextBlock _file = new() { Text = "No model yet.", TextWrapping = TextWrapping.Wrap };
     readonly ComboBox _up = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Z up (as made)", "Z down", "Y up", "Y down", "X up", "X down" }, SelectedIndex = 0 };
-    readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#");
+    readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#"), _pin = Number(0, 20, 0.5m, "0.#");
     readonly ComboBox _outline = new()
     {
         HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -53,12 +53,12 @@ public sealed class StackSliceWindow : Window
         MinWidth = 860;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
-        _height.Value = 60; _thick.Value = 3; _dowel.Value = 0; _turn.Value = 0;
+        _height.Value = 60; _thick.Value = 3; _dowel.Value = 0; _turn.Value = 0; _pin.Value = 2;
 
         var open = Button("Open a 3D model…", tip: "STL or OBJ, from a 3D printing site, Fusion, Blender…");
         open.Click += async (_, _) => await Open();
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Reslice(); };
-        foreach (var n in new[] { _turn, _height, _thick, _dowel }) n.ValueChanged += (_, _) => Later();
+        foreach (var n in new[] { _turn, _height, _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
         foreach (var c in new[] { _up, _outline }) c.SelectionChanged += (_, _) => Later();
         _make.Click += (_, _) => Make();
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
@@ -78,7 +78,9 @@ public sealed class StackSliceWindow : Window
                 Field("Outline", _outline),
                 Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
                 _numbers, _marks,
-                Field("Dowel holes Ø", _dowel, tip: "Two holes through every slice for dowels or pins to line them up. Only where every slice has room. 0 = none."),
+                Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
+                Hint("A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's kerf so the pins fit snugly; pins need only be twice the material thick."),
+                Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
                 _summary,
             },
         };
@@ -130,6 +132,7 @@ public sealed class StackSliceWindow : Window
         ThicknessMm = (double)(_thick.Value ?? 3),
         Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
         DowelMm = (double)(_dowel.Value ?? 0),
+        PinMm = (double)(_pin.Value ?? 0),
     };
 
     async Task Reslice()
@@ -152,6 +155,7 @@ public sealed class StackSliceWindow : Window
             _summary.Text = $"{stack.Slices} slices of {o.ThicknessMm:0.##} mm: the stack stands {stack.StackHeightMm:0.#} mm tall, {stack.ModelWidthMm:0.#} × {stack.ModelDepthMm:0.#} mm across. " +
                             $"{parts} part{(parts == 1 ? "" : "s")} to cut" + (parts > stack.Slices ? " (some slices are in several pieces)" : "") + "." +
                             (stack.LeftOut > 0 ? $" {stack.LeftOut} sliver{(stack.LeftOut == 1 ? " was" : "s were")} too small to cut and left out." : "") +
+                            (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
                             (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on the bed: make the model smaller.");
             _make.IsEnabled = fits && parts > 0;
