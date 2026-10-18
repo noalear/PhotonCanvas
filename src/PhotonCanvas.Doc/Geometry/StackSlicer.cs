@@ -639,12 +639,17 @@ public static class StackLayout
     /// marked on a Score layer, nested by true shape (biggest first, quarter turns, small parts in
     /// the gaps) to fill each bed before starting the next. Parts that don't fit go on new pages
     /// ("Slices 2", …). Returns the design (showing the first page used) and how many beds it takes.
+    /// With <paramref name="material"/> (an outline of the board in the machine), the parts fill that
+    /// on the current page, around anything already on it; each further bed is a new page with
+    /// the same outline (another board the same size, in the same place).
     /// </summary>
-    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices", CancellationToken ct = default)
+    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices", CancellationToken ct = default, PathGeometry? material = null)
     {
         title = string.IsNullOrWhiteSpace(title) ? "Slices" : title.Trim();
         // Never on top of what's already there: a page of their own if this one has anything on it.
-        if (s.Shapes.Count > 0) s = Pages.Add(s, title);
+        // (On the material outlined on this page, the nesting keeps clear of what's there instead.)
+        bool fresh = material is null || s.Shapes.Count == 0;
+        if (material is null && s.Shapes.Count > 0) s = Pages.Add(s, title);
         int firstPage = s.PageIndex;
         int sheets = 1;
         (Layer Cut, Layer Marks) Layers(ref DocState st)
@@ -703,7 +708,7 @@ public static class StackLayout
         }
 
         // Bed by bed: everything left goes on the page, the nesting places what fits, the rest moves on.
-        var options = new NestOptions { SpacingMm = gapMm, MarginMm = gapMm, RotationStepDeg = 90, ResolutionMm = 0.5 };
+        var options = new NestOptions { Sheet = material, SpacingMm = gapMm, MarginMm = gapMm, RotationStepDeg = 90, ResolutionMm = 0.5 };
         while (units.Count > 0)
         {
             // Each page has its own layers: the cut outline is first in its part, the rest are marks.
@@ -711,14 +716,22 @@ public static class StackLayout
             s = Ops.AddShapes(s, onPage.SelectMany(u => u));
             var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
             var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
-            if (report.Placed == 0)
-                throw new InvalidOperationException("A part doesn't fit on the bed with the spacing around it. Make the model smaller.");
+            if (report.Placed == 0 && fresh)
+                throw new InvalidOperationException(material is null
+                    ? "A part doesn't fit on the bed with the spacing around it. Make the model smaller."
+                    : "A part doesn't fit on the material with the spacing around it. Make the model smaller or outline a bigger piece.");
             var unplaced = report.Unplaced.ToHashSet();
             s = Ops.Delete(nested, unplaced);
             units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
             if (units.Count == 0) break;
-            // A new bed-full on its own page.
+            // A new bed-full on its own page (on the same size of board, when there's an outline).
             s = Pages.Add(s, $"{title} {++sheets}");
+            fresh = true;
+            if (material is not null)
+            {
+                var (withLayer, ml) = MaterialOutline.Ensure(s);
+                s = Ops.AddShapes(withLayer, [new PathShape { Name = "Material", LayerId = ml.Id, Geometry = material }]);
+            }
             (cutLayer, markLayer) = Layers(ref s);
         }
         return (Pages.SwitchTo(s, firstPage), sheets);

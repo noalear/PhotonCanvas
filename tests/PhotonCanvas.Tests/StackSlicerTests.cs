@@ -127,6 +127,38 @@ public class StackSlicerTests
     }
 
     [Fact]
+    public void SlicesFillTheMaterialOutline()
+    {
+        // A 150 × 100 board drawn on the page, with something already being cut at its corner.
+        var s = DocState.New();
+        var board = new PathShape { Name = "Board", LayerId = s.Layers[0].Id, Geometry = PathGeometry.Rect(40, 60, 150, 100) };
+        var logo = new PathShape { Name = "Logo", LayerId = s.Layers[0].Id, Geometry = PathGeometry.Rect(45, 65, 30, 30) };
+        s = Ops.AddShapes(s, [board, logo]);
+        s = MaterialOutline.Mark(s, new HashSet<Guid> { board.Id });
+        var material = Assert.Single(MaterialOutline.On(s));
+        Assert.Equal(board.Id, material.Id);
+        Assert.False(s.Layers.Single(l => l.Id == material.LayerId).Output); // never cut
+
+        var stack = StackSlicer.Slice(Cylinder(20, 30), new SliceOptions { ThicknessMm = 3, HeightMm = 30 });
+        Assert.Equal(10, stack.Parts.Count);
+        var (placed, beds) = StackLayout.Place(s, stack, MachineProfile.F2Ultra, numbers: false, marks: false, material: material.World);
+        Assert.True(beds >= 2); // 40 mm discs: only a few fit beside the logo on a 150 × 100 board
+        // The first board is this page (around the logo); the others are new pages with the same outline.
+        Assert.Equal(0, placed.PageIndex);
+        int total = 0;
+        for (int i = 0; i < beds; i++)
+        {
+            var page = Pages.SwitchTo(placed, i);
+            var discs = page.Shapes.OfType<PathShape>().Where(x => x.Name.StartsWith("Slice ")).ToList();
+            total += discs.Count;
+            Assert.All(discs, d => Assert.True(d.Bounds.MinX >= 42.9 && d.Bounds.MaxX <= 187.1 && d.Bounds.MinY >= 62.9 && d.Bounds.MaxY <= 157.1));
+            Assert.Single(MaterialOutline.On(page));
+            if (i == 0) Assert.All(discs, d => Assert.False(d.Bounds.Intersects(new Rect2(45, 65, 75, 95))));
+        }
+        Assert.Equal(10, total);
+    }
+
+    [Fact]
     public void BigAndSmallPartsShareABed()
     {
         // Three big parts (two to a bed, turned) and twelve small ones in the room left over: two beds.

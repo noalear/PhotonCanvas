@@ -734,6 +734,7 @@ public partial class MainWindow : Window
         new("shape.tidy", "Shapes", "Tidy lines…", "", () => _ = Guard(TidyPaths)),
         new("shape.along", "Shapes", "Copy along a path…", "", () => _ = Guard(CopyAlongSel)),
         new("shape.warp", "Shapes", "Warp…", "", () => { if (SelectedPaths().Count > 0) _ = Guard(() => new WarpWindow(_doc).ShowDialog(this)); }),
+        new("shape.material", "Shapes", "Use as material outline", "", MaterialSel),
         new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
         new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
@@ -1204,6 +1205,7 @@ public partial class MainWindow : Window
             Do("Break apart", BreakApart, compound, "Ctrl+Shift+K"),
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked))),
+            Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
                 DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
@@ -1397,7 +1399,7 @@ public partial class MainWindow : Window
     async Task NestSel()
     {
         if (_doc.Selection.Count == 0) return;
-        await new NestWindow(_doc, _doc.Selection).ShowDialog(this);
+        await new NestWindow(_doc, _doc.Selection, Canvas.Machine).ShowDialog(this);
     }
 
     void CenterSelInField()
@@ -1985,6 +1987,18 @@ public partial class MainWindow : Window
         if (after >= before) { StatusText.Text = "Already as simple as it gets at that accuracy."; return; }
         _doc.Commit("Simplify", s);
         StatusText.Text = $"Simplified: {before} pieces → {after}.";
+    }
+
+    /// <summary>
+    /// The selected closed shapes are the board in the machine: they move to the Material layer
+    /// (shown, never sent), and nesting and the model slicer fill them instead of the whole bed.
+    /// </summary>
+    void MaterialSel()
+    {
+        var ids = SelectedPaths().Where(p => p is not (TextShape or CodeShape) && p.Geometry.Subpaths.Any(sp => sp.Closed)).Select(p => p.Id).ToHashSet();
+        if (ids.Count == 0) { StatusText.Text = "Select the closed outline of your material (drawn, or picked from the camera)."; return; }
+        _doc.Commit("Use as material outline", MaterialOutline.Mark(_doc.State, ids), ids);
+        StatusText.Text = $"Material outline{(ids.Count == 1 ? "" : "s")} set: on the Material layer, which is never sent. Nest and 3D to slices now fill {(ids.Count == 1 ? "it" : "them")}.";
     }
 
     void CutShapesSel()

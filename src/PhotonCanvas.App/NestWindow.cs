@@ -13,8 +13,9 @@ namespace PhotonCanvas.App;
 public sealed class NestWindow : Window
 {
     readonly Document _doc;
+    readonly MachineProfile _machine;
     readonly IReadOnlySet<Guid> _ids;
-    readonly List<PathShape?> _sheets;
+    readonly List<MaterialChoice> _sheets;
     readonly ComboBox _sheet = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _spacing = Number(0, 50, 0.5m, "0.##");
     readonly NumericUpDown _margin = Number(0, 50, 0.5m, "0.##");
@@ -26,9 +27,10 @@ public sealed class NestWindow : Window
     readonly ProgressBar _busy = new() { IsIndeterminate = true, IsVisible = false, Height = 4 };
     CancellationTokenSource? _cts;
 
-    public NestWindow(Document doc, IReadOnlySet<Guid> ids)
+    public NestWindow(Document doc, IReadOnlySet<Guid> ids, MachineProfile machine)
     {
         _doc = doc;
+        _machine = machine;
         _ids = Ops.WithGroups(doc.State, ids);
         Title = "Nest parts";
         Width = 460;
@@ -37,14 +39,11 @@ public sealed class NestWindow : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
 
-        // Any closed shape that isn't being nested can be the sheet.
-        _sheets = [null];
-        foreach (var s in doc.State.Shapes.OfType<PathShape>().Where(s => !_ids.Contains(s.Id) && s.Geometry.Subpaths.Any(sp => sp.Closed) && s.Bounds.Width * s.Bounds.Height > 100))
-            _sheets.Add(s);
-        _sheet.ItemsSource = _sheets.Select(s => s is null ? "The whole work area (220 × 220 mm)" :
-            $"{(string.IsNullOrWhiteSpace(s.Name) ? "Shape" : s.Name)} · {s.Bounds.Width:0} × {s.Bounds.Height:0} mm").ToList();
-        _sheet.SelectedIndex = 0;
-        ToolTip.SetTip(_sheet, "Where the parts go. Pick a shape to nest inside it, for example an offcut outlined with Pick piece from camera.");
+        // The material outlined on the page first; any other closed shape that isn't being nested can be the sheet too.
+        (_sheets, int first) = MaterialChoice.For(doc.State, machine.FieldW, machine.FieldH, _ids, otherShapes: true);
+        _sheet.ItemsSource = _sheets.Select(c => c.Label).ToList();
+        _sheet.SelectedIndex = first;
+        ToolTip.SetTip(_sheet, "Where the parts go. Outline the board in the machine (draw it, or Pick piece from camera), then right-click it: Use as material outline.");
         _spacing.Value = 2;
         _margin.Value = 2;
         _copies.Value = 1;
@@ -86,8 +85,8 @@ public sealed class NestWindow : Window
         var cts = _cts = new CancellationTokenSource();
         var opt = new NestOptions
         {
-            Sheet = _sheets[Math.Max(0, _sheet.SelectedIndex)]?.World,
-            SheetShapeId = _sheets[Math.Max(0, _sheet.SelectedIndex)]?.Id,
+            Sheet = _sheets[Math.Max(0, _sheet.SelectedIndex)].Outline,
+            SheetShapeId = _sheets[Math.Max(0, _sheet.SelectedIndex)].ShapeId,
             SpacingMm = (double)(_spacing.Value ?? 2),
             MarginMm = (double)(_margin.Value ?? 2),
             RotationStepDeg = _rotation.SelectedIndex switch { 0 => 0, 1 => 90, 2 => 45, 3 => 15, _ => 5 },
@@ -101,7 +100,7 @@ public sealed class NestWindow : Window
         _status.Text = "Nesting…";
         try
         {
-            var (next, report) = await Task.Run(() => Nesting.Nest(state, _ids, opt, MachineProfile.F2Ultra, cts.Token), cts.Token);
+            var (next, report) = await Task.Run(() => Nesting.Nest(state, _ids, opt, _machine, cts.Token), cts.Token);
             if (!ReferenceEquals(state, _doc.State)) { _status.Text = "The design changed meanwhile; try again."; return; }
             var placedIds = _ids.Except(report.Unplaced).Concat(report.Added);
             _doc.Commit("Nest", next, report.Unplaced.Count > 0 ? report.Unplaced : placedIds);

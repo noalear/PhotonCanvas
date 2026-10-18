@@ -55,6 +55,8 @@ public sealed class StackSliceWindow : Window
     readonly NumericUpDown _sheetsX = Number(1, 60, 1, "0"), _sheetsY = Number(1, 60, 1, "0"), _fins = Number(3, 72, 1, "0"), _rings = Number(1, 20, 1, "0"), _core = Number(0, 50, 0.5m, "0.#"), _fit = Number(-0.5m, 1, 0.05m, "0.##");
     StackPanel _stackedPanel = null!, _eggPanel = null!, _radialPanel = null!;
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
+    readonly ComboBox _stock = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly List<MaterialChoice> _stocks;
     readonly Button _make = new() { Content = "Make the slices", Classes = { "primary" }, IsEnabled = false, MinWidth = 150 };
 
     readonly AppSettings? _settings;
@@ -74,6 +76,10 @@ public sealed class StackSliceWindow : Window
         _sheetsX.Value = 6; _sheetsY.Value = 4; _fins.Value = 12; _rings.Value = 3; _core.Value = 6; _fit.Value = 0.1m;
         foreach (var n in new[] { _sheetsX, _sheetsY, _fins, _rings, _core, _fit }) n.ValueChanged += (_, _) => Later();
         _method.SelectionChanged += (_, _) => { ShowMethod(); Later(); };
+        (_stocks, int first) = MaterialChoice.For(doc.State, machine.FieldW, machine.FieldH);
+        _stock.ItemsSource = _stocks.Select(c => c.Label).ToList();
+        _stock.SelectedIndex = first;
+        _stock.SelectionChanged += (_, _) => Later();
 
         var open = Button("Open a 3D model…", tip: "STL or OBJ, from a 3D printing site, Fusion, Blender…");
         open.Click += async (_, _) => await Open();
@@ -144,6 +150,7 @@ public sealed class StackSliceWindow : Window
                 }),
                 _numbers,
                 Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
+                Field("Cut from", _stock, tip: "Where the parts go. To use the board actually in the machine, outline it first (draw it, or Pick piece from camera), right-click it: Use as material outline. Further beds get the same outline on new pages."),
                 _summary,
             },
         };
@@ -346,7 +353,13 @@ public sealed class StackSliceWindow : Window
             Range(true);
             var biggest = stack.Parts.Select(p => p.Outline.Bounds()).Where(b => !b.IsEmpty).DefaultIfEmpty(Rect2.Empty).MaxBy(b => b.Width * b.Height);
             int parts = stack.Parts.Count;
-            bool fits = stack.Parts.All(p => p.Outline.Bounds() is var b && b.Width + 6 <= _machine.FieldW && b.Height + 6 <= _machine.FieldH);
+            // Against the board chosen (its biggest piece), or the bed; a quarter turn is allowed.
+            var room = _stocks[Math.Max(0, _stock.SelectedIndex)].Outline is { } stockOutline
+                ? stockOutline.Subpaths.Where(sp => sp.Closed).Select(sp => new PhotonCanvas.Doc.PathGeometry([sp]).Bounds()).MaxBy(b => b.Width * b.Height)
+                : new Rect2(0, 0, _machine.FieldW, _machine.FieldH);
+            double roomLong = Math.Min(Math.Max(room.Width, room.Height), Math.Max(_machine.FieldW, _machine.FieldH)), roomShort = Math.Min(Math.Min(room.Width, room.Height), Math.Min(_machine.FieldW, _machine.FieldH));
+            bool fits = stack.Parts.All(p => p.Outline.Bounds() is var b && Math.Max(b.Width, b.Height) + 6 <= roomLong && Math.Min(b.Width, b.Height) + 6 <= roomShort);
+            string where = room.Width >= _machine.FieldW && room.Height >= _machine.FieldH ? "the bed" : "the material";
             if (o.Method != SliceMethod.Stacked)
             {
                 int slots = stack.Parts.Sum(p => p.Notes.Count) / 2;
@@ -356,7 +369,7 @@ public sealed class StackSliceWindow : Window
                                     ? "Each slot is marked with the sheet that goes in it: X sheets slide down from the top onto the Y sheets."
                                     : "Each slot is marked with the part that goes in it: slide the rings down over the fins from the top, smallest first" + (o.CoreMm > 0 ? $", with a {o.CoreMm:0.#} mm dowel up the middle." : ".")) +
                                 (stack.LeftOut > 0 ? $" {stack.LeftOut} tiny piece{(stack.LeftOut == 1 ? " was" : "s were")} left out." : "") +
-                                (fits ? "" : $"\n⚠ The biggest sheet ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on the bed: make the model smaller.");
+                                (fits ? "" : $"\n⚠ The biggest sheet ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
                 _make.IsEnabled = fits && parts > 0;
                 return;
             }
@@ -367,7 +380,7 @@ public sealed class StackSliceWindow : Window
                             (stack.Parts.Count(p => p.Floating) is var fl and > 0 ? $"\n⚠ {fl} part{(fl == 1 ? "" : "s")} start in mid-air with nothing under them (red in the preview): separate pieces of the model, to glue on by eye or leave out." : "") +
                             (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
-                            (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on the bed: make the model smaller.");
+                            (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
             _make.IsEnabled = fits && parts > 0;
         }
         catch (OperationCanceledException) { }
@@ -385,9 +398,10 @@ public sealed class StackSliceWindow : Window
         if (_stack is not { } stack) return;
         try
         {
-            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name);
+            var stock = _stocks[Math.Max(0, _stock.SelectedIndex)];
+            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name, material: stock.Outline);
             _doc.Commit($"Stacked slices of {_name}", s, []);
-            _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} bed{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area)." : ".") +
+            _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +
                             " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\".";
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }
