@@ -91,6 +91,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Slices go on pages of their own (named after the model) when the current page already has something on it
 - [x] Slices and sheets nested by true shape (biggest first, quarter turns, small parts in the gaps) to fill each bed before starting the next; nesting itself much faster
 - [x] Material outline: any closed shape (drawn, or picked from the camera) marked as the board in the machine goes on a Material layer that's never sent; Nest and 3D to slices fill it (holes kept clear, around what's already there), further beds repeat it on new pages
+- [x] Slicer preview: burnt edges (charred cut edges per material, darkest where the beam enters, smoke beside the cut; acrylic stays clean)
 - [x] Curved surface: measure it with the pointer and the close-up camera (up to 40 × 40 points, bad points found and left out), or type in a cylinder or slatted drum; fit as any shape, cylinder, drum of flat slats or slanted plane; 3D preview; marked in 0.2 mm height bands as xTool Studio does (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)

@@ -30,6 +30,8 @@ public sealed class StackView : Control
 
     public StackLook Look { get; set { field = value; InvalidateVisual(); } } = StackLook.Solid;
     public StackMaterial Material { get; set { field = value; InvalidateVisual(); } } = StackMaterial.Basswood;
+    /// <summary>Cut edges charred as the laser leaves them (darkest on the side it comes in), with a little smoke on the faces beside them.</summary>
+    public bool Burnt { get; set { field = value; InvalidateVisual(); } } = true;
     /// <summary>The first and last slice shown (1 = bottom).</summary>
     public int From { get; set { field = value; InvalidateVisual(); } } = 1;
     public int To { get; set { field = value; InvalidateVisual(); } } = int.MaxValue;
@@ -133,17 +135,25 @@ public sealed class StackView : Control
 
     // ---- shaded solid ----------------------------------------------------------------------
 
-    sealed record Look3(Color Top, Color Side, Color Glue, double Shine, int Plies);
+    /// <summary>A material's colours: faces, cut edges, glue lines; and, burnt, the charred edge and how much smoke stains the faces (none for acrylic, which melts clean).</summary>
+    sealed record Look3(Color Top, Color Side, Color Glue, double Shine, int Plies, Color? Char = null, double Smoke = 0);
 
     static Look3 Of(StackMaterial m) => m switch
     {
-        StackMaterial.BirchPlywood => new(Color.Parse("#E7D2A6"), Color.Parse("#D8BF8E"), Color.Parse("#7A5E3C"), 0, 3),
-        StackMaterial.Walnut => new(Color.Parse("#6E4B33"), Color.Parse("#5C3E2A"), Color.Parse("#3B2718"), 0.05, 0),
-        StackMaterial.Mdf => new(Color.Parse("#B9996F"), Color.Parse("#8F7455"), Color.Parse("#5E4B36"), 0, 0),
-        StackMaterial.Cardboard => new(Color.Parse("#C9A777"), Color.Parse("#B8925F"), Color.Parse("#7D6142"), 0, 2),
+        StackMaterial.BirchPlywood => new(Color.Parse("#E7D2A6"), Color.Parse("#D8BF8E"), Color.Parse("#7A5E3C"), 0, 3, Color.Parse("#3A2819"), 0.30),
+        StackMaterial.Walnut => new(Color.Parse("#6E4B33"), Color.Parse("#5C3E2A"), Color.Parse("#3B2718"), 0.05, 0, Color.Parse("#21150D"), 0.25),
+        StackMaterial.Mdf => new(Color.Parse("#B9996F"), Color.Parse("#8F7455"), Color.Parse("#5E4B36"), 0, 0, Color.Parse("#1E1712"), 0.35),
+        StackMaterial.Cardboard => new(Color.Parse("#C9A777"), Color.Parse("#B8925F"), Color.Parse("#7D6142"), 0, 2, Color.Parse("#4A321F"), 0.30),
         StackMaterial.WhiteAcrylic => new(Color.Parse("#F4F4F2"), Color.Parse("#E2E3E0"), Color.Parse("#BFC1BD"), 0.6, 0),
         StackMaterial.BlackAcrylic => new(Color.Parse("#26272A"), Color.Parse("#1D1E21"), Color.Parse("#0E0F11"), 0.7, 0),
-        _ => new(Color.Parse("#EAD7AF"), Color.Parse("#DCC294"), Color.Parse("#9C7F57"), 0, 0),
+        _ => new(Color.Parse("#EAD7AF"), Color.Parse("#DCC294"), Color.Parse("#9C7F57"), 0, 0, Color.Parse("#4B321E"), 0.30),
+    };
+
+    /// <summary>The look with the cut edges charred: the char colour in place of the bare edge, glue lines and plies darker still.</summary>
+    static Look3 Charred(Look3 l) => l.Char is not { } c ? l : l with
+    {
+        Side = c,
+        Glue = Color.FromRgb((byte)(c.R * 0.6), (byte)(c.G * 0.6), (byte)(c.B * 0.6)),
     };
 
     void RenderSolid(DrawingContext ctx, SliceStack st)
@@ -153,7 +163,9 @@ public sealed class StackView : Control
         var px = new uint[w * h];
         var depth = new float[w * h];
         Array.Fill(depth, float.NegativeInfinity);
-        var look = Of(Material);
+        var bare = Of(Material);
+        bool burnt = Burnt && bare.Char is not null;
+        var look = burnt ? Charred(bare) : bare;
         // Light from the upper left, in front; a little always (so nothing is black).
         var light = Norm(-0.45, -0.75, 0.55);
         double Lit((double X, double Y, double D) n, out double spec)
@@ -178,7 +190,9 @@ public sealed class StackView : Control
             var nf = front ? nUp : (-nUp.X, -nUp.Y, -nUp.D);
             double faceLight = Lit(nf, out double faceSpec);
             uint faceColour = Shade(tint ?? look.Top, faceLight, faceSpec);
-            FillFace(loops, uv => Pr(uv, front ? s1 : s0), w, h, px, depth, faceColour);
+            // Smoke beside the cut: about a millimetre wide, heavier on the top (where the laser comes in) than underneath.
+            double smoke = burnt && tint is null ? look.Smoke * (front ? 1 : 0.4) : 0;
+            FillFace(loops, uv => Pr(uv, front ? s1 : s0), w, h, px, depth, faceColour, smoke, 1.0 * v.Scale);
 
             // The edges all round: a strip of quads per outline, facing outwards.
             foreach (var l in loops)
@@ -202,8 +216,8 @@ public sealed class StackView : Control
                     var p1 = Pr(c, s0);
                     var p2 = Pr(c, s1);
                     var p3 = Pr(a, s1);
-                    Triangle(p0, p1, p2, 0, 0, 1, w, h, px, depth, look, tint, lit, spec);
-                    Triangle(p0, p2, p3, 0, 1, 1, w, h, px, depth, look, tint, lit, spec);
+                    Triangle(p0, p1, p2, 0, 0, 1, w, h, px, depth, look, tint, lit, spec, burnt);
+                    Triangle(p0, p2, p3, 0, 1, 1, w, h, px, depth, look, tint, lit, spec, burnt);
                 }
             }
         }
@@ -241,7 +255,7 @@ public sealed class StackView : Control
     }
 
     /// <summary>A flat face (outlines with holes, even-odd) on the screen, depth-tested; its depth follows the face's plane.</summary>
-    static void FillFace(List<List<Vec2>> loops, Func<Vec2, (double X, double Y, double D)> project, int w, int h, uint[] px, float[] depth, uint colour)
+    static void FillFace(List<List<Vec2>> loops, Func<Vec2, (double X, double Y, double D)> project, int w, int h, uint[] px, float[] depth, uint colour, double smoke = 0, double smokePx = 0)
     {
         if (loops.Count == 0) return;
         // The plane on screen: depth = a·x + b·y + c, from three corners well apart.
@@ -287,6 +301,21 @@ public sealed class StackView : Control
         }
         var bytes = mask.Bytes;
         int stride = mask.RowBytes;
+        // The smoke stain: the outline drawn soft, darkening the face where they overlap.
+        byte[]? stain = null;
+        if (smoke > 0 && smokePx > 0.5)
+        {
+            using var soft = new SKBitmap(new SKImageInfo(bw, bh, SKColorType.Alpha8, SKAlphaType.Premul));
+            using (var canvas = new SKCanvas(soft))
+            {
+                canvas.Clear(SKColors.Transparent);
+                canvas.Translate(-x0, -y0);
+                using var blur = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, (float)(smokePx * 0.6));
+                using var paint = new SKPaint { Color = SKColors.White, IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = (float)smokePx, MaskFilter = blur };
+                canvas.DrawPath(path, paint);
+            }
+            stain = soft.Bytes;
+        }
         for (int y = 0; y < bh; y++)
         {
             for (int x = 0; x < bw; x++)
@@ -296,14 +325,19 @@ public sealed class StackView : Control
                 float d = (float)(da * (x + x0 + 0.5) + db * (y + y0 + 0.5) + dc + 1e-3); // a hair in front of its own edges
                 if (d <= depth[i]) continue;
                 depth[i] = d;
-                px[i] = colour;
+                if (stain is not null && stain[y * stride + x] is var a && a > 0)
+                {
+                    double k = 1 - smoke * a / 255.0;
+                    px[i] = 0xFF000000u | (uint)((colour >> 16 & 0xFF) * k) << 16 | (uint)((colour >> 8 & 0xFF) * k) << 8 | (uint)((colour & 0xFF) * k);
+                }
+                else px[i] = colour;
             }
         }
     }
 
     /// <summary>One triangle of an edge, depth-tested; <paramref name="t0"/>… is how far up the slice each corner is (0 bottom, 1 top), for glue lines and plies.</summary>
     static void Triangle((double X, double Y, double D) a, (double X, double Y, double D) b, (double X, double Y, double D) c, double t0, double t1, double t2,
-        int w, int h, uint[] px, float[] depth, Look3 look, Color? tint, double lit, double spec)
+        int w, int h, uint[] px, float[] depth, Look3 look, Color? tint, double lit, double spec, bool burnt = false)
     {
         int minX = Math.Max(0, (int)Math.Floor(Math.Min(a.X, Math.Min(b.X, c.X)))), maxX = Math.Min(w - 1, (int)Math.Ceiling(Math.Max(a.X, Math.Max(b.X, c.X))));
         int minY = Math.Max(0, (int)Math.Floor(Math.Min(a.Y, Math.Min(b.Y, c.Y)))), maxY = Math.Min(h - 1, (int)Math.Ceiling(Math.Max(a.Y, Math.Max(b.Y, c.Y))));
@@ -333,7 +367,8 @@ public sealed class StackView : Control
                     double within = ply - Math.Floor(ply);
                     colour = within < 0.07 ? glue : ((int)ply % 2 == 0 ? side : Color.FromRgb((byte)(side.R * 0.93), (byte)(side.G * 0.93), (byte)(side.B * 0.93)));
                 }
-                px[i] = Shade(colour, lit, spec);
+                // Charred darkest at the top, where the beam comes in, a little lighter at the bottom.
+                px[i] = Shade(colour, burnt && tint is null ? lit * (0.8 + 0.3 * (1 - t)) : lit, spec);
             }
     }
 }

@@ -31,6 +31,7 @@ public sealed class StackSliceWindow : Window
     readonly StackView _view = new() { MinHeight = 380 };
     readonly ComboBox _look = new() { ItemsSource = new[] { "Solid", "Outlines" }, SelectedIndex = 0, Width = 120 };
     readonly ComboBox _material = new() { ItemsSource = new[] { "Basswood", "Birch plywood", "Walnut", "MDF", "Cardboard", "White acrylic", "Black acrylic" }, SelectedIndex = 0, Width = 150 };
+    readonly CheckBox _burnt = new() { Content = "Burnt edges", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
     readonly Slider _from = new() { Minimum = 1, Maximum = 1, Value = 1, IsSnapToTickEnabled = true, TickFrequency = 1 };
     readonly Slider _to = new() { Minimum = 1, Maximum = 1, Value = 1, IsSnapToTickEnabled = true, TickFrequency = 1 };
     readonly TextBlock _range = new() { VerticalAlignment = VerticalAlignment.Center, MinWidth = 120 };
@@ -156,8 +157,10 @@ public sealed class StackSliceWindow : Window
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new(0, 10, 0, 0), Children = { close, _make } };
         var grid = new Grid { ColumnDefinitions = new("*,16,360") };
-        _look.SelectionChanged += (_, _) => { _view.Look = _look.SelectedIndex == 1 ? StackLook.Lines : StackLook.Solid; _material.IsEnabled = _look.SelectedIndex == 0; };
-        _material.SelectionChanged += (_, _) => _view.Material = (StackMaterial)Math.Max(0, _material.SelectedIndex);
+        _look.SelectionChanged += (_, _) => { _view.Look = _look.SelectedIndex == 1 ? StackLook.Lines : StackLook.Solid; _material.IsEnabled = _look.SelectedIndex == 0; BurntShown(); };
+        _material.SelectionChanged += (_, _) => { _view.Material = (StackMaterial)Math.Max(0, _material.SelectedIndex); BurntShown(); };
+        _burnt.IsCheckedChanged += (_, _) => _view.Burnt = _burnt.IsChecked == true;
+        ToolTip.SetTip(_burnt, "The cut edges as they come off the laser: charred dark, darkest on the top where the beam comes in, with a little smoke beside them. Acrylic doesn't char.");
         _from.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Range(fromMoved: true); };
         _to.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Range(fromMoved: false); };
         var controls = new StackPanel
@@ -165,7 +168,7 @@ public sealed class StackSliceWindow : Window
             Spacing = 8, Margin = new(0, 8, 0, 0),
             Children =
             {
-                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { new TextBlock { Text = "View", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _look, _material } },
+                new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { new TextBlock { Text = "View", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } }, _look, _material, _burnt } },
                 new Grid
                 {
                     ColumnDefinitions = new("Auto,*,Auto,*,Auto"), ColumnSpacing = 8,
@@ -205,6 +208,9 @@ public sealed class StackSliceWindow : Window
         Natural();
         OwnSize();
     }
+
+    /// <summary>Burnt edges only mean something on solid wood or card.</summary>
+    void BurntShown() => _burnt.IsEnabled = _look.SelectedIndex == 0 && _material.SelectedIndex < (int)StackMaterial.WhiteAcrylic;
 
     /// <summary>Only the settings for the chosen way of building.</summary>
     void ShowMethod()
