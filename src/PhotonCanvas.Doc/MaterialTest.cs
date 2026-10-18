@@ -165,7 +165,7 @@ public static class MaterialTest
         var y0 = o.Origin.Y + headerRow;
 
         var shapes = new List<Shape>();
-        int layerIndex = s.Layers.Count;
+        int layerIndex = s.Layers.Count, firstTest = s.Layers.Count;
         for (int r = 0; r < down.Count; r++)
             for (int c = 0; c < across.Count; c++)
             {
@@ -186,7 +186,8 @@ public static class MaterialTest
             ? new LaserSettings { Light = LightSource.Red, Power = 30, Speed = 1000 }
             : LaserSettings.Blue(Math.Clamp(o.Power * 0.6, 5, 100), Math.Clamp(Math.Max(o.Speed, 200), m.MinSpeed, m.MaxSpeed));
         var labels = Layer.Default(layerIndex, LayerMode.Score) with { Name = "Test labels", Laser = labelLaser };
-        s = Ops.AddLayer(s, labels);
+        // Before the squares: cut squares drop out, so nothing may come after them.
+        s = Ops.AddLayer(s, labels, firstTest);
         var style = new TextStyle(o.Font, o.LabelMm);
         TextShape Text(string text, double cx, double cy, bool rightAlign = false)
         {

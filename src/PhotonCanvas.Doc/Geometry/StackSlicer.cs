@@ -665,7 +665,8 @@ public static class StackLayout
             {
                 var score = Layer.Default(st.Layers.Count, LayerMode.Score);
                 mk = score with { Name = "Slices · marks", Laser = score.Laser with { Power = Math.Min(score.Laser.Power, 15) } };
-                st = Ops.AddLayer(st, mk);
+                // Marked before anything is cut: cut parts can shift or drop.
+                st = Ops.AddLayer(st, mk, st.Layers.FindIndex(l => l.Id == cut.Id));
             }
             return (cut, mk);
         }

@@ -252,6 +252,8 @@ public partial class MainWindow : Window
         {
             // An etch test just finished: straight to its results.
             if (_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowEtchTest(true)));
+            // A cut test (or its kerf test) likewise.
+            else if (CutTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCutTest(true)));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
             if (from != _doc.FilePath) return;
             var next = VariableText.AfterRun(_doc.State, DateTime.Now);
@@ -594,6 +596,7 @@ public partial class MainWindow : Window
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
         mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => ShowEtchTest(_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null))), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
+        mat.Large("Cut test", "IcTestGrid", () => _ = Guard(() => ShowCutTest(CutTestWindow.InDesign(_doc.State))), "Find the cut: small squares at different speeds and passes, see which drop out; then the kerf and the slot fit at that setting; saved with the material");
         var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
         colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
@@ -2304,6 +2307,9 @@ public partial class MainWindow : Window
             ? "This copy marks the design's own serial number / row again."
             : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
     }
+
+    Task ShowCutTest(bool results) =>
+        new CutTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
 
     Task ShowEtchTest(bool results) =>
         new EtchTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results,
