@@ -630,11 +630,8 @@ public sealed class MachinePanel : UserControl
     }
 
     /// <summary>Run auto-focus (as the button does) and return the new distance.</summary>
-    public async Task<double?> AutoFocusNowAsync()
-    {
-        await AutoFocus();
-        return Distance;
-    }
+    /// <summary>Auto-focus; the material distance it found, or null if it didn't finish (stopped, failed, busy).</summary>
+    public async Task<double?> AutoFocusNowAsync() => await AutoFocus() ? Distance : null;
 
     /// <summary>A plain overview photo for a time-lapse: nothing else is touched while a job runs.</summary>
     public Task<byte[]> TimeLapseFrameAsync() =>
@@ -1106,13 +1103,14 @@ public sealed class MachinePanel : UserControl
         finally { _updatingLid = false; }
     }
 
-    async Task AutoFocus()
+    /// <summary>True when it finished and the head is at the material's focus.</summary>
+    async Task<bool> AutoFocus()
     {
-        if (_client is not { } c) return;
+        if (_client is not { } c) return false;
         if (Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or ""))
         {
             _focusState.Text = $"The machine is busy ({Describe(Mode)}). Try again when it's ready.";
-            return;
+            return false;
         }
         _focus.IsEnabled = false;
         IsBusyFocusing = true;
@@ -1128,11 +1126,13 @@ public sealed class MachinePanel : UserControl
             Log($"Auto-focus finished: distance {dist:0.0} mm (head Z {z:0.00}).");
             UpdateCalState();
             if (_onCanvas.IsChecked == true) await RefreshOverlay(); // the camera view depends on the distance
+            return true;
         }
         catch (DeviceException e)
         {
             _focusState.Text = e.Message;
             Log($"Auto-focus: {e.Message}");
+            return false;
         }
         finally { _focus.IsEnabled = IsConnected; IsBusyFocusing = false; Changed(); }
     }

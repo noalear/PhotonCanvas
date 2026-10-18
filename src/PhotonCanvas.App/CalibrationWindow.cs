@@ -33,6 +33,10 @@ public sealed class CalibrationWindow : Window
     readonly NumericUpDown _speed = Number(2, 15000, 10, "0.#");
     readonly NumericUpDown _distance = Number(0, 150, 0.5m, "0.0#");
     readonly TextBlock _burnState = Hint();
+    readonly TextBlock _focusState = new() { TextWrapping = TextWrapping.Wrap };
+    readonly NumericUpDown _typedFocus = Number(0, 150, 0.5m, "0.0#");
+    /// <summary>The material distance focused to in this window (null = not yet).</summary>
+    double? _focusedAt;
     readonly TextBlock _photoState = Hint();
     readonly TextBlock _instruction = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
     readonly TextBlock _result = new() { TextWrapping = TextWrapping.Wrap };
@@ -80,6 +84,25 @@ public sealed class CalibrationWindow : Window
         _speed.Value = 150;
         _distance.Value = (decimal)Math.Round(defaultDistance ?? machine.Distance ?? 0, 1);
 
+        var autoFocus = new Button { Content = "Auto-focus on the material", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+        autoFocus.Click += async (_, _) =>
+        {
+            if (!_machine.IsConnected) { _focusState.Text = "Connect to the machine first."; return; }
+            autoFocus.IsEnabled = false;
+            _focusState.Text = "Focusing… the head moves.";
+            _focusState.Foreground = Brush("TextMain");
+            try { Focused(await _machine.AutoFocusNowAsync(), "auto-focus"); }
+            finally { autoFocus.IsEnabled = true; }
+        };
+        _typedFocus.Value = (decimal)Math.Round(machine.Distance ?? 3, 1);
+        var moveFocus = Button("Move the head to it", tip: "When auto-focus can't see the material (glass, very dark or shiny): measure its thickness and type it.");
+        moveFocus.Click += async (_, _) =>
+        {
+            if (!_machine.IsConnected) { _focusState.Text = "Connect to the machine first."; return; }
+            double mm = (double)(_typedFocus.Value ?? 0);
+            var error = await _machine.MoveFocusAsync(mm);
+            Focused(error is null ? mm : null, error ?? "typed height");
+        };
         var send = Button("Send marks to machine", "IcSend");
         send.Click += async (_, _) => await SendMarks();
         var take = Button("Take photo", "IcCamera", "Overview camera photo. Lights must be on (they are, unless a job is running).");
@@ -98,17 +121,23 @@ public sealed class CalibrationWindow : Window
         {
             Children =
             {
-                Card("1 · Burn marks",
-                    Hint("Lay a flat scrap sheet (wood or card) over the whole 220 × 220 mm area and set the focus distance on the machine as you would for real work. PhotonCanvas burns 25 marks in a grid, plus one small dot beside the top-left mark and two beside the top-right mark."),
+                Card("1 · Focus on the material",
+                    Hint("Lay a flat scrap sheet (wood or card) over the whole 220 × 220 mm area first, then focus on it. Out of focus, the marks come out faint or wide and the camera is calibrated for the wrong height."),
+                    autoFocus,
+                    Field("Or its height", _typedFocus, tip: "Material thickness (mm), when auto-focus can't see it."),
+                    moveFocus,
+                    _focusState),
+                Card("2 · Burn marks",
+                    Hint("PhotonCanvas burns 25 marks in a grid over the whole area, plus one small dot beside the top-left mark and two beside the top-right mark."),
                     Field("Marks", _markStyle, tip: "Dots are easiest to spot; crosshairs make the centre easiest to judge by eye. Either way PhotonCanvas finds the exact centre itself."),
                     Field("Mark size", _markSize, Hint("Smaller marks are easier to judge but fainter. Use the same choice when you take the photo."), "Dot diameter, or crosshair width."),
                     Field("Power", _power, tip: "Blue diode power for the dots."),
                     Field("Speed", _speed, tip: "Slower = darker marks."),
                     send, _burnState),
-                Card("2 · Photo", Row(take, open), _photoState),
-                Card("3 · Locate the marks", _instruction, restart,
+                Card("3 · Photo", Row(take, open), _photoState),
+                Card("4 · Locate the marks", _instruction, restart,
                     Hint("You don't need to click the exact centre: PhotonCanvas snaps to the middle of the nearest mark. Scroll to zoom, right-drag to pan. To fix a mark: click its marker, then click the mark. Right-click a marker to ignore that mark.")),
-                Card("4 · Check and save",
+                Card("5 · Check and save",
                     Field("Distance", _distance, Hint("Material distance (mm) the marks were burned at. Saved calibrations are matched to the machine's distance."), "Focus distance when the marks were burned."),
                     _result, _check, _save),
             },
@@ -123,11 +152,36 @@ public sealed class CalibrationWindow : Window
         Closed += (_, _) => { _display?.Dispose(); _checkImage?.Dispose(); };
         ResetMarks();
         UpdateConnectionHints();
+        _focusState.Text = machine.IsConnected ? "Not focused in this window yet." : "Connect to the machine to focus.";
+        _focusState.Foreground = Brush("Warn");
+    }
+
+    /// <summary>After focusing: where it is, or why not; a focus at the very top of the head's travel means it didn't find the material.</summary>
+    void Focused(double? distance, string how)
+    {
+        if (distance is not { } d)
+        {
+            _focusedAt = null;
+            _focusState.Text = $"⚠ Not focused ({how}). Try again, or type the material's height and move the head to it.";
+            _focusState.Foreground = Brush("Warn");
+            return;
+        }
+        if (d >= 149)
+        {
+            _focusedAt = null;
+            _focusState.Text = $"⚠ The head ended at the top of its travel ({d:0.0} mm): it didn't find the material. Check the material is under the head and try again, or type its height.";
+            _focusState.Foreground = Brush("Warn");
+            return;
+        }
+        _focusedAt = d;
+        _distance.Value = (decimal)Math.Round(d, 1);
+        _focusState.Text = $"✓ Focused at {d:0.0} mm ({how}).";
+        _focusState.Foreground = Brush("Ok");
     }
 
     void UpdateConnectionHints()
     {
-        _burnState.Text = _machine.IsConnected ? "" : "Connect to the machine (Machine, at the right end of the ribbon) to send the marks. If they are already burned, skip to step 2.";
+        _burnState.Text = _machine.IsConnected ? "" : "Connect to the machine (Machine, at the right end of the ribbon) to send the marks. If they are already burned, skip to step 3.";
         _photoState.Text = _machine.IsConnected ? "" : "Not connected: you can open a saved overview photo instead.";
     }
 
@@ -156,6 +210,12 @@ public sealed class CalibrationWindow : Window
             await Dialogs.Message(this, "Can't make the marks", e.Message);
             return;
         }
+        if (_focusedAt is null &&
+            !await Dialogs.Confirm(this, "Not focused yet",
+                "You haven't focused on the material in this window (step 1). Burned out of focus, the marks come out faint or wide and a sheet is wasted." +
+                (_machine.Distance is { } fd ? $"\n\nThe machine's focus is at {fd:0.0} mm" + (fd >= 149 ? ", the top of its travel: almost certainly wrong." : ".") : ""),
+                "Burn anyway", "Go back and focus"))
+            return;
         var dist = _machine.Distance is { } d ? $"Machine focus distance: {d:0.0} mm.\n" : "";
         if (!await Dialogs.Confirm(this, "Burn calibration marks",
                 $"25 {(Spec.Style == MarkStyle.Cross ? "crosshairs" : "dots")} ({Spec.SizeMm:0.#} mm) plus 3 orientation dots across the whole 220 × 220 mm area, blue diode {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
@@ -166,7 +226,7 @@ public sealed class CalibrationWindow : Window
         {
             _burnState.Text = "Uploading…";
             await _machine.UploadJobAsync(xf, null, CancellationToken.None, replaceLoadedJob: true, name: "Camera calibration marks");
-            _burnState.Text = "Uploaded. Press the start button on the machine. When it finishes, take the photo (step 2).";
+            _burnState.Text = "Uploaded. Press the start button on the machine. When it finishes, take the photo (step 3).";
             if (_machine.Distance is { } md) _distance.Value = (decimal)Math.Round(md, 1);
         }
         catch (DeviceException e)
