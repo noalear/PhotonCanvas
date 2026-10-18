@@ -482,11 +482,30 @@ public static class JobBuilder
             warnings.Add(mode is WorkMode.Rotary
                 ? "Rotary attachment: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first."
                 : "Conveyor: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first.");
+        // A curved piece: the head steps through height bands that follow it.
+        Surface? surface = null;
+        if (s.Curve.On && s.Curve.Build() is { } built)
+        {
+            if (mode is not WorkMode.Flat)
+                warnings.Add("Curved surface is on, but it only works on the flat bed: it's left out with the rotary or conveyor.");
+            else
+            {
+                surface = built;
+                warnings.Add($"Curved surface: the head follows it in {s.Curve.BandMm:0.##} mm steps. Experimental: try it on scrap first.");
+                if (!s.Curve.Typed && !s.Curve.Area.IsEmpty && !s.Curve.Area.Inflate(1).Contains(bounds.TopLeft) | !s.Curve.Area.Inflate(1).Contains(bounds.BottomRight))
+                    warnings.Add("Parts of the design are outside the measured area: the heights there are guessed. Measure a bigger area to be sure.");
+                if (blocks.OfType<VectorBlock>().Any(v => v.Drop is not null))
+                    warnings.Add("Step-down is left out on a curved surface (the head's height follows the surface instead).");
+                blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
+            }
+        }
         var job = new Job(opt.Machine, blocks)
         {
             PassMode = opt.WholeJobPasses ? new PassMode.Rounds(opt.PassDelayS) : new PassMode.PerBlock(),
             Created = (now ?? DateTimeOffset.Now).ToString("yyyy_MM_dd_HH_mm_ss"),
             Mode = mode,
+            SurfaceHeight = surface is null ? null : surface.HeightAt,
+            BandMm = s.Curve.BandMm,
         };
         var motion = job.Render();
         Vec2[] frame = [bounds.TopLeft, new(bounds.MaxX, bounds.MinY), bounds.BottomRight, new(bounds.MinX, bounds.MaxY), bounds.TopLeft];
@@ -518,7 +537,7 @@ public static class JobBuilder
             PreviewJpeg = XfPackage.PreviewJpeg(steps.Select(st => (IReadOnlyList<Vec2>)(st.Closed ? [.. st.Points, st.Points[0]] : st.Points))),
             Light = light,
             Params = prms,
-            Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => "LASER_PLANE" },
+            Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => surface is not null ? "CURVE_PROCESS" : "LASER_PLANE" },
             Axis = mode is WorkMode.Flat ? "" : "U",
             Created = now ?? DateTimeOffset.Now,
         });

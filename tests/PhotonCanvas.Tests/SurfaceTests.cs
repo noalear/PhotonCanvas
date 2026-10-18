@@ -108,4 +108,21 @@ public class SurfaceTests
         Assert.Contains(ours, l => l.StartsWith("G0X") && l.EndsWith("F180000"));
         Assert.Contains(ours, l => l.EndsWith("S100F1200"));
     }
+
+    [Fact]
+    public void ADesignCarriesItsSurface()
+    {
+        var s = PhotonCanvas.Doc.DocState.New();
+        s = PhotonCanvas.Doc.Ops.AddShapes(s, [new PhotonCanvas.Doc.PathShape { LayerId = s.Layers[0].Id, Geometry = PhotonCanvas.Doc.PathGeometry.Rect(100, 100, 20, 10) }]);
+        // A 60 mm tube along Y through x = 110, its top 30 mm up.
+        s = s with { Curve = new PhotonCanvas.Doc.CurvedSurface { On = true, Typed = true, Shape = SurfaceShape.Cylinder, AxisDeg = 90, AxisPoint = new Vec2(110, 0), TopMm = 30, DiameterMm = 60 } };
+        Assert.Equal(30, s.Curve.Build()!.HeightAt(new Vec2(110, 50)), 6);
+        var built = PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions());
+        Assert.Contains("G102", built.Motion.Split('\n'));
+        Assert.Contains(built.Warnings, w => w.Contains("Curved surface"));
+        var back = PhotonCanvas.Doc.DocFile.Deserialize(PhotonCanvas.Doc.DocFile.Serialize(s));
+        Assert.Equal(s.Curve with { Points = [] }, back.Curve with { Points = [] });
+        // Off: a flat job as before.
+        Assert.DoesNotContain("G102", PhotonCanvas.Doc.JobBuilder.Build(s with { Curve = s.Curve with { On = false } }, new PhotonCanvas.Doc.JobOptions()).Motion.Split('\n'));
+    }
 }

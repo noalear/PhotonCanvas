@@ -82,6 +82,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Relief: noise reduction (slices in reverse order) and more cleanup options (xTool)
 
 ### Machine modes
+- [ ] Stacked slices: a 3D model sliced into flat layers of the material's thickness, each cut out with its number marked on it, to glue up in order (our own idea; Autodesk's discontinued Slicer for Fusion 360 did the slicing, no laser software does)
 - [ ] Curved surface: measure the surface with the camera and the pointer (a grid of points), then follow it in Z (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)

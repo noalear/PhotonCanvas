@@ -218,6 +218,7 @@ public static class DocFile
             ["layers"] = layers,
             ["shapes"] = shapes,
             ["guides"] = new JsonArray([.. s.Guides.Select(g => (JsonNode)new JsonObject { ["vertical"] = g.Vertical, ["at"] = g.At })]),
+            ["curve"] = CurveJson(s.Curve),
             ["variables"] = new JsonObject
             {
                 ["serial"] = s.Vars.Serial,
@@ -472,12 +473,56 @@ public static class DocFile
             if (starts.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && starts.TryGetValue(sh.Id, out var p) ? ps.WithStart(p) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
-            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides };
+            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]) };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {
             throw new FormatException($"The project file is damaged ({e.Message}).");
         }
+    }
+
+    static JsonNode? CurveJson(CurvedSurface c)
+    {
+        if (c == new CurvedSurface()) return null;
+        return new JsonObject
+        {
+            ["on"] = c.On,
+            ["shape"] = c.Shape.ToString(),
+            ["points"] = new JsonArray([.. c.Points.Select(p => (JsonNode)new JsonArray(p.At.X, p.At.Y, p.Height))]),
+            ["area"] = c.Area.IsEmpty ? null : new JsonArray(c.Area.MinX, c.Area.MinY, c.Area.MaxX, c.Area.MaxY),
+            ["smoothing"] = c.Smoothing,
+            ["sides"] = c.Sides,
+            ["bandMm"] = c.BandMm,
+            ["typed"] = c.Typed,
+            ["axisDeg"] = c.AxisDeg,
+            ["axisPoint"] = new JsonArray(c.AxisPoint.X, c.AxisPoint.Y),
+            ["topMm"] = c.TopMm,
+            ["diameterMm"] = c.DiameterMm,
+        };
+    }
+
+    static CurvedSurface CurveFrom(JsonNode? n)
+    {
+        if (n is not JsonObject o) return new();
+        double D(string k, double d) => o[k] is JsonValue v && v.TryGetValue<double>(out var x) ? x : d;
+        var area = o["area"] is JsonArray { Count: 4 } a ? new Rect2(a[0]!.GetValue<double>(), a[1]!.GetValue<double>(), a[2]!.GetValue<double>(), a[3]!.GetValue<double>()) : Rect2.Empty;
+        var axis = o["axisPoint"] is JsonArray { Count: 2 } ap ? new Vec2(ap[0]!.GetValue<double>(), ap[1]!.GetValue<double>()) : new Vec2(110, 110);
+        return new CurvedSurface
+        {
+            On = o["on"]?.GetValue<bool>() ?? false,
+            Shape = Enum.TryParse<SurfaceShape>(o["shape"]?.GetValue<string>(), out var sh) ? sh : SurfaceShape.Freeform,
+            Points = [.. (o["points"] as JsonArray ?? []).OfType<JsonArray>().Where(p => p.Count == 3)
+                .Select(p => new SurfacePoint(new Vec2(p[0]!.GetValue<double>(), p[1]!.GetValue<double>()), p[2]!.GetValue<double>()))],
+            Area = area,
+            Smoothing = D("smoothing", 0.3),
+            Sides = (int)D("sides", 12),
+            BandMm = D("bandMm", 0.2),
+            Typed = o["typed"]?.GetValue<bool>() ?? false,
+            AxisDeg = D("axisDeg", 90),
+            AxisPoint = axis,
+            TopMm = D("topMm", 50),
+            DiameterMm = D("diameterMm", 80),
+        };
     }
 
     public static void Save(DocState s, string path)
