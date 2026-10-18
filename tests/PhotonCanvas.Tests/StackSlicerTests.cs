@@ -185,4 +185,13 @@ public class StackSlicerTests
         Assert.All(floating, p => Assert.True(p.Outline.Bounds().MinX > 35));
         Assert.All(stack.Parts.Where(p => p.Outline.Bounds().MaxX < 25), p => Assert.False(p.Floating));
     }
+
+    [Fact]
+    public void PiecesStandingOnTheBaseAreFine()
+    {
+        // A head and separate body segments (a flexible fish), each standing on the base: none flagged.
+        var mesh = new List<Tri>([.. Box(0, 0, 0, 20, 20, 30), .. Box(25, 0, 0, 35, 20, 24), .. Box(40, 0, 0, 50, 20, 18)]);
+        var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 3, HeightMm = 30 });
+        Assert.DoesNotContain(stack.Parts, p => p.Floating);
+    }
 }

@@ -55,7 +55,7 @@ public sealed record SliceOptions
 /// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
 public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, double LabelRoomMm, IReadOnlyList<IReadOnlyList<Vec2>> NextMarks)
 {
-    /// <summary>Touches nothing in the slices above or below: a separate piece of the model, glued on by eye.</summary>
+    /// <summary>Not joined, through the slices, to anything resting on the bottom slice: it starts in mid-air with nothing under it (glue it on by eye).</summary>
     public bool Floating { get; init; }
 }
 
@@ -165,8 +165,7 @@ public static class StackSlicer
                             pins.Add((i + 1, p));
                         }
                     }
-        // Groups of parts joined to each other through the slices; anything not joined to the biggest
-        // group is a separate piece of the model (an eye, a tusk modelled on its own).
+        // Groups of parts joined to each other through the slices.
         var ids = new Dictionary<(int, int), int>();
         foreach (var (i, list) in islands.Select((l, i) => (i, l)))
             for (int k = 0; k < list.Count; k++) ids[(i, k)] = ids.Count;
@@ -177,11 +176,10 @@ public static class StackSlicer
                 for (int b = 0; b < islands[i + 1].Count; b++)
                     if (Area(ShapeGeometry.Boolean(islands[i][a], islands[i + 1][b], BoolOp.Intersect)) > 0.5)
                         parent[Find(ids[(i, a)])] = Find(ids[(i + 1, b)]);
-        var groupArea = new Dictionary<int, double>();
-        foreach (var ((i, k), id) in ids)
-            groupArea[Find(id)] = groupArea.GetValueOrDefault(Find(id)) + Area(islands[i][k]);
-        int main = groupArea.Count == 0 ? -1 : groupArea.MaxBy(g => g.Value).Key;
-        bool Touches(int i, int k) => Find(ids[(i, k)]) == main;
+        // A group that reaches the bottom slice stands on the base and can be built up from it (a
+        // fish's separate segments, say); only a group starting in mid-air has nothing under it.
+        var grounded = ids.Where(kv => kv.Key.Item1 == 0).Select(kv => Find(kv.Value)).ToHashSet();
+        bool Touches(int i, int k) => grounded.Contains(Find(ids[(i, k)]));
         var parts = new List<SlicePart>();
         for (int i = 0; i < n; i++)
         {
