@@ -208,23 +208,69 @@ public sealed class Surface
         if (double.IsInfinity(best.Err)) return FitFreeform(pts, 0.3);
         if (shape == SurfaceShape.Cylinder)
             return new(SurfaceShape.Cylinder, pts, 0, 0, null, 0, 0, 0, default, 1, best.Deg, best.Uc, best.Zc, best.R, 0);
-        // A prism round the same axis: the turn of its faces and its size, by search.
-        double bestErr = double.PositiveInfinity, bestPhase = 0, bestR = best.R, bestZc = best.Zc;
+        // A prism round the same axis direction: its axis position, height, size and the turn of its
+        // faces, optimised together (Nelder–Mead) from several starting turns.
         double t2 = best.Deg * Math.PI / 180;
-        var cross = pts.Select(p => (U: -p.At.X * Math.Sin(t2) + p.At.Y * Math.Cos(t2) - best.Uc, p.Height)).ToList();
+        var cross = pts.Select(p => (U: -p.At.X * Math.Sin(t2) + p.At.Y * Math.Cos(t2), p.Height)).ToList();
+        double Err(double[] v) => cross.Sum(c => Math.Pow(c.Height - v[1] - PrismTop(c.U - v[0], Math.Abs(v[2]), sides, v[3]), 2));
         double step = 2 * Math.PI / sides;
-        for (double rs = 0.97; rs <= 1.08; rs += 0.005)
+        double[] bestV = [best.Uc, best.Zc, best.R, 0];
+        double bestErr = double.PositiveInfinity;
+        for (int k = 0; k < 8; k++)
         {
-            double r = best.R * rs;
-            for (double ph = 0; ph < step; ph += step / 90)
+            double[] start = [best.Uc, best.Zc, best.R, step * k / 8];
+            var v = NelderMead(Err, start, [2, 2, best.R * 0.05, step / 8], 600);
+            double e = Err(v);
+            if (e < bestErr) { bestErr = e; bestV = v; }
+        }
+        double phase = ((bestV[3] % step) + step) % step;
+        return new(SurfaceShape.Prism, pts, 0, sides, null, 0, 0, 0, default, 1, best.Deg, bestV[0], bestV[1], Math.Abs(bestV[2]), phase);
+    }
+
+    /// <summary>A plain Nelder–Mead minimiser (few parameters, smooth enough).</summary>
+    static double[] NelderMead(Func<double[], double> f, double[] start, double[] scale, int iterations)
+    {
+        int n = start.Length;
+        var simplex = new double[n + 1][];
+        var fx = new double[n + 1];
+        for (int i = 0; i <= n; i++)
+        {
+            simplex[i] = (double[])start.Clone();
+            if (i > 0) simplex[i][i - 1] += scale[i - 1];
+            fx[i] = f(simplex[i]);
+        }
+        for (int it = 0; it < iterations; it++)
+        {
+            var order = Enumerable.Range(0, n + 1).OrderBy(i => fx[i]).ToArray();
+            simplex = [.. order.Select(i => simplex[i])];
+            fx = [.. order.Select(i => fx[i])];
+            if (Math.Abs(fx[n] - fx[0]) < 1e-12 * (1 + Math.Abs(fx[0]))) break;
+            var centroid = new double[n];
+            for (int i = 0; i < n; i++) for (int d = 0; d < n; d++) centroid[d] += simplex[i][d] / n;
+            double[] Along(double t) => [.. Enumerable.Range(0, n).Select(d => centroid[d] + t * (simplex[n][d] - centroid[d]))];
+            var r = Along(-1);
+            double fr = f(r);
+            if (fr < fx[0])
             {
-                // The best centre height for this size and turn is just the mean offset.
-                double off = cross.Average(c => c.Height - PrismTop(c.U, r, sides, ph));
-                double err = cross.Sum(c => Math.Pow(c.Height - off - PrismTop(c.U, r, sides, ph), 2));
-                if (err < bestErr) { bestErr = err; bestPhase = ph; bestR = r; bestZc = off; }
+                var e = Along(-2);
+                double fe = f(e);
+                (simplex[n], fx[n]) = fe < fr ? (e, fe) : (r, fr);
+            }
+            else if (fr < fx[n - 1]) (simplex[n], fx[n]) = (r, fr);
+            else
+            {
+                var c = Along(0.5);
+                double fc = f(c);
+                if (fc < fx[n]) (simplex[n], fx[n]) = (c, fc);
+                else
+                    for (int i = 1; i <= n; i++)
+                    {
+                        for (int d = 0; d < n; d++) simplex[i][d] = simplex[0][d] + 0.5 * (simplex[i][d] - simplex[0][d]);
+                        fx[i] = f(simplex[i]);
+                    }
             }
         }
-        return new(SurfaceShape.Prism, pts, 0, sides, null, 0, 0, 0, default, 1, best.Deg, best.Uc, bestZc, bestR, bestPhase);
+        return simplex[Array.IndexOf(fx, fx.Min())];
     }
 
     /// <summary>Gaussian elimination with partial pivoting; null if singular.</summary>

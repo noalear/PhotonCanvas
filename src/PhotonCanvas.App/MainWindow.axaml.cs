@@ -603,6 +603,7 @@ public partial class MainWindow : Window
         job.SmallToggle("Time-lapse", "IcCamera", on => { _settings.TimeLapse = on; _settings.Save(); }, $"Take a camera photo every {_settings.TimeLapseSeconds:0} s while a job runs and make a video of it (needs ffmpeg for the video; otherwise the photos are kept). Saved in Pictures.", null, () => _settings.TimeLapse);
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
+        work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
         var machine = laser.Group("Machine");

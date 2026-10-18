@@ -72,6 +72,9 @@ public sealed class MachinePanel : UserControl
     volatile bool _overlayWanted;
 
     public bool IsConnected => _client?.IsConnected == true;
+
+    /// <summary>The connection, for tools that drive the machine themselves (curved-surface measuring).</summary>
+    public DeviceClient? Client => _client;
     /// <summary>Material distance from the head's Z (mm), when known.</summary>
     public double? Distance { get; private set; }
     public string Mode { get; private set; } = "";

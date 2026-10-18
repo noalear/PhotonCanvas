@@ -83,7 +83,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 
 ### Machine modes
 - [ ] Stacked slices: a 3D model sliced into flat layers of the material's thickness, each cut out with its number marked on it, to glue up in order (our own idea; Autodesk's discontinued Slicer for Fusion 360 did the slicing, no laser software does)
-- [ ] Curved surface: measure the surface with the camera and the pointer (a grid of points), then follow it in Z (xTool "Curved material")
+- [x] Curved surface: measure it with the pointer and the close-up camera (up to 40 × 40 points, bad points found and left out), or type in a cylinder or slatted drum; fit as any shape, cylinder, drum of flat slats or slanted plane; 3D preview; marked in 0.2 mm height bands as xTool Studio does (xTool "Curved material")
 - [x] Screen printing: one job per layer with "next colour", mirrored design, CMYK split and halftone per colour (xTool "Screen preparation")
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)
 - [ ] The same on the conveyor: mark, move on, photograph again (needs the conveyor)
@@ -181,4 +181,5 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Place on every piece: pieces found on the real bed; the bed's honeycomb not mistaken for pieces.
 - Cut order, start points, tabs, lead-out, perforation and dot mode on scrap.
 - Time-lapse: photos while a job runs don't disturb it.
+- Curved surface: calibrate the pointer on a flat board (are the photos dark enough to see the dot? xTool lowers the camera exposure); measure the slatted drum at 20 × 20; mark a test on it; check the job is accepted as CURVE_PROCESS.
 - Read the squares: on a real burned test grid.
