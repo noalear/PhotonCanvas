@@ -148,6 +148,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB, values in V8's serialization format) under its AppData folder. The format is readable; reading that folder waits on the owner's go-ahead, since it also holds xTool's account and device records
 - [x] Copy and paste layer settings (xTool)
 - [x] Single-point test: one square at chosen settings (xTool)
+- [x] Etch-rate test: circles burned 1, 2, 3 … passes, round by round; the first through gives thickness ÷ passes with its range, depths on shallower ones show the slowdown; saved with the material (our own)
 - [x] Read a burned test grid from a photo and point out the best square: darkest even mark or lightest clear one, measured against the bare material (xTool does it *online* with AI)
 
 ### Machine and device
@@ -184,3 +185,4 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Time-lapse: photos while a job runs don't disturb it.
 - Curved surface: calibrate the pointer on a flat board (are the photos dark enough to see the dot? xTool lowers the camera exposure); measure the slatted drum at 20 × 20; mark a test on it; check the job is accepted as CURVE_PROCESS.
 - Read the squares: on a real burned test grid.
+- Etch rate: a 3 mm board, 30 circles; does the through-hole show clearly enough to pick the first one?

@@ -161,6 +161,8 @@ public sealed record Recipe
     /// <summary>Focus distance used, mm (material top to laser), if it matters.</summary>
     public double? FocusMm { get; init; }
     public string Notes { get; init; } = "";
+    /// <summary>Measured with an etch-rate test: how deep each pass of these settings goes (mm).</summary>
+    public double? EtchMmPerPass { get; init; }
     /// <summary>File name of a photo of the result, in the library's photo folder.</summary>
     public string? Photo { get; init; }
     /// <summary>Machine it was made on (device code), e.g. GS004-CLASS-4.</summary>
