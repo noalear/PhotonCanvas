@@ -289,8 +289,17 @@ public class PathShape : Shape
 
     public required PathGeometry Geometry { get; init; }
 
-    /// <summary>Tabs placed by hand on this shape's outlines (world mm): used instead of evenly spaced ones on a Cut layer with tabs.</summary>
+    /// <summary>Tabs placed by hand on this shape's outlines (the shape's own mm, so they move with it): used instead of evenly spaced ones on a Cut layer with tabs.</summary>
     public ImmutableList<Vec2> ManualTabs { get; private set; } = [];
+
+    /// <summary>Where cutting starts on this shape's outline (the shape's own mm); null = wherever the cut order picks.</summary>
+    public Vec2? StartPoint { get; private set; }
+
+    /// <summary>The hand-placed tabs on the work area.</summary>
+    public IEnumerable<Vec2> TabsWorld => ManualTabs.Select(Transform.Apply);
+
+    /// <summary>The chosen start point on the work area.</summary>
+    public Vec2? StartWorld => StartPoint is { } p ? Transform.Apply(p) : null;
 
     PathGeometry? _world;
     List<FlatPath>? _flat;
@@ -313,11 +322,19 @@ public class PathShape : Shape
         _bounds = null;
     }
 
-    /// <summary>The same shape with these hand-placed tabs.</summary>
+    /// <summary>The same shape with these hand-placed tabs (its own mm).</summary>
     public PathShape WithTabs(ImmutableList<Vec2> tabs)
     {
         var c = (PathShape)MemberwiseClone();
         c.ManualTabs = tabs;
+        return c;
+    }
+
+    /// <summary>The same shape starting its cut at this point (its own mm), or anywhere (null).</summary>
+    public PathShape WithStart(Vec2? start)
+    {
+        var c = (PathShape)MemberwiseClone();
+        c.StartPoint = start;
         return c;
     }
 

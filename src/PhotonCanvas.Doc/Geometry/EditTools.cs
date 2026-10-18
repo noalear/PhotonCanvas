@@ -222,4 +222,58 @@ public static class EditTools
         var joined = steps == 1 ? copies[0] : ShapeGeometry.Union(copies);
         return ShapeGeometry.Boolean(joined, area, BoolOp.Subtract);
     }
+
+    /// <summary>
+    /// Extend lines: each open end carries on straight, the way it was heading, to the first
+    /// line or outline it meets (up to <paramref name="maxMm"/>). Ends that meet nothing stay.
+    /// </summary>
+    public static (List<PathGeometry> Geometries, int Extended) Extend(IReadOnlyList<PathGeometry> shapes, double maxMm = 500)
+    {
+        var walls = shapes.SelectMany(g => g.Flatten(0.02)).SelectMany(f =>
+        {
+            var pts = f.Points;
+            var segs = new List<(Vec2, Vec2)>();
+            for (int i = 0; i + 1 < pts.Count; i++) segs.Add((pts[i], pts[i + 1]));
+            if (f.Closed && pts.Count > 2) segs.Add((pts[^1], pts[0]));
+            return segs;
+        }).ToList();
+        int extended = 0;
+        Vec2? Hit(Vec2 from, Vec2 dir)
+        {
+            double best = maxMm;
+            foreach (var (a, b) in walls)
+            {
+                var e = b - a;
+                double den = dir.X * e.Y - dir.Y * e.X;
+                if (Math.Abs(den) < 1e-12) continue;
+                var w = a - from;
+                double t = (w.X * e.Y - w.Y * e.X) / den, s = (w.X * dir.Y - w.Y * dir.X) / den;
+                // Not the line's own end (t > 0), and on the wall.
+                if (t > 1e-4 && t < best && s >= -1e-9 && s <= 1 + 1e-9) best = t;
+            }
+            return best < maxMm ? from + dir * best : null;
+        }
+        var o = new List<PathGeometry>(shapes.Count);
+        foreach (var g in shapes)
+        {
+            var subs = new List<Subpath>();
+            foreach (var sp in g.Subpaths)
+            {
+                if (sp.Closed || sp.Segs.Length == 0) { subs.Add(sp); continue; }
+                var segs = sp.Segs.ToList();
+                var start = sp.Start;
+                // Heading at each end: along the last line, or the curve's end tangent.
+                var last = segs[^1];
+                var beforeLast = segs.Count > 1 ? segs[^2].To : sp.Start;
+                var endDir = last.To - (last.Kind == SegKind.Cubic && last.C2.Dist(last.To) > 1e-9 ? last.C2 : beforeLast);
+                var first = segs[0];
+                var startDir = sp.Start - (first.Kind == SegKind.Cubic && first.C1.Dist(sp.Start) > 1e-9 ? first.C1 : first.To);
+                if (endDir.Length > 1e-9 && Hit(last.To, endDir / endDir.Length) is { } he) { segs.Add(Seg.Line(he)); extended++; }
+                if (startDir.Length > 1e-9 && Hit(sp.Start, startDir / startDir.Length) is { } hs) { segs.Insert(0, Seg.Line(sp.Start)); start = hs; extended++; }
+                subs.Add(new Subpath(start, [.. segs], false));
+            }
+            o.Add(new PathGeometry(subs));
+        }
+        return (o, extended);
+    }
 }

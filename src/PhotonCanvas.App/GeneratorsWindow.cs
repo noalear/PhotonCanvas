@@ -8,7 +8,7 @@ using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
 
-/// <summary>Make a finger-jointed box, a keychain or tag, or the selection in several sizes.</summary>
+/// <summary>Make a finger-jointed box, a keychain or tag, a living hinge, earrings, or the selection in several sizes.</summary>
 public sealed class GeneratorsWindow : Window
 {
     readonly Document _doc;
@@ -19,19 +19,29 @@ public sealed class GeneratorsWindow : Window
     readonly NumericUpDown _kw = Number(10, 300, 1, "0.#"), _kh = Number(5, 300, 1, "0.#"), _kHole = Number(0, 30, 0.5m, "0.#"), _kInset = Number(0.5m, 50, 0.5m, "0.#");
     readonly TextBox _kText = new() { Watermark = "Text on it (optional; fields like {serial} work)" };
     readonly TextBox _sizes = new() { Text = "40, 60, 80", Watermark = "Widths in mm, separated by commas" };
+    readonly NumericUpDown _hw = Number(5, 1000, 5, "0.#"), _hh = Number(5, 1000, 5, "0.#"), _hCut = Number(1, 200, 1, "0.#"), _hGap = Number(0.5m, 50, 0.5m, "0.#"), _hSpace = Number(0.3m, 20, 0.1m, "0.##");
+    readonly CheckBox _hOutline = new() { Content = "With the panel's outline", IsChecked = true };
+    readonly ComboBox _eShape = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Teardrop", "Leaf", "Circle", "Hexagon", "Arch" }, SelectedIndex = 0 };
+    readonly NumericUpDown _ew = Number(5, 100, 1, "0.#"), _eh = Number(5, 150, 1, "0.#"), _eHole = Number(0, 10, 0.1m, "0.#"), _eInset = Number(0.3m, 20, 0.1m, "0.#");
 
     public GeneratorsWindow(Document doc, MachineProfile field)
     {
         _doc = doc;
         _field = field;
         Title = "Generators";
-        Width = 460;
+        Width = 600;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
         _bw.Value = 80; _bd.Value = 60; _bh.Value = 40; _bt.Value = 3; _bf.Value = 9;
         _kw.Value = 50; _kh.Value = 25; _kHole.Value = 4; _kInset.Value = 3;
+        _hw.Value = 60; _hh.Value = 40; _hCut.Value = 15; _hGap.Value = 3; _hSpace.Value = 1.5m;
+        _ew.Value = 25; _eh.Value = 40; _eHole.Value = 1.5m; _eInset.Value = 1.5m;
+        var makeHinge = new Button { Content = "Make the hinge", Classes = { "primary" } };
+        makeHinge.Click += (_, _) => { MakeHinge(); Close(); };
+        var makeEarrings = new Button { Content = "Make a pair", Classes = { "primary" } };
+        makeEarrings.Click += (_, _) => { MakeEarrings(); Close(); };
         var makeBox = new Button { Content = "Make the box", Classes = { "primary" } };
         makeBox.Click += (_, _) => { MakeBox(); Close(); };
         var makeTag = new Button { Content = "Make it", Classes = { "primary" } };
@@ -73,6 +83,39 @@ public sealed class GeneratorsWindow : Window
                             _kText,
                             Hint("The outline goes on a Cut layer, the text on an Engrave layer, fitted inside."),
                             makeTag,
+                        },
+                    },
+                },
+                new TabItem
+                {
+                    Header = "Living hinge",
+                    Content = new StackPanel
+                    {
+                        Spacing = 8, Margin = new(0, 10, 0, 0),
+                        Children =
+                        {
+                            Row(Field("Width", _hw), Field("Height", _hh)),
+                            Row(Field("Cut length", _hCut), Field("Gap", _hGap)),
+                            Field("Between rows", _hSpace, tip: "Closer rows bend more easily but the strips get thinner. In 3 mm plywood, 1.5 mm is a good start."),
+                            _hOutline,
+                            Hint("Cuts run up and down, so the panel bends around an up-and-down line. They go on a Cut layer."),
+                            makeHinge,
+                        },
+                    },
+                },
+                new TabItem
+                {
+                    Header = "Earrings",
+                    Content = new StackPanel
+                    {
+                        Spacing = 8, Margin = new(0, 10, 0, 0),
+                        Children =
+                        {
+                            Field("Shape", _eShape),
+                            Row(Field("Width", _ew), Field("Height", _eh)),
+                            Row(Field("Hook hole Ø", _eHole), Field("from the top", _eInset)),
+                            Hint("A matching pair, on a Cut layer."),
+                            makeEarrings,
                         },
                     },
                 },
@@ -134,6 +177,38 @@ public sealed class GeneratorsWindow : Window
         }
         var (ns, _) = Ops.Group(Ops.AddShapes(s, shapes), shapes.Select(x => x.Id).ToHashSet());
         _doc.Commit("Keychain", ns, shapes.Select(x => x.Id));
+    }
+
+    void MakeHinge()
+    {
+        var s = _doc.State;
+        var layer = LayerFor(ref s, LayerMode.Cut, "Cut");
+        double w = (double)(_hw.Value ?? 60), h = (double)(_hh.Value ?? 40);
+        var at = Affine.Translate(_field.FieldW / 2 - w / 2, _field.FieldH / 2 - h / 2);
+        var shapes = new List<Shape>
+        {
+            new PathShape { Name = "Living hinge", LayerId = layer.Id, Geometry = Generators.LivingHinge(w, h, (double)(_hCut.Value ?? 15), (double)(_hGap.Value ?? 3), (double)(_hSpace.Value ?? 1.5m)).Transform(at) },
+        };
+        if (_hOutline.IsChecked == true) shapes.Add(new PathShape { Name = "Hinge panel", LayerId = layer.Id, Geometry = PathGeometry.Rect(0, 0, w, h).Transform(at) });
+        var (ns, _) = Ops.Group(Ops.AddShapes(s, shapes), shapes.Select(x => x.Id).ToHashSet());
+        _doc.Commit("Living hinge", ns, shapes.Select(x => x.Id));
+    }
+
+    void MakeEarrings()
+    {
+        var s = _doc.State;
+        var layer = LayerFor(ref s, LayerMode.Cut, "Cut");
+        double w = (double)(_ew.Value ?? 25), h = (double)(_eh.Value ?? 40);
+        var g = Generators.Earring((Generators.EarringShape)Math.Max(0, _eShape.SelectedIndex), w, h, (double)(_eHole.Value ?? 1.5m), (double)(_eInset.Value ?? 1.5m));
+        double x = _field.FieldW / 2 - w - 2.5, y = _field.FieldH / 2 - h / 2;
+        var shapes = new List<Shape>
+        {
+            new PathShape { Name = "Earring (left)", LayerId = layer.Id, Geometry = g.Transform(Affine.Translate(x, y)) },
+            // The right one mirrored, so a lopsided shape makes a matching pair.
+            new PathShape { Name = "Earring (right)", LayerId = layer.Id, Geometry = g.Transform(Affine.Scale(-1, 1).Then(Affine.Translate(x + 2 * w + 5, y))) },
+        };
+        var (ns, _) = Ops.Group(Ops.AddShapes(s, shapes), shapes.Select(x => x.Id).ToHashSet());
+        _doc.Commit("Earrings", ns, shapes.Select(x => x.Id));
     }
 
     void MakeSizes()

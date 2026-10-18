@@ -372,14 +372,15 @@ public static class JobBuilder
                         warnings.Add($"Layer \"{layer.Name}\": {removedMm:0.#} mm of lines lying on top of each other will be cut only once.");
                     }
                 }
-                var extras = new CutExtras(layer) { ManualTabs = [.. shapes.SelectMany(sh => sh.ManualTabs)] };
+                var extras = new CutExtras(layer) { ManualTabs = [.. shapes.SelectMany(sh => sh.TabsWorld)] };
+                List<Vec2> startPoints = [.. shapes.Select(sh => sh.StartWorld).OfType<Vec2>()];
                 StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
                 bool wobble = layer.Wobble && layer.Laser.Light == LightSource.Red;
                 if (layer.Wobble && !wobble)
                     warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
-                foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest))
+                foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
                     foreach (var p in extras.Pieces(path, depth))
                     {
                         var pl = p.Closed ? Polyline.Loop(p.Points) : Polyline.Open(p.Points);
@@ -954,8 +955,30 @@ public static class JobBuilder
     }
 
     /// <summary><see cref="OrderForCutting"/>, with each path's nesting depth (even = part outline, odd = hole).</summary>
-    static List<(FlatPath Path, int Depth)> Order(List<FlatPath> paths, ref Vec2 pos, PathOrder order = PathOrder.Optimised, bool startNearest = false)
+    static List<(FlatPath Path, int Depth)> Order(List<FlatPath> paths, ref Vec2 pos, PathOrder order = PathOrder.Optimised, bool startNearest = false, List<Vec2>? starts = null)
     {
+        // Loops with a start point chosen on them begin exactly there (at the nearest point, even mid-edge).
+        if (starts is { Count: > 0 })
+            paths = [.. paths.Select(p =>
+            {
+                if (!p.Closed || p.Points.Count < 3) return p;
+                var ring = p.Points[0].Dist(p.Points[^1]) < 1e-9 ? p.Points.Take(p.Points.Count - 1).ToList() : p.Points;
+                foreach (var s in starts)
+                {
+                    var near = PathTools.Nearest([.. ring, ring[0]], s);
+                    if (near.Distance > 1) continue;
+                    List<Vec2> closedRing = [.. ring, ring[0]];
+                    var cum = PathTools.CumulativeLengths(closedRing);
+                    var at = PathTools.At(closedRing, cum, near.Along);
+                    int i = 0;
+                    while (i + 1 < ring.Count && cum[i + 1] <= near.Along) i++;
+                    // Start at the point, go round, and come back to it.
+                    List<Vec2> pts = [at.Point, .. ring.Skip(i + 1), .. ring.Take(i + 1)];
+                    return p with { Points = pts.Where((q, k) => k == 0 || q.Dist(pts[k - 1]) > 1e-9).ToList() };
+                }
+                return p;
+            })];
+        bool Fixed(FlatPath p) => starts is { Count: > 0 } && p.Closed && starts.Any(s => s.Dist(p.Points[0]) < 1e-6);
         int n = paths.Count;
         var depth = Depths(paths);
         var o = new List<(FlatPath, int)>(n);
@@ -963,7 +986,7 @@ public static class JobBuilder
         {
             for (int i = 0; i < n; i++)
             {
-                var p = startNearest ? StartAt(paths[i], pos) : paths[i];
+                var p = startNearest && !Fixed(paths[i]) ? StartAt(paths[i], pos) : paths[i];
                 o.Add((p, depth[i]));
                 if (p.Points.Count > 0) pos = p.Closed ? p.Points[0] : p.Points[^1];
             }
@@ -996,7 +1019,7 @@ public static class JobBuilder
                 int pickDepth = depth[left[best]];
                 left.RemoveAt(best);
                 if (reverse) pick = pick with { Points = Enumerable.Reverse(pick.Points).ToList() };
-                if (startNearest) pick = StartAt(pick, pos);
+                if (startNearest && !Fixed(pick)) pick = StartAt(pick, pos);
                 o.Add((pick, pickDepth));
                 pos = pick.Closed ? pick.Points[0] : pick.Points[^1];
             }

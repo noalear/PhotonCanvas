@@ -142,4 +142,70 @@ public class OrderAndImportTests
         Assert.Equal(new Vec2(20, 0), curve.End);
         Assert.Throws<FormatException>(() => LbrnImport.Parse("<svg/>"));
     }
+
+    [Fact]
+    public void ChosenStartPointsAndTabsMoveWithTheShape()
+    {
+        var moved = Affine.Translate(50, 0);
+        // Start chosen mid-way along the bottom edge (the shape's own mm), then the shape moved.
+        var r = Shape(PathGeometry.Rect(10, 10, 20, 20)).WithStart(new Vec2(20, 30)).WithTabs([new Vec2(10, 20)]);
+        var shifted = (PathShape)r.With(transform: moved);
+        var cut = Vectors(Doc(l => l with { StartNearest = true }, (PathShape)r.WithTabs([]).With(transform: moved)));
+        Assert.Equal(new Vec2(70, 30), cut[0].Path.Points[0]);
+        var tabbed = Vectors(Doc(l => l with { TabWidthMm = 2 }, shifted));
+        Assert.Equal(80 - 2, Length(tabbed), 3);
+        Assert.Equal(new Vec2(60, 20), Assert.Single(shifted.TabsWorld));
+        var back = Assert.IsType<PathShape>(Assert.Single(DocFile.Deserialize(DocFile.Serialize(Doc(l => l, r))).Shapes));
+        Assert.Equal(new Vec2(20, 30), back.StartPoint);
+    }
+
+    [Fact]
+    public void LinesExtendToTheNextShape()
+    {
+        var line = PathGeometry.Line(new(0, 5), new(4, 5));
+        var wall = PathGeometry.Rect(10, 0, 5, 10);
+        var (g, n) = EditTools.Extend([line, wall]);
+        Assert.Equal(1, n); // the far end meets the wall; the near end meets nothing
+        Assert.Equal(new Vec2(10, 5), g[0].Subpaths[0].End);
+        Assert.Equal(new Vec2(0, 5), g[0].Subpaths[0].Start);
+        Assert.Same(wall.Subpaths[0], g[1].Subpaths[0]);
+    }
+
+    [Fact]
+    public void HingesAndEarrings()
+    {
+        var hinge = Generators.LivingHinge(30, 40, 15, 3, 1.5);
+        Assert.All(hinge.Subpaths, sp => Assert.True(!sp.Closed && sp.Start.X == sp.End.X));
+        var cols = hinge.Subpaths.GroupBy(sp => Math.Round(sp.Start.X, 6)).OrderBy(c => c.Key).ToList();
+        Assert.Equal(20, cols.Count);
+        // Even columns stop short of the edges; odd ones run out through them.
+        Assert.True(cols[0].Min(sp => sp.Start.Y) > 0.1);
+        Assert.Equal(0, cols[1].Min(sp => sp.Start.Y), 6);
+        Assert.Equal(40, cols[1].Max(sp => sp.End.Y), 6);
+        foreach (Generators.EarringShape kind in Enum.GetValues<Generators.EarringShape>())
+        {
+            var e = Generators.Earring(kind, 20, 30, 1.5, 1);
+            Assert.Equal(2, e.Subpaths.Length);
+            var b = Rect2.Bounds(e.Subpaths[0].Flatten(0.01));
+            Assert.InRange(b.Width, 19.5, 20.01);
+            Assert.InRange(b.Height, 29.5, 30.01);
+        }
+    }
+
+    [Fact]
+    public void TheEraserWhitensWhatItCovers()
+    {
+        var px = new byte[20 * 10 * 4];
+        for (int i = 0; i < px.Length; i += 4) { px[i + 3] = 255; }
+        var src = ImageSource.FromEncoded(new Core.Imaging.RasterImage(20, 10, px).EncodePng());
+        var im = new ImageShape { Source = src, SizeMm = new Vec2(20, 10), Transform = Affine.Translate(100, 100), Clip = PathGeometry.Rect(0, 0, 10, 10) };
+        var erased = im.Erase([new Vec2(105, 105)], 2);
+        Assert.Equal(255, erased.Rgba[(5 * 20 + 5) * 4]);
+        Assert.Equal(0, erased.Rgba[(5 * 20 + 15) * 4]);
+        Assert.Equal(0, erased.Rgba[(1 * 20 + 1) * 4]);
+        // A new picture keeps the clip where it was on the work area.
+        var moved = im.WithPicture(src, transform: Affine.Translate(102, 100));
+        var cb = Rect2.Bounds(moved.Clip!.Transform(moved.Transform).Flatten(0.01).SelectMany(f => f.Points).ToList());
+        Assert.Equal(new Rect2(100, 100, 110, 110), cb);
+    }
 }

@@ -80,6 +80,84 @@ public static class Generators
         return cuts.Count == 0 ? rect : ShapeGeometry.Boolean(rect, ShapeGeometry.Union(cuts), BoolOp.Subtract);
     }
 
+    /// <summary>
+    /// A living hinge: rows of straight cuts, staggered, that let flat sheet bend (mm, top-left at
+    /// 0, 0). Cuts run up and down, so the panel bends around an up-and-down line. Every other
+    /// column runs out through the top and bottom edges; the rest stop short. Shorter gaps and
+    /// closer columns bend more easily but are weaker.
+    /// </summary>
+    public static PathGeometry LivingHinge(double width, double height, double cutLength, double gap, double spacing)
+    {
+        cutLength = Math.Max(1, cutLength);
+        gap = Math.Max(0.5, gap);
+        spacing = Math.Max(0.3, spacing);
+        double period = cutLength + gap;
+        var subs = new List<Subpath>();
+        int columns = Math.Max(1, (int)Math.Floor(width / spacing));
+        double x0 = (width - (columns - 1) * spacing) / 2;
+        for (int c = 0; c < columns; c++)
+        {
+            double x = x0 + c * spacing;
+            // Even columns: whole cuts with a gap at each edge. Odd columns: shifted half a period, cut through the edges.
+            double y = c % 2 == 0 ? gap / 2 : gap / 2 + period / 2 - period;
+            double lo = c % 2 == 0 ? gap / 2 : 0, hi = c % 2 == 0 ? height - gap / 2 : height;
+            for (; y < height; y += period)
+            {
+                double a = Math.Max(lo, y), b = Math.Min(hi, y + cutLength);
+                if (b - a >= 0.5) subs.Add(new Subpath(new Vec2(x, a), [Seg.Line(new Vec2(x, b))], false));
+            }
+        }
+        return new PathGeometry(subs);
+    }
+
+    public enum EarringShape { Teardrop, Leaf, Circle, Hexagon, Arch }
+
+    /// <summary>An earring outline with the hole for its hook at the top (mm, top-left at 0, 0).</summary>
+    public static PathGeometry Earring(EarringShape shape, double width, double height, double holeDiameter, double holeInset)
+    {
+        double w = width, h = height, cx = w / 2;
+        PathGeometry body = shape switch
+        {
+            EarringShape.Circle => PathGeometry.Ellipse(cx, h / 2, w / 2, h / 2),
+            EarringShape.Leaf => new PathGeometry([new Subpath(new(cx, 0),
+                [Seg.Cubic(new(cx + w * 2 / 3, h * 0.2), new(cx + w * 2 / 3, h * 0.8), new(cx, h)), Seg.Cubic(new(cx - w * 2 / 3, h * 0.8), new(cx - w * 2 / 3, h * 0.2), new(cx, 0))], true)]),
+            EarringShape.Hexagon => PathGeometry.Polyline([.. Enumerable.Range(0, 6).Select(i => new Vec2(cx + w / 2 * Math.Sin(i * Math.PI / 3) / Math.Sin(Math.PI / 3), h / 2 - h / 2 * Math.Cos(i * Math.PI / 3)))], true),
+            EarringShape.Arch => Arch(w, h),
+            _ => Teardrop(w, h),
+        };
+        if (!(holeDiameter > 0)) return body;
+        var hole = PathGeometry.Ellipse(cx, holeInset + holeDiameter / 2, holeDiameter / 2, holeDiameter / 2);
+        return new PathGeometry(body.Subpaths.Concat(hole.Subpaths));
+    }
+
+    /// <summary>A drop: a point at the top, round at the bottom, the sides tangent to the circle.</summary>
+    static PathGeometry Teardrop(double w, double h)
+    {
+        double r = Math.Min(w / 2, h / 2);
+        var c = new Vec2(w / 2, h - r);
+        double d = c.Y;
+        if (d <= r * 1.01) return PathGeometry.Ellipse(w / 2, h / 2, w / 2, h / 2);
+        double phi = Math.Acos(r / d);
+        var pts = new List<Vec2> { new(w / 2, 0) };
+        double a0 = -Math.PI / 2 + phi, a1 = 3 * Math.PI / 2 - phi;
+        for (int i = 0; i <= 64; i++)
+        {
+            double a = a0 + (a1 - a0) * i / 64;
+            pts.Add(c + new Vec2(Math.Cos(a), Math.Sin(a)) * r);
+        }
+        return PathGeometry.Polyline(pts, true);
+    }
+
+    /// <summary>A rainbow arch: a half ring standing on its ends.</summary>
+    static PathGeometry Arch(double w, double h)
+    {
+        double rx = w / 2, ry = h, band = Math.Min(w, h) * 0.3;
+        var pts = new List<Vec2>();
+        for (int i = 0; i <= 48; i++) { double a = Math.PI + Math.PI * i / 48; pts.Add(new(w / 2 + rx * Math.Cos(a), h + ry * Math.Sin(a))); }
+        for (int i = 48; i >= 0; i--) { double a = Math.PI + Math.PI * i / 48; pts.Add(new(w / 2 + (rx - band) * Math.Cos(a), h + (ry - band) * Math.Sin(a))); }
+        return PathGeometry.Polyline(pts, true);
+    }
+
     public enum TagShape { RoundedRectangle, Circle, Tag }
 
     /// <summary>A keychain or tag outline with its hole (mm, top-left at 0, 0).</summary>

@@ -133,35 +133,109 @@ public sealed partial class CanvasView
         var w = ToWorld(p);
         var (_, seg, _, d) = EditTools.Nearest(target.World, w);
         if (seg < 0) return;
+        if (!target.Transform.IsInvertible) return;
         ImmutableList<Vec2> tabs;
         if (remove)
         {
             if (target.ManualTabs.Count == 0) return;
-            var nearest = target.ManualTabs.MinBy(t => t.Dist(w));
-            if (nearest.Dist(w) > 8 / _scale) return;
-            tabs = target.ManualTabs.Remove(nearest);
+            // Tabs are kept in the shape's own mm so they move with it.
+            int nearest = Enumerable.Range(0, target.ManualTabs.Count).MinBy(i => target.Transform.Apply(target.ManualTabs[i]).Dist(w));
+            if (target.Transform.Apply(target.ManualTabs[nearest]).Dist(w) > 8 / _scale) return;
+            tabs = target.ManualTabs.RemoveAt(nearest);
         }
-        else
-        {
-            var flat = PathTools.Polylines(target.World);
-            var on = flat.Select(f => (f, PathTools.Nearest(f, w))).MinBy(x => x.Item2.Distance);
-            var cum = PathTools.CumulativeLengths(on.f);
-            tabs = target.ManualTabs.Add(PathTools.At(on.f, cum, on.Item2.Along).Point);
-        }
+        else tabs = target.ManualTabs.Add(target.Transform.Invert().Apply(OnOutline(target, w)));
         _doc.Commit(remove ? "Remove tab" : "Add tab", Ops.Replace(_doc.State, target.WithTabs(tabs)));
         Hint?.Invoke($"{tabs.Count} tab{(tabs.Count == 1 ? "" : "s")} on this shape. They're used on a Cut layer (width from the layer's tab width).");
+    }
+
+    /// <summary>The point on a shape's outline nearest <paramref name="w"/> (world mm).</summary>
+    static Vec2 OnOutline(PathShape target, Vec2 w)
+    {
+        var flat = PathTools.Polylines(target.World);
+        var on = flat.Select(f => (f, PathTools.Nearest(f, w))).MinBy(x => x.Item2.Distance);
+        return PathTools.At(on.f, PathTools.CumulativeLengths(on.f), on.Item2.Along).Point;
     }
 
     void DrawTabs(DrawingContext ctx)
     {
         if (_doc is null) return;
         var pen = new Pen(ToolInk, 3);
+        var ring = new Pen(ToolInk, 2);
         foreach (var s in _doc.State.Shapes.OfType<PathShape>())
-            foreach (var t in s.ManualTabs)
+        {
+            foreach (var t in s.TabsWorld)
             {
                 var c = ToScreen(t);
                 ctx.DrawRectangle(ToolInk, pen, new Rect(c.X - 3, c.Y - 3, 6, 6));
             }
+            // A chosen start point: a ring with a dot.
+            if (s.StartWorld is { } st)
+            {
+                var c = ToScreen(st);
+                ctx.DrawEllipse(null, ring, c, 6, 6);
+                ctx.DrawEllipse(ToolInk, null, c, 2, 2);
+            }
+        }
+        // The eraser's stroke so far.
+        if (_erase is { } er && er.Stroke.Count > 0)
+        {
+            var brush = new Pen(new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)), Math.Max(1, EraserMm * _scale), lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round);
+            var g = new StreamGeometry();
+            using (var gc = g.Open())
+            {
+                gc.BeginFigure(ToScreen(er.Stroke[0]), false);
+                foreach (var q in er.Stroke.Skip(1)) gc.LineTo(ToScreen(q));
+                if (er.Stroke.Count == 1) gc.LineTo(ToScreen(er.Stroke[0]) + new Point(0.01, 0));
+                gc.EndFigure(false);
+            }
+            ctx.DrawGeometry(null, brush, g);
+        }
+        else if (_tool == Tool.Eraser && _cursor is { } cur)
+            ctx.DrawEllipse(null, new Pen(ToolInk, 1), ToScreen(cur), EraserMm * _scale / 2, EraserMm * _scale / 2);
+    }
+
+    // ---- chosen start points ------------------------------------------------------------
+
+    void StartPressed(Point p, bool clear)
+    {
+        if (_doc is null || TrimTarget(p) is not { } target) { Hint?.Invoke("Click on an outline where its cut should start (Shift+click a shape to let the cut order choose again)."); return; }
+        if (!target.Transform.IsInvertible) return;
+        var start = clear ? (Vec2?)null : target.Transform.Invert().Apply(OnOutline(target, ToWorld(p)));
+        _doc.Commit(clear ? "Clear start point" : "Set start point", Ops.Replace(_doc.State, target.WithStart(start)));
+        Hint?.Invoke(clear ? "The cut order picks this shape's start again." : "The cut of this outline starts here (and goes round from it).");
+    }
+
+    // ---- picture eraser -----------------------------------------------------------------
+
+    sealed record EraseStroke(ImageShape Target, List<Vec2> Stroke);
+    EraseStroke? _erase;
+
+    bool ErasePressed(Point p)
+    {
+        if (_doc is null) return false;
+        var w = ToWorld(p);
+        var layers = _doc.State.Layers.ToDictionary(l => l.Id);
+        var im = _doc.State.Shapes.Reverse().OfType<ImageShape>().FirstOrDefault(s =>
+            layers.TryGetValue(s.LayerId, out var l) && l.Visible && !l.Locked && !s.Locked && s.HitTest(w, 0, true));
+        if (im is null) { Hint?.Invoke("Drag over a picture to rub parts of it out (they turn white and aren't engraved)."); return false; }
+        _erase = new EraseStroke(im, [w]);
+        return true;
+    }
+
+    void EraseMoved(Vec2 w)
+    {
+        _cursor = w;
+        if (_erase is { } er && er.Stroke[^1].Dist(w) > EraserMm / 8) er.Stroke.Add(w);
+    }
+
+    void EraseReleased()
+    {
+        if (_erase is not { } er || _doc is null) { _erase = null; return; }
+        _erase = null;
+        // The picture may have been changed meanwhile (undo): use what's there now.
+        if (_doc.State.Shapes.FirstOrDefault(s => s.Id == er.Target.Id) is not ImageShape im) return;
+        var pixels = im.Erase(er.Stroke, EraserMm);
+        _doc.Commit("Erase", Ops.Replace(_doc.State, im.WithPicture(ImageSource.FromEncoded(pixels.EncodePng()))), [im.Id]);
     }
 
     // ---- scissors -----------------------------------------------------------------------

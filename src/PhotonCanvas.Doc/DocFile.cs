@@ -120,6 +120,7 @@ public static class DocFile
             if (sh.GroupId is { } gid) o["group"] = gid.ToString();
             if (sh.Locked) o["locked"] = true;
             if (sh is PathShape { ManualTabs.Count: > 0 } mt) o["tabs"] = new JsonArray([.. mt.ManualTabs.Select(t => (JsonNode)new JsonArray(t.X, t.Y))]);
+            if (sh is PathShape { StartPoint: { } sp }) o["start"] = new JsonArray(sp.X, sp.Y);
             switch (sh)
             {
                 case TextShape tx:
@@ -425,6 +426,11 @@ public static class DocFile
                 .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty,
                     x => x["tabs"]!.AsArray().OfType<JsonArray>().Select(p => new Vec2(p[0]!.GetValue<double>(), p[1]!.GetValue<double>())).ToImmutableList());
             if (tabs.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && tabs.TryGetValue(sh.Id, out var t) ? ps.WithTabs(t) : sh)];
+            // Chosen start points.
+            var starts = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["start"] is JsonArray { Count: 2 })
+                .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty,
+                    x => new Vec2(x["start"]![0]!.GetValue<double>(), x["start"]![1]!.GetValue<double>()));
+            if (starts.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && starts.TryGetValue(sh.Id, out var p) ? ps.WithStart(p) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
             return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides };

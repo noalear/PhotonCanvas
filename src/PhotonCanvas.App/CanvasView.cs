@@ -10,7 +10,7 @@ using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
 namespace PhotonCanvas.App;
 
-public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors, Tabs }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors, Tabs, Start, Eraser }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
@@ -182,6 +182,9 @@ public sealed partial class CanvasView : Control
 
     /// <summary>A code (QR, barcode) was double-clicked: edit it.</summary>
     public event Action<Guid>? CodeEditRequested;
+
+    /// <summary>Picture eraser: brush width (mm).</summary>
+    public double EraserMm { get; set; } = 3;
 
     /// <summary>Point editing: the radius R gives a corner (mm).</summary>
     public double CornerRadiusMm { get; set; } = 2;
@@ -605,7 +608,8 @@ public sealed partial class CanvasView : Control
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
         else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic or Tool.Measure or Tool.Align2) c = StandardCursorType.Cross;
-        else if (_tool is Tool.Trim or Tool.Scissors or Tool.Tabs) c = StandardCursorType.Hand;
+        else if (_tool is Tool.Trim or Tool.Scissors or Tool.Tabs or Tool.Start) c = StandardCursorType.Hand;
+        else if (_tool == Tool.Eraser) c = StandardCursorType.Cross;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
         else if (screen is { } p && _drag == Drag.None)
         {
@@ -689,6 +693,8 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Align2) { AlignPressed(); return; }
         if (_tool == Tool.Scissors) { ScissorsPressed(p); return; }
         if (_tool == Tool.Tabs) { TabPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
+        if (_tool == Tool.Start) { StartPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
+        if (_tool == Tool.Eraser) { if (ErasePressed(p)) e.Pointer.Capture(this); return; }
         if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;
@@ -759,6 +765,7 @@ public sealed partial class CanvasView : Control
         _lastMods = mods;
 
         if (_guideDrag is not null) { GuideMoved(p); _lastScreen = p; return; }
+        if (_tool == Tool.Eraser) { EraseMoved(w); _lastScreen = p; InvalidateVisual(); return; }
         switch (_drag)
         {
             case Drag.None:
@@ -856,6 +863,7 @@ public sealed partial class CanvasView : Control
         e.Pointer.Capture(null);
         if (_doc is null) return;
         if (_guideDrag is not null) { GuideReleased(p); return; }
+        if (_tool == Tool.Eraser) { EraseReleased(); InvalidateVisual(); return; }
         if (_tool == Tool.Measure) MeasureReleased();
         switch (drag)
         {

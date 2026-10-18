@@ -454,7 +454,7 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
-        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, and the selection in several sizes");
+        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
@@ -480,11 +480,13 @@ public partial class MainWindow : Window
         outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
         ToolSmall(outline, "Scissors", "IcCut", Tool.Scissors, "Scissors: click a line or outline to cut it there");
         ToolSmall(outline, "Place tabs", "IcBreak", Tool.Tabs, "Click outlines to put tabs exactly where you want them (Shift+click removes one); used on Cut layers");
-        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Remove overlapping lines, tangent circles, shadows");
+        ToolSmall(outline, "Start point", "IcPen", Tool.Start, "Click an outline where its cut should start (Shift+click clears it)");
+        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Extend lines, remove overlapping lines, tangent circles, shadows");
         moreOutline.Flyout = new MenuFlyout
         {
             Items =
             {
+                Item("Extend lines to meet the next shape", ExtendSel),
                 Item("Remove overlapping lines", RemoveOverlapsSel),
                 Item("Tangent circles (select three circles)", TangentCirclesSel),
                 AsyncItem("Drop shadow…", () => ShadowSel(false)),
@@ -546,6 +548,7 @@ public partial class MainWindow : Window
         pclip.Small("Remove clip", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove clip", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Show and engrave the whole picture again", () => SelectedPicture() is { Clip: not null });
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
+        ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
         pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
         pedit.Small("CMYK split", "IcLayers", () => { if (SelectedPicture() is { } im) SplitCmyk(im); }, "Four pictures, one per ink (cyan, magenta, yellow, black), each on its own layer: for screen printing", HasPicture);
         pedit.Small("Centre-line trace", "IcPen", () => { if (SelectedPicture() is { } im) _ = Guard(() => CentrelineTrace(im)); }, "One line down the middle of each stroke (handwriting, line art), on a Score layer", HasPicture);
@@ -912,11 +915,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>The same picture shape with a new picture (same place and size, unless given).</summary>
-    static ImageShape Repicture(ImageShape im, Core.Imaging.RasterImage img, Vec2? size = null, Affine? transform = null) => new()
-    {
-        Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = transform ?? im.Transform,
-        SizeMm = size ?? im.SizeMm, Tone = im.Tone, Source = ImageSource.FromEncoded(img.EncodePng()),
-    };
+    static ImageShape Repicture(ImageShape im, Core.Imaging.RasterImage img, Vec2? size = null, Affine? transform = null) =>
+        im.WithPicture(ImageSource.FromEncoded(img.EncodePng()), size, transform);
 
     async Task FilterPicture(ImageShape im)
     {
@@ -1831,6 +1831,21 @@ public partial class MainWindow : Window
             .OrderByDescending(p => p.World.Flatten(0.05).Sum(f => PathTools.CumulativeLengths(f.Points)[^1])).FirstOrDefault();
         if (guide is null || sel.Count < 2) { StatusText.Text = "Select what to copy and the path to copy it along."; return; }
         await new CopyAlongWindow(_doc, guide).ShowDialog(this);
+    }
+
+    void ExtendSel()
+    {
+        var all = _doc.State.Editable().OfType<PathShape>().Where(p => p is not (TextShape or CodeShape)).ToList();
+        var targets = (_doc.Selection.Count > 0 ? SelectedPaths() : all).Where(p => p is not (TextShape or CodeShape) && p.HasOpenSubpaths).ToList();
+        if (targets.Count == 0) { StatusText.Text = "Select lines with open ends to extend."; return; }
+        // Ends run on to anything in the design, not just the selection.
+        var others = all.Where(p => !targets.Contains(p)).Select(p => p.World).ToList();
+        var (geoms, n) = EditTools.Extend([.. targets.Select(p => p.World), .. others]);
+        if (n == 0) { StatusText.Text = "No open end meets anything if carried on straight."; return; }
+        var s = _doc.State;
+        for (int i = 0; i < targets.Count; i++) s = Ops.Replace(s, Plain(targets[i], geoms[i]));
+        _doc.Commit("Extend lines", s);
+        StatusText.Text = $"Extended {n} end{(n == 1 ? "" : "s")} to the next line.";
     }
 
     void RemoveOverlapsSel()

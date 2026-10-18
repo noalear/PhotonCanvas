@@ -104,6 +104,57 @@ public sealed class ImageShape : Shape
         _bounds = null;
     }
 
+    /// <summary>
+    /// The same picture with new pixels (and optionally a new size and placement), keeping its
+    /// tone settings and clip outline where they were on the work area.
+    /// </summary>
+    public ImageShape WithPicture(ImageSource source, Vec2? size = null, Affine? transform = null)
+    {
+        var t = transform ?? Transform;
+        return new()
+        {
+            Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = t, Source = source, SizeMm = size ?? SizeMm, Tone = Tone,
+            Clip = Clip is null || transform is null ? Clip : t.IsInvertible ? Clip.Transform(Transform.Then(t.Invert())) : null,
+        };
+    }
+
+    /// <summary>
+    /// The pixels with a brush stroke (world mm, <paramref name="widthMm"/> wide) rubbed out:
+    /// what's under it turns white, so it isn't engraved.
+    /// </summary>
+    public RasterImage Erase(IReadOnlyList<Vec2> stroke, double widthMm)
+    {
+        var src = Source.Pixels;
+        int w = src.Width, h = src.Height;
+        var rgba = (byte[])src.Rgba.Clone();
+        if (stroke.Count == 0 || !Transform.IsInvertible) return new RasterImage(w, h, rgba);
+        double r = widthMm / 2, kx = w / SizeMm.X, ky = h / SizeMm.Y;
+        var inv = Transform.Invert();
+        var pts = stroke.Count == 1 ? [stroke[0], stroke[0]] : stroke;
+        for (int i = 0; i + 1 < pts.Count; i++)
+        {
+            Vec2 a = pts[i], b = pts[i + 1];
+            // The pixels around this piece of the stroke: its corners taken into picture pixels.
+            var box = Rect2.Bounds([a + new Vec2(-r, -r), a + new Vec2(r, r), b + new Vec2(-r, -r), b + new Vec2(r, r), a + new Vec2(-r, r), a + new Vec2(r, -r), b + new Vec2(-r, r), b + new Vec2(r, -r)]);
+            var corners = new[] { new Vec2(box.MinX, box.MinY), new Vec2(box.MaxX, box.MinY), new Vec2(box.MaxX, box.MaxY), new Vec2(box.MinX, box.MaxY) }
+                .Select(c => inv.Apply(c)).Select(l => new Vec2(l.X * kx, l.Y * ky)).ToList();
+            int x0 = Math.Max(0, (int)Math.Floor(corners.Min(c => c.X))), x1 = Math.Min(w - 1, (int)Math.Ceiling(corners.Max(c => c.X)));
+            int y0 = Math.Max(0, (int)Math.Floor(corners.Min(c => c.Y))), y1 = Math.Min(h - 1, (int)Math.Ceiling(corners.Max(c => c.Y)));
+            var ab = b - a;
+            double len2 = ab.Dot(ab);
+            for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
+                {
+                    var p = Transform.Apply(new Vec2((x + 0.5) / kx, (y + 0.5) / ky));
+                    double t = len2 < 1e-18 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
+                    if (p.Dist(a + ab * t) > r) continue;
+                    int k = (y * w + x) * 4;
+                    rgba[k] = rgba[k + 1] = rgba[k + 2] = rgba[k + 3] = 255;
+                }
+        }
+        return new RasterImage(w, h, rgba);
+    }
+
     public ImageShape WithTone(ToneAdjust tone) => new()
     {
         Id = Id, Name = Name, LayerId = LayerId, GroupId = GroupId, Transform = Transform, Source = Source, SizeMm = SizeMm, Tone = tone, Clip = Clip,
