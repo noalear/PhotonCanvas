@@ -26,11 +26,17 @@ public sealed class CutTestWindow : Window
     // Making the test
     readonly ComboBox _light = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Diode (blue)", "MOPA (red)" }, SelectedIndex = 0 };
     readonly NumericUpDown _sMin = Number(1, 15000, 1, "0.#"), _sMax = Number(1, 15000, 1, "0.#"), _sSteps = Number(1, 12, 1, "0");
-    readonly ComboBox _down = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Passes", "Power %" }, SelectedIndex = 0 };
+    readonly RadioButton _byPasses = new() { Content = "More passes on each row", GroupName = "cutdown", IsChecked = true };
+    readonly RadioButton _byPower = new() { Content = "More power on each row", GroupName = "cutdown" };
     readonly NumericUpDown _dMin = Number(1, 100, 1, "0.#"), _dMax = Number(1, 100, 1, "0.#"), _dSteps = Number(1, 10, 1, "0");
     readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _passes = Number(1, 50, 1, "0"), _cell = Number(4, 20, 1, "0.#");
-    readonly Control _powerRow, _passesRow;
-    readonly TextBlock _plan = new() { TextWrapping = TextWrapping.Wrap };
+    readonly TextBlock _dMinLabel = Label(""), _dMaxLabel = Label("");
+    readonly Control _powerCol, _stepsCol, _passesCol;
+    readonly ContentControl _third = new();
+    readonly CutTestPreview _preview = new() { Margin = new(4) };
+    readonly TextBlock _speedList = Hint(), _downList = Hint();
+    readonly TextBlock _plan = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
+    readonly Button _add = new() { Content = "Add the test to the design", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
     // Reading the results
     readonly ComboBox _material = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBox _newName = new() { Watermark = "e.g. Basswood" };
@@ -66,32 +72,42 @@ public sealed class CutTestWindow : Window
         _power.Value = 100; _passes.Value = 1; _cell.Value = 8; _thick.Value = 3;
         foreach (var n in new[] { _sMin, _sMax, _sSteps, _dMin, _dMax, _dSteps, _power, _passes, _cell }) n.ValueChanged += (_, _) => Plan();
         _light.SelectionChanged += (_, _) => Plan();
-        _down.SelectionChanged += (_, _) =>
+        void Switch(bool power)
         {
-            // Sensible ranges when switching what goes down the side.
-            if (_down.SelectedIndex == 1) { _dMin.Value = 60; _dMax.Value = 100; _dSteps.Value = 5; }
-            else { _dMin.Value = 1; _dMax.Value = 3; _dSteps.Value = 3; }
+            // Sensible ranges for what the rows try (the other button may not have let go yet, so it's passed in).
+            if (power) { _dMin.Value = 60; _dMax.Value = 100; _dSteps.Value = 5; }
+            else { _dMin.Value = 1; _dMax.Value = 3; }
             Plan();
-        };
-        _powerRow = Field("Power %", _power, tip: "Cutting is usually full power; the speed and passes do the testing.");
-        _passesRow = Field("Passes", _passes);
+        }
+        _byPasses.IsCheckedChanged += (_, _) => { if (_byPasses.IsChecked == true) Switch(false); };
+        _byPower.IsCheckedChanged += (_, _) => { if (_byPower.IsChecked == true) Switch(true); };
+        _powerCol = Col("Power for every square (%)", _power);
+        _stepsCol = Col("How many", _dSteps);
+        _passesCol = Col("Passes for every square", _passes);
 
-        var add = new Button { Content = "Add the test to the design", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var add = _add;
         add.Click += (_, _) => AddTest();
         var make = new StackPanel
         {
-            Spacing = 8, Margin = new(0, 12, 0, 0),
+            Spacing = 12, Margin = new(0, 12, 0, 0),
             Children =
             {
-                Hint("Small squares cut at different speeds (across) and passes or power (down). The ones that drop out, or push out with a finger, went through; the quickest of those is the setting to use."),
+                new TextBlock
+                {
+                    TextWrapping = TextWrapping.Wrap,
+                    Text = "This cuts a grid of little squares, each with different settings. Afterwards, the squares that fell out (or push out with a finger) were cut right through. The quickest of those is your cut setting.",
+                },
                 Field("Laser", _light),
-                Row(Field("Speeds from", _sMin), Field("to", _sMax), Field("steps", _sSteps)),
-                Field("Down the side", _down),
-                Row(Field("from", _dMin), Field("to", _dMax), Field("steps", _dSteps)),
-                _powerRow, _passesRow,
-                Field("Square (mm)", _cell, tip: "Big enough to see whether it dropped, small enough not to tip up into the head once it's loose."),
+                new Border { Background = Brush("Bg0"), CornerRadius = new(8), Padding = new(10), Child = _preview },
+                Card("Across: speed", "Each column is cut at a different speed. Slower cuts deeper.",
+                    Row(Col("Slowest (mm/s)", _sMin), Col("Fastest (mm/s)", _sMax), Col("How many speeds", _sSteps)), _speedList),
+                Card("Down: passes or power", "Each row adds more passes (or more power) to go deeper.",
+                    new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, Children = { _byPasses, _byPower } },
+                    Row(Col(_dMinLabel, _dMin), Col(_dMaxLabel, _dMax), _third),
+                    _passesCol, _downList),
+                Field("Square size (mm)", _cell, tip: "Big enough to see whether it dropped, small enough not to tip up into the head once it's loose."),
                 _plan,
-                Hint("Cut on the honeycomb or pins with air assist on, and stay with it: slow cuts can flare up. Labels are only lightly marked."),
+                Hint("Cut on the honeycomb or pins with air assist on, and stay with it: slow cuts can flare up. The numbers are only lightly marked."),
                 add,
                 Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Laser → Cut test)."),
             },
@@ -137,6 +153,31 @@ public sealed class CutTestWindow : Window
         Compute();
     }
 
+    /// <summary>Rows of passes at most (more is spread out over the range).</summary>
+    const int MaxRows = 10;
+
+    /// <summary>"4, 8, 12 and 16".</summary>
+    static string List(IEnumerable<string> items)
+    {
+        var l = items.ToList();
+        return l.Count <= 1 ? string.Concat(l) : $"{string.Join(", ", l.Take(l.Count - 1))} and {l[^1]}";
+    }
+
+    static TextBlock Label(string text) => new() { Text = text, Classes = { "muted" }, FontSize = 12 };
+
+    /// <summary>A setting with its name above it.</summary>
+    static Control Col(string label, Control editor) => Col(Label(label), editor);
+
+    static Control Col(TextBlock label, Control editor) => new StackPanel { Spacing = 3, Children = { label, editor } };
+
+    /// <summary>A titled group of settings with a line saying what it does.</summary>
+    static Control Card(string title, string about, params Control[] content)
+    {
+        var panel = new StackPanel { Spacing = 8, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold }, Hint(about) } };
+        foreach (var c in content) panel.Children.Add(c);
+        return new Border { BorderBrush = Brush("Line"), BorderThickness = new(1), CornerRadius = new(8), Padding = new(12), Child = panel };
+    }
+
     /// <summary>Is there a cut test (or a kerf test) in the design to read?</summary>
     public static bool InDesign(DocState s) => s.Layers.Any(CutTest.IsCell) || CutTest.KerfLayer(s) is not null;
 
@@ -144,8 +185,10 @@ public sealed class CutTestWindow : Window
     {
         Light = _light.SelectedIndex == 1 ? LightSource.Red : LightSource.Blue,
         SpeedMin = (double)(_sMin.Value ?? 4), SpeedMax = (double)(_sMax.Value ?? 24), SpeedSteps = (int)(_sSteps.Value ?? 6),
-        Down = _down.SelectedIndex == 1 ? CutTestDown.Power : CutTestDown.Passes,
-        DownMin = (double)(_dMin.Value ?? 1), DownMax = (double)(_dMax.Value ?? 3), DownSteps = (int)(_dSteps.Value ?? 3),
+        Down = _byPower.IsChecked == true ? CutTestDown.Power : CutTestDown.Passes,
+        DownMin = (double)(_dMin.Value ?? 1), DownMax = (double)(_dMax.Value ?? 3),
+        // Passes are whole numbers: every one from the fewest to the most.
+        DownSteps = _byPower.IsChecked == true ? (int)(_dSteps.Value ?? 5) : Math.Min(MaxRows, (int)Math.Abs((double)((_dMax.Value ?? 3) - (_dMin.Value ?? 1))) + 1),
         Power = (double)(_power.Value ?? 100), Passes = (int)(_passes.Value ?? 1),
         CellMm = (double)(_cell.Value ?? 8),
     };
@@ -153,16 +196,36 @@ public sealed class CutTestWindow : Window
     void Plan()
     {
         var o = Options();
-        _powerRow.IsVisible = o.Down == CutTestDown.Passes;
-        _passesRow.IsVisible = o.Down == CutTestDown.Power;
+        bool power = o.Down == CutTestDown.Power;
+        // The third box: the power for every square (rows of passes), or how many powers (rows of power).
+        _third.Content = power ? _stepsCol : _powerCol;
+        _passesCol.IsVisible = power;
+        _dMinLabel.Text = power ? "Lowest power (%)" : "Fewest passes";
+        _dMaxLabel.Text = power ? "Highest power (%)" : "Most passes";
+        var speeds = MaterialTest.Values(TestParam.Speed, o.SpeedMin, o.SpeedMax, o.SpeedSteps, _machine);
+        var down = MaterialTest.Values(power ? TestParam.Power : TestParam.Passes, o.DownMin, o.DownMax, o.DownSteps, _machine);
+        _speedList.Text = $"Tries {List(speeds.Select(v => $"{v:0.#}"))} mm/s.";
+        _downList.Text = power
+            ? $"Tries {List(down.Select(v => $"{v:0.#}"))}% power, {o.Passes} pass{(o.Passes == 1 ? "" : "es")} each."
+            : $"Tries {List(down.Select(v => $"{v:0}"))} pass{(down.Count == 1 && down[0] == 1 ? "" : "es")}, all at {o.Power:0.#}% power.";
+        _preview.Show(speeds, down, power, o.Power, o.Passes);
         try
         {
             var (s, _) = CutTest.Add(DocState.New() with { Layers = [] }, o, _machine);
             var job = JobBuilder.Build(s, new JobOptions());
             int n = s.Layers.Count(CutTest.IsCell);
-            _plan.Text = $"{n} squares, {job.Bounds.Width:0} × {job.Bounds.Height:0} mm; about {Duration(job.EstimateS)} to cut.";
+            var size = s.Bounds(s.Shapes.Select(x => x.Id).ToHashSet());
+            bool fits = size.Width <= _machine.FieldW - 4 && size.Height <= _machine.FieldH - 4;
+            _plan.Text = $"{n} squares · {size.Width:0} × {size.Height:0} mm of material · about {Duration(job.EstimateS)} to cut" +
+                         (fits ? "" : $"\n⚠ That's bigger than the bed ({_machine.FieldW:0} × {_machine.FieldH:0} mm): try fewer speeds or rows, or smaller squares.");
+            if (fits) _plan.ClearValue(TextBlock.ForegroundProperty); else _plan.Foreground = Brush("Warn");
+            _add.IsEnabled = fits;
         }
-        catch (Exception e) when (e is JobException or InvalidOperationException) { _plan.Text = e.Message; }
+        catch (Exception e) when (e is JobException or InvalidOperationException or OutsideWorkAreaException)
+        {
+            _plan.Text = e.Message;
+            _add.IsEnabled = false;
+        }
     }
 
     void AddTest()
