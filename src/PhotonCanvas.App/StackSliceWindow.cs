@@ -39,7 +39,7 @@ public sealed class StackSliceWindow : Window
     readonly ComboBox _up = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Z up (as made)", "Z down", "Y up", "Y down", "X up", "X down" }, SelectedIndex = 0 };
     readonly NumericUpDown _width = Number(1, 2000, 5, "0.#"), _depth = Number(1, 2000, 5, "0.#");
     readonly CheckBox _keepProportions = new() { Content = "Keep proportions", IsChecked = true };
-    readonly Button _ownSize = Button("Model's own size", tip: "Back to the size the model was made at (one model unit = 1 mm, as almost every STL and OBJ is).");
+    readonly Button _ownSize = Button("Model's own size", tip: "Back to the size the model was made at (one model unit = 1 mm, as almost every STL and OBJ is; STEP files say their units and are read in millimetres).");
     (double X, double Y, double Z) _natural = (1, 1, 1);
     bool _sizing;
     readonly NumericUpDown _turn = Number(-180, 180, 15, "0"), _height = Number(1, 2000, 5, "0.#"), _thick = Number(0.3m, 50, 0.5m, "0.##"), _dowel = Number(0, 20, 0.5m, "0.#"), _pin = Number(0, 20, 0.5m, "0.#");
@@ -82,7 +82,7 @@ public sealed class StackSliceWindow : Window
         _stock.SelectedIndex = first;
         _stock.SelectionChanged += (_, _) => Later();
 
-        var open = Button("Open a 3D model…", tip: "STL or OBJ, from a 3D printing site, Fusion, Blender…");
+        var open = Button("Open a 3D model…", tip: "STL or OBJ from a 3D printing site or Blender; STEP straight from CAD (Fusion, Onshape, SolidWorks, McMaster-Carr parts…)");
         open.Click += async (_, _) => await Open();
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Reslice(); };
         foreach (var n in new[] { _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
@@ -307,12 +307,24 @@ public sealed class StackSliceWindow : Window
             var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
             {
                 Title = "3D model to slice",
-                FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ)") { Patterns = ["*.stl", "*.obj"] }],
+                FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ, STEP)") { Patterns = ["*.stl", "*.obj", "*.stp", "*.step"] }],
             });
             path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
         }
         if (path is null) return;
-        try { Load(await Task.Run(() => StlDepth.Load(path)), Path.GetFileNameWithoutExtension(path)); }
+        _file.Text = $"Reading {Path.GetFileName(path)}…";
+        try
+        {
+            if (Path.GetExtension(path).ToLowerInvariant() is ".stp" or ".step")
+            {
+                // From CAD: its exact shapes turned into triangles; say if any face couldn't be.
+                var r = await Task.Run(() => PhotonCanvas.Doc.Import.Step.StepMesh.Load(path));
+                Load(StlDepth.FromStep(r), Path.GetFileNameWithoutExtension(path));
+                if (r.FailedFaces > 0)
+                    _file.Text += $" ⚠ {r.FailedFaces} of {r.Faces} faces couldn't be read and are missing ({r.Problems.FirstOrDefault()}).";
+            }
+            else Load(await Task.Run(() => StlDepth.Load(path)), Path.GetFileNameWithoutExtension(path));
+        }
         catch (Exception e) when (e is FormatException or IOException or UnauthorizedAccessException) { _file.Text = $"Couldn't read it: {e.Message}"; }
     }
 

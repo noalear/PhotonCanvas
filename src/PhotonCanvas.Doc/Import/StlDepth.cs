@@ -17,10 +17,25 @@ public static class StlDepth
     public readonly record struct Triangle(Vec3 A, Vec3 B, Vec3 C);
     public readonly record struct Vec3(double X, double Y, double Z);
 
-    /// <summary>A 3D model file by its extension: STL (binary or text) or OBJ.</summary>
+    /// <summary>A 3D model file by its extension: STL (binary or text), OBJ, or STEP (turned into triangles within 0.05 mm of its exact shapes).</summary>
     /// <exception cref="FormatException">Not a readable model.</exception>
-    public static List<Triangle> Load(string path) =>
-        Path.GetExtension(path).Equals(".obj", StringComparison.OrdinalIgnoreCase) ? ParseObj(File.ReadAllText(path)) : Parse(File.ReadAllBytes(path));
+    public static List<Triangle> Load(string path, double stepToleranceMm = 0.05) => Path.GetExtension(path).ToLowerInvariant() switch
+    {
+        ".obj" => ParseObj(File.ReadAllText(path)),
+        ".stp" or ".step" => FromStep(Step.StepMesh.Load(path, stepToleranceMm)),
+        _ => Parse(File.ReadAllBytes(path)),
+    };
+
+    /// <summary>File types <see cref="Load"/> reads.</summary>
+    public static readonly string[] Extensions = [".stl", ".obj", ".stp", ".step"];
+
+    /// <summary>A STEP file's triangles as a model.</summary>
+    public static List<Triangle> FromStep(Step.StepResult r)
+    {
+        if (r.Triangles.Count == 0)
+            throw new FormatException(r.Problems.Count > 0 ? $"Nothing in this STEP file could be turned into a model: {r.Problems[0]}." : "There are no solid shapes in this STEP file.");
+        return [.. r.Triangles.Select(t => new Triangle(new(t.A.X, t.A.Y, t.A.Z), new(t.B.X, t.B.Y, t.B.Z), new(t.C.X, t.C.Y, t.C.Z)))];
+    }
 
     /// <summary>Wavefront OBJ: "v x y z" corners and "f a b c …" faces (faces with more corners are fanned into triangles).</summary>
     public static List<Triangle> ParseObj(string text)

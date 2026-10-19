@@ -278,13 +278,12 @@ public sealed class StlWindow : Window
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "3D model",
-            FileTypeFilter = [new FilePickerFileType("STL 3D model") { Patterns = ["*.stl"] }],
+            FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ, STEP)") { Patterns = ["*.stl", "*.obj", "*.stp", "*.step"] }],
         });
         if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
         try
         {
-            var bytes = await File.ReadAllBytesAsync(path);
-            _tris = await Task.Run(() => StlDepth.Parse(bytes));
+            _tris = await Task.Run(() => StlDepth.Load(path));
             _name = Path.GetFileNameWithoutExtension(path);
             Render();
         }

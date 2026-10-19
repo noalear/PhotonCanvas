@@ -12,13 +12,13 @@ using static PhotonCanvas.App.UiKit;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// Picking a 3D model by sight: every STL and OBJ in a folder as a shaded thumbnail (drawn here,
+/// Picking a 3D model by sight: every STL, OBJ and STEP in a folder as a shaded thumbnail (drawn here,
 /// nothing to install), with its name and size. Thumbnails are kept, so a folder opens instantly
 /// the next time. Double-click (or Open) to use one.
 /// </summary>
 public sealed class ModelBrowserWindow : Window
 {
-    static readonly string[] Extensions = [".stl", ".obj"];
+    static readonly string[] Extensions = StlDepth.Extensions;
     static string CacheDir => Path.Combine(AppIdentity.DataDir, "model-thumbs");
 
     readonly AppSettings _settings;
@@ -96,7 +96,7 @@ public sealed class ModelBrowserWindow : Window
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "3D model to slice",
-            FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ)") { Patterns = ["*.stl", "*.obj"] }],
+            FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ, STEP)") { Patterns = ["*.stl", "*.obj", "*.stp", "*.step"] }],
         });
         if (files.Count > 0 && files[0].TryGetLocalPath() is { } path) Finish(path);
     }
@@ -138,7 +138,7 @@ public sealed class ModelBrowserWindow : Window
             _status.Text = $"Couldn't read the folder: {e.Message}";
             return;
         }
-        _status.Text = files.Count == 0 ? "No STL or OBJ files here." : $"{files.Count} model{(files.Count == 1 ? "" : "s")}.";
+        _status.Text = files.Count == 0 ? "No STL, OBJ or STEP files here." : $"{files.Count} model{(files.Count == 1 ? "" : "s")}.";
         foreach (var f in files) _tiles.Children.Add(Tile(f, cts.Token));
         Filter();
     }
@@ -203,7 +203,10 @@ public sealed class ModelBrowserWindow : Window
                 {
                     png = await Task.Run(() =>
                     {
-                        var mesh = StlDepth.Load(path);
+                        // STEP files are worked out from their exact shapes: coarser is plenty for a picture, and huge ones are left out.
+                        bool step = Path.GetExtension(path).ToLowerInvariant() is ".stp" or ".step";
+                        if (step && info.Length > 60L << 20) throw new IOException("too big to preview");
+                        var mesh = StlDepth.Load(path, stepToleranceMm: 0.2);
                         return MeshPicture.Render(mesh, 300).EncodePng();
                     }, ct);
                 }

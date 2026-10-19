@@ -84,7 +84,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 ### Machine modes
 - [x] Stacked slices: a 3D model (STL, OBJ) sliced into layers of the material's thickness, any way up; middle, outer (sand back) or inner (fill) outlines; each part numbered from the bottom, the next slice's place marked on it, optional dowel holes; laid out bed by bed on pages (our own idea; Autodesk's discontinued Slicer for Fusion 360 did the slicing, no laser software does)
 - [ ] Stacked slices: shaping the edges (chamfers, fillets) by engraving them down in steps, once the etch depth per setting is measured
-- [ ] Stacked slices: open STEP (.stp, .step) CAD files as well as STL and OBJ (needs a CAD geometry engine to turn the exact surfaces into triangles)
+- [x] STEP (.stp, .step) CAD files for the slicer, the model browser and depth reliefs: our own reader turns the exact shapes (planes, cylinders, cones, spheres, tori including spindle ones, swept curves, NURBS) into sealed meshes within 0.05 mm; assemblies placed, inch files in millimetres; no CAD engine to install
 - [x] Stacked slices: a model browser with shaded thumbnails of every STL and OBJ in a folder (Windows shows none for them)
 - [x] Egg crate: upright sheets across the model both ways, slotted half-way where they cross; each sheet named and every slot marked with the sheet that goes in it; slot fit setting
 - [x] Radial: fins round an upright axis slotted onto flat rings, with an optional centre hole for a dowel; preview shows the sheets standing in place
