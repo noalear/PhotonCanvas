@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -26,6 +27,10 @@ public sealed class LineTestWindow : Window
     List<Layer> _sources = [];
     readonly NumericUpDown _size = Number(6, 25, 1, "0");
     readonly ComboBox _shows = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly PiecePicker _picker = new() { Height = 200, Margin = new(0, 4, 0, 0) };
+    readonly TextBlock _pickerNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap, Text = "The square is the piece each patch shows: the spot with the most shading and detail. Click the picture to move it." };
+    // Where the piece is, per picture (0–1 across and down); found once, then wherever it was clicked.
+    readonly Dictionary<Guid, Vec2> _spots = [];
     List<ImageShape> _samples = [];
     readonly StackPanel _variants = new() { Spacing = 4 };
     readonly TextBlock _plan = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
@@ -51,7 +56,9 @@ public sealed class LineTestWindow : Window
         _size.Value = 10;
         _size.ValueChanged += (_, _) => Plan();
         _source.SelectionChanged += (_, _) => { Samples(); Plan(); };
-        _shows.SelectionChanged += (_, _) => Plan();
+        _shows.SelectionChanged += (_, _) => { ShowPicker(); Plan(); };
+        _size.ValueChanged += (_, _) => ShowPicker();
+        _picker.Moved += at => { if (Picture() is { } p) { _spots[p.Id] = at; ShowPicker(); Plan(); } };
         _add.Click += (_, _) => AddTest();
 
         var make = new StackPanel
@@ -68,6 +75,8 @@ public sealed class LineTestWindow : Window
                 Field("Settings of", _source, tip: "The picture layer to try: every patch starts from exactly its settings."),
                 Field("Patch shows", _shows, tip: "A piece of your picture shows the rows as they'd be in it. Rows often show only where the picture changes from dot to dot (burning back and forth, " +
                                                   "a late power change lands on opposite sides in neighbouring rows), which flat grey can't show. Grey bands and edges has both flat greys and edges."),
+                _picker,
+                _pickerNote,
                 Explained("The patches, left to right", "Each one changes one thing from the first. Closer lines get less power by the same share, so they put in the same energy; " +
                                                        "on wood they usually still come out lighter, with more pale greys, because it marks much less at low power.", _variants),
                 Explained("Patch size", "Bigger patches are easier to judge by eye.", Row(Labelled("Size (mm)", _size))),
@@ -136,12 +145,30 @@ public sealed class LineTestWindow : Window
     void Samples()
     {
         _samples = [.. _doc.State.ShapesFor(SourceLayer()).OfType<ImageShape>()];
-        _shows.ItemsSource = _samples.Select(p => $"The middle of {(string.IsNullOrWhiteSpace(p.Name) ? "the picture" : p.Name)}").Prepend("Grey bands and edges").ToList();
+        _shows.ItemsSource = _samples.Select(p => $"A piece of {(string.IsNullOrWhiteSpace(p.Name) ? "the picture" : p.Name)}").Prepend("Grey bands and edges").ToList();
         _shows.SelectedIndex = _samples.Count > 0 ? 1 : 0;
+        ShowPicker();
     }
 
-    LineTest.Piece? Sample(double size) =>
-        _shows.SelectedIndex >= 1 && _shows.SelectedIndex - 1 < _samples.Count ? LineTest.PieceOf(_samples[_shows.SelectedIndex - 1], size) : null;
+    ImageShape? Picture() => _shows.SelectedIndex >= 1 && _shows.SelectedIndex - 1 < _samples.Count ? _samples[_shows.SelectedIndex - 1] : null;
+
+    Vec2 Spot(ImageShape p, double size)
+    {
+        if (!_spots.TryGetValue(p.Id, out var at)) _spots[p.Id] = at = LineTest.BusiestSpot(p, size);
+        return at;
+    }
+
+    void ShowPicker()
+    {
+        var p = Picture();
+        _picker.IsVisible = _pickerNote.IsVisible = p is not null;
+        if (p is null) return;
+        double size = (double)(_size.Value ?? 10);
+        var (w, h) = LineTest.PieceSize(p, size);
+        _picker.Show(p.Source, Spot(p, size), new Vec2((double)w / p.Source.Width, (double)h / p.Source.Height));
+    }
+
+    LineTest.Piece? Sample(double size) => Picture() is { } p ? LineTest.PieceOf(p, size, Spot(p, size)) : null;
 
     void Plan()
     {
@@ -238,5 +265,55 @@ public sealed class LineTestWindow : Window
                        (heatChanged && target.MaterialTone is not null ? " Its tone correction was measured with the old settings: run the tone test again with these." : "");
         _status.Foreground = Brush("Ok");
         AppLog.Write("line test", $"Used \"{LineTest.Label(tested)}\" on {target.Name}.");
+    }
+
+    /// <summary>The picture small, with the piece marked; a click moves the piece there.</summary>
+    sealed class PiecePicker : Control
+    {
+        Avalonia.Media.Imaging.Bitmap? _thumb;
+        ImageSource? _source;
+        Vec2 _at, _size;
+        public event Action<Vec2>? Moved;
+
+        public void Show(ImageSource source, Vec2 at, Vec2 size)
+        {
+            if (!ReferenceEquals(source, _source))
+            {
+                _source = source;
+                var small = source.Pixels;
+                using var ms = new MemoryStream(small.EncodePng());
+                _thumb = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(ms, 400);
+            }
+            (_at, _size) = (at, size);
+            InvalidateVisual();
+        }
+
+        Rect Fit()
+        {
+            if (_thumb is null) return default;
+            double k = Math.Min(Bounds.Width / _thumb.Size.Width, Bounds.Height / _thumb.Size.Height);
+            double w = _thumb.Size.Width * k, h = _thumb.Size.Height * k;
+            return new Rect(0, (Bounds.Height - h) / 2, w, h);
+        }
+
+        public override void Render(DrawingContext ctx)
+        {
+            if (_thumb is null) return;
+            var r = Fit();
+            ctx.DrawImage(_thumb, r);
+            double cx = Math.Clamp(_at.X, _size.X / 2, 1 - _size.X / 2), cy = Math.Clamp(_at.Y, _size.Y / 2, 1 - _size.Y / 2);
+            var box = new Rect(r.X + (cx - _size.X / 2) * r.Width, r.Y + (cy - _size.Y / 2) * r.Height, _size.X * r.Width, _size.Y * r.Height);
+            ctx.DrawRectangle(null, new Pen(Brushes.Black, 4), box);
+            ctx.DrawRectangle(null, new Pen(UiKit.Brush("Accent"), 2), box);
+        }
+
+        protected override void OnPointerPressed(Avalonia.Input.PointerPressedEventArgs e)
+        {
+            base.OnPointerPressed(e);
+            var r = Fit();
+            var p = e.GetPosition(this);
+            if (r.Width <= 0 || !r.Contains(p)) return;
+            Moved?.Invoke(new Vec2((p.X - r.X) / r.Width, (p.Y - r.Y) / r.Height));
+        }
     }
 }

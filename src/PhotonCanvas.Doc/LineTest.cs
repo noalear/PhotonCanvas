@@ -166,20 +166,88 @@ public static class LineTest
     public sealed record Piece(byte[] Png, Vec2 SizeMm, ToneAdjust Tone);
 
     /// <summary>
-    /// The middle of <paramref name="picture"/>, <paramref name="size"/> mm square at the size it's
-    /// placed at (or all of it, when it's smaller), keeping its own pixels: burned just as the picture would be.
+    /// A <paramref name="size"/> mm square of <paramref name="picture"/> at the size it's placed at (or
+    /// all of it, when it's smaller), centred at <paramref name="centre"/> (0–1 across and down; the
+    /// middle when null), keeping its own pixels: burned just as the picture would be.
     /// </summary>
-    public static Piece PieceOf(ImageShape picture, double size)
+    public static Piece PieceOf(ImageShape picture, double size, Vec2? centre = null)
     {
         var src = picture.Source.Pixels;
-        double scale = Math.Max(1e-9, picture.Transform.ScaleX);
-        double pxPerMm = src.Width / (picture.SizeMm.X * scale);
-        int w = Math.Clamp((int)Math.Round(size * pxPerMm), 1, src.Width), h = Math.Clamp((int)Math.Round(size * pxPerMm), 1, src.Height);
-        int x0 = (src.Width - w) / 2, y0 = (src.Height - h) / 2;
+        var (w, h) = PieceSize(picture, size);
+        double pxPerMm = src.Width / (picture.SizeMm.X * Math.Max(1e-9, picture.Transform.ScaleX));
+        var at = centre ?? new Vec2(0.5, 0.5);
+        int x0 = Math.Clamp((int)Math.Round(at.X * src.Width - w / 2.0), 0, src.Width - w);
+        int y0 = Math.Clamp((int)Math.Round(at.Y * src.Height - h / 2.0), 0, src.Height - h);
         var px = new byte[w * h * 4];
         for (int y = 0; y < h; y++)
             Array.Copy(src.Rgba, ((y0 + y) * src.Width + x0) * 4, px, y * w * 4, w * 4);
         return new Piece(new RasterImage(w, h, px).EncodePng(), new Vec2(w / pxPerMm, h / pxPerMm), picture.Tone);
+    }
+
+    /// <summary>The piece's size in the picture's pixels.</summary>
+    public static (int W, int H) PieceSize(ImageShape picture, double size)
+    {
+        var src = picture.Source;
+        double pxPerMm = src.Width / (picture.SizeMm.X * Math.Max(1e-9, picture.Transform.ScaleX));
+        int n = (int)Math.Round(size * pxPerMm);
+        return (Math.Clamp(n, 1, src.Width), Math.Clamp(n, 1, src.Height));
+    }
+
+    /// <summary>
+    /// The best spot for a piece: the widest spread from light to dark, with both smooth shading and
+    /// fine detail in it (a skull's dome beside flowers beats flowers alone, which have no gradients,
+    /// or plain background). The centre, 0–1 across and down.
+    /// </summary>
+    public static Vec2 BusiestSpot(ImageShape picture, double size)
+    {
+        var src = picture.Source;
+        var (pw, ph) = PieceSize(picture, size);
+        if (pw >= src.Width && ph >= src.Height) return new Vec2(0.5, 0.5);
+        // Work on a small copy: about 160 across.
+        int k = Math.Max(1, src.Width / 160), gw = src.Width / k, gh = src.Height / k;
+        var lum = src.Luminance;
+        var g = new float[gw * gh];
+        for (int y = 0; y < gh; y++)
+            for (int x = 0; x < gw; x++)
+            {
+                double sum = 0;
+                for (int yy = 0; yy < k; yy++)
+                    for (int xx = 0; xx < k; xx++) sum += lum[(y * k + yy) * src.Width + x * k + xx];
+                g[y * gw + x] = (float)(sum / (k * k));
+            }
+        // Each cell's local detail (how much it differs from its neighbours).
+        var detail = new float[gw * gh];
+        for (int y = 1; y < gh - 1; y++)
+            for (int x = 1; x < gw - 1; x++)
+            {
+                int i = y * gw + x;
+                detail[i] = Math.Abs(g[i + 1] - g[i - 1]) + Math.Abs(g[i + gw] - g[i - gw]);
+            }
+        int ww = Math.Max(2, pw / k), wh = Math.Max(2, ph / k), step = Math.Max(1, Math.Min(ww, wh) / 6);
+        double best = double.MinValue;
+        var at = new Vec2(0.5, 0.5);
+        var values = new List<float>();
+        for (int y0 = 0; y0 + wh <= gh; y0 += step)
+            for (int x0 = 0; x0 + ww <= gw; x0 += step)
+            {
+                values.Clear();
+                int smooth = 0, busy = 0;
+                for (int y = y0; y < y0 + wh; y++)
+                    for (int x = x0; x < x0 + ww; x++)
+                    {
+                        values.Add(g[y * gw + x]);
+                        float d = detail[y * gw + x];
+                        if (d < 0.04f) smooth++;
+                        else if (d > 0.15f) busy++;
+                    }
+                values.Sort();
+                double spread = values[(int)(values.Count * 0.95)] - values[(int)(values.Count * 0.05)];
+                // Both kinds in one piece: smooth shading (gradients) and fine detail (edges), across the tones.
+                double mix = Math.Min(smooth, busy) / (double)values.Count;
+                double score = spread * (0.2 + mix);
+                if (score > best) { best = score; at = new Vec2((x0 + ww / 2.0) * k / src.Width, (y0 + wh / 2.0) * k / src.Height); }
+            }
+        return at;
     }
 
     /// <summary>The test's patches in the design, left to right, each with its layer; empty when there's none.</summary>
