@@ -4,16 +4,18 @@ using PhotonCanvas.Core.Imaging;
 namespace PhotonCanvas.Doc;
 
 /// <summary>
-/// The line test: which settings hide the rows a picture is burned in. A row of the same grey
-/// patch (dark, mid and light bands), each burned with a picture layer's settings with one thing
-/// changed: the lines spread out or not, one direction or both, and closer lines (with the power
-/// lowered to put in the same heat). Each patch has its own layer, so it can be used as it is.
+/// The line test: which settings hide the rows a picture is burned in. A row of the same patch,
+/// each burned with a picture layer's settings with one thing changed: the lines spread out or
+/// not, one direction or both, and closer lines (with the power lowered to put in the same heat).
+/// The patch is a piece of one of the user's pictures, or grey bands with edges: rows often show
+/// only where the power changes along a row (burning back and forth, a late change lands on
+/// opposite sides in neighbouring rows), which flat greys never do. Each patch has its own layer.
 /// </summary>
 public static class LineTest
 {
     public const string LayerPrefix = "Line test · ";
     const string ShapePrefix = "Line patch · ";
-    /// <summary>The greys in each patch, side by side: where rows show differs with the tone.</summary>
+    /// <summary>The greys in the top of the standard patch, side by side: where rows show differs with the tone.</summary>
     public static readonly double[] Greys = [0.25, 0.5, 0.75];
     const int PxPerMm = 20;
 
@@ -70,10 +72,13 @@ public static class LineTest
     /// Add the test for <paramref name="source"/> (a picture layer): one layer and one patch per
     /// variant, left to right from <paramref name="origin"/>. Returns the new state and the patches' ids.
     /// </summary>
-    public static (DocState State, IReadOnlyList<Guid> Patches) Add(DocState s, Layer source, double size, Vec2 origin)
+    /// <param name="sample">What each patch shows: a piece of a picture (see <see cref="PieceOf"/>), or null for grey bands and edges.</param>
+    public static (DocState State, IReadOnlyList<Guid> Patches) Add(DocState s, Layer source, double size, Vec2 origin, Piece? sample = null)
     {
         var variants = Variants(source);
-        var png = Patch(size);
+        var png = sample?.Png ?? Patch(size);
+        var patchMm = sample?.SizeMm ?? new Vec2(size, size);
+        var tone = sample?.Tone ?? ToneAdjust.None;
         var ids = new List<Guid>();
         for (int i = 0; i < variants.Count; i++)
         {
@@ -91,8 +96,9 @@ public static class LineTest
                 Name = ShapePrefix + source.Name,
                 LayerId = layer.Id,
                 Source = ImageSource.FromEncoded(png),
-                SizeMm = new Vec2(size, size),
-                Transform = Affine.Translate(origin.X + i * (size + Gap(size)), origin.Y),
+                SizeMm = patchMm,
+                Tone = tone,
+                Transform = Affine.Translate(origin.X + i * (patchMm.X + Gap(size)), origin.Y),
             };
             s = Ops.AddShapes(s, [patch]);
             ids.Add(patch.Id);
@@ -100,20 +106,55 @@ public static class LineTest
         return (s, ids);
     }
 
-    /// <summary>The patch picture: the greys side by side, full height (rows run across all of them).</summary>
+    /// <summary>
+    /// The standard patch. Top: the greys side by side (flat: rows from spacing or heat show here).
+    /// Bottom: things that change along a row, where rows from burning back and forth show as
+    /// jagged edges: upright bars, a ring on mid grey, and a ramp from black to white.
+    /// </summary>
     static byte[] Patch(double size)
     {
         int n = Math.Max(1, (int)Math.Round(size * PxPerMm));
         var px = new byte[n * n * 4];
+        double c = n * 0.5, ringR = n / 6.0, ringW = Math.Max(2, n / 40.0);
         for (int y = 0; y < n; y++)
             for (int x = 0; x < n; x++)
             {
-                byte v = (byte)Math.Round(Greys[Math.Min(Greys.Length - 1, x * Greys.Length / n)] * 255);
+                int third = Math.Min(2, x * 3 / n);
+                double v;
+                if (y < n * 0.4) v = Greys[third];
+                else if (third == 0) v = (x / (PxPerMm * 0.5)) % 2 < 1 ? 0.1 : 0.9; // 0.5 mm bars
+                else if (third == 1)
+                {
+                    double d = Math.Sqrt((x - c) * (x - c) + (y - n * 0.7) * (y - n * 0.7));
+                    v = Math.Abs(d - ringR) < ringW ? 0.1 : 0.55;
+                }
+                else v = (x - 2 * n / 3.0) / (n / 3.0); // ramp
+                byte b = (byte)Math.Round(Math.Clamp(v, 0, 1) * 255);
                 int k = (y * n + x) * 4;
-                px[k] = px[k + 1] = px[k + 2] = v;
+                px[k] = px[k + 1] = px[k + 2] = b;
                 px[k + 3] = 255;
             }
         return new RasterImage(n, n, px).EncodePng();
+    }
+
+    /// <summary>A piece of a picture for the patches: its pixels, its size on the bed, and its tone settings.</summary>
+    public sealed record Piece(byte[] Png, Vec2 SizeMm, ToneAdjust Tone);
+
+    /// <summary>
+    /// The middle of <paramref name="picture"/>, <paramref name="size"/> mm square at the size it's
+    /// placed at (or all of it, when it's smaller), keeping its own pixels: burned just as the picture would be.
+    /// </summary>
+    public static Piece PieceOf(ImageShape picture, double size)
+    {
+        var src = picture.Source.Pixels;
+        double scale = Math.Max(1e-9, picture.Transform.ScaleX);
+        double pxPerMm = src.Width / (picture.SizeMm.X * scale);
+        int w = Math.Clamp((int)Math.Round(size * pxPerMm), 1, src.Width), h = Math.Clamp((int)Math.Round(size * pxPerMm), 1, src.Height);
+        int x0 = (src.Width - w) / 2, y0 = (src.Height - h) / 2;
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            Array.Copy(src.Rgba, ((y0 + y) * src.Width + x0) * 4, px, y * w * 4, w * 4);
+        return new Piece(new RasterImage(w, h, px).EncodePng(), new Vec2(w / pxPerMm, h / pxPerMm), picture.Tone);
     }
 
     /// <summary>The test's patches in the design, left to right, each with its layer; empty when there's none.</summary>

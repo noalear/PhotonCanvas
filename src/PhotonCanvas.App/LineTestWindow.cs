@@ -25,6 +25,8 @@ public sealed class LineTestWindow : Window
     readonly ComboBox _source = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     List<Layer> _sources = [];
     readonly NumericUpDown _size = Number(6, 25, 1, "0");
+    readonly ComboBox _shows = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    List<ImageShape> _samples = [];
     readonly StackPanel _variants = new() { Spacing = 4 };
     readonly TextBlock _plan = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
     readonly Button _add = new() { Content = "Add the test to the design", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
@@ -48,7 +50,8 @@ public sealed class LineTestWindow : Window
         Background = Brush("Bg1");
         _size.Value = 10;
         _size.ValueChanged += (_, _) => Plan();
-        _source.SelectionChanged += (_, _) => Plan();
+        _source.SelectionChanged += (_, _) => { Samples(); Plan(); };
+        _shows.SelectionChanged += (_, _) => Plan();
         _add.Click += (_, _) => AddTest();
 
         var make = new StackPanel
@@ -59,10 +62,12 @@ public sealed class LineTestWindow : Window
                 new TextBlock
                 {
                     TextWrapping = TextWrapping.Wrap,
-                    Text = "Pictures are burned in rows, and sometimes the rows show. This burns the same grey patch (dark, mid and light) with a picture layer's settings, " +
+                    Text = "Pictures are burned in rows, and sometimes the rows show. This burns the same patch with a picture layer's settings, " +
                            "and again with one thing changed each time, so you can see which change hides them.",
                 },
                 Field("Settings of", _source, tip: "The picture layer to try: every patch starts from exactly its settings."),
+                Field("Patch shows", _shows, tip: "A piece of your picture shows the rows as they'd be in it. Rows often show only where the picture changes from dot to dot (burning back and forth, " +
+                                                  "a late power change lands on opposite sides in neighbouring rows), which flat grey can't show. Grey bands and edges has both flat greys and edges."),
                 Explained("The patches, left to right", "Each one changes one thing from the first. Closer lines get less power, so they put in the same heat and only the rows differ.", _variants),
                 Explained("Patch size", "Bigger patches are easier to judge by eye.", Row(Labelled("Size (mm)", _size))),
                 _plan,
@@ -98,6 +103,7 @@ public sealed class LineTestWindow : Window
         tabs.SelectedIndex = showResults ? 1 : 0;
         Content = new Avalonia.Controls.Border { Padding = new(16), Child = tabs };
         Sources();
+        Samples();
         Plan();
         Lists();
         ReadPhoto();
@@ -108,16 +114,32 @@ public sealed class LineTestWindow : Window
 
     void Sources()
     {
-        _sources = [.. _doc.State.Layers.Where(l => l.Mode == LayerMode.Image && l.ImageMode != ImageEngraveMode.Slices && !LineTest.IsTestLayer(l) && !ToneTest.IsTestLayer(l))];
+        _sources = [.. _doc.State.Layers.Where(l => PictureLayer(l) && l.ImageMode != ImageEngraveMode.Slices)];
         if (_sources.Count == 0) _sources.Add(Layer.Default(_doc.State.Layers.Count, LayerMode.Image) with { Name = "Pictures" });
         _source.ItemsSource = _sources.Select(l => $"{l.Name} · {Describe(l)}").ToList();
         _source.SelectedIndex = 0;
     }
 
+    /// <summary>A picture layer of the design's own: not a line test, nor a tone test holding only its strip (pictures do get put on those).</summary>
+    bool PictureLayer(Layer l) =>
+        l.Mode == LayerMode.Image && !LineTest.IsTestLayer(l) &&
+        (!ToneTest.IsTestLayer(l) || _doc.State.ShapesFor(l).Any(x => x.Id != ToneTest.Strip(_doc.State)?.Id));
+
     static string Describe(Layer l) =>
         $"{l.Laser.Power:0.#}% · {l.Laser.Speed:0} mm/s · {l.Dpi:0} dpi · {(l.ImageMode == ImageEngraveMode.Grayscale ? "greyscale" : l.Dither.ToString().ToLowerInvariant())}";
 
     Layer SourceLayer() => _sources[Math.Clamp(_source.SelectedIndex, 0, _sources.Count - 1)];
+
+    /// <summary>The pictures on the chosen layer, offered as what the patches show.</summary>
+    void Samples()
+    {
+        _samples = [.. _doc.State.ShapesFor(SourceLayer()).OfType<ImageShape>()];
+        _shows.ItemsSource = _samples.Select(p => $"The middle of {(string.IsNullOrWhiteSpace(p.Name) ? "the picture" : p.Name)}").Prepend("Grey bands and edges").ToList();
+        _shows.SelectedIndex = _samples.Count > 0 ? 1 : 0;
+    }
+
+    LineTest.Piece? Sample(double size) =>
+        _shows.SelectedIndex >= 1 && _shows.SelectedIndex - 1 < _samples.Count ? LineTest.PieceOf(_samples[_shows.SelectedIndex - 1], size) : null;
 
     void Plan()
     {
@@ -134,7 +156,7 @@ public sealed class LineTestWindow : Window
         }
         try
         {
-            var (s, _) = LineTest.Add(DocState.New() with { Layers = [] }, layer, size, new Vec2(10, 10));
+            var (s, _) = LineTest.Add(DocState.New() with { Layers = [] }, layer, size, new Vec2(10, 10), Sample(size));
             var job = JobBuilder.Build(s, new JobOptions());
             _plan.Text = $"{variants.Count} patches · {LineTest.Width(variants.Count, size):0} × {size:0} mm of material · about {Duration(job.EstimateS)} to burn";
             _add.IsEnabled = true;
@@ -152,7 +174,7 @@ public sealed class LineTestWindow : Window
         double size = (double)(_size.Value ?? 10);
         double w = LineTest.Width(LineTest.Variants(layer).Count, size);
         var at = new Vec2(_machine.FieldW / 2 - w / 2, _machine.FieldH / 2 - size / 2);
-        var (s, ids) = LineTest.Add(LineTest.Remove(_doc.State), layer, size, at);
+        var (s, ids) = LineTest.Add(LineTest.Remove(_doc.State), layer, size, at, Sample(size));
         _doc.Commit("Line test", s, ids);
         AppLog.Write("line test", $"Test added: {ids.Count} patches of {size:0} mm from {layer.Name}'s settings.");
         Close();
@@ -160,7 +182,7 @@ public sealed class LineTestWindow : Window
 
     void Lists()
     {
-        _useLayers = [.. _doc.State.Layers.Where(l => l.Mode == LayerMode.Image && !LineTest.IsTestLayer(l) && !ToneTest.IsTestLayer(l))];
+        _useLayers = [.. _doc.State.Layers.Where(PictureLayer)];
         _useOn.ItemsSource = _useLayers.Select(l => l.Name).ToList();
         int match = LineTest.SourceName(_doc.State) is { } name ? _useLayers.FindIndex(l => l.Name == name) : -1;
         _useOn.SelectedIndex = match >= 0 ? match : _useLayers.Count > 0 ? 0 : -1;

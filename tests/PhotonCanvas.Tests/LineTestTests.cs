@@ -57,6 +57,24 @@ public class LineTestTests
     }
 
     [Fact]
+    public void PatchesCanBeAPieceOfThePictureAtItsRealSize()
+    {
+        // 1448 pixels across 58.7 mm (the skull picture): a 10 mm piece is about 247 pixels of it.
+        int w = 1448, h = 1086;
+        var px = new byte[w * h * 4];
+        for (int i = 0; i < w * h; i++) { px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = (byte)(i % w * 255 / w); px[i * 4 + 3] = 255; }
+        var pic = new ImageShape { LayerId = Guid.NewGuid(), Source = ImageSource.FromEncoded(new RasterImage(w, h, px).EncodePng()), SizeMm = new Vec2(100, 75), Transform = Affine.Scale(0.5872, 0.5872), Tone = ToneAdjust.None with { Contrast = 0.2 } };
+        var piece = LineTest.PieceOf(pic, 10);
+        Assert.Equal(10, piece.SizeMm.X, 1);
+        Assert.Equal(0.2, piece.Tone.Contrast, 6);
+        var (s, _) = LineTest.Add(DocState.New(), Pictures(), 10, new Vec2(20, 20), piece);
+        var patch = LineTest.Patches(s)[0].Patch;
+        Assert.InRange(patch.Source.Width, 245, 249);
+        // The middle of the picture: a mid grey in the middle of the piece.
+        Assert.InRange(patch.Source.SampleLuminance(patch.Source.Width / 2.0, patch.Source.Height / 2.0), 0.45, 0.55);
+    }
+
+    [Fact]
     public void APatchsSettingsGoOnTheLayer()
     {
         var target = Pictures() with { Dither = DitherMethod.Jarvis };
