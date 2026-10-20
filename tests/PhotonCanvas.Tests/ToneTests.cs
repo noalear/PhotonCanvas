@@ -101,6 +101,46 @@ public class ToneTests
     }
 
     [Fact]
+    public void ATestFittedToTheCloseUpWrapsIntoRowsAndIsReadTheSame()
+    {
+        // The close-up sees about 30 × 22 mm: 11 patches of 6 mm don't fit in a row (93 mm).
+        var fit = ToneTest.Fit(11, 6, new Vec2(30, 22))!.Value;
+        var need = ToneTest.Size(11, fit.Size, fit.Columns);
+        Assert.True(need.X <= 30 && need.Y + 3 <= 22, $"{need} at {fit}");
+        Assert.True(fit.Columns < 11);
+        var picLayer = Layer.Default(1, LayerMode.Image) with { Name = "Photo", Dpi = 254 };
+        var (state, _) = ToneTest.Add(Ops.AddLayer(DocState.New(), picLayer), picLayer, 11, fit.Size, new Vec2(100, 80), fit.Columns);
+        var strip = ToneTest.Strip(state)!;
+        Assert.Equal(fit.Columns, ToneTest.Columns(strip));
+        var patches = ToneTest.Patches(strip);
+        Assert.Equal(11, patches.Count);
+        // The next row starts under the first, after a gap.
+        Assert.Equal(patches[0].Bed.MinX, patches[fit.Columns].Bed.MinX, 6);
+        Assert.True(patches[fit.Columns].Bed.MinY > patches[0].Bed.MaxY);
+        Assert.Equal(1, patches[^1].Level);
+
+        // Read off a sharp photo of just that bit of the bed, as from the close-up camera.
+        var area = new Rect2(95, 72, 128, 98);
+        const double mmPerPx = 0.05;
+        int w = (int)(area.Width / mmPerPx), h = (int)(area.Height / mmPerPx);
+        var px = new byte[w * h * 4];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                var p = new Vec2(area.MinX + (x + 0.5) * mmPerPx, area.MinY + (y + 0.5) * mmPerPx);
+                double light = 1;
+                foreach (var (level, bed) in patches)
+                    if (p.X >= bed.MinX && p.X <= bed.MaxX && p.Y >= bed.MinY && p.Y <= bed.MaxY) light = Wood(level);
+                int k = (y * w + x) * 4;
+                px[k] = (byte)Math.Round(60 + 150 * light); px[k + 1] = (byte)Math.Round(35 + 145 * light); px[k + 2] = (byte)Math.Round(20 + 120 * light); px[k + 3] = 255;
+            }
+        var reading = ToneTest.Read(strip, new RasterImage(w, h, px), area, mmPerPx)!;
+        Assert.NotNull(reading);
+        Assert.Null(ToneTest.Problem(reading));
+        foreach (var g in new[] { 0.2, 0.5, 0.8 }) Assert.InRange(reading.Curve.Response(g), Wood(g) - 0.03, Wood(g) + 0.03);
+    }
+
+    [Fact]
     public void PicturesAreCorrectedAndTheCurveIsSaved()
     {
         var curve = new ToneCurve([.. Enumerable.Range(0, 11).Select(i => i / 10.0).Select(g => (g, Wood(g)))]);

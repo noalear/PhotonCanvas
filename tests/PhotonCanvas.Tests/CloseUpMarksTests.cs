@@ -70,9 +70,16 @@ public class CloseUpMarksTests
         var got = CloseUpMarks.Locate(Photo(cam, dots, 1.2), dots);
         AssertFits(got, cam, dots);
         Assert.All(got!.Found, f => Assert.NotNull(f));
-        // It sees about 1200 × 900 px at 35 px/mm: some 30 × 25 mm round the dots.
+        // It sees 1200 × 900 px at 35 px/mm (34 × 26 mm) turned about 31° from square: the straight
+        // part that's surely in the picture is smaller, round the dots, and all inside the picture.
         Assert.True(got.Sees.Contains(centre));
-        Assert.InRange(got.Sees.Width, 25, 50);
+        Assert.InRange(got.Sees.Width * got.Sees.Height, 34 * 26 * 0.3, 34 * 26 * 0.8);
+        foreach (var corner in new[] { got.Sees.TopLeft, new Vec2(got.Sees.MaxX, got.Sees.MinY), got.Sees.BottomRight, new Vec2(got.Sees.MinX, got.Sees.MaxY) })
+        {
+            var p = cam.Apply(corner);
+            Assert.InRange(p.X, 0, W);
+            Assert.InRange(p.Y, 0, H);
+        }
     }
 
     [Fact]

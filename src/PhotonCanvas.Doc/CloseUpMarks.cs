@@ -198,8 +198,36 @@ public static class CloseUpMarks
         var pairsMm = Enumerable.Range(0, marksMm.Count).Where(k => found[k] is not null).Select(k => (marksMm[k], found[k]!.Value)).ToList();
         if (Homography.Fit(pairsMm) is not { } toCamera || Homography.Fit([.. pairsMm.Select(p => (p.Item2, p.Item1))]) is not { } toBed) return null;
         double errMm = pairsMm.Average(p => toBed.Apply(p.Item2).Dist(p.Item1));
-        var sees = Rect2.Bounds([toBed.Apply(new Vec2(0, 0)), toBed.Apply(new Vec2(photo.Width, 0)), toBed.Apply(new Vec2(photo.Width, photo.Height)), toBed.Apply(new Vec2(0, photo.Height))]);
+        var sees = Inside([toBed.Apply(new Vec2(0, 0)), toBed.Apply(new Vec2(photo.Width, 0)), toBed.Apply(new Vec2(photo.Width, photo.Height)), toBed.Apply(new Vec2(0, photo.Height))]);
         return new Located(toCamera, found, errMm, sees);
+    }
+
+    /// <summary>
+    /// The biggest straight (unturned) rectangle round the middle of a camera picture's outline on the
+    /// bed (a turned quadrilateral), less a small margin: the part of the bed that's surely in the picture.
+    /// </summary>
+    public static Rect2 Inside(IReadOnlyList<Vec2> quad)
+    {
+        var box = Rect2.Bounds(quad);
+        var c = new Vec2(quad.Average(p => p.X), quad.Average(p => p.Y));
+        bool In(Vec2 p) => Geom.Inside([.. quad], p);
+        // Shrink the outline's box about the middle until its corners are all inside, keeping its shape.
+        double hw = box.Width / 2, hh = box.Height / 2;
+        for (double k = 1; k > 0.05; k -= 0.01)
+        {
+            var r = new Rect2(c.X - hw * k, c.Y - hh * k, c.X + hw * k, c.Y + hh * k);
+            if (In(r.TopLeft) && In(new Vec2(r.MaxX, r.MinY)) && In(r.BottomRight) && In(new Vec2(r.MinX, r.MaxY)))
+            {
+                // Then widen and heighten it each as far as it goes.
+                double grow = Math.Min(hw, hh) * 0.01;
+                while (In(new Vec2(r.MinX - grow, r.MinY)) && In(new Vec2(r.MinX - grow, r.MaxY)) && In(new Vec2(r.MaxX + grow, r.MinY)) && In(new Vec2(r.MaxX + grow, r.MaxY)))
+                    r = new Rect2(r.MinX - grow, r.MinY, r.MaxX + grow, r.MaxY);
+                while (In(new Vec2(r.MinX, r.MinY - grow)) && In(new Vec2(r.MaxX, r.MinY - grow)) && In(new Vec2(r.MinX, r.MaxY + grow)) && In(new Vec2(r.MaxX, r.MaxY + grow)))
+                    r = new Rect2(r.MinX, r.MinY - grow, r.MaxX, r.MaxY + grow);
+                return r.Inflate(-Math.Min(r.Width, r.Height) * 0.05);
+            }
+        }
+        return new Rect2(c.X, c.Y, c.X, c.Y);
     }
 
     /// <summary>A turn, scale and shift (mirrored or not) of the plane, as complex multiplication.</summary>

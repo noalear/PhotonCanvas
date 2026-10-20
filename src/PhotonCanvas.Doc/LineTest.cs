@@ -91,6 +91,28 @@ public static class LineTest
     /// <summary>Width of the row of patches (mm).</summary>
     public static double Width(int patches, double size) => patches * size + (patches - 1) * Gap(size);
 
+    /// <summary>The size of the test (mm) laid out <paramref name="columns"/> patches to a row.</summary>
+    public static Vec2 Size(int patches, double size, int columns)
+    {
+        int cols = Math.Clamp(columns, 1, Math.Max(1, patches)), rows = (patches + cols - 1) / cols;
+        return new Vec2(Width(cols, size), Width(rows, size));
+    }
+
+    /// <summary>
+    /// The layout that fits in <paramref name="area"/>: as many patches to a row as fit, and the
+    /// patch size (up to <paramref name="size"/>) at which the rows fit too; null when nothing does (under 3 mm).
+    /// </summary>
+    public static (double Size, int Columns)? Fit(int patches, double size, Vec2 area)
+    {
+        for (double s = size; s >= 3 - 1e-9; s -= 0.5)
+        {
+            int cols = Math.Max(1, (int)Math.Floor((area.X + Gap(s)) / (s + Gap(s))));
+            var need = Size(patches, s, cols);
+            if (need.X <= area.X + 1e-9 && need.Y <= area.Y + 1e-9) return (s, cols);
+        }
+        return null;
+    }
+
     static double Gap(double size) => Math.Max(3, size / 3);
 
     /// <summary>
@@ -98,8 +120,10 @@ public static class LineTest
     /// variant, left to right from <paramref name="origin"/>. Returns the new state and the patches' ids.
     /// </summary>
     /// <param name="sample">What each patch shows: a piece of a picture (see <see cref="PieceOf"/>), or null for grey bands and edges.</param>
-    public static (DocState State, IReadOnlyList<Guid> Patches) Add(DocState s, Layer source, double size, Vec2 origin, Piece? sample = null)
+    /// <param name="columns">Patches per row (more rows below); all in one row when not given.</param>
+    public static (DocState State, IReadOnlyList<Guid> Patches) Add(DocState s, Layer source, double size, Vec2 origin, Piece? sample = null, int columns = int.MaxValue)
     {
+        columns = Math.Max(1, columns);
         var variants = Variants(source);
         var png = sample?.Png ?? Patch(size);
         var patchMm = sample?.SizeMm ?? new Vec2(size, size);
@@ -123,7 +147,7 @@ public static class LineTest
                 Source = ImageSource.FromEncoded(png),
                 SizeMm = patchMm,
                 Tone = tone,
-                Transform = Affine.Translate(origin.X + i * (patchMm.X + Gap(size)), origin.Y),
+                Transform = Affine.Translate(origin.X + i % columns * (patchMm.X + Gap(size)), origin.Y + i / columns * (patchMm.Y + Gap(size))),
             };
             s = Ops.AddShapes(s, [patch]);
             ids.Add(patch.Id);
@@ -254,10 +278,11 @@ public static class LineTest
     public static IReadOnlyList<(Layer Layer, ImageShape Patch)> Patches(DocState s)
     {
         var o = new List<(Layer, ImageShape)>();
+        // In the layers' order: the order they were made in, wherever the patches were put.
         foreach (var l in s.Layers.Where(IsTestLayer))
             foreach (var p in s.ShapesFor(l).OfType<ImageShape>().Where(p => p.Name.StartsWith(ShapePrefix, StringComparison.Ordinal)))
                 o.Add((l, p));
-        return [.. o.OrderBy(x => x.Item2.Bounds.MinX)];
+        return o;
     }
 
     /// <summary>The name of the picture layer the test was made from (kept in the patches' names).</summary>

@@ -81,6 +81,22 @@ public class LineTestTests
     }
 
     [Fact]
+    public void TheTestFitsWhereTheCloseUpSeesInRows()
+    {
+        var fit = LineTest.Fit(7, 10, new Vec2(30, 22))!.Value;
+        var need = LineTest.Size(7, fit.Size, fit.Columns);
+        Assert.True(need.X <= 30 && need.Y <= 22, $"{need} at {fit}");
+        var (s, _) = LineTest.Add(DocState.New(), Pictures(), fit.Size, new Vec2(100, 80), columns: fit.Columns);
+        var patches = LineTest.Patches(s);
+        // Still in the order made, row by row.
+        Assert.Equal(["As set", "Not spread", "One way", "400 dpi", "500 dpi", "2 passes turned", "3 passes turned"], patches.Select(p => LineTest.Label(p.Layer)));
+        Assert.True(patches[fit.Columns].Patch.Bounds.MinY > patches[0].Patch.Bounds.MaxY);
+        var all = patches.Select(p => p.Patch.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+        Assert.True(all.Width <= 30.01 && all.Height <= 22.01);
+        Assert.Null(LineTest.Fit(7, 10, new Vec2(8, 8)));
+    }
+
+    [Fact]
     public void APatchsSettingsGoOnTheLayer()
     {
         var target = Pictures() with { Dither = DitherMethod.Jarvis };

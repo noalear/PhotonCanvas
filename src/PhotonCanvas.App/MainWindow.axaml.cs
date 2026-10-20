@@ -256,6 +256,7 @@ public partial class MainWindow : Window
             else if (CutTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCutTest(true)));
             else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
             else if (LineTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowLineTest(true)));
+            else if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
             // A depth round burned: measure it next.
             if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
@@ -593,6 +594,7 @@ public partial class MainWindow : Window
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+        cal.Large("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
 
         // ---- Laser: materials and the job ----
         var laser = _ribbon.Tab("Laser", "Materials, tests, framing and shipping the job");
@@ -2321,10 +2323,13 @@ public partial class MainWindow : Window
     Task ShowExactDepth() => new ExactDepthWindow(_doc, _machine, _library, _doc.Selection).ShowDialog(this);
 
     Task ShowToneTest(bool results) =>
-        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
+        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees).ShowDialog(this);
+
+    Task ShowCloseUpCalibration(bool find) =>
+        new CloseUpCalibrationWindow(_doc, _machine, Canvas.Machine, find).ShowDialog(this);
 
     Task ShowLineTest(bool results) =>
-        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
+        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees).ShowDialog(this);
 
     Task ShowCutTest(bool results) =>
         new CutTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);

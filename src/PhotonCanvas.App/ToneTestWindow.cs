@@ -23,6 +23,11 @@ public sealed class ToneTestWindow : Window
     readonly MachineProfile _machine;
     readonly Func<CameraPhoto?> _photo;
     readonly Func<Task> _updatePhoto;
+    readonly Func<Task<CameraPhoto?>> _closeUpPhoto;
+    readonly Func<Rect2?> _closeUpSees;
+    // The close-up photo, when that's what the results are read from (else the overview camera's).
+    CameraPhoto? _closeUp;
+    readonly CheckBox _inCloseUp = new() { Content = "Where the close-up camera sees it (results read from close-up photos)" };
 
     // Making the test
     readonly ComboBox _source = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -48,13 +53,19 @@ public sealed class ToneTestWindow : Window
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
     ToneReading? _reading;
 
-    public ToneTestWindow(Document doc, MaterialLibrary lib, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults)
+    public ToneTestWindow(Document doc, MaterialLibrary lib, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults,
+        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null)
     {
         _doc = doc;
         _lib = lib;
         _machine = machine;
         _photo = photo;
         _updatePhoto = updatePhoto;
+        _closeUpPhoto = closeUpPhoto ?? (() => Task.FromResult<CameraPhoto?>(null));
+        _closeUpSees = closeUpSees ?? (() => null);
+        _inCloseUp.IsChecked = _closeUpSees() is not null;
+        _inCloseUp.IsVisible = _inCloseUp.IsChecked == true;
+        _inCloseUp.IsCheckedChanged += (_, _) => Plan();
         Title = "Tone test";
         Width = 820;
         Height = 860;
@@ -82,6 +93,7 @@ public sealed class ToneTestWindow : Window
                 new Border { Background = Brush("Bg0"), CornerRadius = new(8), Padding = new(10), Child = _wedge },
                 Explained("Patches", "More patches read the curve more finely; bigger ones are easier for the camera to read.",
                     Row(Labelled("How many", _steps), Labelled("Size (mm)", _size))),
+                _inCloseUp,
                 _plan,
                 Hint("Use the material you'll engrave the pictures on, flat and in the camera's view. Keep the patches clear of knots and grain lines."),
                 _add,
@@ -90,7 +102,17 @@ public sealed class ToneTestWindow : Window
         };
 
         var update = Button("Update photo", "IcCamera", "A fresh camera photo of the burned test.");
-        update.Click += async (_, _) => { update.IsEnabled = false; try { await _updatePhoto(); } finally { update.IsEnabled = true; } ReadPhoto(); };
+        update.Click += async (_, _) => { update.IsEnabled = false; try { await _updatePhoto(); } finally { update.IsEnabled = true; } _closeUp = null; ReadPhoto(); };
+        var closeUp = Button("Close-up photo", "IcZoomIn", "Read the results from a close-up photo: sharp enough to see single rows. Needs the close-up camera's position (Camera → Close-up position).");
+        closeUp.IsEnabled = _closeUpSees() is not null;
+        closeUp.Click += async (_, _) =>
+        {
+            closeUp.IsEnabled = false;
+            try { _closeUp = await _closeUpPhoto(); }
+            finally { closeUp.IsEnabled = true; }
+            if (_closeUp is null) _photoNote.Text = "Couldn't take a close-up photo: connect the machine, at the focus height the close-up position was saved for.";
+            else ReadPhoto();
+        };
         _picture.SelectionChanged += (_, _) => Preview();
         _apply.Click += (_, _) => Apply();
         _material.SelectionChanged += (_, _) => _newName.IsVisible = _material.SelectedIndex == 0;
@@ -106,7 +128,7 @@ public sealed class ToneTestWindow : Window
             Children =
             {
                 Hint("Take a photo of the burned strip (the camera must see all of it); the patches are found wherever you moved it to."),
-                Row(update),
+                Row(update, closeUp),
                 _photoNote,
                 new ScrollViewer { Content = _patches, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
                 Explained("How this material takes greys", "Dots: each patch as read. The straight dashed line is what you'd want; the further the dots are from it, the more pictures change when corrected.", _chart),
@@ -142,16 +164,29 @@ public sealed class ToneTestWindow : Window
     Layer SourceLayer() =>
         _sources.ElementAtOrDefault(Math.Max(0, _source.SelectedIndex)) ?? Layer.Default(_doc.State.Layers.Count, LayerMode.Image) with { Name = "Pictures" };
 
+    /// <summary>The layout: patch size and patches to a row (to fit where the close-up camera sees, when that's wanted); null when it can't fit.</summary>
+    (double Size, int Columns)? Layout(int steps, double size) =>
+        _inCloseUp.IsChecked == true && _closeUpSees() is { } sees ? ToneTest.Fit(steps, size, new Vec2(sees.Width, sees.Height)) : (size, int.MaxValue);
+
     void Plan()
     {
         int steps = (int)(_steps.Value ?? 11);
-        double size = (double)(_size.Value ?? 6);
         _wedge.Show(ToneTest.Levels(steps));
+        if (Layout(steps, (double)(_size.Value ?? 6)) is not { } fit)
+        {
+            var sees = _closeUpSees()!.Value;
+            _plan.Text = $"{steps} patches don't fit where the close-up camera sees ({sees.Width:0} × {sees.Height:0} mm), even at 3 mm: use fewer patches, or untick it.";
+            _add.IsEnabled = false;
+            return;
+        }
+        double size = fit.Size;
         try
         {
-            var (s, _) = ToneTest.Add(DocState.New() with { Layers = [] }, SourceLayer(), steps, size, new Vec2(10, 10));
+            var (s, _) = ToneTest.Add(DocState.New() with { Layers = [] }, SourceLayer(), steps, size, new Vec2(10, 10), fit.Columns);
             var job = JobBuilder.Build(s, new JobOptions());
-            _plan.Text = $"{steps} patches · {ToneTest.Width(steps, size):0} × {size:0.#} mm of material · about {Duration(job.EstimateS)} to burn with {SourceLayer().Name}'s settings";
+            var need = ToneTest.Size(steps, size, fit.Columns);
+            _plan.Text = $"{steps} patches of {size:0.#} mm" + (fit.Columns < steps ? $", {fit.Columns} to a row" : "") + $" · {need.X:0} × {need.Y:0} mm of material · about {Duration(job.EstimateS)} to burn with {SourceLayer().Name}'s settings" +
+                         (_inCloseUp.IsChecked == true ? " · placed where the close-up camera sees it" : "");
             _add.IsEnabled = true;
         }
         catch (Exception e) when (e is JobException or InvalidOperationException or OutsideWorkAreaException)
@@ -164,10 +199,14 @@ public sealed class ToneTestWindow : Window
     void AddTest()
     {
         int steps = (int)(_steps.Value ?? 11);
-        double size = (double)(_size.Value ?? 6);
-        double w = ToneTest.Width(steps, size);
-        var at = new Vec2(_machine.FieldW / 2 - w / 2, _machine.FieldH / 2 - size / 2);
-        var (s, id) = ToneTest.Add(_doc.State, SourceLayer(), steps, size, at);
+        if (Layout(steps, (double)(_size.Value ?? 6)) is not { } fit) return;
+        double size = fit.Size;
+        var need = ToneTest.Size(steps, size, fit.Columns);
+        // In the middle of where the close-up camera sees (room above for the bare wood), else of the bed.
+        var at = _inCloseUp.IsChecked == true && _closeUpSees() is { } sees
+            ? new Vec2(sees.Center.X - need.X / 2, sees.Center.Y - (need.Y + 3) / 2 + 3)
+            : new Vec2(_machine.FieldW / 2 - need.X / 2, _machine.FieldH / 2 - need.Y / 2);
+        var (s, id) = ToneTest.Add(_doc.State, SourceLayer(), steps, size, at, fit.Columns);
         _doc.Commit("Tone test", s, [id]);
         AppLog.Write("tone test", $"Test added: {steps} patches of {size:0.#} mm with {SourceLayer().Name}'s settings.");
         Close();
@@ -194,7 +233,7 @@ public sealed class ToneTestWindow : Window
         _patches.Children.Clear();
         _reading = null;
         var strip = ToneTest.Strip(_doc.State);
-        var photo = _photo();
+        var photo = _closeUp ?? _photo();
         if (strip is null) _photoNote.Text = "There's no tone test in this design yet: make one on the first tab.";
         else if (photo is null) _photoNote.Text = "No camera photo yet: press Update photo once the strip has been burned.";
         else

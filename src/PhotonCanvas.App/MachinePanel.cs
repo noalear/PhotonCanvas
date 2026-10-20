@@ -291,6 +291,37 @@ public sealed class MachinePanel : UserControl
         Changed();
     }
 
+    /// <summary>The part of the bed the close-up camera sees at the current focus height, if that's known (Camera → Close-up position).</summary>
+    public Rect2? CloseUpSees() => CloseUpPlacement() is { } toCamera ? Sees(toCamera) : null;
+
+    /// <summary>Where it looked at the nearest focus height that's known (a first guess at another height).</summary>
+    public Rect2? CloseUpSeesAnyHeight() =>
+        _settings.CloseUpPlacements.OrderBy(p => Math.Abs(p.DistanceMm - (Distance ?? p.DistanceMm))).FirstOrDefault()?.Map is { } h ? Sees(h) : null;
+
+    static Rect2? Sees(Homography toCamera)
+    {
+        var probe = new[] { new Vec2(0, 0), new Vec2(10, 0), new Vec2(10, 10), new Vec2(0, 10) };
+        if (Homography.Fit([.. probe.Select(mm => (toCamera.Apply(mm), mm))]) is not { } toBed) return null;
+        // The camera's picture is 4000 × 3000; it lands on the bed turned, so the part that's surely in it is a straight rectangle inside.
+        return PhotonCanvas.Doc.CloseUpMarks.Inside([toBed.Apply(new Vec2(0, 0)), toBed.Apply(new Vec2(4000, 0)), toBed.Apply(new Vec2(4000, 3000)), toBed.Apply(new Vec2(0, 3000))]);
+    }
+
+    /// <summary>
+    /// A close-up photo laid straight on the bed, like a camera photo but much sharper: for reading
+    /// tests. Null when not connected or where the close-up camera looks isn't known at this focus height.
+    /// </summary>
+    public async Task<CameraPhoto?> CloseUpBedPhotoAsync()
+    {
+        if (CloseUpPlacement() is not { } toCamera || CloseUpSees() is not { } sees || await CloseUpPhotoAsync() is not { } jpg) return null;
+        return await Task.Run(() =>
+        {
+            var raw = PhotonCanvas.Core.Imaging.RasterImage.Decode(jpg);
+            double pxPerMm = Math.Min(40, 2400 / Math.Max(sees.Width, sees.Height));
+            var img = PhotonCanvas.Doc.Colour.GratingMeasure.Straighten(raw, toCamera, sees, pxPerMm);
+            return new CameraPhoto(img, sees, 1 / pxPerMm, Distance);
+        });
+    }
+
     /// <summary>One close-up photo (shown through <see cref="CloseUpFrame"/> too). Null when not connected.</summary>
     public async Task<byte[]?> CloseUpPhotoAsync()
     {

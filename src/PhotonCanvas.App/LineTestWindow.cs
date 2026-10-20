@@ -21,6 +21,11 @@ public sealed class LineTestWindow : Window
     readonly MachineProfile _machine;
     readonly Func<CameraPhoto?> _photo;
     readonly Func<Task> _updatePhoto;
+    readonly Func<Task<CameraPhoto?>> _closeUpPhoto;
+    readonly Func<Rect2?> _closeUpSees;
+    // The close-up photo, when that's what the results are read from (else the overview camera's).
+    CameraPhoto? _closeUp;
+    readonly CheckBox _inCloseUp = new() { Content = "Where the close-up camera sees it (results from close-up photos)" };
 
     // Making the test
     readonly ComboBox _source = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -42,12 +47,18 @@ public sealed class LineTestWindow : Window
     List<Layer> _useLayers = [];
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
 
-    public LineTestWindow(Document doc, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults)
+    public LineTestWindow(Document doc, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults,
+        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null)
     {
         _doc = doc;
         _machine = machine;
         _photo = photo;
         _updatePhoto = updatePhoto;
+        _closeUpPhoto = closeUpPhoto ?? (() => Task.FromResult<CameraPhoto?>(null));
+        _closeUpSees = closeUpSees ?? (() => null);
+        _inCloseUp.IsChecked = _closeUpSees() is not null;
+        _inCloseUp.IsVisible = _inCloseUp.IsChecked == true;
+        _inCloseUp.IsCheckedChanged += (_, _) => Plan();
         Title = "Line test";
         Width = 860;
         Height = 820;
@@ -80,6 +91,7 @@ public sealed class LineTestWindow : Window
                 Explained("The patches, left to right", "Each one changes one thing from the first. Closer lines get less power by the same share, so they put in the same energy; " +
                                                        "on wood they usually still come out lighter, with more pale greys, because it marks much less at low power.", _variants),
                 Explained("Patch size", "Bigger patches are easier to judge by eye.", Row(Labelled("Size (mm)", _size))),
+                _inCloseUp,
                 _plan,
                 Hint("Use the material you'll engrave the pictures on, flat and in the camera's view, clear of knots and grain lines."),
                 _add,
@@ -88,7 +100,17 @@ public sealed class LineTestWindow : Window
         };
 
         var update = Button("Update photo", "IcCamera", "A fresh camera photo of the burned patches.");
-        update.Click += async (_, _) => { update.IsEnabled = false; try { await _updatePhoto(); } finally { update.IsEnabled = true; } ReadPhoto(); };
+        update.Click += async (_, _) => { update.IsEnabled = false; try { await _updatePhoto(); } finally { update.IsEnabled = true; } _closeUp = null; ReadPhoto(); };
+        var closeUp = Button("Close-up photo", "IcZoomIn", "Read the results from a close-up photo: sharp enough to see single rows. Needs the close-up camera's position (Camera → Close-up position).");
+        closeUp.IsEnabled = _closeUpSees() is not null;
+        closeUp.Click += async (_, _) =>
+        {
+            closeUp.IsEnabled = false;
+            try { _closeUp = await _closeUpPhoto(); }
+            finally { closeUp.IsEnabled = true; }
+            if (_closeUp is null) _photoNote.Text = "Couldn't take a close-up photo: connect the machine, at the focus height the close-up position was saved for.";
+            else ReadPhoto();
+        };
         var remove = Button("Remove the test from the design", "IcTrash", "Delete the patches and their layers.");
         remove.Click += (_, _) =>
         {
@@ -102,7 +124,7 @@ public sealed class LineTestWindow : Window
             Children =
             {
                 Hint("Look at the burned piece itself, close up and in light from the side: single rows are finer than the camera can see. The photos below are to keep track of which patch is which."),
-                Row(update),
+                Row(update, closeUp),
                 _photoNote,
                 _cards,
                 Explained("Use it", "\"Use these settings\" puts the patch's resolution, power, spreading and direction on this layer. Everything else stays. " +
@@ -170,11 +192,22 @@ public sealed class LineTestWindow : Window
 
     LineTest.Piece? Sample(double size) => Picture() is { } p ? LineTest.PieceOf(p, size, Spot(p, size)) : null;
 
+    /// <summary>The layout: patch size and patches to a row (to fit where the close-up camera sees, when that's wanted); null when it can't fit.</summary>
+    (double Size, int Columns)? Layout(int patches, double size) =>
+        _inCloseUp.IsChecked == true && _closeUpSees() is { } sees ? LineTest.Fit(patches, size, new Vec2(sees.Width, sees.Height)) : (size, int.MaxValue);
+
     void Plan()
     {
         var layer = SourceLayer();
-        double size = (double)(_size.Value ?? 10);
         var variants = LineTest.Variants(layer);
+        if (Layout(variants.Count, (double)(_size.Value ?? 10)) is not { } fit)
+        {
+            var sees = _closeUpSees()!.Value;
+            _plan.Text = $"{variants.Count} patches don't fit where the close-up camera sees ({sees.Width:0} × {sees.Height:0} mm), even at 3 mm: untick it to put them anywhere.";
+            _add.IsEnabled = false;
+            return;
+        }
+        double size = fit.Size;
         _variants.Children.Clear();
         for (int i = 0; i < variants.Count; i++)
         {
@@ -185,9 +218,11 @@ public sealed class LineTestWindow : Window
         }
         try
         {
-            var (s, _) = LineTest.Add(DocState.New() with { Layers = [] }, layer, size, new Vec2(10, 10), Sample(size));
+            var (s, _) = LineTest.Add(DocState.New() with { Layers = [] }, layer, size, new Vec2(10, 10), Sample(size), fit.Columns);
             var job = JobBuilder.Build(s, new JobOptions());
-            _plan.Text = $"{variants.Count} patches · {LineTest.Width(variants.Count, size):0} × {size:0} mm of material · about {Duration(job.EstimateS)} to burn";
+            var need = LineTest.Size(variants.Count, size, fit.Columns);
+            _plan.Text = $"{variants.Count} patches of {size:0.#} mm" + (fit.Columns < variants.Count ? $", {fit.Columns} to a row" : "") + $" · {need.X:0} × {need.Y:0} mm of material · about {Duration(job.EstimateS)} to burn" +
+                         (_inCloseUp.IsChecked == true ? " · placed where the close-up camera sees it" : "");
             _add.IsEnabled = true;
         }
         catch (Exception e) when (e is JobException or InvalidOperationException or OutsideWorkAreaException)
@@ -200,10 +235,13 @@ public sealed class LineTestWindow : Window
     void AddTest()
     {
         var layer = SourceLayer();
-        double size = (double)(_size.Value ?? 10);
-        double w = LineTest.Width(LineTest.Variants(layer).Count, size);
-        var at = new Vec2(_machine.FieldW / 2 - w / 2, _machine.FieldH / 2 - size / 2);
-        var (s, ids) = LineTest.Add(LineTest.Remove(_doc.State), layer, size, at, Sample(size));
+        int count = LineTest.Variants(layer).Count;
+        if (Layout(count, (double)(_size.Value ?? 10)) is not { } fit) return;
+        double size = fit.Size;
+        var need = LineTest.Size(count, size, fit.Columns);
+        var middle = _inCloseUp.IsChecked == true && _closeUpSees() is { } sees ? sees.Center : new Vec2(_machine.FieldW / 2, _machine.FieldH / 2);
+        var at = new Vec2(middle.X - need.X / 2, middle.Y - need.Y / 2);
+        var (s, ids) = LineTest.Add(LineTest.Remove(_doc.State), layer, size, at, Sample(size), fit.Columns);
         _doc.Commit("Line test", s, ids);
         AppLog.Write("line test", $"Test added: {ids.Count} patches of {size:0} mm from {layer.Name}'s settings.");
         Close();
@@ -221,7 +259,7 @@ public sealed class LineTestWindow : Window
     {
         _cards.Children.Clear();
         var patches = LineTest.Patches(_doc.State);
-        var photo = _photo();
+        var photo = _closeUp ?? _photo();
         if (patches.Count == 0) { _photoNote.Text = "There's no line test in this design: make one on the first tab."; return; }
         _photoNote.Text = photo is null ? "No camera photo yet: press Update photo once the patches have been burned." : "";
         for (int i = 0; i < patches.Count; i++)

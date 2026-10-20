@@ -29,22 +29,47 @@ public static class ToneTest
     /// <summary>Width of the strip for this many patches of this size (mm).</summary>
     public static double Width(int steps, double patchMm) => steps * patchMm * (1 + GapShare) - patchMm * GapShare;
 
+    /// <summary>The size of the test (mm) laid out <paramref name="columns"/> patches to a row.</summary>
+    public static Vec2 Size(int steps, double patchMm, int columns)
+    {
+        int cols = Math.Clamp(columns, 1, Math.Max(1, steps)), rows = (steps + cols - 1) / cols;
+        return new Vec2(Width(cols, patchMm), Width(rows, patchMm));
+    }
+
+    /// <summary>
+    /// The layout that fits in <paramref name="area"/>, leaving room above for reading the bare
+    /// material: as many patches to a row as fit, at the biggest size up to <paramref name="patchMm"/>; null when under 3 mm.
+    /// </summary>
+    public static (double Size, int Columns)? Fit(int steps, double patchMm, Vec2 area)
+    {
+        for (double s = patchMm; s >= 3 - 1e-9; s -= 0.5)
+        {
+            int cols = Math.Max(1, (int)Math.Floor((area.X + s * GapShare) / (s * (1 + GapShare))));
+            var need = Size(steps, s, cols);
+            if (need.X <= area.X + 1e-9 && need.Y + 3 <= area.Y + 1e-9) return (s, cols);
+        }
+        return null;
+    }
+
     /// <summary>
     /// Add the test: a copy of <paramref name="settings"/> (a picture layer; its tone correction off)
     /// holding the strip, top-left at <paramref name="origin"/>. Returns the new state and the strip's id.
     /// </summary>
-    public static (DocState State, Guid Strip) Add(DocState s, Layer settings, int steps, double patchMm, Vec2 origin)
+    /// <param name="columns">Patches per row (more rows below); all in one row when not given.</param>
+    public static (DocState State, Guid Strip) Add(DocState s, Layer settings, int steps, double patchMm, Vec2 origin, int columns = int.MaxValue)
     {
         var levels = Levels(steps);
-        double gap = patchMm * GapShare, width = Width(levels.Count, patchMm);
-        int w = Math.Max(1, (int)Math.Round(width * PxPerMm)), h = Math.Max(1, (int)Math.Round(patchMm * PxPerMm));
+        int cols = Math.Clamp(columns, 1, levels.Count);
+        double gap = patchMm * GapShare;
+        var size = Size(levels.Count, patchMm, cols);
+        int w = Math.Max(1, (int)Math.Round(size.X * PxPerMm)), h = Math.Max(1, (int)Math.Round(size.Y * PxPerMm));
         var px = new byte[w * h * 4];
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
-                double mm = (x + 0.5) / PxPerMm;
-                int patch = (int)Math.Floor(mm / (patchMm + gap));
-                bool inPatch = patch < levels.Count && mm - patch * (patchMm + gap) < patchMm;
+                double mx = (x + 0.5) / PxPerMm, my = (y + 0.5) / PxPerMm;
+                int c = (int)Math.Floor(mx / (patchMm + gap)), r = (int)Math.Floor(my / (patchMm + gap)), patch = r * cols + c;
+                bool inPatch = c < cols && patch < levels.Count && mx - c * (patchMm + gap) < patchMm && my - r * (patchMm + gap) < patchMm;
                 byte v = inPatch ? (byte)Math.Round(levels[patch] * 255) : (byte)255;
                 int k = (y * w + x) * 4;
                 px[k] = px[k + 1] = px[k + 2] = v;
@@ -62,10 +87,10 @@ public static class ToneTest
         s = Ops.AddLayer(s, layer);
         var strip = new ImageShape
         {
-            Name = $"{ShapePrefix}{levels.Count} steps",
+            Name = $"{ShapePrefix}{levels.Count} steps" + (cols < levels.Count ? $" · {cols} across" : ""),
             LayerId = layer.Id,
             Source = ImageSource.FromEncoded(png),
-            SizeMm = new Vec2(width, patchMm),
+            SizeMm = size,
             Transform = Affine.Translate(origin.X, origin.Y),
         };
         return (Ops.AddShapes(s, [strip]), strip.Id);
@@ -82,16 +107,24 @@ public static class ToneTest
     public static int Steps(ImageShape strip) =>
         int.TryParse(strip.Name[ShapePrefix.Length..].Split(' ')[0], out int n) ? n : 11;
 
+    /// <summary>How many patches to a row (from its name; all in one row when it doesn't say).</summary>
+    public static int Columns(ImageShape strip)
+    {
+        int at = strip.Name.IndexOf(" · ", ShapePrefix.Length, StringComparison.Ordinal);
+        return at >= 0 && int.TryParse(strip.Name[(at + 3)..].Split(' ')[0], out int n) && n > 0 ? n : Steps(strip);
+    }
+
     /// <summary>Each patch's grey and where it is on the bed now (the strip may have been moved or scaled).</summary>
     public static IReadOnlyList<(double Level, Rect2 Bed)> Patches(ImageShape strip)
     {
         var levels = Levels(Steps(strip));
-        double patch = strip.SizeMm.X / (levels.Count * (1 + GapShare) - GapShare), gap = patch * GapShare;
+        int cols = Math.Clamp(Columns(strip), 1, levels.Count);
+        double patch = strip.SizeMm.X / (cols * (1 + GapShare) - GapShare), gap = patch * GapShare;
         var o = new List<(double, Rect2)>();
         for (int i = 0; i < levels.Count; i++)
         {
-            double x0 = i * (patch + gap);
-            Vec2[] corners = [new(x0, 0), new(x0 + patch, 0), new(x0 + patch, strip.SizeMm.Y), new(x0, strip.SizeMm.Y)];
+            double x0 = i % cols * (patch + gap), y0 = i / cols * (patch + gap);
+            Vec2[] corners = [new(x0, y0), new(x0 + patch, y0), new(x0 + patch, y0 + patch), new(x0, y0 + patch)];
             o.Add((levels[i], Rect2.Bounds(corners.Select(strip.Transform.Apply))));
         }
         return o;
@@ -107,7 +140,12 @@ public static class ToneTest
         var patches = Patches(strip);
         var readings = patches.Select(p => TestGridReader.Read(photo, area, mmPerPx, p.Bed)).ToList();
         if (readings.Any(r => r is null)) return null;
-        double bare = readings.Average(r => r!.Around);
+        // The bare material: the clear band above the test (patches close together, as when fitted
+        // where the close-up camera sees, put their neighbours in the ring round each one).
+        uint band = MeanColour(photo, area, mmPerPx, Ring(patches));
+        double bare = Ring(patches) is var ring && ring.MinY >= area.MinY && ring.MinX >= area.MinX && ring.MaxX <= area.MaxX
+            ? 0.299 * (band >> 16 & 0xFF) + 0.587 * (band >> 8 & 0xFF) + 0.114 * (band & 0xFF)
+            : readings.Average(r => r!.Around);
         var curve = ToneCurve.FromReadings([.. patches.Select(p => p.Level)], [.. readings.Select(r => r!.Inside)], bare);
         var black = patches.Select((p, i) => (p.Level, i)).MinBy(x => x.Level).i;
         uint burnColour = MeanColour(photo, area, mmPerPx, Inner(patches[black].Bed)), bareColour = MeanColour(photo, area, mmPerPx, Ring(patches));
