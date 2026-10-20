@@ -346,6 +346,9 @@ public sealed record DotBlock(
     /// <summary>Burn the rows spread out, every <see cref="Spread"/>th row first (see <see cref="FillBlock.Spread"/>). 0 or 1 = in order.</summary>
     public int Spread { get; init; }
 
+    /// <summary>Every row burned left to right, the head going back unlit (slower; rows can't be offset from each other by the direction).</summary>
+    public bool Unidirectional { get; init; }
+
     /// <summary>The <c>S</c> value (per-mille) of a dot with strength <paramref name="level"/>.</summary>
     public long LevelSValue(byte level) =>
         (long)Math.Round((MinPower + (Laser.Power - MinPower) * level / 255.0) * 10, MidpointRounding.AwayFromZero);
@@ -785,7 +788,9 @@ public sealed class Job
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
             PointsBlock p => p.Points.Count * p.DotUs * 1e-6 + Enumerable.Range(1, Math.Max(0, p.Points.Count - 1)).Sum(i => p.Points[i - 1].Dist(p.Points[i])) / Math.Max(1, p.Laser.Speed),
             DotBlock d => d.Bitmap.Bits.Count(v => v) *
-                (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed)),
+                (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed))
+                // One way: the head goes back across each row.
+                + (d.Unidirectional ? d.Bitmap.Height * d.Bitmap.Width * 25.4 / d.Dpi / Jump : 0),
             _ => 0,
         };
     }
@@ -1391,7 +1396,7 @@ public sealed class Job
                 else body.Add($"G25X{x}" + power);
                 lastX = x;
             }
-            forward = !forward;
+            if (!b.Unidirectional) forward = !forward;
         }
         if (first) return []; // blank bitmap
         var v = BitmapHead(tag, l, "M523P10");

@@ -266,7 +266,7 @@ public static class JobBuilder
                         warnings.Add($"\"{img.Name}\" has {img.Source.Width} pixels across {img.Bounds.Width:0.#} mm ({OwnDpi(img):0} dpi), more than layer \"{layer.Name}\"'s {layer.Dpi:0} dpi. One dot per pixel would put {OwnDpi(img) / layer.Dpi:0.#}× the heat in, so it's engraved at {layer.Dpi:0} dpi instead (pass-through can't keep its own pixels).");
                     var (dots, area) = Rasterize(img, layer);
                     if (dots is null) continue;
-                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / dots.Dpi) : 0 };
+                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / dots.Dpi) : 0, Unidirectional = !layer.Bidirectional };
                     int bm = blocks.Count, sm = steps.Count;
                     blocks.Add(block);
                     steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));

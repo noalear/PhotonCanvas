@@ -46,6 +46,8 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _perf = Num(0, 100, 0.5m, "0.##"), _perfGap = Num(0.05m, 100, 0.5m, "0.##"), _dotMode = Number(0, 50, 0.1m, "0.###");
     readonly NumericUpDown _ramp = Number(0, 10, 0.1m, "0.##");
     readonly CheckBox _passThrough = new() { Content = "Pass-through (the file's own pixels)" };
+    // The same setting as _bidir, shown with the picture settings (a control has one place).
+    readonly CheckBox _bidirPic = new() { Content = "Burn rows in both directions" };
     readonly Control _rampRow;
     readonly TextBlock _lpcmHint = Hint(), _dpiHint = Hint(), _passHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow, _imageModeRow;
@@ -212,6 +214,7 @@ public sealed class LayerEditor : UserControl
         ToolTip.SetTip(_deepestFirst, "Engrave the deepest (smallest) slices first and the widest last: often a smoother floor (noise reduction).");
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
+        ToolTip.SetTip(_bidirPic, "Off: every row burns left to right and the head goes back unlit. Slower, but rows can't be shifted against each other by the direction (a woven look). Laser → Line test compares both.");
         ToolTip.SetTip(_bidir, "Off: every line burns in the same direction and the beam returns unlit. More even on some materials, a little slower.");
         ToolTip.SetTip(_together, "Scan all of this layer's shapes in one go instead of one shape at a time: fewer jumps for lots of small shapes. Where shapes overlap they cancel out.");
         ToolTip.SetTip(_passThrough, "Engrave the picture's own pixels, one dot each, with no resampling (for pictures already prepared at the right size). Never closer together than the resolution above: a picture with more pixels than that is resampled down, so it can't put in more heat than you set.");
@@ -251,6 +254,7 @@ public sealed class LayerEditor : UserControl
                 _grayRow,
                 _rampRow,
                 _passThrough,
+                _bidirPic,
                 _dotRow,
                 _sliceExtras,
             },
@@ -347,6 +351,7 @@ public sealed class LayerEditor : UserControl
         _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
         _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
+        _bidirPic.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidirPic.IsChecked == true }, _bidirPic.IsChecked.HasValue);
         _together.IsCheckedChanged += (_, _) => EditLayers("All shapes in one scan", l => l with { FillTogether = _together.IsChecked == true }, _together.IsChecked.HasValue);
         _perf.ValueChanged += (_, _) => EditLayers("Perforation", l => l with { PerforateMm = (double)_perf.Value!.Value }, _perf.Value.HasValue, "perf");
         _perfGap.ValueChanged += (_, _) => EditLayers("Perforation gap", l => l with { PerforateGapMm = (double)_perfGap.Value!.Value }, _perfGap.Value.HasValue, "perfgap");
@@ -461,6 +466,8 @@ public sealed class LayerEditor : UserControl
         _bidir.IsChecked = Same(l => l.Bidirectional);
         _together.IsChecked = Same(l => l.FillTogether);
         _bidir.IsVisible = _together.IsVisible = _scanReverse.IsVisible = anyFill && !allOffset;
+        _bidirPic.IsChecked = Same(l => l.Bidirectional);
+        _bidirPic.IsVisible = anyImage && !allSlices;
         _outlineAfter.IsVisible = anyFill;
         _crossRow.IsVisible = anyFill && ls.Any(l => l.Crosshatch);
         _stepRows.IsVisible = anyCut || anyFill;
