@@ -42,8 +42,9 @@ public sealed class CloseUpCalibrationWindow : Window
         Height = 860;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = Brush("Bg1");
-        _spacing.Value = 4;
-        _dot.Value = 1.2m;
+        // The close-up camera sees about 100 mm across (Oct 2026): dots this size are some 70 pixels across in its photo.
+        _spacing.Value = 8;
+        _dot.Value = 2;
         _spacing.ValueChanged += (_, _) => Plan();
         _dot.ValueChanged += (_, _) => Plan();
 
@@ -155,13 +156,16 @@ public sealed class CloseUpCalibrationWindow : Window
             var (raw, found, spots) = await Task.Run(() =>
             {
                 var r = RasterImage.Decode(jpg);
-                return (r, CloseUpMarks.Locate(r, marks), CloseUpMarks.FindSpots(r));
+                // Kept, so a photo that didn't work can be looked at later.
+                try { File.WriteAllBytes(Path.Combine(AppLog.Dir, "closeup-marks.jpg"), jpg); } catch (IOException) { }
+                var located = CloseUpMarks.Locate(r, marks);
+                return (r, located, CloseUpMarks.FindSpots(r, located is null ? CloseUpMarks.Darker[^1] : CloseUpMarks.Darker[0]));
             });
             _view.Show(raw, spots, found);
             if (found is null)
             {
-                _result.Text = $"Couldn't find the dots: {spots.Count} dark spot{(spots.Count == 1 ? "" : "s")} in the photo, but not the pattern " +
-                               "(at least seven dots, and the odd one off the side). Check they all burned dark and are inside the picture, then try again.";
+                _result.Text = $"Couldn't find the dots: {spots.Count} dark spot{(spots.Count == 1 ? "" : "s")} in the photo (ringed), but not the pattern " +
+                               "(at least seven dots, and the odd one off the side). If the dots are faint or small, burn bigger, darker ones (first tab), then try again.";
                 return;
             }
             _found = found;

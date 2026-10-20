@@ -11,9 +11,9 @@ public class CloseUpMarksTests
     const int W = 1200, H = 900;
 
     /// <summary>The camera: bed mm → photo pixels, turned like the user's close-up (148.8°), about 35 px/mm, a little perspective, maybe mirrored.</summary>
-    static Homography Camera(Vec2 centreMm, bool mirror = false)
+    static Homography Camera(Vec2 centreMm, bool mirror = false, double k = 35)
     {
-        double a = 148.8 * Math.PI / 180, k = 35;
+        double a = 148.8 * Math.PI / 180;
         Vec2 Map(Vec2 mm)
         {
             double x = mm.X - centreMm.X, y = (mm.Y - centreMm.Y) * (mirror ? -1 : 1);
@@ -26,7 +26,7 @@ public class CloseUpMarksTests
     }
 
     /// <summary>A photo of burned dots on wood: uneven light, grain lines, a knot, a little noise.</summary>
-    static RasterImage Photo(Homography mmToPx, IReadOnlyList<Vec2> dots, double dotMm, IEnumerable<int>? leaveOut = null)
+    static RasterImage Photo(Homography mmToPx, IReadOnlyList<Vec2> dots, double dotMm, IEnumerable<int>? leaveOut = null, double? dotDarker = null)
     {
         var skip = (leaveOut ?? []).ToHashSet();
         var toBed = Homography.Fit([.. dots.Take(4).Select(d => (mmToPx.Apply(d), d)).Append((mmToPx.Apply(dots[8]), dots[8]))])!.Value;
@@ -41,7 +41,7 @@ public class CloseUpMarksTests
                 if (new Vec2(x, y).Dist(new Vec2(1050, 780)) < 30) light *= 0.5; // a knot
                 var mm = toBed.Apply(new Vec2(x + 0.5, y + 0.5));
                 for (int i = 0; i < dots.Count; i++)
-                    if (!skip.Contains(i) && mm.Dist(dots[i]) < dotMm / 2) light = 0.22;
+                    if (!skip.Contains(i) && mm.Dist(dots[i]) < dotMm / 2) light = dotDarker is { } dd ? light * (1 - dd) : 0.22;
                 light += (rnd.NextDouble() - 0.5) * 0.04;
                 int k = (y * W + x) * 4;
                 byte v = (byte)Math.Clamp(light * 255, 0, 255);
@@ -80,6 +80,21 @@ public class CloseUpMarksTests
             Assert.InRange(p.X, 0, W);
             Assert.InRange(p.Y, 0, H);
         }
+    }
+
+    [Fact]
+    public void FaintSmallDotsInAWideViewAreStillFound()
+    {
+        // As on the real machine: the close-up sees about 108 mm across (here 1200 px, 11 px/mm),
+        // and 1.2 mm dots burned only about 15% darker than the wood.
+        var centre = new Vec2(110, 95);
+        var dots = CloseUpMarks.Places(centre, 4);
+        var cam = Camera(centre, k: 11);
+        var photo = Photo(cam, dots, 1.2, dotDarker: 0.15);
+        Assert.True(CloseUpMarks.FindSpots(photo).Count < 7); // too faint for the strict look
+        var got = CloseUpMarks.Locate(photo, dots);
+        Assert.NotNull(got);
+        foreach (var d in dots) Assert.True(got!.MmToCamera.Apply(d).Dist(cam.Apply(d)) < 2);
     }
 
     [Fact]

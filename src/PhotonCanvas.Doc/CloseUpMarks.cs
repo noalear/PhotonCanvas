@@ -76,11 +76,15 @@ public static class CloseUpMarks
     /// </summary>
     public sealed record Located(Homography MmToCamera, IReadOnlyList<Vec2?> Found, double ErrorMm, Rect2 Sees);
 
+    /// <summary>How much darker than its surroundings a spot must be, strictest first: faint burns are looked for only when bold ones don't make the pattern.</summary>
+    public static readonly double[] Darker = [0.8, 0.86, 0.91, 0.95];
+
     /// <summary>
     /// Dark, roundish spots in a photo (burned dots on lighter material), darker than what's
     /// around them, so uneven light doesn't matter.
     /// </summary>
-    public static List<Spot> FindSpots(RasterImage photo)
+    /// <param name="darker">A spot's pixels are under this share of the brightness around them (0.8 = a fifth darker).</param>
+    public static List<Spot> FindSpots(RasterImage photo, double darker = 0.8)
     {
         int f = Math.Max(1, (int)Math.Ceiling(photo.Width / 1000.0));
         int w = photo.Width / f, h = photo.Height / f;
@@ -112,7 +116,7 @@ public static class CloseUpMarks
             {
                 int x0 = Math.Max(0, x - rad), x1 = Math.Min(w, x + rad + 1), y0 = Math.Max(0, y - rad), y1 = Math.Min(h, y + rad + 1);
                 double mean = (sat[y1 * (w + 1) + x1] - sat[y0 * (w + 1) + x1] - sat[y1 * (w + 1) + x0] + sat[y0 * (w + 1) + x0]) / ((x1 - x0) * (y1 - y0));
-                dark[y * w + x] = g[y * w + x] < mean * 0.8;
+                dark[y * w + x] = g[y * w + x] < mean * darker;
             }
         // Join touching dark pixels into spots, keep the roundish ones.
         var spots = new List<Spot>();
@@ -153,7 +157,13 @@ public static class CloseUpMarks
     /// </summary>
     public static Located? Locate(RasterImage photo, IReadOnlyList<Vec2> marksMm)
     {
-        var spots = FindSpots(photo);
+        foreach (double darker in Darker)
+            if (LocateIn(photo, FindSpots(photo, darker), marksMm) is { } found) return found;
+        return null;
+    }
+
+    static Located? LocateIn(RasterImage photo, List<Spot> spots, IReadOnlyList<Vec2> marksMm)
+    {
         // The likeliest ones: of all the spots, those about the size of most of the others.
         if (spots.Count > 60) spots = [.. spots.OrderByDescending(x => x.Area).Take(60)];
         var d = spots.Select(x => x.At).ToList();
