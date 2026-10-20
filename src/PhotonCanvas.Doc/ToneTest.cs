@@ -116,6 +116,29 @@ public static class ToneTest
         return new ToneReading(curve, [.. readings.Select(r => r!.Inside)], bare, burnColour, bareColour);
     }
 
+    /// <summary>
+    /// Why a reading can't be right, or null when it looks sound. The white patch is never burned
+    /// (white isn't visited), so it must read close to bare material; and a lighter grey can't burn
+    /// clearly darker than a darker one. When either fails, the camera was reading the wrong spots
+    /// (the view doesn't line up with the strip, a shadow, or an older burn under it), and a curve
+    /// made from it would squeeze every picture into a few dark tones.
+    /// </summary>
+    public static string? Problem(ToneReading r)
+    {
+        var pts = r.Curve.Points.OrderBy(p => p.Input).ToList();
+        if (pts.Count > 0 && pts[^1].Input >= 0.999 && pts[^1].Lightness < 0.8)
+            return $"The white patch isn't burned at all, but it reads only {pts[^1].Lightness * 100:0}% as light as bare wood, so the camera is reading the wrong spots. " +
+                   "Check that the photo lines up with the strip (calibrate the camera if it doesn't), that nothing shades it and that it's on clean wood, then update the photo.";
+        for (int i = 1; i < pts.Count; i++)
+        {
+            double darkest = pts.Take(i).Max(p => p.Lightness);
+            if (pts[i].Lightness < darkest - 0.12)
+                return $"Grey {pts[i].Input * 100:0}% reads darker ({pts[i].Lightness * 100:0}% light) than a darker grey ({darkest * 100:0}%), which a burn can't do: the camera is reading the wrong spots. " +
+                       "Check that the photo lines up with the strip, that nothing shades it and that it's on clean wood, then update the photo.";
+        }
+        return null;
+    }
+
     static Rect2 Inner(Rect2 r) => new(r.MinX + r.Width * 0.2, r.MinY + r.Height * 0.2, r.MaxX - r.Width * 0.2, r.MaxY - r.Height * 0.2);
 
     /// <summary>A band of bare material just above the strip.</summary>

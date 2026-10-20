@@ -222,8 +222,12 @@ public sealed class ToneTestWindow : Window
             }
         }
         _chart.Show(_reading?.Curve);
-        _apply.IsEnabled = _save.IsEnabled = _reading is not null && _useLayers.Count > 0;
-        _save.IsEnabled = _reading is not null;
+        // A reading that can't be right is shown (so it can be looked at) but not used.
+        string? problem = _reading is null ? null : ToneTest.Problem(_reading);
+        if (problem is not null) _photoNote.Text = problem;
+        bool usable = _reading is not null && problem is null;
+        _apply.IsEnabled = usable && _useLayers.Count > 0;
+        _save.IsEnabled = usable;
         Summary();
         Preview();
     }
@@ -239,6 +243,10 @@ public sealed class ToneTestWindow : Window
         };
         if (darkFrom > 0.05) lines.Add($"The material is as dark as it goes from {darkFrom * 100:0}% grey down: darker greys only add heat.");
         if (firstShows < 0.95) lines.Add($"Greys lighter than {firstShows * 100:0}% barely show.");
+        // The lightest burned grey: if it already comes out dark, soft highlights can't be made.
+        var lightest = r.Curve.Points.Where(p => p.Input < 0.999).OrderByDescending(p => p.Input).FirstOrDefault();
+        if (lightest.Input > 0 && lightest.Lightness < 0.75)
+            lines.Add($"Even the lightest burned grey comes out only {lightest.Lightness * 100:0}% light: there's a jump from bare wood to the first burn, so pale tones can't be made. Lower \"Lightest power %\" (or speed up) and test again.");
         lines.Add("Corrected, every tone is sent as the grey that gives it.");
         _summary.Text = string.Join(" ", lines);
     }

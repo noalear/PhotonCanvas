@@ -140,6 +140,20 @@ public class ToneTests
     }
 
     [Fact]
+    public void AReadingThatCantBeRightIsTurnedDown()
+    {
+        static ToneReading R(params double[] light) =>
+            new(new ToneCurve([.. light.Select((l, i) => ((double)i / (light.Length - 1), l))]), light, 1, 0, 0xFFFFFF);
+        // What the camera read on the real strip (15 patches): the unburned white patch at 53%.
+        var real = R(0, 0.089, 0.187, 0.374, 0.451, 0.518, 0.561, 0.605, 0.629, 0.625, 0.615, 0.539, 0.536, 0.527, 0.527);
+        Assert.Contains("white patch", ToneTest.Problem(real));
+        // A lighter grey clearly darker than a darker one, with a sound white.
+        Assert.Contains("reads darker", ToneTest.Problem(R(0, 0.3, 0.6, 0.35, 0.8, 1)));
+        // A sound, steep reading (most greys dark) is fine: that's the material, not the camera.
+        Assert.Null(ToneTest.Problem(R(0, 0.02, 0.05, 0.1, 0.3, 0.97)));
+    }
+
+    [Fact]
     public void LibraryKeepsAPictureRecipeWithItsToneCurve()
     {
         var folder = Path.Combine(Path.GetTempPath(), $"pc-lib-{Guid.NewGuid():N}");
