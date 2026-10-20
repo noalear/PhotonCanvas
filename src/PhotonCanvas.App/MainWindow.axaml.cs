@@ -155,9 +155,10 @@ public partial class MainWindow : Window
                 _settings.Save();
                 ApplyEquipment();
             }
-            if (ConnectOnOpen) await OfferRecovery();
+            bool recovered = ConnectOnOpen && await OfferRecovery();
             if (ConnectOnOpen) _ = _machine.AutoConnectAsync();
             if (OpenPathOnStartup is { } p) await OpenPath(p);
+            else if (ConnectOnOpen && !recovered) await ReopenLast();
             _autosave.Tick += (_, _) => Autosave();
             if (ConnectOnOpen) _autosave.Start();
         };
@@ -873,10 +874,31 @@ public partial class MainWindow : Window
         catch (IOException) { }
     }
 
-    /// <summary>A design was left unsaved when the program last stopped: offer it back.</summary>
-    async Task OfferRecovery()
+    /// <summary>The design that was open when the program was last closed, at the same view (when it had been saved and is still there).</summary>
+    async Task ReopenLast()
     {
-        if (!File.Exists(AutosaveFile)) return;
+        if (_settings.LastOpenFile is not { } last || !File.Exists(last)) return;
+        await OpenPath(last);
+        if (_doc.FilePath != last) return;
+        if (_settings.LastView is [var l, var t, var r, var b] && r > l && b > t)
+            // After layout, so the canvas knows its size.
+            Dispatcher.UIThread.Post(() => Canvas.FitRect(new Rect2(l, t, r, b), 0), DispatcherPriority.Background);
+        StatusText.Text = $"Reopened {Path.GetFileName(last)}, as it was when {AppIdentity.ProductName} was closed.";
+    }
+
+    /// <summary>Keep what's open (the saved design and the view) to reopen next time.</summary>
+    void RememberOpen()
+    {
+        _settings.LastOpenFile = _doc.FilePath;
+        var v = Canvas.VisibleArea;
+        _settings.LastView = v.IsEmpty ? null : [v.MinX, v.MinY, v.MaxX, v.MaxY];
+        _settings.Save();
+    }
+
+    /// <summary>A design was left unsaved when the program last stopped: offer it back. True when it was brought back.</summary>
+    async Task<bool> OfferRecovery()
+    {
+        if (!File.Exists(AutosaveFile)) return false;
         var from = File.Exists(AutosaveFrom) ? File.ReadAllText(AutosaveFrom).Trim() : "";
         string name = from.Length > 0 ? Path.GetFileName(from) : "an unsaved design";
         var when = File.GetLastWriteTime(AutosaveFile);
@@ -890,11 +912,12 @@ public partial class MainWindow : Window
                 _layers.Activate(_doc.ActiveLayer);
                 Canvas.FitField();
                 StatusText.Text = "Unsaved work brought back: save it to keep it.";
-                return;
+                return true;
             }
             catch (Exception e) when (e is IOException or FormatException) { await Dialogs.Message(this, "Couldn't open the copy", e.Message); }
         }
         ClearAutosave();
+        return false;
     }
 
     async Task ShowVersions()
@@ -2224,6 +2247,7 @@ public partial class MainWindow : Window
     {
         if (_closeConfirmed || !_doc.Dirty)
         {
+            if (ConnectOnOpen) RememberOpen();
             ClearAutosave();
             _machine.Shutdown();
             _depthCharge.Dispose(); // stops DepthCharge only if this program started it

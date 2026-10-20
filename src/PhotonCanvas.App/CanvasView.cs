@@ -277,6 +277,9 @@ public sealed partial class CanvasView : Control
 
     public void FitField() => FitRect(new Rect2(0, 0, _machine.FieldW, _machine.FieldH));
 
+    /// <summary>The part of the bed on screen now (mm).</summary>
+    public Rect2 VisibleArea => new(ToWorld(Viewport.TopLeft).X, ToWorld(Viewport.TopLeft).Y, ToWorld(Viewport.BottomRight).X, ToWorld(Viewport.BottomRight).Y);
+
     public void FitSelection()
     {
         if (_doc is null) return;

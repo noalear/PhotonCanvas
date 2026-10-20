@@ -40,6 +40,10 @@ public sealed class AppSettings
     public PhotonCanvas.Core.Camera.MarkStyle CalibMarkStyle { get; set; } = PhotonCanvas.Core.Camera.MarkStyle.Dot;
     public double CalibMarkSizeMm { get; set; } = 2;
     public List<string> RecentFiles { get; set; } = [];
+    /// <summary>The design open when the program was last closed (reopened on start), if it had been saved.</summary>
+    public string? LastOpenFile { get; set; }
+    /// <summary>The part of the bed on screen then (mm: left, top, right, bottom), to come back to the same view.</summary>
+    public double[]? LastView { get; set; }
     public double OffsetDistanceMm { get; set; } = 2;
     public int OffsetDirection { get; set; }
     public int OffsetCorners { get; set; } = 1;
