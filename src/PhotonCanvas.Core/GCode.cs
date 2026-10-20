@@ -242,6 +242,13 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     public int LineDwellMs { get; init; }
 
     /// <summary>
+    /// Burn the scan lines spread out: every <see cref="Spread"/>th line first, then the ones after
+    /// them, and so on, so no line is burned straight after its neighbour and the heat has time to
+    /// leave (less scorching and warping, more even colours). 0 or 1 = in order.
+    /// </summary>
+    public int Spread { get; init; }
+
+    /// <summary>
     /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
     /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
     /// </summary>
@@ -335,6 +342,9 @@ public sealed record DotBlock(
     /// Null: every dot fires at the layer's power (dithered engraving).
     /// </summary>
     public byte[]? Levels { get; init; }
+
+    /// <summary>Burn the rows spread out, every <see cref="Spread"/>th row first (see <see cref="FillBlock.Spread"/>). 0 or 1 = in order.</summary>
+    public int Spread { get; init; }
 
     /// <summary>The <c>S</c> value (per-mille) of a dot with strength <paramref name="level"/>.</summary>
     public long LevelSValue(byte level) =>
@@ -998,9 +1008,47 @@ public sealed class Job
     /// <summary>Every burn segment of a fill, in emission order. The list is shared: don't change it.</summary>
     public static List<FillSegment> FillLines(FillBlock b) => LineCache.GetValue(b, MakeFillLines);
 
+    /// <summary>
+    /// How many lines apart to burn when spreading them out: neighbours about 0.4 mm apart in each
+    /// sweep (heat from one line has mostly gone by the time the next one beside it is burned).
+    /// </summary>
+    public static int SpreadStride(double lineSpacingMm) =>
+        lineSpacingMm > 0 && double.IsFinite(lineSpacingMm) ? Math.Clamp((int)Math.Round(0.4 / lineSpacingMm), 2, 32) : 2;
+
+    /// <summary>Rows 0…n−1 in spread order: 0, k, 2k, … then 1, 1+k, … (k ≤ 1: in order).</summary>
+    public static IEnumerable<int> SpreadOrder(int n, int stride)
+    {
+        if (stride <= 1) { for (int i = 0; i < n; i++) yield return i; yield break; }
+        for (int start = 0; start < Math.Min(stride, n); start++)
+            for (int i = start; i < n; i += stride) yield return i;
+    }
+
+    /// <summary>The scan lines (each one or more segments on the same line) burned in spread order, alternating direction as they go.</summary>
+    static List<FillSegment> SpreadOut(List<FillSegment> lines, int stride)
+    {
+        var groups = new List<List<FillSegment>>();
+        foreach (var s in lines)
+        {
+            if (groups.Count == 0 || Math.Abs(groups[^1][0].Y - s.Y) > 1e-9) groups.Add([]);
+            groups[^1].Add(s);
+        }
+        static FillSegment Flip(FillSegment s) => new(s.Y, s.X1, s.X0, s.End, s.Start);
+        var o = new List<FillSegment>(lines.Count);
+        bool forward = true;
+        foreach (int i in SpreadOrder(groups.Count, stride))
+        {
+            var run = groups[i].Select(s => s.X1 >= s.X0 ? s : Flip(s)).OrderBy(s => s.X0).ToList();
+            if (forward) o.AddRange(run);
+            else for (int k = run.Count - 1; k >= 0; k--) o.Add(Flip(run[k]));
+            forward = !forward;
+        }
+        return o;
+    }
+
     static List<FillSegment> MakeFillLines(FillBlock b)
     {
         var lines = MakeFullLines(b);
+        if (b.Spread > 1) lines = SpreadOut(lines, b.Spread);
         if (b.ReverseOrder)
         {
             // From the far side: the lines in reverse order, each run the other way so the zigzag still joins up.
@@ -1313,7 +1361,7 @@ public sealed class Job
         long lastS = l.SValue;
         var levels = b.Levels;
         var cols = new List<int>();
-        for (int r = 0; r < b.Bitmap.Height; r++)
+        foreach (int r in SpreadOrder(b.Bitmap.Height, b.Spread))
         {
             cols.Clear();
             for (int c = 0; c < b.Bitmap.Width; c++)

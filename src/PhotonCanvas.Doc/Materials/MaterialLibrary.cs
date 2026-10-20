@@ -38,6 +38,7 @@ public sealed record ProcessSettings
     public bool Bidirectional { get; init; } = true;
     public double CrossAngleDeg { get; init; } = 90;
     public int LineDwellMs { get; init; }
+    public bool SpreadLines { get; init; }
     public bool OutlineAfter { get; init; }
     public bool ScanReverse { get; init; }
     public double TabPowerPct { get; init; }
@@ -68,7 +69,7 @@ public sealed record ProcessSettings
         HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
-        CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
+        CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, SpreadLines = l.SpreadLines, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
         Order = l.Order, StartNearest = l.StartNearest, RemoveOverlaps = l.RemoveOverlaps, LeadOutMm = l.LeadOutMm,
     };
 
@@ -82,7 +83,7 @@ public sealed record ProcessSettings
         HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
-        CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
+        CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, SpreadLines = SpreadLines, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
         Order = Order, StartNearest = StartNearest, RemoveOverlaps = RemoveOverlaps, LeadOutMm = LeadOutMm,
     };
 

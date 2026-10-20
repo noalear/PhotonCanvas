@@ -37,7 +37,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _cpi = Num(2, 500, 1, "0.#"), _screenAngle = Num(-180, 180, 15, "0.#"), _dotWidth = Number(0, 1, 0.005m, "0.###");
     readonly Control _screenRow;
     readonly CheckBox _bidir = new() { Content = "Burn in both directions" }, _together = new() { Content = "All shapes in one scan" };
-    readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _deepestFirst = new() { Content = "Deepest slice first" };
+    readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _spread = new() { Content = "Spread the lines out (less heat)" }, _deepestFirst = new() { Content = "Deepest slice first" };
     readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
     readonly Control _crossRow, _stepRows;
     readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)" } };
@@ -207,6 +207,8 @@ public sealed class LayerEditor : UserControl
         };
         ToolTip.SetTip(_outlineAfter, "After filling each shape, trace its outline at the same settings: hides ragged edges.");
         ToolTip.SetTip(_scanReverse, "Fill from the far side back (bottom to top): keeps the smoke away from what's still to engrave, depending on how your air flows.");
+        ToolTip.SetTip(_spread, "Burn every few lines first, then the ones between, so no line is burned straight after the one beside it and the heat has time to leave: " +
+                                "less scorching, less warping of thin plastic, more even colours on metal. Hardly any slower on a galvo.");
         ToolTip.SetTip(_deepestFirst, "Engrave the deepest (smallest) slices first and the widest last: often a smoother floor (noise reduction).");
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
@@ -256,7 +258,7 @@ public sealed class LayerEditor : UserControl
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _pulseRow, _freqRow, focusRow, _moreNothing } };
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _pulseRow, _freqRow, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
@@ -342,6 +344,7 @@ public sealed class LayerEditor : UserControl
         _tabPower.ValueChanged += (_, _) => EditLayers("Tab power", l => l with { TabPowerPct = (double)_tabPower.Value!.Value }, _tabPower.Value.HasValue, "tabpower");
         _outlineAfter.IsCheckedChanged += (_, _) => EditLayers("Outline after fill", l => l with { OutlineAfter = _outlineAfter.IsChecked == true }, _outlineAfter.IsChecked.HasValue);
         _scanReverse.IsCheckedChanged += (_, _) => EditLayers("Scan direction", l => l with { ScanReverse = _scanReverse.IsChecked == true }, _scanReverse.IsChecked.HasValue);
+        _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
         _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
         _together.IsCheckedChanged += (_, _) => EditLayers("All shapes in one scan", l => l with { FillTogether = _together.IsChecked == true }, _together.IsChecked.HasValue);
@@ -470,6 +473,8 @@ public sealed class LayerEditor : UserControl
         Num(_tabPower, Same(l => l.TabPowerPct));
         _outlineAfter.IsChecked = Same(l => l.OutlineAfter);
         _scanReverse.IsChecked = Same(l => l.ScanReverse);
+        _spread.IsChecked = Same(l => l.SpreadLines);
+        _spread.IsVisible = (anyFill && !allOffset) || (anyImage && !allSlices);
         _deepestFirst.IsChecked = Same(l => l.Slices.DeepestFirst);
         Num(_perf, Same(l => l.PerforateMm));
         Num(_perfGap, Same(l => l.PerforateGapMm));

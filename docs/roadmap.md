@@ -175,6 +175,17 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Interlock status (lid, safety key, exhaust fan, emergency stop) and alarm messages for the emergency stop, flame, tilt and overheating (xTool)
 - [ ] Purifier and duct-fan accessory control (fan speed) (xTool)
 
+### New ideas nobody else has (researched 2026-10-19)
+
+- [ ] Photo engraving matched to the material: burn a grey step wedge, the camera reads how dark each step came out, and pictures are corrected so their greys come out as they look; a preview of how it will look (Trotec has you read a matrix by eye; Bambu builds a curve; none read it with the machine's own camera)
+- [x] Heat-aware fill order (layer setting "Spread the lines out", fills and pictures): fill lines burned spread apart (1, 5, 9 … then 2, 6, 10 …) so neighbours never follow each other: less scorching and warping, more even MOPA colours (heat build-up from adjacent passes is what laser-processing research warns about; cheap on a galvo)
+- [ ] Engrave to an exact depth: measure the depth with the red pointer between passes and adjust the passes left (only in patents so far). Needs the pointer's real precision measured at the machine test
+- [ ] Engraving-style portraits: photos redrawn as banknote lines that swell in the shadows: straight, contour-following or guilloché (only separate web tools do this)
+- [ ] Inlay and marquetry maker: matching pocket and piece from one design, the fit from the cut test's kerf and the pocket depth from the etch rate so veneer sits flush
+- [ ] Stencil bridges: the middles of O, A, R kept in by automatic bridges
+- [ ] Laser-induced graphene (experimental): burn cork or wood into conductive carbon for touch pads and simple sensors, with a resistance test pattern; whether the 450 nm diode does it needs testing (papers show hobby visible lasers on cork)
+- [ ] Print-then-cut: the camera finds printed artwork (stickers) and the diode cuts round it (Bambu's H2D sells on this)
+
 ### Online only (not planned; listed for completeness)
 - Accounts and linking the machine to one; cloud projects and sharing; cloud fonts
 - AI image generation and editing (AImake, cutout, enhance, expand, restyle, magic eraser), AI emboss, AI material recognition and suggested settings, AI test-grid reading, AI assistant
@@ -198,3 +209,4 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Egg crate / radial: cut a small set in 3 mm basswood; do the slots slide together at 0.1 mm fit with the cut layer's kerf?
 - Material outline: outline a real offcut with Pick piece, Use as material outline, slice into it; do the parts land on the wood?
 - Cut test: does a cut square drop cleanly or need a push; is the measured kerf about 0.1–0.2 mm on 3 mm basswood; does the comb's snug slot match the egg crate fit?
+- Spread lines: does the machine take picture rows out of order in a picture block? Compare scorching on thin acrylic and colour evenness on steel with it on and off.

@@ -262,7 +262,7 @@ public static class JobBuilder
                 {
                     var (dots, area) = Rasterize(img, layer);
                     if (dots is null) continue;
-                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm };
+                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / dots.Dpi) : 0 };
                     int bm = blocks.Count, sm = steps.Count;
                     blocks.Add(block);
                     steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));
@@ -319,7 +319,12 @@ public static class JobBuilder
                         DotWidthMm = layer.DotWidthMm,
                         Unidirectional = !layer.Bidirectional,
                     };
-                    block = block with { LineDwellMs = layer.LineDwellMs, ReverseOrder = layer.ScanReverse };
+                    block = block with
+                    {
+                        LineDwellMs = layer.LineDwellMs,
+                        ReverseOrder = layer.ScanReverse,
+                        Spread = layer.SpreadLines ? Job.SpreadStride(10 / layer.LinesPerCm) : 0,
+                    };
                     var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + layer.CrossAngleDeg } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;
                     if (!first && !second) continue;

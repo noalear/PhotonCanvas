@@ -134,6 +134,8 @@ public sealed record Layer
     public double CrossAngleDeg { get; init; } = 90;
     /// <summary>Fill lines: pause before each line (ms), against heat build-up. 0 = none.</summary>
     public int LineDwellMs { get; init; }
+    /// <summary>Fills and pictures: burn the lines spread apart, never one straight after its neighbour, against heat build-up.</summary>
+    public bool SpreadLines { get; init; }
     /// <summary>Fill: trace each shape's outline after filling it, for clean edges.</summary>
     public bool OutlineAfter { get; init; }
     /// <summary>Fill lines: scan from the other side (bottom to top).</summary>
