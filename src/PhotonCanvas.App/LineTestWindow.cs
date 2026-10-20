@@ -68,7 +68,8 @@ public sealed class LineTestWindow : Window
                 Field("Settings of", _source, tip: "The picture layer to try: every patch starts from exactly its settings."),
                 Field("Patch shows", _shows, tip: "A piece of your picture shows the rows as they'd be in it. Rows often show only where the picture changes from dot to dot (burning back and forth, " +
                                                   "a late power change lands on opposite sides in neighbouring rows), which flat grey can't show. Grey bands and edges has both flat greys and edges."),
-                Explained("The patches, left to right", "Each one changes one thing from the first. Closer lines get less power, so they put in the same heat and only the rows differ.", _variants),
+                Explained("The patches, left to right", "Each one changes one thing from the first. Closer lines get less power by the same share, so they put in the same energy; " +
+                                                       "on wood they usually still come out lighter, with more pale greys, because it marks much less at low power.", _variants),
                 Explained("Patch size", "Bigger patches are easier to judge by eye.", Row(Labelled("Size (mm)", _size))),
                 _plan,
                 Hint("Use the material you'll engrave the pictures on, flat and in the camera's view, clear of knots and grain lines."),
@@ -95,7 +96,8 @@ public sealed class LineTestWindow : Window
                 Row(update),
                 _photoNote,
                 _cards,
-                Explained("Use it", "\"Use these settings\" puts the patch's resolution, power, spreading and direction on this layer. Everything else stays.", Field("Layer", _useOn), _status),
+                Explained("Use it", "\"Use these settings\" puts the patch's resolution, power, spreading and direction on this layer. Everything else stays. " +
+                                    "To fine-tune, make the test again from the layer's new settings: each round changes one thing from where you are.", Field("Layer", _useOn), _status),
                 Row(remove),
             },
         };

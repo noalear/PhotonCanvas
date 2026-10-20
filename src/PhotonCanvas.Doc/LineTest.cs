@@ -42,14 +42,16 @@ public static class LineTest
             double dpi = Math.Min(2540, Math.Round(l.Dpi * k / 10) * 10);
             if (dpi <= l.Dpi) continue;
             var finer = Finer(l, dpi);
-            o.Add(new($"{dpi:0} dpi", $"Lines {25.4 / dpi:0.###} mm apart; power {finer.Laser.Power:0.#}% (same heat)", finer));
+            o.Add(new($"{dpi:0} dpi", $"Lines {25.4 / dpi:0.###} mm apart; power {finer.Laser.Power:0.#}% (same energy)", finer));
         }
         return o;
     }
 
     /// <summary>
-    /// The layer at a finer resolution with the same heat: more lines (or dots) per mm, so the
-    /// power goes down by the same share, the lightest grey's power too.
+    /// The layer at a finer resolution with the same energy: more lines (or dots) per mm, so the
+    /// power goes down by the same share, the lightest grey's power too. On wood it comes out
+    /// lighter all the same (seen on basswood, Oct 2026): it marks much less at low power, which
+    /// also gives more of the pale greys.
     /// </summary>
     public static Layer Finer(Layer l, double dpi)
     {

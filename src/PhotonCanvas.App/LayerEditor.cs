@@ -210,7 +210,8 @@ public sealed class LayerEditor : UserControl
         ToolTip.SetTip(_outlineAfter, "After filling each shape, trace its outline at the same settings: hides ragged edges.");
         ToolTip.SetTip(_scanReverse, "Fill from the far side back (bottom to top): keeps the smoke away from what's still to engrave, depending on how your air flows.");
         ToolTip.SetTip(_spread, "Burn every few lines first, then the ones between, so no line is burned straight after the one beside it and the heat has time to leave: " +
-                                "less scorching, less warping of thin plastic, more even colours on metal. Hardly any slower on a galvo.");
+                                "less scorching, less warping of thin plastic, more even colours on metal. Hardly any slower on a galvo. " +
+                                "On wood pictures it can leave visible rows (lines burned beside already-charred ones come out darker); Laser → Line test shows both.");
         ToolTip.SetTip(_deepestFirst, "Engrave the deepest (smallest) slices first and the widest last: often a smoother floor (noise reduction).");
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
