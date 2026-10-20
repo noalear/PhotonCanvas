@@ -284,7 +284,7 @@ public sealed class LineTestWindow : Window
                     {
                         face,
                         new TextBlock { Text = $"{i + 1}. {LineTest.Label(layer)}", FontWeight = FontWeight.SemiBold },
-                        new TextBlock { Text = $"{layer.Dpi:0} dpi · {layer.Laser.Power:0.#}% · {(layer.Bidirectional ? "both ways" : "one way")} · {(layer.SpreadLines ? "spread" : "in order")}", FontSize = 11.5, Foreground = Brush("TextMuted"), TextWrapping = TextWrapping.Wrap },
+                        new TextBlock { Text = LineTest.Describe(layer), FontSize = 11.5, Foreground = Brush("TextMuted"), TextWrapping = TextWrapping.Wrap },
                         use,
                     },
                 },

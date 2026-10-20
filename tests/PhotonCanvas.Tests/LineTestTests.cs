@@ -30,9 +30,9 @@ public class LineTestTests
         // The opposite toggles when the layer starts the other way.
         var other = LineTest.Variants(Pictures() with { SpreadLines = false, Bidirectional = false });
         Assert.Equal(["As set", "Spread out", "Both ways", "400 dpi", "500 dpi", "2 passes turned", "3 passes turned"], other.Select(x => x.Label));
-        // Turned passes: the power shared out, each pass 180° ÷ passes round from the last.
-        Assert.Equal((3, 30.0, 60.0), (v[6].Settings.Laser.Passes, v[6].Settings.Laser.Power, v[6].Settings.AngleStepDeg));
-        Assert.Equal((2, 45.0, 90.0, 5.0), (v[5].Settings.Laser.Passes, v[5].Settings.Laser.Power, v[5].Settings.AngleStepDeg, v[5].Settings.GrayMinPower));
+        // Turned passes: the power cut by the square root (weak passes mark less), each pass 180° ÷ passes round from the last.
+        Assert.Equal((3, 52.0, 60.0), (v[6].Settings.Laser.Passes, v[6].Settings.Laser.Power, v[6].Settings.AngleStepDeg));
+        Assert.Equal((2, 63.6, 90.0, 7.1), (v[5].Settings.Laser.Passes, v[5].Settings.Laser.Power, v[5].Settings.AngleStepDeg, v[5].Settings.GrayMinPower));
     }
 
     [Fact]

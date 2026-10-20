@@ -29,7 +29,7 @@ public static class LineTest
     {
         var o = new List<Variant>
         {
-            new("As set", $"{l.Dpi:0} dpi · {(l.Bidirectional ? "both ways" : "one way")} · {(l.SpreadLines ? "spread" : "in order")}", l),
+            new("As set", Describe(l), l),
             l.SpreadLines
                 ? new("Not spread", "Lines burned in order, each beside the last", l with { SpreadLines = false })
                 : new("Spread out", "Every few lines first, then the ones between", l with { SpreadLines = true }),
@@ -48,7 +48,7 @@ public static class LineTest
         foreach (int n in new[] { 2, 3 })
         {
             var turned = Turned(l, n);
-            o.Add(new($"{turned.Laser.Passes} passes turned", $"{turned.Laser.Passes} passes at {turned.Laser.Power:0.#}%, each turned {turned.AngleStepDeg:0}° (same energy)", turned));
+            o.Add(new($"{turned.Laser.Passes} passes turned", $"{turned.Laser.Passes} passes at {turned.Laser.Power:0.#}%, each turned {turned.AngleStepDeg:0}° (a bit more energy than as set: weak passes mark less)", turned));
         }
         return o;
     }
@@ -73,19 +73,33 @@ public static class LineTest
 
     /// <summary>
     /// The layer burned in <paramref name="times"/> as many passes, each turned 180° ÷ passes from the
-    /// last (2 → 0° and 90°, 3 → 0°, 60°, 120°), with the power cut by the same share: the same energy.
+    /// last (2 → 0° and 90°, 3 → 0°, 60°, 120°), with the power cut by the square root of that: a
+    /// little more energy in all. Cut by the same share, the passes came out far too weak (basswood,
+    /// Oct 2026: 6 × 20% barely marked and 9 × 13.3% didn't at all, where 3 × 40% was dark): below
+    /// some power wood doesn't mark however many passes go over it.
     /// </summary>
     public static Layer Turned(Layer l, int times)
     {
         int passes = Math.Max(1, l.Laser.Passes) * times;
-        double power = Math.Max(1, Math.Round(l.Laser.Power / times, 1));
+        double k = 1 / Math.Sqrt(times);
+        double power = Math.Max(1, Math.Round(l.Laser.Power * k, 1));
         return l with
         {
             Laser = l.Laser with { Power = power, Passes = passes },
-            GrayMinPower = Math.Min(power, Math.Round(l.GrayMinPower / times, 1)),
+            GrayMinPower = Math.Min(power, Math.Round(l.GrayMinPower * k, 1)),
             AngleStepDeg = Math.Round(180.0 / passes, 1),
             Crosshatch = false,
         };
+    }
+
+    /// <summary>A patch's settings in a line: "400 dpi · 40% × 3, turned 60° · both ways · spread".</summary>
+    public static string Describe(Layer l)
+    {
+        int passes = Math.Max(1, l.Laser.Passes);
+        string turn = passes > 1 && l.AngleStepDeg != 0 ? $", turned {l.AngleStepDeg:0.#}°" : "";
+        string cross = l.Crosshatch ? $" · crosshatched {l.CrossAngleDeg:0.#}°" : "";
+        string angle = l.FillAngleDeg % 360 != 0 ? $" · rows at {l.FillAngleDeg:0.#}°" : "";
+        return $"{l.Dpi:0} dpi · {l.Laser.Power:0.#}%{(passes > 1 ? $" × {passes}{turn}" : "")}{angle}{cross} · {(l.Bidirectional ? "both ways" : "one way")} · {(l.SpreadLines ? "spread" : "in order")}";
     }
 
     /// <summary>Width of the row of patches (mm).</summary>
