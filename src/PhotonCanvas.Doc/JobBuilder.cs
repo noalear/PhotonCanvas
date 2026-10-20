@@ -260,6 +260,8 @@ public static class JobBuilder
                 }
                 foreach (var img in images)
                 {
+                    if (layer.PassThrough && OwnDpi(img) > layer.Dpi * 1.02)
+                        warnings.Add($"\"{img.Name}\" has {img.Source.Width} pixels across {img.Bounds.Width:0.#} mm ({OwnDpi(img):0} dpi), more than layer \"{layer.Name}\"'s {layer.Dpi:0} dpi. One dot per pixel would put {OwnDpi(img) / layer.Dpi:0.#}× the heat in, so it's engraved at {layer.Dpi:0} dpi instead (pass-through can't keep its own pixels).");
                     var (dots, area) = Rasterize(img, layer);
                     if (dots is null) continue;
                     var block = dots with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / dots.Dpi) : 0 };
@@ -592,6 +594,9 @@ public static class JobBuilder
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
 
+    /// <summary>The resolution a picture's own pixels have at its size on the bed.</summary>
+    public static double OwnDpi(ImageShape img) => 25.4 * img.Source.Width / Math.Max(1e-6, Math.Abs(img.SizeMm.X * img.Transform.ScaleX));
+
     /// <summary>Most dots a single image may produce (keeps files and memory sane).</summary>
     const long MaxImageCells = 40_000_000;
 
@@ -603,8 +608,9 @@ public static class JobBuilder
     public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer)
     {
         JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
-        // Pass-through: one dot per pixel of the file.
-        double dpi = layer.PassThrough ? Math.Clamp(25.4 * img.Source.Width / Math.Max(1e-6, img.SizeMm.X * img.Transform.ScaleX), 10, 2540) : layer.Dpi;
+        // Pass-through: one dot per pixel of the file, but never closer together than the layer's
+        // resolution (a big file on a small picture would put far more heat in than was set).
+        double dpi = layer.PassThrough ? Math.Clamp(Math.Min(OwnDpi(img), layer.Dpi), 10, 2540) : layer.Dpi;
         double pitch = 25.4 / dpi;
         var b = img.Bounds;
         int cols = Math.Max(1, (int)Math.Floor(b.Width / pitch + 1e-9));

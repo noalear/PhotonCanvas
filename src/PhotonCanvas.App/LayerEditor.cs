@@ -214,7 +214,7 @@ public sealed class LayerEditor : UserControl
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
         ToolTip.SetTip(_bidir, "Off: every line burns in the same direction and the beam returns unlit. More even on some materials, a little slower.");
         ToolTip.SetTip(_together, "Scan all of this layer's shapes in one go instead of one shape at a time: fewer jumps for lots of small shapes. Where shapes overlap they cancel out.");
-        ToolTip.SetTip(_passThrough, "Engrave the picture's own pixels, one dot each: its size and pixel count set the resolution (prepared pictures, no resampling).");
+        ToolTip.SetTip(_passThrough, "Engrave the picture's own pixels, one dot each, with no resampling (for pictures already prepared at the right size). Never closer together than the resolution above: a picture with more pixels than that is resampled down, so it can't put in more heat than you set.");
         _cleanFreqRow = Field("Cleanup kHz", _cleanFreq, tip: "MOPA: the cleanup pass's frequency (its pulse width stays the layer's).");
         _cleanRows = new StackPanel
         {

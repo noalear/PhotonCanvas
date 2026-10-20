@@ -84,9 +84,14 @@ public class ParityTests
         int w = block.Bitmap.Width;
         Assert.True(block.Levels![0] < block.Levels[(w / 2) * w + w / 2]);
 
-        var through = layer with { RampMm = 0, PassThrough = true, Dpi = 50 };
+        // 40 pixels across 10 mm is about 102 dpi: kept as they are under a finer layer resolution…
+        var through = layer with { RampMm = 0, PassThrough = true, Dpi = 300 };
         var (pt, _) = JobBuilder.Rasterize(Picture(layer.Id, 40, 40, (x, y) => 0, 10), through);
         Assert.Equal(40, pt!.Bitmap.Width);
+        // …but never packed closer than the layer's resolution (that would pile on heat).
+        var (coarse, _) = JobBuilder.Rasterize(Picture(layer.Id, 40, 40, (x, y) => 0, 10), through with { Dpi = 50 });
+        Assert.Equal(50.0, coarse!.Dpi, 6);
+        Assert.InRange(coarse.Bitmap.Width, 19, 20);
 
         var clipped = Picture(layer.Id, 100, 100, (x, y) => 0, 10).WithClip(PathGeometry.Ellipse(25, 25, 5, 5));
         var (cb, _) = JobBuilder.Rasterize(clipped, layer with { RampMm = 0 });
