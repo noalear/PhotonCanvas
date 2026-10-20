@@ -311,6 +311,7 @@ public partial class MainWindow : Window
     {
         Canvas.Grid = GridWindow.From(_settings);
         Canvas.ShowGrid = _settings.ShowGrid;
+        Canvas.PicturesAsBurned = _settings.PicturesAsBurned;
         Canvas.SnapToObjects = _settings.SnapToObjects;
         Canvas.SnapToGrid = _settings.SnapToGrid;
         Canvas.SnapDistancePx = _settings.SnapDistancePx;
@@ -639,6 +640,8 @@ public partial class MainWindow : Window
         tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
+        panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
+            "Show pictures as they'll come out on their layer's material: corrected, in the material's own colours. Needs a tone test on that material (Laser → Tone test).", null, () => _settings.PicturesAsBurned);
 
         _ribbon.Select(_settings.RibbonTab);
         _ribbon.TabSelected += t => { _settings.RibbonTab = t; _settings.Save(); };

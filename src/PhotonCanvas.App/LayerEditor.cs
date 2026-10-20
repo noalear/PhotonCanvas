@@ -638,7 +638,7 @@ public sealed class LayerEditor : UserControl
             return;
         }
         var m = lib.Materials[_material.SelectedIndex - 1];
-        EditLayers($"Material: {m.Label}", l => WithReflective(l with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label) }, m.HighlyReflective), true);
+        EditLayers($"Material: {m.Label}", l => WithTone(WithReflective(l with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label) }, m.HighlyReflective), m), true);
     }
 
     void RecipeChosen()
@@ -652,6 +652,20 @@ public sealed class LayerEditor : UserControl
     /// <summary>Put a recipe's settings on the selected layers and remember which it was.</summary>
     public void ApplyRecipe(PhotonCanvas.Doc.Materials.Material m, PhotonCanvas.Doc.Materials.Recipe r) =>
         EditLayers($"Apply {m.Label} · {r.Title}", l => WithReflective(r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, m.HighlyReflective), true);
+
+    /// <summary>
+    /// A picture layer on a material that has had a tone test takes its correction (from the tested
+    /// settings nearest the layer's own), so its pictures come out, and show, as they look.
+    /// </summary>
+    static Layer WithTone(Layer l, PhotonCanvas.Doc.Materials.Material m)
+    {
+        if (l.Mode != LayerMode.Image) return l;
+        var tested = m.Recipes.Where(r => r.Settings.MaterialTone is not null)
+            .OrderBy(r => Math.Abs(r.Settings.Laser.Power - l.Laser.Power) + Math.Abs(r.Settings.Laser.Speed - l.Laser.Speed) / 10 + Math.Abs(r.Settings.Dpi - l.Dpi) / 20)
+            .ThenByDescending(r => r.TestedOn)
+            .FirstOrDefault();
+        return tested is null ? l : l with { MaterialTone = tested.Settings.MaterialTone };
+    }
 
     /// <summary>The layer takes the material's reflective tag (and a frequency that respects it).</summary>
     Layer WithReflective(Layer l, bool reflective)

@@ -85,6 +85,11 @@ public class ToneTests
         Assert.NotNull(reading);
         foreach (var g in new[] { 0.2, 0.5, 0.8 }) Assert.InRange(reading.Curve.Response(g), Wood(g) - 0.02, Wood(g) + 0.02);
         Assert.Equal(0xD2B48Cu, reading.BareColour);
+        // The colours travel with the curve.
+        Assert.Equal(0xD2B48Cu, reading.Curve.BareColour);
+        Assert.Equal(0x3C2314u, reading.Curve.BurnColour);
+        // Mid-grey, corrected, comes out half-way between burned and bare: (60 + 210) / 2 = 135 red.
+        Assert.InRange((int)(reading.Curve.Burned(0.5, corrected: true) >> 16), 130, 140);
         Assert.Equal(0x3C2314u, reading.BurnColour);
 
         // A simulated picture: corrected, a mid-grey comes out mid-way between burned and bare.
@@ -115,10 +120,22 @@ public class ToneTests
         var back = DocFile.Deserialize(DocFile.Serialize(withCurve)).Layers.Single(l => l.Id == layer.Id).MaterialTone!;
         Assert.Equal(curve.Points.Count, back.Points.Count);
         Assert.Equal(curve.Correct(0.5), back.Correct(0.5), 9);
+        // Colours kept through saving, and an older file with only the points still reads.
+        var coloured = curve with { BareColour = 0xD2B48C, BurnColour = 0x3C2314 };
+        var back2 = DocFile.Deserialize(DocFile.Serialize(Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { MaterialTone = coloured })))
+            .Layers.Single(l => l.Id == layer.Id).MaterialTone!;
+        Assert.Equal(0xD2B48Cu, back2.BareColour);
+        Assert.Equal(0x3C2314u, back2.BurnColour);
+        var old = DocFile.ReadTone(System.Text.Json.Nodes.JsonNode.Parse("[[0,0],[0.5,0.2],[1,1]]"))!;
+        Assert.Equal(3, old.Points.Count);
+        Assert.Null(old.BareColour);
         // And in the material library's own format.
         var settings = PhotonCanvas.Doc.Materials.ProcessSettings.From(layer with { MaterialTone = curve });
         var json = System.Text.Json.JsonSerializer.Serialize(settings);
         var again = System.Text.Json.JsonSerializer.Deserialize<PhotonCanvas.Doc.Materials.ProcessSettings>(json)!;
         Assert.Equal(curve.Correct(0.5), again.MaterialTone!.Correct(0.5), 9);
+        var againColoured = System.Text.Json.JsonSerializer.Deserialize<PhotonCanvas.Doc.Materials.ProcessSettings>(
+            System.Text.Json.JsonSerializer.Serialize(PhotonCanvas.Doc.Materials.ProcessSettings.From(layer with { MaterialTone = coloured })))!;
+        Assert.Equal(0xD2B48Cu, againColoured.MaterialTone!.BareColour);
     }
 }

@@ -110,8 +110,10 @@ public static class ToneTest
         double bare = readings.Average(r => r!.Around);
         var curve = ToneCurve.FromReadings([.. patches.Select(p => p.Level)], [.. readings.Select(r => r!.Inside)], bare);
         var black = patches.Select((p, i) => (p.Level, i)).MinBy(x => x.Level).i;
-        return new ToneReading(curve, [.. readings.Select(r => r!.Inside)], bare,
-            MeanColour(photo, area, mmPerPx, Inner(patches[black].Bed)), MeanColour(photo, area, mmPerPx, Ring(patches)));
+        uint burnColour = MeanColour(photo, area, mmPerPx, Inner(patches[black].Bed)), bareColour = MeanColour(photo, area, mmPerPx, Ring(patches));
+        // The colours go with the curve, so pictures can be shown as they'll burn anywhere it's used.
+        curve = curve with { BareColour = bareColour, BurnColour = burnColour };
+        return new ToneReading(curve, [.. readings.Select(r => r!.Inside)], bare, burnColour, bareColour);
     }
 
     static Rect2 Inner(Rect2 r) => new(r.MinX + r.Width * 0.2, r.MinY + r.Height * 0.2, r.MaxX - r.Width * 0.2, r.MaxY - r.Height * 0.2);

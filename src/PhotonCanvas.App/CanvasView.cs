@@ -168,6 +168,47 @@ public sealed partial class CanvasView : Control
     }
 
     bool _showGrid = true;
+    /// <summary>
+    /// Pictures on a layer with a measured tone curve are drawn as they'll come out: corrected and
+    /// through the material's response, in its own colours.
+    /// </summary>
+    public bool PicturesAsBurned
+    {
+        get => _asBurned;
+        set { _asBurned = value; InvalidateVisual(); }
+    }
+    bool _asBurned;
+    readonly Dictionary<(ImageSource, Core.Imaging.ToneAdjust, Core.Imaging.ToneCurve), Avalonia.Media.Imaging.Bitmap> _burned = [];
+
+    /// <summary>A picture as it'll burn (made once per picture, its tone settings and the material's curve).</summary>
+    Avalonia.Media.Imaging.Bitmap Burned(ImageShape im, Core.Imaging.ToneCurve curve)
+    {
+        var key = (im.Source, im.Tone, curve);
+        if (_burned.TryGetValue(key, out var have)) return have;
+        if (_burned.Count > 24) _burned.Clear();
+        var src = im.Source.Pixels;
+        var px = new byte[src.Width * src.Height * 4];
+        // Tones are worked out once each (pictures have far more pixels than greys).
+        var colour = new uint[256];
+        for (int g = 0; g < 256; g++) colour[g] = curve.Burned(im.Tone.Apply(g / 255.0), corrected: true);
+        uint bare = curve.Burned(1, corrected: true);
+        for (int i = 0; i < src.Width * src.Height; i++)
+        {
+            int k = i * 4;
+            int lum = (int)Math.Round(0.299 * src.Rgba[k] + 0.587 * src.Rgba[k + 1] + 0.114 * src.Rgba[k + 2]);
+            double a = src.Rgba[k + 3] / 255.0;
+            uint c = colour[Math.Clamp(lum, 0, 255)];
+            // Transparent parts are bare material.
+            px[k] = (byte)Math.Round(((c >> 16) & 0xFF) * a + ((bare >> 16) & 0xFF) * (1 - a));
+            px[k + 1] = (byte)Math.Round(((c >> 8) & 0xFF) * a + ((bare >> 8) & 0xFF) * (1 - a));
+            px[k + 2] = (byte)Math.Round((c & 0xFF) * a + (bare & 0xFF) * (1 - a));
+            px[k + 3] = 255;
+        }
+        var bmp = CameraImaging.ToAvaloniaRgba(new Core.Imaging.RasterImage(src.Width, src.Height, px));
+        _burned[key] = bmp;
+        return bmp;
+    }
+
     public bool ShowGrid
     {
         get => _showGrid;
@@ -388,7 +429,9 @@ public sealed partial class CanvasView : Control
 
     void DrawPicture(DrawingContext ctx, ImageShape im, Layer layer, bool sel, bool hov, double px)
     {
-        var bmp = _pictures.GetValue(im.Source, s => CameraImaging.ToAvaloniaRgba(s.Pixels));
+        var bmp = _asBurned && layer.MaterialTone is { BareColour: not null, BurnColour: not null } curve
+            ? Burned(im, curve)
+            : _pictures.GetValue(im.Source, s => CameraImaging.ToAvaloniaRgba(s.Pixels));
         var t = im.Transform;
         using (ctx.PushTransform(new Matrix(t.A, t.B, t.C, t.D, t.E, t.F)))
         using (ctx.PushOpacity(layer.Output ? 1 : 0.5))

@@ -15,6 +15,23 @@ public sealed record ToneCurve(IReadOnlyList<(double Input, double Lightness)> P
 {
     double[]? _lut;
 
+    /// <summary>The bare material's colour (0xRRGGBB) as the camera saw it, if measured: for showing pictures as they'll burn.</summary>
+    public uint? BareColour { get; init; }
+    /// <summary>The colour of the darkest burn these settings make (0xRRGGBB), if measured.</summary>
+    public uint? BurnColour { get; init; }
+
+    /// <summary>
+    /// A picture tone (0 black … 1 white) as it comes out: corrected first (or sent as it is),
+    /// then through the material's response, coloured between the burned and bare colours.
+    /// </summary>
+    public uint Burned(double tone, bool corrected)
+    {
+        uint bare = BareColour ?? 0xE6CFA6, burn = BurnColour ?? 0x3A2416;
+        double light = Response(corrected ? Correct(tone) : tone);
+        uint Mix(int shift) => (uint)Math.Round(((burn >> shift) & 0xFF) + ((double)((bare >> shift) & 0xFF) - ((burn >> shift) & 0xFF)) * light);
+        return Mix(16) << 16 | Mix(8) << 8 | Mix(0);
+    }
+
     /// <summary>
     /// From patch brightnesses read off a photo: <paramref name="brightness"/>[i] for grey
     /// <paramref name="inputs"/>[i], against the bare material's <paramref name="bare"/>. The
@@ -138,14 +155,27 @@ public sealed record ToneCurve(IReadOnlyList<(double Input, double Lightness)> P
 /// <summary>A tone curve in JSON: [[input, lightness], …].</summary>
 public sealed class ToneCurveJson : JsonConverter<ToneCurve>
 {
+    sealed record Stored(double[][] Points, uint? Bare, uint? Burn);
+
     public override ToneCurve? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType == JsonTokenType.Null) return null;
-        var pts = JsonSerializer.Deserialize<double[][]>(ref reader, options) ?? [];
+        // Either [[input, lightness], …] (the first files), or { points, bare, burn }.
+        double[][] pts;
+        uint? bare = null, burn = null;
+        if (reader.TokenType == JsonTokenType.StartArray) pts = JsonSerializer.Deserialize<double[][]>(ref reader) ?? [];
+        else
+        {
+            var s = JsonSerializer.Deserialize<Stored>(ref reader, Plain);
+            pts = s?.Points ?? [];
+            (bare, burn) = (s?.Bare, s?.Burn);
+        }
         var list = pts.Where(p => p.Length == 2).Select(p => (Math.Clamp(p[0], 0, 1), Math.Clamp(p[1], 0, 1))).ToList();
-        return list.Count >= 2 ? new ToneCurve(list) : null;
+        return list.Count >= 2 ? new ToneCurve(list) { BareColour = bare, BurnColour = burn } : null;
     }
 
     public override void Write(Utf8JsonWriter writer, ToneCurve value, JsonSerializerOptions options) =>
-        JsonSerializer.Serialize(writer, value.Points.Select(p => new[] { p.Input, p.Lightness }).ToArray(), options);
+        JsonSerializer.Serialize(writer, new Stored([.. value.Points.Select(p => new[] { p.Input, p.Lightness })], value.BareColour, value.BurnColour), Plain);
+
+    static readonly JsonSerializerOptions Plain = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true };
 }

@@ -83,7 +83,7 @@ public static class DocFile
                 ["crossAngleDeg"] = l.CrossAngleDeg,
                 ["lineDwellMs"] = l.LineDwellMs,
                 ["spreadLines"] = l.SpreadLines,
-                ["materialTone"] = l.MaterialTone is { } mt ? new JsonArray([.. mt.Points.Select(p => (JsonNode)new JsonArray(p.Input, p.Lightness))]) : null,
+                ["materialTone"] = l.MaterialTone is { } mt ? JsonSerializer.SerializeToNode(mt) : null,
                 ["outlineAfter"] = l.OutlineAfter,
                 ["scanReverse"] = l.ScanReverse,
                 ["tabPowerPct"] = l.TabPowerPct,
@@ -239,12 +239,9 @@ public static class DocFile
     /// <summary>A tone curve written as [[input, lightness], …], or null.</summary>
     public static Core.Imaging.ToneCurve? ReadTone(JsonNode? node)
     {
-        if (node is not JsonArray a) return null;
-        var pts = new List<(double, double)>();
-        foreach (var p in a)
-            if (p is JsonArray { Count: 2 } pair && pair[0] is { } x && pair[1] is { } y)
-                pts.Add((Math.Clamp(x.GetValue<double>(), 0, 1), Math.Clamp(y.GetValue<double>(), 0, 1)));
-        return pts.Count >= 2 ? new Core.Imaging.ToneCurve(pts) : null;
+        if (node is null) return null;
+        try { return node.Deserialize<Core.Imaging.ToneCurve>(); }
+        catch (JsonException) { return null; }
     }
 
     public static DocState Deserialize(string json)

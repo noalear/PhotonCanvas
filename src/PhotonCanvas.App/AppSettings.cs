@@ -61,6 +61,8 @@ public sealed class AppSettings
     public string GridMajorColor { get; set; } = "#2A303B";
     public string GridMinorColor { get; set; } = "#1D2129";
     public bool ShowGrid { get; set; } = true;
+    /// <summary>Draw pictures as they'll come out on their layer's material (where it has a tone test).</summary>
+    public bool PicturesAsBurned { get; set; }
     public bool SnapToObjects { get; set; } = true;
     public bool SnapToGrid { get; set; }
     public double SnapDistancePx { get; set; } = 8;
