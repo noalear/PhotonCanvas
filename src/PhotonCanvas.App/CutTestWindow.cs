@@ -30,7 +30,7 @@ public sealed class CutTestWindow : Window
     readonly RadioButton _byPower = new() { Content = "More power on each row", GroupName = "cutdown" };
     readonly NumericUpDown _dMin = Number(1, 100, 1, "0.#"), _dMax = Number(1, 100, 1, "0.#"), _dSteps = Number(1, 10, 1, "0");
     readonly NumericUpDown _power = Number(1, 100, 5, "0.#"), _passes = Number(1, 50, 1, "0"), _cell = Number(4, 20, 1, "0.#");
-    readonly TextBlock _dMinLabel = Label(""), _dMaxLabel = Label("");
+    readonly TextBlock _dMinLabel = Muted(""), _dMaxLabel = Muted("");
     readonly Control _powerCol, _stepsCol, _passesCol;
     readonly ContentControl _third = new();
     readonly CutTestPreview _preview = new() { Margin = new(4) };
@@ -81,9 +81,9 @@ public sealed class CutTestWindow : Window
         }
         _byPasses.IsCheckedChanged += (_, _) => { if (_byPasses.IsChecked == true) Switch(false); };
         _byPower.IsCheckedChanged += (_, _) => { if (_byPower.IsChecked == true) Switch(true); };
-        _powerCol = Col("Power for every square (%)", _power);
-        _stepsCol = Col("How many", _dSteps);
-        _passesCol = Col("Passes for every square", _passes);
+        _powerCol = Labelled("Power for every square (%)", _power);
+        _stepsCol = Labelled("How many", _dSteps);
+        _passesCol = Labelled("Passes for every square", _passes);
 
         var add = _add;
         add.Click += (_, _) => AddTest();
@@ -99,11 +99,11 @@ public sealed class CutTestWindow : Window
                 },
                 Field("Laser", _light),
                 new Border { Background = Brush("Bg0"), CornerRadius = new(8), Padding = new(10), Child = _preview },
-                Card("Across: speed", "Each column is cut at a different speed. Slower cuts deeper.",
-                    Row(Col("Slowest (mm/s)", _sMin), Col("Fastest (mm/s)", _sMax), Col("How many speeds", _sSteps)), _speedList),
-                Card("Down: passes or power", "Each row adds more passes (or more power) to go deeper.",
+                Explained("Across: speed", "Each column is cut at a different speed. Slower cuts deeper.",
+                    Row(Labelled("Slowest (mm/s)", _sMin), Labelled("Fastest (mm/s)", _sMax), Labelled("How many speeds", _sSteps)), _speedList),
+                Explained("Down: passes or power", "Each row adds more passes (or more power) to go deeper.",
                     new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, Children = { _byPasses, _byPower } },
-                    Row(Col(_dMinLabel, _dMin), Col(_dMaxLabel, _dMax), _third),
+                    Row(Labelled(_dMinLabel, _dMin), Labelled(_dMaxLabel, _dMax), _third),
                     _passesCol, _downList),
                 Field("Square size (mm)", _cell, tip: "Big enough to see whether it dropped, small enough not to tip up into the head once it's loose."),
                 _plan,
@@ -156,28 +156,6 @@ public sealed class CutTestWindow : Window
     /// <summary>Rows of passes at most (more is spread out over the range).</summary>
     const int MaxRows = 10;
 
-    /// <summary>"4, 8, 12 and 16".</summary>
-    static string List(IEnumerable<string> items)
-    {
-        var l = items.ToList();
-        return l.Count <= 1 ? string.Concat(l) : $"{string.Join(", ", l.Take(l.Count - 1))} and {l[^1]}";
-    }
-
-    static TextBlock Label(string text) => new() { Text = text, Classes = { "muted" }, FontSize = 12 };
-
-    /// <summary>A setting with its name above it.</summary>
-    static Control Col(string label, Control editor) => Col(Label(label), editor);
-
-    static Control Col(TextBlock label, Control editor) => new StackPanel { Spacing = 3, Children = { label, editor } };
-
-    /// <summary>A titled group of settings with a line saying what it does.</summary>
-    static Control Card(string title, string about, params Control[] content)
-    {
-        var panel = new StackPanel { Spacing = 8, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold }, Hint(about) } };
-        foreach (var c in content) panel.Children.Add(c);
-        return new Border { BorderBrush = Brush("Line"), BorderThickness = new(1), CornerRadius = new(8), Padding = new(12), Child = panel };
-    }
-
     /// <summary>Is there a cut test (or a kerf test) in the design to read?</summary>
     public static bool InDesign(DocState s) => s.Layers.Any(CutTest.IsCell) || CutTest.KerfLayer(s) is not null;
 
@@ -204,10 +182,10 @@ public sealed class CutTestWindow : Window
         _dMaxLabel.Text = power ? "Highest power (%)" : "Most passes";
         var speeds = MaterialTest.Values(TestParam.Speed, o.SpeedMin, o.SpeedMax, o.SpeedSteps, _machine);
         var down = MaterialTest.Values(power ? TestParam.Power : TestParam.Passes, o.DownMin, o.DownMax, o.DownSteps, _machine);
-        _speedList.Text = $"Tries {List(speeds.Select(v => $"{v:0.#}"))} mm/s.";
+        _speedList.Text = $"Tries {ListWords(speeds.Select(v => $"{v:0.#}"))} mm/s.";
         _downList.Text = power
-            ? $"Tries {List(down.Select(v => $"{v:0.#}"))}% power, {o.Passes} pass{(o.Passes == 1 ? "" : "es")} each."
-            : $"Tries {List(down.Select(v => $"{v:0}"))} pass{(down.Count == 1 && down[0] == 1 ? "" : "es")}, all at {o.Power:0.#}% power.";
+            ? $"Tries {ListWords(down.Select(v => $"{v:0.#}"))}% power, {o.Passes} pass{(o.Passes == 1 ? "" : "es")} each."
+            : $"Tries {ListWords(down.Select(v => $"{v:0}"))} pass{(down.Count == 1 && down[0] == 1 ? "" : "es")}, all at {o.Power:0.#}% power.";
         _preview.Show(speeds, down, power, o.Power, o.Passes);
         try
         {

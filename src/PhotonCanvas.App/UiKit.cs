@@ -19,6 +19,29 @@ static class UiKit
         return new Border { Classes = { "card" }, Child = stack };
     }
 
+    /// <summary>A titled group of settings with a line saying what it does.</summary>
+    public static Control Explained(string title, string about, params Control[] content)
+    {
+        var panel = new StackPanel { Spacing = 8, Children = { new TextBlock { Text = title, FontWeight = FontWeight.SemiBold }, Hint(about) } };
+        foreach (var c in content) panel.Children.Add(c);
+        return new Border { BorderBrush = Brush("Line"), BorderThickness = new(1), CornerRadius = new(8), Padding = new(12), Child = panel };
+    }
+
+    /// <summary>A small grey label.</summary>
+    public static TextBlock Muted(string text) => new() { Text = text, Classes = { "muted" }, FontSize = 12 };
+
+    /// <summary>A setting with its name above it.</summary>
+    public static Control Labelled(string label, Control editor) => Labelled(Muted(label), editor);
+
+    public static Control Labelled(TextBlock label, Control editor) => new StackPanel { Spacing = 3, Children = { label, editor } };
+
+    /// <summary>"4, 8, 12 and 16".</summary>
+    public static string ListWords(IEnumerable<string> items)
+    {
+        var l = items.ToList();
+        return l.Count <= 1 ? string.Concat(l) : $"{string.Join(", ", l.Take(l.Count - 1))} and {l[^1]}";
+    }
+
     /// <summary>Label on the left, editor on the right, optional hint underneath.</summary>
     public static Control Field(string label, Control editor, TextBlock? hint = null, string? tip = null)
     {

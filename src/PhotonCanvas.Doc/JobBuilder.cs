@@ -615,6 +615,8 @@ public static class JobBuilder
         var toLocal = img.Transform.Invert();
         var origin = new Vec2(b.MinX + pitch / 2, b.MinY + pitch / 2);
         var tone = img.Tone;
+        // The material's measured response, turned round: the grey to send for each tone wanted.
+        var material = layer.MaterialTone;
         var grey = new float[cols * rows];
         Parallel.For(0, rows, r =>
         {
@@ -627,6 +629,7 @@ public static class JobBuilder
                 {
                     var px = img.LocalToPixel(local);
                     v = (float)tone.Apply(img.Source.SampleLuminance(px.X, px.Y));
+                    if (material is not null) v = (float)material.Correct(v);
                 }
                 grey[r * cols + c] = v;
             }

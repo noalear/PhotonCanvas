@@ -83,6 +83,7 @@ public static class DocFile
                 ["crossAngleDeg"] = l.CrossAngleDeg,
                 ["lineDwellMs"] = l.LineDwellMs,
                 ["spreadLines"] = l.SpreadLines,
+                ["materialTone"] = l.MaterialTone is { } mt ? new JsonArray([.. mt.Points.Select(p => (JsonNode)new JsonArray(p.Input, p.Lightness))]) : null,
                 ["outlineAfter"] = l.OutlineAfter,
                 ["scanReverse"] = l.ScanReverse,
                 ["tabPowerPct"] = l.TabPowerPct,
@@ -235,6 +236,17 @@ public static class DocFile
     }
 
     /// <exception cref="FormatException">The file is not a readable PhotonCanvas project.</exception>
+    /// <summary>A tone curve written as [[input, lightness], …], or null.</summary>
+    public static Core.Imaging.ToneCurve? ReadTone(JsonNode? node)
+    {
+        if (node is not JsonArray a) return null;
+        var pts = new List<(double, double)>();
+        foreach (var p in a)
+            if (p is JsonArray { Count: 2 } pair && pair[0] is { } x && pair[1] is { } y)
+                pts.Add((Math.Clamp(x.GetValue<double>(), 0, 1), Math.Clamp(y.GetValue<double>(), 0, 1)));
+        return pts.Count >= 2 ? new Core.Imaging.ToneCurve(pts) : null;
+    }
+
     public static DocState Deserialize(string json)
     {
         JsonNode? root;
@@ -313,6 +325,7 @@ public static class DocFile
                     CrossAngleDeg = n["crossAngleDeg"]?.GetValue<double>() ?? 90,
                     LineDwellMs = n["lineDwellMs"]?.GetValue<int>() ?? 0,
                     SpreadLines = n["spreadLines"]?.GetValue<bool>() ?? false,
+                    MaterialTone = ReadTone(n["materialTone"]),
                     OutlineAfter = n["outlineAfter"]?.GetValue<bool>() ?? false,
                     ScanReverse = n["scanReverse"]?.GetValue<bool>() ?? false,
                     TabPowerPct = n["tabPowerPct"]?.GetValue<double>() ?? 0,
