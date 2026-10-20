@@ -255,6 +255,8 @@ public partial class MainWindow : Window
             // A cut test (or its kerf test) likewise.
             else if (CutTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCutTest(true)));
             else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
+            // A depth round burned: measure it next.
+            if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
             if (from != _doc.FilePath) return;
             var next = VariableText.AfterRun(_doc.State, DateTime.Now);
@@ -598,6 +600,7 @@ public partial class MainWindow : Window
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
         mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => ShowEtchTest(_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null))), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
         mat.Large("Cut test", "IcTestGrid", () => _ = Guard(() => ShowCutTest(CutTestWindow.InDesign(_doc.State))), "Find the cut: small squares at different speeds and passes, see which drop out; then the kerf and the slot fit at that setting; saved with the material");
+        mat.Large("Exact depth", "IcDepth", () => _ = Guard(ShowExactDepth), "Engrave the selected shapes to an exact depth: the red pointer measures the surface, then the depth after each round of passes, and works out the next round");
         mat.Large("Tone test", "IcPalette", () => _ = Guard(() => ShowToneTest(ToneTestWindow.InDesign(_doc.State))), "Photos that come out as they look: grey patches burned with a picture layer's settings, read by the camera, and that layer's pictures corrected for the material");
         var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
@@ -2309,6 +2312,8 @@ public partial class MainWindow : Window
             ? "This copy marks the design's own serial number / row again."
             : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
     }
+
+    Task ShowExactDepth() => new ExactDepthWindow(_doc, _machine, _library, _doc.Selection).ShowDialog(this);
 
     Task ShowToneTest(bool results) =>
         new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
