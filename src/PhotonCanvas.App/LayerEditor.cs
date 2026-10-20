@@ -48,6 +48,11 @@ public sealed class LayerEditor : UserControl
     readonly CheckBox _passThrough = new() { Content = "Pass-through (the file's own pixels)" };
     // The same setting as _bidir, shown with the picture settings (a control has one place).
     readonly CheckBox _bidirPic = new() { Content = "Burn rows in both directions" };
+    // Scan angle, crosshatch and turning per pass for pictures (the same layer settings as for fills).
+    readonly NumericUpDown _picAngle = Number(-180, 180, 15, "0.#"), _picCrossAngle = Number(-180, 180, 15, "0.#"), _picTurn = Number(-180, 180, 5, "0.#");
+    readonly CheckBox _picCross = new() { Content = "Crosshatch (each pass twice, the second turned)" };
+    readonly TextBlock _picPasses = new() { Classes = { "hint" }, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+    Control? _picCrossRow, _picTurnRows;
     readonly Control _rampRow;
     readonly TextBlock _lpcmHint = Hint(), _dpiHint = Hint(), _passHint = Hint(), _freqHint = Hint();
     readonly Control _lpcmRow, _dpiRow, _ditherRow, _dotRow, _imageModeRow;
@@ -247,6 +252,20 @@ public sealed class LayerEditor : UserControl
             },
         };
         ToolTip.SetTip(_negative, "For depth maps where light means deep (most are dark = deep).");
+        _picCrossRow = Field("Second pass at (°)", _picCrossAngle, tip: "Crosshatch: how far the second copy of each pass is turned from the first. 90° is the classic crosshatch.");
+        _picTurnRows = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Field("Scan angle (°)", _picAngle, tip: "The direction the rows run. 0 = left to right."),
+                Field("Turn per pass (°)", _picTurn, tip: "With several passes, each one runs its rows this much further round, so no row lies on top of another and the row pattern averages out. " +
+                                                          "Pull the power back so all the passes together make the darkness you want. 0 = every pass the same way."),
+                _picCross,
+                _picCrossRow,
+                _picPasses,
+            },
+        };
         _imageExtras = new StackPanel
         {
             Spacing = 6,
@@ -256,6 +275,7 @@ public sealed class LayerEditor : UserControl
                 _rampRow,
                 _passThrough,
                 _bidirPic,
+                _picTurnRows,
                 _dotRow,
                 _sliceExtras,
             },
@@ -352,6 +372,10 @@ public sealed class LayerEditor : UserControl
         _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
         _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
+        _picAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_picAngle.Value!.Value }, _picAngle.Value.HasValue, "fangle");
+        _picTurn.ValueChanged += (_, _) => EditLayers("Turn per pass", l => l with { AngleStepDeg = (double)_picTurn.Value!.Value }, _picTurn.Value.HasValue, "anglestep");
+        _picCrossAngle.ValueChanged += (_, _) => EditLayers("Crosshatch angle", l => l with { CrossAngleDeg = (double)_picCrossAngle.Value!.Value }, _picCrossAngle.Value.HasValue, "crossangle");
+        _picCross.IsCheckedChanged += (_, _) => EditLayers("Crosshatch", l => l with { Crosshatch = _picCross.IsChecked == true }, _picCross.IsChecked.HasValue);
         _bidirPic.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidirPic.IsChecked == true }, _bidirPic.IsChecked.HasValue);
         _together.IsCheckedChanged += (_, _) => EditLayers("All shapes in one scan", l => l with { FillTogether = _together.IsChecked == true }, _together.IsChecked.HasValue);
         _perf.ValueChanged += (_, _) => EditLayers("Perforation", l => l with { PerforateMm = (double)_perf.Value!.Value }, _perf.Value.HasValue, "perf");
@@ -469,6 +493,13 @@ public sealed class LayerEditor : UserControl
         _bidir.IsVisible = _together.IsVisible = _scanReverse.IsVisible = anyFill && !allOffset;
         _bidirPic.IsChecked = Same(l => l.Bidirectional);
         _bidirPic.IsVisible = anyImage && !allSlices;
+        _picTurnRows!.IsVisible = anyImage && !allSlices;
+        Num(_picAngle, Same(l => l.FillAngleDeg));
+        Num(_picTurn, Same(l => l.AngleStepDeg));
+        Num(_picCrossAngle, Same(l => l.CrossAngleDeg));
+        _picCross.IsChecked = Same(l => l.Crosshatch);
+        _picCrossRow!.IsVisible = ls.Any(l => l.Crosshatch);
+        _picPasses.Text = ls.Count == 1 ? PassAngles(ls[0]) : "";
         _outlineAfter.IsVisible = anyFill;
         _crossRow.IsVisible = anyFill && ls.Any(l => l.Crosshatch);
         _stepRows.IsVisible = anyCut || anyFill;
@@ -681,6 +712,25 @@ public sealed class LayerEditor : UserControl
         if (on.Count == 0) return true;
         bool pictures = on.OfType<ImageShape>().Any(), outlines = on.OfType<PathShape>().Any();
         return mode == LayerMode.Image ? pictures : outlines;
+    }
+
+    /// <summary>What a picture layer's passes do, spelled out: "3 passes, rows at 0°, 60° and 120°; each at 30% (90% in all)".</summary>
+    static string PassAngles(Layer l)
+    {
+        int passes = Math.Max(1, l.Laser.Passes);
+        bool turns = l.AngleStepDeg != 0 && passes > 1;
+        if (!turns && !l.Crosshatch && l.FillAngleDeg % 360 == 0) return passes > 1 ? $"{passes} passes, all with rows left to right." : "";
+        var angles = new List<double>();
+        for (int p = 0; p < Math.Min(passes, 8); p++)
+        {
+            double a = l.FillAngleDeg + (turns ? p * l.AngleStepDeg : 0);
+            angles.Add(a);
+            if (l.Crosshatch) angles.Add(a + l.CrossAngleDeg);
+        }
+        static string Deg(double a) => $"{((a % 180) + 180) % 180:0.#}°";
+        int burns = passes * (l.Crosshatch ? 2 : 1);
+        string list = string.Join(", ", angles.Select(Deg)) + (passes > 8 ? ", …" : "");
+        return $"{burns} burn{(burns == 1 ? "" : "s")}, rows at {list}; each at {l.Laser.Power:0.#}%, so the darkest spots get {burns}× that.";
     }
 
     /// <summary>

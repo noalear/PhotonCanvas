@@ -6,7 +6,7 @@ namespace PhotonCanvas.Doc;
 /// <summary>
 /// The line test: which settings hide the rows a picture is burned in. A row of the same patch,
 /// each burned with a picture layer's settings with one thing changed: the lines spread out or
-/// not, one direction or both, and closer lines (with the power lowered to put in the same heat).
+/// not, one direction or both, closer lines, and more passes each turned (the power lowered to put in the same energy).
 /// The patch is a piece of one of the user's pictures, or grey bands with edges: rows often show
 /// only where the power changes along a row (burning back and forth, a late change lands on
 /// opposite sides in neighbouring rows), which flat greys never do. Each patch has its own layer.
@@ -44,6 +44,12 @@ public static class LineTest
             var finer = Finer(l, dpi);
             o.Add(new($"{dpi:0} dpi", $"Lines {25.4 / dpi:0.###} mm apart; power {finer.Laser.Power:0.#}% (same energy)", finer));
         }
+        // Less power, more passes, each turned: no row lies on another, so the row pattern averages out.
+        foreach (int n in new[] { 2, 3 })
+        {
+            var turned = Turned(l, n);
+            o.Add(new($"{turned.Laser.Passes} passes turned", $"{turned.Laser.Passes} passes at {turned.Laser.Power:0.#}%, each turned {turned.AngleStepDeg:0}° (same energy)", turned));
+        }
         return o;
     }
 
@@ -62,6 +68,23 @@ public static class LineTest
             Dpi = dpi,
             Laser = l.Laser with { Power = power },
             GrayMinPower = Math.Min(power, Math.Round(l.GrayMinPower * k, 1)),
+        };
+    }
+
+    /// <summary>
+    /// The layer burned in <paramref name="times"/> as many passes, each turned 180° ÷ passes from the
+    /// last (2 → 0° and 90°, 3 → 0°, 60°, 120°), with the power cut by the same share: the same energy.
+    /// </summary>
+    public static Layer Turned(Layer l, int times)
+    {
+        int passes = Math.Max(1, l.Laser.Passes) * times;
+        double power = Math.Max(1, Math.Round(l.Laser.Power / times, 1));
+        return l with
+        {
+            Laser = l.Laser with { Power = power, Passes = passes },
+            GrayMinPower = Math.Min(power, Math.Round(l.GrayMinPower / times, 1)),
+            AngleStepDeg = Math.Round(180.0 / passes, 1),
+            Crosshatch = false,
         };
     }
 
@@ -177,15 +200,19 @@ public static class LineTest
 
     /// <summary>
     /// <paramref name="target"/> with the settings the test varies taken from a patch's layer
-    /// (resolution, power, lightest power, spreading, direction); everything else stays.
+    /// (resolution, power, lightest power, passes and their angles, spreading, direction); everything else stays.
     /// </summary>
     public static Layer UseOn(Layer target, Layer tested) => target with
     {
         Dpi = tested.Dpi,
-        Laser = target.Laser with { Power = tested.Laser.Power },
+        Laser = target.Laser with { Power = tested.Laser.Power, Passes = tested.Laser.Passes },
         GrayMinPower = tested.GrayMinPower,
         SpreadLines = tested.SpreadLines,
         Bidirectional = tested.Bidirectional,
+        FillAngleDeg = tested.FillAngleDeg,
+        AngleStepDeg = tested.AngleStepDeg,
+        Crosshatch = tested.Crosshatch,
+        CrossAngleDeg = tested.CrossAngleDeg,
     };
 
     /// <summary>Take the test out of the design: its patches and their layers.</summary>

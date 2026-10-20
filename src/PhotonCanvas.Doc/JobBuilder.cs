@@ -260,18 +260,43 @@ public static class JobBuilder
                     }
                     continue;
                 }
+                // Scan angle, crosshatch and turning per pass: flat bed only (the rotary and conveyor
+                // step along one axis, a curved surface is banded in rows).
+                bool straight = opt.Mode is not WorkMode.Flat || s.Curve.On;
+                bool wantsTurn = layer.FillAngleDeg % 360 != 0 || layer.Crosshatch || (layer.AngleStepDeg != 0 && layer.Laser.Passes > 1);
+                if (straight && wantsTurn && images.Count > 0)
+                    warnings.Add($"Layer \"{layer.Name}\": scan angle, crosshatch and turning per pass only work on the flat bed, so its pictures are burned in straight rows.");
+                double firstAngle = straight ? 0 : layer.FillAngleDeg + layer.RunTurnDeg;
+                double[] angles = !straight && layer.Crosshatch ? [firstAngle, firstAngle + layer.CrossAngleDeg] : [firstAngle];
+                bool perPass = !straight && layer.AngleStepDeg != 0 && layer.Laser.Passes > 1;
+                DotBlock Finish(DotBlock d) => d with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / d.Dpi) : 0, Unidirectional = !layer.Bidirectional };
                 foreach (var img in images)
                 {
                     if (layer.PassThrough && OwnDpi(img) > layer.Dpi * 1.02)
                         warnings.Add($"\"{img.Name}\" has {img.Source.Width} pixels across {img.Bounds.Width:0.#} mm ({OwnDpi(img):0} dpi), more than layer \"{layer.Name}\"'s {layer.Dpi:0} dpi. One dot per pixel would put {OwnDpi(img) / layer.Dpi:0.#}× the heat in, so it's engraved at {layer.Dpi:0} dpi instead (pass-through can't keep its own pixels).");
-                    var (dots, area) = Rasterize(img, layer);
-                    if (dots is null) continue;
-                    var block = dots with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / dots.Dpi) : 0, Unidirectional = !layer.Bidirectional };
-                    int bm = blocks.Count, sm = steps.Count;
-                    blocks.Add(block);
-                    steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true));
-                    Link(bm, sm);
-                    bounds = bounds.Union(area);
+                    foreach (double angle in angles)
+                    {
+                        var (dots, area) = Rasterize(img, layer, angle);
+                        if (dots is null) continue;
+                        var block = Finish(dots);
+                        if (perPass)
+                        {
+                            // Each pass turned further: the picture laid out again at each pass's angle.
+                            var per = new List<DotBlock> { block };
+                            for (int p = 2; p <= Math.Min(layer.Laser.Passes, MaxTurnedPasses); p++)
+                            {
+                                var (more, moreArea) = Rasterize(img, layer, angle + (p - 1) * layer.AngleStepDeg);
+                                per.Add(more is null ? block with { Bitmap = new Bitmap(1, 1), Levels = null } : Finish(more));
+                                area = area.Union(moreArea);
+                            }
+                            block = block with { PassBlocks = per };
+                        }
+                        int bm = blocks.Count, sm = steps.Count;
+                        blocks.Add(block);
+                        steps.Add(new(layer.Id, [area.TopLeft, new(area.MaxX, area.MinY), area.BottomRight, new(area.MinX, area.MaxY)], true, true) { ScanAngleDeg = angle });
+                        Link(bm, sm);
+                        bounds = bounds.Union(area);
+                    }
                 }
                 continue;
             }
@@ -619,29 +644,44 @@ public static class JobBuilder
     /// <summary>The resolution a picture's own pixels have at its size on the bed.</summary>
     public static double OwnDpi(ImageShape img) => 25.4 * img.Source.Width / Math.Max(1e-6, Math.Abs(img.SizeMm.X * img.Transform.ScaleX));
 
+    /// <summary>Most different pass angles a picture is laid out at (after that, they repeat).</summary>
+    const int MaxTurnedPasses = 36;
+
     /// <summary>Most dots a single image may produce (keeps files and memory sane).</summary>
     const long MaxImageCells = 40_000_000;
 
     /// <summary>
     /// Resample an image onto the machine's dot grid (axis-aligned, so rotated
-    /// images work), apply its tone settings and dither it. Returns the dot
-    /// block and the area it covers, or null when nothing would burn.
+    /// images work, or turned by <paramref name="angleDeg"/> so the rows run that way),
+    /// apply its tone settings and dither it. Returns the dot block and the area it
+    /// covers, or null when nothing would burn.
     /// </summary>
-    public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer)
+    public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer, double angleDeg = 0)
     {
+        angleDeg = ((angleDeg % 360) + 360) % 360;
+        if (Math.Abs(angleDeg - Math.Round(angleDeg)) < 1e-9) angleDeg = Math.Round(angleDeg) % 360;
         JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
         // Pass-through: one dot per pixel of the file, but never closer together than the layer's
         // resolution (a big file on a small picture would put far more heat in than was set).
         double dpi = layer.PassThrough ? Math.Clamp(Math.Min(OwnDpi(img), layer.Dpi), 10, 2540) : layer.Dpi;
         double pitch = 25.4 / dpi;
         var b = img.Bounds;
-        int cols = Math.Max(1, (int)Math.Floor(b.Width / pitch + 1e-9));
-        int rows = Math.Max(1, (int)Math.Floor(b.Height / pitch + 1e-9));
+        // The grid's axes: along the rows (u) and across them (v); at 0° just X and Y.
+        double a = angleDeg * Math.PI / 180;
+        var U = angleDeg == 0 ? new Vec2(1, 0) : new Vec2(Math.Cos(a), Math.Sin(a));
+        var V = angleDeg == 0 ? new Vec2(0, 1) : new Vec2(-Math.Sin(a), Math.Cos(a));
+        Vec2[] corners = angleDeg == 0 ? [b.TopLeft, b.BottomRight]
+            : [.. new[] { new Vec2(0, 0), new Vec2(img.SizeMm.X, 0), new Vec2(img.SizeMm.X, img.SizeMm.Y), new Vec2(0, img.SizeMm.Y) }.Select(img.Transform.Apply)];
+        double u0 = corners.Min(p => p.X * U.X + p.Y * U.Y), u1 = corners.Max(p => p.X * U.X + p.Y * U.Y);
+        double v0 = corners.Min(p => p.X * V.X + p.Y * V.Y), v1 = corners.Max(p => p.X * V.X + p.Y * V.Y);
+        int cols = Math.Max(1, (int)Math.Floor((u1 - u0) / pitch + 1e-9));
+        int rows = Math.Max(1, (int)Math.Floor((v1 - v0) / pitch + 1e-9));
         if ((long)cols * rows > MaxImageCells)
             throw new JobException($"Image \"{img.Name}\" at {layer.Dpi:0} dpi needs {(long)cols * rows / 1e6:0.#} million dots. Lower the resolution or make it smaller.");
         if (!img.Transform.IsInvertible) return (null, b);
         var toLocal = img.Transform.Invert();
-        var origin = new Vec2(b.MinX + pitch / 2, b.MinY + pitch / 2);
+        var origin = angleDeg == 0 ? new Vec2(b.MinX + pitch / 2, b.MinY + pitch / 2) : U * (u0 + pitch / 2) + V * (v0 + pitch / 2);
+        Vec2 Pos(int c, int r) => angleDeg == 0 ? new Vec2(origin.X + c * pitch, origin.Y + r * pitch) : origin + U * (c * pitch) + V * (r * pitch);
         var tone = img.Tone;
         // The material's measured response, turned round: the grey to send for each tone wanted.
         var material = layer.MaterialTone;
@@ -650,7 +690,7 @@ public static class JobBuilder
         {
             for (int c = 0; c < cols; c++)
             {
-                var local = toLocal.Apply(new Vec2(origin.X + c * pitch, origin.Y + r * pitch));
+                var local = toLocal.Apply(Pos(c, r));
                 float v;
                 if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y || !img.InClip(local)) v = 1f; // outside the picture
                 else
@@ -662,7 +702,7 @@ public static class JobBuilder
                 grey[r * cols + c] = v;
             }
         });
-        var area = new Rect2(origin.X, origin.Y, origin.X + (cols - 1) * pitch, origin.Y + (rows - 1) * pitch);
+        var area = Rect2.Bounds([Pos(0, 0), Pos(cols - 1, 0), Pos(0, rows - 1), Pos(cols - 1, rows - 1)]);
         if (tone.Sharpen > 0) Core.Imaging.Dither.Sharpen(grey, cols, rows, tone.Sharpen, Math.Max(1, (int)Math.Round(tone.SharpenRadiusMm / pitch)));
         var bitmap = new Bitmap(cols, rows);
         if (layer.ImageMode == ImageEngraveMode.Grayscale)
@@ -683,6 +723,7 @@ public static class JobBuilder
             return (new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs, layer.GrayMinPower, "grayscale")
             {
                 Levels = levels,
+                AngleDeg = angleDeg,
             }, area);
         }
         if (layer.Dither == DitherMethod.Threshold && layer.RampMm > 0)
@@ -701,13 +742,13 @@ public static class JobBuilder
                 any = true;
             }
             if (!any) return (null, b);
-            return (new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs, Math.Min(layer.GrayMinPower, layer.Laser.Power), "grayscale") { Levels = levels }, area);
+            return (new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs, Math.Min(layer.GrayMinPower, layer.Laser.Power), "grayscale") { Levels = levels, AngleDeg = angleDeg }, area);
         }
         var dots = Core.Imaging.Dither.Apply(grey, cols, rows, layer.Dither, new Screen(dpi / Math.Max(1, layer.HalftoneCpi), layer.HalftoneAngleDeg));
         if (!dots.Any(d => d)) return (null, b);
         Array.Copy(dots, bitmap.Bits, dots.Length);
         var block = new DotBlock(bitmap, origin, layer.Laser, dpi, layer.DotUs,
-            Math.Min(1, layer.Laser.Power), Core.Imaging.Dither.WireName(layer.Dither));
+            Math.Min(1, layer.Laser.Power), Core.Imaging.Dither.WireName(layer.Dither)) { AngleDeg = angleDeg };
         return (block, area);
     }
 

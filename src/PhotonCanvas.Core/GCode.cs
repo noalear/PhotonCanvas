@@ -349,6 +349,30 @@ public sealed record DotBlock(
     /// <summary>Every row burned left to right, the head going back unlit (slower; rows can't be offset from each other by the direction).</summary>
     public bool Unidirectional { get; init; }
 
+    /// <summary>
+    /// The rows' direction, degrees from X (the picture was laid out on a grid turned this much).
+    /// Dot (c, r) is at <see cref="At"/>; at 0 that's <see cref="Origin"/> + (c, r) × pitch.
+    /// </summary>
+    public double AngleDeg { get; init; }
+
+    /// <summary>
+    /// Turning per pass: the same picture laid out at each pass's angle; pass p burns
+    /// PassBlocks[(p − 1) mod count]. Null: every pass the same.
+    /// </summary>
+    public IReadOnlyList<DotBlock>? PassBlocks { get; init; }
+
+    /// <summary>The block a pass burns (see <see cref="PassBlocks"/>).</summary>
+    public DotBlock ForPass(int pass) => PassBlocks is { Count: > 0 } pb && pass >= 1 ? pb[(pass - 1) % pb.Count] : this;
+
+    /// <summary>Where dot (column, row) is on the bed.</summary>
+    public Vec2 At(int c, int r)
+    {
+        double pitch = 25.4 / Dpi;
+        if (AngleDeg == 0) return new(Origin.X + c * pitch, Origin.Y + r * pitch);
+        double a = AngleDeg * Math.PI / 180, cos = Math.Cos(a), sin = Math.Sin(a);
+        return new(Origin.X + (c * cos - r * sin) * pitch, Origin.Y + (c * sin + r * cos) * pitch);
+    }
+
     /// <summary>The <c>S</c> value (per-mille) of a dot with strength <paramref name="level"/>.</summary>
     public long LevelSValue(byte level) =>
         (long)Math.Round((MinPower + (Laser.Power - MinPower) * level / 255.0) * 10, MidpointRounding.AwayFromZero);
@@ -539,9 +563,11 @@ public sealed class Job
                     // The corners of the pixel grid bound every dot.
                     if (b.Bitmap.Width > 0 && b.Bitmap.Height > 0)
                     {
-                        CheckPoint(b.Origin, ctx);
-                        CheckPoint(new(b.Origin.X + (b.Bitmap.Width - 1) * pitch,
-                            b.Origin.Y + (b.Bitmap.Height - 1) * pitch), ctx);
+                        foreach (var pb in b.PassBlocks ?? [b])
+                        {
+                            int w = pb.Bitmap.Width - 1, h = pb.Bitmap.Height - 1;
+                            foreach (var corner in new[] { pb.At(0, 0), pb.At(w, 0), pb.At(0, h), pb.At(w, h) }) CheckPoint(corner, ctx);
+                        }
                     }
                     anyMotion |= b.Bitmap.Bits.Any(v => v);
                     break;
@@ -620,6 +646,12 @@ public sealed class Job
                             lines.AddRange(RenderBlock(f.ForPass(p), tag, 1));
                             lines.Add("");
                         }
+                    else if (b is DotBlock { PassBlocks.Count: > 1 } d && d.Laser.Passes > 1)
+                        for (int p = 1; p <= d.Laser.Passes; p++)
+                        {
+                            lines.AddRange(RenderBlock(d.ForPass(p), tag, 1));
+                            lines.Add("");
+                        }
                     else
                     {
                         lines.AddRange(RenderBlock(b, tag, b.Laser.Passes));
@@ -640,7 +672,7 @@ public sealed class Job
                     foreach (var b in blocks.Where(b => b.Laser.Passes >= round))
                     {
                         Focus(b);
-                        lines.AddRange(RenderBlock(b is FillBlock f ? f.ForPass(round) : b, tag, 1, round));
+                        lines.AddRange(RenderBlock(b switch { FillBlock f => f.ForPass(round), DotBlock d => d.ForPass(round), _ => b }, tag, 1, round));
                         lines.Add("");
                     }
                 }
@@ -1384,6 +1416,21 @@ public sealed class Job
                     long sv = b.LevelSValue(levels[r * b.Bitmap.Width + cols[k]]);
                     if (first || sv != lastS) power = $"S{sv}";
                     lastS = sv;
+                }
+                if (b.AngleDeg != 0)
+                {
+                    // Rows at an angle: both X and Y change from dot to dot.
+                    var p = b.At(cols[k], r);
+                    string xy = $"X{Fixed3(p.X)}Y{Fixed3(p.Y)}";
+                    if (first)
+                    {
+                        body.Add($"G0{xy}");
+                        body.Add("");
+                        body.Add(levels is null ? $"G25{xy}S{l.SValue}" : $"G25{xy}{power}");
+                        first = false;
+                    }
+                    else body.Add($"G25{xy}" + power);
+                    continue;
                 }
                 if (first)
                 {

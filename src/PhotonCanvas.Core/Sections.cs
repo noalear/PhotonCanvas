@@ -11,6 +11,23 @@ public static class Sections
     /// The parts of <paramref name="b"/> inside <paramref name="clip"/> (design mm), moved by
     /// <paramref name="shift"/>. Nothing comes back when nothing of it is inside.
     /// </summary>
+    /// <summary>A picture laid out at an angle, with only its dots inside <paramref name="clip"/>, moved by <paramref name="shift"/>; null when none are.</summary>
+    static DotBlock? ClipDots(DotBlock d, Rect2 clip, Vec2 shift)
+    {
+        var bmp = new Bitmap(d.Bitmap.Width, d.Bitmap.Height);
+        byte[]? levels = d.Levels is null ? null : new byte[d.Levels.Length];
+        bool any = false;
+        for (int r = 0; r < bmp.Height; r++)
+            for (int c = 0; c < bmp.Width; c++)
+            {
+                if (!d.Bitmap[c, r] || !clip.Contains(d.At(c, r))) continue;
+                bmp[c, r] = true;
+                if (levels is not null) levels[r * bmp.Width + c] = d.Levels![r * bmp.Width + c];
+                any = true;
+            }
+        return any ? d with { Bitmap = bmp, Levels = levels, Origin = d.Origin + shift, PassBlocks = null } : null;
+    }
+
     public static IEnumerable<Block> Cut(Block b, Rect2 clip, Vec2 shift)
     {
         switch (b)
@@ -51,6 +68,15 @@ public static class Sections
             case PointsBlock p:
                 var inPts = p.Points.Where(clip.Contains).Select(x => x + shift).ToList();
                 if (inPts.Count > 0) yield return p with { Points = inPts };
+                break;
+            case DotBlock { AngleDeg: not 0 } or DotBlock { PassBlocks: not null }:
+                // Rows at an angle: the dots outside the section are dropped, the grid stays.
+                var dd = (DotBlock)b;
+                var passes = (dd.PassBlocks ?? [dd]).Select(pb => ClipDots(pb, clip, shift)).ToList();
+                if (passes.All(pb => pb is null)) yield break;
+                // A pass with nothing in the section stays as an empty one (it burns nothing).
+                var kept = passes.Select((pb, i) => pb ?? (dd.PassBlocks ?? [dd])[i] with { Bitmap = new Bitmap(1, 1), Levels = null, Origin = (dd.PassBlocks ?? [dd])[i].Origin + shift }).ToList();
+                yield return dd.PassBlocks is null ? kept[0] : kept[0] with { PassBlocks = kept };
                 break;
             case DotBlock d:
                 double pitch = 25.4 / d.Dpi;
