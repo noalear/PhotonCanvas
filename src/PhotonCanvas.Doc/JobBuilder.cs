@@ -85,6 +85,8 @@ public sealed record BuiltJob(
 
     /// <summary>Each output layer's time, in run order.</summary>
     public IReadOnlyList<LayerTime> LayerTimes { get; init; } = [];
+    /// <summary>Shapes that are on an output layer but won't be done (on the wrong kind of layer), one line per layer.</summary>
+    public IReadOnlyList<string> LeftOut { get; init; } = [];
 
     /// <summary>Whole-job rounds (passes run over the whole job), with the pause between them; null when each path runs its own passes.</summary>
     public double? RoundDelayS { get; init; }
@@ -174,6 +176,7 @@ public static class JobBuilder
     {
         if (VariableText.Problems(s).FirstOrDefault() is { } problem) throw new JobException(problem);
         var warnings = new List<string>();
+        var leftOut = new List<string>();
         var blocks = new List<Block>();
         var steps = new List<BuiltJob.Step>();
         // Which steps each block marks (blocks and steps are added together, a group at a time).
@@ -225,8 +228,7 @@ public static class JobBuilder
             var shapes = onLayer.OfType<PathShape>().ToList();
             if (layer.Mode == LayerMode.Image)
             {
-                if (shapes.Count > 0)
-                    warnings.Add($"Layer \"{layer.Name}\" is an Image layer, so its {shapes.Count} vector shape(s) were skipped. Move them to a Cut, Score or Fill layer.");
+                if (LeftOutOn(s, layer) is { } left) { warnings.Add(left); leftOut.Add(left); }
                 if (layer.ImageMode == ImageEngraveMode.Slices)
                 {
                     var sl = layer.Slices;
@@ -273,8 +275,7 @@ public static class JobBuilder
                 }
                 continue;
             }
-            if (images.Count > 0)
-                warnings.Add($"Layer \"{layer.Name}\" is a {layer.Mode} layer, so its {images.Count} image(s) were skipped. Put images on an Image layer to engrave them, or trace them into vectors.");
+            if (LeftOutOn(s, layer) is { } leftImages) { warnings.Add(leftImages); leftOut.Add(leftImages); }
             if (shapes.Count == 0) continue;
 
             if (layer.Mode == LayerMode.Fill && layer.FillStyle == FillStyle.Offset)
@@ -468,7 +469,9 @@ public static class JobBuilder
         }
 
         if (blocks.Count == 0)
-            throw new JobException(s.Shapes.Count == 0
+            throw new JobException(leftOut.Count > 0
+                ? $"Nothing would be done. {string.Join(" ", leftOut)}"
+                : s.Shapes.Count == 0
                 ? "There is nothing on the canvas to process."
                 : "No shapes are on an enabled, visible layer.");
 
@@ -551,6 +554,7 @@ public static class JobBuilder
         return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps)
         {
             LayerTimes = times,
+            LeftOut = leftOut,
             RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
             Timeline = Timeline(job, blockSteps),
         };
@@ -593,6 +597,24 @@ public static class JobBuilder
     static double FoldTo180(double deg) => ((deg % 180) + 180) % 180;
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
+
+    /// <summary>
+    /// What on this layer won't be done because it's the wrong kind of layer for it (outlines on a
+    /// picture layer, pictures on a cut, score or fill layer), in plain words; null when all is fine.
+    /// </summary>
+    public static string? LeftOutOn(DocState s, Layer layer)
+    {
+        var on = s.ShapesFor(layer).ToList();
+        if (layer.Mode == LayerMode.Image)
+        {
+            int paths = on.OfType<PathShape>().Count();
+            return paths == 0 ? null
+                : $"Layer \"{layer.Name}\" is a Picture layer, which only engraves pictures, so {(paths == 1 ? "its shape" : $"its {paths} shapes")} won't be done. Change the layer to Cut, Score or Fill, or move {(paths == 1 ? "it" : "them")} to a layer that is.";
+        }
+        int pictures = on.OfType<ImageShape>().Count();
+        return pictures == 0 ? null
+            : $"Layer \"{layer.Name}\" is a {layer.Mode} layer, so {(pictures == 1 ? "its picture" : $"its {pictures} pictures")} won't be engraved. Move {(pictures == 1 ? "it" : "them")} to a Picture layer, or trace {(pictures == 1 ? "it" : "them")} into outlines.";
+    }
 
     /// <summary>The resolution a picture's own pixels have at its size on the bed.</summary>
     public static double OwnDpi(ImageShape img) => 25.4 * img.Source.Width / Math.Max(1e-6, Math.Abs(img.SizeMm.X * img.Transform.ScaleX));

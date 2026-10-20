@@ -60,6 +60,35 @@ public class ParityTests
         Assert.Equal(4, JobBuilder.Build(p, new JobOptions()).Job.Blocks.Count);
     }
 
+    [Fact]
+    public void ShapesOnTheWrongKindOfLayerAreNamedAsLeftOut()
+    {
+        // A rectangle on a layer switched to Picture (the user's "Cut" layer took a picture recipe).
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Name = "Cut", Mode = LayerMode.Image };
+        s = Ops.UpdateLayers(s, new HashSet<Guid> { cut.Id }, _ => cut);
+        var photo = Layer.Default(2, LayerMode.Image);
+        s = Ops.AddLayer(s, photo);
+        s = Ops.AddShapes(s, [new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }, Picture(photo.Id, 20, 20, (x, y) => 0, 10)]);
+
+        var left = JobBuilder.LeftOutOn(s, cut)!;
+        Assert.Contains("Picture layer", left);
+        Assert.Contains("its shape won't be done", left);
+        Assert.Null(JobBuilder.LeftOutOn(s, photo));
+        var job = JobBuilder.Build(s, new JobOptions());
+        Assert.Equal([left], job.LeftOut);
+        Assert.DoesNotContain(job.Job.Blocks, b => b is VectorBlock);
+        // With nothing else to do, the job says why rather than "nothing on the canvas".
+        var only = Ops.Delete(s, s.ShapesFor(photo).Select(x => x.Id).ToHashSet());
+        var e = Assert.Throws<JobException>(() => JobBuilder.Build(only, new JobOptions()));
+        Assert.StartsWith("Nothing would be done. Layer \"Cut\" is a Picture layer", e.Message);
+
+        // A picture on a cut layer is named too.
+        s = Ops.UpdateLayers(s, new HashSet<Guid> { cut.Id }, l => l with { Mode = LayerMode.Cut });
+        s = Ops.AddShapes(s, [Picture(cut.Id, 20, 20, (x, y) => 0, 10)]);
+        Assert.Contains("its picture won't be engraved", JobBuilder.LeftOutOn(s, s.FindLayer(cut.Id)!));
+    }
+
     static ImageShape Picture(Guid layer, int w, int h, Func<int, int, byte> grey, double mm)
     {
         var rgba = new byte[w * h * 4];

@@ -776,7 +776,14 @@ public sealed class JobBar : UserControl
         }
         if (job.Job.Blocks.Any(b => b.FocusOffsetMm != 0))
             sb.AppendLine($"The head moves for focus offsets (down at most {Math.Max(0, offset):0.##} mm) and comes back at the end.");
-        foreach (var w in job.Warnings) sb.AppendLine($"⚠ {w}");
+        foreach (var w in job.Warnings.Except(job.LeftOut)) sb.AppendLine($"⚠ {w}");
+        if (job.LeftOut.Count > 0)
+        {
+            // First thing in the message: things that look like part of the job but won't be done.
+            var head = new System.Text.StringBuilder().AppendLine("NOT IN THIS JOB:");
+            foreach (var w in job.LeftOut) head.AppendLine($"✖ {w}");
+            sb.Insert(0, head.AppendLine().ToString());
+        }
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();

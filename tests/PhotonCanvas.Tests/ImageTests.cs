@@ -191,8 +191,8 @@ public class ImageTests
             new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(50, 50, 5, 5) },
         ]);
         var job = JobBuilder.Build(s, new JobOptions());
-        Assert.Contains(job.Warnings, w => w.Contains("image(s) were skipped"));
-        Assert.Contains(job.Warnings, w => w.Contains("vector shape(s) were skipped"));
+        Assert.Contains(job.Warnings, w => w.Contains("its picture won't be engraved"));
+        Assert.Contains(job.Warnings, w => w.Contains("its shape won't be done"));
     }
 
     [Fact]

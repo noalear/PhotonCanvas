@@ -649,9 +649,31 @@ public sealed class LayerEditor : UserControl
         ApplyRecipe(m, _recipeChoices[_recipe.SelectedIndex]);
     }
 
-    /// <summary>Put a recipe's settings on the selected layers and remember which it was.</summary>
-    public void ApplyRecipe(PhotonCanvas.Doc.Materials.Material m, PhotonCanvas.Doc.Materials.Recipe r) =>
-        EditLayers($"Apply {m.Label} · {r.Title}", l => WithReflective(r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, m.HighlyReflective), true);
+    /// <summary>
+    /// Put a recipe's settings on the selected layers and remember which it was. With several layers
+    /// selected (shapes on different layers picked together), only the layers it suits take it: a
+    /// picture recipe goes on layers with pictures, a cut, score or fill recipe on layers with
+    /// outlines, so picking a photo's settings doesn't turn the cut layer next to it into a picture layer.
+    /// </summary>
+    public void ApplyRecipe(PhotonCanvas.Doc.Materials.Material m, PhotonCanvas.Doc.Materials.Recipe r)
+    {
+        if (_updating) return;
+        var ids = _layers.SelectedLayers;
+        if (ids.Count == 0) return;
+        var suited = ids.Where(id => _doc.State.FindLayer(id) is { } l && Suits(l, r.Settings.Mode)).ToHashSet();
+        IReadOnlySet<Guid> targets = ids.Count > 1 && suited.Count > 0 ? suited : ids;
+        _doc.Commit(targets.Count > 1 ? $"Apply {m.Label} · {r.Title} ({targets.Count} layers)" : $"Apply {m.Label} · {r.Title}",
+            Ops.UpdateLayers(_doc.State, targets, l => WithReflective(r.Settings.ApplyTo(l) with { Material = new PhotonCanvas.Doc.Materials.MaterialRef(m.Id, m.Label, r.Id, r.Title) }, m.HighlyReflective)));
+    }
+
+    /// <summary>Whether settings of this kind fit what's on the layer (empty layers take anything).</summary>
+    bool Suits(Layer l, LayerMode mode)
+    {
+        var on = _doc.State.ShapesFor(l).ToList();
+        if (on.Count == 0) return true;
+        bool pictures = on.OfType<ImageShape>().Any(), outlines = on.OfType<PathShape>().Any();
+        return mode == LayerMode.Image ? pictures : outlines;
+    }
 
     /// <summary>
     /// A picture layer on a material that has had a tone test takes its correction (from the tested

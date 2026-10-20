@@ -271,6 +271,17 @@ public sealed class LayersPanel : UserControl
                 FontSize = 11.5, Margin = new(20, 1, 4, 0), TextTrimming = TextTrimming.CharacterEllipsis, Opacity = 0.85,
             });
         lines.Children.Add(bottom);
+        // Shapes on the wrong kind of layer (outlines on a picture layer…) would quietly be left out.
+        if (l.Output && l.ParentId is null && Doc.JobBuilder.LeftOutOn(_doc.State, l) is { } left)
+        {
+            var warn = new TextBlock
+            {
+                Text = l.Mode == LayerMode.Image ? "⚠ Outlines here won't be cut (picture layer)" : "⚠ Pictures here won't be engraved",
+                FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Res("Warn"), Margin = new(20, 3, 4, 0), TextWrapping = TextWrapping.Wrap,
+            };
+            ToolTip.SetTip(warn, left);
+            lines.Children.Add(warn);
+        }
 
         var grid = new Grid { ColumnDefinitions = new("Auto,*"), Margin = new(5, 5, 3, 6) };
         grid.Children.Add(bar);
