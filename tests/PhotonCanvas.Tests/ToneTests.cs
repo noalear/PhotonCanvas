@@ -138,4 +138,25 @@ public class ToneTests
             System.Text.Json.JsonSerializer.Serialize(PhotonCanvas.Doc.Materials.ProcessSettings.From(layer with { MaterialTone = coloured })))!;
         Assert.Equal(0xD2B48Cu, againColoured.MaterialTone!.BareColour);
     }
+
+    [Fact]
+    public void LibraryKeepsAPictureRecipeWithItsToneCurve()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), $"pc-lib-{Guid.NewGuid():N}");
+        try
+        {
+            var lib = new PhotonCanvas.Doc.Materials.MaterialLibrary(folder);
+            var curve = new ToneCurve([(0, 0), (0.5, 0.46), (1, 1)]) { BareColour = 0xD2B48C, BurnColour = 0x3C2314 };
+            var layer = Layer.Default(1, LayerMode.Image) with { MaterialTone = curve };
+            var m = new PhotonCanvas.Doc.Materials.Material { Name = "Basswood", ThicknessMm = 2.75 };
+            var recipe = new PhotonCanvas.Doc.Materials.Recipe { Purpose = PhotonCanvas.Doc.Materials.RecipePurpose.Picture, Title = "Pictures, matched", Settings = PhotonCanvas.Doc.Materials.ProcessSettings.From(layer) };
+            lib.Upsert(m with { Recipes = m.Recipes.Add(recipe) });
+            lib.Save();
+            var back = PhotonCanvas.Doc.Materials.MaterialLibrary.Load(folder);
+            var r = Assert.Single(Assert.Single(back.Materials).Recipes);
+            Assert.Equal(0.46, r.Settings.MaterialTone!.Response(0.5), 6);
+            Assert.Equal(0xD2B48Cu, r.Settings.MaterialTone.BareColour);
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }
 }

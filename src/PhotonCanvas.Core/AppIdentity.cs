@@ -4,35 +4,41 @@ namespace PhotonCanvas.Core;
 public static class AppIdentity
 {
     public const string ProductName = "PhotonCanvas";
-    /// <summary>Folder under %APPDATA% for settings, calibration, keys and logs.</summary>
+    /// <summary>Folder in the user's home for settings, calibration, keys, the material library and logs.</summary>
     public const string DataFolder = "PhotonCanvas";
-    /// <summary>The folder used before the rename (moved over on first start).</summary>
+    /// <summary>The folder used before the rename.</summary>
     public const string LegacyDataFolder = "YTool";
-
-    public static string DataDir => Path.Combine(AppData, DataFolder);
-
-    static string AppData => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    /// <summary>Set to use another data folder (tests and the screenshot harness, so they never touch real data).</summary>
+    public const string DataDirVariable = "PHOTONCANVAS_DATA";
 
     /// <summary>
-    /// First start after the rename: copy settings, camera calibration, keys and the pairing
-    /// token from the old folder. The old folder is left as it was. Never throws.
+    /// Where everything is kept: <c>%USERPROFILE%\PhotonCanvas</c>. Not under AppData: Windows quietly
+    /// redirects AppData writes from programs started by a packaged (Store/MSIX) app into that app's
+    /// own storage, so the same program saved to two places depending on how it was opened, and
+    /// each run saw only its own saves. A folder in the home directory is the same for everyone.
     /// </summary>
-    public static void MigrateLegacyData()
+    public static string DataDir =>
+        Environment.GetEnvironmentVariable(DataDirVariable) is { Length: > 0 } custom ? custom : Path.Combine(Home, DataFolder);
+
+    static string Home => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+    static string AppData => Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+    static string LocalAppData => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+    /// <summary>
+    /// Every folder earlier versions may have saved into: AppData's PhotonCanvas (and YTool), and the
+    /// copies Windows redirected into packaged apps' storage (…\Packages\*\LocalCache\Roaming\…).
+    /// Oldest name first, so newer data wins where both have it.
+    /// </summary>
+    public static IEnumerable<string> EarlierDataDirs()
     {
-        try
+        foreach (var name in new[] { LegacyDataFolder, DataFolder })
         {
-            var old = Path.Combine(AppData, LegacyDataFolder);
-            if (Directory.Exists(DataDir) || !Directory.Exists(old)) return;
-            foreach (var file in Directory.EnumerateFiles(old, "*", SearchOption.AllDirectories))
-            {
-                var target = Path.Combine(DataDir, Path.GetRelativePath(old, file));
-                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-                File.Copy(file, target, overwrite: false);
-            }
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            // Not fatal: the program starts with defaults.
+            yield return Path.Combine(AppData, name);
+            var packages = Path.Combine(LocalAppData, "Packages");
+            IEnumerable<string> redirected = [];
+            try { redirected = Directory.EnumerateDirectories(packages).Select(p => Path.Combine(p, "LocalCache", "Roaming", name)).Where(Directory.Exists).ToList(); }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+            foreach (var r in redirected) yield return r;
         }
     }
 }
