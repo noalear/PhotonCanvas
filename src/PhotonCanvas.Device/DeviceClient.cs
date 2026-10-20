@@ -1162,12 +1162,21 @@ public sealed class DeviceClient : IAsyncDisposable
     }
 
     /// <summary>
-    /// With <paramref name="allowed"/>, clears a job that is loaded but not started, or a frame
-    /// that is tracing, and waits for the machine to be idle. Returns the mode afterwards.
-    /// A running or paused job is never touched.
+    /// A finished job is put away (always: nothing is lost). With <paramref name="allowed"/>, a job
+    /// that is loaded but not started, or a frame that is tracing, is cleared too. Waits for the
+    /// machine to be idle and returns the mode afterwards. A running or paused job is never touched.
     /// </summary>
     async Task<string> MakeRoomAsync(string mode, bool allowed, CancellationToken cancellationToken)
     {
+        if (mode is "P_WORK_DONE" or "P_FINISH")
+        {
+            // After a job the F2 Ultra stays "finished" until its button is pressed, and won't take
+            // another. Switching it to idle is what xTool Studio does to leave such states (sleep,
+            // focusing); nothing moves or fires.
+            Log("The last job is finished: putting the machine back to idle for the next one.");
+            await RequestAsync("PUT", "/v1/device/mode", new JsonObject { ["mode"] = "P_IDLE" }, cancellationToken: cancellationToken).ConfigureAwait(false);
+            return await WaitForModeAsync("P_IDLE", TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
+        }
         if (!allowed || mode is not ("P_WORK" or "P_FRAMING")) return mode;
         Log(mode == "P_WORK" ? "A job is loaded and not started: cancelling it to make room." : "Stopping the frame to make room.");
         await StopJobAsync(cancellationToken).ConfigureAwait(false);
@@ -1238,6 +1247,7 @@ public sealed class DeviceClient : IAsyncDisposable
         "P_AUTOFOCUS" or "P_MEASURE" => "The machine is measuring or focusing. Wait for it to finish, then send again.",
         "P_FRAMING" => "The machine is framing (tracing the outline). Stop framing, then try again.",
         "P_ERROR" => "The machine is reporting an error. Check it (the light, or Settings → Machine), then send again.",
+        "P_WORK_DONE" or "P_FINISH" => "The machine is still showing the last job as finished. Press its button once, then send again.",
         _ => $"The machine isn't ready for a new job (it reports \"{mode}\"). Wait a moment and try again.",
     };
 

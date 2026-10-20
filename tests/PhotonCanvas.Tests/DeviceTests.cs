@@ -539,6 +539,19 @@ public sealed class DeviceClientTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PutsAFinishedJobAwayBeforeTheNext()
+    {
+        // After a job the machine stays "finished" until its button is pressed.
+        _fake.Mode = "P_WORK_DONE";
+        _fake.OnModeSwitch = m => _fake.Mode = m;
+        await using var client = await Connected();
+        await client.UploadJobAsync([1, 2, 3]);
+        Assert.Equal(["P_IDLE"], _fake.Modes);
+        Assert.Empty(_fake.States); // nothing stopped or started
+        Assert.Equal([1, 2, 3], _fake.Uploaded);
+    }
+
+    [Fact]
     public async Task ReplacesAJobThatIsLoadedButNotStarted()
     {
         _fake.Mode = "P_WORK";
@@ -762,6 +775,7 @@ sealed class FakeDevice : IAsyncDisposable
     public string Desc { get; set; } = "";
     public string? TaskId { get; set; }
     public Action<string>? OnStateAction { get; set; }
+    public Action<string>? OnModeSwitch { get; set; }
     public volatile bool AnswerPings = true;
     public byte[] DownloadFile { get; set; } = [];
     public bool CorruptDigest { get; set; }
@@ -918,6 +932,7 @@ sealed class FakeDevice : IAsyncDisposable
                 break;
             case "/v1/device/mode":
                 Modes.Enqueue(data!["mode"]!.GetValue<string>());
+                OnModeSwitch?.Invoke(data!["mode"]!.GetValue<string>());
                 await Reply(req, 0);
                 break;
             case "/v1/laser-head/focus/control":

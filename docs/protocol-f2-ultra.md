@@ -35,6 +35,7 @@ Implemented in `src/ytool/`.
 
   The live view is therefore built on snapshot polling (`ytool view`).
 - **Not found (404):** `/v1/camera`, `/v1/camera/resolution`, `/v1/platform/camera/resolution`.
+- **After a job (seen in logs, 2026-10-18/19):** the mode goes `P_WORKING` → `P_WORK_DONE` and stays there until the machine's button is pressed (then `P_IDLE`). PhotonCanvas now sends `PUT /v1/device/mode {mode:"P_IDLE"}` before an upload when it sees `P_WORK_DONE`. xTool Studio uses the same request to leave sleep and focusing. Not yet confirmed that this clears `P_WORK_DONE` on the machine.
 
 ## Two protocol generations
 
