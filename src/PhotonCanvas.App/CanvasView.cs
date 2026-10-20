@@ -277,6 +277,14 @@ public sealed partial class CanvasView : Control
 
     public void FitField() => FitRect(new Rect2(0, 0, _machine.FieldW, _machine.FieldH));
 
+    /// <summary>Where the close-up camera sees (outlined, so tests read from it can be kept inside); null hides it.</summary>
+    public Rect2? CloseUpArea
+    {
+        get => _closeUpArea;
+        set { if (value != _closeUpArea) { _closeUpArea = value; InvalidateVisual(); } }
+    }
+    Rect2? _closeUpArea;
+
     /// <summary>The part of the bed on screen now (mm).</summary>
     public Rect2 VisibleArea => new(ToWorld(Viewport.TopLeft).X, ToWorld(Viewport.TopLeft).Y, ToWorld(Viewport.BottomRight).X, ToWorld(Viewport.BottomRight).Y);
 
@@ -373,6 +381,14 @@ public sealed partial class CanvasView : Control
             ctx.DrawRectangle(new Pen(new SolidColorBrush(AccentColor), 1, new DashStyle([4, 3], 0)), r);
         }
         if (_showGrid) DrawGrid(ctx, field);
+        if (_closeUpArea is { } seen)
+        {
+            var r = ToScreen(seen);
+            var green = Color.Parse("#2FC27A");
+            ctx.DrawRectangle(new Pen(new SolidColorBrush(green), 1.5, new DashStyle([6, 4], 0)), r);
+            var label = new FormattedText("close-up camera sees this", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Inter"), 11, new SolidColorBrush(green));
+            ctx.DrawText(label, new Point(r.X + 4, r.Y - label.Height - 2));
+        }
         ctx.DrawRectangle(FieldPen, field.Deflate(0.5));
 
         if (_doc is { } doc)

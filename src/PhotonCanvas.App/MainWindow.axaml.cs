@@ -113,6 +113,11 @@ public partial class MainWindow : Window
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
+        // While a test read from the close-up camera is in the design, show where that camera sees.
+        void ShowCloseUpArea() => Canvas.CloseUpArea =
+            ToneTestWindow.InDesign(_doc.State) || LineTestWindow.InDesign(_doc.State) ? _machine.CloseUpSees() : null;
+        _doc.Changed += _ => ShowCloseUpArea();
+        _machine.StateChanged += ShowCloseUpArea;
         _machine.PhotoChanged += p => Canvas.Photo = p;
         _machine.StateChanged += _ribbon.Refresh;
         _machine.FramingChanged += _ribbon.Refresh;
@@ -2347,13 +2352,13 @@ public partial class MainWindow : Window
     Task ShowExactDepth() => new ExactDepthWindow(_doc, _machine, _library, _doc.Selection).ShowDialog(this);
 
     Task ShowToneTest(bool results) =>
-        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees).ShowDialog(this);
+        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
 
     Task ShowCloseUpCalibration(bool find) =>
         new CloseUpCalibrationWindow(_doc, _machine, Canvas.Machine, find).ShowDialog(this);
 
     Task ShowLineTest(bool results) =>
-        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees).ShowDialog(this);
+        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
 
     Task ShowCutTest(bool results) =>
         new CutTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);

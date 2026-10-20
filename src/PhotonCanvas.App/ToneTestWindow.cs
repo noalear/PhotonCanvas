@@ -27,6 +27,7 @@ public sealed class ToneTestWindow : Window
     readonly Func<Rect2?> _closeUpSees;
     // The close-up photo, when that's what the results are read from (else the overview camera's).
     CameraPhoto? _closeUp;
+    readonly LightControls? _lights;
     readonly CheckBox _inCloseUp = new() { Content = "Where the close-up camera sees it (results read from close-up photos)" };
 
     // Making the test
@@ -54,8 +55,10 @@ public sealed class ToneTestWindow : Window
     ToneReading? _reading;
 
     public ToneTestWindow(Document doc, MaterialLibrary lib, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults,
-        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null)
+        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null,
+        Func<(int Front, int Back)>? lights = null, Action<int, int>? setLights = null)
     {
+        _lights = lights is not null && setLights is not null ? new LightControls(lights, setLights) : null;
         _doc = doc;
         _lib = lib;
         _machine = machine;
@@ -129,6 +132,7 @@ public sealed class ToneTestWindow : Window
             {
                 Hint("Take a photo of the burned strip (the camera must see all of it); the patches are found wherever you moved it to."),
                 Row(update, closeUp),
+                (Control?)_lights ?? new Panel(),
                 _photoNote,
                 new ScrollViewer { Content = _patches, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto, VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled },
                 Explained("How this material takes greys", "Dots: each patch as read. The straight dashed line is what you'd want; the further the dots are from it, the more pictures change when corrected.", _chart),

@@ -87,6 +87,7 @@ public sealed class CloseUpCalibrationWindow : Window
             {
                 Hint("Don't move the scrap after burning: the dots are found where they were burned."),
                 Row(take),
+                new LightControls(() => _machine.Lights, _machine.SetLights),
                 _view,
                 _result,
                 _save,

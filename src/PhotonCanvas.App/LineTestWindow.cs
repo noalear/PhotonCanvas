@@ -25,6 +25,7 @@ public sealed class LineTestWindow : Window
     readonly Func<Rect2?> _closeUpSees;
     // The close-up photo, when that's what the results are read from (else the overview camera's).
     CameraPhoto? _closeUp;
+    readonly LightControls? _lights;
     readonly CheckBox _inCloseUp = new() { Content = "Where the close-up camera sees it (results from close-up photos)" };
 
     // Making the test
@@ -48,8 +49,10 @@ public sealed class LineTestWindow : Window
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
 
     public LineTestWindow(Document doc, MachineProfile machine, Func<CameraPhoto?> photo, Func<Task> updatePhoto, bool showResults,
-        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null)
+        Func<Task<CameraPhoto?>>? closeUpPhoto = null, Func<Rect2?>? closeUpSees = null,
+        Func<(int Front, int Back)>? lights = null, Action<int, int>? setLights = null)
     {
+        _lights = lights is not null && setLights is not null ? new LightControls(lights, setLights) : null;
         _doc = doc;
         _machine = machine;
         _photo = photo;
@@ -125,6 +128,7 @@ public sealed class LineTestWindow : Window
             {
                 Hint("Look at the burned piece itself, close up and in light from the side: single rows are finer than the camera can see. The photos below are to keep track of which patch is which."),
                 Row(update, closeUp),
+                (Control?)_lights ?? new Panel(),
                 _photoNote,
                 _cards,
                 Explained("Use it", "\"Use these settings\" puts the patch's resolution, power, spreading and direction on this layer. Everything else stays. " +
@@ -265,7 +269,16 @@ public sealed class LineTestWindow : Window
         for (int i = 0; i < patches.Count; i++)
         {
             var (layer, patch) = patches[i];
-            Control face = new Avalonia.Controls.Border { Width = 150, Height = 150, Background = Brush("Bg0"), CornerRadius = new(6) };
+            bool inPhoto = photo is not null && photo.Area.Contains(patch.Bounds.TopLeft) && photo.Area.Contains(patch.Bounds.BottomRight);
+            Control face = new Avalonia.Controls.Border
+            {
+                Width = 150, Height = 150, Background = Brush("Bg0"), CornerRadius = new(6),
+                Child = photo is null ? null : new TextBlock
+                {
+                    Text = inPhoto ? "" : _closeUp is not null ? "Not in the close-up photo: keep the test inside the green outline" : "Not in the photo",
+                    TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new(8), FontSize = 12, Foreground = Brush("TextMuted"),
+                },
+            };
             if (photo is not null && MaterialLibrary.CropPhoto(photo.Image, photo.Area, photo.MmPerPx, patch.Bounds.Inflate(0.5), 300) is { } jpg)
             {
                 try { using var ms = new MemoryStream(jpg); face = new Image { Width = 150, Height = 150, Source = new Avalonia.Media.Imaging.Bitmap(ms), Stretch = Stretch.UniformToFill }; }
