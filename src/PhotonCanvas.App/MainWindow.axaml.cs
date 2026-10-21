@@ -166,6 +166,8 @@ public partial class MainWindow : Window
             else if (ConnectOnOpen && !recovered) await ReopenLast();
             _autosave.Tick += (_, _) => Autosave();
             if (ConnectOnOpen) _autosave.Start();
+            // A newer version published? (Quiet when offline; off in Settings → Updates.)
+            if (ConnectOnOpen) _ = Guard(() => UpdateNotice.CheckAtStart(this, _settings));
         };
         Closing += OnClosing;
         UpdateChrome();
@@ -708,7 +710,7 @@ public partial class MainWindow : Window
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
                 new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
             ]),
-        ], [("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); }))]);
+        ], [("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); })), ("Updates", UpdateNotice.Panel(_settings, () => this))]);
         await w.ShowDialog(this);
         _ribbon.Refresh();
     }
@@ -2295,7 +2297,7 @@ public partial class MainWindow : Window
     Task ShowSafety() => Dialogs.Message(this, "Safety and disclaimer", WelcomeWindow.SafetyText + "\n\n" + WelcomeWindow.DisclaimerText);
 
     Task ShowAbout() => Dialogs.Message(this, $"About {AppIdentity.ProductName}",
-        $"{AppIdentity.ProductName} – an offline, no-telemetry laser workspace for the xTool F2 Ultra.\n\n" +
+        $"{AppIdentity.ProductName} {Updates.Current} – an offline, no-telemetry laser workspace for the xTool F2 Ultra.\n\n" +
         "Jobs are generated locally in the same G-code dialect as the stock software, verified line for line against real exports.\n\n" +
         "Free software under the GNU General Public License v3 (see LICENSE and THIRD-PARTY-NOTICES). No warranty. " +
         "Not affiliated with, endorsed by or supported by xTool or Makeblock. \"xTool\" is their trademark, used only to say which machines this works with.");

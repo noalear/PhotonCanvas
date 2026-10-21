@@ -7,6 +7,8 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <Deterministic>true</Deterministic>
     <Product>PhotonCanvas</Product>
+    <!-- The release version: tools/release.sh sets it; the update check compares against it. -->
+    <Version>0.1.0</Version>
     <Copyright>Copyright © 2026 the PhotonCanvas contributors. GPL-3.0-or-later.</Copyright>
     <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
   </PropertyGroup>

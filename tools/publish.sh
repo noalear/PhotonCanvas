@@ -29,7 +29,7 @@ for rid in "${TARGETS[@]}"; do
   out="dist/$rid"
   rm -rf "$out"
   echo "== $rid"
-  dotnet publish src/PhotonCanvas.App -c Release -r "$rid" --self-contained true \
+  dotnet publish src/PhotonCanvas.App -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin" -nologo -v q
 
   case "$rid" in

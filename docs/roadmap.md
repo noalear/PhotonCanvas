@@ -138,6 +138,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Lenticular pictures (xTool; probably not useful on a galvo)
 
 ### Files and workflow
+- [x] Updates for friends: tools/release.sh builds every platform and publishes a release on the public, releases-only repo (noalear/PhotonCanvas-releases; the source stays private); at start the app asks GitHub for the latest release and offers it (Settings → Updates: off, or check now)
 - [x] Autosave and crash recovery; version history (xTool, LightBurn)
 - [x] Paste pictures and SVG from other programs (LightBurn)
 - [x] Export the design as SVG, DXF and PNG (LightBurn, xTool)
