@@ -209,6 +209,8 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Egg crate / radial: cut a small set in 3 mm basswood; do the slots slide together at 0.1 mm fit with the cut layer's kerf?
 - Material outline: outline a real offcut with Pick piece, Use as material outline, slice into it; do the parts land on the wood?
 - Cut test: does a cut square drop cleanly or need a push; is the measured kerf about 0.1–0.2 mm on 3 mm basswood; does the comb's snug slot match the egg crate fit?
-- Spread lines: does the machine take picture rows out of order in a picture block? Compare scorching on thin acrylic and colour evenness on steel with it on and off.
+- Spread lines: confirmed 2026-10-20, the machine takes picture rows out of order. On basswood pictures, though, spreading leaves visible rows (the Line test). Still to compare: scorching on thin acrylic and colour evenness on steel, with it on and off.
+- Picture rows at an angle (scan angle, turn per pass, crosshatch): confirmed 2026-10-20, the machine takes dot-by-dot rows at 20–30° (Line test patches). Still to check: whether the edges line up between turned passes.
+- A finished job put away before the next upload (P_WORK_DONE → P_IDLE without the button): still to check.
 - Tone test: does the camera photo of a burned strip read cleanly (lighting, glare, grain)? Burn a portrait with and without the correction on basswood and compare.
 - Exact depth: how precise is the pointer at reading a hole's floor (repeat a reading 5 times; compare with calipers' depth gauge)? Does the dot show on charred wood? Try 1 mm in basswood and 0.3 mm in steel.
