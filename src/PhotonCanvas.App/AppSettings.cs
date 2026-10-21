@@ -55,6 +55,9 @@ public sealed class AppSettings
 
     /// <summary>Quick processing: closing the lid focuses, photographs, centres the design on the material and loads the job (the button starts it).</summary>
     public bool QuickProcessing { get; set; }
+    /// <summary>How far the MOPA lands from the blue laser (mm), measured with Camera → Align MOPA.</summary>
+    public double MopaOffsetX { get; set; }
+    public double MopaOffsetY { get; set; }
     /// <summary>Exhaust fan gear (1–4) and purifier speed (%) sent with each job (3 and 50 are what xTool Studio sends).</summary>
     public int FanGear { get; set; } = 3;
     public int PurifierSpeed { get; set; } = 50;

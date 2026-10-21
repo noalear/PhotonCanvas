@@ -280,6 +280,7 @@ public sealed class JobBar : UserControl
         Mode = WorkModes.From(_settings),
         Machine = WorkModes.Area(_settings),
         FanGear = _settings.FanGear,
+        MopaOffset = new Vec2(_settings.MopaOffsetX, _settings.MopaOffsetY),
         PurifierSpeed = _settings.PurifierSpeed,
         Section = _section,
         OnlyLayer = _onlyLayer,

@@ -12,6 +12,8 @@ public sealed record JobOptions
     /// False: stock behaviour, each path repeats its passes before the next starts.
     /// </summary>
     public bool WholeJobPasses { get; init; } = true;
+    /// <summary>How far the MOPA lands from the blue laser (mm, from Camera → Align MOPA): MOPA work is moved back by it.</summary>
+    public Vec2 MopaOffset { get; init; }
     /// <summary>Exhaust fan gear (1–4) and purifier speed (%) for the job: see <see cref="Job.FanGear"/>.</summary>
     public int FanGear { get; init; } = 3;
     public int PurifierSpeed { get; init; } = 50;
@@ -537,6 +539,12 @@ public static class JobBuilder
                     warnings.Add("Step-down is left out on a curved surface (the head's height follows the surface instead).");
                 blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
             }
+        }
+        // The MOPA lined up with the blue laser: its work moved back by how far off it lands.
+        if (opt.MopaOffset.Length > 1e-6)
+        {
+            var everywhere = new Rect2(-1e6, -1e6, 1e6, 1e6);
+            blocks = [.. blocks.SelectMany(b => b.Laser.Light == LightSource.Red ? Sections.Cut(b, everywhere, -opt.MopaOffset) : [b])];
         }
         var job = new Job(opt.Machine, blocks)
         {

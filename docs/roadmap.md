@@ -165,7 +165,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 ### Machine and device
 - [x] Device settings page: name and versions, job counts, flame alarm, stop when moved, stop when the lid opens, exhaust run-on, sleep, MOPA overheat alarm, beeper (xTool; the F2 Ultra has no flame sensitivity setting)
 - [x] Galvo timing per laser: laser on/off delays, corner and jump delays, factory reset (xTool, EZCad, LightBurn galvo)
-- [ ] Calibrations: MOPA-to-blue alignment (engrave crosses, line them up on the camera), thickness measurement, focus, conveyor angle and X, pointer alignment (xTool)
+- [x] MOPA-to-blue alignment (Camera → Align MOPA): both lasers burn a grid of dots where the close-up camera sees, the camera measures where each lands, and MOPA work is moved by the difference (xTool). Still to do: thickness measurement, conveyor angle and X, pointer alignment
 - [ ] Focus: aimed measure with the camera and the red pointer (xTool's fallback; the F2 Ultra has no separate quick-measure sensor)
 - [x] Z-axis homing (xTool)
 - [x] Keep a job on the machine, to run again from its screen (xTool; needs the touchscreen controller)

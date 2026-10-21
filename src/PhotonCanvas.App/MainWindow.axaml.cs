@@ -272,6 +272,7 @@ public partial class MainWindow : Window
             else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
             else if (LineTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowLineTest(true)));
             else if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
+            else if (LaserAlignWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, true).ShowDialog(this)));
             // A depth round burned: measure it next.
             if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
@@ -612,6 +613,7 @@ public partial class MainWindow : Window
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+        cal.Small("Align MOPA", "IcCalibrate", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)), "Line the MOPA (fiber) laser up with the blue one: both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
         cal.Large("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
 
         // ---- Laser: materials and the job ----
