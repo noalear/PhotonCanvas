@@ -18,12 +18,10 @@
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="280,4,*,4,300">
-      <!-- Layers, each with its settings -->
-      <Border Grid.Column="0" Background="{DynamicResource Bg1}" Padding="10,10,6,0">
-        <ContentControl x:Name="LayersHost" />
-      </Border>
-      <GridSplitter Grid.Column="1" Background="{DynamicResource Line}" ResizeDirection="Columns" />
+    <Grid x:Name="MainGrid" ColumnDefinitions="280,4,*,4,300">
+      <!-- The side panels (layers, selection, layer settings): movable, see Docking -->
+      <ContentControl x:Name="LeftDock" Grid.Column="0" />
+      <GridSplitter x:Name="LeftSplit" Grid.Column="1" Background="{DynamicResource Line}" ResizeDirection="Columns" />
 
       <!-- Work area -->
       <DockPanel Grid.Column="2">
@@ -68,19 +66,8 @@
         </Panel>
       </DockPanel>
 
-      <GridSplitter Grid.Column="3" Background="{DynamicResource Line}" ResizeDirection="Columns" />
-      <!-- What's selected (top) and how its layer is processed (bottom) -->
-      <Grid Grid.Column="4" RowDefinitions="*,4,*" Background="{DynamicResource Bg1}">
-        <Border Grid.Row="0" Padding="10,10,10,0">
-          <ContentControl x:Name="InspectorHost" />
-        </Border>
-        <GridSplitter Grid.Row="1" Background="{DynamicResource Line}" ResizeDirection="Rows" />
-        <Border Grid.Row="2" Padding="10,10,10,0">
-          <ScrollViewer>
-            <ContentControl x:Name="LayerSettingsHost" Margin="0,0,0,10" />
-          </ScrollViewer>
-        </Border>
-      </Grid>
+      <GridSplitter x:Name="RightSplit" Grid.Column="3" Background="{DynamicResource Line}" ResizeDirection="Columns" />
+      <ContentControl x:Name="RightDock" Grid.Column="4" />
     </Grid>
   </DockPanel>
 </Window>

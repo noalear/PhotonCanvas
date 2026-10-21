@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     readonly PropertiesPanel _props;
     readonly JobBar _job;
     readonly MachinePanel _machine;
+    readonly Docking _docking;
     readonly MachineHud _hud;
     readonly Ribbon _ribbon = new();
     CloseUpView? _closeUp;
@@ -99,11 +100,14 @@ public partial class MainWindow : Window
         _hud.SettingsRequested += () => _ = Guard(() => ShowSettings("Machine"));
         _hud.CalibrateRequested += () => _ = Guard(_machine.CalibrateAsync);
         _hud.CloseUpRequested += () => ToggleCloseUp(!CloseUpOpen);
-        LayersHost.Content = _layers;
-        InspectorHost.Content = _props;
         JobHost.Content = _job;
         PagesHost.Content = new PagesBar(_doc, this);
-        LayerSettingsHost.Content = _layerEditor;
+        // The side panels: movable between the sides, floating or folded (View → Panels).
+        _docking = new Docking(this, _settings, MainGrid, LeftDock, RightDock, LeftSplit, RightSplit);
+        _docking.Add("layers", "Layers", _layers, new PanelPlace { Side = "Left", Order = 0 });
+        _docking.Add("selection", "Selection", _props, new PanelPlace { Side = "Right", Order = 0 });
+        _docking.Add("layer", "Layer settings", new ScrollViewer { Content = new ContentControl { Content = _layerEditor, Margin = new(0, 0, 4, 10) } }, new PanelPlace { Side = "Right", Order = 1 });
+        _docking.Layout();
         _ribbon.SetBodyTrail(_hud);
         RibbonHost.Content = _ribbon;
 
@@ -652,6 +656,7 @@ public partial class MainWindow : Window
         ToolLarge(tools, "Measure", "IcMeasure", Tool.Measure, "Measure: drag between two points (snaps to corners; Shift = 45° steps)");
         tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
+        panels.Small("Reset panels", "IcLayers", () => _docking.Reset(), "Put the layers, selection and layer settings panels back where they started (each panel's title bar moves, floats or folds it)");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
         panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
             "Show pictures as they'll come out on their layer's material: corrected, in the material's own colours. Needs a tone test on that material (Laser → Tone test).", null, () => _settings.PicturesAsBurned);

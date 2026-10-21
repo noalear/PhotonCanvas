@@ -42,6 +42,11 @@ public sealed class AppSettings
     public List<string> RecentFiles { get; set; } = [];
     /// <summary>Lasers the user added (GRBL machines); the F2 Ultra is built in.</summary>
     public List<PhotonCanvas.Core.MachineSetup> Machines { get; set; } = [];
+    /// <summary>Where each side panel is (Docking): side, order, folded, floating.</summary>
+    public Dictionary<string, PanelPlace> PanelLayout { get; set; } = [];
+    /// <summary>The sides' widths (px); 0 = as they start.</summary>
+    public double LeftDockWidth { get; set; }
+    public double RightDockWidth { get; set; }
     /// <summary>The machine in use; null = the F2 Ultra.</summary>
     public Guid? ActiveMachine { get; set; }
 
