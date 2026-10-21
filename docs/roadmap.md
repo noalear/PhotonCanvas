@@ -185,7 +185,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Engraving-style portraits: photos redrawn as banknote lines that swell in the shadows: straight, following the forms, rings (guilloché) or a spiral (Picture → Engraving)
 - [x] Inlay maker (Laser → Inlay): matching pocket and piece from one design, the pocket depth from the etch rate and the piece size from the cut test's kerf, so veneer sits flush (marquetry, cutting both from veneer, still to come)
 - [x] Stencil bridges: the middles of O, A, R kept in by automatic bridges (Outline → More… → Stencil bridges)
-- [ ] Laser-induced graphene (experimental): burn cork or wood into conductive carbon for touch pads and simple sensors, with a resistance test pattern; whether the 450 nm diode does it needs testing (papers show hobby visible lasers on cork)
+- [x] Laser-induced graphene test (experimental; Laser → Graphene test): strips between contact pads at a grid of powers and speeds, focus raised; resistances typed in, the lowest (and its ohms per square) saved to the library. Whether the 450 nm diode does it on cork or wood still needs burning
 - [x] Print-then-cut (Camera → Cut round prints): the camera (close-up when it covers the area) finds printed artwork on paper and a cut goes round each sticker with a margin; not yet tried on real prints
 
 ### Online only (not planned; listed for completeness)
