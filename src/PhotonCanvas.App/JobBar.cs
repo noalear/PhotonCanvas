@@ -721,7 +721,8 @@ public sealed class JobBar : UserControl
     string? _sentFrom;
     bool _sentMidSections;
 
-    public async Task Send()
+    /// <param name="quick">Quick processing: no confirmation when the job has nothing to warn about (the machine still waits for its button).</param>
+    public async Task Send(bool quick = false)
     {
         if (TopLevel.GetTopLevel(this) is not Window owner || _sending) return;
         // Dates and times as of now (fields are otherwise filled in when the design changes).
@@ -799,7 +800,7 @@ public sealed class JobBar : UserControl
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();
         sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button.");
-        if (!await Dialogs.Confirm(owner, "Ship it to the machine?", sb.ToString(), "Ship It", "Cancel")) return;
+        if ((!quick || job.Warnings.Count > 0) && !await Dialogs.Confirm(owner, "Ship it to the machine?", sb.ToString(), "Ship It", "Cancel")) return;
 
         _sending = true;
         _progress.IsVisible = true;

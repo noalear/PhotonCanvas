@@ -98,7 +98,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Batch on the bed: photograph the pieces, find each one, put a copy of the design on it, turned and snapped to its edges (xTool batch; their recognition is *online* or a downloaded model, ours is our own piece finding)
 - [ ] The same on the conveyor: mark, move on, photograph again (needs the conveyor)
 - [x] Variables batch: a different serial number or spreadsheet row on each item found, or on each copy of an array (xTool)
-- [ ] Quick processing: closing the lid focuses, photographs, finds the material, centres the design and starts (xTool)
+- [x] Quick processing (Laser → Quick on lid close): closing the lid focuses, photographs, finds the material, centres the design on it and loads the job; the machine's button starts it (xTool). Not yet tried on the machine
 
 ### Shapes, text and editing
 - [x] Simplify shapes: fewer points (LightBurn optimise, xTool simplify)

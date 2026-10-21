@@ -53,6 +53,9 @@ public sealed class AppSettings
     /// <summary>The machine in use (the F2 Ultra unless another was chosen).</summary>
     public PhotonCanvas.Core.MachineSetup ActiveSetup() => Machines.FirstOrDefault(m => m.Id == ActiveMachine) ?? PhotonCanvas.Core.MachineSetup.F2Ultra;
 
+    /// <summary>Quick processing: closing the lid focuses, photographs, centres the design on the material and loads the job (the button starts it).</summary>
+    public bool QuickProcessing { get; set; }
+
     /// <summary>At start, ask GitHub whether a newer version has been published (nothing about you is sent).</summary>
     public bool CheckForUpdates { get; set; } = true;
     /// <summary>A version the user said not to be told about again.</summary>

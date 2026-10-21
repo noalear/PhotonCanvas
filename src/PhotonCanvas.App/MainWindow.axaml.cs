@@ -125,6 +125,8 @@ public partial class MainWindow : Window
         _machine.StateChanged += ShowCloseUpArea;
         _machine.PhotoChanged += p => Canvas.Photo = p;
         _machine.StateChanged += _ribbon.Refresh;
+        // Quick processing: the lid closing starts focus, photo, placing and upload.
+        _machine.DeviceEventReceived += e => { if (e.Module == "GAP" && e.Type == "CLOSE") _ = Guard(QuickProcess); };
         _machine.FramingChanged += _ribbon.Refresh;
         Canvas.Hint += h => StatusText.Text = h;
         Canvas.CameraOpacity = _machine.OverlayOpacity;
@@ -625,12 +627,13 @@ public partial class MainWindow : Window
         mat.Large("Line test", "IcLine", () => _ = Guard(() => ShowLineTest(LineTestWindow.InDesign(_doc.State))), "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side");
         mat.Small("Inlay", "IcLayers", () => _ = Guard(() => new InlayWindow(_doc, _library, SelectedPaths()).ShowDialog(this)), "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)", () => SelectedPaths().Count > 0);
         mat.Small("Graphene test", "IcBolt", () => _ = Guard(() => new GrapheneTestWindow(_doc, _library, Canvas.Machine, GrapheneTestWindow.InDesign(_doc.State)).ShowDialog(this)), "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter");
+        mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
         var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
         colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
         colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
-        job.Large("Ship It", "IcSend", () => _ = Guard(_job.Send), "Upload the job; the machine waits for its start button", () => _job.CanSend);
+        job.Large("Ship It", "IcSend", () => _ = Guard(() => _job.Send()), "Upload the job; the machine waits for its start button", () => _job.CanSend);
         job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.Small("Preview run", "IcPreview", () => { if (_job.CurrentJob is { } bj) new RunPreviewWindow(bj, Canvas).Show(this); }, "Play the job back on the work area, sped up: what's marked when", () => _job.CurrentJob is not null);
@@ -797,7 +800,7 @@ public partial class MainWindow : Window
         new("tool.trim", "Tools", "Trim", "", () => Canvas.Tool = Tool.Trim),
         new("tool.align2", "Tools", "Align by two points", "", () => Canvas.Tool = Tool.Align2),
         new("job.frame", "Job", "Frame", "", () => _ = Guard(_job.ToggleFrame)),
-        new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(_job.Send); }),
+        new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(() => _job.Send()); }),
         new("job.console", "Job", "G-code console", "", ShowConsole),
     ];
 
@@ -2122,6 +2125,48 @@ public partial class MainWindow : Window
         var shape = new PathShape { Name = label, LayerId = parts[0].LayerId, Geometry = result };
         var state = Ops.Delete(_doc.State, parts.Select(p => p.Id).ToHashSet());
         _doc.Commit(label, Ops.AddShapes(state, [shape]), [shape.Id]);
+    }
+
+    bool _quickRunning;
+
+    /// <summary>
+    /// Quick processing (when turned on): the lid closed on an idle machine with a design to run, so
+    /// focus on the material, photograph the bed, centre the design on the biggest piece found, and
+    /// load the job. Nothing fires until the machine's button is pressed.
+    /// </summary>
+    async Task QuickProcess()
+    {
+        if (!_settings.QuickProcessing || _quickRunning || !_machine.IsConnected || _machine.Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "")) return;
+        if (_settings.ActiveSetup().Kind != MachineKind.XTool) return;
+        var output = JobBuilder.OutputLayers(_doc.State).SelectMany(l => _doc.State.ShapesFor(l)).ToList();
+        if (output.Count == 0) return;
+        _quickRunning = true;
+        try
+        {
+            StatusText.Text = "Lid closed: focusing…";
+            if (await _machine.AutoFocusNowAsync() is not { } dist) { StatusText.Text = "Quick processing stopped: the focus couldn't be measured."; return; }
+            StatusText.Text = "Lid closed: finding the material…";
+            const double MmPerPx = 0.4;
+            var area = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH);
+            using var photo = await _machine.CaptureAreaAsync(area, MmPerPx, dist);
+            var raster = CameraImaging.ToRaster(photo);
+            var pieces = await Task.Run(() => PhotonCanvas.Core.Camera.PieceFinder.Find(PhotonCanvas.Core.Imaging.BackgroundRemoval.Mask(raster, new PhotonCanvas.Core.Imaging.BackgroundOptions()), raster.Width, raster.Height, area, MmPerPx, 400));
+            if (pieces.MaxBy(p => p.AreaMm2) is { } piece)
+            {
+                var b = output.Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, c) => a.Union(c));
+                var move = piece.Centre - b.Center;
+                if (move.Length > 0.05)
+                    _doc.Commit("Quick processing: centred on the material", Ops.Transform(_doc.State, output.Select(x => x.Id).ToHashSet(), Affine.Translate(move.X, move.Y)));
+            }
+            else StatusText.Text = "Lid closed: no material found in the photo; the design stays where it is.";
+            await _job.Send(quick: true);
+            StatusText.Text = pieces.Count > 0 ? "Quick processing: focused, centred on the material and loaded. Press the machine's button to start." : StatusText.Text;
+        }
+        catch (Exception e) when (e is PhotonCanvas.Device.DeviceException or FormatException or InvalidOperationException)
+        {
+            StatusText.Text = $"Quick processing stopped: {e.Message}";
+        }
+        finally { _quickRunning = false; }
     }
 
     /// <summary>Print-then-cut: cuts round printed art the camera finds (close-up when it covers the area, else the overview).</summary>
