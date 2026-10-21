@@ -187,6 +187,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Stencil bridges: the middles of O, A, R kept in by automatic bridges (Outline → More… → Stencil bridges)
 - [x] Laser-induced graphene test (experimental; Laser → Graphene test): strips between contact pads at a grid of powers and speeds, focus raised; resistances typed in, the lowest (and its ohms per square) saved to the library. Whether the 450 nm diode does it on cork or wood still needs burning
 - [x] Print-then-cut (Camera → Cut round prints): the camera (close-up when it covers the area) finds printed artwork on paper and a cut goes round each sticker with a margin; not yet tried on real prints
+- [ ] Bevelled edges from the galvo's slanted beam (idea 2026-10-21): away from the middle of the field the beam comes down at a slant, so a straight edge's slope is set by how far it lies from the middle (atan(distance ÷ pivot height)), with the piece on the middle's side wider at the bottom. Cut edge by edge: the far edges at their bevel's distance and the rest about 3 mm oversize, then the piece turned (180° for a square), found again by the camera (close-up where it can) and the next edges cut, trimming the oversize off. For pyramids and chamfered boxes, and stacked slices bevelled to their shape's slope instead of stepped. First step built (Laser → Bevel test: four bars measured with calipers give the pivot heights); the rest waits on those measurements: if the pivot is about 300 mm up the steepest bevel is about 19°, at 600 mm only about 10°
 
 ### Online only (not planned; listed for completeness)
 - Accounts and linking the machine to one; cloud projects and sharing; cloud fonts
@@ -215,4 +216,5 @@ Built from xTool Studio's own requests but not yet tried on the machine:
 - Picture rows at an angle (scan angle, turn per pass, crosshatch): confirmed 2026-10-20, the machine takes dot-by-dot rows at 20–30° (Line test patches). Still to check: whether the edges line up between turned passes.
 - A finished job put away before the next upload (P_WORK_DONE → P_IDLE without the button): still to check.
 - Tone test: does the camera photo of a burned strip read cleanly (lighting, glare, grain)? Burn a portrait with and without the correction on basswood and compare.
+- Bevel test: cut the four bars in a board 4 mm or thicker, measure bars and holes with calipers. What pivot heights come out, are the two directions close, and is a real bevel as steep as they predict?
 - Exact depth: how precise is the pointer at reading a hole's floor (repeat a reading 5 times; compare with calipers' depth gauge)? Does the dot show on charred wood? Try 1 mm in basswood and 0.3 mm in steel.
