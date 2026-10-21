@@ -60,7 +60,7 @@ public sealed class MachinesPanel : UserControl
     {
         _list.Children.Clear();
         var active = _settings.ActiveSetup();
-        foreach (var m in new[] { MachineSetup.F2Ultra }.Concat(_settings.Machines))
+        foreach (var m in new[] { MachineSetup.F2Ultra }.Concat(MachineSetup.XToolFamily).Concat(_settings.Machines))
         {
             var use = new RadioButton { GroupName = "machine", IsChecked = m.Id == active.Id, VerticalAlignment = VerticalAlignment.Center };
             var id = m.Id;
@@ -85,7 +85,13 @@ public sealed class MachinesPanel : UserControl
                 Children =
                 {
                     new TextBlock { Text = m.Name, FontWeight = FontWeight.SemiBold },
-                    new TextBlock { Text = m.Kind == MachineKind.XTool ? "Built in · over Wi-Fi · 220 × 220 mm" : $"GRBL over USB{(m.Port.Length > 0 ? $" ({m.Port})" : "")} · {m.Laser} {m.PowerW:0.#} W · {m.BedW:0.#} × {m.BedH:0.#} mm", Classes = { "muted" }, FontSize = 12 },
+                    new TextBlock
+                    {
+                        Text = m.Kind == MachineKind.XTool
+                            ? $"Built in · over Wi-Fi · {m.Laser} · {m.BedW:0} × {m.BedH:0} mm" + (m.Untested ? " · untested: same protocol and G-code as the F2 Ultra" + (m.MopaKnown ? "" : ", fiber settings not yet known") : "")
+                            : $"GRBL over USB{(m.Port.Length > 0 ? $" ({m.Port})" : "")} · {m.Laser} {m.PowerW:0.#} W · {m.BedW:0.#} × {m.BedH:0.#} mm",
+                        Classes = { "muted" }, FontSize = 12, TextWrapping = TextWrapping.Wrap,
+                    },
                 },
             });
             _list.Children.Add(new Border { Background = Brush("Bg2"), CornerRadius = new(8), Padding = new(8, 6), Child = row });

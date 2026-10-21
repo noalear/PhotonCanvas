@@ -95,3 +95,24 @@ public class FanHeaderTests
         Assert.DoesNotContain("M9064 B3", quieter);
     }
 }
+
+public class XToolFamilyTests
+{
+    [Fact]
+    public void EachModelHasItsAreaAndGcodeTag()
+    {
+        var f1 = MachineSetup.ForDeviceCode("GS003")!;
+        Assert.Equal(("GS002", 220.0), (f1.Profile.GcodeTag, f1.Profile.FieldW));
+        var lite = MachineSetup.ForDeviceCode("GS005")!;
+        Assert.Equal(115, lite.Profile.FieldW);
+        Assert.Same(MachineSetup.F2Ultra, MachineSetup.ForDeviceCode("GS004-CLASS-4"));
+        Assert.Null(MachineSetup.ForDeviceCode("XX999"));
+        // The G-code is tagged for the model.
+        var cut = new VectorBlock(Polyline.Open((10, 10), (20, 10)), LaserSettings.Blue(50, 20));
+        Assert.Contains("# GS002 HEAD", new Job(f1.Profile, [cut]) { Created = "x" }.Render());
+        // Fiber settings only where their limits are known (the F2 Ultra's).
+        var fiber = LaserSettings.Red(50, 500, 200, 60);
+        Assert.Throws<JobException>(() => fiber.Validate(f1.Profile));
+        fiber.Validate(MachineSetup.ForDeviceCode("GS007-CLASS-4")!.Profile);
+    }
+}

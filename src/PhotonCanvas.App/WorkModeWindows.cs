@@ -45,7 +45,7 @@ public static class WorkModes
     }
 
     /// <summary>The work area the canvas shows for the mode: the bed, the object unrolled, or the belt's length.</summary>
-    public static MachineProfile Area(AppSettings s) => s.ActiveSetup() is { Kind: MachineKind.Grbl } g ? g.Profile : From(s) switch
+    public static MachineProfile Area(AppSettings s) => s.ActiveSetup() is { } m && m.Id != MachineSetup.F2Ultra.Id ? m.Profile : From(s) switch
     {
         WorkMode.Rotary r => MachineProfile.F2Ultra with { FieldH = Math.Round(r.CircumferenceMm, 2) },
         WorkMode.Conveyor c => MachineProfile.F2Ultra with { FieldW = c.LengthMm },

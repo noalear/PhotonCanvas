@@ -875,6 +875,12 @@ public sealed class MachinePanel : UserControl
             _info.Text = $"Serial {info.Sn ?? "?"} · firmware {info.Firmware ?? "?"}";
             if (!info.AcceptsTextGcode)
                 _info.Text += "\n⚠ This firmware does not list text G-code support; sending may fail.";
+            // Which model it is: say so when it isn't the one chosen in Settings → Machines.
+            string? code = info.Raw["deviceCode"]?.GetValue<string>();
+            if (MachineSetup.ForDeviceCode(code) is { } model && model.Id != _settings.ActiveSetup().Id)
+                _info.Text += $"\n⚠ This is an {model.Name}, but {_settings.ActiveSetup().Name} is chosen: pick it in Settings → Machines so jobs fit its work area.";
+            else if (code is not null && MachineSetup.ForDeviceCode(code) is null)
+                _info.Text += $"\n⚠ PhotonCanvas doesn't know this model ({code}); jobs are made as for the F2 Ultra.";
             _connState.Text = $"Connected to {ip}.";
             _connect.Content = "Disconnect";
             _connect.Classes.Remove("primary");

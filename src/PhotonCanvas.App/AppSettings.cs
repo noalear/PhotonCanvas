@@ -51,7 +51,8 @@ public sealed class AppSettings
     public Guid? ActiveMachine { get; set; }
 
     /// <summary>The machine in use (the F2 Ultra unless another was chosen).</summary>
-    public PhotonCanvas.Core.MachineSetup ActiveSetup() => Machines.FirstOrDefault(m => m.Id == ActiveMachine) ?? PhotonCanvas.Core.MachineSetup.F2Ultra;
+    public PhotonCanvas.Core.MachineSetup ActiveSetup() =>
+        Machines.FirstOrDefault(m => m.Id == ActiveMachine) ?? PhotonCanvas.Core.MachineSetup.XToolFamily.FirstOrDefault(m => m.Id == ActiveMachine) ?? PhotonCanvas.Core.MachineSetup.F2Ultra;
 
     /// <summary>Quick processing: closing the lid focuses, photographs, centres the design on the material and loads the job (the button starts it).</summary>
     public bool QuickProcessing { get; set; }

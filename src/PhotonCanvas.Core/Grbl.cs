@@ -46,6 +46,13 @@ public sealed record MachineSetup
     public bool AirAssist { get; init; } = true;
     /// <summary>Picture rows: run this far past each end, laser off, so the head is at speed where it burns (mm).</summary>
     public double RasterOverscanMm { get; init; } = 3;
+    /// <summary>xTool machines: the model's device code (as it reports itself) and its tag in the G-code (# GS004-4 HEAD…).</summary>
+    public string DeviceCode { get; init; } = "";
+    public string GcodeTag { get; init; } = "";
+    /// <summary>xTool machines: whether the MOPA (fiber) laser's limits are known (the F2 Ultra's), so MOPA settings are allowed.</summary>
+    public bool MopaKnown { get; init; }
+    /// <summary>Not yet run on a real one: shown with the machine.</summary>
+    public bool Untested { get; init; }
 
     /// <summary>The F2 Ultra (built in, over Wi-Fi with xTool's own protocol).</summary>
     public static readonly MachineSetup F2Ultra = new()
@@ -53,7 +60,33 @@ public sealed record MachineSetup
         Id = new Guid("2f2f0000-0000-4000-8000-000000000001"), Name = "xTool F2 Ultra", Kind = MachineKind.XTool,
         BedW = MachineProfile.F2Ultra.FieldW, BedH = MachineProfile.F2Ultra.FieldH, Laser = "Diode + fiber", PowerW = 60,
         MaxSpeed = MachineProfile.F2Ultra.MaxSpeed, MinSpeed = MachineProfile.F2Ultra.MinSpeed,
+        DeviceCode = MachineProfile.F2Ultra.DeviceCode, GcodeTag = MachineProfile.F2Ultra.GcodeTag, MopaKnown = true,
     };
+
+    /// <summary>
+    /// The rest of xTool's galvo family, which speak the same protocol (V2) and G-code as the F2 Ultra
+    /// (from xTool Studio's own model list): work area, lasers and G-code tag. Not yet run on any.
+    /// </summary>
+    public static readonly IReadOnlyList<MachineSetup> XToolFamily =
+    [
+        XTool("xTool F2 Ultra (Single)", "GS007-CLASS-4", "GS007-4", 220, "Fiber", 60, mopa: true),
+        XTool("xTool F1 Ultra", "GS003", "GS002", 220, "Diode + fiber", 20),
+        XTool("xTool F1 Ultra (first)", "GS002", "GS002", 220, "Diode + fiber", 20),
+        XTool("xTool F2", "GS006", "GS006", 115, "Diode + infrared", 15),
+        XTool("xTool F1 Lite", "GS005", "F1", 115, "Diode", 10),
+        XTool("xTool F2 Ultra UV", "GS009-CLASS-4", "GS009-4", 200, "UV", 5),
+    ];
+
+    static MachineSetup XTool(string name, string code, string tag, double field, string laser, double watts, bool mopa = false) => new()
+    {
+        Id = new Guid(System.Security.Cryptography.MD5.HashData(System.Text.Encoding.UTF8.GetBytes(code))),
+        Name = name, Kind = MachineKind.XTool, DeviceCode = code, GcodeTag = tag, BedW = field, BedH = field, Laser = laser, PowerW = watts,
+        MaxSpeed = MachineProfile.F2Ultra.MaxSpeed, MinSpeed = MachineProfile.F2Ultra.MinSpeed, MopaKnown = mopa, Untested = true,
+    };
+
+    /// <summary>The built-in xTool machine with this device code, if PhotonCanvas knows it.</summary>
+    public static MachineSetup? ForDeviceCode(string? code) =>
+        code is null ? null : code == F2Ultra.DeviceCode ? F2Ultra : XToolFamily.FirstOrDefault(m => m.DeviceCode == code);
 
     /// <summary>
     /// A starting point for a Full Spectrum Laser 5th Gen Hobby 20×12 (45 W CO2) running GRBL after a
@@ -66,7 +99,13 @@ public sealed record MachineSetup
     };
 
     /// <summary>The limits PhotonCanvas checks jobs against.</summary>
-    public MachineProfile Profile => Kind == MachineKind.XTool ? MachineProfile.F2Ultra : new MachineProfile
+    public MachineProfile Profile => Kind == MachineKind.XTool
+        ? (DeviceCode.Length == 0 || DeviceCode == MachineProfile.F2Ultra.DeviceCode ? MachineProfile.F2Ultra : MachineProfile.F2Ultra with
+        {
+            DeviceCode = DeviceCode, GcodeTag = GcodeTag, FieldW = BedW, FieldH = BedH,
+            Mopa = MopaKnown ? MachineProfile.F2UltraMopa : [],
+        })
+        : new MachineProfile
     {
         DeviceCode = "GRBL", GcodeTag = "GRBL", FieldW = BedW, FieldH = BedH, MinSpeed = MinSpeed, MaxSpeed = MaxSpeed,
         ZOffset = 0, ZMax = 0, Mopa = [],
