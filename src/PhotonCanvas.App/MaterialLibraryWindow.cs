@@ -81,12 +81,14 @@ public sealed class MaterialLibraryWindow : Window
         import.Click += async (_, _) => await Import();
         var export = Button("Export…", tip: "Save the selected materials (or all, if none is selected) to a .pcmat file to share.");
         export.Click += async (_, _) => await Export();
+        var xtool = Button("Import from xTool Studio…", tip: "xTool's tested F2 Ultra settings and your own from xTool Studio, read from its folder on this computer (read only; nothing is sent).");
+        xtool.Click += async (_, _) => await ImportXTool();
         var author = new TextBox { Text = settings.LibraryAuthor ?? "", Watermark = "Your name (shown to people you share with)" };
         author.LostFocus += (_, _) => { _settings.LibraryAuthor = string.IsNullOrWhiteSpace(author.Text) ? null : author.Text.Trim(); _settings.Save(); };
 
         var left = new DockPanel { Margin = new(0, 0, 14, 0) };
         var top = new StackPanel { Spacing = 6, Margin = new(0, 0, 0, 8), Children = { _search, _filter } };
-        var bottom = new StackPanel { Spacing = 6, Margin = new(0, 8, 0, 0), Children = { Row(add, del), Row(import, export), author, _status } };
+        var bottom = new StackPanel { Spacing = 6, Margin = new(0, 8, 0, 0), Children = { Row(add, del), Row(import, export), xtool, author, _status } };
         DockPanel.SetDock(top, Dock.Top);
         DockPanel.SetDock(bottom, Dock.Bottom);
         left.Children.Add(top);
@@ -427,6 +429,39 @@ public sealed class MaterialLibraryWindow : Window
         Fill();
         await Dialogs.Message(this, "Import", string.Join("\n", report) +
             "\n\nOther people's recipes are marked with who tested them. Their machine and material may differ from yours: try them on a scrap first.");
+    }
+
+    /// <summary>xTool Studio's settings for this machine, read from its folder (read only, presets only).</summary>
+    async Task ImportXTool()
+    {
+        if (PhotonCanvas.Doc.Import.XToolPresets.Folder() is not { } folder)
+        {
+            await Dialogs.Message(this, "Import from xTool Studio", "xTool Studio isn't installed on this computer (or hasn't opened its material library yet).");
+            return;
+        }
+        if (!await Dialogs.Confirm(this, "Import from xTool Studio",
+                "This reads xTool Studio's material settings from its folder on this computer: xTool's own tested F2 Ultra settings (as xTool Studio last downloaded them) and the settings you made yourself in xTool Studio.\n\n" +
+                "Only materials and settings are read. Your account, devices and projects are left alone, nothing in xTool Studio is changed, and nothing is sent anywhere.\n\n" +
+                "Materials already in your library (same name and thickness) get the new settings added; settings with the same name are updated.", "Import", "Cancel")) return;
+        try
+        {
+            var r = await Task.Run(() => PhotonCanvas.Doc.Import.XToolPresets.Read(folder, PhotonCanvas.Core.MachineProfile.F2Ultra.DeviceCode));
+            var (mats, added, updated) = PhotonCanvas.Doc.Import.XToolPresets.Into(_lib, r, PhotonCanvas.Core.MachineProfile.F2Ultra.DeviceCode);
+            _lib.Save();
+            Changed();
+            Fill();
+            int yours = r.Materials.Where(m => m.Yours).Sum(m => m.Settings.Count), theirs = r.Materials.Where(m => !m.Yours).Sum(m => m.Settings.Count);
+            AppLog.Write("library", $"xTool Studio import: {mats} new materials, {added} settings added, {updated} updated ({theirs} xTool's, {yours} yours); {r.LeftOut} for other work modes left out.");
+            await Dialogs.Message(this, "Import from xTool Studio",
+                $"{theirs} of xTool's tested settings and {yours} of your own, on {r.Materials.Count} materials: {mats} new material{(mats == 1 ? "" : "s")}, {added} setting{(added == 1 ? "" : "s")} added, {updated} updated.\n\n" +
+                $"xTool's are marked \"(xTool)\". Left out: {r.LeftOut} settings for xTool's other work modes (batch, conveyor, relief) and tools PhotonCanvas doesn't have; most repeat the flat-bed ones.\n\n" +
+                "Try any setting on scrap first: xTool's are for their own materials, and both lasers' settings are in (blue and MOPA).");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or InvalidDataException)
+        {
+            AppLog.Error("xTool import", e);
+            await Dialogs.Message(this, "Import from xTool Studio", $"Couldn't read xTool Studio's settings: {e.Message}\n\nIf xTool Studio is open, close it and try again.");
+        }
     }
 
     async Task Export()

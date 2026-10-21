@@ -154,7 +154,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
 
 ### Material library and tests
-- [ ] xTool's own tested F2 Ultra settings, imported when the app runs, never kept in our repo. They aren't shipped with xTool Studio: they're its cache of the online library, in a Chromium IndexedDB (LevelDB, values in V8's serialization format) under its AppData folder. The format is readable; reading that folder waits on the owner's go-ahead, since it also holds xTool's account and device records
+- [x] xTool's own tested F2 Ultra settings, and the user's own from xTool Studio: Library → Import from xTool Studio reads its cache (Chromium IndexedDB: LevelDB, Snappy, V8 values) read-only, materials and settings only; nothing kept in our repo
 - [x] Copy and paste layer settings (xTool)
 - [x] Single-point test: one square at chosen settings (xTool)
 - [x] Etch-rate test: circles burned 1, 2, 3 … passes, round by round; the first through gives thickness ÷ passes with its range, depths on shallower ones show the slowdown; saved with the material (our own)
