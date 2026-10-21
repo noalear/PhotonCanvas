@@ -577,6 +577,7 @@ public partial class MainWindow : Window
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
+        pwork.Large("Engraving", "IcLine", () => { if (SelectedPicture() is { } im) _ = Guard(() => new EngravingWindow(_doc, im).ShowDialog(this)); }, "The picture as engraving lines, banknote style: lines that swell in the shadows (straight, following the forms, rings or a spiral)", HasPicture);
         _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
         _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
