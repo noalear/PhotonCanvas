@@ -279,6 +279,8 @@ public sealed class JobBar : UserControl
         PassDelayS = (double)(_delay.Value ?? 0),
         Mode = WorkModes.From(_settings),
         Machine = WorkModes.Area(_settings),
+        FanGear = _settings.FanGear,
+        PurifierSpeed = _settings.PurifierSpeed,
         Section = _section,
         OnlyLayer = _onlyLayer,
     };

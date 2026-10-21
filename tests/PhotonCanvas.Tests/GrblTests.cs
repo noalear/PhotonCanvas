@@ -78,3 +78,20 @@ public class GrblTests
         Assert.All(g.Where(l => l.StartsWith("G1")), l => Assert.DoesNotMatch(@"S[1-9]", l));
     }
 }
+
+public class FanHeaderTests
+{
+    [Fact]
+    public void TheFanGearAndPurifierSpeedGoInTheJobsHeader()
+    {
+        var block = new VectorBlock(Polyline.Open((10, 10), (20, 10)), LaserSettings.Blue(50, 20));
+        var plain = new Job(MachineProfile.F2Ultra, [block]) { Created = "x" }.Render();
+        Assert.Contains("M9064 B3", plain); // as xTool Studio sends
+        Assert.Contains("G198 P76 \"M9039 V50\"", plain);
+        var quieter = new Job(MachineProfile.F2Ultra, [block]) { Created = "x", FanGear = 2, PurifierSpeed = 80 }.Render();
+        Assert.Contains("M9064 B2", quieter);
+        Assert.Contains("G198 P70 \"M9064 B2\"", quieter);
+        Assert.Contains("G198 P76 \"M9039 V80\"", quieter);
+        Assert.DoesNotContain("M9064 B3", quieter);
+    }
+}

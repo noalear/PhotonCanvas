@@ -404,6 +404,14 @@ public sealed class Job
     public MachineProfile Machine { get; }
     public IReadOnlyList<Block> Blocks { get; }
     public PassMode PassMode { get; init; } = new PassMode.PerBlock();
+
+    /// <summary>
+    /// The exhaust fan's gear for the job (M9064 B…, sent to the fan's accessory port too): 3 is what
+    /// xTool Studio sends, its calibration jobs 2. Read back by xTool as the fan's "A" gear.
+    /// </summary>
+    public int FanGear { get; init; } = 3;
+    /// <summary>The purifier's speed for the job (%; M9039 V…, 50 as xTool Studio sends).</summary>
+    public int PurifierSpeed { get; init; } = 50;
     public Preamble Preamble { get; init; }
     /// <summary>Written to the <c># date=</c> header line, e.g. <c>2026_10_12_19_02_38</c>.</summary>
     public string Created { get; init; } = "";
@@ -714,12 +722,12 @@ public sealed class Job
             "G4P5",
             "G198 P84 \"M9033 V100\"",
             "G198 P85 \"M9401 D2 V500\"",
-            "M9064 B3",
-            "G198 P70 \"M9064 B3\"",
-            "G198 P78 \"M9064 B3\"",
+            $"M9064 B{Math.Clamp(FanGear, 1, 4)}",
+            $"G198 P70 \"M9064 B{Math.Clamp(FanGear, 1, 4)}\"",
+            $"G198 P78 \"M9064 B{Math.Clamp(FanGear, 1, 4)}\"",
             "M9039 C2",
             "G198 P69 \"M9039 C2\"",
-            "G198 P76 \"M9039 V50\"",
+            $"G198 P76 \"M9039 V{Math.Clamp(PurifierSpeed, 10, 100)}\"",
             $"G198 P76 \"M9043 {m9043}\"",
             "G4P5",
             $"# {tag} HEAD",

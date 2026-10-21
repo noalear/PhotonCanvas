@@ -12,6 +12,22 @@ namespace PhotonCanvas.App;
 /// </summary>
 public sealed class EquipmentPanel : UserControl
 {
+    static NumericUpDown Gear(AppSettings settings)
+    {
+        var n = UiKit.Number(1, 4, 1, "0");
+        n.Value = Math.Clamp(settings.FanGear, 1, 4);
+        n.ValueChanged += (_, _) => { if (n.Value is { } v) { settings.FanGear = (int)v; settings.Save(); } };
+        return n;
+    }
+
+    static NumericUpDown Speed(AppSettings settings)
+    {
+        var n = UiKit.Number(10, 100, 10, "0");
+        n.Value = Math.Clamp(settings.PurifierSpeed, 10, 100);
+        n.ValueChanged += (_, _) => { if (n.Value is { } v) { settings.PurifierSpeed = (int)v; settings.Save(); } };
+        return n;
+    }
+
     /// <summary>Something was ticked or unticked.</summary>
     public event Action? Changed;
 
@@ -41,6 +57,10 @@ public sealed class EquipmentPanel : UserControl
                 Box("Diffraction gratings", settings.ShowDiffraction, v => settings.ShowDiffraction = v, "Rainbow shimmer pictures and the depth-map almost-hologram on polished stainless (MOPA)."),
                 Box("G-code console", settings.ShowConsole, v => settings.ShowConsole = v, "Send commands straight to the machine, and keep macros (advanced)."),
                 Hint("Hiding a feature only takes it out of the ribbon: nothing is lost, and ticking it again brings it back."),
+                new TextBlock { Text = "EXTRACTION", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
+                Field("Exhaust fan gear", Gear(settings), tip: "Sent with each job to the exhaust fan (and an xTool duct fan): 1 lowest, 4 highest. xTool Studio sends 3."),
+                Field("Purifier speed (%)", Speed(settings), tip: "Sent with each job to an xTool purifier. xTool Studio sends 50%."),
+                Hint("Experimental: these are the commands xTool Studio puts at the start of every job, with the numbers changed. Check the fan sounds right on the first job."),
             },
         };
     }

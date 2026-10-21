@@ -175,7 +175,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Firmware updates from a file (xTool; downloading them is *online*)
 - [x] Wi-Fi setup (scan, join) and finding the machine over a USB or Ethernet cable (xTool)
 - [x] Interlock status (lid, safety key, exhaust fan, emergency stop) and alarm messages for the emergency stop, flame, tilt and overheating (xTool)
-- [ ] Purifier and duct-fan accessory control (fan speed) (xTool)
+- [x] Exhaust fan gear and purifier speed per job (Settings → Equipment → Extraction): the M9064 B… and M9039 V… commands xTool Studio puts at the start of each job, with the numbers set (xTool). Experimental: not yet heard on the machine
 
 ### New ideas nobody else has (researched 2026-10-19)
 

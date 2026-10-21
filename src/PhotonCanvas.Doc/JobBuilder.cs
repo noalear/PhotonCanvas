@@ -12,6 +12,9 @@ public sealed record JobOptions
     /// False: stock behaviour, each path repeats its passes before the next starts.
     /// </summary>
     public bool WholeJobPasses { get; init; } = true;
+    /// <summary>Exhaust fan gear (1–4) and purifier speed (%) for the job: see <see cref="Job.FanGear"/>.</summary>
+    public int FanGear { get; init; } = 3;
+    public int PurifierSpeed { get; init; } = 50;
     /// <summary>Pause between whole-job passes, in seconds.</summary>
     public double PassDelayS { get; init; }
     /// <summary>Maximum deviation of the cut path from the true curve, in mm.</summary>
@@ -540,6 +543,8 @@ public static class JobBuilder
             PassMode = opt.WholeJobPasses ? new PassMode.Rounds(opt.PassDelayS) : new PassMode.PerBlock(),
             Created = (now ?? DateTimeOffset.Now).ToString("yyyy_MM_dd_HH_mm_ss"),
             Mode = mode,
+            FanGear = opt.FanGear,
+            PurifierSpeed = opt.PurifierSpeed,
             SurfaceHeight = surface is null ? null : surface.HeightAt,
             BandMm = s.Curve.BandMm,
         };
