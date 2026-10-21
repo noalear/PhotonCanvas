@@ -15,6 +15,7 @@ licence texts ship inside their NuGet packages and are linked below.
 | [PdfPig](https://github.com/UglyToad/PdfPig) 0.1 | Importing PDF and AI drawings | Apache License 2.0 |
 | [ZXing.Net](https://github.com/micjahn/ZXing.Net) 0.16 | QR codes, Data Matrix and barcodes | Apache License 2.0 |
 | [.NET](https://github.com/dotnet/runtime) runtime | Platform | MIT |
+| [System.IO.Ports](https://github.com/dotnet/runtime) | USB serial connection to GRBL machines | MIT |
 
 Test-only: xUnit (Apache 2.0), Microsoft.NET.Test.Sdk (MIT), coverlet (MIT).
 

@@ -268,7 +268,7 @@ public sealed class JobBar : UserControl
         set => _order.IsChecked = value;
     }
 
-    public bool CanSend => !_sending && _job is not null && _machine.IsConnected;
+    public bool CanSend => !_sending && _job is not null && (_machine.IsConnected || _settings.ActiveSetup().Kind == MachineKind.Grbl);
     public bool CanFrame => _machine.IsFraming || CanSend;
 
     void UpdateDelayRow() => _delayRow.IsVisible = _passMode.SelectedIndex == 0;
@@ -278,6 +278,7 @@ public sealed class JobBar : UserControl
         WholeJobPasses = _passMode.SelectedIndex == 0,
         PassDelayS = (double)(_delay.Value ?? 0),
         Mode = WorkModes.From(_settings),
+        Machine = WorkModes.Area(_settings),
         Section = _section,
         OnlyLayer = _onlyLayer,
     };
@@ -731,6 +732,16 @@ public sealed class JobBar : UserControl
         catch (JobException e)
         {
             await Dialogs.Message(owner, "Can't send", e.Message);
+            return;
+        }
+        // A GRBL machine: the job as GRBL G-code, sent over USB from its own window.
+        if (_settings.ActiveSetup() is { Kind: MachineKind.Grbl } grbl)
+        {
+            string title = _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "Untitled";
+            string gcode;
+            try { gcode = GrblWriter.Write(job.Job, grbl, title); }
+            catch (JobException e) { await Dialogs.Message(owner, "Can't send", e.Message); return; }
+            await new GrblWindow(grbl, gcode, job.Bounds, title).ShowDialog(owner);
             return;
         }
 

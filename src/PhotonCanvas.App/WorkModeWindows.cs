@@ -20,7 +20,7 @@ public static class WorkModes
     public static bool Owned(AppSettings s, int attachment) => attachment >= 2 ? s.OwnsRa3 : s.OwnsRa2;
 
     /// <summary>The work mode in the settings is one the user's equipment can do (else the flat bed is used).</summary>
-    public static bool Usable(AppSettings s) => s.WorkMode switch
+    public static bool Usable(AppSettings s) => s.ActiveSetup().Kind == MachineKind.XTool && s.WorkMode switch
     {
         "Rotary" => Owned(s, s.RotaryAttachment),
         "Conveyor" => s.OwnsConveyor,
@@ -45,7 +45,7 @@ public static class WorkModes
     }
 
     /// <summary>The work area the canvas shows for the mode: the bed, the object unrolled, or the belt's length.</summary>
-    public static MachineProfile Area(AppSettings s) => From(s) switch
+    public static MachineProfile Area(AppSettings s) => s.ActiveSetup() is { Kind: MachineKind.Grbl } g ? g.Profile : From(s) switch
     {
         WorkMode.Rotary r => MachineProfile.F2Ultra with { FieldH = Math.Round(r.CircumferenceMm, 2) },
         WorkMode.Conveyor c => MachineProfile.F2Ultra with { FieldW = c.LengthMm },

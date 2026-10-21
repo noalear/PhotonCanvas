@@ -89,8 +89,9 @@ public partial class MainWindow : Window
         _layerEditor.SaveToLibraryRequested += l => _ = Guard(() => SaveToLibrary(l));
         _layerEditor.LibraryRequested += () => _ = Guard(ShowLibrary);
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
-        if (!WorkModes.Usable(_settings)) _settings.WorkMode = "Flat";
-        if (_settings.WorkMode != "Flat") Canvas.Machine = WorkModes.Area(_settings);
+        if (_settings.ActiveSetup().Kind == MachineKind.XTool && !WorkModes.Usable(_settings)) _settings.WorkMode = "Flat";
+        // The machine in use (and its work mode) sets the work area.
+        Canvas.Machine = WorkModes.Area(_settings);
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
         _job.LayerClicked += id => _layers.Activate(id);
@@ -678,6 +679,8 @@ public partial class MainWindow : Window
     {
         var equipment = new EquipmentPanel(_settings);
         equipment.Changed += ApplyEquipment;
+        var machines = new MachinesPanel(_settings);
+        machines.Changed += ApplyWorkMode;
         var w = new SettingsWindow(_machine, page,
         [
             ("Workspace",
@@ -710,7 +713,7 @@ public partial class MainWindow : Window
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
                 new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
             ]),
-        ], [("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); })), ("Updates", UpdateNotice.Panel(_settings, () => this))]);
+        ], [("Machines", machines), ("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); })), ("Updates", UpdateNotice.Panel(_settings, () => this))]);
         await w.ShowDialog(this);
         _ribbon.Refresh();
     }

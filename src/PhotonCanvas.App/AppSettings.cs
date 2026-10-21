@@ -40,6 +40,14 @@ public sealed class AppSettings
     public PhotonCanvas.Core.Camera.MarkStyle CalibMarkStyle { get; set; } = PhotonCanvas.Core.Camera.MarkStyle.Dot;
     public double CalibMarkSizeMm { get; set; } = 2;
     public List<string> RecentFiles { get; set; } = [];
+    /// <summary>Lasers the user added (GRBL machines); the F2 Ultra is built in.</summary>
+    public List<PhotonCanvas.Core.MachineSetup> Machines { get; set; } = [];
+    /// <summary>The machine in use; null = the F2 Ultra.</summary>
+    public Guid? ActiveMachine { get; set; }
+
+    /// <summary>The machine in use (the F2 Ultra unless another was chosen).</summary>
+    public PhotonCanvas.Core.MachineSetup ActiveSetup() => Machines.FirstOrDefault(m => m.Id == ActiveMachine) ?? PhotonCanvas.Core.MachineSetup.F2Ultra;
+
     /// <summary>At start, ask GitHub whether a newer version has been published (nothing about you is sent).</summary>
     public bool CheckForUpdates { get; set; } = true;
     /// <summary>A version the user said not to be told about again.</summary>

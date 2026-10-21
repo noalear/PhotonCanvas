@@ -152,6 +152,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Other languages (LightBurn, xTool)
 - [ ] Movable, dockable panels (LightBurn)
 - [x] Mac and Linux builds (LightBurn): `tools/publish.sh`; built and packaged, not yet run on a Mac or Linux machine
+- [x] User-defined machines (Settings → Machines): GRBL machines added and described (bed, laser, speeds, power scale, origin, port, air assist), with a Full Spectrum 5th Gen Hobby 20×12 starting point; jobs written as GRBL 1.1 laser-mode G-code and streamed over USB (character-counting flow control), with home, unlock, frame, pause, stop and Save G-code. Not yet run on a real GRBL machine
 - [ ] Other machines: the F1 Ultra and the rest of the family use the same commands (xTool)
 
 ### Material library and tests
