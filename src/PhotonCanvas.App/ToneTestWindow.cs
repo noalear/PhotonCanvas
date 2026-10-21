@@ -191,6 +191,9 @@ public sealed class ToneTestWindow : Window
             var need = ToneTest.Size(steps, size, fit.Columns);
             _plan.Text = $"{steps} patches of {size:0.#} mm" + (fit.Columns < steps ? $", {fit.Columns} to a row" : "") + $" · {need.X:0} × {need.Y:0} mm of material · about {Duration(job.EstimateS)} to burn with {SourceLayer().Name}'s settings" +
                          (_inCloseUp.IsChecked == true ? " · placed where the close-up camera sees it" : "");
+            // Seen on basswood: later passes burn the char from earlier ones back off (lighter, cleaner wood, not darker).
+            if (SourceLayer().Laser.Passes > 1)
+                _plan.Text += $"\n⚠ {SourceLayer().Laser.Passes} passes: on wood, later passes burn the char from the earlier ones back off, so the greys come out lighter and uneven, not darker. For pictures, one pass at the power you need reads (and burns) far more evenly.";
             _add.IsEnabled = true;
         }
         catch (Exception e) when (e is JobException or InvalidOperationException or OutsideWorkAreaException)

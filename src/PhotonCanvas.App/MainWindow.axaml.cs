@@ -613,6 +613,7 @@ public partial class MainWindow : Window
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+        cal.Small("Focus on selection", "IcFocus", () => _ = Guard(FocusByPointer), "Aimed focus: the red pointer is aimed at the middle of the selection (or of the bed), the close-up camera reads the height there from where its dot lands, and the head moves to focus on it. Nothing touches the material; needs the pointer calibrated (Curved surface)");
         cal.Small("Thickness", "IcMeasure", () => _ = Guard(MeasureThickness), "Measure the material's thickness: auto-focus on it and compare with the empty bed (measured once)");
         cal.Small("Align MOPA", "IcCalibrate", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)), "Line the MOPA (fiber) laser up with the blue one: both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
         cal.Large("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
@@ -2128,6 +2129,36 @@ public partial class MainWindow : Window
         var shape = new PathShape { Name = label, LayerId = parts[0].LayerId, Geometry = result };
         var state = Ops.Delete(_doc.State, parts.Select(p => p.Id).ToHashSet());
         _doc.Commit(label, Ops.AddShapes(state, [shape]), [shape.Id]);
+    }
+
+    /// <summary>
+    /// Aimed focus (xTool's fallback): the red pointer aimed at the middle of the selection, the
+    /// close-up camera reads the height there from where its dot lands (the pointer comes in at a
+    /// slant, so the dot moves with height), and the head moves to focus on it. Nothing fires and
+    /// nothing touches the material.
+    /// </summary>
+    async Task FocusByPointer()
+    {
+        if (_machine.Client is not { IsConnected: true } client) { await Dialogs.Message(this, "Focus on selection", "Connect the machine first."); return; }
+        if (SurfaceProbe.LoadCalibration() is not { } cal)
+        {
+            await Dialogs.Message(this, "Focus on selection", "The red pointer needs calibrating once first: Laser → Work mode → Curved surface → Calibrate the pointer (on a flat board).");
+            return;
+        }
+        if (_machine.Distance is not { } now) { await Dialogs.Message(this, "Focus on selection", "Focus once first (auto-focus, or type the height in the machine panel): the pointer reads heights near the focus."); return; }
+        var sel = _doc.State.Shapes.Where(x => _doc.Selection.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+        var aim = sel.IsEmpty ? new Vec2(Canvas.Machine.FieldW / 2, Canvas.Machine.FieldH / 2) : sel.Center;
+        StatusText.Text = $"Reading the height at ({aim.X:0}, {aim.Y:0}) with the pointer…";
+        var heights = await new SurfaceProbe(client).MeasureAsync([aim], now, cal, new Progress<string>(t => StatusText.Text = t), CancellationToken.None);
+        if (heights[0] is not { } h)
+        {
+            StatusText.Text = "The pointer's dot couldn't be read there: too far from the current focus, too dark, or shiny. Auto-focus nearer first, or pick another spot.";
+            return;
+        }
+        if (Math.Abs(h - now) < 0.05) { StatusText.Text = $"Already in focus there ({h:0.00} mm)."; return; }
+        if (await _machine.MoveFocusAsync(h) is { } error) { StatusText.Text = $"Couldn't move the focus: {error}"; return; }
+        StatusText.Text = $"Focused on the {(sel.IsEmpty ? "middle of the bed" : "selection")}: {h:0.00} mm ({h - now:+0.00;-0.00} from before), read with the pointer.";
+        AppLog.Write("focus", $"Aimed focus at ({aim.X:0.#}, {aim.Y:0.#}): {now:0.00} → {h:0.00} mm.");
     }
 
     /// <summary>
