@@ -31,7 +31,7 @@ public static class LineTest
         {
             new("As set", Describe(l), l),
             l.SpreadLines
-                ? new("Not spread", "Lines burned in order, each beside the last", l with { SpreadLines = false })
+                ? new("Not spread", "Lines burned in order, each beside the last", l with { SpreadLines = false, SpreadScatter = false })
                 : new("Spread out", "Every few lines first, then the ones between", l with { SpreadLines = true }),
             l.Bidirectional
                 ? new("One way", "Every row left to right; slower", l with { Bidirectional = false })
@@ -44,6 +44,8 @@ public static class LineTest
             var finer = Finer(l, dpi);
             o.Add(new($"{dpi:0} dpi", $"Lines {25.4 / dpi:0.###} mm apart; power {finer.Laser.Power:0.#}% (same energy)", finer));
         }
+        // Spread with no repeating pattern (the regular one can show as rows on wood).
+        if (l.SpreadLines && !l.SpreadScatter) o.Insert(2, new("Scattered", "Spread out in no set order: no row pattern repeats", l with { SpreadScatter = true }));
         // Less power, more passes, each turned: no row lies on another, so the row pattern averages out.
         foreach (int n in new[] { 2, 3 })
         {
@@ -99,7 +101,7 @@ public static class LineTest
         string turn = passes > 1 && l.AngleStepDeg != 0 ? $", turned {l.AngleStepDeg:0.#}°" : "";
         string cross = l.Crosshatch ? $" · crosshatched {l.CrossAngleDeg:0.#}°" : "";
         string angle = l.FillAngleDeg % 360 != 0 ? $" · rows at {l.FillAngleDeg:0.#}°" : "";
-        return $"{l.Dpi:0} dpi · {l.Laser.Power:0.#}%{(passes > 1 ? $" × {passes}{turn}" : "")}{angle}{cross} · {(l.Bidirectional ? "both ways" : "one way")} · {(l.SpreadLines ? "spread" : "in order")}";
+        return $"{l.Dpi:0} dpi · {l.Laser.Power:0.#}%{(passes > 1 ? $" × {passes}{turn}" : "")}{angle}{cross} · {(l.Bidirectional ? "both ways" : "one way")} · {(l.SpreadLines ? l.SpreadScatter ? "scattered" : "spread" : "in order")}";
     }
 
     /// <summary>Width of the row of patches (mm).</summary>
@@ -315,6 +317,7 @@ public static class LineTest
         Laser = target.Laser with { Power = tested.Laser.Power, Passes = tested.Laser.Passes },
         GrayMinPower = tested.GrayMinPower,
         SpreadLines = tested.SpreadLines,
+        SpreadScatter = tested.SpreadScatter,
         Bidirectional = tested.Bidirectional,
         FillAngleDeg = tested.FillAngleDeg,
         AngleStepDeg = tested.AngleStepDeg,

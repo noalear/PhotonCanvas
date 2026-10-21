@@ -213,7 +213,7 @@ public static class GrblWriter
             double a = d.AngleDeg * Math.PI / 180;
             var along = new Vec2(Math.Cos(a), Math.Sin(a));
             bool forward = true;
-            foreach (int r in Job.SpreadOrder(d.Bitmap.Height, d.Spread))
+            foreach (int r in Job.SpreadOrder(d.Bitmap.Height, d.Spread, d.Scatter))
             {
                 int c0 = -1, c1 = -1;
                 for (int c = 0; c < d.Bitmap.Width; c++)

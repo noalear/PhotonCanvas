@@ -37,7 +37,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _cpi = Num(2, 500, 1, "0.#"), _screenAngle = Num(-180, 180, 15, "0.#"), _dotWidth = Number(0, 1, 0.005m, "0.###");
     readonly Control _screenRow;
     readonly CheckBox _bidir = new() { Content = "Burn in both directions" }, _together = new() { Content = "All shapes in one scan" };
-    readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _spread = new() { Content = "Spread the lines out (less heat)" }, _deepestFirst = new() { Content = "Deepest slice first" };
+    readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _spread = new() { Content = "Spread the lines out (less heat)" }, _scatter = new() { Content = "…in no set pattern (no rows)", Margin = new(22, 0, 0, 0) }, _deepestFirst = new() { Content = "Deepest slice first" };
     readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
     readonly Control _crossRow, _stepRows;
     readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)" } };
@@ -283,7 +283,7 @@ public sealed class LayerEditor : UserControl
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _pulseRow, _freqRow, focusRow, _moreNothing } };
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _scatter, _pulseRow, _freqRow, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
@@ -370,6 +370,8 @@ public sealed class LayerEditor : UserControl
         _outlineAfter.IsCheckedChanged += (_, _) => EditLayers("Outline after fill", l => l with { OutlineAfter = _outlineAfter.IsChecked == true }, _outlineAfter.IsChecked.HasValue);
         _scanReverse.IsCheckedChanged += (_, _) => EditLayers("Scan direction", l => l with { ScanReverse = _scanReverse.IsChecked == true }, _scanReverse.IsChecked.HasValue);
         _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
+        _scatter.IsCheckedChanged += (_, _) => EditLayers("Scatter lines", l => l with { SpreadScatter = _scatter.IsChecked == true }, _scatter.IsChecked.HasValue);
+        ToolTip.SetTip(_scatter, "Spread the lines in no set order (each still away from the last), so there's no repeating pattern of early and late lines to show as rows. Laser → Line test compares it.");
         _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
         _picAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_picAngle.Value!.Value }, _picAngle.Value.HasValue, "fangle");
@@ -513,7 +515,9 @@ public sealed class LayerEditor : UserControl
         _outlineAfter.IsChecked = Same(l => l.OutlineAfter);
         _scanReverse.IsChecked = Same(l => l.ScanReverse);
         _spread.IsChecked = Same(l => l.SpreadLines);
+        _scatter.IsChecked = Same(l => l.SpreadScatter);
         _spread.IsVisible = (anyFill && !allOffset) || (anyImage && !allSlices);
+        _scatter.IsVisible = _spread.IsVisible && ls.Any(l => l.SpreadLines);
         _deepestFirst.IsChecked = Same(l => l.Slices.DeepestFirst);
         Num(_perf, Same(l => l.PerforateMm));
         Num(_perfGap, Same(l => l.PerforateGapMm));

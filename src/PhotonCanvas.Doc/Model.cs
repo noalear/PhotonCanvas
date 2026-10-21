@@ -136,6 +136,8 @@ public sealed record Layer
     public int LineDwellMs { get; init; }
     /// <summary>Fills and pictures: burn the lines spread apart, never one straight after its neighbour, against heat build-up.</summary>
     public bool SpreadLines { get; init; }
+    /// <summary>Spread out in no set pattern (see FillBlock.Scatter): no repeating rows.</summary>
+    public bool SpreadScatter { get; init; }
     /// <summary>
     /// Pictures: how this material really takes these settings, measured with a tone test; each
     /// picture's greys are corrected through it so they come out as light as they look. Null = as sent.

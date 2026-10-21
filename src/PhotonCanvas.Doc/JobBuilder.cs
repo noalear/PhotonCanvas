@@ -269,7 +269,7 @@ public static class JobBuilder
                 double firstAngle = straight ? 0 : layer.FillAngleDeg + layer.RunTurnDeg;
                 double[] angles = !straight && layer.Crosshatch ? [firstAngle, firstAngle + layer.CrossAngleDeg] : [firstAngle];
                 bool perPass = !straight && layer.AngleStepDeg != 0 && layer.Laser.Passes > 1;
-                DotBlock Finish(DotBlock d) => d with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / d.Dpi) : 0, Unidirectional = !layer.Bidirectional };
+                DotBlock Finish(DotBlock d) => d with { FocusOffsetMm = layer.FocusOffsetMm, Spread = layer.SpreadLines ? Job.SpreadStride(25.4 / d.Dpi) : 0, Scatter = layer.SpreadScatter, Unidirectional = !layer.Bidirectional };
                 foreach (var img in images)
                 {
                     if (layer.PassThrough && OwnDpi(img) > layer.Dpi * 1.02)
@@ -352,6 +352,7 @@ public static class JobBuilder
                         LineDwellMs = layer.LineDwellMs,
                         ReverseOrder = layer.ScanReverse,
                         Spread = layer.SpreadLines ? Job.SpreadStride(10 / layer.LinesPerCm) : 0,
+                        Scatter = layer.SpreadScatter,
                     };
                     var cross = layer.Crosshatch ? block with { AngleDeg = block.AngleDeg + layer.CrossAngleDeg } : null;
                     bool first = Job.FillLines(block).Count > 0, second = cross is not null && Job.FillLines(cross).Count > 0;

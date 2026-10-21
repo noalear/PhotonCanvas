@@ -39,6 +39,7 @@ public sealed record ProcessSettings
     public double CrossAngleDeg { get; init; } = 90;
     public int LineDwellMs { get; init; }
     public bool SpreadLines { get; init; }
+    public bool SpreadScatter { get; init; }
     /// <summary>Pictures: the material's measured tone curve (see <see cref="Layer.MaterialTone"/>).</summary>
     public Core.Imaging.ToneCurve? MaterialTone { get; init; }
     public bool OutlineAfter { get; init; }
@@ -71,7 +72,7 @@ public sealed record ProcessSettings
         HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
-        CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, SpreadLines = l.SpreadLines, MaterialTone = l.MaterialTone, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
+        CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, SpreadLines = l.SpreadLines, SpreadScatter = l.SpreadScatter, MaterialTone = l.MaterialTone, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
         Order = l.Order, StartNearest = l.StartNearest, RemoveOverlaps = l.RemoveOverlaps, LeadOutMm = l.LeadOutMm,
     };
 
@@ -85,7 +86,7 @@ public sealed record ProcessSettings
         HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
-        CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, SpreadLines = SpreadLines, MaterialTone = MaterialTone, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
+        CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, SpreadLines = SpreadLines, SpreadScatter = SpreadScatter, MaterialTone = MaterialTone, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
         Order = Order, StartNearest = StartNearest, RemoveOverlaps = RemoveOverlaps, LeadOutMm = LeadOutMm,
     };
 

@@ -248,6 +248,9 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// </summary>
     public int Spread { get; init; }
 
+    /// <summary>Spread the lines in no set pattern (still never beside the last), so no row pattern repeats across the area.</summary>
+    public bool Scatter { get; init; }
+
     /// <summary>
     /// Turn the scan lines this much more on every repeat of the block (degrees), so the line
     /// pattern doesn't build up into stripes on deep or repeated engraving. 0 = every pass the same.
@@ -345,6 +348,9 @@ public sealed record DotBlock(
 
     /// <summary>Burn the rows spread out, every <see cref="Spread"/>th row first (see <see cref="FillBlock.Spread"/>). 0 or 1 = in order.</summary>
     public int Spread { get; init; }
+
+    /// <summary>Spread the lines in no set pattern (still never beside the last), so no row pattern repeats across the area.</summary>
+    public bool Scatter { get; init; }
 
     /// <summary>Every row burned left to right, the head going back unlit (slower; rows can't be offset from each other by the direction).</summary>
     public bool Unidirectional { get; init; }
@@ -1053,15 +1059,46 @@ public sealed class Job
         lineSpacingMm > 0 && double.IsFinite(lineSpacingMm) ? Math.Clamp((int)Math.Round(0.4 / lineSpacingMm), 2, 32) : 2;
 
     /// <summary>Rows 0…n−1 in spread order: 0, k, 2k, … then 1, 1+k, … (k ≤ 1: in order).</summary>
-    public static IEnumerable<int> SpreadOrder(int n, int stride)
+    public static IEnumerable<int> SpreadOrder(int n, int stride, bool scatter = false)
     {
+        if (scatter && stride > 1 && n > 2) { foreach (int i in Scattered(n, stride)) yield return i; yield break; }
         if (stride <= 1) { for (int i = 0; i < n; i++) yield return i; yield break; }
         for (int start = 0; start < Math.Min(stride, n); start++)
             for (int i = start; i < n; i += stride) yield return i;
     }
 
+    /// <summary>
+    /// Rows 0…n−1 in no set order, each next one at least <paramref name="stride"/> rows from the
+    /// last whenever any such are left: heat spread like <see cref="SpreadOrder"/>, but with no
+    /// repeating pattern of rows burned early (cool wood) and late (beside charred ones) to show.
+    /// The same every time for the same rows.
+    /// </summary>
+    public static List<int> Scattered(int n, int stride)
+    {
+        var rnd = new Random(unchecked(n * 7919 + stride * 104729));
+        var left = Enumerable.Range(0, n).ToList();
+        var o = new List<int>(n);
+        int prev = -stride * 2;
+        while (left.Count > 0)
+        {
+            int pick = -1;
+            for (int t = 0; t < 32 && pick < 0; t++)
+            {
+                int k = rnd.Next(left.Count);
+                if (Math.Abs(left[k] - prev) >= stride) pick = k;
+            }
+            if (pick < 0) pick = left.FindIndex(r => Math.Abs(r - prev) >= stride);
+            if (pick < 0) pick = rnd.Next(left.Count); // only near ones are left
+            prev = left[pick];
+            o.Add(prev);
+            left[pick] = left[^1];
+            left.RemoveAt(left.Count - 1);
+        }
+        return o;
+    }
+
     /// <summary>The scan lines (each one or more segments on the same line) burned in spread order, alternating direction as they go.</summary>
-    static List<FillSegment> SpreadOut(List<FillSegment> lines, int stride)
+    static List<FillSegment> SpreadOut(List<FillSegment> lines, int stride, bool scatter = false)
     {
         var groups = new List<List<FillSegment>>();
         foreach (var s in lines)
@@ -1072,7 +1109,7 @@ public sealed class Job
         static FillSegment Flip(FillSegment s) => new(s.Y, s.X1, s.X0, s.End, s.Start);
         var o = new List<FillSegment>(lines.Count);
         bool forward = true;
-        foreach (int i in SpreadOrder(groups.Count, stride))
+        foreach (int i in SpreadOrder(groups.Count, stride, scatter))
         {
             var run = groups[i].Select(s => s.X1 >= s.X0 ? s : Flip(s)).OrderBy(s => s.X0).ToList();
             if (forward) o.AddRange(run);
@@ -1085,7 +1122,7 @@ public sealed class Job
     static List<FillSegment> MakeFillLines(FillBlock b)
     {
         var lines = MakeFullLines(b);
-        if (b.Spread > 1) lines = SpreadOut(lines, b.Spread);
+        if (b.Spread > 1) lines = SpreadOut(lines, b.Spread, b.Scatter);
         if (b.ReverseOrder)
         {
             // From the far side: the lines in reverse order, each run the other way so the zigzag still joins up.
@@ -1398,7 +1435,7 @@ public sealed class Job
         long lastS = l.SValue;
         var levels = b.Levels;
         var cols = new List<int>();
-        foreach (int r in SpreadOrder(b.Bitmap.Height, b.Spread))
+        foreach (int r in SpreadOrder(b.Bitmap.Height, b.Spread, b.Scatter))
         {
             cols.Clear();
             for (int c = 0; c < b.Bitmap.Width; c++)
