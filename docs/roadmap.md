@@ -183,7 +183,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Heat-aware fill order (layer setting "Spread the lines out", fills and pictures): fill lines burned spread apart (1, 5, 9 … then 2, 6, 10 …) so neighbours never follow each other: less scorching and warping, more even MOPA colours (heat build-up from adjacent passes is what laser-processing research warns about; cheap on a galvo)
 - [x] Engrave to an exact depth (Laser → Exact depth; rounds you ship as usual, measured in between): measure the depth with the red pointer between passes and adjust the passes left (only in patents so far). Needs the pointer's real precision measured at the machine test
 - [x] Engraving-style portraits: photos redrawn as banknote lines that swell in the shadows: straight, following the forms, rings (guilloché) or a spiral (Picture → Engraving)
-- [ ] Inlay and marquetry maker: matching pocket and piece from one design, the fit from the cut test's kerf and the pocket depth from the etch rate so veneer sits flush
+- [x] Inlay maker (Laser → Inlay): matching pocket and piece from one design, the pocket depth from the etch rate and the piece size from the cut test's kerf, so veneer sits flush (marquetry, cutting both from veneer, still to come)
 - [x] Stencil bridges: the middles of O, A, R kept in by automatic bridges (Outline → More… → Stencil bridges)
 - [ ] Laser-induced graphene (experimental): burn cork or wood into conductive carbon for touch pads and simple sensors, with a resistance test pattern; whether the 450 nm diode does it needs testing (papers show hobby visible lasers on cork)
 - [ ] Print-then-cut: the camera finds printed artwork (stickers) and the diode cuts round it (Bambu's H2D sells on this)
