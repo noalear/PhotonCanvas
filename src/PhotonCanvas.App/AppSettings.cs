@@ -61,6 +61,9 @@ public sealed class AppSettings
     /// <summary>How far the MOPA lands from the blue laser (mm), measured with Camera → Align MOPA.</summary>
     public double MopaOffsetX { get; set; }
     public double MopaOffsetY { get; set; }
+    /// <summary>The galvo's pivot heights (mm), measured with the bevel test: for slopes across (edges running down the field) and down (edges running across).</summary>
+    public double? BevelPivotAcross { get; set; }
+    public double? BevelPivotDown { get; set; }
     /// <summary>Exhaust fan gear (1–4) and purifier speed (%) sent with each job (3 and 50 are what xTool Studio sends).</summary>
     public int FanGear { get; set; } = 3;
     public int PurifierSpeed { get; set; } = 50;

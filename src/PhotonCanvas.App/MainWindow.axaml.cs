@@ -272,6 +272,7 @@ public partial class MainWindow : Window
             else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
             else if (LineTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowLineTest(true)));
             else if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
+            else if (Bevel.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, true).ShowDialog(this)));
             else if (LaserAlignWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, true).ShowDialog(this)));
             // A depth round burned: measure it next.
             if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
@@ -630,6 +631,7 @@ public partial class MainWindow : Window
         mat.Large("Tone test", "IcPalette", () => _ = Guard(() => ShowToneTest(ToneTestWindow.InDesign(_doc.State))), "Photos that come out as they look: grey patches burned with a picture layer's settings, read by the camera, and that layer's pictures corrected for the material");
         mat.Large("Line test", "IcLine", () => _ = Guard(() => ShowLineTest(LineTestWindow.InDesign(_doc.State))), "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side");
         mat.Small("Inlay", "IcLayers", () => _ = Guard(() => new InlayWindow(_doc, _library, SelectedPaths()).ShowDialog(this)), "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)", () => SelectedPaths().Count > 0);
+        mat.Small("Bevel test", "IcMeasure", () => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, Bevel.InDesign(_doc.State)).ShowDialog(this)), "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges");
         mat.Small("Graphene test", "IcBolt", () => _ = Guard(() => new GrapheneTestWindow(_doc, _library, Canvas.Machine, GrapheneTestWindow.InDesign(_doc.State)).ShowDialog(this)), "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter");
         mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
         var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
