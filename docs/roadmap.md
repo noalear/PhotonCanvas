@@ -186,7 +186,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Inlay maker (Laser → Inlay): matching pocket and piece from one design, the pocket depth from the etch rate and the piece size from the cut test's kerf, so veneer sits flush (marquetry, cutting both from veneer, still to come)
 - [x] Stencil bridges: the middles of O, A, R kept in by automatic bridges (Outline → More… → Stencil bridges)
 - [ ] Laser-induced graphene (experimental): burn cork or wood into conductive carbon for touch pads and simple sensors, with a resistance test pattern; whether the 450 nm diode does it needs testing (papers show hobby visible lasers on cork)
-- [ ] Print-then-cut: the camera finds printed artwork (stickers) and the diode cuts round it (Bambu's H2D sells on this)
+- [x] Print-then-cut (Camera → Cut round prints): the camera (close-up when it covers the area) finds printed artwork on paper and a cut goes round each sticker with a margin; not yet tried on real prints
 
 ### Online only (not planned; listed for completeness)
 - Accounts and linking the machine to one; cloud projects and sharing; cloud fonts

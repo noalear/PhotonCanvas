@@ -606,6 +606,7 @@ public partial class MainWindow : Window
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
+        fit.Large("Cut round prints", "IcCut", () => _ = Guard(CutRoundPrints), "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it");
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
@@ -2120,6 +2121,31 @@ public partial class MainWindow : Window
         var shape = new PathShape { Name = label, LayerId = parts[0].LayerId, Geometry = result };
         var state = Ops.Delete(_doc.State, parts.Select(p => p.Id).ToHashSet());
         _doc.Commit(label, Ops.AddShapes(state, [shape]), [shape.Id]);
+    }
+
+    /// <summary>Print-then-cut: cuts round printed art the camera finds (close-up when it covers the area, else the overview).</summary>
+    async Task CutRoundPrints()
+    {
+        if (!_machine.IsConnected) { await Dialogs.Message(this, "Cut round prints", "Connect the machine first: this needs a fresh camera photo."); return; }
+        // Where to look: inside the selected shape(s), else the whole bed.
+        var sel = _doc.State.Shapes.Where(x => _doc.Selection.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+        var within = sel.IsEmpty ? new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH) : sel;
+        var text = await Dialogs.Prompt(this, "Cut round prints", "How far outside the printed art the cut goes (mm): a white border round each sticker.", "1");
+        if (text is null || !double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double margin) || margin < 0) return;
+        StatusText.Text = "Photographing the prints…";
+        CameraPhoto? photo = null;
+        if (_machine.CloseUpSees() is { } sees && sees.Contains(within.TopLeft) && sees.Contains(within.BottomRight)) photo = await _machine.CloseUpBedPhotoAsync();
+        if (photo is null) { await _machine.UpdatePhotoAsync(); photo = Canvas.Photo; }
+        if (photo is null) { StatusText.Text = "No camera photo: calibrate the camera first (Camera → Calibrate)."; return; }
+        var cuts = await Task.Run(() => PrintCut.Find(photo.Image, photo.Area, photo.MmPerPx, within, new PrintCutOptions { MarginMm = margin }));
+        int n = cuts.Subpaths.Length;
+        if (n == 0) { StatusText.Text = "No print found there: is it on white paper, in the camera's view and well lit?"; return; }
+        var s = _doc.State;
+        var layer = s.Layers.FirstOrDefault(l => l.Name == "Print cut") ?? Layer.Default(s.Layers.Count, LayerMode.Cut) with { Name = "Print cut" };
+        if (s.FindLayer(layer.Id) is null) s = Ops.AddLayer(s, layer);
+        var shapes = cuts.Subpaths.Select((sp, i) => (Shape)new PathShape { Name = $"Print {i + 1}", LayerId = layer.Id, Geometry = new PathGeometry([sp]) }).ToList();
+        _doc.Commit("Cut round prints", Ops.AddShapes(s, shapes), shapes.Select(x => x.Id));
+        StatusText.Text = $"{n} print{(n == 1 ? "" : "s")} found: a cut round each, {margin:0.##} mm out, on the \"Print cut\" layer. Set its power for the paper (a kiss cut for stickers).";
     }
 
     /// <summary>Stencil bridges: the middles of O, A, R… kept joined to the stencil by a strip across the letter.</summary>
