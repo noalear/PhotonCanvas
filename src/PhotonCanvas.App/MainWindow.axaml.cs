@@ -613,6 +613,7 @@ public partial class MainWindow : Window
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+        cal.Small("Thickness", "IcMeasure", () => _ = Guard(MeasureThickness), "Measure the material's thickness: auto-focus on it and compare with the empty bed (measured once)");
         cal.Small("Align MOPA", "IcCalibrate", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)), "Line the MOPA (fiber) laser up with the blue one: both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
         cal.Large("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
 
@@ -2127,6 +2128,34 @@ public partial class MainWindow : Window
         var shape = new PathShape { Name = label, LayerId = parts[0].LayerId, Geometry = result };
         var state = Ops.Delete(_doc.State, parts.Select(p => p.Id).ToHashSet());
         _doc.Commit(label, Ops.AddShapes(state, [shape]), [shape.Id]);
+    }
+
+    /// <summary>
+    /// The material's thickness: the auto-focus distance on it against the empty bed's (measured once,
+    /// on the first go). Auto-focus moves the head, but nothing fires.
+    /// </summary>
+    async Task MeasureThickness()
+    {
+        if (!_machine.IsConnected) { await Dialogs.Message(this, "Thickness", "Connect the machine first."); return; }
+        if (_settings.BedFocusMm is not { } bed)
+        {
+            if (!await Dialogs.Confirm(this, "Thickness: the empty bed first", "To measure thickness, PhotonCanvas first needs the empty bed's height, once. Clear the bed under the head (nothing on it), then measure.", "Measure the empty bed", "Cancel")) return;
+            StatusText.Text = "Focusing on the empty bed…";
+            if (await _machine.AutoFocusNowAsync() is not { } b) { StatusText.Text = "Couldn't focus on the bed."; return; }
+            _settings.BedFocusMm = b;
+            _settings.Save();
+            await Dialogs.Message(this, "Thickness", $"The empty bed is measured ({b:0.00} mm). Now put the material under the head and press Thickness again.");
+            return;
+        }
+        StatusText.Text = "Focusing on the material…";
+        if (await _machine.AutoFocusNowAsync() is not { } on) { StatusText.Text = "Couldn't focus on the material."; return; }
+        double t = Math.Abs(bed - on);
+        StatusText.Text = $"The material is {t:0.00} mm thick (focus {on:0.00} mm, the empty bed {bed:0.00} mm).";
+        if (await Dialogs.Confirm(this, "Thickness", $"The material is {t:0.00} mm thick.\n\nIf that's far off (the bed was moved or changed), measure the empty bed again.", "OK", "Measure the empty bed again"))
+            return;
+        _settings.BedFocusMm = null;
+        _settings.Save();
+        await MeasureThickness();
     }
 
     bool _quickRunning;

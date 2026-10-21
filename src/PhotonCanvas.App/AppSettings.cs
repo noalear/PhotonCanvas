@@ -55,6 +55,8 @@ public sealed class AppSettings
 
     /// <summary>Quick processing: closing the lid focuses, photographs, centres the design on the material and loads the job (the button starts it).</summary>
     public bool QuickProcessing { get; set; }
+    /// <summary>The auto-focus distance measured on the empty bed (mm): material thickness is the difference from it.</summary>
+    public double? BedFocusMm { get; set; }
     /// <summary>How far the MOPA lands from the blue laser (mm), measured with Camera → Align MOPA.</summary>
     public double MopaOffsetX { get; set; }
     public double MopaOffsetY { get; set; }
