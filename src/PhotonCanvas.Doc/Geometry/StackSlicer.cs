@@ -81,6 +81,14 @@ public sealed record SliceOptions
     /// <summary>Parts smaller than this (mm²), or thinner than <see cref="MinPartWidthMm"/>, are left out: slivers too small to cut or handle.</summary>
     public double MinPartMm2 { get; init; } = 1;
     public double MinPartWidthMm { get; init; } = 1;
+    /// <summary>
+    /// Edge shaping (stacked): engrave each slice's top down in steps of this depth (mm, the depth one
+    /// engrave pass takes off, from the etch test) wherever the model slopes away within the slice,
+    /// so the stack's steps become the model's slopes. 0 = off.
+    /// </summary>
+    public double ShapeStepMm { get; init; }
+    /// <summary>Edge shaping never engraves deeper than the slice less this (mm), so it can't go through.</summary>
+    public double ShapeSkinMm { get; init; } = 0.4;
 }
 
 /// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
@@ -94,6 +102,13 @@ public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, do
     public IReadOnlyList<(string Text, Vec2 At)> Notes { get; init; } = [];
     /// <summary>Not joined, through the slices, to anything resting on the bottom slice: it starts in mid-air with nothing under it (glue it on by eye).</summary>
     public bool Floating { get; init; }
+    /// <summary>
+    /// Edge shaping: the areas to engrave on its top, one per step down, shallowest (biggest) first;
+    /// each is engraved once, so a spot is taken down one step for every area it's in.
+    /// </summary>
+    public IReadOnlyList<PathGeometry> Shaping { get; init; } = [];
+    /// <summary>How much of its underside slopes away (mm²): steps there can't be engraved from above, so they're sanded.</summary>
+    public double UndersideMm2 { get; init; }
 }
 
 /// <summary>The result: every part, bottom slice first, in model millimetres (laid flat, top view).</summary>
@@ -232,8 +247,11 @@ public static class StackSlicer
                 var loops = Loops(part);
                 var (at, room) = Pole(loops);
                 var marks = next is null ? [] : MarksInside(next, loops, 0.6);
+                var (shaping, under) = o.ShapeStepMm > 0 ? Shape(tris, part, i * slab, slab, o) : ([], 0);
                 parts.Add(new SlicePart(i + 1, part, at, room, marks)
                 {
+                    Shaping = shaping,
+                    UndersideMm2 = under,
                     Floating = n > 1 && !Touches(i, k),
                     Frame = new Frame3(new V3(0, 0, (i + 0.5) * o.ThicknessMm), new V3(1, 0, 0), new V3(0, 1, 0), new V3(0, 0, 1)),
                 });
@@ -241,6 +259,39 @@ public static class StackSlicer
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
         return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined };
+    }
+
+    /// <summary>
+    /// Edge shaping for one part of the slice from <paramref name="z0"/>, <paramref name="slab"/> thick.
+    /// Step k (depth k·step) engraves where the model has no material at that depth or anywhere
+    /// above it in the slice: the part less every cross-section from the top down to it. Areas
+    /// shrink with depth, so each spot is engraved once per step it should go down. Also how much
+    /// of the underside slopes away (only reachable from below).
+    /// </summary>
+    static (IReadOnlyList<PathGeometry> Steps, double UndersideMm2) Shape(IReadOnlyList<Tri> tris, PathGeometry part, double z0, double slab, SliceOptions o)
+    {
+        double step = o.ShapeStepMm;
+        int count = (int)Math.Floor((slab - o.ShapeSkinMm) / step + 1e-9);
+        var steps = new List<PathGeometry>();
+        PathGeometry above = PathGeometry.Empty;
+        double top = z0 + slab;
+        for (int k = 1; k <= count; k++)
+        {
+            // The middle of the layer this step takes off.
+            var cut = Section(tris, top - (k - 0.5) * step);
+            above = above.IsEmpty ? cut : cut.IsEmpty ? above : ShapeGeometry.Union([above, cut]);
+            var away = above.IsEmpty ? part : ShapeGeometry.Boolean(part, above, BoolOp.Subtract);
+            // Hairline slivers (where the section and the cut outline all but agree) aren't worth a pass.
+            away = ShapeGeometry.Offset(ShapeGeometry.Offset(away, -0.05, JoinStyle.Round, EndStyle.Round), 0.05, JoinStyle.Round, EndStyle.Round);
+            if (Area(away) < 0.5) break; // everything deeper is narrower still
+            steps.Add(PathTools.Simplify(away, 0.01).Geometry);
+        }
+        // The underside: where the model is higher up in the slice but not at its bottom (an overhang).
+        var bottom = Section(tris, z0 + Math.Min(step, slab / 4));
+        var higher = ShapeGeometry.Union([Section(tris, z0 + slab / 2), Section(tris, top - Math.Min(step, slab / 4))]);
+        var over = higher.IsEmpty ? PathGeometry.Empty : bottom.IsEmpty ? higher : ShapeGeometry.Boolean(higher, bottom, BoolOp.Subtract);
+        double under = over.IsEmpty ? 0 : Area(ShapeGeometry.Boolean(over, part, BoolOp.Intersect));
+        return (steps, under);
     }
 
     // ---- egg crate and radial ------------------------------------------------------------------
@@ -643,8 +694,10 @@ public static class StackLayout
     /// on the current page, around anything already on it; each further bed is a new page with
     /// the same outline (another board the same size, in the same place).
     /// </summary>
-    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices", CancellationToken ct = default, PathGeometry? material = null)
+    /// <param name="shaping">The engrave settings for edge shaping (one pass = one step); the parts' shaping is left out when null.</param>
+    public static (DocState State, int Sheets) Place(DocState s, SliceStack stack, MachineProfile machine, bool numbers, bool marks, double gapMm = 3, string title = "Slices", CancellationToken ct = default, PathGeometry? material = null, Layer? shaping = null)
     {
+        bool shape = shaping is not null && stack.Parts.Any(p => p.Shaping.Count > 0);
         title = string.IsNullOrWhiteSpace(title) ? "Slices" : title.Trim();
         // Never on top of what's already there: a page of their own if this one has anything on it.
         // (On the material outlined on this page, the nesting keeps clear of what's there instead.)
@@ -652,7 +705,7 @@ public static class StackLayout
         if (material is null && s.Shapes.Count > 0) s = Pages.Add(s, title);
         int firstPage = s.PageIndex;
         int sheets = 1;
-        (Layer Cut, Layer Marks) Layers(ref DocState st)
+        (Layer Cut, Layer Marks, Layer? Shaping) Layers(ref DocState st)
         {
             var cut = st.Layers.FirstOrDefault(l => l.Name == "Slices · cut");
             var mk = st.Layers.FirstOrDefault(l => l.Name == "Slices · marks");
@@ -661,16 +714,29 @@ public static class StackLayout
                 cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = "Slices · cut" };
                 st = Ops.AddLayer(st, cut);
             }
+            Layer? sh = null;
+            if (shape)
+            {
+                sh = st.Layers.FirstOrDefault(l => l.Name == ShapingLayer);
+                if (sh is null)
+                {
+                    // Engraved before the cut (cut parts can shift), one pass a step.
+                    sh = shaping! with { Id = Guid.NewGuid(), Name = ShapingLayer, Mode = LayerMode.Fill, Laser = shaping!.Laser.WithPasses(1), ParentId = null };
+                    st = Ops.AddLayer(st, sh, st.Layers.FindIndex(l => l.Id == cut.Id));
+                }
+            }
             if (mk is null)
             {
                 var score = Layer.Default(st.Layers.Count, LayerMode.Score);
                 mk = score with { Name = "Slices · marks", Laser = score.Laser with { Power = Math.Min(score.Laser.Power, 15) } };
                 // Marked before anything is cut: cut parts can shift or drop.
-                st = Ops.AddLayer(st, mk, st.Layers.FindIndex(l => l.Id == cut.Id));
+                st = Ops.AddLayer(st, mk, st.Layers.FindIndex(l => l.Id == (sh ?? cut).Id));
             }
-            return (cut, mk);
+            return (cut, mk, sh);
         }
-        var (cutLayer, markLayer) = Layers(ref s);
+        var (cutLayer, markLayer, shapeLayer) = Layers(ref s);
+        // The shaping steps of every part (ids are kept through grouping and the nesting).
+        var shapingIds = new HashSet<Guid>();
         // Each part with its marks, made at the bed's corner; the nesting moves it into place.
         var units = new List<List<Shape>>();
         foreach (var part in stack.Parts)
@@ -681,6 +747,13 @@ public static class StackLayout
                 throw new InvalidOperationException($"{part.Label ?? $"Slice {part.Slice}"} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
             var move = Affine.Translate(gapMm - box.MinX, gapMm - box.MinY);
             var shapes = new List<Shape> { new PathShape { Name = part.Label is { } nm ? nm : $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
+            if (shape)
+                foreach (var (area, k) in part.Shaping.Select((a, k) => (a, k)))
+                {
+                    var step = new PathShape { Name = $"Slice {part.Slice} · step {k + 1}", LayerId = shapeLayer!.Id, Geometry = area.Transform(move) };
+                    shapingIds.Add(step.Id);
+                    shapes.Add(step);
+                }
             if (marks && part.NextMarks.Count > 0)
                 shapes.Add(new PathShape { Name = $"Where slice {part.Slice + 1} goes", LayerId = markLayer.Id, Geometry = new PathGeometry(part.NextMarks.SelectMany(m => PathGeometry.Polyline(m, false).Subpaths)).Transform(move) });
             if (numbers && part.LabelRoomMm > 0.6)
@@ -713,7 +786,7 @@ public static class StackLayout
         while (units.Count > 0)
         {
             // Each page has its own layers: the cut outline is first in its part, the rest are marks.
-            var onPage = units.Select(u => u.Select((sh, k) => sh.With(layerId: k == 0 ? cutLayer.Id : markLayer.Id)).ToList()).ToList();
+            var onPage = units.Select(u => u.Select((sh, k) => sh.With(layerId: k == 0 ? cutLayer.Id : shapingIds.Contains(sh.Id) ? shapeLayer!.Id : markLayer.Id)).ToList()).ToList();
             s = Ops.AddShapes(s, onPage.SelectMany(u => u));
             var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
             var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
@@ -733,8 +806,11 @@ public static class StackLayout
                 var (withLayer, ml) = MaterialOutline.Ensure(s);
                 s = Ops.AddShapes(withLayer, [new PathShape { Name = "Material", LayerId = ml.Id, Geometry = material }]);
             }
-            (cutLayer, markLayer) = Layers(ref s);
+            (cutLayer, markLayer, shapeLayer) = Layers(ref s);
         }
         return (Pages.SwitchTo(s, firstPage), sheets);
     }
+
+    /// <summary>The engrave layer edge shaping goes on.</summary>
+    public const string ShapingLayer = "Slices · shaping";
 }

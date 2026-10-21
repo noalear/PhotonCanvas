@@ -46,6 +46,48 @@ public class StackSlicerTests
     static double Area(PathGeometry g) => g.Flatten(0.01).Where(f => f.Closed).Sum(f => Geom.SignedArea(f.Points)) is var a ? Math.Abs(a) : 0;
 
     [Fact]
+    public void EdgeShapingEngravesTheStepsDownToTheSlope()
+    {
+        // A pyramid 30 mm across and tall in 3 mm slices: its faces rise 2 mm for every 1 mm in.
+        // Engraved 0.25 mm a pass, the bottom slice's top should go down 3 − 2x at x mm in from its edge.
+        var o = new SliceOptions { ThicknessMm = 3, HeightMm = 30, Outline = SliceOutline.Outer, KeepJoined = false, ShapeStepMm = 0.25 };
+        var stack = StackSlicer.Slice(Pyramid(30, 30), o);
+        var bottom = stack.Parts.Single(p => p.Slice == 1);
+        // (3 − 0.4 mm skin) ÷ 0.25: ten steps at most, each a smaller ring than the last.
+        Assert.Equal(10, bottom.Shaping.Count);
+        var areas = bottom.Shaping.Select(Area).ToList();
+        Assert.True(areas.Zip(areas.Skip(1)).All(p => p.First > p.Second), string.Join(", ", areas));
+        int Steps(double inset) => bottom.Shaping.Count(g => InsideAny(g, new Vec2(15, inset)));
+        Assert.InRange(Steps(0.5), 7, 9);   // 2 mm down: 8 steps
+        Assert.InRange(Steps(1.25), 1, 3);  // 0.5 mm down: 2 steps
+        Assert.Equal(0, Steps(2.5));        // on top of the slice above: untouched
+        Assert.Equal(10, Steps(0.1));       // near the edge: as deep as it goes, short of the skin
+        // A pyramid only narrows going up: no underside to sand.
+        Assert.True(bottom.UndersideMm2 < 5, $"underside {bottom.UndersideMm2}");
+
+        // Laid out: the steps on their own engrave layer, one pass each, before the cut.
+        var shaping = Layer.Default(1, LayerMode.Fill) with { Laser = LaserSettings.Blue(60, 200).WithPasses(4) };
+        var (s, _) = StackLayout.Place(DocState.New(), stack, MachineProfile.F2Ultra, numbers: true, marks: true, shaping: shaping);
+        var layer = s.Layers.Single(l => l.Name == StackLayout.ShapingLayer);
+        Assert.Equal(LayerMode.Fill, layer.Mode);
+        Assert.Equal(1, layer.Laser.Passes);
+        Assert.True(s.Layers.FindIndex(l => l.Id == layer.Id) < s.Layers.FindIndex(l => l.Name == "Slices · cut"));
+        Assert.Equal(stack.Parts.Sum(p => p.Shaping.Count), s.Shapes.Count(x => x.LayerId == layer.Id));
+        // Steps moved with their part: the bottom slice's first step lies round its cut outline.
+        var cut = s.Shapes.Single(x => x.Name == "Slice 1");
+        var first = s.Shapes.Single(x => x.Name == "Slice 1 · step 1");
+        Assert.True(cut.Bounds.Inflate(0.01).Contains(first.Bounds.TopLeft) && cut.Bounds.Inflate(0.01).Contains(first.Bounds.BottomRight));
+        // Upside down, the pyramid's slices have their steps underneath, out of reach from above.
+        var flipped = StackSlicer.Slice(Pyramid(30, 30), o with { Up = SliceUp.MinusZ });
+        Assert.True(flipped.Parts.Single(p => p.Slice == 8).UndersideMm2 > 50, $"{flipped.Parts.Single(p => p.Slice == 8).UndersideMm2}");
+        // Without shaping settings, no shaping layer.
+        Assert.DoesNotContain(StackLayout.Place(DocState.New(), stack, MachineProfile.F2Ultra, true, true).State.Layers, l => l.Name == StackLayout.ShapingLayer);
+    }
+
+    /// <summary>Inside the shape, holes counted (even-odd over all its loops).</summary>
+    static bool InsideAny(PathGeometry g, Vec2 p) => g.Flatten(0.01).Where(f => f.Closed).Count(f => Geom.Inside(f.Points, p)) % 2 == 1;
+
+    [Fact]
     public void ACylinderBecomesCircles()
     {
         // 10 mm tall, 4 mm across, in 2 mm wood: five circles, numbered 1 to 5 from the bottom.

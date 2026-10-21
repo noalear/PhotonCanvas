@@ -61,10 +61,21 @@ public sealed class StackSliceWindow : Window
     readonly Button _make = new() { Content = "Make the slices", Classes = { "primary" }, IsEnabled = false, MinWidth = 150 };
 
     readonly AppSettings? _settings;
+    // From the material library: the cut (thickness, kerf, slot fit from the cut test) and edge shaping (depth a pass from the etch test).
+    readonly ComboBox _cutWith = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    List<(Doc.Materials.Material M, Doc.Materials.Recipe R)?> _cuts = [];
+    readonly TextBlock _cutNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
+    readonly CheckBox _shape = new() { Content = "Shape the edges: engrave the steps down to the slope" };
+    readonly ComboBox _etchWith = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    List<(Doc.Materials.Material M, Doc.Materials.Recipe R)> _etches = [];
+    readonly NumericUpDown _step = Number(0.02m, 2, 0.01m, "0.0##");
+    readonly TextBlock _shapeNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
+    readonly Doc.Materials.MaterialLibrary? _library;
 
-    public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null)
+    public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null, Doc.Materials.MaterialLibrary? library = null)
     {
         _settings = settings;
+        _library = library;
         _doc = doc;
         _machine = machine;
         Title = "Stacked slices";
@@ -94,6 +105,18 @@ public sealed class StackSliceWindow : Window
         _keepProportions.IsCheckedChanged += (_, _) => { if (_keepProportions.IsChecked == true) Resize(_height); };
         _ownSize.Click += (_, _) => OwnSize();
         _joined.IsCheckedChanged += (_, _) => Later();
+        Library();
+        _cutWith.SelectionChanged += (_, _) => CutChosen();
+        _etchWith.SelectionChanged += (_, _) => { if (_etchWith.SelectedIndex >= 0 && _etchWith.SelectedIndex < _etches.Count && _etches[_etchWith.SelectedIndex].R.EtchMmPerPass is { } e) _step.Value = (decimal)e; Later(); };
+        _step.ValueChanged += (_, _) => Later();
+        _shape.IsCheckedChanged += (_, _) =>
+        {
+            // Shaping takes material away, so the slices should start out covering the whole shape.
+            if (_shape.IsChecked == true && _outline.SelectedIndex != (int)SliceOutline.Outer) _outline.SelectedIndex = (int)SliceOutline.Outer;
+            ShowShaping();
+            Later();
+        };
+        ToolTip.SetTip(_shape, "Each slice's top is engraved down in steps, a pass a step, wherever the model slopes away inside the slice, so the stack's steps become the model's slopes. Needs the depth one engrave pass takes off: Laser → Etch rate test.");
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
@@ -121,6 +144,10 @@ public sealed class StackSliceWindow : Window
                     Children =
                     {
                         Field("Outline", _outline),
+                        _shape,
+                        Field("Engrave with", _etchWith, tip: "Engrave settings from your library with a measured depth a pass (Laser → Etch rate test)."),
+                        Field("Depth a pass (mm)", _step, tip: "How deep one engrave pass goes: one step of the shaping."),
+                        _shapeNote,
                         Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
                         _marks, _joined,
                         Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
@@ -150,6 +177,8 @@ public sealed class StackSliceWindow : Window
                     },
                 }),
                 _numbers,
+                Field("Cut with", _cutWith, tip: "Cut settings from your library: the material's thickness, and the kerf and slot fit your cut test measured, go on the slices."),
+                _cutNote,
                 Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
                 Field("Cut from", _stock, tip: "Where the parts go. To use the board actually in the machine, outline it first (draw it, or Pick piece from camera), right-click it: Use as material outline. Further beds get the same outline on new pages."),
                 _summary,
@@ -347,7 +376,61 @@ public sealed class StackSliceWindow : Window
         Rings = (int)(_rings.Value ?? 3),
         CoreMm = (double)(_core.Value ?? 6),
         SlotFitMm = (double)(_fit.Value ?? 0.1m),
+        ShapeStepMm = _shape.IsChecked == true && (int)Math.Max(0, _method.SelectedIndex) == (int)SliceMethod.Stacked ? (double)(_step.Value ?? 0) : 0,
     };
+
+    /// <summary>What edge shaping will do, in a sentence or two.</summary>
+    static string Shaping(SliceStack stack, SliceOptions o)
+    {
+        var shaped = stack.Parts.Where(p => p.Shaping.Count > 0).ToList();
+        int steps = shaped.Sum(p => p.Shaping.Count), deepest = shaped.Select(p => p.Shaping.Count).DefaultIfEmpty(0).Max();
+        int under = stack.Parts.Count(p => p.UndersideMm2 > 5);
+        string text = shaped.Count == 0
+            ? "\nEdge shaping: no slopes to engrave (the model doesn't narrow going up inside any slice)."
+            : $"\nEdge shaping: {steps} engraving step{(steps == 1 ? "" : "s")} on {shaped.Count} part{(shaped.Count == 1 ? "" : "s")}, at most {deepest} deep ({deepest * o.ShapeStepMm:0.##} mm of {o.ThicknessMm:0.##}).";
+        return text + (under > 0 ? $" {under} part{(under == 1 ? " has" : "s have")} slopes underneath (the model narrows downward there): sand those." : "");
+    }
+
+    /// <summary>The library's cut and engrave settings to offer.</summary>
+    void Library()
+    {
+        var mats = _library?.Materials ?? [];
+        _cuts = [null, .. mats.SelectMany(m => m.Recipes.Where(r => r.Settings.Mode == LayerMode.Cut).Select(r => ((Doc.Materials.Material, Doc.Materials.Recipe)?)(m, r)))];
+        _cutWith.ItemsSource = _cuts.Select(c => c is { } x
+            ? $"{x.M.Label} · {x.R.Title}" + (x.R.SlotFitMm is { } f ? $" (fit {f:+0.##;-0.##;0} mm)" : "")
+            : "As set on the cut layer").ToList();
+        _cutWith.SelectedIndex = 0;
+        _etches = [.. mats.SelectMany(m => m.Recipes.Where(r => r.EtchMmPerPass is > 0).Select(r => (m, r)))];
+        _etchWith.ItemsSource = _etches.Count == 0 ? ["No etch-rate results yet"] : _etches.Select(x => $"{x.M.Label} · {x.R.Title} ({x.R.EtchMmPerPass:0.###} mm a pass)").ToList();
+        _etchWith.SelectedIndex = 0;
+        _etchWith.IsEnabled = _etches.Count > 0;
+        _step.Value = _etches.Count > 0 && _etches[0].R.EtchMmPerPass is { } e ? (decimal)e : 0.15m;
+        ShowShaping();
+    }
+
+    void ShowShaping()
+    {
+        bool on = _shape.IsChecked == true;
+        _etchWith.IsVisible = _step.IsVisible = _shapeNote.IsVisible = on;
+        // (The fields' labels go with them.)
+        if (_etchWith.Parent is Control f1) f1.IsVisible = on;
+        if (_step.Parent is Control f2) f2.IsVisible = on;
+        _shapeNote.Text = _etches.Count == 0
+            ? "Measure the depth a pass first (Laser → Etch rate test, saved to the library); until then the depth here is a guess, and the shaping will be too deep or too shallow."
+            : "Engraved before the cut, on its own layer (\"Slices · shaping\", one pass a step). Where the model narrows downward the steps are underneath: those are sanded.";
+    }
+
+    /// <summary>Cut settings chosen from the library: the material's thickness and the cut test's slot fit come with them.</summary>
+    void CutChosen()
+    {
+        if (_cutWith.SelectedIndex <= 0 || _cutWith.SelectedIndex >= _cuts.Count || _cuts[_cutWith.SelectedIndex] is not { } c) { _cutNote.Text = ""; return; }
+        var notes = new List<string>();
+        if (c.M.ThicknessMm is { } t) { _thick.Value = (decimal)t; notes.Add($"material {t:0.##} mm"); }
+        if (c.R.Settings.KerfMm > 0) notes.Add($"kerf {c.R.Settings.KerfMm:0.###} mm on the cut layer");
+        if (c.R.SlotFitMm is { } fit) { _fit.Value = (decimal)fit; notes.Add($"slot fit {fit:+0.##;-0.##;0} mm from your cut test"); }
+        _cutNote.Text = notes.Count > 0 ? $"From {c.M.Label}: {string.Join(", ", notes)}." : "";
+        Later();
+    }
 
     async Task Reslice()
     {
@@ -398,6 +481,7 @@ public sealed class StackSliceWindow : Window
                             (stack.Parts.Count(p => p.Floating) is var fl and > 0 ? $"\n⚠ {fl} part{(fl == 1 ? "" : "s")} start in mid-air with nothing under them (red in the preview): separate pieces of the model, to glue on by eye or leave out." : "") +
                             (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
+                            (o.ShapeStepMm > 0 ? Shaping(stack, o) : "") +
                             (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
             _make.IsEnabled = fits && parts > 0;
         }
@@ -417,7 +501,17 @@ public sealed class StackSliceWindow : Window
         try
         {
             var stock = _stocks[Math.Max(0, _stock.SelectedIndex)];
-            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name, material: stock.Outline);
+            // Edge shaping: engraved with the chosen settings, a pass a step.
+            Layer? shaping = null;
+            if (_shape.IsChecked == true && stack.Parts.Any(p => p.Shaping.Count > 0))
+                shaping = _etchWith.SelectedIndex >= 0 && _etchWith.SelectedIndex < _etches.Count
+                    ? _etches[_etchWith.SelectedIndex].R.Settings.ApplyTo(Layer.Default(0, LayerMode.Fill))
+                    : Layer.Default(0, LayerMode.Fill);
+            var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name, material: stock.Outline, shaping: shaping);
+            // The cut settings from the library (kerf included) on the cut layer.
+            if (_cutWith.SelectedIndex > 0 && _cutWith.SelectedIndex < _cuts.Count && _cuts[_cutWith.SelectedIndex] is { } c)
+                s = Ops.UpdateLayers(s, s.Layers.Where(l => l.Name == "Slices · cut").Select(l => l.Id).ToHashSet(),
+                    l => c.R.Settings.ApplyTo(l) with { Material = new Doc.Materials.MaterialRef(c.M.Id, c.M.Label, c.R.Id, c.R.Title) });
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +
                             " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\".";

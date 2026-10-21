@@ -519,7 +519,7 @@ public partial class MainWindow : Window
         import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
         var importMore = import.Small("Import as…", "IcMore", () => { }, "Import a drawing grouped, in separate pieces, or as one picture");
-        import.Small("3D to slices", "IcDepth", () => _ = Guard(() => new StackSliceWindow(_doc, Canvas.Machine, _settings).ShowDialog(this)), "Slice a 3D model (STL, OBJ, STEP) into layers of your material's thickness: cut them, numbered, and glue them up into the model");
+        import.Small("3D to slices", "IcDepth", () => _ = Guard(() => new StackSliceWindow(_doc, Canvas.Machine, _settings, _library).ShowDialog(this)), "Slice a 3D model (STL, OBJ, STEP) into layers of your material's thickness: cut them, numbered, and glue them up into the model");
         importMore.Flyout = new MenuFlyout
         {
             Items =
