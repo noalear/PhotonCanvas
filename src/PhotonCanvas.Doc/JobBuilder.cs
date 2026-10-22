@@ -103,6 +103,8 @@ public sealed record BuiltJob(
 
     /// <summary>Whole-job rounds (passes run over the whole job), with the pause between them; null when each path runs its own passes.</summary>
     public double? RoundDelayS { get; init; }
+    /// <summary>How many paths the job cuts, marks or fills. Steps can be more: a heat-ordered layer has a step for every piece of every pass.</summary>
+    public int Paths { get; init; }
 
     /// <summary>
     /// One stretch of the run, in the order it happens: seconds from the start (by the same
@@ -207,6 +209,8 @@ public static class JobBuilder
         var warnings = new List<string>();
         // The job bar's pause after each path: how many it was put after, and the time they add (heat-ordered layers have their own).
         int fixedPauses = 0;
+        // Heat-ordered layers add a step per piece per pass: the extra ones beyond one per path.
+        int heatExtraSteps = 0;
         double fixedPauseS = 0;
         var leftOut = new List<string>();
         var blocks = new List<Block>();
@@ -461,6 +465,7 @@ public static class JobBuilder
                     }
                     var settings = HeatSettingsFor(layer, opt);
                     var plan = HeatOrder.Plan(groups, settings, opt.HeatProgress, opt.Cancel);
+                    int heatFirstStep = steps.Count;
                     if (wobble && (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm))
                         throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
                     foreach (var cut in plan.Cuts)
@@ -476,6 +481,7 @@ public static class JobBuilder
                         Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(cut.Points));
                     }
+                    heatExtraSteps += Math.Max(0, steps.Count - heatFirstStep - groups.Count);
                     foreach (var gap in gaps)
                     {
                         int bm = blocks.Count, sm = steps.Count;
@@ -690,6 +696,7 @@ public static class JobBuilder
             LeftOut = leftOut,
             RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
             Timeline = Timeline(job, blockSteps),
+            Paths = steps.Count - heatExtraSteps,
         };
     }
 

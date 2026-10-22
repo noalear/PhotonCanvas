@@ -102,6 +102,7 @@ public class HeatPlanTests
         Assert.Equal(25 * 3, job.Job.Blocks.Count);
         Assert.All(job.Job.Blocks, b => Assert.Equal(1, b.Laser.Passes));
         Assert.Equal(1, job.LayerTimes.Single().Passes); // passes already written out
+        Assert.Equal((25, 75), (job.Paths, job.Steps.Count)); // 25 paths, cut 75 times
         Assert.Contains(job.Warnings, w => w.Contains("spreads the heat") && w.Contains("°C (estimated, on a"));
         // Saved with the layer.
         var back = DocFile.Deserialize(DocFile.Serialize(s)).Layers[0];

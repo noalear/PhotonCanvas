@@ -457,7 +457,7 @@ public sealed class JobBar : UserControl
             int rounds = j.LayerTimes.Count == 0 ? 1 : j.LayerTimes.Max(t => t.Passes);
             _summary.Text = (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") +
                             (_onlyLayer is { } ol && _doc.State.FindLayer(ol) is { } oll ? $"Only {oll.Name} · " : "") + (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat" ? $"{_settings.WorkMode} · " : "") +
-                            $"{layers} layer{(layers == 1 ? "" : "s")} · {j.Steps.Count} path{(j.Steps.Count == 1 ? "" : "s")}" +
+                            $"{layers} layer{(layers == 1 ? "" : "s")} · {j.Paths:N0} path{(j.Paths == 1 ? "" : "s")}" + (j.Steps.Count > j.Paths ? $" ({j.Steps.Count:N0} cuts with the passes)" : "") +
                             (j.RoundDelayS is not null && rounds > 1 ? $" · {rounds} rounds" : "") +
                             $" · {j.Bounds.Width:0.#} × {j.Bounds.Height:0.#} mm at {j.Bounds.MinX:0.#}, {j.Bounds.MinY:0.#}";
             foreach (var w in j.Warnings) _messages.Children.Add(Message(w, "Warn"));
