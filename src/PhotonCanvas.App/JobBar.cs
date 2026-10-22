@@ -81,6 +81,14 @@ public sealed class JobBar : UserControl
     string? _error;
     int _version;
     bool _sending;
+    // Getting ready to ship (building the job if it isn't built yet): the button greyed, "Shipping it" with dots going round.
+    bool _preparing;
+    readonly DispatcherTimer _shipDots = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    int _dots;
+    readonly PathIcon _sendIcon = new() { Width = 17, Height = 17, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center };
+    // The design and settings the shown job was built from, and the build under way: Ship It uses them rather than building again.
+    (DocState State, JobOptions Options)? _jobFor;
+    (DocState State, JobOptions Options, Task<BuiltJob> Build)? _pending;
     readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
     /// <summary>A new job was built (null when the design can't be processed).</summary>
@@ -104,10 +112,12 @@ public sealed class JobBar : UserControl
             Orientation = Orientation.Horizontal, Spacing = 9, HorizontalAlignment = HorizontalAlignment.Center,
             Children =
             {
-                new PathIcon { Data = Icon("IcSend"), Width = 17, Height = 17, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center },
+                _sendIcon,
                 _sendText,
             },
         };
+        _sendIcon.Data = Icon("IcSend");
+        _shipDots.Tick += (_, _) => _sendText.Text = "Shipping it" + new string('.', _dots = (_dots + 1) % 6);
         ToolTip.SetTip(_send, "Uploads the job. Nothing moves or fires until you press the start button on the machine.");
         _send.Click += async (_, _) => await Send();
         _stop.Background = Brush("Danger");
@@ -286,7 +296,7 @@ public sealed class JobBar : UserControl
         set => _order.IsChecked = value;
     }
 
-    public bool CanSend => !_sending && _job is not null && (_machine.IsConnected || _settings.ActiveSetup().Kind == MachineKind.Grbl);
+    public bool CanSend => !_sending && !_preparing && _job is not null && (_machine.IsConnected || _settings.ActiveSetup().Kind == MachineKind.Grbl);
     public bool CanFrame => _machine.IsFraming || CanSend;
 
     void UpdateDelayRow() => _delayRow.IsVisible = _passMode.SelectedIndex == 0;
@@ -376,6 +386,24 @@ public sealed class JobBar : UserControl
     /// options are read here, on the UI thread: Avalonia controls may only be
     /// touched from it.
     /// </summary>
+    /// <summary>A build under way, once it's done; null if it failed or was stopped (then Ship It builds its own).</summary>
+    static async Task<BuiltJob?> Finished(Task<BuiltJob> build)
+    {
+        try { return await build; }
+        catch (Exception e) when (e is JobException or OperationCanceledException) { return null; }
+    }
+
+    /// <summary>Ready (or given up): the button back to "Ship It".</summary>
+    void DoneShipping()
+    {
+        if (!_preparing) return;
+        _preparing = false;
+        _shipDots.Stop();
+        _sendText.Text = "Ship It";
+        _sendIcon.IsVisible = true;
+        UpdateSend();
+    }
+
     Task<BuiltJob> BuildNow()
     {
         var state = _doc.State;
@@ -413,19 +441,23 @@ public sealed class JobBar : UserControl
         _buildCancel?.Cancel();
         var cts = _buildCancel = new CancellationTokenSource();
         _buildClock.Restart();
-        var opt = Options with
+        var plain = Options;
+        var opt = plain with
         {
             Cancel = cts.Token,
             HeatProgress = f => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (v == _version) ShowPlanning(f); }),
         };
         BuiltJob? job = null;
         string? error = null;
-        try { job = await Task.Run(() => JobBuilder.Build(state, opt)); }
+        var build = Task.Run(() => JobBuilder.Build(state, opt));
+        _pending = (state, plain, build);
+        try { job = await build; }
         catch (JobException e) { error = e.Message; }
         catch (OperationCanceledException) { return; }
         if (v != _version) return;
         ShowPlanning(null);
         _job = job;
+        _jobFor = (state, plain);
         _error = error;
         Show();
         JobBuilt?.Invoke(job);
@@ -791,12 +823,27 @@ public sealed class JobBar : UserControl
         var fresh = VariableText.Refresh(_doc.State, DateTime.Now);
         if (!ReferenceEquals(fresh, _doc.State)) _doc.Commit("Update date and time", fresh);
         BuiltJob job;
-        try { job = await BuildNow(); }
+        _preparing = true;
+        _dots = 0;
+        _sendText.Text = "Shipping it";
+        _sendIcon.IsVisible = false;
+        _shipDots.Start();
+        UpdateSend();
+        try
+        {
+            // Already built for this very design and settings (for the estimate), or being built: use that.
+            var plain = Options;
+            if (_job is { } built && _jobFor is { } f && ReferenceEquals(f.State, _doc.State) && f.Options == plain) job = built;
+            else if (_pending is { } p && ReferenceEquals(p.State, _doc.State) && p.Options == plain && await Finished(p.Build) is { } done) job = done;
+            else job = await BuildNow();
+        }
         catch (JobException e)
         {
+            DoneShipping();
             await Dialogs.Message(owner, "Can't send", e.Message);
             return;
         }
+        finally { DoneShipping(); }
         // A GRBL machine: the job as GRBL G-code, sent over USB from its own window.
         if (_settings.ActiveSetup() is { Kind: MachineKind.Grbl } grbl)
         {
