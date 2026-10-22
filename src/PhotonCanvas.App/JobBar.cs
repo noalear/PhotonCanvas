@@ -33,7 +33,7 @@ public sealed class JobBar : UserControl
         MinWidth = 0, FontSize = 11.5, MinHeight = 22, Height = 24, Padding = new(8, 0),
     };
     readonly NumericUpDown _delay = Number(0, 3600, 0.5m, "0.#"), _pathPause = Number(0, (decimal)PhotonCanvas.Core.Job.MaxPathPauseS, 0.5m, "0.##");
-    readonly StackPanel _delayRow;
+    readonly StackPanel _delayRow, _pathRow, _passesArea;
     readonly TextBlock _pathPauseLabel = new() { Text = "s after each path", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock _summary = new() { FontSize = 12, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
     readonly TextBlock _caption = new() { FontSize = 11.5, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
@@ -45,7 +45,7 @@ public sealed class JobBar : UserControl
     readonly Button _send = new() { Classes = { "primary" }, Width = 140, Height = 48, Padding = new(12, 0), CornerRadius = new(8), VerticalContentAlignment = VerticalAlignment.Center };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 4, Margin = new(0, 3, 0, 0) };
     // Working out a heat order (the finer model takes a while): how far it's got, so it doesn't look stuck.
-    readonly ProgressBar _planBar = new() { Minimum = 0, Maximum = 1, MinWidth = 40, MaxWidth = 200, Height = 6, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new(8, 0, 6, 0) };
+    readonly ProgressBar _planBar = new() { Minimum = 0, Maximum = 1, MinWidth = 40, Height = 6, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new(8, 0, 6, 0) };
     readonly TextBlock _planText = new() { FontSize = 11.5, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
     readonly Grid _planRow = new() { ColumnDefinitions = new("Auto,*"), IsVisible = false };
     CancellationTokenSource? _buildCancel;
@@ -181,15 +181,15 @@ public sealed class JobBar : UserControl
         ToolTip.SetTip(_pathPause, "Seconds to wait after each cut or score path, laser off, so heat can leave before the next one (thin metal, masks, anything that warps). After every pass of it, round by round or path by path. The checks say how much time it adds.");
         TextBlock Muted(string t) => new() { Text = t, FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
         _delayRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("pause"), _delay, Muted("s between rounds") } };
-        var pathRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("·"), _pathPause, _pathPauseLabel } };
+        _pathRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("·"), _pathPause, _pathPauseLabel } };
         _passMode.SelectionChanged += (_, _) => { _settings.WholeJobPasses = _passMode.SelectedIndex == 0; _settings.Save(); UpdateDelayRow(); Schedule(); };
         _delay.ValueChanged += (_, _) => { _settings.PassDelayS = (double)(_delay.Value ?? 0); _settings.Save(); Schedule(); };
         _pathPause.ValueChanged += (_, _) => { _settings.PathPauseS = (double)(_pathPause.Value ?? 0); _settings.Save(); Schedule(); };
         ToolTip.SetTip(_estimate, "Estimated time. It ignores acceleration, so real jobs run a little longer.");
-        var passes = new StackPanel
+        var passes = _passesArea = new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 6, Margin = new(12, 0, 0, 0),
-            Children = { _passesLabel, _passMode, _delayRow, pathRow },
+            Children = { _passesLabel, _passMode, _delayRow, _pathRow },
         };
         var right = new StackPanel
         {
@@ -383,8 +383,23 @@ public sealed class JobBar : UserControl
         return Task.Run(() => JobBuilder.Build(state, opt));
     }
 
+    /// <summary>Layers that spread the heat work out their own waits and passes: settings that don't touch them aren't shown.</summary>
+    void UpdatePassControls()
+    {
+        if (_pathRow is null) return; // still being built
+        var working = _doc.State.Layers.Where(l => l.Output && _doc.State.ShapesFor(l).Any()).ToList();
+        static bool Heat(Layer l) => l.Order == PathOrder.Heat && l.Mode is LayerMode.Cut or LayerMode.Score;
+        var cutting = working.Where(l => l.Mode is LayerMode.Cut or LayerMode.Score).ToList();
+        bool someHeat = cutting.Any(Heat);
+        _pathRow.IsVisible = !(cutting.Count > 0 && cutting.All(Heat));
+        _passesArea.IsVisible = !(working.Count > 0 && working.All(Heat));
+        _pathPauseLabel.Text = someHeat ? "s after each path*" : "s after each path";
+        ToolTip.SetTip(_pathPauseLabel, someHeat ? "*Not on layers that spread the heat: they work out their own waits." : null);
+    }
+
     void Schedule()
     {
+        UpdatePassControls();
         _debounce.Stop();
         _debounce.Start();
     }
@@ -457,14 +472,7 @@ public sealed class JobBar : UserControl
             _checks.Content = _doc.State.Shapes.Count == 0 ? ChipText("IcCheck", "Empty", "TextMuted") : ChipText("IcWarn", "Can't build", "Danger");
         }
         if (_order.IsChecked == true) _canvas.Preview = _job;
-        // Layers that spread the heat work out their own waits: the fixed pause doesn't apply to them.
-        var cutting = _doc.State.Layers.Where(l => l.Output && l.Mode is LayerMode.Cut or LayerMode.Score && _doc.State.ShapesFor(l).Any()).ToList();
-        bool allHeat = cutting.Count > 0 && cutting.All(l => l.Order == PathOrder.Heat);
-        _pathPause.IsEnabled = !allHeat;
-        bool someHeat = cutting.Any(l => l.Order == PathOrder.Heat);
-        _pathPauseLabel.Text = allHeat ? "s · by heat order" : someHeat ? "s after each path*" : "s after each path";
-        ToolTip.SetTip(_pathPauseLabel, allHeat ? "Every cutting layer spreads the heat, so the waits after each path come from the heat model, not from this setting."
-            : someHeat ? "*Not on layers that spread the heat: they work out their own waits." : null);
+        UpdatePassControls();
         UpdateSend();
     }
 
