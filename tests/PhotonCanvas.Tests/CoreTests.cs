@@ -290,10 +290,10 @@ public class LayerDescentWobbleTests
         var back = PhotonCanvas.Doc.DocFile.Deserialize(PhotonCanvas.Doc.DocFile.Serialize(s)).Layers[0];
         Assert.Equal((0.5, 0.01, true, 0.05, 0.015), (back.StepDownMm, back.StepDownFirstMm, back.Wobble, back.WobbleDiameterMm, back.WobbleSpacingMm));
 
-        // Blue diode: wobble ignored, with a warning.
+        // The blue diode wobbles too: it's how the galvo moves, not a property of the laser.
         var blue = s with { Layers = [layer with { Laser = LaserSettings.Blue(70, 40).WithPasses(3) }] };
         var bj = PhotonCanvas.Doc.JobBuilder.Build(blue, new PhotonCanvas.Doc.JobOptions());
-        Assert.Contains(bj.Warnings, w => w.Contains("wobble only works"));
-        Assert.True(((VectorBlock)bj.Job.Blocks[0]).Path.Points.Count < 10);
+        Assert.DoesNotContain(bj.Warnings, w => w.Contains("wobble"));
+        Assert.InRange(((VectorBlock)bj.Job.Blocks[0]).Path.Points.Count, 191_000, 193_000);
     }
 }

@@ -67,7 +67,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _kerf = Number(-1, 1, 0.01m, "0.###"), _tabs = Number(0, 100, 1, "0"), _tabWidth = Number(0.1m, 10, 0.1m, "0.##");
     readonly NumericUpDown _overcut = Number(0, 10, 0.1m, "0.##"), _leadIn = Number(0, 10, 0.5m, "0.##");
     readonly NumericUpDown _stepDown = Number(0, 2, 0.1m, "0.##"), _stepFirst = Number(0, 2, 0.05m, "0.##");
-    readonly CheckBox _wobble = new() { Content = "Wobble (MOPA)" };
+    readonly CheckBox _wobble = new() { Content = "Wobble" };
     readonly NumericUpDown _wobbleD = Number(0.01m, 5, 0.01m, "0.###"), _wobbleS = Number(0.005m, 5, 0.005m, "0.###");
     readonly Control _wobbleRows;
     readonly NumericUpDown _fillAngle = Number(-180, 180, 15, "0.#"), _overscan = Number(0, 20, 0.5m, "0.##");
@@ -174,12 +174,12 @@ public sealed class LayerEditor : UserControl
             Spacing = 6,
             Children =
             {
-                Field("Wobble size (mm)", _wobbleD, tip: "Diameter of the small circles the beam traces while moving. Wider, smoother marks and cuts on metal."),
+                Field("Wobble size (mm)", _wobbleD, tip: "Diameter of the small circles the beam traces while moving: about how much wider the line or kerf gets."),
                 Field("Wobble spacing", _wobbleS, tip: "How far the circles move forward per loop (mm). Smaller = denser, slower."),
             },
         };
         ((StackPanel)_cutExtras).Children.Add(_wobbleRows);
-        ToolTip.SetTip(_wobble, "MOPA only: the beam traces small overlapping circles along the path.");
+        ToolTip.SetTip(_wobble, "The beam traces small overlapping circles along the path: wider, smoother lines, and a wider kerf that lets thick cuts clear their smoke and melt. Works with either laser.");
         _fillStyleRow = Field("Fill style", _fillStyle, tip: "Lines: straight back and forth. Offset: the outline stepped inward, like contour lines: follows the shape, so edges come out cleaner (good for text and logos).");
         ToolTip.SetTip(_resetRuns, "Count runs from 0 again, so the next run starts at the scan angle as set.");
         _runRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _runCount, _resetRuns } };
@@ -302,11 +302,11 @@ public sealed class LayerEditor : UserControl
                 _heatHint,
             },
         };
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _scatter, _pulseRow, _freqRow, focusRow, _moreNothing } };
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _scatter, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
-        ToolTip.SetTip(_more, "Kerf, tabs, overcut, lead-in, step-down, wobble, scan angle, overscan, dot time and MOPA pulse settings. The defaults work for most jobs.");
+        ToolTip.SetTip(_more, "Kerf, tabs, overcut, lead-in, step-down, wobble, scan angle, overscan and dot time. The defaults work for most jobs.");
 
         var saveToLib = Button("Save to library…", tip: "Remember these settings for a material, with how well they worked (and a photo of the result).");
         saveToLib.Click += (_, _) =>
@@ -336,6 +336,8 @@ public sealed class LayerEditor : UserControl
                 _mode,
                 _light,
                 trio,
+                _pulseRow,
+                _freqRow,
                 _passHint,
                 _orderRow,
                 _heatRows,
@@ -622,8 +624,8 @@ public sealed class LayerEditor : UserControl
         _dither.SelectedIndex = dith is { } dm ? (int)dm : -1;
         _dither.PlaceholderText = dith is null ? "mixed" : "";
         _dpiHint.Text = Same(l => l.Dpi) is { } dpi ? $"Dots {25.4 / dpi:0.###} mm apart." : "";
-        _wobble.IsVisible = anyRed;
-        _wobbleRows.IsVisible = anyRed && ls.Any(l => l.Wobble);
+        _wobble.IsVisible = true;
+        _wobbleRows.IsVisible = ls.Any(l => l.Wobble);
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;
         _pulse.PlaceholderText = pw is null ? "mixed" : "";

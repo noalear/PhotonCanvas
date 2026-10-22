@@ -118,8 +118,8 @@ public sealed record StepDown(double FirstMm, double PerPassMm)
 }
 
 /// <summary>
-/// Fiber "wobble": the beam traces small circles while moving along the path, for wider,
-/// smoother marks and cuts. Generated as xTool Studio does (checked point by point against its
+/// Wobble: the beam traces small circles while moving along the path, for wider, smoother marks
+/// and a wider kerf that lets a cut clear itself (either laser: it's only how the galvo moves). Generated as xTool Studio does (checked point by point against its
 /// export): 36 points per loop turning 10° each, starting at −100°, the loop centre advancing
 /// <c>spacing / 36</c> along the path per point.
 /// </summary>

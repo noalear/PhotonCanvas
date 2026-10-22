@@ -445,9 +445,8 @@ public static class JobBuilder
                 var extras = new CutExtras(layer) { ManualTabs = [.. shapes.SelectMany(sh => sh.TabsWorld)] };
                 List<Vec2> startPoints = [.. shapes.Select(sh => sh.StartWorld).OfType<Vec2>()];
                 StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
-                bool wobble = layer.Wobble && layer.Laser.Light == LightSource.Red;
-                if (layer.Wobble && !wobble)
-                    warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
+                // The beam tracing small circles as it goes: a matter of motion, so either laser.
+                bool wobble = layer.Wobble;
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
                 bool heat = layer.Order == PathOrder.Heat && layer.DotModeMm <= 0 && layer.PerforateMm <= 0;
