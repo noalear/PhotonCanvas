@@ -213,7 +213,7 @@ public sealed class PropertiesPanel : UserControl
 
         _cornerRow = Field("Corner radius", _pCorner, tip: "Rounded corners, mm (0 = square).");
         _sidesRow = Field("Sides / points", _pSides);
-        _innerRow = Field("Point depth %", _pInner, tip: "How far in the star's inner corners are, as a share of its size: smaller = spikier.");
+        _innerRow = Field("Inner size %", _pInner, tip: "How far in the star's inner corners are, as a share of its size: smaller = spikier.");
         _paramCard = Card("Shape", Row(Field2("W", _pw), Field2("H", _ph)), _cornerRow, _sidesRow, _innerRow,
             Hint("Stays editable until you edit its points (convert it to a path first: Ctrl+Shift+C)."));
         foreach (var n in new[] { _pw, _ph, _pCorner, _pSides, _pInner }) n.ValueChanged += (_, _) => EditParam();

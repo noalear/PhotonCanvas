@@ -107,7 +107,7 @@ public sealed class CutTestWindow : Window
                     _passesCol, _downList),
                 Field("Square size (mm)", _cell, tip: "Big enough to see whether it dropped, small enough not to tip up into the head once it's loose."),
                 _plan,
-                Hint("Cut on the honeycomb or pins with air assist on, and stay with it: slow cuts can flare up. The numbers are only lightly marked."),
+                Hint("Cut on the honeycomb or pins (with air assist on, if you have it), and stay with it: slow cuts can flare up. The numbers are only lightly marked."),
                 add,
                 Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Laser → Cut test)."),
             },

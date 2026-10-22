@@ -199,6 +199,28 @@ public sealed class Ribbon : UserControl
         return c;
     }
 
+    readonly Dictionary<string, Control> _named = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Every command by "Tab/Label" (icon-only ones by their tooltip), for the help and the tutorials to point at.</summary>
+    public IReadOnlyDictionary<string, Control> Commands => _named;
+
+    internal void Register(string tab, string label, Control c) => _named.TryAdd($"{tab}/{label}", c);
+
+    /// <summary>A command's button, after switching to its tab so it can be seen; null if there's no such command.</summary>
+    public Control? Show(string tab, string label)
+    {
+        if (!_named.TryGetValue($"{tab}/{label}", out var c)) return null;
+        if (_folded) Fold(false);
+        Select(tab);
+        return c;
+    }
+
+    /// <summary>A tab's header button.</summary>
+    public Control? TabHeader(string name) => _tabs.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase))?.Header;
+
+    /// <summary>The tab names, in order.</summary>
+    public IEnumerable<string> TabNames => _tabs.Select(t => t.Name);
+
     internal void Track(Control c, Func<bool>? enabled)
     {
         if (enabled is not null) _conditional.Add((c, enabled));
@@ -373,6 +395,7 @@ public sealed class RibbonGroup
         b.Content = LargeContent(b, label, icon);
         b.Click += (_, _) => action();
         AddLarge(b);
+        _ribbon.Register(_tab.Name, label, b);
         return Setup(b, tip, enabled);
     }
 
@@ -382,6 +405,7 @@ public sealed class RibbonGroup
         b.Content = LargeContent(b, label, icon);
         b.Click += (_, _) => changed(b.IsChecked == true);
         AddLarge(b);
+        _ribbon.Register(_tab.Name, label, b);
         _ribbon.TrackChecked(b, isChecked);
         return Setup(b, tip, enabled);
     }
@@ -391,6 +415,7 @@ public sealed class RibbonGroup
         var b = new Button { Classes = { "rb" }, Content = SmallContent(label, icon, true), Padding = new(4, 1) };
         b.Click += (_, _) => action();
         AddSmall(b);
+        _ribbon.Register(_tab.Name, label, b);
         return Setup(b, tip, enabled);
     }
 
@@ -399,6 +424,7 @@ public sealed class RibbonGroup
         var b = new ToggleButton { Classes = { "rb" }, Content = SmallContent(label, icon, true), Padding = new(4, 1) };
         b.Click += (_, _) => changed(b.IsChecked == true);
         AddSmall(b);
+        _ribbon.Register(_tab.Name, label, b);
         _ribbon.TrackChecked(b, isChecked);
         return Setup(b, tip, enabled);
     }
@@ -418,6 +444,7 @@ public sealed class RibbonGroup
             };
             b.Click += (_, _) => action();
             grid.Children.Add(Setup(b, tip, enabled));
+            _ribbon.Register(_tab.Name, tip, b);
         }
         _items.Children.Add(grid);
     }

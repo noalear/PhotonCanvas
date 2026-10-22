@@ -49,6 +49,7 @@ public static class EngravingLines
             var local = toLocal.Apply(world);
             if (local.X < 0 || local.Y < 0 || local.X > picture.SizeMm.X || local.Y > picture.SizeMm.Y || !picture.InClip(local)) return 0;
             var px = picture.LocalToPixel(local);
+            if (picture.Source.SeeThrough(px.X, px.Y)) return 0; // see-through: no lines, even inverted
             return 1 - Math.Clamp(picture.Tone.Apply(picture.Source.SampleLuminance(px.X, px.Y)), 0, 1);
         }
         return Make(picture.Bounds, Dark, o);

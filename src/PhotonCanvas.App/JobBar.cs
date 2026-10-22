@@ -211,7 +211,7 @@ public sealed class JobBar : UserControl
         _checks.Flyout = new Flyout { Placement = PlacementMode.TopEdgeAlignedRight, Content = _messages };
         ToolTip.SetTip(_checks, "Things worth knowing before you send. Click for the list.");
         Compact(false);
-        ToolTip.SetTip(_order, "Show the processing order on the work area: numbered paths and the travel moves between them.");
+        ToolTip.SetTip(_order, "Show the processing order on the work area: paths coloured from first (blue) to last (red), with a key, and the travel moves between them on small jobs.");
         _order.IsCheckedChanged += (_, _) => _canvas.Preview = _order.IsChecked == true ? _job : null;
         var more = _export;
         var exportXf = new MenuItem { Header = "Job package for the machine (.xf)…" };
@@ -297,7 +297,8 @@ public sealed class JobBar : UserControl
     }
 
     public bool CanSend => !_sending && !_preparing && _job is not null && (_machine.IsConnected || _settings.ActiveSetup().Kind == MachineKind.Grbl);
-    public bool CanFrame => _machine.IsFraming || CanSend;
+    /// <summary>Framing is the xTool machine's: a GRBL machine frames from its own Send window.</summary>
+    public bool CanFrame => _machine.IsFraming || CanSend && _settings.ActiveSetup().Kind != MachineKind.Grbl;
 
     void UpdateDelayRow() => _delayRow.IsVisible = _passMode.SelectedIndex == 0;
 
@@ -927,7 +928,9 @@ public sealed class JobBar : UserControl
             _sentJob = job;
             _sentFrom = _doc.FilePath;
             // A section of a bigger design: the fields move on only after the last one.
-            _sentMidSections = _section is { } s && s.Index < s.Count - 1;
+            _sentMidSections = _section is { } s && s.Index < s.Count - 1
+                // Layer by layer: the piece is done after its last layer, not each one.
+                || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.ShapesFor(l).Any()).LastOrDefault()?.Id != onlyOne;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }
         catch (DeviceException e)

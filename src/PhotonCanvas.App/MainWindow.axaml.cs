@@ -103,6 +103,7 @@ public partial class MainWindow : Window
         JobHost.Content = _job;
         PagesHost.Content = new PagesBar(_doc, this);
         // The side panels: movable between the sides, floating or folded (View → Panels).
+        HookHelpKey();
         _docking = new Docking(this, _settings, MainGrid, LeftDock, RightDock, LeftSplit, RightSplit);
         _docking.Add("layers", "Layers", _layers, new PanelPlace { Side = "Left", Order = 0 });
         _docking.Add("selection", "Selection", _props, new PanelPlace { Side = "Right", Order = 0 });
@@ -436,21 +437,27 @@ public partial class MainWindow : Window
             Placement = PlacementMode.BottomEdgeAlignedRight,
             Items =
             {
+                Item("Help guide", () => ShowHelp(), "F1"),
+                Item("Tutorials", ShowTutorials),
+                new Separator(),
                 AsyncItem("Getting started", ShowGettingStarted),
-                AsyncItem("Keyboard shortcuts", ShowShortcuts, "F1"),
+                AsyncItem("Keyboard shortcuts", ShowShortcuts),
                 AsyncItem("Safety and disclaimer", ShowSafety),
                 new Separator(),
                 AsyncItem($"About {AppIdentity.ProductName}", ShowAbout),
             },
         };
         _ribbon.SetTrail(save, _undoButton, _redoButton, new Border { Width = 1, Background = UiKit.Brush("Line"), Margin = new(6, 6) }, gear, help);
+        foreach (var (name, c) in new (string, Control)[] { ("File", file), ("Save", save), ("Undo", _undoButton), ("Redo", _redoButton), ("Settings", gear), ("Help", help) })
+            _headerButtons[name] = c;
         _ribbon.Track(_undoButton, () => _doc.CanUndo);
         _ribbon.Track(_redoButton, () => _doc.CanRedo);
 
         // ---- Home: everyday drawing and editing ----
         var home = _ribbon.Tab("Home", "Draw, select, combine and edit");
         var clip = home.Group("Clipboard");
-        clip.Large("Paste", "IcPaste", Paste, "Paste (Ctrl+V)", () => _clipboard.Count > 0);
+        // Always on: what another program copied (a picture, SVG) can be pasted too.
+        clip.Large("Paste", "IcPaste", Paste, "Paste (Ctrl+V): shapes copied here, or a picture or SVG copied in another program");
         clip.Small("Cut", "IcCut", CutSel, "Cut (Ctrl+X)", HasSel);
         clip.Small("Copy", "IcCopy", CopySel, "Copy (Ctrl+C)", HasSel);
         clip.Small("Duplicate", "IcDuplicate", DuplicateSel, "Duplicate, offset a little (Ctrl+D)", HasSel);
@@ -671,7 +678,7 @@ public partial class MainWindow : Window
         tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
         panels.Small("Reset panels", "IcLayers", () => _docking.Reset(), "Put the layers, selection and layer settings panels back where they started (each panel's title bar moves, floats or folds it)");
-        panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Number the paths in the order they run", null, () => _job.ShowOrder);
+        panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Colour the paths by when they run: blue first, through green and yellow, to red last (a key shows at the top of the work area)", null, () => _job.ShowOrder);
         panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
             "Show pictures as they'll come out on their layer's material: corrected, in the material's own colours. Needs a tone test on that material (Laser → Tone test).", null, () => _settings.PicturesAsBurned);
 
@@ -727,6 +734,8 @@ public partial class MainWindow : Window
             ]),
             ("Help",
             [
+                new("Help guide", "Every feature and setting explained, with pictures. F1 in any window opens its page.", () => { ShowHelp(); return Task.CompletedTask; }),
+                new("Tutorials", "Short guided walks through each feature: a card points at each button as you go.", () => { ShowTutorials(); return Task.CompletedTask; }),
                 new("Getting started", "A short tour, and the connection setup.", ShowGettingStarted),
                 new("Keyboard shortcuts", "Every shortcut on one page.", ShowShortcuts),
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
@@ -754,7 +763,9 @@ public partial class MainWindow : Window
         new("file.import", "File", "Import…", "Ctrl+I", () => _ = Guard(() => ImportAny(false)), true),
         new("file.importcolour", "File", "Import, one layer per colour…", "Ctrl+Shift+I", () => _ = Guard(() => ImportAny(true)), true),
         new("file.picture", "File", "Import picture…", "Ctrl+J", () => _ = Guard(ImportImage), true),
-        new("help.keys", "File", "Keyboard shortcuts", "F1", () => _ = Guard(ShowShortcuts), true),
+        new("help.guide", "File", "Help guide", "F1", () => ShowHelp(), true),
+        new("help.tutorials", "File", "Tutorials", "", ShowTutorials, true),
+        new("help.keys", "File", "Keyboard shortcuts", "", () => _ = Guard(ShowShortcuts), true),
         new("edit.undo", "Edit", "Undo", "Ctrl+Z", _doc.Undo),
         new("edit.redo", "Edit", "Redo", "Ctrl+Y|Ctrl+Shift+Z", _doc.Redo),
         new("edit.history", "Edit", "Undo history", "Ctrl+H", ShowHistory),
@@ -782,6 +793,8 @@ public partial class MainWindow : Window
         new("shape.material", "Shapes", "Use as material outline", "", MaterialSel),
         new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
         new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
+        new("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", () => { if (_doc.Selection.Count > 0) _ = Guard(NestSel); }),
+        new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
         new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
         new("layer.moveto", "Layers", "Move selection to the active layer", "Ctrl+M", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer))),
@@ -789,6 +802,7 @@ public partial class MainWindow : Window
         new("view.zoomout", "View", "Zoom out", "Ctrl+OemMinus|Ctrl+Subtract", () => Canvas.ZoomBy(0.8)),
         new("view.fit", "View", "Fit work area", "Home|Ctrl+D0|Ctrl+NumPad0", Canvas.FitField),
         new("view.fitsel", "View", "Fit selection", "F", Canvas.FitSelection),
+        new("view.grid", "View", "Grid settings…", "Ctrl+OemQuotes", () => _ = Guard(ShowGridSettings)),
         new("tool.select", "Tools", "Select", "V", () => Canvas.Tool = Tool.Select),
         new("tool.rect", "Tools", "Rectangle", "R", () => Canvas.Tool = Tool.Rect),
         new("tool.ellipse", "Tools", "Ellipse", "E", () => Canvas.Tool = Tool.Ellipse),
@@ -827,8 +841,10 @@ public partial class MainWindow : Window
         var m = e.KeyModifiers;
         bool ctrl = m.HasFlag(KeyModifiers.Control), shift = m.HasFlag(KeyModifiers.Shift);
         bool typing = TextInputFocused();
-        // Pen and point editing use these keys themselves.
-        bool toolKeys = Canvas.Tool is Tool.Pen or Tool.Nodes && !ctrl && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S;
+        // Pen, point editing and the magnetic pen use these keys themselves (R rounds a point, it doesn't pick the rectangle).
+        bool toolKeys = !ctrl && (Canvas.Tool is Tool.Pen or Tool.Nodes && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S
+            || Canvas.Tool is Tool.Nodes && e.Key is Key.R or Key.Y or Key.B
+            || Canvas.Tool is Tool.Magnetic && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape);
         foreach (var c in Commands())
         {
             // File shortcuts work everywhere; the rest leave text boxes their Ctrl+Z, Ctrl+A, Delete, arrows and letters.
@@ -1093,7 +1109,7 @@ public partial class MainWindow : Window
         StatusText.Text = await _machine.HomeZAsync() is { } err ? $"Z homing: {err}" : "Z axis homed. Set the focus height again before marking.";
     }
 
-    static readonly string[] BackupItems = ["settings.json", "materials", "shapes", "templates"];
+    static readonly string[] BackupItems = ["app.json", "materials", "shapes", "templates"];
 
     async Task BackupSettings()
     {
@@ -1144,7 +1160,9 @@ public partial class MainWindow : Window
                 System.IO.Compression.ZipFileExtensions.ExtractToFile(e, target, overwrite: true);
             }
         });
-        await Dialogs.Message(this, "Restored", "Settings restored. Close and open the program again to use them.");
+        // The settings in memory would be written over the restored ones on the way out.
+        AppSettings.Frozen = true;
+        await Dialogs.Message(this, "Restored", "Settings restored. Close and open the program again to use them (changes made before then aren't kept).");
     }
 
     async Task ShowWorkMode()
@@ -1179,7 +1197,7 @@ public partial class MainWindow : Window
 
     void ShowConsole()
     {
-        if (!_settings.ShowConsole) return;
+        // (Its ribbon button shows only while Settings → Equipment's console box is ticked; Settings → Tools opens it anyway.)
         if (_console is { } open) { open.Activate(); return; }
         _console = new ConsoleWindow(_machine, _settings);
         _console.Closed += (_, _) => _console = null;
@@ -1330,7 +1348,7 @@ public partial class MainWindow : Window
             var replaced = new ImageShape
             {
                 Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = im.Transform,
-                SizeMm = im.SizeMm, Tone = im.Tone, Source = ImageSource.FromEncoded(result.ToPng()),
+                SizeMm = im.SizeMm, Tone = im.Tone, Clip = im.Clip, Source = ImageSource.FromEncoded(result.ToPng()),
             };
             _doc.Commit("Remove background", Ops.Replace(_doc.State, replaced), [im.Id]);
         });
@@ -1473,7 +1491,7 @@ public partial class MainWindow : Window
     {
         var b = _doc.State.Bounds(_doc.Selection);
         if (b.IsEmpty) return;
-        var m = MachineProfile.F2Ultra;
+        var m = Canvas.Machine;
         _doc.Commit("Centre in work area", Ops.Move(_doc.State, _doc.Selection, m.FieldW / 2 - b.Center.X, m.FieldH / 2 - b.Center.Y));
     }
 
@@ -1561,7 +1579,8 @@ public partial class MainWindow : Window
                     {
                         var tmp = Path.Combine(Path.GetTempPath(), $"pasted-{Guid.NewGuid():N}.png");
                         bmp.Save(tmp);
-                        await ImportPaths([tmp], false);
+                        // A picture: onto a picture layer, as Import picture does.
+                        await ImportPictures([tmp]);
                         return;
                     }
                 }
@@ -2144,7 +2163,7 @@ public partial class MainWindow : Window
         if (_machine.Client is not { IsConnected: true } client) { await Dialogs.Message(this, "Focus on selection", "Connect the machine first."); return; }
         if (SurfaceProbe.LoadCalibration() is not { } cal)
         {
-            await Dialogs.Message(this, "Focus on selection", "The red pointer needs calibrating once first: Laser → Work mode → Curved surface → Calibrate the pointer (on a flat board).");
+            await Dialogs.Message(this, "Focus on selection", "The red pointer needs calibrating once first: Laser → Curved surface → Calibrate the pointer (on a flat board).");
             return;
         }
         if (_machine.Distance is not { } now) { await Dialogs.Message(this, "Focus on selection", "Focus once first (auto-focus, or type the height in the machine panel): the pointer reads heights near the focus."); return; }

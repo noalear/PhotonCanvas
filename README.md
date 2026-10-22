@@ -121,7 +121,7 @@ code is its own.
    program searches for them and pairs with them. They are not included in this
    project. If xTool Studio is installed on your computer, click **Find them in my
    xTool Studio** (Settings → Connection or the welcome screen) and they are read from your own
-   copy in a few seconds and saved to `%APPDATA%\PhotonCanvas\keys.json`. You can also point
+   copy in a few seconds and saved to `keys.json` in the data folder (see [Where things are kept](#where-things-are-kept)). You can also point
    it at xTool Studio's `resources\app.asar`, or paste them in; each one is checked
    against a fingerprint. Don't have xTool Studio? Install it, run the setup once, then
    uninstall it.
@@ -129,6 +129,11 @@ code is its own.
    the machine's button to allow this computer.
 
 The ? menu at the top right → Getting started shows the short tour again.
+
+**Help guide and tutorials.** The ? menu → **Help guide** (or `F1`) explains every button,
+setting and window, with pictures; `F1` in any window opens its page. **Tutorials** walks
+you through each feature a step at a time, pointing at each control as you go. Both are the
+Markdown files in [`docs/help`](docs/help) (readable here on GitHub too).
 
 ## DepthCharge
 
@@ -143,7 +148,8 @@ are used too. DepthCharge is not part of PhotonCanvas; its models keep their own
 
 ## Where things are kept
 
-Everything lives in `%APPDATA%\PhotonCanvas`: `app.json` (settings, including the close-up
+Everything lives in a `PhotonCanvas` folder in your home folder (`%USERPROFILE%\PhotonCanvas` on
+Windows, `~/PhotonCanvas` on macOS and Linux): `app.json` (settings, including the close-up
 camera's angle and position), `camera.json` (overview camera calibration), `keys.json`
 (connection keys), `state.json` (pairing token), `materials\` (the material library: recipes,
 colour palettes, grating sets and their photos), `shapes\` (your saved shapes) and `logs\`.
@@ -176,8 +182,8 @@ tools/publish.sh osx-arm64      # or one: win-x64, win-arm64, osx-arm64, osx-x64
 
 Each build carries its own .NET runtime. The Mac build is a `PhotonCanvas.app` bundle (not
 signed: right-click → Open the first time); the Linux build is a folder with a `.desktop`
-file. On macOS and Linux the settings folder is `~/.config/PhotonCanvas` instead of
-`%APPDATA%\PhotonCanvas`. Finding the machine needs the firewall to allow the program on any
+file. On macOS and Linux the settings folder is `~/PhotonCanvas`, as on Windows it's
+`%USERPROFILE%\PhotonCanvas`. Finding the machine needs the firewall to allow the program on any
 system.
 
 ### Ground rules
@@ -186,6 +192,10 @@ system.
   for interoperability. Never copy its code into `src/` or commit anything from it.
 - Never put the connection keys in the source, tests or docs.
 - Nothing in the code may move the head or fire the laser without the user asking.
+- A new or changed feature updates the help guide and its tutorial in the same change
+  (`docs/help`, format in [`docs/help/AUTHORING.md`](docs/help/AUTHORING.md)).
+  `python tools/helpcheck.py` and the `HelpTests` tests fail when a button, layer setting or window
+  isn't covered, or a tutorial points at something that doesn't exist.
 
 To regenerate `reference/` from your own install:
 

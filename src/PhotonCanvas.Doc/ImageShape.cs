@@ -30,6 +30,17 @@ public sealed class ImageSource
     /// <exception cref="FormatException">The bytes are not a readable image.</exception>
     public static ImageSource FromEncoded(byte[] encoded) => new(encoded, RasterImage.Decode(encoded));
 
+    /// <summary>
+    /// Whether the pixel at these coordinates is mostly see-through (a removed background, a
+    /// transparent PNG): such a pixel is never engraved, whatever the tone settings (Invert included).
+    /// </summary>
+    public bool SeeThrough(double px, double py)
+    {
+        int x = (int)Math.Floor(px), y = (int)Math.Floor(py);
+        if (x < 0 || y < 0 || x >= Width || y >= Height) return true;
+        return Pixels.Rgba[(y * Width + x) * 4 + 3] < 128;
+    }
+
     /// <summary>Bilinear brightness at pixel coordinates (pixel centres at +0.5). Outside = white.</summary>
     public float SampleLuminance(double px, double py)
     {
@@ -120,7 +131,7 @@ public sealed class ImageShape : Shape
 
     /// <summary>
     /// The pixels with a brush stroke (world mm, <paramref name="widthMm"/> wide) rubbed out:
-    /// what's under it turns white, so it isn't engraved.
+    /// what's under it turns white and see-through, so it isn't engraved (not even when the picture is inverted).
     /// </summary>
     public RasterImage Erase(IReadOnlyList<Vec2> stroke, double widthMm)
     {
@@ -149,7 +160,8 @@ public sealed class ImageShape : Shape
                     double t = len2 < 1e-18 ? 0 : Math.Clamp((p - a).Dot(ab) / len2, 0, 1);
                     if (p.Dist(a + ab * t) > r) continue;
                     int k = (y * w + x) * 4;
-                    rgba[k] = rgba[k + 1] = rgba[k + 2] = rgba[k + 3] = 255;
+                    rgba[k] = rgba[k + 1] = rgba[k + 2] = 255;
+                    rgba[k + 3] = 0;
                 }
         }
         return new RasterImage(w, h, rgba);

@@ -431,7 +431,9 @@ public static class JobBuilder
                 var paths = layer.KerfMm != 0
                     ? ApplyKerf(shapes, layer, opt.Tolerance, warnings)
                     : shapes.SelectMany(sh => sh.World.Flatten(opt.Tolerance)).Where(f => f.Points.Count >= 2).ToList();
-                if (layer.RemoveOverlaps)
+                if (layer.RemoveOverlaps && layer.KerfMm != 0)
+                    warnings.Add($"Layer \"{layer.Name}\": Cut shared edges once has nothing to do with a kerf set: the kerf moves each part's outline out by half of it, so shapes side by side no longer share an edge.");
+                else if (layer.RemoveOverlaps)
                 {
                     // Shared edges cut once: the doubled stretches come out as open lines.
                     var geoms = paths.Select(f => PathGeometry.Polyline(f.Points, f.Closed)).ToList();
@@ -807,9 +809,9 @@ public static class JobBuilder
                 var local = toLocal.Apply(Pos(c, r));
                 float v;
                 if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y || !img.InClip(local)) v = 1f; // outside the picture
+                else if (img.LocalToPixel(local) is var px && img.Source.SeeThrough(px.X, px.Y)) v = 1f; // see-through: never burned, even inverted
                 else
                 {
-                    var px = img.LocalToPixel(local);
                     v = (float)tone.Apply(img.Source.SampleLuminance(px.X, px.Y));
                     if (material is not null) v = (float)material.Correct(v);
                 }
@@ -940,6 +942,7 @@ public static class JobBuilder
                 var local = toLocal.Apply(new Vec2(b.MinX + (c + 0.5) * cell, b.MinY + (r + 0.5) * cell));
                 if (local.X < 0 || local.Y < 0 || local.X > img.SizeMm.X || local.Y > img.SizeMm.Y || !img.InClip(local)) continue; // outside the picture
                 var px = img.LocalToPixel(local);
+                if (img.Source.SeeThrough(px.X, px.Y)) continue; // see-through: not carved
                 double grey = Math.Clamp(tone.Apply(img.Source.SampleLuminance(px.X, px.Y)), 0, 1);
                 double depth = negative ? grey : 1 - grey;
                 levels[r * cols + c] = (byte)Math.Clamp((int)Math.Round(depth * n), 0, n);

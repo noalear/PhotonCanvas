@@ -344,6 +344,9 @@ public sealed class MachinePanel : UserControl
     /// <summary>"Ready", "Running a job"… or "Not connected".</summary>
     public string ModeText => IsConnected ? Describe(Mode) : "Not connected";
 
+    /// <summary>The connected machine's model, short (F2 Ultra, F1 Lite…), as it reports itself; null until known.</summary>
+    public string? ModelName { get; private set; }
+
     public bool IsBusyFocusing { get; private set; }
 
     /// <summary>Move the head to a focus distance (mm). Returns an error message, or null when done.</summary>
@@ -877,6 +880,7 @@ public sealed class MachinePanel : UserControl
                 _info.Text += "\n⚠ This firmware does not list text G-code support; sending may fail.";
             // Which model it is: say so when it isn't the one chosen in Settings → Machines.
             string? code = info.Raw["deviceCode"]?.GetValue<string>();
+            ModelName = MachineSetup.ForDeviceCode(code)?.Name.Replace("xTool ", "");
             if (MachineSetup.ForDeviceCode(code) is { } model && model.Id != _settings.ActiveSetup().Id)
                 _info.Text += $"\n⚠ This is an {model.Name}, but {_settings.ActiveSetup().Name} is chosen: pick it in Settings → Machines so jobs fit its work area.";
             else if (code is not null && MachineSetup.ForDeviceCode(code) is null)
@@ -1003,6 +1007,7 @@ public sealed class MachinePanel : UserControl
         "P_SLEEP" => "Asleep",
         "P_AUTOFOCUS" => "Auto-focusing",
         "P_MEASURE" => "Measuring",
+        "P_ERROR" => "Error: check the machine",
         "" => "Unknown",
         _ => mode,
     };

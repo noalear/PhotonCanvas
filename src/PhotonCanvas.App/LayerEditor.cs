@@ -92,6 +92,7 @@ public sealed class LayerEditor : UserControl
     readonly NumericUpDown _grayMin = Number(0, 100, 1, "0.#");
     readonly ComboBox _pulse = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _freq = Number(1, 4000, 5, "0");
+    readonly Control[] _cutOnly;
     readonly Control _cutExtras, _fillExtras, _imageExtras, _grayRow, _pulseRow, _freqRow;
     readonly TextBlock _moreNothing = Hint("Nothing more for this kind of layer.");
 
@@ -132,7 +133,7 @@ public sealed class LayerEditor : UserControl
         _settings = settings;
         _pulse.ItemsSource = _machine.Mopa.Select(m => $"{m.PulseWidthNs} ns").ToList();
 
-        ToolTip.SetTip(_mode, "Cut and Score follow the outline (Score is lighter and runs first). Engrave scans back and forth to burn the inside of closed shapes. Picture engraves photos as fine dots.");
+        ToolTip.SetTip(_mode, "Cut and Score follow the outline (Score is for light lines and marks; layers run in the order of the Layers list, top first). Engrave scans back and forth to burn the inside of closed shapes. Picture engraves photos as fine dots.");
         ToolTip.SetTip(_light, "Blue: 40 W diode, for wood, leather, acrylic, paper. MOPA: the 60 W MOPA fiber laser, for metals (including colour on stainless) and some plastics.");
         var trio = Row(
             Labelled("Power %", _power, "Percent of the laser's full power."),
@@ -148,20 +149,26 @@ public sealed class LayerEditor : UserControl
         _imageModeRow = Field("Picture mode", _imageMode, tip: "Dots: every dot at full power, tone from dot spacing (proven). Greyscale: each dot's power follows the picture (not yet tested on your machine). " +
                                                               "Depth slices: the picture is a depth map (dark = deep), carved in thin slices one after another: relief on metal with the MOPA, or on wood.");
 
+        // Tabs, overcut and the leads shape how a part is cut free: only Cut layers use them.
+        _cutOnly =
+        [
+            Field("Tabs", _tabs, tip: "Small uncut bridges in each closed outline so parts stay in the sheet. 0 = none."),
+            Field("Tab width (mm)", _tabWidth),
+            Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
+            Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
+            Field("Lead-out (mm)", _leadOut, tip: "End each outline with a short exit line into the waste, so the end mark isn't on the part either."),
+            Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
+        ];
         _cutExtras = new StackPanel
         {
             Spacing = 6,
             Children =
             {
                 Field("Kerf (mm)", _kerf, tip: "Width of the cut line. Outlines move out by half of it so parts come out at their drawn size (holes stay true too). 0 = off."),
-                Field("Tabs", _tabs, tip: "Small uncut bridges in each closed outline so parts stay in the sheet. 0 = none."),
-                Field("Tab width (mm)", _tabWidth),
-                Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
-                Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
-                Field("Lead-out (mm)", _leadOut, tip: "End each outline with a short exit line into the waste, so the end mark isn't on the part either."),
+                _cutOnly[0], _cutOnly[1], _cutOnly[2], _cutOnly[3], _cutOnly[4],
                 _startNearest,
                 _removeOverlaps,
-                Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
+                _cutOnly[5],
                 Row(Labelled("Perforate: burn mm", _perf, "Perforation: burn this far, then skip the gap, along every line (fold lines, tear-off). 0 = a continuous line."),
                     Labelled("then skip mm", _perfGap, "The gap between perforation dashes.")),
                 Field("Dot mode every", _dotMode, tip: "Dot mode: a single pulse every this many mm instead of a line (stippled marks, dotted lines). The dot time is set under the picture settings' Dot time. 0 = off."),
@@ -280,7 +287,6 @@ public sealed class LayerEditor : UserControl
                 _passThrough,
                 _bidirPic,
                 _picTurnRows,
-                _dotRow,
                 _sliceExtras,
             },
         };
@@ -302,7 +308,7 @@ public sealed class LayerEditor : UserControl
                 _heatHint,
             },
         };
-        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _scatter, focusRow, _moreNothing } };
+        _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _dotRow, _spread, _scatter, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
         _more.Collapsed += (_, _) => { _settings.ShowAdvanced = false; _settings.Save(); };
@@ -515,6 +521,8 @@ public sealed class LayerEditor : UserControl
         _lpcmRow.IsVisible = anyFill || anySlices;
         _dpiRow.IsVisible = _imageModeRow.IsVisible = anyImage;
         _ditherRow.IsVisible = _dotRow.IsVisible = anyImage && !allSlices;
+        // Greyscale sets each dot's power instead of dithering: the method doesn't apply.
+        if (anyImage && ls.Where(l => l.Mode == LayerMode.Image).All(l => l.ImageMode == ImageEngraveMode.Grayscale)) _ditherRow.IsVisible = false;
         _screenRow.IsVisible = anyImage && !allSlices && ls.Any(l => l.Mode == LayerMode.Image && l.ImageMode == ImageEngraveMode.Dither && l.Dither is DitherMethod.Halftone or DitherMethod.LineScreen);
         Num(_cpi, Same(l => l.HalftoneCpi));
         Num(_screenAngle, Same(l => l.HalftoneAngleDeg));
@@ -570,6 +578,7 @@ public sealed class LayerEditor : UserControl
         _passThrough.IsVisible = anyImage && !allSlices;
         if (anyCut && ls.Any(l => l.DotModeMm > 0)) _dotRow.IsVisible = true;
         _cutExtras.IsVisible = anyCut;
+        foreach (var r in _cutOnly) r.IsVisible = ls.Any(l => l.Mode == LayerMode.Cut);
         _fillExtras.IsVisible = anyFill || anySlices;
         _fillStyleRow.IsVisible = anyFill;
         _lineRows.IsVisible = !allOffset;
@@ -616,7 +625,8 @@ public sealed class LayerEditor : UserControl
         _crosshatch.IsChecked = Same(l => l.Crosshatch);
         var im = Same(l => l.ImageMode);
         _imageMode.SelectedIndex = im is { } imv ? (int)imv : -1;
-        _grayRow.IsVisible = ls.Any(l => l.ImageMode == ImageEngraveMode.Grayscale);
+        _grayRow.IsVisible = ls.Any(l => l.ImageMode == ImageEngraveMode.Grayscale)
+            || anyImage && ls.Any(l => l.ImageMode == ImageEngraveMode.Dither && l.Dither == DitherMethod.Threshold && l.RampMm > 0);
         Num(_grayMin, Same(l => l.GrayMinPower));
         Num(_dpi, Same(l => l.Dpi));
         Num(_dotUs, Same(l => (double)l.DotUs));

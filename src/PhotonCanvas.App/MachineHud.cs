@@ -292,7 +292,7 @@ public sealed class MachineHud : UserControl
                 : ("#4FAF83", _m.ModeText);
             _dot.Background = new SolidColorBrush(Color.Parse(colour));
             if (!on) _note = null;
-            _status.Text = _note ?? (on ? $"F2 Ultra · {text}" : text);
+            _status.Text = _note ?? (on ? $"{_m.ModelName ?? _settings.ActiveSetup().Name.Replace("xTool ", "")} · {text}" : text);
             ToolTip.SetTip(_pill, (_note is { } n ? n + "\n\n" : "") +
                 (on ? "Click to disconnect, calibrate the camera or open machine settings." : "Click to connect (or for machine settings)."));
 

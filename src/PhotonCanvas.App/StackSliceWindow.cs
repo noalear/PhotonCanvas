@@ -225,6 +225,8 @@ public sealed class StackSliceWindow : Window
         root.Children.Add(buttons);
         root.Children.Add(grid);
         Content = root;
+        // Now the settings sit in their rows: hide the shaping rows (labels too) unless it's on.
+        ShowShaping();
         ShowMethod();
     }
 
@@ -467,8 +469,8 @@ public sealed class StackSliceWindow : Window
                 _summary.Text = $"{parts} sheet{(parts == 1 ? "" : "s")} of {o.ThicknessMm:0.##} mm, {stack.ModelWidthMm:0.#} × {stack.ModelDepthMm:0.#} × {stack.StackHeightMm:0.#} mm overall, " +
                                 $"slotted together at {slots} crossing{(slots == 1 ? "" : "s")} (slots {o.ThicknessMm + o.SlotFitMm:0.##} mm wide). " +
                                 (o.Method == SliceMethod.EggCrate
-                                    ? "Each slot is marked with the sheet that goes in it: X sheets slide down from the top onto the Y sheets."
-                                    : "Each slot is marked with the part that goes in it: slide the rings down over the fins from the top, smallest first" + (o.CoreMm > 0 ? $", with a {o.CoreMm:0.#} mm dowel up the middle." : ".")) +
+                                    ? "Each slot is marked with the sheet that goes in it: stand the X sheets up and slide the Y sheets down onto them from the top."
+                                    : "Each slot is marked with the part that goes in it: hold the rings at their heights and push each fin in from the side, towards the middle" + (o.CoreMm > 0 ? $", with a {o.CoreMm:0.#} mm dowel up the middle." : ".")) +
                                 (stack.LeftOut > 0 ? $" {stack.LeftOut} tiny piece{(stack.LeftOut == 1 ? " was" : "s were")} left out." : "") +
                                 (fits ? "" : $"\n⚠ The biggest sheet ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
                 _make.IsEnabled = fits && parts > 0;
@@ -507,10 +509,12 @@ public sealed class StackSliceWindow : Window
                 shaping = _etchWith.SelectedIndex >= 0 && _etchWith.SelectedIndex < _etches.Count
                     ? _etches[_etchWith.SelectedIndex].R.Settings.ApplyTo(Layer.Default(0, LayerMode.Fill))
                     : Layer.Default(0, LayerMode.Fill);
+            // The slices go on a page of their own when this one already has something on it (on a bed), then a page a bed.
+            int firstPage = _doc.State.PageIndex + (stock.Outline is null && _doc.State.Shapes.Count > 0 ? 1 : 0);
             var (s, sheets) = StackLayout.Place(_doc.State, stack, _machine, _numbers.IsChecked == true, _marks.IsChecked == true, title: _name, material: stock.Outline, shaping: shaping);
-            // The cut settings from the library (kerf included) on the cut layer.
+            // The cut settings from the library (kerf included) on the cut layer, on every page the slices went on.
             if (_cutWith.SelectedIndex > 0 && _cutWith.SelectedIndex < _cuts.Count && _cuts[_cutWith.SelectedIndex] is { } c)
-                s = Ops.UpdateLayers(s, s.Layers.Where(l => l.Name == "Slices · cut").Select(l => l.Id).ToHashSet(),
+                s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == "Slices · cut",
                     l => c.R.Settings.ApplyTo(l) with { Material = new Doc.Materials.MaterialRef(c.M.Id, c.M.Label, c.R.Id, c.R.Title) });
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +

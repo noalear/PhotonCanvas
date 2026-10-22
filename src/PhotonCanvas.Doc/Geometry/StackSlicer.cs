@@ -352,7 +352,8 @@ public static class StackSlicer
     {
         double maxX = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), maxY = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
         double maxZ = tris.Max(t => Math.Max(t.A.Z, Math.Max(t.B.Z, t.C.Z)));
-        double w = o.ThicknessMm + Math.Max(0, o.SlotFitMm);
+        // Below 0 makes the slots tighter than the material (for a cut layer's kerf to open up), but never under half of it.
+        double w = o.ThicknessMm + Math.Max(-o.ThicknessMm / 2, o.SlotFitMm);
         var up = new V3(0, 0, -1); // v runs down the part, so the model's top is at the top of the part as laid on the bed
         var sheets = new List<Sheet>();
         if (o.Method == SliceMethod.EggCrate)

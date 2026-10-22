@@ -193,8 +193,13 @@ public sealed class AppSettings
         return new();
     }
 
+    /// <summary>Set after restoring a backup: nothing is saved until the program starts again (it would overwrite what was restored).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public static bool Frozen { get; set; }
+
     public void Save()
     {
+        if (Frozen) return;
         try
         {
             Directory.CreateDirectory(Dir);

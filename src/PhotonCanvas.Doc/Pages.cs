@@ -36,6 +36,18 @@ public static class Pages
         return s with { Layers = p.Layers, Shapes = p.Shapes, Guides = p.Guides, PageName = p.Name, PageIndex = index, OtherPages = others };
     }
 
+    /// <summary>
+    /// Change the layers <paramref name="which"/> picks on pages <paramref name="from"/> to
+    /// <paramref name="from"/> + <paramref name="count"/> − 1 (each page has its own copy of its layers).
+    /// </summary>
+    public static DocState UpdateLayers(DocState s, int from, int count, Func<Layer, bool> which, Func<Layer, Layer> edit)
+    {
+        var all = All(s);
+        for (int i = Math.Max(0, from); i < Math.Min(all.Count, from + count); i++)
+            all[i] = all[i] with { Layers = [.. all[i].Layers.Select(l => which(l) ? edit(l) : l)] };
+        return Show(s, all, s.PageIndex);
+    }
+
     /// <summary>Show page <paramref name="index"/> (the one on screen is kept as it is).</summary>
     public static DocState SwitchTo(DocState s, int index) => index == s.PageIndex ? s : Show(s, All(s), index);
 

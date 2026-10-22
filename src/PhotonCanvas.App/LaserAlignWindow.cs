@@ -43,7 +43,8 @@ public sealed class LaserAlignWindow : Window
             {
                 new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "The blue laser and the MOPA (fiber) laser each burn a grid of nine small dots, the MOPA's 18 mm below the blue's, where the close-up camera sees. The camera then finds every dot: how far apart the two lasers land is kept, and MOPA work is moved to match." },
                 new TextBlock { TextWrapping = TextWrapping.Wrap, Text = known ? "The close-up camera's position is known at this focus height." : "First teach PhotonCanvas where the close-up camera looks (Camera → Close-up position), at this focus height.", Foreground = Brush(known ? "Ok" : "Warn") },
-                Hint($"Now in use: the MOPA moved {settings.MopaOffsetX:+0.00;-0.00;0} mm across, {settings.MopaOffsetY:+0.00;-0.00;0} mm down."),
+                Hint(settings.MopaOffsetX == 0 && settings.MopaOffsetY == 0 ? "Now in use: none (MOPA work isn't moved)."
+                    : $"Now in use: the MOPA lands {settings.MopaOffsetX:+0.00;-0.00;0} mm across and {settings.MopaOffsetY:+0.00;-0.00;0} mm down from the blue laser, so MOPA work is moved back by that much."),
                 add,
                 Hint("Use scrap both lasers mark (anodised aluminium, black card, coated metal, or wood). Set each layer's power so its dots come out dark, then send. When the job finishes this window opens again."),
             },

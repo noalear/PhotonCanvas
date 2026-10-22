@@ -158,8 +158,9 @@ public sealed class CropWindow : Window
             Children =
             {
                 Field("Shape", _ratio),
-                Row(Field("Left %", _l), Field("Top %", _t)),
-                Row(Field("Width %", _w), Field("Height %", _h)),
+                // Two to a row: names above their boxes (beside them they don't fit).
+                Row(Labelled("Left %", _l), Labelled("Top %", _t)),
+                Row(Labelled("Width %", _w), Labelled("Height %", _h)),
                 Hint("The cropped picture keeps its scale: it gets smaller on the work area by the part cut away."),
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { cancel, ok } },
             },

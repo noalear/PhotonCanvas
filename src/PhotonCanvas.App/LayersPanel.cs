@@ -754,7 +754,9 @@ public sealed class LayersPanel : UserControl
         if (_selected.Count >= layers.Count)
         {
             // Deleting every layer: keep the shapes on a fresh default layer instead.
-            _doc.Commit("Delete layers", Ops.DeleteLayers(_doc.State, _selected, null));
+            var fresh = Layer.Default(0);
+            _doc.Commit("Delete layers", Ops.DeleteLayers(Ops.AddLayer(_doc.State, fresh), _selected, fresh.Id));
+            Activate(fresh.Id);
             return;
         }
         int first = layers.FindIndex(l => _selected.Contains(l.Id));

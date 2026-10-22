@@ -70,6 +70,15 @@ public sealed class Docking
         Layout();
     }
 
+    /// <summary>A panel by its title, unfolded if it was folded (for the tutorials to point into); null if there's none.</summary>
+    public Control? Show(string title)
+    {
+        if (_panels.FirstOrDefault(p => string.Equals(p.Title, title, StringComparison.OrdinalIgnoreCase)) is not { } panel) return null;
+        if (Place(panel) is { Folded: true } place) Set(panel, place with { Folded = false });
+        panel.Window?.Activate();
+        return panel.Content;
+    }
+
     /// <summary>Back to where everything started.</summary>
     public void Reset()
     {

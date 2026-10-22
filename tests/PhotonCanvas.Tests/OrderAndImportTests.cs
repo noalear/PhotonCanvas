@@ -201,6 +201,7 @@ public class OrderAndImportTests
         var im = new ImageShape { Source = src, SizeMm = new Vec2(20, 10), Transform = Affine.Translate(100, 100), Clip = PathGeometry.Rect(0, 0, 10, 10) };
         var erased = im.Erase([new Vec2(105, 105)], 2);
         Assert.Equal(255, erased.Rgba[(5 * 20 + 5) * 4]);
+        Assert.Equal(0, erased.Rgba[(5 * 20 + 5) * 4 + 3]); // see-through: never burned, even inverted
         Assert.Equal(0, erased.Rgba[(5 * 20 + 15) * 4]);
         Assert.Equal(0, erased.Rgba[(1 * 20 + 1) * 4]);
         // A new picture keeps the clip where it was on the work area.

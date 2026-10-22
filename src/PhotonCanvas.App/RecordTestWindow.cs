@@ -147,6 +147,29 @@ public sealed class RecordTestWindow : Window
         if (_cells.Count == 0) return;
         var powers = _cells.Select(c => c.Power).Distinct().Order().ToList();
         var speeds = _cells.Select(c => c.Speed).Distinct().Order().ToList();
+        if (_cells.Select(c => (c.Power, c.Speed)).Distinct().Count() < _cells.Count)
+        {
+            // Squares that differ in something else (focus, line spacing…): laid out as they were burned.
+            static double Snap(double v) => Math.Round(v / 2) * 2;
+            var xs = _cells.Select(c => Snap(c.Bounds.Center.X)).Distinct().Order().ToList();
+            var ys = _cells.Select(c => Snap(c.Bounds.Center.Y)).Distinct().Order().ToList();
+            foreach (var _ in xs) _grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            _grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            foreach (var _ in ys) _grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            var note = new TextBlock { Text = "As burned (each square's settings are in its name: hover it)", Classes = { "hint" }, Margin = new(0, 0, 8, 4) };
+            Grid.SetColumnSpan(note, Math.Max(1, xs.Count));
+            _grid.Children.Add(note);
+            var shot = _photo();
+            foreach (var cell in _cells)
+            {
+                var c = CellButton(cell, shot);
+                ToolTip.SetTip(c, cell.Layer.Name);
+                Grid.SetRow(c, ys.IndexOf(Snap(cell.Bounds.Center.Y)) + 1);
+                Grid.SetColumn(c, xs.IndexOf(Snap(cell.Bounds.Center.X)));
+                _grid.Children.Add(c);
+            }
+            return;
+        }
         _grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
         foreach (var _ in powers) _grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
         _grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));

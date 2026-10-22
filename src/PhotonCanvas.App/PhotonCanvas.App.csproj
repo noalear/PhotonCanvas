@@ -20,6 +20,8 @@
     <!-- Ship the licence and notices next to the program. -->
     <None Include="..\..\LICENSE" Link="LICENSE.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Link="THIRD-PARTY-NOTICES.md" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The help guide and the tutorials (docs/help), in a help folder beside the program. -->
+    <None Include="..\..\docs\help\**\*" Exclude="..\..\docs\help\AUTHORING.md" LinkBase="help" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
