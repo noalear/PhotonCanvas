@@ -55,13 +55,14 @@ public sealed record HeatCut(List<Vec2> Points, bool Closed, int Path, int Pass,
 public sealed record HeatPlan(IReadOnlyList<HeatCut> Cuts, double PeakC, double WaitS, double OneCutC, double CellMm);
 
 /// <summary>
-/// A cut order that spreads the heat. The sheet's temperature is simulated as the job runs (a thin
-/// plate: heat from each cut spreads at the metal's diffusivity and leaves slowly into the air from
-/// both faces), and the next cut is always one where the sheet is coolest, preferring one far from
-/// the last. Every pass of every path is scheduled on its own, so repeated passes are spread by
-/// their own heat too, and long paths are cut in short pieces at different times. When even the
-/// coolest cut would warm the sheet past the limit, the job waits just long enough. Holes and
-/// insides are finished before the last pass of the outline around them, so parts stay held.
+/// A cut order that keeps thin sheet cool. The sheet's temperature is simulated as the job runs (a
+/// thin plate: heat from each cut spreads at the metal's diffusivity and leaves slowly into the air
+/// from both faces; holes already cut out no longer carry or hold heat). The work is cut from the
+/// middle outwards, while the metal round it is still whole to carry the heat away: of the cuts in
+/// the innermost band, the innermost one cool enough goes next, and when none is, the job waits
+/// just long enough. Every pass of every path is scheduled on its own, so repeated passes wait for
+/// their own heat too, and long paths are cut in short pieces at different times. Holes and insides
+/// are finished before the last pass of the outline around them, so parts stay held.
 /// </summary>
 public static class HeatOrder
 {
@@ -71,7 +72,8 @@ public static class HeatOrder
     const double AirLoss = 15e-6;
     /// <summary>No single wait longer than this (s).</summary>
     const double MaxWait = 30;
-    const int Regions = 8, Candidates = 48;
+    /// <summary>How far out from the innermost cut still to be done the next one may be taken (mm, at least a few cells).</summary>
+    const double Band = 10;
 
     /// <summary>
     /// Plan the cuts. <paramref name="paths"/>: each path's outline (for which lies inside which) and
@@ -104,87 +106,82 @@ public static class HeatOrder
         double cutS = pieces.Sum(p => p.Length) / h.SpeedMmS * passes;
         double jobS = cutS + pieces.Count * passes * (h.JumpS + h.PauseAfterS);
         double dx = Math.Pow(4 * alpha * Math.Max(jobS, 1) * box.Width * box.Height / 2e8, 0.25);
-        dx = Math.Clamp(dx, 0.5, 6);
+        // Not finer than about a millimetre in fast-spreading metals: finer cells need much shorter steps
+        // (a time step goes with the cell squared), and warping is read over a few mm anyway.
+        dx = Math.Clamp(dx, Math.Max(0.5, Math.Sqrt(alpha * 0.012)), 6);
         dx = Math.Max(dx, Math.Max(box.Width, box.Height) / 220);
         var sim = new Sheet(box, dx, h);
 
         // Each piece's heat as it's cut, spread over the cells it crosses.
         var deposits = pieces.Select(p => sim.Deposit(p.Points, h.HeatShare * h.Watts * p.Length / h.SpeedMmS)).ToList();
         var own = deposits.Select(sim.OwnRise).ToArray();
-        var centres = pieces.Select(p => Rect2.Bounds(p.Points).Center).ToArray();
+        // Middle outwards: the pieces by distance from the middle of the work.
+        var middle = box.Center;
+        var byRadius = Enumerable.Range(0, pieces.Count).OrderBy(i => Rect2.Bounds(pieces[i].Points).Center.Dist(middle)).ToArray();
+        var radius = byRadius.Select(i => Rect2.Bounds(pieces[i].Points).Center.Dist(middle)).ToArray();
+        double band = Math.Max(Band, 4 * dx);
         var nextPass = new int[pieces.Count];
         Array.Fill(nextPass, 1);
-        var regionOf = centres.Select(sim.Region).ToArray();
-        var byRegion = Enumerable.Range(0, Regions * Regions).Select(_ => new List<int>()).ToArray();
-        for (int i = 0; i < pieces.Count; i++) byRegion[regionOf[i]].Add(i);
-        var rotate = new int[byRegion.Length];
+        var unitsLeft = new int[paths.Count];
+        for (int j = 0; j < paths.Count; j++) unitsLeft[j] = piecesOf[j] * passes;
 
         bool Ready(int i) => nextPass[i] <= passes && (nextPass[i] < passes || blockers[pieces[i].Path] == 0);
 
         var cuts = new List<HeatCut>(pieces.Count * passes);
         double peak = 0, waited = 0;
-        var last = centres[0];
         bool released = false;
-        int left = pieces.Count * passes;
+        int left = pieces.Count * passes, first = 0;
         while (left > 0)
         {
-            // The coolest few parts of the sheet that have something ready to cut.
-            var means = sim.RegionMeans();
-            int best = -1;
-            double bestPred = double.PositiveInfinity;
-            var scored = new List<(int Piece, double Pred)>();
-            int regionsSeen = 0;
-            foreach (int r in Enumerable.Range(0, means.Length).OrderBy(r => means[r]))
-            {
-                var list = byRegion[r];
-                if (list.Count == 0) continue;
-                int seen = 0, start = rotate[r]++ % list.Count;
-                for (int k = 0; k < list.Count && seen < Candidates; k++)
-                {
-                    int i = list[(start + k) % list.Count];
-                    if (!released && !Ready(i)) continue;
-                    seen++;
-                    double pred = sim.LocalRise(deposits[i]) + own[i];
-                    scored.Add((i, pred));
-                    if (pred < bestPred) { bestPred = pred; best = i; }
-                }
-                if (seen > 0 && ++regionsSeen == 3) break;
-            }
-            if (best < 0)
+            while (first < byRadius.Length && nextPass[byRadius[first]] > passes) first++;
+            // The innermost cut ready to go, and the band beyond it.
+            int k0 = first;
+            while (k0 < byRadius.Length && !(released ? nextPass[byRadius[k0]] <= passes : Ready(byRadius[k0]))) k0++;
+            if (k0 == byRadius.Length)
             {
                 // Nothing ready (can't happen with nesting, but never hang): drop the inside-first rule.
                 released = true;
                 continue;
             }
-            // Among the nearly coolest, the one farthest from the last cut.
-            double slack = Math.Max(0.5, 0.1 * h.LimitC);
-            best = scored.Where(c => c.Pred <= bestPred + slack).MaxBy(c => centres[c.Piece].Dist(last)).Piece;
+            // The innermost one in the band that's cool enough; if none is, the coolest of them (and wait).
+            int best = -1, coolest = -1;
+            double coolestPred = double.PositiveInfinity;
+            for (int k = k0; k < byRadius.Length && radius[k] <= radius[k0] + band; k++)
+            {
+                int i = byRadius[k];
+                if (released ? nextPass[i] > passes : !Ready(i)) continue;
+                double pred = sim.LocalRise(deposits[i]) + sim.OwnRise(deposits[i]);
+                if (pred <= h.LimitC) { best = i; break; }
+                if (pred < coolestPred) { coolestPred = pred; coolest = i; }
+            }
+            if (best < 0) best = coolest;
 
-            // Too warm everywhere: wait for this spot to cool enough.
-            double wait = 0;
-            double pred0 = sim.LocalRise(deposits[best]) + own[best];
+            // Too warm here: wait for this spot to cool enough.
+            double wait = 0, ownBest = sim.OwnRise(deposits[best]);
+            double pred0 = sim.LocalRise(deposits[best]) + ownBest;
             if (pred0 > h.LimitC)
             {
                 double step = Math.Max(0.05, sim.Dt);
                 while (wait < MaxWait)
                 {
                     double local = sim.LocalRise(deposits[best]);
-                    if (local + own[best] <= h.LimitC || local <= 0.1 * h.LimitC) break;
+                    if (local + ownBest <= h.LimitC || local <= 0.1 * h.LimitC) break;
                     sim.Advance(step);
                     wait += step;
                 }
                 waited += wait;
             }
-            peak = Math.Max(peak, sim.LocalRise(deposits[best]) + own[best]);
+            peak = Math.Max(peak, sim.LocalRise(deposits[best]) + ownBest);
 
             var piece = pieces[best];
             cuts.Add(new(piece.Points, piece.Closed, piece.Path, nextPass[best], Math.Round(wait, 3)));
             sim.Add(deposits[best]);
             sim.Advance(piece.Length / h.SpeedMmS + h.JumpS + h.PauseAfterS);
-            last = centres[best];
             nextPass[best]++;
-            if (nextPass[best] > passes) byRegion[regionOf[best]].Remove(best);
             foreach (int c in containers[piece.Path]) blockers[c]--;
+            // Cut right round: what's inside is gone from the sheet (a hole, or a part now loose).
+            if (--unitsLeft[piece.Path] == 0 && paths[piece.Path].Outline is { Closed: true, Points.Count: >= 3 } outline)
+                sim.RemoveInside(outline.Points);
             left--;
         }
         return new(cuts, peak, waited, own.Max(), dx);
@@ -259,14 +256,17 @@ public static class HeatOrder
 
     /// <summary>
     /// The sheet's warming on a grid (°C over the start): explicit diffusion with insulated edges,
-    /// losses to the air from both faces. Readings are averaged over 3 × 3 cells: warping comes from
-    /// a patch expanding, not from the kerf's own spot.
+    /// losses to the air from both faces. Each cell keeps how much of it is still metal: holes cut
+    /// out take their share of the heat it holds and of what it passes on to its neighbours, so heat
+    /// near cut-out holes leaves more slowly. Readings are averaged over 3 × 3 cells: warping comes
+    /// from a patch expanding, not from the kerf's own spot.
     /// </summary>
     sealed class Sheet
     {
         readonly int _nx, _ny;
         readonly double _x0, _y0, _dx, _r, _decay, _cellHeat;
         double[] _t, _next;
+        readonly double[] _metal;
         double _carry;
         public double Dt { get; }
 
@@ -279,6 +279,8 @@ public static class HeatOrder
             _ny = Math.Max(3, (int)Math.Ceiling(box.Height / dx) + 1);
             _t = new double[_nx * _ny];
             _next = new double[_nx * _ny];
+            _metal = new double[_nx * _ny];
+            Array.Fill(_metal, 1.0);
             double alpha = h.Sheet.DiffusivityMm2S;
             Dt = 0.24 * dx * dx / alpha;
             _r = alpha * Dt / (dx * dx);
@@ -289,13 +291,6 @@ public static class HeatOrder
 
         int Cell(Vec2 p) =>
             Math.Clamp((int)Math.Round((p.Y - _y0) / _dx), 0, _ny - 1) * _nx + Math.Clamp((int)Math.Round((p.X - _x0) / _dx), 0, _nx - 1);
-
-        public int Region(Vec2 p)
-        {
-            int c = Cell(p);
-            int rx = Math.Min(Regions - 1, c % _nx * Regions / _nx), ry = Math.Min(Regions - 1, c / _nx * Regions / _ny);
-            return ry * Regions + rx;
-        }
 
         /// <summary>A cut's heat (J) spread along it, as the warming of each cell it crosses.</summary>
         public (int[] Cells, double[] Rise) Deposit(List<Vec2> pts, double joules)
@@ -330,37 +325,38 @@ public static class HeatOrder
             return m;
         }
 
-        /// <summary>How much a cut warms the sheet by itself.</summary>
+        /// <summary>How much a cut warms the sheet by itself (more where holes have taken metal away).</summary>
         public double OwnRise((int[] Cells, double[] Rise) d)
         {
             var map = new Dictionary<int, double>();
-            for (int k = 0; k < d.Cells.Length; k++) map[d.Cells[k]] = d.Rise[k];
+            for (int k = 0; k < d.Cells.Length; k++) map[d.Cells[k]] = d.Rise[k] / Math.Max(0.25, _metal[d.Cells[k]]);
             double m = 0;
             foreach (int c in d.Cells) m = Math.Max(m, Mean3(i => map.GetValueOrDefault(i), c));
             return m;
         }
 
+        /// <summary>A cut's heat into the sheet: less metal in a cell, the more it warms.</summary>
         public void Add((int[] Cells, double[] Rise) d)
         {
-            for (int k = 0; k < d.Cells.Length; k++) _t[d.Cells[k]] += d.Rise[k];
+            for (int k = 0; k < d.Cells.Length; k++) _t[d.Cells[k]] += d.Rise[k] / Math.Max(0.25, _metal[d.Cells[k]]);
         }
 
-        public double[] RegionMeans()
+        /// <summary>Everything inside a cut-through outline leaves the sheet (sampled 4 × 4 per cell).</summary>
+        public void RemoveInside(List<Vec2> outline)
         {
-            var sum = new double[Regions * Regions];
-            var count = new int[Regions * Regions];
-            for (int y = 0; y < _ny; y++)
-            {
-                int ry = Math.Min(Regions - 1, y * Regions / _ny);
-                for (int x = 0; x < _nx; x++)
+            var b = Rect2.Bounds(outline);
+            int x0 = Math.Max(0, (int)Math.Floor((b.MinX - _x0) / _dx)), x1 = Math.Min(_nx - 1, (int)Math.Ceiling((b.MaxX - _x0) / _dx));
+            int y0 = Math.Max(0, (int)Math.Floor((b.MinY - _y0) / _dx)), y1 = Math.Min(_ny - 1, (int)Math.Ceiling((b.MaxY - _y0) / _dx));
+            for (int y = y0; y <= y1; y++)
+                for (int x = x0; x <= x1; x++)
                 {
-                    int r = ry * Regions + Math.Min(Regions - 1, x * Regions / _nx);
-                    sum[r] += _t[y * _nx + x];
-                    count[r]++;
+                    int inside = 0;
+                    for (int j = 0; j < 4; j++)
+                        for (int i = 0; i < 4; i++)
+                            if (Geom.Inside(outline, new Vec2(_x0 + (x - 0.5 + (i + 0.5) / 4) * _dx, _y0 + (y - 0.5 + (j + 0.5) / 4) * _dx))) inside++;
+                    int c = y * _nx + x;
+                    _metal[c] = Math.Max(0, _metal[c] - inside / 16.0);
                 }
-            }
-            for (int r = 0; r < sum.Length; r++) sum[r] = count[r] > 0 ? sum[r] / count[r] : 0;
-            return sum;
         }
 
         /// <summary>Let the heat spread and leave for <paramref name="seconds"/>.</summary>
@@ -377,8 +373,13 @@ public static class HeatOrder
                     for (int x = 0; x < _nx; x++)
                     {
                         int left = x > 0 ? x - 1 : 1, right = x < _nx - 1 ? x + 1 : _nx - 2;
-                        double c = _t[row + x];
-                        _next[row + x] = (c + _r * (_t[row + left] + _t[row + right] + _t[up + x] + _t[down + x] - 4 * c)) * _decay;
+                        int i = row + x;
+                        double m = _metal[i], c = _t[i];
+                        if (m < 0.02) { _next[i] = 0; continue; }
+                        // Heat passes between neighbours through the metal both still have.
+                        double flow = Math.Min(m, _metal[row + left]) * (_t[row + left] - c) + Math.Min(m, _metal[row + right]) * (_t[row + right] - c)
+                                    + Math.Min(m, _metal[up + x]) * (_t[up + x] - c) + Math.Min(m, _metal[down + x]) * (_t[down + x] - c);
+                        _next[i] = (c + _r * flow / m) * _decay;
                     }
                 }
                 (_t, _next) = (_next, _t);

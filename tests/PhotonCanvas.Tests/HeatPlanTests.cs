@@ -31,13 +31,15 @@ public class HeatPlanTests
     }
 
     [Fact]
-    public void NextCutsGoFarFromTheLast()
+    public void FromTheMiddleOutwards()
     {
         var plan = HeatOrder.Plan(Whole(Grid()), Thin());
-        static Vec2 Centre(HeatCut c) => Rect2.Bounds(c.Points).Center;
-        double mean = Enumerable.Range(1, plan.Cuts.Count - 1).Average(i => Centre(plan.Cuts[i - 1]).Dist(Centre(plan.Cuts[i])));
-        // Least travel would hop to a neighbour 12 mm away each time; spreading the heat jumps across the sheet.
-        Assert.True(mean > 25, $"mean jump {mean:0.#} mm");
+        var middle = new Vec2(20 + 24 + 1.5, 20 + 24 + 1.5);
+        double R(HeatCut c) => Rect2.Bounds(c.Points).Center.Dist(middle);
+        // The middle square first, the outer ring last.
+        Assert.True(R(plan.Cuts[0]) < 1);
+        Assert.True(plan.Cuts.Take(9).Average(R) < plan.Cuts.TakeLast(9).Average(R));
+        Assert.True(R(plan.Cuts[^1]) > 20); // the outer ring (a cut too warm at first can come a little later than its turn)
     }
 
     [Fact]
@@ -59,8 +61,8 @@ public class HeatPlanTests
         Assert.All(plan.Cuts, c => Assert.InRange(Length(c.Points), 14, 14.4));
         double covered = plan.Cuts.Sum(c => Length(c.Points));
         Assert.InRange(covered, 100, 100.4); // a little overlap where pieces meet
-        // Not one after another along the line: the next piece starts away from where the last one ended.
-        Assert.Contains(Enumerable.Range(1, plan.Cuts.Count - 1), i => plan.Cuts[i].Points[0].Dist(plan.Cuts[i - 1].Points[^1]) > 20);
+        // The middle piece first.
+        Assert.InRange(Rect2.Bounds(plan.Cuts[0].Points).Center.X, 55, 65);
     }
 
     [Fact]
