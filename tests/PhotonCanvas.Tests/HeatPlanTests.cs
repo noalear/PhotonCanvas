@@ -107,4 +107,21 @@ public class HeatPlanTests
         var back = DocFile.Deserialize(DocFile.Serialize(s)).Layers[0];
         Assert.Equal((PathOrder.Heat, "Aluminium", 0.1, 30.0, 15.0), (back.Order, back.HeatSheet, back.HeatThicknessMm, back.HeatLimitC, back.HeatPieceMm));
     }
+
+    [Fact]
+    public void TheJobBarsPausesDontApplyItWorksOutItsOwn()
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Laser = LaserSettings.Red(60, 400, 45, 132).WithPasses(4), Order = PathOrder.Heat, HeatThicknessMm = 0.1, HeatLimitC = 20 };
+        s = s with { Layers = [cut] };
+        s = Ops.AddShapes(s, [.. Grid().Select(f => new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Polyline(f.Points, true) })]);
+        var own = JobBuilder.Build(s, new JobOptions { WholeJobPasses = true });
+        var withPauses = JobBuilder.Build(s, new JobOptions { WholeJobPasses = true, PathPauseS = 2, PassDelayS = 5 });
+        // The same cuts and the same waits: the heat's, not the job bar's.
+        Assert.Equal(own.Job.Blocks.Select(b => b.PauseAfterS), withPauses.Job.Blocks.Select(b => b.PauseAfterS));
+        Assert.Contains(own.Job.Blocks, b => b.PauseAfterS > 0); // it did need some waits
+        Assert.Equal(own.EstimateS, withPauses.EstimateS, 1e-6);
+        Assert.Contains(withPauses.Warnings, w => w.Contains("works out its own waits"));
+        Assert.DoesNotContain(withPauses.Warnings, w => w.StartsWith("Pausing"));
+    }
 }

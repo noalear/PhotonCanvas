@@ -42,8 +42,6 @@ public sealed record HeatSettings
     /// melt and metal reflects some: a rough figure, not measured on this machine.
     /// </summary>
     public double HeatShare { get; init; } = 0.3;
-    /// <summary>A fixed wait after every path (s), on top of the ones the model asks for.</summary>
-    public double PauseAfterS { get; init; }
     /// <summary>Galvo jump and laser switching between paths (s).</summary>
     public double JumpS { get; init; } = 0.002;
 }
@@ -104,7 +102,7 @@ public static class HeatOrder
         box = box.Inflate(15);
         double alpha = h.Sheet.DiffusivityMm2S;
         double cutS = pieces.Sum(p => p.Length) / h.SpeedMmS * passes;
-        double jobS = cutS + pieces.Count * passes * (h.JumpS + h.PauseAfterS);
+        double jobS = cutS + pieces.Count * passes * h.JumpS;
         double dx = Math.Pow(4 * alpha * Math.Max(jobS, 1) * box.Width * box.Height / 2e8, 0.25);
         // Not finer than about a millimetre in fast-spreading metals: finer cells need much shorter steps
         // (a time step goes with the cell squared), and warping is read over a few mm anyway.
@@ -176,7 +174,7 @@ public static class HeatOrder
             var piece = pieces[best];
             cuts.Add(new(piece.Points, piece.Closed, piece.Path, nextPass[best], Math.Round(wait, 3)));
             sim.Add(deposits[best]);
-            sim.Advance(piece.Length / h.SpeedMmS + h.JumpS + h.PauseAfterS);
+            sim.Advance(piece.Length / h.SpeedMmS + h.JumpS);
             nextPass[best]++;
             foreach (int c in containers[piece.Path]) blockers[c]--;
             // Cut right round: what's inside is gone from the sheet (a hole, or a part now loose).

@@ -192,7 +192,6 @@ public static class JobBuilder
         Watts = (layer.Laser.Light == LightSource.Red ? opt.RedWatts : opt.BlueWatts) * layer.Laser.Power / 100,
         SpeedMmS = layer.Laser.Speed,
         Passes = Math.Max(1, layer.Laser.Passes),
-        PauseAfterS = opt.PathPauseS,
     };
 
     static string Hours(double s) => s >= 3600 ? $"{(int)(s / 3600)} h {(int)(s % 3600 / 60):00} min" : s >= 60 ? $"{s / 60:0} min" : $"{s:0} s";
@@ -202,6 +201,9 @@ public static class JobBuilder
         if (VariableText.Problems(s).FirstOrDefault() is { } problem) throw new JobException(problem);
         JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
+        // The job bar's pause after each path: how many it was put after, and the time they add (heat-ordered layers have their own).
+        int fixedPauses = 0;
+        double fixedPauseS = 0;
         var leftOut = new List<string>();
         var blocks = new List<Block>();
         var steps = new List<BuiltJob.Step>();
@@ -465,7 +467,7 @@ public static class JobBuilder
                         // A wait the model asked for comes after the cut before.
                         if (cut.WaitBeforeS > 0 && blocks.Count > 0) blocks[^1] = blocks[^1] with { PauseAfterS = blocks[^1].PauseAfterS + cut.WaitBeforeS };
                         int bm = blocks.Count, sm = steps.Count;
-                        blocks.Add(new VectorBlock(pl, layer.Laser with { Passes = 1 }) { FocusOffsetMm = layer.FocusOffsetMm, PauseAfterS = opt.PathPauseS });
+                        blocks.Add(new VectorBlock(pl, layer.Laser with { Passes = 1 }) { FocusOffsetMm = layer.FocusOffsetMm });
                         steps.Add(new(layer.Id, cut.Points, cut.Closed, false));
                         Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(cut.Points));
@@ -486,6 +488,8 @@ public static class JobBuilder
                         warnings.Add($"Layer \"{layer.Name}\": one cut alone warms the sheet about +{plan.OneCutC:0} °C, more than the +{settings.LimitC:0} °C allowed, so the job waits until each spot is nearly cold. Lower the power, go faster, cut shorter pieces or allow more warming.");
                     if (drop is not null)
                         warnings.Add($"Layer \"{layer.Name}\": step-down isn't used when spreading the heat (each pass is cut on its own).");
+                    if (opt.PathPauseS > 0 || opt.WholeJobPasses && opt.PassDelayS > 0 && layer.Laser.Passes > 1)
+                        warnings.Add($"Layer \"{layer.Name}\" works out its own waits from the heat, so the job bar's pauses (after each path, between rounds) don't apply to it.");
                 }
                 else foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
                 {
@@ -534,7 +538,11 @@ public static class JobBuilder
                     }
                     // The pause comes once the whole path is done (its tabs and pieces too).
                     if (opt.PathPauseS > 0 && blocks.Count > pathFirst)
+                    {
                         blocks[^1] = blocks[^1] with { PauseAfterS = opt.PathPauseS };
+                        fixedPauses++;
+                        fixedPauseS += opt.PathPauseS * Math.Max(1, layer.Laser.Passes);
+                    }
                 }
                 extras.Warn(warnings);
             }
@@ -621,14 +629,12 @@ public static class JobBuilder
             var everywhere = new Rect2(-1e6, -1e6, 1e6, 1e6);
             blocks = [.. blocks.SelectMany(b => b.Laser.Light == LightSource.Red ? Sections.Cut(b, everywhere, -opt.MopaOffset) : [b])];
         }
-        if (opt.PathPauseS > 0)
+        if (fixedPauses > 0)
         {
             // Spelled out: a drawing of thousands of pieces turns a short pause into hours.
             var paused = blocks.Where(b => b.PauseAfterS > 0).ToList();
-            double added = paused.Sum(b => b.PauseAfterS * Math.Max(1, b.Laser.Passes));
-            if (paused.Count > 0)
-                warnings.Add($"Pausing {opt.PathPauseS:0.##} s after each of {paused.Count:N0} paths adds about {Hours(added)}." +
-                             (paused.Count(b => b is VectorBlock v && v.Path.Length < 0.5) * 2 > paused.Count && paused.Count > 1000 ? " Most are tiny pieces: if the drawing came in broken up, Outline → Tidy lines joins them into whole shapes first." : ""));
+            warnings.Add($"Pausing {opt.PathPauseS:0.##} s after each of {fixedPauses:N0} paths adds about {Hours(fixedPauseS)}." +
+                         (paused.Count(b => b is VectorBlock v && v.Path.Length < 0.5) * 2 > paused.Count && fixedPauses > 1000 ? " Most are tiny pieces: if the drawing came in broken up, Outline → Tidy lines joins them into whole shapes first." : ""));
         }
         var job = new Job(opt.Machine, blocks)
         {

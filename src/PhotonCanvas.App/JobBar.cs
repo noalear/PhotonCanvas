@@ -34,6 +34,7 @@ public sealed class JobBar : UserControl
     };
     readonly NumericUpDown _delay = Number(0, 3600, 0.5m, "0.#"), _pathPause = Number(0, (decimal)PhotonCanvas.Core.Job.MaxPathPauseS, 0.5m, "0.##");
     readonly StackPanel _delayRow;
+    readonly TextBlock _pathPauseLabel = new() { Text = "s after each path", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock _summary = new() { FontSize = 12, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
     readonly TextBlock _caption = new() { FontSize = 11.5, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
     readonly TextBlock _estimate = new() { FontSize = 22, FontWeight = FontWeight.SemiBold, HorizontalAlignment = HorizontalAlignment.Right };
@@ -174,7 +175,7 @@ public sealed class JobBar : UserControl
         ToolTip.SetTip(_pathPause, "Seconds to wait after each cut or score path, laser off, so heat can leave before the next one (thin metal, masks, anything that warps). After every pass of it, round by round or path by path. The checks say how much time it adds.");
         TextBlock Muted(string t) => new() { Text = t, FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
         _delayRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("pause"), _delay, Muted("s between rounds") } };
-        var pathRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("·"), _pathPause, Muted("s after each path") } };
+        var pathRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("·"), _pathPause, _pathPauseLabel } };
         _passMode.SelectionChanged += (_, _) => { _settings.WholeJobPasses = _passMode.SelectedIndex == 0; _settings.Save(); UpdateDelayRow(); Schedule(); };
         _delay.ValueChanged += (_, _) => { _settings.PassDelayS = (double)(_delay.Value ?? 0); _settings.Save(); Schedule(); };
         _pathPause.ValueChanged += (_, _) => { _settings.PathPauseS = (double)(_pathPause.Value ?? 0); _settings.Save(); Schedule(); };
@@ -426,6 +427,11 @@ public sealed class JobBar : UserControl
             _checks.Content = _doc.State.Shapes.Count == 0 ? ChipText("IcCheck", "Empty", "TextMuted") : ChipText("IcWarn", "Can't build", "Danger");
         }
         if (_order.IsChecked == true) _canvas.Preview = _job;
+        // Layers that spread the heat work out their own waits: the fixed pause doesn't apply to them.
+        var cutting = _doc.State.Layers.Where(l => l.Output && l.Mode is LayerMode.Cut or LayerMode.Score && _doc.State.ShapesFor(l).Any()).ToList();
+        bool allHeat = cutting.Count > 0 && cutting.All(l => l.Order == PathOrder.Heat);
+        _pathPause.IsEnabled = !allHeat;
+        _pathPauseLabel.Text = allHeat ? "s after each path (spread the heat sets its own waits)" : cutting.Any(l => l.Order == PathOrder.Heat) ? "s after each path (not on spread-the-heat layers)" : "s after each path";
         UpdateSend();
     }
 
