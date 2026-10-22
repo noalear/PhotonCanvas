@@ -134,8 +134,6 @@ public sealed record Layer
     public double CrossAngleDeg { get; init; } = 90;
     /// <summary>Fill lines: pause before each line (ms), against heat build-up. 0 = none.</summary>
     public int LineDwellMs { get; init; }
-    /// <summary>Cut and score layers: wait this long after each path, laser off (s), so heat leaves (thin metal, masks). 0 = none.</summary>
-    public double PathPauseS { get; init; }
     /// <summary>Fills and pictures: burn the lines spread apart, never one straight after its neighbour, against heat build-up.</summary>
     public bool SpreadLines { get; init; }
     /// <summary>Spread out in no set pattern (see FillBlock.Scatter): no repeating rows.</summary>

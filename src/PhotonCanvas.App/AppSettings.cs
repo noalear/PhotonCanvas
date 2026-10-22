@@ -29,6 +29,8 @@ public sealed class AppSettings
     public bool AutoConnect { get; set; } = true;
     public double PassDelayS { get; set; } = 1;
     public bool WholeJobPasses { get; set; } = true;
+    /// <summary>Wait this long after each cut or score path (s), set in the job bar. 0 = none.</summary>
+    public double PathPauseS { get; set; }
     public double SvgPxPerInch { get; set; } = 96;
     /// <summary>Clockwise display rotation for the close-up camera (measured on the user's F2 Ultra).</summary>
     public double CloseUpRotationDeg { get; set; } = -148.8;

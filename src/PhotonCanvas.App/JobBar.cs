@@ -32,7 +32,7 @@ public sealed class JobBar : UserControl
         ItemsSource = new[] { "Round by round", "Path by path" },
         MinWidth = 0, FontSize = 11.5, MinHeight = 22, Height = 24, Padding = new(8, 0),
     };
-    readonly NumericUpDown _delay = Number(0, 3600, 0.5m, "0.#");
+    readonly NumericUpDown _delay = Number(0, 3600, 0.5m, "0.#"), _pathPause = Number(0, (decimal)PhotonCanvas.Core.Job.MaxPathPauseS, 0.5m, "0.##");
     readonly StackPanel _delayRow;
     readonly TextBlock _summary = new() { FontSize = 12, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
     readonly TextBlock _caption = new() { FontSize = 11.5, Foreground = Brush("TextMuted"), TextTrimming = TextTrimming.CharacterEllipsis };
@@ -160,21 +160,29 @@ public sealed class JobBar : UserControl
         _passMode.SelectedIndex = settings.WholeJobPasses ? 0 : 1;
         ToolTip.SetTip(_passMode, "Round by round: every layer's first pass, then every layer's second pass, and so on (layers with fewer passes drop out). Path by path: each path repeats all its passes before moving on (what xTool Studio does).");
         _delay.Value = (decimal)settings.PassDelayS;
-        _delay.Width = 52;
-        _delay.ShowButtonSpinner = false;
-        _delay.HorizontalContentAlignment = HorizontalAlignment.Center;
-        _delay.MinHeight = 22;
-        _delay.Height = 24;
-        _delay.FontSize = 12;
+        _pathPause.Value = (decimal)Math.Clamp(settings.PathPauseS, 0, PhotonCanvas.Core.Job.MaxPathPauseS);
+        foreach (var n in new[] { _delay, _pathPause })
+        {
+            n.Width = 52;
+            n.ShowButtonSpinner = false;
+            n.HorizontalContentAlignment = HorizontalAlignment.Center;
+            n.MinHeight = 22;
+            n.Height = 24;
+            n.FontSize = 12;
+        }
         ToolTip.SetTip(_delay, "Seconds to wait between rounds, e.g. to let the material cool or to check progress.");
-        _delayRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { new TextBlock { Text = "pause", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center }, _delay, new TextBlock { Text = "s", FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center } } };
+        ToolTip.SetTip(_pathPause, "Seconds to wait after each cut or score path, laser off, so heat can leave before the next one (thin metal, masks, anything that warps). After every pass of it, round by round or path by path. The checks say how much time it adds.");
+        TextBlock Muted(string t) => new() { Text = t, FontSize = 12, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
+        _delayRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("pause"), _delay, Muted("s between rounds") } };
+        var pathRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Children = { Muted("·"), _pathPause, Muted("s after each path") } };
         _passMode.SelectionChanged += (_, _) => { _settings.WholeJobPasses = _passMode.SelectedIndex == 0; _settings.Save(); UpdateDelayRow(); Schedule(); };
         _delay.ValueChanged += (_, _) => { _settings.PassDelayS = (double)(_delay.Value ?? 0); _settings.Save(); Schedule(); };
+        _pathPause.ValueChanged += (_, _) => { _settings.PathPauseS = (double)(_pathPause.Value ?? 0); _settings.Save(); Schedule(); };
         ToolTip.SetTip(_estimate, "Estimated time. It ignores acceleration, so real jobs run a little longer.");
         var passes = new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 6, Margin = new(12, 0, 0, 0),
-            Children = { _passesLabel, _passMode, _delayRow },
+            Children = { _passesLabel, _passMode, _delayRow, pathRow },
         };
         var right = new StackPanel
         {
@@ -277,6 +285,7 @@ public sealed class JobBar : UserControl
     {
         WholeJobPasses = _passMode.SelectedIndex == 0,
         PassDelayS = (double)(_delay.Value ?? 0),
+        PathPauseS = (double)(_pathPause.Value ?? 0),
         Mode = WorkModes.From(_settings),
         Machine = WorkModes.Area(_settings),
         FanGear = _settings.FanGear,
@@ -774,6 +783,7 @@ public sealed class JobBar : UserControl
         sb.AppendLine(opt.WholeJobPasses
             ? $"Passes run over the whole job{(opt.PassDelayS > 0 ? $", {opt.PassDelayS:0.#} s pause between" : "")}."
             : "Each path runs all its passes before the next.");
+        if (opt.PathPauseS > 0) sb.AppendLine($"A {opt.PathPauseS:0.##} s pause after each path.");
         sb.AppendLine($"Size {job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm · about {Duration(job.EstimateS)}.");
         if (_machine.Distance is { } d) sb.AppendLine($"Machine focus distance: {d:0.0} mm. Make sure this matches your material.");
         if (VariableText.Describe(_doc.State) is { } marks) sb.AppendLine($"Fields: {marks}.");

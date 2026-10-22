@@ -17,6 +17,8 @@ public sealed record JobOptions
     /// <summary>Exhaust fan gear (1–4) and purifier speed (%) for the job: see <see cref="Job.FanGear"/>.</summary>
     public int FanGear { get; init; } = 3;
     public int PurifierSpeed { get; init; } = 50;
+    /// <summary>Wait this long after each cut or score path, every pass of it, laser off (s): heat leaves between paths (thin metal, masks). 0 = none.</summary>
+    public double PathPauseS { get; init; }
     /// <summary>Pause between whole-job passes, in seconds.</summary>
     public double PassDelayS { get; init; }
     /// <summary>Maximum deviation of the cut path from the true curve, in mm.</summary>
@@ -177,9 +179,12 @@ public static class JobBuilder
     public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible);
 
     /// <exception cref="JobException">The job cannot be made; the message says why.</exception>
+    static string Hours(double s) => s >= 3600 ? $"{(int)(s / 3600)} h {(int)(s % 3600 / 60):00} min" : s >= 60 ? $"{s / 60:0} min" : $"{s:0} s";
+
     public static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now = null)
     {
         if (VariableText.Problems(s).FirstOrDefault() is { } problem) throw new JobException(problem);
+        JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
         var leftOut = new List<string>();
         var blocks = new List<Block>();
@@ -419,8 +424,6 @@ public static class JobBuilder
                     warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
-                if (layer.PathPauseS > 0)
-                    JobException.CheckRange($"Layer \"{layer.Name}\": pause after each path", layer.PathPauseS, 0, Job.MaxPathPauseS, "s");
                 foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
                 {
                     int pathFirst = blocks.Count;
@@ -467,8 +470,8 @@ public static class JobBuilder
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
                     // The pause comes once the whole path is done (its tabs and pieces too).
-                    if (layer.PathPauseS > 0 && blocks.Count > pathFirst)
-                        blocks[^1] = blocks[^1] with { PauseAfterS = layer.PathPauseS };
+                    if (opt.PathPauseS > 0 && blocks.Count > pathFirst)
+                        blocks[^1] = blocks[^1] with { PauseAfterS = opt.PathPauseS };
                 }
                 extras.Warn(warnings);
             }
@@ -553,6 +556,15 @@ public static class JobBuilder
         {
             var everywhere = new Rect2(-1e6, -1e6, 1e6, 1e6);
             blocks = [.. blocks.SelectMany(b => b.Laser.Light == LightSource.Red ? Sections.Cut(b, everywhere, -opt.MopaOffset) : [b])];
+        }
+        if (opt.PathPauseS > 0)
+        {
+            // Spelled out: a drawing of thousands of pieces turns a short pause into hours.
+            var paused = blocks.Where(b => b.PauseAfterS > 0).ToList();
+            double added = paused.Sum(b => b.PauseAfterS * Math.Max(1, b.Laser.Passes));
+            if (paused.Count > 0)
+                warnings.Add($"Pausing {opt.PathPauseS:0.##} s after each of {paused.Count:N0} paths adds about {Hours(added)}." +
+                             (paused.Count > 2000 ? " If the drawing came in as many small pieces, Outline → Tidy lines joins them into whole shapes first." : ""));
         }
         var job = new Job(opt.Machine, blocks)
         {
