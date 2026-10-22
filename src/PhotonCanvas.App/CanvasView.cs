@@ -451,6 +451,7 @@ public sealed partial class CanvasView : Control
                 if (_tool == Tool.Wand) DrawWand(ctx);
                 if (_tool == Tool.Magnetic) DrawMagnetic(ctx);
             }
+            if (_preview is { } order) DrawOrderLegend(ctx, order);
             if (_tool == Tool.Nodes) DrawNodes(ctx);
             else DrawSelection(ctx, doc);
             DrawPointTools(ctx);
@@ -589,33 +590,124 @@ public sealed partial class CanvasView : Control
         }
     }
 
+    // ---- processing order preview ---------------------------------------------
+    /// <summary>The order gradient, first to last: blue, cyan, green, yellow, orange, red (reads on the dark canvas).</summary>
+    static readonly Color[] OrderStops = [Color.Parse("#4F8CFF"), Color.Parse("#22D3EE"), Color.Parse("#4ADE80"), Color.Parse("#FACC15"), Color.Parse("#F97316"), Color.Parse("#EF4444")];
+    /// <summary>Paths are drawn in this many colour bands (one geometry each, so big jobs stay quick).</summary>
+    const int OrderBands = 48;
+    /// <summary>Above this many cuts the travel moves aren't drawn: they'd hide the order in a web of lines.</summary>
+    const int MaxTravelSteps = 300;
+
+    static Color OrderColor(double t)
+    {
+        t = Math.Clamp(t, 0, 1) * (OrderStops.Length - 1);
+        int i = Math.Min(OrderStops.Length - 2, (int)t);
+        double f = t - i;
+        Color a = OrderStops[i], b = OrderStops[i + 1];
+        return Color.FromRgb((byte)(a.R + (b.R - a.R) * f), (byte)(a.G + (b.G - a.G) * f), (byte)(a.B + (b.B - a.B) * f));
+    }
+
+    BuiltJob? _orderFor;
+    readonly List<(Color Color, StreamGeometry Paths)> _orderBands = [];
+    StreamGeometry? _orderTravel;
+    int _orderPaths;
+
+    /// <summary>
+    /// Each path coloured by when it's first cut (later passes of the same path aren't drawn again),
+    /// grouped into colour bands; the travel moves only for small jobs.
+    /// </summary>
+    void BuildOrder(BuiltJob job)
+    {
+        _orderFor = job;
+        _orderBands.Clear();
+        var seen = new HashSet<(long, long, long, long, int)>();
+        var firsts = new List<BuiltJob.Step>();
+        foreach (var st in job.Steps)
+        {
+            if (st.Points.Count == 0) continue;
+            static long R(double v) => (long)Math.Round(v * 1000);
+            if (seen.Add((R(st.Points[0].X), R(st.Points[0].Y), R(st.Points[^1].X), R(st.Points[^1].Y), st.Points.Count))) firsts.Add(st);
+        }
+        _orderPaths = firsts.Count;
+        int n = firsts.Count;
+        for (int band = 0; band < OrderBands; band++)
+        {
+            int from = band * n / OrderBands, to = (band + 1) * n / OrderBands;
+            if (to <= from) continue;
+            var g = new StreamGeometry();
+            using (var c = g.Open())
+                for (int i = from; i < to; i++)
+                {
+                    var st = firsts[i];
+                    c.BeginFigure(P(st.Points[0]), false);
+                    for (int k = 1; k < st.Points.Count; k++) c.LineTo(P(st.Points[k]));
+                    c.EndFigure(st.Closed);
+                }
+            _orderBands.Add((OrderColor((band + 0.5) / OrderBands), g));
+        }
+        _orderTravel = null;
+        if (job.Steps.Count <= MaxTravelSteps)
+        {
+            _orderTravel = new StreamGeometry();
+            using var c = _orderTravel.Open();
+            var pos = new Vec2(0, 0);
+            foreach (var st in job.Steps.Where(x => x.Points.Count > 0))
+            {
+                c.BeginFigure(P(pos), false);
+                c.LineTo(P(st.Points[0]));
+                c.EndFigure(false);
+                pos = st.Closed ? st.Points[0] : st.Points[^1];
+            }
+        }
+    }
+
     void DrawPreview(DrawingContext ctx, BuiltJob job)
     {
         double px = 1 / _scale;
-        var travel = new Pen(new SolidColorBrush(Color.FromArgb(150, 160, 170, 185)), 0.8 * px, new DashStyle([2, 3], 0));
-        var pos = new Vec2(0, 0);
-        int n = job.Steps.Count;
-        for (int i = 0; i < n; i++)
-        {
-            var st = job.Steps[i];
-            if (st.Points.Count == 0) continue;
-            ctx.DrawLine(travel, P(pos), P(st.Points[0]));
-            // Early steps blue, late steps orange: reads the processing order at a glance.
-            double t = n <= 1 ? 0 : (double)i / (n - 1);
-            var col = Color.FromRgb((byte)(79 + t * (245 - 79)), (byte)(140 + t * (165 - 140)), (byte)(255 + t * (36 - 255)));
-            var pen = new Pen(new SolidColorBrush(col), 1.6 * px);
-            var g = new StreamGeometry();
-            using (var c = g.Open())
-            {
-                c.BeginFigure(P(st.Points[0]), false);
-                for (int k = 1; k < st.Points.Count; k++) c.LineTo(P(st.Points[k]));
-                c.EndFigure(st.Closed);
-            }
-            ctx.DrawGeometry(null, pen, g);
-            pos = st.Closed ? st.Points[0] : st.Points[^1];
-        }
+        if (!ReferenceEquals(job, _orderFor)) BuildOrder(job);
+        if (_orderTravel is not null)
+            ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, 160, 170, 185)), 0.8 * px, new DashStyle([2, 3], 0)), _orderTravel);
+        foreach (var (color, paths) in _orderBands)
+            ctx.DrawGeometry(null, new Pen(new SolidColorBrush(color), 1.6 * px), paths);
         ctx.DrawRectangle(new Pen(new SolidColorBrush(Color.FromArgb(160, 245, 165, 36)), px, new DashStyle([6, 4], 0)),
             new Rect(job.Bounds.MinX, job.Bounds.MinY, job.Bounds.Width, job.Bounds.Height));
+    }
+
+    /// <summary>The key, at the top of the work area: the gradient with its first and last ends named.</summary>
+    void DrawOrderLegend(DrawingContext ctx, BuiltJob job)
+    {
+        const double BarW = 260, BarH = 10, Pad = 10;
+        var title = Text("Processing Order Gradient", 12, Brushes.White);
+        var first = Text("First", 11, new SolidColorBrush(OrderStops[0]));
+        var last = Text("Last", 11, new SolidColorBrush(OrderStops[^1]));
+        string about = $"{_orderPaths:N0} path{(_orderPaths == 1 ? "" : "s")}" +
+                       (job.Steps.Count > _orderPaths ? $", {job.Steps.Count:N0} cuts with the passes" : "") +
+                       (_orderTravel is null ? " · travel moves hidden" : " · dashed: travel");
+        var sub = Text(about, 10.5, new SolidColorBrush(Color.FromRgb(170, 178, 190)));
+        double w = Math.Max(BarW, Math.Max(title.Width, sub.Width)) + 2 * Pad;
+        double h = Pad + title.Height + 6 + first.Height + 2 + BarH + 4 + sub.Height + Pad;
+        var vp = Viewport;
+        var box = new Rect(vp.X + (vp.Width - w) / 2, vp.Y + 10, w, h);
+        ctx.FillRectangle(new SolidColorBrush(Color.FromArgb(225, 22, 26, 33)), box, 6);
+        ctx.DrawRectangle(new Pen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)), 1), box.Deflate(0.5), 6);
+        double y = box.Y + Pad;
+        ctx.DrawText(title, new Point(box.X + (w - title.Width) / 2, y));
+        y += title.Height + 6;
+        double barX = box.X + (w - BarW) / 2;
+        ctx.DrawText(first, new Point(barX, y));
+        ctx.DrawText(last, new Point(barX + BarW - last.Width, y));
+        y += first.Height + 2;
+        var stops = new GradientStops();
+        for (int i = 0; i < OrderStops.Length; i++) stops.Add(new GradientStop(OrderStops[i], (double)i / (OrderStops.Length - 1)));
+        var gradient = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative), GradientStops = stops };
+        var bar = new Rect(barX, y, BarW, BarH);
+        ctx.FillRectangle(gradient, bar, 3);
+        // The ends marked: a tick under each.
+        var tick = new Pen(Brushes.White, 1.5);
+        ctx.DrawLine(tick, new Point(bar.Left + 1, bar.Top - 2), new Point(bar.Left + 1, bar.Bottom + 2));
+        ctx.DrawLine(tick, new Point(bar.Right - 1, bar.Top - 2), new Point(bar.Right - 1, bar.Bottom + 2));
+        y += BarH + 4;
+        ctx.DrawText(sub, new Point(box.X + (w - sub.Width) / 2, y));
     }
 
     void DrawCreatePreview(DrawingContext ctx)

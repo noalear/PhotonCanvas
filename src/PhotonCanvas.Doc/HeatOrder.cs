@@ -365,24 +365,32 @@ public static class HeatOrder
             _carry += seconds;
             int steps = (int)(_carry / Dt);
             _carry -= steps * Dt;
+            // Big sheets: the rows shared out between the processor's cores, a band each.
+            int bands = _nx * _ny >= 4096 ? Math.Min(Environment.ProcessorCount, _ny / 8) : 1;
             for (int s = 0; s < steps; s++)
             {
-                for (int y = 0; y < _ny; y++)
-                {
-                    int up = (y > 0 ? y - 1 : 1) * _nx, down = (y < _ny - 1 ? y + 1 : _ny - 2) * _nx, row = y * _nx;
-                    for (int x = 0; x < _nx; x++)
-                    {
-                        int left = x > 0 ? x - 1 : 1, right = x < _nx - 1 ? x + 1 : _nx - 2;
-                        int i = row + x;
-                        double m = _metal[i], c = _t[i];
-                        if (m < 0.02) { _next[i] = 0; continue; }
-                        // Heat passes between neighbours through the metal both still have.
-                        double flow = Math.Min(m, _metal[row + left]) * (_t[row + left] - c) + Math.Min(m, _metal[row + right]) * (_t[row + right] - c)
-                                    + Math.Min(m, _metal[up + x]) * (_t[up + x] - c) + Math.Min(m, _metal[down + x]) * (_t[down + x] - c);
-                        _next[i] = (c + _r * flow / m) * _decay;
-                    }
-                }
+                if (bands > 1) Parallel.For(0, bands, b => Rows(b * _ny / bands, (b + 1) * _ny / bands));
+                else Rows(0, _ny);
                 (_t, _next) = (_next, _t);
+            }
+        }
+
+        void Rows(int y0, int y1)
+        {
+            for (int y = y0; y < y1; y++)
+            {
+                int up = (y > 0 ? y - 1 : 1) * _nx, down = (y < _ny - 1 ? y + 1 : _ny - 2) * _nx, row = y * _nx;
+                for (int x = 0; x < _nx; x++)
+                {
+                    int left = x > 0 ? x - 1 : 1, right = x < _nx - 1 ? x + 1 : _nx - 2;
+                    int i = row + x;
+                    double m = _metal[i], c = _t[i];
+                    if (m < 0.02) { _next[i] = 0; continue; }
+                    // Heat passes between neighbours through the metal both still have.
+                    double flow = Math.Min(m, _metal[row + left]) * (_t[row + left] - c) + Math.Min(m, _metal[row + right]) * (_t[row + right] - c)
+                                + Math.Min(m, _metal[up + x]) * (_t[up + x] - c) + Math.Min(m, _metal[down + x]) * (_t[down + x] - c);
+                    _next[i] = (c + _r * flow / m) * _decay;
+                }
             }
         }
     }
