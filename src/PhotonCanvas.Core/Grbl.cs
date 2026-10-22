@@ -147,6 +147,7 @@ public static class GrblWriter
                 case DotBlock d: w.Raster(d.ForPass(pass)); break;
                 default: throw new JobException($"GRBL machines can't run this kind of work ({b.GetType().Name}).");
             }
+            if (b.PauseAfterS > 0) o.AppendLine($"M5\nG4 P{b.PauseAfterS.ToString("0.###", Inv)} ; pause after the path");
         }
         switch (job.PassMode)
         {

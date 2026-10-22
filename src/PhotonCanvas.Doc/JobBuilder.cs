@@ -419,7 +419,11 @@ public static class JobBuilder
                     warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
+                if (layer.PathPauseS > 0)
+                    JobException.CheckRange($"Layer \"{layer.Name}\": pause after each path", layer.PathPauseS, 0, Job.MaxPathPauseS, "s");
                 foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
+                {
+                    int pathFirst = blocks.Count;
                     foreach (var p in extras.Pieces(path, depth))
                     {
                         var pl = p.Closed ? Polyline.Loop(p.Points) : Polyline.Open(p.Points);
@@ -462,6 +466,10 @@ public static class JobBuilder
                         Link(bm, sm);
                         bounds = bounds.Union(Rect2.Bounds(p.Points));
                     }
+                    // The pause comes once the whole path is done (its tabs and pieces too).
+                    if (layer.PathPauseS > 0 && blocks.Count > pathFirst)
+                        blocks[^1] = blocks[^1] with { PauseAfterS = layer.PathPauseS };
+                }
                 extras.Warn(warnings);
             }
         }

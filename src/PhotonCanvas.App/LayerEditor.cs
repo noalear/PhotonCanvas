@@ -39,6 +39,8 @@ public sealed class LayerEditor : UserControl
     readonly CheckBox _bidir = new() { Content = "Burn in both directions" }, _together = new() { Content = "All shapes in one scan" };
     readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _spread = new() { Content = "Spread the lines out (less heat)" }, _scatter = new() { Content = "…in no set pattern (no rows)", Margin = new(22, 0, 0, 0) }, _deepestFirst = new() { Content = "Deepest slice first" };
     readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
+    readonly NumericUpDown _pathPause = Number(0, (decimal)Job.MaxPathPauseS, 0.5m, "0.##");
+    readonly TextBlock _pathPauseHint = Hint();
     readonly Control _crossRow, _stepRows;
     readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)" } };
     readonly CheckBox _startNearest = new() { Content = "Start outlines nearest the laser" }, _removeOverlaps = new() { Content = "Cut shared edges once" };
@@ -154,6 +156,8 @@ public sealed class LayerEditor : UserControl
                 Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
                 Field("Lead-out (mm)", _leadOut, tip: "End each outline with a short exit line into the waste, so the end mark isn't on the part either."),
+                Field("Pause after each path (s)", _pathPause, tip: "Wait this long after each path, laser off, so heat can leave before the next one: thin metal, masks, anything that warps. After every pass of it, whether passes run path by path or round by round. 0 = none."),
+                _pathPauseHint,
                 Field("Order", _order, tip: "Least travel: holes and insides first, then the nearest next. As drawn: the order you drew or imported them. Back to front: from the top of the work area down, so smoke drifts over what's finished."),
                 _startNearest,
                 _removeOverlaps,
@@ -367,6 +371,7 @@ public sealed class LayerEditor : UserControl
         _crossAngle.ValueChanged += (_, _) => EditLayers("Crosshatch angle", l => l with { CrossAngleDeg = (double)_crossAngle.Value!.Value }, _crossAngle.Value.HasValue, "crossangle");
         _dwell.ValueChanged += (_, _) => EditLayers("Pause per line", l => l with { LineDwellMs = (int)_dwell.Value!.Value }, _dwell.Value.HasValue, "dwell");
         _tabPower.ValueChanged += (_, _) => EditLayers("Tab power", l => l with { TabPowerPct = (double)_tabPower.Value!.Value }, _tabPower.Value.HasValue, "tabpower");
+        _pathPause.ValueChanged += (_, _) => EditLayers("Pause after each path", l => l with { PathPauseS = (double)_pathPause.Value!.Value }, _pathPause.Value.HasValue, "pathpause");
         _outlineAfter.IsCheckedChanged += (_, _) => EditLayers("Outline after fill", l => l with { OutlineAfter = _outlineAfter.IsChecked == true }, _outlineAfter.IsChecked.HasValue);
         _scanReverse.IsCheckedChanged += (_, _) => EditLayers("Scan direction", l => l with { ScanReverse = _scanReverse.IsChecked == true }, _scanReverse.IsChecked.HasValue);
         _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
@@ -512,6 +517,14 @@ public sealed class LayerEditor : UserControl
         Num(_leadOut, Same(l => l.LeadOutMm));
         Num(_dwell, Same(l => (double)l.LineDwellMs));
         Num(_tabPower, Same(l => l.TabPowerPct));
+        Num(_pathPause, Same(l => l.PathPauseS));
+        // What the pause adds, spelled out: thousands of paths make even a short one long.
+        {
+            int paths = ls.Where(l => l.Mode is LayerMode.Cut or LayerMode.Score).Sum(l => _doc.State.ShapesFor(l).Count());
+            double added = ls.Where(l => l.Mode is LayerMode.Cut or LayerMode.Score).Sum(l => l.PathPauseS * Math.Max(1, l.Laser.Passes) * _doc.State.ShapesFor(l).Count());
+            _pathPauseHint.Text = added > 0 ? $"About {paths:N0} paths: the pauses add about {Duration(added)}." : "";
+            _pathPauseHint.IsVisible = added > 0;
+        }
         _outlineAfter.IsChecked = Same(l => l.OutlineAfter);
         _scanReverse.IsChecked = Same(l => l.ScanReverse);
         _spread.IsChecked = Same(l => l.SpreadLines);

@@ -29,7 +29,7 @@ public sealed class LayersPanel : UserControl
     Guid? _renamingShape;
     Guid? _shapeAnchor;
     ImmutableHashSet<Guid> _lastSelection = [];
-    const int MaxShapeRows = 300;
+    const int MaxShapeRows = 60;
 
     /// <summary>The mouse is over a shape's row (null when it leaves): highlight it on the canvas.</summary>
     public event Action<Guid?>? ShapeHovered;
@@ -248,14 +248,17 @@ public sealed class LayersPanel : UserControl
         string light = l.Laser.Light == Core.LightSource.Red ? " · MOPA" : "";
         string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
         string detail = l.Mode == LayerMode.Image ? $"{l.Laser.Power:0.#}% · {l.Dpi:0} dpi{light}" : $"{l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes}{light}";
-        var info = new StackPanel
+        // The details take what the time leaves and trim there (a time in hours is wider).
+        pill.Margin = new(0, 0, 6, 0);
+        DockPanel.SetDock(pill, Dock.Left);
+        var info = new DockPanel
         {
-            Orientation = Orientation.Horizontal, Spacing = 6, VerticalAlignment = VerticalAlignment.Center,
-            Children = { pill, new TextBlock { Text = detail, FontSize = 11.5, Foreground = Res("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, MaxWidth = 170 } },
+            VerticalAlignment = VerticalAlignment.Center,
+            Children = { pill, new TextBlock { Text = detail, FontSize = 11.5, Foreground = Res("TextMuted"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis } },
         };
         var time = new TextBlock
         {
-            FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextMuted"),
+            FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Foreground = Res("TextMuted"), Margin = new(6, 0, 0, 0),
             Text = live && _times.TryGetValue(l.Id, out var t) ? UiKit.Clock(t) : "",
         };
         ToolTip.SetTip(time, "About how long this layer takes");

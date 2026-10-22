@@ -72,6 +72,9 @@ public abstract record Block(LaserSettings Laser)
 
     /// <summary>Curved surfaces: the head's height for the whole block (absolute, machine Z), set before it runs. Null = as the job goes.</summary>
     public double? HeadZ { get; init; }
+
+    /// <summary>Wait this long after each pass of the block, laser off (s): heat leaves between paths (thin metal, masks). 0 = none.</summary>
+    public double PauseAfterS { get; init; }
 }
 
 /// <summary>Part of a path at one height of the head (curved surfaces).</summary>
@@ -395,6 +398,9 @@ public sealed class Job
     /// <summary>Longest pause between passes we accept.</summary>
     public const double MaxPassDelayS = 24 * 3600;
 
+    /// <summary>Longest pause after each path we accept (s).</summary>
+    public const double MaxPathPauseS = 600;
+
     /// <summary>Longest fill overscan we accept (mm).</summary>
     public const double MaxOverscanMm = 50;
 
@@ -666,6 +672,15 @@ public sealed class Job
                             lines.AddRange(RenderBlock(d.ForPass(p), tag, 1));
                             lines.Add("");
                         }
+                    else if (b.PauseAfterS > 0)
+                        // A pause after each pass: the passes written out (the device's loop can't hold one).
+                        for (int p = 1; p <= Math.Max(1, b.Laser.Passes); p++)
+                        {
+                            lines.AddRange(RenderBlock(b, tag, 1, p));
+                            lines.Add("# pause after the path");
+                            lines.AddRange(Dwell(b.PauseAfterS));
+                            lines.Add("");
+                        }
                     else
                     {
                         lines.AddRange(RenderBlock(b, tag, b.Laser.Passes));
@@ -687,6 +702,11 @@ public sealed class Job
                     {
                         Focus(b);
                         lines.AddRange(RenderBlock(b switch { FillBlock f => f.ForPass(round), DotBlock d => d.ForPass(round), _ => b }, tag, 1, round));
+                        if (b.PauseAfterS > 0)
+                        {
+                            lines.Add("# pause after the path");
+                            lines.AddRange(Dwell(b.PauseAfterS));
+                        }
                         lines.Add("");
                     }
                 }
@@ -822,7 +842,7 @@ public sealed class Job
     public static double BlockSeconds(Block b)
     {
         const double Jump = 3000;
-        return b switch
+        return b.PauseAfterS + b switch
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
             // Each band: the head's move at 10 mm/s, then the pieces.

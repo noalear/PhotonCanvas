@@ -47,6 +47,13 @@ public sealed partial class CanvasView : Control
     Point _offset = new(60, 60);  // screen position of machine (0, 0)
     bool _fitted;
     readonly ConditionalWeakTable<PathShape, StreamGeometry> _geoms = new();
+    // Layers with many shapes (a DXF of thousands of holes) are drawn in chunks of a few hundred
+    // shapes each, not shape by shape: a chunk is rebuilt only when one of its shapes changes, and
+    // the selected shapes are drawn as one more geometry per layer when the selection changes.
+    const int BatchFrom = 300, ChunkSize = 500;
+    object? _batchedFor, _batchSelFor;
+    readonly Dictionary<Guid, List<(PathShape[] Members, StreamGeometry Geometry)>> _batches = [];
+    readonly Dictionary<Guid, List<StreamGeometry>> _batchSel = [];
     readonly ConditionalWeakTable<ImageSource, Avalonia.Media.Imaging.Bitmap> _pictures = new();
 
     enum Drag { None, Pan, Box, Move, Scale, Rotate, Create, PenHandle, NodeAnchor, NodeHandle }
@@ -322,23 +329,63 @@ public sealed partial class CanvasView : Control
     // ---- rendering -------------------------------------------------------------
     StreamGeometry GeometryFor(PathShape s) => _geoms.GetValue(s, BuildGeometry);
 
-    static StreamGeometry BuildGeometry(PathShape s)
+    static StreamGeometry BuildGeometry(PathShape s) => Combine([s]);
+
+    static StreamGeometry Combine(IEnumerable<PathShape> shapes)
     {
         var g = new StreamGeometry();
         using var c = g.Open();
         c.SetFillRule(FillRule.EvenOdd);
-        foreach (var sp in s.World.Subpaths)
-        {
-            if (sp.Segs.IsEmpty) continue;
-            c.BeginFigure(P(sp.Start), true);
-            foreach (var seg in sp.Segs)
+        foreach (var s in shapes)
+            foreach (var sp in s.World.Subpaths)
             {
-                if (seg.Kind == SegKind.Line) c.LineTo(P(seg.To));
-                else c.CubicBezierTo(P(seg.C1), P(seg.C2), P(seg.To));
+                if (sp.Segs.IsEmpty) continue;
+                c.BeginFigure(P(sp.Start), true);
+                foreach (var seg in sp.Segs)
+                {
+                    if (seg.Kind == SegKind.Line) c.LineTo(P(seg.To));
+                    else c.CubicBezierTo(P(seg.C1), P(seg.C2), P(seg.To));
+                }
+                c.EndFigure(sp.Closed);
             }
-            c.EndFigure(sp.Closed);
-        }
         return g;
+    }
+
+    /// <summary>The layers drawn in one piece (those with many shapes), each as one geometry, and their selected shapes likewise.</summary>
+    void UpdateBatches(Document doc)
+    {
+        var state = doc.State;
+        if (!ReferenceEquals(_batchedFor, state.Shapes))
+        {
+            _batchedFor = state.Shapes;
+            _batchSelFor = null;
+            var old = new Dictionary<Guid, List<(PathShape[] Members, StreamGeometry Geometry)>>(_batches);
+            _batches.Clear();
+            foreach (var g in state.Shapes.OfType<PathShape>().GroupBy(x => x.LayerId))
+            {
+                var shapes = g.ToArray();
+                if (shapes.Length < BatchFrom) continue;
+                var was = old.GetValueOrDefault(g.Key);
+                var chunks = new List<(PathShape[], StreamGeometry)>();
+                for (int i = 0, n = 0; i < shapes.Length; i += ChunkSize, n++)
+                {
+                    var members = shapes[i..Math.Min(shapes.Length, i + ChunkSize)];
+                    // Unchanged shapes are the very same objects: such a chunk keeps its geometry.
+                    if (was is not null && n < was.Count && was[n].Members.Length == members.Length && was[n].Members.AsSpan().SequenceEqual(members, ReferenceEqualityComparer.Instance))
+                        chunks.Add(was[n]);
+                    else chunks.Add((members, Combine(members)));
+                }
+                _batches[g.Key] = chunks;
+            }
+        }
+        if (!ReferenceEquals(_batchSelFor, doc.Selection))
+        {
+            _batchSelFor = doc.Selection;
+            _batchSel.Clear();
+            if (doc.Selection.Count > 0 && _batches.Count > 0)
+                foreach (var g in state.Shapes.OfType<PathShape>().Where(x => _batches.ContainsKey(x.LayerId) && doc.Selection.Contains(x.Id)).GroupBy(x => x.LayerId))
+                    _batchSel[g.Key] = [.. g.Chunk(ChunkSize).Select(Combine)];
+        }
     }
 
     static Point P(Vec2 v) => new(v.X, v.Y);
@@ -422,9 +469,37 @@ public sealed partial class CanvasView : Control
         var layers = doc.State.Layers.ToDictionary(l => l.Id);
         var selected = doc.Selection;
         var viewWorld = new Rect2(ToWorld(new Point(0, 0)).X, ToWorld(new Point(0, 0)).Y, ToWorld(new Point(Bounds.Width, Bounds.Height)).X, ToWorld(new Point(Bounds.Width, Bounds.Height)).Y);
+        UpdateBatches(doc);
+        foreach (var (id, chunks) in _batches)
+        {
+            if (!layers.TryGetValue(id, out var layer) || !layer.Visible) continue;
+            byte alpha = layer.Output ? (byte)255 : (byte)110;
+            IBrush? fill = layer.Mode == LayerMode.Fill ? new SolidColorBrush(LayerColor(layer, (byte)(layer.Output ? 60 : 25))) : null;
+            var pen = new Pen(new SolidColorBrush(LayerColor(layer, alpha)), 1.25 * px);
+            foreach (var (_, geometry) in chunks) ctx.DrawGeometry(fill, pen, geometry);
+            if (_batchSel.TryGetValue(id, out var sel))
+            {
+                // Solid, not dashed: dashing thousands of outlines takes a second a frame.
+                var thick = new Pen(new SolidColorBrush(LayerColor(layer, alpha)), 2.6 * px);
+                var core = new Pen(new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)), 0.9 * px);
+                foreach (var g in sel) { ctx.DrawGeometry(null, thick, g); ctx.DrawGeometry(null, core, g); }
+            }
+        }
         foreach (var shape in doc.State.Shapes)
         {
             if (!layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
+            if (_batches.ContainsKey(shape.LayerId))
+            {
+                // Drawn with its layer; only the one under the pointer (or highlighted) on top.
+                if ((_hover == shape.Id || _highlight == shape.Id) && shape is PathShape hp && !selected.Contains(shape.Id))
+                {
+                    var hg = GeometryFor(hp);
+                    if (_highlight == shape.Id)
+                        ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, AccentColor.R, AccentColor.G, AccentColor.B)), 5 * px), hg);
+                    ctx.DrawGeometry(null, new Pen(new SolidColorBrush(LayerColor(layer)), 2 * px), hg);
+                }
+                continue;
+            }
             if (shape is ImageShape im)
             {
                 if (im.Bounds.Intersects(viewWorld)) DrawPicture(ctx, im, layer, selected.Contains(im.Id), _hover == im.Id || _highlight == im.Id, px);
