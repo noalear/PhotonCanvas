@@ -44,6 +44,8 @@ public sealed record HeatSettings
     public double HeatShare { get; init; } = 0.3;
     /// <summary>Galvo jump and laser switching between paths (s).</summary>
     public double JumpS { get; init; } = 0.002;
+    /// <summary>Simulate on cells half the usual size: holes and the metal between them followed more closely, about 16 times the planning time.</summary>
+    public bool Fine { get; init; }
 }
 
 /// <summary>One cut of the heat order: a piece of a path, one of its passes, after a wait (s).</summary>
@@ -70,6 +72,8 @@ public static class HeatOrder
     const double AirLoss = 15e-6;
     /// <summary>No single wait longer than this (s).</summary>
     const double MaxWait = 30;
+    /// <summary>Warming is read as the average over a patch about this wide (mm): warping comes from a patch expanding, not the kerf's own spot.</summary>
+    const double ReadMm = 4.5;
     /// <summary>How far out from the innermost cut still to be done the next one may be taken (mm, at least a few cells).</summary>
     const double Band = 10;
 
@@ -77,7 +81,10 @@ public static class HeatOrder
     /// Plan the cuts. <paramref name="paths"/>: each path's outline (for which lies inside which) and
     /// the pieces it's cut as (tabs and lead-ins already applied).
     /// </summary>
-    public static HeatPlan Plan(IReadOnlyList<(FlatPath Outline, IReadOnlyList<FlatPath> Pieces)> paths, HeatSettings h)
+    /// <param name="progress">Told how far through it is (0–1), now and then: the finer model can take a minute or two.</param>
+    /// <param name="cancel">Stops planning that's no longer wanted (the design changed meanwhile).</param>
+    public static HeatPlan Plan(IReadOnlyList<(FlatPath Outline, IReadOnlyList<FlatPath> Pieces)> paths, HeatSettings h,
+        Action<double>? progress = null, CancellationToken cancel = default)
     {
         int passes = Math.Max(1, h.Passes);
         // The pieces, long ones split.
@@ -108,6 +115,7 @@ public static class HeatOrder
         // (a time step goes with the cell squared), and warping is read over a few mm anyway.
         dx = Math.Clamp(dx, Math.Max(0.5, Math.Sqrt(alpha * 0.012)), 6);
         dx = Math.Max(dx, Math.Max(box.Width, box.Height) / 220);
+        if (h.Fine) dx = Math.Max(0.25, dx / 2);
         var sim = new Sheet(box, dx, h);
 
         // Each piece's heat as it's cut, spread over the cells it crosses.
@@ -128,9 +136,14 @@ public static class HeatOrder
         var cuts = new List<HeatCut>(pieces.Count * passes);
         double peak = 0, waited = 0;
         bool released = false;
-        int left = pieces.Count * passes, first = 0;
+        int total = pieces.Count * passes, left = total, first = 0, every = Math.Max(1, total / 200);
         while (left > 0)
         {
+            if ((total - left) % every == 0)
+            {
+                cancel.ThrowIfCancellationRequested();
+                progress?.Invoke((double)(total - left) / total);
+            }
             while (first < byRadius.Length && nextPass[byRadius[first]] > passes) first++;
             // The innermost cut ready to go, and the band beyond it.
             int k0 = first;
@@ -176,6 +189,8 @@ public static class HeatOrder
             sim.Add(deposits[best]);
             sim.Advance(piece.Length / h.SpeedMmS + h.JumpS);
             nextPass[best]++;
+            // Its last pass done, the cut goes right through: no heat crosses the kerf any more.
+            if (nextPass[best] > passes) sim.Sever(piece.Closed ? [.. piece.Points, piece.Points[0]] : piece.Points);
             foreach (int c in containers[piece.Path]) blockers[c]--;
             // Cut right round: what's inside is gone from the sheet (a hole, or a part now loose).
             if (--unitsLeft[piece.Path] == 0 && paths[piece.Path].Outline is { Closed: true, Points.Count: >= 3 } outline)
@@ -254,17 +269,23 @@ public static class HeatOrder
 
     /// <summary>
     /// The sheet's warming on a grid (°C over the start): explicit diffusion with insulated edges,
-    /// losses to the air from both faces. Each cell keeps how much of it is still metal: holes cut
-    /// out take their share of the heat it holds and of what it passes on to its neighbours, so heat
-    /// near cut-out holes leaves more slowly. Readings are averaged over 3 × 3 cells: warping comes
-    /// from a patch expanding, not from the kerf's own spot.
+    /// losses to the air from both faces. Each cell keeps how much of it is still metal: holes cut out
+    /// take their share of the heat it holds, and a cell that's partly holes passes heat on less well
+    /// than its share of metal suggests (a perforated sheet: m ÷ (2 − m) of solid, Rayleigh's result for
+    /// round holes), so heat round cut-out holes squeezes through the metal between them. A cut that
+    /// has gone right through blocks heat across its kerf, closed or open. Readings are averaged over
+    /// a patch about 4.5 mm across, whatever the cell size: warping comes from a patch expanding, not
+    /// from the kerf's own spot.
     /// </summary>
-    sealed class Sheet
+    internal sealed class Sheet
     {
-        readonly int _nx, _ny;
+        readonly int _nx, _ny, _half;
         readonly double _x0, _y0, _dx, _r, _decay, _cellHeat;
         double[] _t, _next;
-        readonly double[] _metal;
+        /// <summary>Per cell: how much is still metal (0–1), and how well it conducts compared with solid sheet.</summary>
+        readonly double[] _metal, _conduct;
+        /// <summary>Per face, to the next cell across (x + 1) and down (y + 1): 1 open, 0 cut through.</summary>
+        readonly double[] _openX, _openY;
         double _carry;
         public double Dt { get; }
 
@@ -278,14 +299,26 @@ public static class HeatOrder
             _t = new double[_nx * _ny];
             _next = new double[_nx * _ny];
             _metal = new double[_nx * _ny];
-            Array.Fill(_metal, 1.0);
+            _conduct = new double[_nx * _ny];
+            _openX = new double[_nx * _ny];
+            _openY = new double[_nx * _ny];
+            foreach (var a in new[] { _metal, _conduct, _openX, _openY }) Array.Fill(a, 1.0);
             double alpha = h.Sheet.DiffusivityMm2S;
             Dt = 0.24 * dx * dx / alpha;
             _r = alpha * Dt / (dx * dx);
             double perArea = h.Sheet.HeatPerMm3K * Math.Max(0.01, h.ThicknessMm);
             _decay = Math.Exp(-2 * AirLoss / perArea * Dt);
             _cellHeat = perArea * dx * dx;
+            _half = Math.Max(1, (int)Math.Floor(ReadMm / dx / 2)); // 3 × 3 on 1.5 mm cells, 7 × 7 on 0.75 mm
         }
+
+        /// <summary>The cell size (mm).</summary>
+        public double CellMm => _dx;
+
+        /// <summary>The warming where <paramref name="p"/> is (°C).</summary>
+        public double At(Vec2 p) => _t[Cell(p)];
+        /// <summary>How much of the cell at <paramref name="p"/> is still metal, and how well it conducts next to solid sheet.</summary>
+        public (double Metal, double Conducts) MetalAt(Vec2 p) => (_metal[Cell(p)], _conduct[Cell(p)]);
 
         int Cell(Vec2 p) =>
             Math.Clamp((int)Math.Round((p.Y - _y0) / _dx), 0, _ny - 1) * _nx + Math.Clamp((int)Math.Round((p.X - _x0) / _dx), 0, _nx - 1);
@@ -305,21 +338,22 @@ public static class HeatOrder
             return (d.Keys.ToArray(), d.Values.ToArray());
         }
 
-        double Mean3(Func<int, double> at, int c)
+        /// <summary>The warming averaged over a patch about <see cref="ReadMm"/> across (the same on fine cells as on normal ones).</summary>
+        double Patch(Func<int, double> at, int c)
         {
-            int x = c % _nx, y = c / _nx;
+            int x = c % _nx, y = c / _nx, h = _half;
             double s = 0;
-            for (int j = -1; j <= 1; j++)
-                for (int i = -1; i <= 1; i++)
+            for (int j = -h; j <= h; j++)
+                for (int i = -h; i <= h; i++)
                     s += at(Math.Clamp(y + j, 0, _ny - 1) * _nx + Math.Clamp(x + i, 0, _nx - 1));
-            return s / 9;
+            return s / ((2 * h + 1) * (2 * h + 1));
         }
 
         /// <summary>How warm the sheet is where a cut goes (the warmest patch along it).</summary>
         public double LocalRise((int[] Cells, double[] Rise) d)
         {
             double m = 0;
-            foreach (int c in d.Cells) m = Math.Max(m, Mean3(i => _t[i], c));
+            foreach (int c in d.Cells) m = Math.Max(m, Patch(i => _t[i], c));
             return m;
         }
 
@@ -329,7 +363,7 @@ public static class HeatOrder
             var map = new Dictionary<int, double>();
             for (int k = 0; k < d.Cells.Length; k++) map[d.Cells[k]] = d.Rise[k] / Math.Max(0.25, _metal[d.Cells[k]]);
             double m = 0;
-            foreach (int c in d.Cells) m = Math.Max(m, Mean3(i => map.GetValueOrDefault(i), c));
+            foreach (int c in d.Cells) m = Math.Max(m, Patch(i => map.GetValueOrDefault(i), c));
             return m;
         }
 
@@ -354,7 +388,34 @@ public static class HeatOrder
                             if (Geom.Inside(outline, new Vec2(_x0 + (x - 0.5 + (i + 0.5) / 4) * _dx, _y0 + (y - 0.5 + (j + 0.5) / 4) * _dx))) inside++;
                     int c = y * _nx + x;
                     _metal[c] = Math.Max(0, _metal[c] - inside / 16.0);
+                    _conduct[c] = _metal[c] / (2 - _metal[c]);
                 }
+        }
+
+        /// <summary>A cut gone right through: the faces between cells it crosses carry no more heat.</summary>
+        public void Sever(IReadOnlyList<Vec2> cut)
+        {
+            for (int k = 1; k < cut.Count; k++)
+            {
+                Vec2 p = cut[k - 1], q = cut[k];
+                int x0 = Math.Max(0, (int)Math.Floor((Math.Min(p.X, q.X) - _x0) / _dx) - 1), x1 = Math.Min(_nx - 1, (int)Math.Ceiling((Math.Max(p.X, q.X) - _x0) / _dx) + 1);
+                int y0 = Math.Max(0, (int)Math.Floor((Math.Min(p.Y, q.Y) - _y0) / _dx) - 1), y1 = Math.Min(_ny - 1, (int)Math.Ceiling((Math.Max(p.Y, q.Y) - _y0) / _dx) + 1);
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                    {
+                        var c = new Vec2(_x0 + x * _dx, _y0 + y * _dx);
+                        if (x < _nx - 1 && Crosses(c, c + new Vec2(_dx, 0), p, q)) _openX[y * _nx + x] = 0;
+                        if (y < _ny - 1 && Crosses(c, c + new Vec2(0, _dx), p, q)) _openY[y * _nx + x] = 0;
+                    }
+            }
+        }
+
+        /// <summary>Whether segments a–b and p–q cross (touching counts).</summary>
+        static bool Crosses(Vec2 a, Vec2 b, Vec2 p, Vec2 q)
+        {
+            static double Side(Vec2 o, Vec2 u, Vec2 v) => (u.X - o.X) * (v.Y - o.Y) - (u.Y - o.Y) * (v.X - o.X);
+            double d1 = Side(p, q, a), d2 = Side(p, q, b), d3 = Side(a, b, p), d4 = Side(a, b, q);
+            return d1 * d2 <= 0 && d3 * d4 <= 0 && !(d1 == 0 && d2 == 0);
         }
 
         /// <summary>Let the heat spread and leave for <paramref name="seconds"/>.</summary>
@@ -377,16 +438,18 @@ public static class HeatOrder
         {
             for (int y = y0; y < y1; y++)
             {
-                int up = (y > 0 ? y - 1 : 1) * _nx, down = (y < _ny - 1 ? y + 1 : _ny - 2) * _nx, row = y * _nx;
+                int row = y * _nx;
                 for (int x = 0; x < _nx; x++)
                 {
-                    int left = x > 0 ? x - 1 : 1, right = x < _nx - 1 ? x + 1 : _nx - 2;
                     int i = row + x;
-                    double m = _metal[i], c = _t[i];
+                    double m = _metal[i], c = _t[i], k = _conduct[i];
                     if (m < 0.02) { _next[i] = 0; continue; }
-                    // Heat passes between neighbours through the metal both still have.
-                    double flow = Math.Min(m, _metal[row + left]) * (_t[row + left] - c) + Math.Min(m, _metal[row + right]) * (_t[row + right] - c)
-                                + Math.Min(m, _metal[up + x]) * (_t[up + x] - c) + Math.Min(m, _metal[down + x]) * (_t[down + x] - c);
+                    // Heat passes to each neighbour as well as the worse conductor of the two allows, and
+                    // not at all across a cut. At the sheet's edges the neighbour is mirrored (no heat out).
+                    int l = x > 0 ? i - 1 : i + 1, r = x < _nx - 1 ? i + 1 : i - 1, u = y > 0 ? i - _nx : i + _nx, d = y < _ny - 1 ? i + _nx : i - _nx;
+                    double ol = _openX[x > 0 ? i - 1 : i], or = _openX[x < _nx - 1 ? i : i - 1], ou = _openY[y > 0 ? i - _nx : i], od = _openY[y < _ny - 1 ? i : i - _nx];
+                    double flow = Math.Min(k, _conduct[l]) * ol * (_t[l] - c) + Math.Min(k, _conduct[r]) * or * (_t[r] - c)
+                                + Math.Min(k, _conduct[u]) * ou * (_t[u] - c) + Math.Min(k, _conduct[d]) * od * (_t[d] - c);
                     _next[i] = (c + _r * flow / m) * _decay;
                 }
             }

@@ -102,7 +102,7 @@ public class HeatPlanTests
         Assert.Equal(25 * 3, job.Job.Blocks.Count);
         Assert.All(job.Job.Blocks, b => Assert.Equal(1, b.Laser.Passes));
         Assert.Equal(1, job.LayerTimes.Single().Passes); // passes already written out
-        Assert.Contains(job.Warnings, w => w.Contains("spreads the heat") && w.Contains("°C (estimated)"));
+        Assert.Contains(job.Warnings, w => w.Contains("spreads the heat") && w.Contains("°C (estimated, on a"));
         // Saved with the layer.
         var back = DocFile.Deserialize(DocFile.Serialize(s)).Layers[0];
         Assert.Equal((PathOrder.Heat, "Aluminium", 0.1, 30.0, 15.0), (back.Order, back.HeatSheet, back.HeatThicknessMm, back.HeatLimitC, back.HeatPieceMm));
@@ -123,5 +123,61 @@ public class HeatPlanTests
         Assert.Equal(own.EstimateS, withPauses.EstimateS, 1e-6);
         Assert.Contains(withPauses.Warnings, w => w.Contains("works out its own waits"));
         Assert.DoesNotContain(withPauses.Warnings, w => w.StartsWith("Pausing"));
+    }
+
+    // The sheet itself: 60 × 40 mm of 0.1 mm aluminium on 1 mm cells, a spot of heat at (15, 20).
+    static HeatOrder.Sheet Plate() => new(new Rect2(0, 0, 60, 40), 1, Thin());
+    static void Spot(HeatOrder.Sheet sheet) => sheet.Add(sheet.Deposit([new(14.5, 20), new(15.5, 20)], 0.5));
+
+    [Fact]
+    public void ACutGoneThroughStopsHeatCrossingIt()
+    {
+        var whole = Plate();
+        var slit = Plate();
+        slit.Sever([new(30, -1), new(30, 41)]); // right across the sheet
+        foreach (var sheet in new[] { whole, slit }) { Spot(sheet); sheet.Advance(2); }
+        Assert.True(whole.At(new(45, 20)) > 0.1, $"whole sheet: {whole.At(new(45, 20)):0.###} °C across");
+        Assert.Equal(0, slit.At(new(45, 20)), 9);
+        Assert.True(slit.At(new(15, 20)) > whole.At(new(15, 20))); // kept on its own side, so it stays warmer
+    }
+
+    [Fact]
+    public void HolesSlowTheHeatMoreThanTheMetalTheyTake()
+    {
+        var solid = Plate();
+        var holed = Plate();
+        // A band of 0.5 mm holes, 1 mm apart, between the heat and where it's read: 20% of the metal there gone.
+        for (double y = 0.5; y < 40; y += 1)
+            for (double x = 25.5; x < 35; x += 1)
+                holed.RemoveInside([.. Enumerable.Range(0, 12).Select(k => new Vec2(x + 0.252 * Math.Cos(k * Math.PI / 6), y + 0.252 * Math.Sin(k * Math.PI / 6)))]);
+        foreach (var sheet in new[] { solid, holed }) { Spot(sheet); sheet.Advance(3); }
+        Assert.True(holed.At(new(45, 20)) < 0.95 * solid.At(new(45, 20)), "less gets through the band");
+        // A cell 20% holes holds 80% of the heat, but passes on only 0.8 ÷ 1.2 = 67% (Rayleigh's perforated sheet), not 80%.
+        var (metal, conducts) = holed.MetalAt(new(30, 20.5));
+        Assert.InRange(metal, 0.7, 0.85); // holes counted on a 4 × 4 grid of points per cell
+        Assert.Equal(metal / (2 - metal), conducts, 6);
+    }
+
+    [Fact]
+    public void TheFinerModelHalvesTheCells()
+    {
+        var normal = HeatOrder.Plan(Whole(Grid()), Thin());
+        var fine = HeatOrder.Plan(Whole(Grid()), Thin() with { Fine = true });
+        Assert.Equal(normal.CellMm / 2, fine.CellMm, 6);
+        Assert.Equal(normal.Cuts.Count, fine.Cuts.Count);
+    }
+
+    [Fact]
+    public void PlanningSaysHowFarItsGotAndCanBeStopped()
+    {
+        var seen = new List<double>();
+        HeatOrder.Plan(Whole(Grid()), Thin(passes: 4), seen.Add);
+        Assert.True(seen.Count > 10);
+        Assert.Equal(0, seen[0]);
+        Assert.True(seen.Zip(seen.Skip(1)).All(p => p.Second > p.First), "always forward");
+        Assert.InRange(seen[^1], 0.9, 1);
+        using var stop = new CancellationTokenSource();
+        stop.Cancel();
+        Assert.ThrowsAny<OperationCanceledException>(() => HeatOrder.Plan(Whole(Grid()), Thin(passes: 4), null, stop.Token));
     }
 }

@@ -50,6 +50,7 @@ public sealed record ProcessSettings
     public double HeatThicknessMm { get; init; } = 0.2;
     public double HeatLimitC { get; init; } = 30;
     public double HeatPieceMm { get; init; } = 15;
+    public bool HeatFine { get; init; }
     public bool StartNearest { get; init; }
     public bool RemoveOverlaps { get; init; }
     public double LeadOutMm { get; init; }
@@ -77,7 +78,7 @@ public sealed record ProcessSettings
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
         CrossAngleDeg = l.CrossAngleDeg, LineDwellMs = l.LineDwellMs, SpreadLines = l.SpreadLines, SpreadScatter = l.SpreadScatter, MaterialTone = l.MaterialTone, OutlineAfter = l.OutlineAfter, ScanReverse = l.ScanReverse, TabPowerPct = l.TabPowerPct,
-        Order = l.Order, HeatSheet = l.HeatSheet, HeatThicknessMm = l.HeatThicknessMm, HeatLimitC = l.HeatLimitC, HeatPieceMm = l.HeatPieceMm, StartNearest = l.StartNearest, RemoveOverlaps = l.RemoveOverlaps, LeadOutMm = l.LeadOutMm,
+        Order = l.Order, HeatSheet = l.HeatSheet, HeatThicknessMm = l.HeatThicknessMm, HeatLimitC = l.HeatLimitC, HeatPieceMm = l.HeatPieceMm, HeatFine = l.HeatFine, StartNearest = l.StartNearest, RemoveOverlaps = l.RemoveOverlaps, LeadOutMm = l.LeadOutMm,
     };
 
     public Layer ApplyTo(Layer l) => l with
@@ -91,7 +92,7 @@ public sealed record ProcessSettings
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,
         CrossAngleDeg = CrossAngleDeg, LineDwellMs = LineDwellMs, SpreadLines = SpreadLines, SpreadScatter = SpreadScatter, MaterialTone = MaterialTone, OutlineAfter = OutlineAfter, ScanReverse = ScanReverse, TabPowerPct = TabPowerPct,
-        Order = Order, HeatSheet = HeatSheet, HeatThicknessMm = HeatThicknessMm, HeatLimitC = HeatLimitC, HeatPieceMm = HeatPieceMm, StartNearest = StartNearest, RemoveOverlaps = RemoveOverlaps, LeadOutMm = LeadOutMm,
+        Order = Order, HeatSheet = HeatSheet, HeatThicknessMm = HeatThicknessMm, HeatLimitC = HeatLimitC, HeatPieceMm = HeatPieceMm, HeatFine = HeatFine, StartNearest = StartNearest, RemoveOverlaps = RemoveOverlaps, LeadOutMm = LeadOutMm,
     };
 
     /// <summary>Settings brought inside the machine's limits (imported files are not trusted blindly).</summary>

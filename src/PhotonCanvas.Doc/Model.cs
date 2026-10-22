@@ -158,6 +158,8 @@ public sealed record Layer
     public double HeatThicknessMm { get; init; } = 0.2;
     public double HeatLimitC { get; init; } = 30;
     public double HeatPieceMm { get; init; } = 15;
+    /// <summary>Spread-the-heat order: simulate on cells half the size (closer to small holes and the metal between them, much slower to plan).</summary>
+    public bool HeatFine { get; init; }
     /// <summary>Cut/Score: each closed outline starts at its point nearest where the laser already is (less travel).</summary>
     public bool StartNearest { get; init; }
     /// <summary>Cut/Score: lines lying on top of each other are cut once (shared edges of shapes side by side).</summary>

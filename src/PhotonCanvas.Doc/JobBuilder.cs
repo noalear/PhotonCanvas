@@ -24,6 +24,9 @@ public sealed record JobOptions
     /// <summary>Maximum deviation of the cut path from the true curve, in mm.</summary>
     public double Tolerance { get; init; } = 0.01;
     public MachineProfile Machine { get; init; } = MachineProfile.F2Ultra;
+    /// <summary>Spread-the-heat planning: how far through it is (0–1), now and then, and a way to stop it when it's no longer wanted.</summary>
+    public Action<double>? HeatProgress { get; init; }
+    public CancellationToken Cancel { get; init; }
     /// <summary>The lasers' full power (W), for the heat order: the F2 Ultra's 40 W blue diode and 60 W MOPA.</summary>
     public double BlueWatts { get; init; } = 40;
     public double RedWatts { get; init; } = 60;
@@ -189,6 +192,7 @@ public static class JobBuilder
         ThicknessMm = layer.HeatThicknessMm,
         LimitC = layer.HeatLimitC,
         PieceMm = layer.HeatPieceMm,
+        Fine = layer.HeatFine,
         Watts = (layer.Laser.Light == LightSource.Red ? opt.RedWatts : opt.BlueWatts) * layer.Laser.Power / 100,
         SpeedMmS = layer.Laser.Speed,
         Passes = Math.Max(1, layer.Laser.Passes),
@@ -456,7 +460,7 @@ public static class JobBuilder
                         gaps.AddRange(extras.TakeTabGaps());
                     }
                     var settings = HeatSettingsFor(layer, opt);
-                    var plan = HeatOrder.Plan(groups, settings);
+                    var plan = HeatOrder.Plan(groups, settings, opt.HeatProgress, opt.Cancel);
                     if (wobble && (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm))
                         throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
                     foreach (var cut in plan.Cuts)
@@ -482,7 +486,7 @@ public static class JobBuilder
                     int split = plan.Cuts.Count / Math.Max(1, settings.Passes);
                     warnings.Add($"Layer \"{layer.Name}\" spreads the heat: {groups.Count:N0} path{(groups.Count == 1 ? "" : "s")}" +
                                  (split > groups.Count ? $" in {split:N0} pieces" : "") + $", {settings.Passes} pass{(settings.Passes == 1 ? "" : "es")} each, cut where the sheet is coolest. " +
-                                 $"The {settings.Sheet.Name.ToLowerInvariant()} stays under about +{plan.PeakC:0} °C (estimated)" +
+                                 $"The {settings.Sheet.Name.ToLowerInvariant()} stays under about +{plan.PeakC:0} °C (estimated, on a {plan.CellMm:0.##} mm grid)" +
                                  (plan.WaitS > 0.05 ? $", with {Hours(plan.WaitS)} of waits to let it cool." : ", with no waits needed."));
                     if (plan.OneCutC > settings.LimitC)
                         warnings.Add($"Layer \"{layer.Name}\": one cut alone warms the sheet about +{plan.OneCutC:0} °C, more than the +{settings.LimitC:0} °C allowed, so the job waits until each spot is nearly cold. Lower the power, go faster, cut shorter pieces or allow more warming.");

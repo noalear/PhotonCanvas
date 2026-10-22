@@ -44,6 +44,7 @@ public sealed class LayerEditor : UserControl
     readonly ComboBox _heatSheet = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SheetMetal.All.Select(m => m.Name).ToList() };
     readonly NumericUpDown _heatThick = Number(0.01m, 10, 0.05m, "0.###"), _heatLimit = Number(1, 500, 5, "0"), _heatPiece = Number(0, 500, 5, "0.#");
     readonly TextBlock _heatHint = Hint();
+    readonly CheckBox _heatFine = new() { Content = "Finer heat model (much slower to plan)" };
     readonly Control _orderRow, _heatRows;
     readonly CheckBox _startNearest = new() { Content = "Start outlines nearest the laser" }, _removeOverlaps = new() { Content = "Cut shared edges once" };
     readonly NumericUpDown _leadOut = Number(0, 10, 0.5m, "0.##");
@@ -297,6 +298,7 @@ public sealed class LayerEditor : UserControl
                     Labelled("Thickness mm", _heatThick, "Thinner sheet warms more from the same cut.")),
                 Row(Labelled("Keep under +°C", _heatLimit, "How much warmer than at the start any patch of the sheet (a few mm across) may get. Lower = flatter, with more waiting. An estimate: tune it by how flat your parts come out."),
                     Labelled("Pieces of mm", _heatPiece, "Paths longer than this are cut in pieces of about this length, at different times, so a long line never takes all its heat at once. 0 = whole paths.")),
+                _heatFine,
                 _heatHint,
             },
         };
@@ -382,6 +384,8 @@ public sealed class LayerEditor : UserControl
         _heatThick.ValueChanged += (_, _) => EditLayers("Sheet thickness", l => l with { HeatThicknessMm = (double)_heatThick.Value!.Value }, _heatThick.Value.HasValue, "heatthick");
         _heatLimit.ValueChanged += (_, _) => EditLayers("Keep under", l => l with { HeatLimitC = (double)_heatLimit.Value!.Value }, _heatLimit.Value.HasValue, "heatlimit");
         _heatPiece.ValueChanged += (_, _) => EditLayers("Piece length", l => l with { HeatPieceMm = (double)_heatPiece.Value!.Value }, _heatPiece.Value.HasValue, "heatpiece");
+        ToolTip.SetTip(_heatFine, "Work the heat out on cells half the size: small holes and the thin metal between them are followed more closely, so waits round dense hole patterns come out truer. Planning takes about 16 times as long: a minute or two on a big job with thousands of holes, after every change.");
+        _heatFine.IsCheckedChanged += (_, _) => EditLayers(_heatFine.IsChecked == true ? "Finer heat model" : "Normal heat model", l => l with { HeatFine = _heatFine.IsChecked == true }, _heatFine.IsChecked.HasValue);
         _startNearest.IsCheckedChanged += (_, _) => EditLayers("Start nearest", l => l with { StartNearest = _startNearest.IsChecked == true }, _startNearest.IsChecked.HasValue);
         _removeOverlaps.IsCheckedChanged += (_, _) => EditLayers("Cut shared edges once", l => l with { RemoveOverlaps = _removeOverlaps.IsChecked == true }, _removeOverlaps.IsChecked.HasValue);
         _leadOut.ValueChanged += (_, _) => EditLayers("Lead-out", l => l with { LeadOutMm = (double)_leadOut.Value!.Value }, _leadOut.Value.HasValue, "leadout");
@@ -540,6 +544,7 @@ public sealed class LayerEditor : UserControl
             Num(_heatThick, Same(l => l.HeatThicknessMm));
             Num(_heatLimit, Same(l => l.HeatLimitC));
             Num(_heatPiece, Same(l => l.HeatPieceMm));
+            _heatFine.IsChecked = Same(l => l.HeatFine);
             _heatHint.Text = "Holes and insides are finished before the last pass of the outline around them. The job's checks say how warm the sheet gets and how much waiting it adds (estimates: the share of the laser's power that stays in the sheet isn't measured).";
         }
         _startNearest.IsChecked = Same(l => l.StartNearest);

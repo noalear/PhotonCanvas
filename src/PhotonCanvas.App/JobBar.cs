@@ -44,6 +44,12 @@ public sealed class JobBar : UserControl
     readonly ToggleButton _order = new() { Classes = { "chip" } };
     readonly Button _send = new() { Classes = { "primary" }, Width = 140, Height = 48, Padding = new(12, 0), CornerRadius = new(8), VerticalContentAlignment = VerticalAlignment.Center };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 4, Margin = new(0, 3, 0, 0) };
+    // Working out a heat order (the finer model takes a while): how far it's got, so it doesn't look stuck.
+    readonly ProgressBar _planBar = new() { Minimum = 0, Maximum = 1, MinWidth = 40, MaxWidth = 200, Height = 6, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new(8, 0, 6, 0) };
+    readonly TextBlock _planText = new() { FontSize = 11.5, Foreground = Brush("TextMuted"), VerticalAlignment = VerticalAlignment.Center };
+    readonly Grid _planRow = new() { ColumnDefinitions = new("Auto,*"), IsVisible = false };
+    CancellationTokenSource? _buildCancel;
+    readonly System.Diagnostics.Stopwatch _buildClock = new();
     string _sendState = "";
     string? _hoverText;
 
@@ -219,7 +225,10 @@ public sealed class JobBar : UserControl
         DockPanel.SetDock(chips, Dock.Right);
         foot.Children.Add(chips);
         _caption.VerticalAlignment = VerticalAlignment.Center;
-        foot.Children.Add(new Panel { Children = { _caption, _progress } });
+        _planRow.Children.Add(_planText);
+        Grid.SetColumn(_planBar, 1);
+        _planRow.Children.Add(_planBar);
+        foot.Children.Add(new Panel { Children = { _caption, _progress, _planRow } });
         var middle = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center, Children = { head, _timeline, foot } };
 
         var grid = new Grid { ColumnDefinitions = new("Auto,Auto,*,Auto"), ColumnSpacing = 12, Margin = new(10, 8) };
@@ -385,17 +394,38 @@ public sealed class JobBar : UserControl
     {
         int v = ++_version;
         var state = _doc.State;
-        var opt = Options;
+        // A build still working out a heat order for an older design: stop it.
+        _buildCancel?.Cancel();
+        var cts = _buildCancel = new CancellationTokenSource();
+        _buildClock.Restart();
+        var opt = Options with
+        {
+            Cancel = cts.Token,
+            HeatProgress = f => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (v == _version) ShowPlanning(f); }),
+        };
         BuiltJob? job = null;
         string? error = null;
         try { job = await Task.Run(() => JobBuilder.Build(state, opt)); }
         catch (JobException e) { error = e.Message; }
+        catch (OperationCanceledException) { return; }
         if (v != _version) return;
+        ShowPlanning(null);
         _job = job;
         _error = error;
         Show();
         JobBuilt?.Invoke(job);
         if (_machine.IsFraming) _ = UpdateFrame();
+    }
+
+    /// <summary>The heat order's progress under the timeline (after a moment, so quick builds don't flash it); null hides it.</summary>
+    void ShowPlanning(double? done)
+    {
+        bool show = done is not null && _buildClock.ElapsedMilliseconds > 400;
+        _planRow.IsVisible = show;
+        _caption.IsVisible = !show;
+        if (done is not { } f) return;
+        _planBar.Value = f;
+        _planText.Text = $"Working out the heat order… {f:P0}";
     }
 
     void ShowTimeline() => _timeline.Show(_job, _doc.State, _doc.ActiveLayer, _error);
@@ -431,7 +461,10 @@ public sealed class JobBar : UserControl
         var cutting = _doc.State.Layers.Where(l => l.Output && l.Mode is LayerMode.Cut or LayerMode.Score && _doc.State.ShapesFor(l).Any()).ToList();
         bool allHeat = cutting.Count > 0 && cutting.All(l => l.Order == PathOrder.Heat);
         _pathPause.IsEnabled = !allHeat;
-        _pathPauseLabel.Text = allHeat ? "s after each path (spread the heat sets its own waits)" : cutting.Any(l => l.Order == PathOrder.Heat) ? "s after each path (not on spread-the-heat layers)" : "s after each path";
+        bool someHeat = cutting.Any(l => l.Order == PathOrder.Heat);
+        _pathPauseLabel.Text = allHeat ? "s · by heat order" : someHeat ? "s after each path*" : "s after each path";
+        ToolTip.SetTip(_pathPauseLabel, allHeat ? "Every cutting layer spreads the heat, so the waits after each path come from the heat model, not from this setting."
+            : someHeat ? "*Not on layers that spread the heat: they work out their own waits." : null);
         UpdateSend();
     }
 
