@@ -39,6 +39,8 @@ public enum PathOrder
     AsDrawn,
     /// <summary>From the back of the work area to the front, so smoke drifts over what's done, not what's still to cut (insides still first).</summary>
     BackToFront,
+    /// <summary>Thin sheet metal: the sheet's heat simulated, each pass of each path cut where it's coolest, long paths in pieces, waits only when needed (see <see cref="HeatOrder"/>).</summary>
+    Heat,
 }
 
 /// <summary>How a Fill layer covers the inside of its shapes.</summary>
@@ -151,6 +153,11 @@ public sealed record Layer
     public double TabPowerPct { get; init; }
     /// <summary>Cut/Score: the order the paths run in.</summary>
     public PathOrder Order { get; init; }
+    /// <summary>Spread-the-heat order: the sheet (a <see cref="SheetMetal"/> name), its thickness (mm), the warming to stay under (°C) and the longest piece a path is cut in (mm, 0 = whole).</summary>
+    public string HeatSheet { get; init; } = "Aluminium";
+    public double HeatThicknessMm { get; init; } = 0.2;
+    public double HeatLimitC { get; init; } = 30;
+    public double HeatPieceMm { get; init; } = 15;
     /// <summary>Cut/Score: each closed outline starts at its point nearest where the laser already is (less travel).</summary>
     public bool StartNearest { get; init; }
     /// <summary>Cut/Score: lines lying on top of each other are cut once (shared edges of shapes side by side).</summary>

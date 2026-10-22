@@ -24,6 +24,9 @@ public sealed record JobOptions
     /// <summary>Maximum deviation of the cut path from the true curve, in mm.</summary>
     public double Tolerance { get; init; } = 0.01;
     public MachineProfile Machine { get; init; } = MachineProfile.F2Ultra;
+    /// <summary>The lasers' full power (W), for the heat order: the F2 Ultra's 40 W blue diode and 60 W MOPA.</summary>
+    public double BlueWatts { get; init; } = 40;
+    public double RedWatts { get; init; } = 60;
     /// <summary>Flat bed, rotary or conveyor (for the rotary, the origin is set from the design).</summary>
     public WorkMode Mode { get; init; } = new WorkMode.Flat();
     /// <summary>Mark only this section of a design bigger than the work area, moved into it.</summary>
@@ -179,6 +182,19 @@ public static class JobBuilder
     public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible);
 
     /// <exception cref="JobException">The job cannot be made; the message says why.</exception>
+    /// <summary>What the heat order needs from a layer: its sheet, and the laser as it will cut.</summary>
+    public static HeatSettings HeatSettingsFor(Layer layer, JobOptions opt) => new()
+    {
+        Sheet = SheetMetal.Find(layer.HeatSheet),
+        ThicknessMm = layer.HeatThicknessMm,
+        LimitC = layer.HeatLimitC,
+        PieceMm = layer.HeatPieceMm,
+        Watts = (layer.Laser.Light == LightSource.Red ? opt.RedWatts : opt.BlueWatts) * layer.Laser.Power / 100,
+        SpeedMmS = layer.Laser.Speed,
+        Passes = Math.Max(1, layer.Laser.Passes),
+        PauseAfterS = opt.PathPauseS,
+    };
+
     static string Hours(double s) => s >= 3600 ? $"{(int)(s / 3600)} h {(int)(s % 3600 / 60):00} min" : s >= 60 ? $"{s / 60:0} min" : $"{s:0} s";
 
     public static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now = null)
@@ -424,7 +440,54 @@ public static class JobBuilder
                     warnings.Add($"Layer \"{layer.Name}\": wobble only works with the MOPA laser, so it's ignored on the blue diode.");
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
-                foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
+                bool heat = layer.Order == PathOrder.Heat && layer.DotModeMm <= 0 && layer.PerforateMm <= 0;
+                if (layer.Order == PathOrder.Heat && !heat)
+                    warnings.Add($"Layer \"{layer.Name}\": dot mode and perforation keep the usual order; spreading the heat is for whole cuts.");
+                if (heat)
+                {
+                    // Every pass of every path (long ones in pieces) placed where the sheet is coolest.
+                    var groups = new List<(FlatPath Outline, IReadOnlyList<FlatPath> Pieces)>();
+                    var gaps = new List<List<Vec2>>();
+                    foreach (var (path, depth) in Order(paths, ref pos, PathOrder.Optimised, layer.StartNearest, startPoints))
+                    {
+                        groups.Add((path, extras.Pieces(path, depth).ToList()));
+                        gaps.AddRange(extras.TakeTabGaps());
+                    }
+                    var settings = HeatSettingsFor(layer, opt);
+                    var plan = HeatOrder.Plan(groups, settings);
+                    if (wobble && (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm))
+                        throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
+                    foreach (var cut in plan.Cuts)
+                    {
+                        var pl = cut.Closed ? Polyline.Loop(cut.Points) : Polyline.Open(cut.Points);
+                        if (!pl.HasExtent) continue;
+                        if (wobble) pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
+                        // A wait the model asked for comes after the cut before.
+                        if (cut.WaitBeforeS > 0 && blocks.Count > 0) blocks[^1] = blocks[^1] with { PauseAfterS = blocks[^1].PauseAfterS + cut.WaitBeforeS };
+                        int bm = blocks.Count, sm = steps.Count;
+                        blocks.Add(new VectorBlock(pl, layer.Laser with { Passes = 1 }) { FocusOffsetMm = layer.FocusOffsetMm, PauseAfterS = opt.PathPauseS });
+                        steps.Add(new(layer.Id, cut.Points, cut.Closed, false));
+                        Link(bm, sm);
+                        bounds = bounds.Union(Rect2.Bounds(cut.Points));
+                    }
+                    foreach (var gap in gaps)
+                    {
+                        int bm = blocks.Count, sm = steps.Count;
+                        blocks.Add(new VectorBlock(Polyline.Open(gap), layer.Laser with { Power = Math.Min(layer.Laser.Power, layer.TabPowerPct) }) { FocusOffsetMm = layer.FocusOffsetMm });
+                        steps.Add(new(layer.Id, gap, false, false));
+                        Link(bm, sm);
+                    }
+                    int split = plan.Cuts.Count / Math.Max(1, settings.Passes);
+                    warnings.Add($"Layer \"{layer.Name}\" spreads the heat: {groups.Count:N0} path{(groups.Count == 1 ? "" : "s")}" +
+                                 (split > groups.Count ? $" in {split:N0} pieces" : "") + $", {settings.Passes} pass{(settings.Passes == 1 ? "" : "es")} each, cut where the sheet is coolest. " +
+                                 $"The {settings.Sheet.Name.ToLowerInvariant()} stays under about +{plan.PeakC:0} °C (estimated)" +
+                                 (plan.WaitS > 0.05 ? $", with {Hours(plan.WaitS)} of waits to let it cool." : ", with no waits needed."));
+                    if (plan.OneCutC > settings.LimitC)
+                        warnings.Add($"Layer \"{layer.Name}\": one cut alone warms the sheet about +{plan.OneCutC:0} °C, more than the +{settings.LimitC:0} °C allowed, so the job waits until each spot is nearly cold. Lower the power, go faster, cut shorter pieces or allow more warming.");
+                    if (drop is not null)
+                        warnings.Add($"Layer \"{layer.Name}\": step-down isn't used when spreading the heat (each pass is cut on its own).");
+                }
+                else foreach (var (path, depth) in Order(paths, ref pos, layer.Order, layer.StartNearest, startPoints))
                 {
                     int pathFirst = blocks.Count;
                     foreach (var p in extras.Pieces(path, depth))
@@ -507,7 +570,8 @@ public static class JobBuilder
         {
             var (layer, start) = starts[i];
             int end = i + 1 < starts.Count ? starts[i + 1].Start : blocks.Count;
-            if (end > start) times.Add(new(layer.Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, layer.Laser.Passes)));
+            // Passes written out one block each (heat order, step-down) count once.
+            if (end > start) times.Add(new(layer.Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, blocks.Skip(start).Take(end - start).Max(b => b.Laser.Passes))));
         }
 
         if (blocks.Count == 0)
@@ -564,7 +628,7 @@ public static class JobBuilder
             double added = paused.Sum(b => b.PauseAfterS * Math.Max(1, b.Laser.Passes));
             if (paused.Count > 0)
                 warnings.Add($"Pausing {opt.PathPauseS:0.##} s after each of {paused.Count:N0} paths adds about {Hours(added)}." +
-                             (paused.Count > 2000 ? " If the drawing came in as many small pieces, Outline → Tidy lines joins them into whole shapes first." : ""));
+                             (paused.Count(b => b is VectorBlock v && v.Path.Length < 0.5) * 2 > paused.Count && paused.Count > 1000 ? " Most are tiny pieces: if the drawing came in broken up, Outline → Tidy lines joins them into whole shapes first." : ""));
         }
         var job = new Job(opt.Machine, blocks)
         {

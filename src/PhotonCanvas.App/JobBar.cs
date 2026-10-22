@@ -286,6 +286,9 @@ public sealed class JobBar : UserControl
         WholeJobPasses = _passMode.SelectedIndex == 0,
         PassDelayS = (double)(_delay.Value ?? 0),
         PathPauseS = (double)(_pathPause.Value ?? 0),
+        // GRBL machines: their one laser's power (the F2 Ultra's 40 W blue and 60 W MOPA are the defaults).
+        BlueWatts = _settings.ActiveSetup() is { Kind: MachineKind.Grbl } g1 ? g1.PowerW : 40,
+        RedWatts = _settings.ActiveSetup() is { Kind: MachineKind.Grbl } g2 ? g2.PowerW : 60,
         Mode = WorkModes.From(_settings),
         Machine = WorkModes.Area(_settings),
         FanGear = _settings.FanGear,

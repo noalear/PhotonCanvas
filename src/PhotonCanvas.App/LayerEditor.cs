@@ -40,7 +40,11 @@ public sealed class LayerEditor : UserControl
     readonly CheckBox _outlineAfter = new() { Content = "Trace the outline after filling" }, _scanReverse = new() { Content = "Scan from the other side" }, _spread = new() { Content = "Spread the lines out (less heat)" }, _scatter = new() { Content = "…in no set pattern (no rows)", Margin = new(22, 0, 0, 0) }, _deepestFirst = new() { Content = "Deepest slice first" };
     readonly NumericUpDown _crossAngle = Number(-180, 180, 15, "0.#"), _dwell = Number(0, 60000, 50, "0"), _tabPower = Number(0, 100, 1, "0.#");
     readonly Control _crossRow, _stepRows;
-    readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)" } };
+    readonly ComboBox _order = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Least travel (insides first)", "As drawn", "Back to front (away from smoke)", "Spread the heat" } };
+    readonly ComboBox _heatSheet = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SheetMetal.All.Select(m => m.Name).ToList() };
+    readonly NumericUpDown _heatThick = Number(0.01m, 10, 0.05m, "0.###"), _heatLimit = Number(1, 500, 5, "0"), _heatPiece = Number(0, 500, 5, "0.#");
+    readonly TextBlock _heatHint = Hint();
+    readonly Control _orderRow, _heatRows;
     readonly CheckBox _startNearest = new() { Content = "Start outlines nearest the laser" }, _removeOverlaps = new() { Content = "Cut shared edges once" };
     readonly NumericUpDown _leadOut = Number(0, 10, 0.5m, "0.##");
     readonly NumericUpDown _perf = Num(0, 100, 0.5m, "0.##"), _perfGap = Num(0.05m, 100, 0.5m, "0.##"), _dotMode = Number(0, 50, 0.1m, "0.###");
@@ -154,7 +158,6 @@ public sealed class LayerEditor : UserControl
                 Field("Tab power %", _tabPower, tip: "Cut the tabs at this power instead of leaving them: thin bridges that snap out cleanly. 0 = tabs left uncut."),
                 Field("Overcut (mm)", _overcut, tip: "Keep cutting this far past the start so the outline closes cleanly. Ignored when tabs are on."),
                 Field("Lead-out (mm)", _leadOut, tip: "End each outline with a short exit line into the waste, so the end mark isn't on the part either."),
-                Field("Order", _order, tip: "Least travel: holes and insides first, then the nearest next. As drawn: the order you drew or imported them. Back to front: from the top of the work area down, so smoke drifts over what's finished."),
                 _startNearest,
                 _removeOverlaps,
                 Field("Lead-in (mm)", _leadIn, tip: "Start each outline with a short entry line in the waste, so the start mark isn't on the part."),
@@ -283,6 +286,20 @@ public sealed class LayerEditor : UserControl
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
         _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
+        _orderRow = Field("Order", _order, tip: "Least travel: holes and insides first, then the nearest next. As drawn: the order you drew or imported them. Back to front: from the top of the work area down, so smoke drifts over what's finished. " +
+                                                 "Spread the heat: for thin sheet metal that warps. The sheet's warming is worked out as the job runs and every pass of every path is cut where it's coolest, far from the last cut; long paths are cut in short pieces at different times; the job waits only when the whole sheet is too warm.");
+        _heatRows = new StackPanel
+        {
+            Spacing = 6,
+            Children =
+            {
+                Row(Labelled("Sheet", _heatSheet, "The metal: how fast heat spreads through it and how much it takes to warm it."),
+                    Labelled("Thickness mm", _heatThick, "Thinner sheet warms more from the same cut.")),
+                Row(Labelled("Keep under +°C", _heatLimit, "How much warmer than at the start any patch of the sheet (a few mm across) may get. Lower = flatter, with more waiting. An estimate: tune it by how flat your parts come out."),
+                    Labelled("Pieces of mm", _heatPiece, "Paths longer than this are cut in pieces of about this length, at different times, so a long line never takes all its heat at once. 0 = whole paths.")),
+                _heatHint,
+            },
+        };
         _more.Content = new StackPanel { Spacing = 6, Children = { _cutExtras, _fillExtras, _stepRows, _imageExtras, _spread, _scatter, _pulseRow, _freqRow, focusRow, _moreNothing } };
         _more.IsExpanded = _settings.ShowAdvanced;
         _more.Expanded += (_, _) => { _settings.ShowAdvanced = true; _settings.Save(); };
@@ -318,6 +335,8 @@ public sealed class LayerEditor : UserControl
                 _light,
                 trio,
                 _passHint,
+                _orderRow,
+                _heatRows,
                 _lpcmRow, _dpiRow, _imageModeRow, _ditherRow, _screenRow,
                 Field("Material", _material),
                 _reflective,
@@ -359,6 +378,10 @@ public sealed class LayerEditor : UserControl
         }, _imageMode.SelectedIndex >= 0);
         _fillStyle.Changed += i => EditLayers("Fill style", l => l with { FillStyle = (FillStyle)i }, true);
         _order.SelectionChanged += (_, _) => EditLayers("Path order", l => l with { Order = (PathOrder)Math.Max(0, _order.SelectedIndex) }, _order.SelectedIndex >= 0);
+        _heatSheet.SelectionChanged += (_, _) => EditLayers("Sheet metal", l => l with { HeatSheet = SheetMetal.All[Math.Max(0, _heatSheet.SelectedIndex)].Name }, _heatSheet.SelectedIndex >= 0);
+        _heatThick.ValueChanged += (_, _) => EditLayers("Sheet thickness", l => l with { HeatThicknessMm = (double)_heatThick.Value!.Value }, _heatThick.Value.HasValue, "heatthick");
+        _heatLimit.ValueChanged += (_, _) => EditLayers("Keep under", l => l with { HeatLimitC = (double)_heatLimit.Value!.Value }, _heatLimit.Value.HasValue, "heatlimit");
+        _heatPiece.ValueChanged += (_, _) => EditLayers("Piece length", l => l with { HeatPieceMm = (double)_heatPiece.Value!.Value }, _heatPiece.Value.HasValue, "heatpiece");
         _startNearest.IsCheckedChanged += (_, _) => EditLayers("Start nearest", l => l with { StartNearest = _startNearest.IsChecked == true }, _startNearest.IsChecked.HasValue);
         _removeOverlaps.IsCheckedChanged += (_, _) => EditLayers("Cut shared edges once", l => l with { RemoveOverlaps = _removeOverlaps.IsChecked == true }, _removeOverlaps.IsChecked.HasValue);
         _leadOut.ValueChanged += (_, _) => EditLayers("Lead-out", l => l with { LeadOutMm = (double)_leadOut.Value!.Value }, _leadOut.Value.HasValue, "leadout");
@@ -507,6 +530,18 @@ public sealed class LayerEditor : UserControl
         _stepRows.IsVisible = anyCut || anyFill;
         Num(_crossAngle, Same(l => l.CrossAngleDeg));
         _order.SelectedIndex = Same(l => l.Order) is { } od ? (int)od : -1;
+        _orderRow.IsVisible = anyCut;
+        bool heat = anyCut && ls.Any(l => l.Order == PathOrder.Heat);
+        _heatRows.IsVisible = heat;
+        if (heat)
+        {
+            var first = ls.First(l => l.Order == PathOrder.Heat);
+            _heatSheet.SelectedIndex = ls.Where(l => l.Order == PathOrder.Heat).Select(l => l.HeatSheet).Distinct().Count() == 1 ? SheetMetal.All.ToList().FindIndex(m => m.Name == SheetMetal.Find(first.HeatSheet).Name) : -1;
+            Num(_heatThick, Same(l => l.HeatThicknessMm));
+            Num(_heatLimit, Same(l => l.HeatLimitC));
+            Num(_heatPiece, Same(l => l.HeatPieceMm));
+            _heatHint.Text = "Holes and insides are finished before the last pass of the outline around them. The job's checks say how warm the sheet gets and how much waiting it adds (estimates: the share of the laser's power that stays in the sheet isn't measured).";
+        }
         _startNearest.IsChecked = Same(l => l.StartNearest);
         _removeOverlaps.IsChecked = Same(l => l.RemoveOverlaps);
         Num(_leadOut, Same(l => l.LeadOutMm));
@@ -594,6 +629,7 @@ public sealed class LayerEditor : UserControl
         // Plain-language hints with the exact values sent.
         int passes = Same(l => l.Laser.Passes) ?? 2;
         _passHint.Text = passes <= 1 ? ""
+            : ls.All(l => l.Order == PathOrder.Heat && l.Mode is LayerMode.Cut or LayerMode.Score) ? "Each pass of each path is placed on its own, where the sheet is coolest (spread the heat), not round by round."
             : _settings.WholeJobPasses ? "Passes run over the whole job, one round at a time (set in the job bar)."
             : "Each path repeats all its passes before the next one.";
         _passHint.IsVisible = _passHint.Text.Length > 0;
