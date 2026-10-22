@@ -252,7 +252,8 @@ switch: they show on the work area the order the job runs in.
   they'd hide the order.
 - A dashed orange rectangle shows the job's outer edges.
 - The key at the top, **Processing Order Gradient**, has **First** and **Last** at its ends and
-  says how many paths there are, how many cuts with the passes, and whether travel is shown.
+  says how many paths there are (and, with **Spread the heat**, how many pieces they were cut
+  into), how many cuts with the passes, and whether travel is shown.
 
 It follows the job as it's rebuilt. Use it to check holes are cut before their outlines, and to
 see what a layer's **Order** setting does.
@@ -321,6 +322,8 @@ The cameras are dark while a job runs, because the machine turns its lights off.
 ran, the design, how many layers, its size, how long it took, and whether it **finished** or was
 **stopped**. The top line adds them up: how many jobs, and how much marking time in all (finished
 jobs only). A job that was cancelled before it started isn't listed.
+
+![Job history: three jobs, one stopped early](images/window-job-history.png)
 
 ## Preview run
 <!-- windows: RunPreviewWindow -->

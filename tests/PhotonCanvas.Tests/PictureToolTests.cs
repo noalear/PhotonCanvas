@@ -32,6 +32,10 @@ public class PictureToolTests
         Assert.Equal("Cyan", plates[0].Ink);
         Assert.Equal(0, plates[0].Plate.Rgba[0]);     // full cyan ink
         Assert.Equal(255, plates[1].Plate.Rgba[0]);   // no magenta
+        // Split as the tone settings show it: white inverted is black, all black ink.
+        var inverted = PictureTools.CmykSplit(Solid(4, 4, 255, 255, 255), new ToneAdjust(Invert: true));
+        Assert.Equal(0, inverted[3].Plate.Rgba[0]);
+        Assert.Equal(255, inverted[0].Plate.Rgba[0]);
         foreach (var f in Enum.GetValues<PictureFilter>()) Assert.Equal(800, PictureTools.Apply(red, f, 0.5).Rgba.Length);
         Assert.Equal(red.Width, PictureTools.ShadeRelief(red, 2, 0.1).Width);
     }

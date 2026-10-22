@@ -8,6 +8,8 @@ when to use it.
 
 ## How to use this guide
 
+![The guide: contents on the left, the page on the right](images/help-guide-page.png)
+
 - **The contents** on the left lists every page. The arrow beside a page opens its sections.
 - **Search** (the box above the contents, or `Ctrl+F`) finds every section that mentions all the
   words you type. Matching tutorials are listed first.
@@ -17,12 +19,16 @@ when to use it.
 - **F1** in any window of the program opens this guide at the page explaining that window.
   In the main window it opens this page.
 
+![Searching for "kerf": tutorials first, then every section that mentions it](images/help-guide-search.png)
+
 <!-- windows: HelpWindow -->
 
 ## Tutorials
 
 The tutorials teach one feature at a time by doing it. Open them with the **▶ Tutorials** button at
 the top of this guide, or **Help → Tutorials** (the **?** at the top right of the program).
+
+![The Tutorials window: every tutorial by topic, with Start and Read](images/tutorials-window.png)
 
 - They're listed by topic, each with a line saying what it teaches and how many steps it has.
   Type in the box at the top to find one.
@@ -32,6 +38,9 @@ the top of this guide, or **Help → Tutorials** (the **?** at the top right of 
   closed section expands by themselves so you can see it.
 - Some steps wait for you: when you've done what they ask (opened a window, drawn a shape, chosen a
   tool), the card says **✓ Done!** and moves on by itself. You can always press **Next** instead.
+
+![A tutorial running: the card at the side, the setting it's about ringed in blue](images/tutorial-running.png)
+
 - **Back** goes to the step before. Drag the card by its title bar to move it out of the way.
   **✕** or `Esc` stops the tutorial. Nothing is changed that you don't do yourself.
 - The page that explains a feature fully lists its tutorials at the end, under **Try it**.

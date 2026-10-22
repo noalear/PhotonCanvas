@@ -299,6 +299,8 @@ right on the first job.
 | **Colours** | **Dark** (the default), **Light** | The program's colours. Takes effect the next time the program starts. |
 | **Lengths in** | **Millimetres** (the default), **Inches** | Rulers, the cursor position, sizes on the work area, measuring, and a selection's position and size. Layer settings (speed, line spacing, kerf…) stay in millimetres. |
 
+![Settings, Appearance page](images/window-settings--appearance.png)
+
 ### Updates
 
 Which version this is (e.g. *This is PhotonCanvas 1.0.0 (win-x64).*) and:
@@ -307,6 +309,8 @@ Which version this is (e.g. *This is PhotonCanvas 1.0.0 (win-x64).*) and:
   the latest version and tells you when there's a newer one. Nothing about you or your designs is
   sent (like any web request, it shows GitHub your internet address). Quiet when offline.
 - **Check now** asks straight away and says what it found.
+
+![Settings, Updates page](images/window-settings--updates.png)
 
 When there's a newer version, **A new version is out** shows what's new, with **Download** (the
 file for this computer, or **Open the download page**), **Skip this version** (not offered at
@@ -450,6 +454,8 @@ Neither the alarm messages nor carrying on after a power cut have been tried on 
 The console sends G-code and M-code lines straight to the machine, and keeps snippets as macros.
 It's for advanced use and testing: commands run at once, outside any job, and can move the head and
 fire the laser. Not yet tried on the machine.
+
+![The G-code console, not connected: the warning, the command line and the macros](images/window-console.png)
 
 Open it with **Console** on the **Laser** tab (in the **Machine** group), or
 **Settings → Tools → G-code console…**. The console is there while **G-code console** is ticked in

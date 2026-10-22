@@ -25,6 +25,8 @@ waits when there's nowhere cool enough to go.
 2. In **Layer settings**, set **Order** to **Spread the heat**.
 3. Set **Sheet** and **Thickness mm** to your metal, and leave the rest as they are for a first try.
 
+![A MOPA cut layer with Order set to Spread the heat, and its own settings under it](images/layer-settings-heat.png)
+
 Its settings appear under **Order**:
 
 | Setting | Range | Start | What it does |
@@ -143,7 +145,8 @@ As the job goes on, the model follows what's been cut:
 - With **Round by round** passes, the whole layer, every pass of it, runs in the first round (its
   passes are already spread out in its own order).
 - The job's time includes the waits. The job summary counts paths, and the cuts with all their
-  passes and pieces: "… paths (… cuts with the passes)".
+  passes and pieces: "… paths (… cuts with the passes)". The order key adds the pieces: "41
+  paths in 156 pieces, 624 cuts with the passes".
 
 ## The checks
 
@@ -167,13 +170,15 @@ thousands of holes). When it takes more than a moment, the job bar shows "Workin
 order… 40%" with a progress bar under the timeline. It starts again whenever the design or a
 setting changes; the plan for the older design is dropped.
 
+![The job bar while the heat order is worked out (here with the finer model)](images/job-bar-heat-planning.png)
+
 ## Seeing the order
 
 Turn on **Order** in the job bar to see it on the work area: every piece is coloured by when it is
 first cut, from blue (first) to red (last). Above 300 cuts the travel moves aren't drawn. See
 [Running a job](running-jobs.md).
 
-![The order preview: paths coloured from first (blue) to last (red), with the key at the top](images/processing-order.png)
+![A plate with 40 holes in the Spread the heat order: the middle is cut first (blue), the outline last (red)](images/processing-order-heat.png)
 
 ## Tuning it
 

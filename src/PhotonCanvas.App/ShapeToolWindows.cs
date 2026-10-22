@@ -296,6 +296,24 @@ public sealed class CirclesWindow : Window
             _sizes.Children.Add(b);
         }
         _info.Text = _circles.Count == 0 ? "There are no circles in the design (on unlocked, visible layers)." : $"{_circles.Count} circles. Click a size to select those, or set a range.";
+        // The range: both boxes full width so their numbers show, and what Select will pick spelled out.
+        var range = new Grid { ColumnDefinitions = new("*,Auto,*"), ColumnSpacing = 8 };
+        var to = new TextBlock { Text = "to", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
+        Grid.SetColumn(to, 1);
+        Grid.SetColumn(_max, 2);
+        range.Children.Add(_min);
+        range.Children.Add(to);
+        range.Children.Add(_max);
+        var picks = Hint();
+        void Picks()
+        {
+            int n = InRange((double)(_min.Value ?? 0), (double)(_max.Value ?? 0)).Count();
+            picks.Text = $"Select picks {n} circle{(n == 1 ? "" : "s")} from Ø {_min.Value ?? 0:0.###} to {_max.Value ?? 0:0.###} mm.";
+            select.IsEnabled = n > 0;
+        }
+        _min.ValueChanged += (_, _) => Picks();
+        _max.ValueChanged += (_, _) => Picks();
+        Picks();
         Content = new Border
         {
             Padding = new Thickness(18),
@@ -306,14 +324,16 @@ public sealed class CirclesWindow : Window
                 {
                     _info,
                     new ScrollViewer { MaxHeight = 280, Content = _sizes },
-                    Row(Field("From Ø mm", _min), Field("to", _max)),
+                    new StackPanel { Spacing = 4, Children = { Muted("Or every circle across (mm)"), range, picks } },
                     new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { close, select } },
                 },
             },
         };
     }
 
-    void SelectRange(double min, double max) => _doc.Select(_circles.Where(c => c.D >= min - 1e-9 && c.D <= max + 1e-9).Select(c => c.Id));
+    IEnumerable<Guid> InRange(double min, double max) => _circles.Where(c => c.D >= min - 1e-9 && c.D <= max + 1e-9).Select(c => c.Id);
+
+    void SelectRange(double min, double max) => _doc.Select(InRange(min, max));
 }
 
 /// <summary>Every step of the undo history: click one to go back (or forward) to it. The canvas shows it straight away.</summary>

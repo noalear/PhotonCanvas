@@ -109,6 +109,8 @@ outline round a single line so it can be cut as a strip. The result shows on the
 change the settings. **Offset** keeps it; **Cancel** (or closing the window) leaves the design as
 it was.
 
+![Offset with an open line selected: Line ends shows](images/window-offset-open-line.png)
+
 ![The Offset window for a closed shape: distance, direction, corners, and keep the originals](images/window-home-offset.png)
 
 | Setting | What it does |

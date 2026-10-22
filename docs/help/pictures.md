@@ -84,7 +84,10 @@ exactly; **Keep proportions** keeps the picture from stretching. **Layer** moves
 [The workspace](workspace.md).
 
 Below it, the **Picture** card holds the picture's tone settings. They change how the picture
-engraves, not the file, and each picture has its own.
+engraves, not the file, and each picture has its own. Each slider's value shows at its right
+("+20%", "1.40 (lighter mid-tones)", "off").
+
+![The Picture card in the Selection panel](images/panel-selection-picture-card.png)
 
 | Setting | Range (default) | What it does |
 |---|---|---|
@@ -366,6 +369,8 @@ Carving depth slices hasn't been tried on the machine yet.
 **3D model** turns a 3D model into a depth map, to carve it as a relief: the highest point is the
 surface, the lowest the deepest.
 
+![3D model to relief: a chess pawn seen from the front, its depth map on the right (lighter is higher)](images/window-picture-3d-model.png)
+
 1. **Open STL…** picks the model: STL (binary or text), OBJ or STEP.
 2. **View:** **From the top**, **From the front** or **From the side**.
 3. **Pixels** (100 to 4000, default 800): pixels along the map's longer side. 10 per mm is plenty
@@ -464,6 +469,8 @@ Press `Esc` or choose another tool to stop erasing.
 
 **Crop** cuts the picture down to part of it. An orange box on the picture shows what's kept.
 
+![Crop: the frame on the picture, and its edges as percentages](images/window-picture-crop.png)
+
 | Setting | Range (default) | What it does |
 |---|---|---|
 | **Shape** | **Free** | Or **Square 1:1**, **4:3**, **3:4**, **3:2**, **2:3**, **16:9**: changing the width sets the height to match (and the other way round), in true pixels. |
@@ -482,10 +489,14 @@ elsewhere. Each goes on its own new Picture layer (**Cyan ·**, **Magenta ·**, 
 **Halftone (dots)** dithering at the usual screen angles: cyan 15°, magenta 75°, yellow 0°, black
 45°.
 
+![The Layers panel after a CMYK split: a Picture layer for each ink](images/panel-layers-cmyk.png)
+
 - Mark each plate on its own screen. **Laser → Layer by layer** runs one layer at a time with a
   pause between ([Work area](work-area.md)).
-- The plates are made from the picture's own pixels: its tone settings and clip aren't carried
-  over. The original picture stays; turn its layer's output off.
+- The plates are made from the picture as its tone settings show it: **Brightness**, **Contrast**,
+  **Gamma** and **Invert** are applied to the colours first, so each plate starts with those at
+  their defaults. **Sharpen** is copied onto each plate, and a clip ([Clip to shape](#clip-to-shape))
+  is kept. The original picture stays; turn its layer's output off.
 
 ## Remove background
 <!-- windows: BackgroundWindow -->

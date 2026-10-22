@@ -198,10 +198,11 @@ public sealed class LayersPanel : UserControl
         {
             var title = new TextBlock { Text = l.Name, FontWeight = active ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis, Opacity = live ? 1 : 0.6, VerticalAlignment = VerticalAlignment.Center };
             var parent = l.ParentId is { } pid ? _doc.State.FindLayer(pid) : null;
+            // Short, so the name keeps the room (the parent's name is in the tip; the card is indented under it).
             var n = new TextBlock
             {
-                Text = parent is not null ? $"↳ {parent.Name}'s shapes" : count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes",
-                Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0),
+                Text = parent is not null ? "↳ sub-layer" : count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes",
+                Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0), TextWrapping = TextWrapping.NoWrap,
             };
             if (parent is not null) ToolTip.SetTip(n, $"A sub-layer: another operation on the shapes of \"{parent.Name}\", with its own settings.");
             var g = new Grid { ColumnDefinitions = new("Auto,Auto"), VerticalAlignment = VerticalAlignment.Center };

@@ -211,7 +211,7 @@ public static class StackSlicer
                     for (int b = 0; b < islands[i + 1].Count; b++)
                     {
                         ct.ThrowIfCancellationRequested();
-                        foreach (var p in PinSpots(islands[i][a], islands[i + 1][b], i > 0 ? layers[i - 1] : null, i + 2 < n ? layers[i + 2] : null, o.PinMm, holes[i][a]))
+                        foreach (var p in PinSpots(islands[i][a], islands[i + 1][b], i > 0 ? layers[i - 1] : null, i + 2 < n ? layers[i + 2] : null, o.PinMm, holes[i][a], dowels, o.DowelMm))
                         {
                             holes[i][a].Add(p);
                             holes[i + 1][b].Add(p);
@@ -464,8 +464,9 @@ public static class StackSlicer
     /// Where pins go between a part and the part above it: inside both, clear of their edges, and
     /// where the slices below and above cover the holes too (so they don't show) if there's room.
     /// Two pins, far apart, when there's room for both (that stops the parts turning); else one.
+    /// They keep clear of the lower part's other pins and of the dowel holes through every slice.
     /// </summary>
-    static List<Vec2> PinSpots(PathGeometry lower, PathGeometry upper, PathGeometry? below, PathGeometry? above, double pinMm, IReadOnlyList<Vec2> taken)
+    static List<Vec2> PinSpots(PathGeometry lower, PathGeometry upper, PathGeometry? below, PathGeometry? above, double pinMm, IReadOnlyList<Vec2> taken, IReadOnlyList<Vec2> dowels, double dowelMm)
     {
         var overlap = ShapeGeometry.Boolean(lower, upper, BoolOp.Intersect);
         if (overlap.IsEmpty) return [];
@@ -477,9 +478,11 @@ public static class StackSlicer
         {
             if (area.IsEmpty) continue;
             var room = ShapeGeometry.Offset(area, -clear, JoinStyle.Round, EndStyle.Round);
-            // Clear of the holes already in the lower part (its pins from the joint below).
-            if (taken.Count > 0 && !room.IsEmpty)
-                room = ShapeGeometry.Boolean(room, new PathGeometry(taken.SelectMany(t => PathGeometry.Ellipse(t.X, t.Y, pinMm * 1.5 + 1, pinMm * 1.5 + 1).Subpaths)), BoolOp.Subtract);
+            // Clear of the holes already in the lower part (its pins from the joint below), and of the
+            // dowel holes, with a wall as thick as the one kept to the edge between them.
+            var keepOff = taken.Select(t => (t, pinMm * 1.5 + 1)).Concat(dowels.Select(d => (d, dowelMm / 2 + clear))).ToList();
+            if (keepOff.Count > 0 && !room.IsEmpty)
+                room = ShapeGeometry.Boolean(room, new PathGeometry(keepOff.SelectMany(k => PathGeometry.Ellipse(k.Item1.X, k.Item1.Y, k.Item2, k.Item2).Subpaths)), BoolOp.Subtract);
             if (room.IsEmpty) continue;
             var two = TwoPointsInside(room);
             // Two pins only where they can be well apart (small parts: one, plus the outline mark).

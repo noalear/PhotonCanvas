@@ -154,10 +154,14 @@ public sealed class PropertiesPanel : UserControl
         var resetTone = Button("Reset");
         resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
         _picCard = Card("Picture",
-            Slider("Brightness", _bright), Slider("Contrast", _contrast), Slider("Gamma", _gamma), Slider("Sharpen", _sharpen), _invertPic,
+            Slider("Brightness", _bright, v => Math.Abs(v) < 0.005 ? "0 (as it is)" : $"{v:+0%;−0%}"),
+            Slider("Contrast", _contrast, v => Math.Abs(v) < 0.005 ? "0 (as it is)" : $"{v:+0%;−0%}"),
+            Slider("Gamma", _gamma, v => Math.Abs(v - 1) < 0.005 ? "1 (as it is)" : $"{v:0.00} ({(v > 1 ? "lighter" : "darker")} mid-tones)"),
+            Slider("Sharpen", _sharpen, v => v < 0.005 ? "off" : $"{v:0.0}"),
+            _invertPic,
             Hint("These change how the picture engraves (Image layers), not the file."),
-            Row(trace, depth),
-            Row(removeBg, resetTone));
+            trace, removeBg,
+            Row(depth, resetTone));
         _bright.ValueChanged += (_, _) => EditPicture("Picture brightness", t => t with { Brightness = _bright.Value }, "bright");
         _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
@@ -246,10 +250,17 @@ public sealed class PropertiesPanel : UserControl
         finally { _updating = false; }
     }
 
-    static Control Slider(string label, Slider s) => new StackPanel
+    /// <summary>A slider with its name, and its value spelled out on the right.</summary>
+    static Control Slider(string label, Slider s, Func<double, string> show)
     {
-        Children = { new TextBlock { Text = label, Classes = { "muted" } }, s },
-    };
+        var value = new TextBlock { Text = show(s.Value), HorizontalAlignment = HorizontalAlignment.Right };
+        s.ValueChanged += (_, _) => value.Text = show(s.Value);
+        var head = new Grid { ColumnDefinitions = new("*,Auto") };
+        head.Children.Add(new TextBlock { Text = label, Classes = { "muted" } });
+        Grid.SetColumn(value, 1);
+        head.Children.Add(value);
+        return new StackPanel { Children = { head, s } };
+    }
 
     TextShape? SelectedText() =>
         _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is TextShape t ? t : null;

@@ -43,6 +43,11 @@ public sealed class CutTestWindow : Window
     readonly NumericUpDown _thick = Number(0.1m, 100, 0.1m, "0.##");
     readonly Grid _cells = new();
     readonly HashSet<Guid> _through = [];
+    // What was ticked and picked, kept while the program runs: the window opens again after the kerf test
+    // is burned, and the squares shouldn't need clicking again (the test's layers are new each time, so
+    // another test's squares never match).
+    static readonly HashSet<Guid> Ticked = [];
+    static Guid? Picked;
     readonly ComboBox _use = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     List<Layer> _useChoices = [];
     readonly Button _kerfTest = new() { Content = "Kerf and fit test at this setting…", HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center, IsEnabled = false };
@@ -115,7 +120,12 @@ public sealed class CutTestWindow : Window
 
         _material.SelectionChanged += (_, _) => { _newName.IsVisible = _material.SelectedIndex == 0; if (_material.SelectedIndex > 0 && _lib.Materials[_material.SelectedIndex - 1].ThicknessMm is { } t) _thick.Value = (decimal)t; };
         _thick.ValueChanged += (_, _) => Compute();
-        _use.SelectionChanged += (_, _) => Compute();
+        _through.UnionWith(Ticked);
+        _use.SelectionChanged += (_, _) =>
+        {
+            if (Chosen is { } c) Picked = c.Id;
+            Compute();
+        };
         _measured.ValueChanged += (_, _) => Compute();
         _measured.Watermark = "e.g. 19.82";
         _snug.ItemsSource = KerfDefaults.Fits.Select(f => $"{CutTest.FitLabel(f)} (slot {f:+0.0#;−0.0#;0} mm on the thickness)").Prepend("Not tried yet").ToList();
@@ -259,7 +269,12 @@ public sealed class CutTestWindow : Window
             };
             ToolTip.SetTip(b, $"{CutTest.Describe(layer.Laser)}: click if it went through" + (through ? " (marked ✓)" : ""));
             var id = layer.Id;
-            b.Click += (_, _) => { if (!_through.Remove(id)) _through.Add(id); BuildCells(); };
+            b.Click += (_, _) =>
+            {
+                if (_through.Remove(id)) Ticked.Remove(id);
+                else { _through.Add(id); Ticked.Add(id); }
+                BuildCells();
+            };
             var cell = new StackPanel { Children = { b, new TextBlock { Text = (through ? "✓ " : "") + $"{layer.Laser.Speed:0.#} mm/s {layer.Laser.Passes}×", FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center } } };
             Grid.SetRow(cell, Nearest(rows, bounds.Center.Y));
             Grid.SetColumn(cell, Nearest(cols, bounds.Center.X));
@@ -281,7 +296,7 @@ public sealed class CutTestWindow : Window
     /// <summary>The squares that went through, quickest first; the quickest picked.</summary>
     void UseChoices()
     {
-        var keep = _use.SelectedIndex >= 0 && _use.SelectedIndex < _useChoices.Count ? _useChoices[_use.SelectedIndex].Id : (Guid?)null;
+        var keep = _use.SelectedIndex >= 0 && _use.SelectedIndex < _useChoices.Count ? _useChoices[_use.SelectedIndex].Id : Picked;
         _useChoices = [.. Cells().Select(c => c.Layer).Where(l => _through.Contains(l.Id)).OrderBy(l => CutTest.SecondsPerMm(l.Laser)).ThenBy(l => l.Laser.Power)];
         _use.ItemsSource = _useChoices.Count == 0 ? new[] { "Click the squares that went through" } :
             _useChoices.Select((l, i) => CutTest.Describe(l.Laser) + (i == 0 ? " (the quickest)" : "")).ToList();

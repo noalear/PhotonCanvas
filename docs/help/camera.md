@@ -463,6 +463,8 @@ current focus height ([Close-up position](#close-up-position)). **Align MOPA to 
   layer's power so its dots come out dark, then send. When the job finishes, the window opens again
   on **Measure**.
 
+![Align MOPA, Burn the dots tab, before the close-up camera's position is taught: it says what to do first](images/window-camera-align-mopa--burn-the-dots.png)
+
 ### Measure
 
 Don't move the scrap after burning.

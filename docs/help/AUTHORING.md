@@ -100,15 +100,37 @@ Without a `wait` the user presses **Next**. Don't wait for anything a user might
 
 ## Screenshots
 
-`images/` is made by the harness's `docs` scenario (scratch tool, not shipped): it opens the program
-with a sample design, opens every window and tab, and saves each. Name pictures after what they show
-(`laser-cut-test.png`). Use a screenshot where seeing it helps: a window full of settings, a panel, a
-result on the work area. Not for every button.
+`images/` is made by `tools/HelpShots`, which runs the real program headless with a sample design
+(nothing touches the real data folder or a machine). From the repository root:
+
+```
+dotnet run --project tools/HelpShots -- shots              (retake every picture)
+dotnet run --project tools/HelpShots -- shots more         (one group: main, windows, extra or more)
+dotnet run --project tools/HelpShots -- shots --keep-new   (keep new pictures no page shows yet)
+dotnet run --project tools/HelpShots -- guide              (the help window and a tutorial running)
+dotnet run --project tools/HelpShots -- walk [id,id]       (step through tutorials, report missing targets)
+```
+
+- `shots` opens every window the ribbon and menus open (each tab), every kind of layer's settings,
+  the panels, and (in `MoreShots.cs`) the windows that need something in them first: 3D models in
+  the slicing window, a heat-ordered plate, undo steps, versions, templates, jobs. A new window or
+  state that needs setting up goes in `MoreShots.cs`.
+- New pictures no page shows are deleted after a run unless `--keep-new` is given; every picture in
+  `images/` must be on a page (`HelpTests` checks).
+- `walk` clicks what each step says (ribbon and top buttons, the menu item a step names in bold, a
+  button that opens or closes a window, tabs, list pages). Steps needing a connected machine, a
+  camera photo, a 3D model or a burned test are expected to be reported.
+
+Name pictures after what they show (`laser-cut-test.png`). Use a screenshot where seeing it helps: a
+window full of settings, a panel, a result on the work area. Not for every button, and not for a
+plain message or a one-line prompt.
 
 ## When a feature is added or changed
 
 1. Describe it on its page (bold names exactly as shown; every setting, what it does, its range).
 2. If it's a window, add its class to a `<!-- windows: … -->` line.
 3. Add or update a tutorial, with targets that exist.
-4. Retake screenshots that show it.
-5. Run the tests: `HelpTests` checks links, pictures, targets and that every button, setting and window is covered.
+4. Retake screenshots that show it (`tools/HelpShots`), and put new ones on the page.
+5. Run `walk` on its tutorials, and the tests: `HelpTests` checks links, pictures (every one used),
+   targets and that every button, setting and window is covered. `python tools/helpcheck.py` checks
+   the same without building.

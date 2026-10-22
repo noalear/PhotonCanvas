@@ -313,7 +313,9 @@ MOPA 20 % at 1000 mm/s).
 
 1. **Material** and **Thickness (mm)**, measured with calipers; it's kept with the setting.
 2. **Update photo** for thumbnails, laid out as on the bed.
-3. Click every square that went through: it gets a green border and a ✓.
+3. Click every square that went through: it gets a green border and a ✓. The squares you click,
+   and the setting chosen under **Use**, stay marked when the window opens again (until the program
+   closes), as it does after the kerf test.
 4. **Use** lists them quickest first (passes ÷ speed, so 2 passes at 12 mm/s beats 3 at 16), and
    picks the quickest. Choose another if its edges were better.
 5. **Save to the library** adds a cut recipe `Cuts 3 mm: 8 mm/s × 2`. Its notes list the other

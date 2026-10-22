@@ -140,8 +140,10 @@ Each time you save over a design's file, the file as it was is copied aside firs
 kept for each design, so you can go back to how it was a few saves ago.
 
 **File → Earlier versions…** opens the **Earlier versions** window for the design that's open. It
-lists the kept versions newest first, each named by the date and time it was saved. Pick one and
-click **Open as a new design**:
+lists the kept versions newest first, each by the date and time it was saved and how long ago
+(*Wednesday, October 21, 2026, 12:23 AM · yesterday*). Pick one and click **Open as a new design**:
+
+![Earlier versions of a saved design, the newest picked](images/window-earlier-versions.png)
 
 - It opens as a new, untitled design. The design's file isn't changed.
 - To go back to that version for good, save it over the original file (**Save as…**, choose the
@@ -269,13 +271,11 @@ that. To trace, crop, filter or prepare a picture, see [Pictures](pictures.md).
 
 You can drag files from Explorer onto the window:
 
-- SVG, DXF, PDF, AI, `.xs` and `.xcs` drawings are imported as with **Import**. Hold `Shift` while
-  dropping for one layer per colour.
+- Drawings of every kind **Import** reads (SVG, DXF, PDF, AI, EPS and PostScript, xTool, LightBurn,
+  HPGL) are imported as with **Import**. Hold `Shift` while dropping for one layer per colour.
 - PNG, JPG, BMP, GIF, WebP and TIFF pictures are imported as with **Picture**.
 - A design file (`.pcanvas` or `.ytool`) is opened, after asking about unsaved changes, when no
   drawings are dropped with it.
-
-EPS, LightBurn and HPGL files can't be dropped: use **Import** for them.
 
 **Paste** (`Ctrl+V`) also brings in what another program copied: SVG code copied as text is imported
 like an SVG file, and a copied picture goes onto a picture layer as with **Picture**.
@@ -288,10 +288,10 @@ like an SVG file, and a copied picture goes onto a picture layer as with **Pictu
 | DXF | `.dxf` | Lines, arcs, circles, polylines, splines, blocks, with layer names and colours | Text, hatches, dimensions, pictures, 3-D objects |
 | PDF | `.pdf` | The first page: paths with their colours, and pictures | Text, other pages |
 | Illustrator | `.ai` | As PDF (needs a PDF-compatible file) | As PDF |
-| EPS | `.eps` | As PDF (needs Ghostscript) | As PDF |
+| EPS, PostScript | `.eps`, `.ps` | As PDF (needs Ghostscript) | As PDF |
 | xTool Studio | `.xs`, `.xcs` | The open canvas: shapes, text, pictures, layer names and colours | Laser settings, 3D models, hidden objects |
 | LightBurn | `.lbrn2`, `.lbrn` | Shapes, text, pictures, layer names | Laser settings |
-| HPGL / plotter | `.plt`, `.hpgl` | Lines and circles, a colour per pen | |
+| HPGL / plotter | `.plt`, `.hpgl`, `.hpg` | Lines and circles, a colour per pen | |
 
 Details, for when a drawing doesn't come in as expected:
 
@@ -356,7 +356,7 @@ Details, for when a drawing doesn't come in as expected:
 - Each LightBurn layer (cut setting) becomes a layer here, with its name. Its settings aren't converted.
 - Shapes of other kinds are left out, with a note.
 
-**HPGL plotter files (.plt, .hpgl)**
+**HPGL plotter files (.plt, .hpgl, .hpg)**
 
 - Pen moves and circles, in plotter units of 0.025 mm, turned right side up.
 - Each pen number has its own colour, so **By colour** gives a layer per pen.

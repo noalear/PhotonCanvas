@@ -146,6 +146,9 @@ public class HelpTests
         // Every page is in the contents.
         var listed = Flatten(lib.Contents).Select(e => e.File).ToHashSet(StringComparer.OrdinalIgnoreCase);
         problems.AddRange(lib.Pages.Keys.Where(p => !listed.Contains(p)).Select(p => $"{p} isn't in contents.md"));
+        // Every picture is shown somewhere (a retaken screenshot nothing uses is left behind otherwise).
+        var shown = lib.Pages.Values.SelectMany(p => p.Blocks.OfType<Figure>()).Select(f => Path.GetFileName(f.Source)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        problems.AddRange(Directory.GetFiles(Path.Combine(HelpDir, "images")).Select(Path.GetFileName).Where(f => !shown.Contains(f!)).Select(f => $"images/{f} isn't on any page"));
         Assert.True(problems.Count == 0, string.Join("\n", problems));
     }
 

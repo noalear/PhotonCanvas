@@ -19,6 +19,8 @@ of those are tested. Above it, **Search materials** finds names, notes and recip
 category box shows one category (**All categories** shows all). Pick a material to see and edit it
 on the right. Changes are saved as you make them.
 
+![The material library with a material open](images/window-material-library.png)
+
 - **New material** adds one called *New material* in *Wood*, ready to rename.
 - **Delete** removes the materials picked in the list (`Ctrl`-click or `Shift`-click for several),
   with all their recipes and photos. It asks first; it can't be undone.

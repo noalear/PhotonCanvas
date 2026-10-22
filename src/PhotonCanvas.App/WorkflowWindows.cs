@@ -103,6 +103,16 @@ public sealed class VersionsWindow : Window
         catch (UnauthorizedAccessException) { }
     }
 
+    /// <summary>When a kept copy was saved, as a person reads it: "Wednesday, October 21, 2026, 12:23 AM · yesterday".</summary>
+    public static string Saved(string versionPath)
+    {
+        var name = Path.GetFileNameWithoutExtension(versionPath);
+        if (!DateTime.TryParseExact(name, "yyyy-MM-dd HH-mm-ss", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var at)) return name;
+        int days = (DateTime.Today - at.Date).Days;
+        string ago = days switch { 0 => "today", 1 => "yesterday", < 0 => "", _ => $"{days} days ago" };
+        return $"{at:D}, {at:t}" + (ago.Length > 0 ? $" · {ago}" : "");
+    }
+
     public VersionsWindow(string designPath)
     {
         Title = "Earlier versions";
@@ -112,7 +122,7 @@ public sealed class VersionsWindow : Window
         Background = Brush("Bg1");
         var dir = Folder(designPath);
         var files = Directory.Exists(dir) ? Directory.GetFiles(dir).OrderByDescending(f => f).ToList() : [];
-        var list = new ListBox { ItemsSource = files.Select(Path.GetFileNameWithoutExtension).ToList() };
+        var list = new ListBox { ItemsSource = files.Select(Saved).ToList() };
         var open = new Button { Content = "Open as a new design", Classes = { "primary" }, IsDefault = true };
         var cancel = new Button { Content = "Cancel", IsCancel = true };
         open.Click += (_, _) => { if (list.SelectedIndex >= 0) { Chosen = files[list.SelectedIndex]; Close(); } };

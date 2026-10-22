@@ -41,7 +41,7 @@ Each layer is a card. From left to right and top to bottom:
 | Colour bar | The layer's colour, used to draw its shapes. Click it to pick another (see below). Faded when the layer won't be sent. |
 | ▸ / ▾ | Shows or hides the list of the layer's shapes. Greyed out for an empty layer or a sub-layer. |
 | Name | The layer's name, in bold for the active layer. Faded when the layer won't be sent. |
-| Count | "empty", "1 shape" or "N shapes". A sub-layer shows "↳ *parent*'s shapes" instead. |
+| Count | "empty", "1 shape" or "N shapes". A sub-layer shows "↳ sub-layer" instead (point at it for its parent layer). |
 | Lightning | Output on or off (see below). |
 | Eye | Shown or hidden. |
 | Padlock | Locked or not. |
@@ -206,6 +206,8 @@ outline traced round a fill, a fill inside a cut, a second picture pass. It has 
 own: it always does whatever is on its parent layer, so moving or changing those shapes changes
 both.
 
+![A sub-layer under the cut layer (indented, no shapes of its own), and a Score layer warning that its picture won't be engraved](images/panel-layers-sublayer.png)
+
 Right-click a layer → **Add sub-layer (another operation on these shapes)**. The sub-layer is placed
 right after the layer (and its other sub-layers) and becomes the active layer. It takes the parent's
 colour, laser (diode or MOPA), material and **Highly reflective material** tick, and starts with
@@ -217,7 +219,8 @@ the power and speed a new layer of its mode gets (see [Layer settings](layer-set
 | Picture | Picture | "*parent* · second pass" |
 | Cut or Score | Engrave | "*parent* · fill" |
 
-Change its mode and settings like any layer. Its card is indented and says "↳ *parent*'s shapes".
+Change its mode and settings like any layer. Its card is indented under its parent and says
+"↳ sub-layer".
 
 - It runs where it is in the list, like any layer; it can be dragged above its parent.
 - It has its own output, show and lock switches. The parent's switches don't turn it off.
@@ -232,6 +235,8 @@ the other kind on a layer are left out of the job, and the card says so in orang
 
 - **⚠ Pictures here won't be engraved** (a Cut, Score or Engrave layer with pictures on it).
 - **⚠ Outlines here won't be cut (picture layer)** (a Picture layer with outlines on it).
+
+The picture under [Sub-layers](#sub-layers) shows one: a picture moved onto the **Score lines** layer.
 
 Point at the warning for the details, for example: "Layer "Cut" is a Cut layer, so its picture
 won't be engraved. Move it to a Picture layer, or trace it into outlines." The same line appears in

@@ -280,9 +280,13 @@ public sealed class TutorialRunner
 
     void Tick()
     {
-        KeepRinged();
+        try { KeepRinged(); }
+        catch (Exception e) { AppLog.Write("tutorial", $"{_tutorial.Id}: {e.Message}"); Unring(); }
         if (_done || _step < 0 || _tutorial.Steps[_step].Wait is not { } wait) return;
-        if (!Met(wait)) return;
+        bool met;
+        try { met = Met(wait); }
+        catch (Exception e) { AppLog.Write("tutorial", $"{_tutorial.Id}: waiting for {wait}: {e.Message}"); met = false; }
+        if (!met) return;
         _done = true;
         _status.Text = "✓ Done!";
         _status.Foreground = Brush("Ok");
@@ -308,14 +312,20 @@ public sealed class TutorialRunner
     /// <summary>The program's windows, newest first, leaving out this card and the help.</summary>
     IEnumerable<Window> Windows() =>
         (Application.Current?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Windows.Reverse().Where(w => w != _card && w is not HelpWindow and not TutorialsWindow)
-        ?? _host.Main.OwnedWindows.Reverse().Append(_host.Main).Where(w => w != _card);
+        ?? Owned(_host.Main).Append(_host.Main).Where(w => w != _card);
+
+    /// <summary>The windows a window opened, and the ones they opened (the model browser from Stacked slices), newest first.</summary>
+    static IEnumerable<Window> Owned(Window w) => w.OwnedWindows.Reverse().SelectMany(o => Owned(o).Append(o));
 
     /// <summary>Ring the step's target, wherever it is.</summary>
     void Point(string? target)
     {
         Unring();
         if (target is null) return;
-        var c = Find(target);
+        Control? c;
+        // A tutorial never takes the program down: if the target can't be looked for, the step just isn't ringed.
+        try { c = Find(target); }
+        catch (Exception e) { AppLog.Write("tutorial", $"{_tutorial.Id}: looking for {target}: {e.Message}"); return; }
         if (c is null) return;
         Reveal(c);
         Ring(c);
@@ -352,7 +362,9 @@ public sealed class TutorialRunner
     static Control? FindIn(Window w, string kind, string value)
     {
         var everything = w.GetVisualDescendants().OfType<Control>().Concat(w.GetLogicalDescendantsOf()).Distinct().ToList();
-        var panels = new[] { "RightDock", "LeftDock" }.Select(n => w.FindControl<Control>(n)).OfType<Control>().ToList();
+        // The main window's side panels (windows built in code have no names to look up).
+        var names = NameScope.GetNameScope(w);
+        var panels = names is null ? [] : new[] { "RightDock", "LeftDock" }.Select(n => names.Find<Control>(n)).OfType<Control>().ToList();
         bool InPanel(Control c) => panels.Any(p => p == c || p.IsVisualAncestorOf(c) || IsLogicalAncestor(p, c));
         var ordered = everything.Where(InPanel).Concat(everything.Where(c => !InPanel(c))).ToList();
         foreach (bool visibleOnly in new[] { true, false })

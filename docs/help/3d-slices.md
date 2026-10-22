@@ -18,7 +18,7 @@ To carve a 3D model into one board as a relief instead, use **Picture → 3D mod
 Click **3D to slices** on the **Home** tab (in the **Bring in** group). The **Stacked slices**
 window opens over the program and stays open until you close it.
 
-![The Stacked slices window before a model is opened: the preview on the left, the settings on the right](images/window-home-3d-to-slices.png)
+![The Stacked slices window with a chess pawn open: the preview on the left, the settings on the right](images/window-3d-slices-pawn.png)
 
 - **Left:** a 3D preview of the parts as they'll be put together, with the view settings under it.
 - **Right:** the model, its size, the material, how to build it, and where the parts go. The
@@ -56,6 +56,8 @@ with the model's own size.
 
 **Open a 3D model** shows every STL, OBJ and STEP file in your models folder as a shaded picture,
 with its name, type and file size, so you can pick one by sight.
+
+![The model browser: each model in the folder as a picture](images/window-model-browser.png)
 
 | Control | What it does |
 |---|---|
@@ -131,6 +133,8 @@ each slice is cut to.
 one engrave pass a step, wherever the model slopes away inside the slice. The stack's stair steps
 become the model's slopes, with far less sanding. Only for **Stacked layers (solid)**.
 
+![Shape the edges ticked: its settings, and the summary's Edge shaping line](images/window-3d-slices-shaping-summary.png)
+
 How it works: going down from each slice's top, a step at a time, it takes the model's
 cross-section at that depth. Every part of the slice the model doesn't reach at that depth (or
 anywhere above it in the slice) is one area to engrave. The areas get smaller as they go deeper,
@@ -161,7 +165,7 @@ through.
 |---|---|---|
 | **Mark where the next slice sits** | on | Lightly marks the outline of the slice above on each part, where it falls inside the part (at least 0.6 mm in from its edge). Glue the next slice inside the line. |
 | **Keep every slice joined** | on | Where the model slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. At each place two slices meet, any piece of the model's cross-section they don't already share enough of (6 mm², or most of a small piece) is added to both, so they overlap enough to glue and pin. Sand it back to the shape. The summary counts these "steep spots". |
-| **Pin holes Ø** | 0 to 20 mm, steps of 0.5 (2) | Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Two pins, well apart, where there's room (that stops the parts turning), else one. Placed where the slices around them hide the holes when they can, clear of the part's edges and of the pin holes already in it (not of dowel holes). The pins need only be twice the material's thickness long; the summary says how many. 0 = none. |
+| **Pin holes Ø** | 0 to 20 mm, steps of 0.5 (2) | Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Two pins, well apart, where there's room (that stops the parts turning), else one. Placed where the slices around them hide the holes when they can, clear of the part's edges, of the pin holes already in it and of the dowel holes, with a wall of material between. The pins need only be twice the material's thickness long; the summary says how many. 0 = none. |
 | **Dowels Ø** | 0 to 20 mm, steps of 0.5 (0) | Two holes through every slice, as far apart as they fit, for long dowels through the whole stack. Only where every slice has room (1.5 mm round each hole); otherwise the summary says "No room for dowel holes in every slice". 0 = none. |
 | **Number each slice (light mark, 1 at the bottom)** | on | Marks each part with its slice number, 1 at the bottom, at the spot furthest from its edges and holes, as large as fits (up to 6 mm). Parts too narrow for a number get none. |
 
@@ -184,6 +188,8 @@ Upright sheets across the model both ways, slotted half-way where they cross, so
 together into an open grid of the model's shape. Few parts, little material. Not yet tried on the
 machine.
 
+![An egg as an egg crate: six sheets one way, four the other](images/window-3d-slices-egg-crate.png)
+
 | Setting | Range (default) | What it does |
 |---|---|---|
 | **Sheets across X** | 1 to 60 (6) | Sheets standing across the model's width, evenly spaced (none on the very ends). Named X1, X2, … |
@@ -204,6 +210,8 @@ machine.
 
 Fins standing round an upright axis through the middle, slotted onto flat rings at a few heights.
 Best for round things. Not yet tried on the machine.
+
+![A vase built radially: twelve fins on three rings](images/window-3d-slices-radial.png)
 
 | Setting | Range (default) | What it does |
 |---|---|---|
@@ -264,6 +272,8 @@ smaller.
 The preview shows the parts in 3D as they'll be put together: slices stacked, or sheets standing
 in place. Drag it to turn it round.
 
+![Outlines view, showing slices 6 to 12 of 12: the pin holes show through](images/window-3d-slices-outlines.png)
+
 | Control | What it does |
 |---|---|
 | **View**: **Solid** or **Outlines** | **Solid**: shaded, in the chosen material, nearer parts hiding farther ones. **Outlines**: see-through outlines, alternate slices in two tones. |
@@ -284,9 +294,13 @@ says what it'll make:
 - **Egg crate and radial:** how many sheets, the overall size, how many crossings and how wide the
   slots are, how they go together, and tiny pieces left out.
 
+![The foot of the settings: the summary says how many slices, parts and pins](images/window-3d-slices-summary.png)
+
 Clicking it lays every part out on the work area. The window stays open and the summary says how
 many parts went on how many beds. It's one step: `Ctrl+Z` takes it all back. Clicking it again
 makes another set.
+
+![After Make the slices: the parts on a page of their own, numbered, on the Slices · cut and Slices · marks layers](images/workspace-after-slices.png)
 
 The parts go on three layers of their own (made if they aren't there yet), in the order they run:
 

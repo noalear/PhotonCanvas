@@ -137,6 +137,18 @@ public class StackSlicerTests
     }
 
     [Fact]
+    public void PinsKeepClearOfTheDowels()
+    {
+        // Pins and dowels together: every pin hole leaves a wall of material next to each dowel hole.
+        var drum = StackSlicer.Slice(Cylinder(15, 12), new SliceOptions { ThicknessMm = 3, HeightMm = 12, DowelMm = 4, PinMm = 3 });
+        Assert.Equal(2, drum.Dowels.Count);
+        Assert.NotEmpty(drum.Pins);
+        foreach (var (_, at) in drum.Pins)
+            foreach (var d in drum.Dowels)
+                Assert.True(at.Dist(d) >= 4 / 2.0 + 3 / 2.0 + 1, $"pin at {at} is {at.Dist(d):0.00} mm from the dowel at {d}");
+    }
+
+    [Fact]
     public void SlicesAreLaidOutBedByBed()
     {
         var stack = StackSlicer.Slice(Cylinder(30, 120), new SliceOptions { ThicknessMm = 3, HeightMm = 120 });

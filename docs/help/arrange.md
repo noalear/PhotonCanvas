@@ -208,6 +208,10 @@ Choose the kind under **Warp**. The sliders run from −100 to 100.
 | **Cone (tapered tumbler)** | **Top Ø**, **Bottom Ø** (5–500 mm, defaults 80 and 65) | For tapered tumblers and cups marked from above: each row of the design is corrected for the diameter at its height, so it wraps at its true size. |
 | **Four corners** | X and Y for **Top-left**, **Top-right**, **Bottom-right** and **Bottom-left** (−500 to 500 mm) | Moves each corner of the box round the design by the amounts typed; everything in between stretches in proportion. |
 
+![Warp, Round object mode](images/window-warp-round-object.png)
+
+![Warp, Four corners mode](images/window-warp-four-corners.png)
+
 - The warp works on the box round all the selected shapes; the line under the settings gives how
   many shapes there are and their size before warping.
 - Text, codes and editable shapes become plain outlines. Curves are followed within 0.02 mm.
@@ -245,8 +249,8 @@ knock by accident.
 
 - In the Layers panel a locked shape has a lock button beside it: click it to unlock just that one.
   Right-clicking a locked shape there gives **Unlock** too.
-- A locked shape can still be selected in the Layers panel or with **Active layer** (Home tab);
-  commands and the arrow keys then act on it.
+- A locked shape can still be selected by clicking it in the Layers panel; commands and the
+  arrow keys then act on it.
 - To lock everything on a layer, lock the layer instead ([Layers](layers.md)). More in
   [Working on the canvas](canvas.md).
 

@@ -21,6 +21,8 @@ Select several layers (`Ctrl+click` or `Shift+click` in the **Layers** panel, se
 each layer's own value until you type a new one. Settings of every kind of layer in the selection
 are shown.
 
+![Layer settings of a cut and an engrave layer edited together](images/layer-settings-several.png)
+
 ## Mode: Cut, Score, Engrave, Picture
 
 The four buttons at the top say what the laser does with the layer's shapes.
@@ -74,6 +76,8 @@ The job bar's choice is explained in [Running a job](running-jobs.md).
 ## MOPA: pulse width and frequency
 
 Only on layers that use the MOPA.
+
+![A MOPA layer: Pulse width and Frequency under the power row, with where full power starts](images/layer-settings-mopa.png)
 
 - **Pulse width**: how long each laser pulse lasts, one of 2, 4, 6, 9, 13, 20, 30, 45, 60, 80, 100,
   150, 200, 250, 350 or 500 ns (200 ns to start). Short pulses mark crisply; long pulses put in more
@@ -151,6 +155,8 @@ orders haven't been tried on the machine yet (they're on the list to check on sc
 scanned, 1–10000 lines per centimetre (100 to start). More lines are darker, smoother and slower.
 The line under it gives the spacing: "Lines 0.1 mm apart." Above 1000 it adds "Very fine: much
 longer jobs and more heat (thin sheet can warp)."
+
+![An engrave layer: Lines / cm with the spacing it gives](images/layer-settings-fill.png)
 
 ## Picture settings
 
@@ -240,6 +246,8 @@ layer.
 
 **Save to library…** keeps the active layer's settings in the material library, with how well they
 worked, so you can put them back on any layer later. It opens **Save to material library**:
+
+![Save to library, for a score layer](images/window-save-to-library.png)
 
 | Field | What it's for |
 |---|---|
@@ -346,6 +354,8 @@ For closed outlines on Cut layers.
 - **Dot mode every** (Cut and Score): a single pulse every this many mm along the line instead of a
   line, 0–50 mm (0 = off): stippled marks, dotted lines. Each dot fires for the layer's
   **Dot time µs** (200 µs unless changed), and the beam moves between dots at the layer's speed.
+
+![More settings of a score layer: kerf, start points, perforation, dot mode, wobble, step down and focus offset](images/layer-settings-mopa-more.png)
 
 Dot mode wins over perforation, and both win over wobble. Neither works with **Spread the heat**
 (the layer keeps the usual order, and the checks say so).

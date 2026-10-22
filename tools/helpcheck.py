@@ -214,6 +214,12 @@ def main(argv):
         for l in links:
             check_link(f"tutorials/{name}", l)
 
+    if not only:
+        shown = {os.path.basename(i) for text in pages.values() for i in parse_blocks(text)[2]}
+        for f in sorted(os.listdir(os.path.join(HELP, "images"))):
+            if f not in shown:
+                problems.append(f"images/{f} isn't on any page")
+
     # Coverage: what the guide doesn't mention yet.
     raw = "\n".join(pages.values())
     tut_raw = "\n".join(tuts.values())

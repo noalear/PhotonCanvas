@@ -155,13 +155,15 @@ public static class PictureTools
     /// CMYK separation for screen printing: four pictures (cyan, magenta, yellow, black), each
     /// black where that ink goes (grey for part), white elsewhere. Transparent stays transparent.
     /// </summary>
-    public static (string Ink, RasterImage Plate)[] CmykSplit(RasterImage src)
+    public static (string Ink, RasterImage Plate)[] CmykSplit(RasterImage src, ToneAdjust? tone = null)
     {
         int n = src.Width * src.Height;
         var plates = Enumerable.Range(0, 4).Select(_ => new byte[n * 4]).ToArray();
+        // The picture as its tone settings show it: brightness, contrast, gamma and invert on each colour.
+        Func<double, double> adjust = tone is null || tone == ToneAdjust.None ? v => v : tone.Apply;
         for (int i = 0; i < n; i++)
         {
-            double r = src.Rgba[i * 4] / 255.0, g = src.Rgba[i * 4 + 1] / 255.0, b = src.Rgba[i * 4 + 2] / 255.0;
+            double r = adjust(src.Rgba[i * 4] / 255.0), g = adjust(src.Rgba[i * 4 + 1] / 255.0), b = adjust(src.Rgba[i * 4 + 2] / 255.0);
             double k = 1 - Math.Max(r, Math.Max(g, b));
             double c = k >= 1 ? 0 : (1 - r - k) / (1 - k), m = k >= 1 ? 0 : (1 - g - k) / (1 - k), y = k >= 1 ? 0 : (1 - b - k) / (1 - k);
             double[] ink = [c, m, y, k];

@@ -195,7 +195,9 @@ system.
 - A new or changed feature updates the help guide and its tutorial in the same change
   (`docs/help`, format in [`docs/help/AUTHORING.md`](docs/help/AUTHORING.md)).
   `python tools/helpcheck.py` and the `HelpTests` tests fail when a button, layer setting or window
-  isn't covered, or a tutorial points at something that doesn't exist.
+  isn't covered, a picture isn't used, or a tutorial points at something that doesn't exist.
+  `dotnet run --project tools/HelpShots -- shots` retakes the guide's screenshots, and `-- walk`
+  steps through the tutorials in the real program and lists targets it can't find.
 
 To regenerate `reference/` from your own install:
 

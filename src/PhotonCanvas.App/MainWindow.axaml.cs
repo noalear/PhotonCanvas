@@ -60,10 +60,12 @@ public partial class MainWindow : Window
     public bool ConnectOnOpen { get; init; } = true;
 
     static readonly FilePickerFileType ProjectType = new("PhotonCanvas project") { Patterns = ["*.pcanvas", "*.ytool"] };
-    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, EPS, xTool, LightBurn, HPGL)") { Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.eps", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl"] };
+    static readonly string[] PictureExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"];
+    // Every drawing format the importer reads (PostScript and .hpg included), so none is left out of the file window.
+    static readonly FilePickerFileType VectorTypes = new("Drawings (SVG, DXF, PDF, AI, EPS, xTool, LightBurn, HPGL)") { Patterns = [.. Importer.Extensions.Select(e => "*" + e)] };
     static readonly FilePickerFileType AnyImportable = new("Everything that can be imported")
     {
-        Patterns = ["*.svg", "*.dxf", "*.pdf", "*.ai", "*.xs", "*.xcs", "*.lbrn2", "*.lbrn", "*.plt", "*.hpgl", "*.eps", "*.png", "*.jpg", "*.jpeg", "*.bmp", "*.gif", "*.webp", "*.tif", "*.tiff"],
+        Patterns = [.. Importer.Extensions.Concat(PictureExtensions).Select(e => "*" + e)],
     };
 
     public MainWindow()
@@ -467,7 +469,7 @@ public partial class MainWindow : Window
         ToolSmall(select, "Pan", "IcHand", Tool.Pan, "Pan the view (H, or hold Space / middle mouse)");
         select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
         select.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
-        select.Small("Active layer", "IcLayers", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id)), "Select everything on the active layer (Ctrl+Shift+A)");
+        select.Small("Active layer", "IcLayers", SelectActiveLayer, "Select everything on the active layer you can pick (Ctrl+Shift+A)");
         var selectBy = select.Small("Select by…", "IcCircles", () => { }, "Select open lines, shapes the same size, shapes inside another, circles by size…");
         selectBy.Flyout = new MenuFlyout
         {
@@ -775,7 +777,7 @@ public partial class MainWindow : Window
         new("edit.duplicate", "Edit", "Duplicate", "Ctrl+D", DuplicateSel),
         new("edit.delete", "Edit", "Delete", "Delete|Back|Shift+Delete|Shift+Back", DeleteSel),
         new("select.all", "Select", "Select all", "Ctrl+A", SelectAll),
-        new("select.layer", "Select", "Select the active layer", "Ctrl+Shift+A", () => _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id))),
+        new("select.layer", "Select", "Select the active layer", "Ctrl+Shift+A", SelectActiveLayer),
         new("select.circles", "Select", "Select circles…", "", () => _ = Guard(() => new CirclesWindow(_doc).ShowDialog(this))),
         new("shape.group", "Shapes", "Group", "Ctrl+G", GroupSel),
         new("shape.ungroup", "Shapes", "Ungroup", "Ctrl+Shift+G", UngroupSel),
@@ -1043,7 +1045,9 @@ public partial class MainWindow : Window
 
     void SplitCmyk(ImageShape im)
     {
-        var plates = Core.Imaging.PictureTools.CmykSplit(im.Source.Pixels);
+        // Separated as the picture looks with its tone settings; each plate keeps its clip and sharpening.
+        var plates = Core.Imaging.PictureTools.CmykSplit(im.Source.Pixels, im.Tone);
+        var plateTone = Core.Imaging.ToneAdjust.None with { Sharpen = im.Tone.Sharpen, SharpenRadiusMm = im.Tone.SharpenRadiusMm };
         var state = _doc.State;
         var made = new List<Shape>();
         uint[] colours = [0x00A3E0, 0xE0007A, 0xF2C800, 0x222222];
@@ -1051,7 +1055,7 @@ public partial class MainWindow : Window
         {
             var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = $"{plates[i].Ink} · {im.Name}", Color = colours[i], Dither = Core.Imaging.DitherMethod.Halftone, HalftoneAngleDeg = new[] { 15.0, 75, 0, 45 }[i] };
             state = Ops.AddLayer(state, layer);
-            var plate = new ImageShape { Name = $"{plates[i].Ink} plate", LayerId = layer.Id, Source = ImageSource.FromEncoded(plates[i].Plate.EncodePng()), SizeMm = im.SizeMm, Transform = im.Transform };
+            var plate = new ImageShape { Name = $"{plates[i].Ink} plate", LayerId = layer.Id, Source = ImageSource.FromEncoded(plates[i].Plate.EncodePng()), SizeMm = im.SizeMm, Transform = im.Transform, Clip = im.Clip, Tone = plateTone };
             made.Add(plate);
         }
         _doc.Commit("CMYK split", Ops.AddShapes(state, made), made.Select(m => m.Id));
@@ -2316,7 +2320,6 @@ public partial class MainWindow : Window
 
     // ---- pictures ------------------------------------------------------------------------
 
-    static readonly string[] PictureExtensions = [".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tif", ".tiff"];
     static bool IsPicture(string path) => PictureExtensions.Contains(Path.GetExtension(path).ToLowerInvariant());
 
     ImageShape? SelectedPicture() =>
@@ -2426,11 +2429,17 @@ public partial class MainWindow : Window
         return Layer.Palette.FirstOrDefault(p => !used.Contains(p), Layer.Palette[s.Layers.Count % Layer.Palette.Count]);
     }
 
+    /// <summary>Everything on the active layer that could be clicked: locked shapes, and a hidden or locked layer's, are left out.</summary>
+    void SelectActiveLayer()
+    {
+        var pickable = _doc.State.Editable().Select(s => s.Id).ToHashSet();
+        _doc.Select(_doc.State.ShapesOn(_doc.ActiveLayer).Select(s => s.Id).Where(pickable.Contains));
+    }
+
     void OnDrop(object? sender, DragEventArgs e)
     {
         var files = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
-        string[] drawingTypes = [".svg", ".dxf", ".pdf", ".ai", ".xs", ".xcs"];
-        var svgs = files.Where(f => drawingTypes.Contains(Path.GetExtension(f).ToLowerInvariant())).ToList();
+        var svgs = files.Where(Importer.CanLoad).ToList();
         var pictures = files.Where(IsPicture).ToList();
         var project = files.FirstOrDefault(f => f.EndsWith(DocFile.Extension, StringComparison.OrdinalIgnoreCase) || f.EndsWith(DocFile.LegacyExtension, StringComparison.OrdinalIgnoreCase));
         if (pictures.Count > 0) _ = Guard(() => ImportPictures(pictures));

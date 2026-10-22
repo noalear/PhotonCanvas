@@ -14,8 +14,8 @@ Click **Select by…** on the **Home** tab, then **Circles by size…**.
 ## Pick a size or a range
 <!-- target: window:Select circles -->
 <!-- wait: closed:Select circles -->
-Click one of the sizes listed to select those circles. Or type a range in **From Ø mm** and
-**to**, and click **Select**.
+Click one of the sizes listed to select those circles. Or type a range under **Or every circle
+across (mm)**, check how many the line below says it picks, and click **Select**.
 
 ## Use the selection
 <!-- target: panel:Selection -->

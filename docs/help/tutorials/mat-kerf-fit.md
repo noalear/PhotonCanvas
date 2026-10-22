@@ -14,7 +14,8 @@ With the burned cut test still in the design, click **Cut test**: it opens on **
 
 ## Pick the setting
 <!-- target: field:Use -->
-Click the squares that went through again, then choose the setting under **Use**.
+The squares you clicked before are still marked, and **Use** shows the setting you chose. Check
+it's the one to test (if the program was closed in between, click the squares again).
 
 ## Add the kerf test
 <!-- target: button:Kerf and fit test at this setting -->

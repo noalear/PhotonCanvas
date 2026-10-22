@@ -54,6 +54,8 @@ afterwards.
 Choosing **Polygon** or **Star** shows a bar above the work area with its options. They apply to
 the shapes you draw next and are remembered between runs.
 
+![The Star tool's options above the work area](images/tool-options-star.png)
+
 | Setting | Range | Default | What it does |
 |---|---|---|---|
 | **Sides** (Polygon) | 3–64 | 6 | How many corners. |
@@ -120,6 +122,8 @@ or select it and click in the text box. The text's name in the layer list is its
 
 With one text selected, the **Selection** panel shows a **Text** card. Every change shows on the
 work area at once.
+
+![The Text card in the Selection panel](images/panel-selection-text-card.png)
 
 | Setting | Range | What it does |
 |---|---|---|
@@ -259,6 +263,8 @@ the hole far enough down that it doesn't break through the sides.
 Copies of the selection in several sizes, side by side. Select the design first: **Make the sizes**
 is greyed out when nothing was selected as the window opened.
 
+![The Sizes tab](images/window-home-generators--sizes.png)
+
 - **Widths (mm)**: the widths you want, separated by commas, semicolons or spaces (use a point for
   decimals: 12.5). Default 40, 60, 80.
 - Each width makes a copy of the whole selection scaled to that width, the height in proportion.
@@ -328,6 +334,8 @@ accurate as the camera's calibration for the material's height.
 2. Move the mouse over a piece: after a moment its outline shows, filled and dashed.
 3. Click inside it. The outline, with any holes in the piece, is added as a shape named
    "Picked piece".
+
+![Pick piece's options above the work area](images/tool-options-pick-piece.png)
 
 It takes the area joined to where you clicked whose colour is close to the clicked colour (the
 photo is smoothed a little first, to calm wood grain and camera noise). The sliders in the bar

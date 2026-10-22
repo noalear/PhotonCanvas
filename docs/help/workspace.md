@@ -125,6 +125,8 @@ A project can hold several pages. Each page is a design of its own, with its own
 and guides, and its own job: **Ship It**, **Frame** and the job bar always work on the page on
 screen. All the pages are saved together in the one project file.
 
+![The pages bar with three pages, the first one showing](images/pages-bar.png)
+
 The pages bar, just above the work area, has a tab for each page and a **+** after them.
 
 - Click a page's tab to show it.

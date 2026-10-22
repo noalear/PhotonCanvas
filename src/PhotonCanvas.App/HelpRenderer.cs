@@ -102,6 +102,15 @@ sealed class HelpRenderer(string folder, Action<string> follow)
     {
         var t = new SelectableTextBlock { TextWrapping = TextWrapping.Wrap, FontSize = size ?? BodySize, LineHeight = (size ?? BodySize) * 1.5 };
         var list = new InlineCollection();
+        // Links are underlined runs of the text itself, so they sit on the line and wrap with it; a click is
+        // matched to a link by where in the text it lands.
+        var links = new List<(int Start, int End, string Target)>();
+        int at = 0;
+        void Add(Run run)
+        {
+            list.Add(run);
+            at += run.Text?.Length ?? 0;
+        }
         foreach (var i in inlines)
             switch (i)
             {
@@ -109,28 +118,44 @@ sealed class HelpRenderer(string folder, Action<string> follow)
                     var run = new Run(r.Text);
                     if (r.Bold) run.FontWeight = FontWeight.SemiBold;
                     if (r.Italic) run.FontStyle = FontStyle.Italic;
-                    list.Add(run);
+                    Add(run);
                     break;
                 case CodeRun c:
                     // A key or a control's name: set off like a key cap.
-                    list.Add(new Run($" {c.Text} ") { Background = Brush("Bg3"), FontWeight = FontWeight.SemiBold, Foreground = Brush("TextMain") });
+                    Add(new Run($" {c.Text} ") { Background = Brush("Bg3"), FontWeight = FontWeight.SemiBold, Foreground = Brush("TextMain") });
                     break;
                 case LinkRun l:
-                    var link = new TextBlock
-                    {
-                        Text = l.Text, Foreground = Brush("Accent"), Cursor = new Cursor(StandardCursorType.Hand),
-                        FontSize = size ?? BodySize, TextDecorations = TextDecorations.Underline,
-                    };
-                    if (l.Target.StartsWith("tutorial:", StringComparison.OrdinalIgnoreCase)) link.Text = "▶ " + l.Text;
-                    ToolTip.SetTip(link, l.Target.StartsWith("tutorial:", StringComparison.OrdinalIgnoreCase) ? "Start this tutorial" : l.Target.StartsWith("http") ? l.Target : null);
-                    var target = l.Target;
-                    link.PointerPressed += (_, e) => { e.Handled = true; follow(target); };
-                    list.Add(new InlineUIContainer(link) { BaselineAlignment = BaselineAlignment.TextBottom });
+                    string text = Tutorial(l.Target) ? "▶ " + l.Text : l.Text;
+                    links.Add((at, at + text.Length, l.Target));
+                    Add(new Run(text) { Foreground = Brush("Accent"), TextDecorations = TextDecorations.Underline });
                     break;
             }
         t.Inlines = list;
+        if (links.Count == 0) return t;
+        string? LinkAt(PointerEventArgs e)
+        {
+            var hit = t.TextLayout.HitTestPoint(e.GetPosition(t) - new Point(t.Padding.Left, t.Padding.Top));
+            if (!hit.IsInside) return null;
+            return links.FirstOrDefault(k => hit.TextPosition >= k.Start && hit.TextPosition < k.End).Target;
+        }
+        var hand = new Cursor(StandardCursorType.Hand);
+        t.PointerMoved += (_, e) =>
+        {
+            var target = LinkAt(e);
+            t.Cursor = target is null ? Cursor.Default : hand;
+            ToolTip.SetTip(t, target is null ? null : Tutorial(target) ? "Start this tutorial" : target.StartsWith("http") ? target : null);
+        };
+        // Ahead of the text selection, which would take the press otherwise.
+        t.AddHandler(InputElement.PointerPressedEvent, (_, e) =>
+        {
+            if (!e.GetCurrentPoint(t).Properties.IsLeftButtonPressed || LinkAt(e) is not { } target) return;
+            e.Handled = true;
+            follow(target);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         return t;
     }
+
+    static bool Tutorial(string target) => target.StartsWith("tutorial:", StringComparison.OrdinalIgnoreCase);
 
     Control List(bool numbered, IReadOnlyList<ListItem> items, int depth = 0)
     {

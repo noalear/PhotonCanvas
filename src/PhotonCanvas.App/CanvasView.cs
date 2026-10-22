@@ -680,7 +680,10 @@ public sealed partial class CanvasView : Control
         var title = Text("Processing Order Gradient", 12, Brushes.White);
         var first = Text("First", 11, new SolidColorBrush(OrderStops[0]));
         var last = Text("Last", 11, new SolidColorBrush(OrderStops[^1]));
-        string about = $"{_orderPaths:N0} path{(_orderPaths == 1 ? "" : "s")}" +
+        // Counted as the job bar counts them; spreading the heat cuts long paths in pieces, said too.
+        int paths = job.Paths > 0 ? job.Paths : _orderPaths;
+        string about = $"{paths:N0} path{(paths == 1 ? "" : "s")}" +
+                       (_orderPaths > paths ? $" in {_orderPaths:N0} pieces" : "") +
                        (job.Steps.Count > _orderPaths ? $", {job.Steps.Count:N0} cuts with the passes" : "") +
                        (_orderTravel is null ? " · travel moves hidden" : " · dashed: travel");
         var sub = Text(about, 10.5, new SolidColorBrush(Color.FromRgb(170, 178, 190)));

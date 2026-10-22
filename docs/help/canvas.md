@@ -40,7 +40,9 @@ View → **Processing order** colours the job's paths by when they run. It's the
   they're left out, as they'd hide the order.
 - A dashed orange rectangle marks the outside edge of the job.
 - The key at the top, **Processing Order Gradient**, runs from First to Last and says how many
-  paths there are (and how many cuts with the passes), and whether the travel is shown.
+  paths there are (and how many cuts with the passes), and whether the travel is shown. With
+  **Spread the heat** it also says how many pieces the long paths were cut into: "41 paths in 156
+  pieces, 624 cuts with the passes".
 
 It follows the design as you change it. Use it to check that holes are cut before the outlines
 around them and that the order makes sense. It starts off each time the program starts. How the
@@ -90,7 +92,7 @@ Shapes can also be selected in the Layers panel: see [Layers](layers.md).
 | Button | Shortcut | What it selects |
 |---|---|---|
 | **All** | `Ctrl+A` | Every shape you can pick (not on hidden or locked layers, not locked). |
-| **Active layer** | `Ctrl+Shift+A` | Every shape on the active layer. |
+| **Active layer** | `Ctrl+Shift+A` | Every shape on the active layer you could click: not locked shapes, and nothing when the layer is hidden or locked. |
 | **Invert** | | Every shape you can pick that isn't selected now; what was selected is let go. |
 
 ### Select by…
@@ -115,10 +117,14 @@ holes for pins or magnets on a layer of their own. A circle here is a shape made
 outline, round to within 1.5% of its radius (drawn circles, and circles in imported drawings).
 Text and codes don't count, nor do shapes you can't pick.
 
+![Select circles: each size found, and a range with how many it picks](images/window-circles-by-size.png)
+
 - The list shows each size found, with how many there are: "4 × Ø 5 mm". Click a size to select
   those circles (to within 0.005 mm) and close the window.
-- Or type a range in **From Ø mm** and **to** (they start at the smallest and largest diameter
-  found) and click **Select** to select every circle in it.
+- Or type a range under **Or every circle across (mm)**: the two boxes start at the smallest and
+  largest diameter found. The line under them says how many circles **Select** will pick ("Select
+  picks 6 circles from Ø 3 to 5 mm."); click **Select** to select them and close the window.
+  **Select** is greyed out when the range holds none.
 - **Close** leaves the selection as it was.
 - With no circles it says "There are no circles in the design (on unlocked, visible layers)."
 
@@ -270,6 +276,8 @@ chose.
 Home → **Edit points** (`N`, or double-click a shape) shows the points of the selected shape, to
 change its outline point by point.
 
+![Edit points on a heart: a point at each corner and where the curves meet](images/canvas-edit-points.png)
+
 - It works on one shape at a time: an ordinary path (drawn with the pen, imported, traced, or the
   result of a shape tool) on a visible, unlocked layer. Click another shape to switch to it.
 - Rectangles, ellipses, polygons and stars drawn with their tools stay editable as shapes (size,
@@ -298,12 +306,11 @@ is an undo step.
 ## Locked shapes
 
 Locking a shape keeps it where it is: it can't be clicked, dragged, box-selected or picked by
-**All**, **Invert** or **Select by…**, so you can work around it without knocking it. It's still
+**All**, **Active layer**, **Invert** or **Select by…**, so you can work around it without knocking it. It's still
 marked when the job runs, and other shapes still snap to it.
 
 - Lock the selection: Arrange → **Lock** (`Ctrl+Alt+L`) or right-click → Lock.
 - Unlock: Arrange → **Unlock all** (`Ctrl+Alt+Shift+L`) unlocks every locked shape.
-- Home → **Active layer** still selects locked shapes on the active layer.
 
 A whole layer can be locked or hidden in the Layers panel: its shapes can't be picked either.
 See [Arranging](arrange.md) and [Layers](layers.md).
