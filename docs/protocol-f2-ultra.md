@@ -40,6 +40,12 @@ Implemented in `src/ytool/`.
   - About 27 px/mm in the middle of its 4000 × 3000 picture. That shows 0.4 mm patterns, but not single 0.05 mm lines.
   - The picture is turned −151.8° to look straight. The largest straight rectangle inside it is 83 × 74 mm: (67, 75) to (150, 149).
 - **After a job (seen in logs, 2026-10-18/19):** the mode goes `P_WORKING` → `P_WORK_DONE` and stays there until the machine's button is pressed (then `P_IDLE`). PhotonCanvas now sends `PUT /v1/device/mode {mode:"P_IDLE"}` before an upload when it sees `P_WORK_DONE`. xTool Studio uses the same request to leave sleep and focusing. Not yet confirmed that this clears `P_WORK_DONE` on the machine.
+- **Several connections at once (2026-10-23, `tools/RemoteProbe`, during a running job):** three clients were connected together (the desktop app plus two probe connections, each with its own `?id=` and its own `mk-guest` pairing). All three could read status, all three got every push, and none was dropped. The job was not disturbed. A remote-control server can therefore sit beside the desktop app.
+- **Camera during a job (same run):** `/v1/camera/snap` still answers while `P_WORKING`. Each overview or close-up picture took 0.15 to 0.3 s, and 12 pictures 5 s apart all arrived. Back to back it managed only 1.1 pictures a second, and 1 of 8 failed with `-1 "get camera snap failed"`.
+  - **But the pictures are black.** They are full 4000×3000 frames, but they average a brightness of 1 out of 255 (about 185 KB, against about 630 KB idle). Only the laser dot shows, plus a faint trail next to it when brightened.
+  - `POST /v1/camera` (params `{exp, stream, exp_time?}`) is accepted during a job but changes nothing. That covers `exp 0` (the stock app's normal setting) and `exp 2` with `exp_time` 2, 20, 100, 500 and 2000. The overview was left at `exp 0` afterwards.
+  - `GET /v1/peripheral/param?type=fill_light` reports `{front:165, back:79}` (on) during the job. `type=ir_led` returns `-3 "error action type !"`.
+  - **The machine blanks both cameras for the whole job.** Five seconds after the job ended (`P_WORK_DONE`), with the same lighting, the overview averaged 82 and the close-up 113, both clear. During the job, every picture over a full minute was black, so the blanking isn't just while the beam is on. The user confirms the machine always does this. A time-lapse during a job therefore needs pauses, separate passes, or an outside camera.
 
 ## Two protocol generations
 

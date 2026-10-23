@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc.Import;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;

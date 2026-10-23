@@ -8,6 +8,7 @@ using SkiaSharp;
 using PhotonCanvas.Core;
 using PhotonCanvas.Core.Camera;
 using PhotonCanvas.Device;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 using Bitmap = Avalonia.Media.Imaging.Bitmap;
 

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;

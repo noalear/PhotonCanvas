@@ -59,7 +59,7 @@ layer's tone correction (if it has one) applied, and **Dithering** turns the gre
 or skip: dark areas get many dots, light areas few, white none. The picture's own pixel count doesn't
 matter (except with **Pass-through**): the layer's resolution decides how many dots are burned.
 
-- White and see-through parts aren't burned, and nothing outside a clip outline is. With **Invert
+- White and see-through parts aren't burned, and nothing outside an image mask is. With **Invert
   (for dark materials)** ticked, white parts count as black and do burn; see-through parts (more
   than half see-through) are never burned, inverted or not.
 - A picture on a Cut, Score or Engrave layer isn't engraved, and shapes on a Picture layer aren't
@@ -198,7 +198,7 @@ shapes, so it engraves crisply with ordinary fill settings instead of dots.
 | **Centre** | two sliders | Rings and spiral: where they start, across then down the picture (default the middle, a little above centre). |
 
 - Lines narrower than 0.06 mm are broken off, so highlights stay clean.
-- The picture's tone settings and clip are followed.
+- The picture's tone settings and image mask are followed.
 - The summary under the settings gives the number of line pieces, the spacing, the widest line and
   the area covered.
 - **Don't engrave the picture itself (its layer off)** (on by default) turns the picture's layer's
@@ -436,7 +436,7 @@ circle, a heart, a frame. The picture itself isn't changed.
   in sight.
 - The shape itself stays, as a guide. Delete it, or turn its layer's output off, if it shouldn't be
   marked.
-- The picture's own engraving (dots or depth slices) and **Engraving** lines follow the clip.
+- The picture's own engraving (dots or depth slices) and **Engraving** lines follow the mask.
   **Trace**, **Centre-line trace**, **Colour on metal**, **Diffraction**, **Depthmap** and **CMYK
   split** use the whole picture.
 
@@ -502,7 +502,7 @@ Press `Esc` or choose another tool to stop erasing.
 | **Width %**, **Height %** | 1 to 100 (100) | How much is kept. |
 
 **Crop** keeps the picture's scale: the kept part stays exactly where it was on the work area, and
-the picture gets smaller by the part cut away. Its tone settings and clip are kept.
+the picture gets smaller by the part cut away. Its tone settings and image mask are kept.
 
 ## CMYK split
 
@@ -526,7 +526,7 @@ elsewhere. Each goes on its own new Picture layer (**Cyan ·**, **Magenta ·**, 
 <!-- windows: BackgroundWindow -->
 
 **Remove background** makes a picture's backdrop see-through, so it isn't engraved, even with
-**Invert (for dark materials)** ticked. The picture's tone settings and clip are kept. It works best on
+**Invert (for dark materials)** ticked. The picture's tone settings and image mask are kept. It works best on
 logos, scans and objects on a plain backdrop, and uses no AI and nothing online.
 
 ![The Remove background window: the backdrop removed, the circle kept](images/window-picture-remove-background.png)
@@ -553,7 +553,7 @@ how much of the picture is kept. **Apply** works at full size and replaces the p
 - [A diffraction picture](tutorial:pic-diffraction)
 - [A relief from a depth map](tutorial:pic-depthmap)
 - [A relief from a 3D model](tutorial:pic-3d-model)
-- [Clip a picture to a shape](tutorial:pic-clip)
+- [Mask a picture with a shape](tutorial:pic-clip)
 - [Turn shapes into a picture](tutorial:pic-shapes-to-picture)
 - [Picture filters](tutorial:pic-filters)
 - [Rub out parts of a picture](tutorial:pic-eraser)

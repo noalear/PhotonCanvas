@@ -2,23 +2,10 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
-
-/// <summary>Where a side panel is: which side, its place there, folded to its title, or floating in its own window.</summary>
-public sealed record PanelPlace
-{
-    public string Side { get; init; } = "Left";
-    public int Order { get; init; }
-    public bool Folded { get; init; }
-    public bool Floating { get; init; }
-    /// <summary>A floating panel's window (screen position and size).</summary>
-    public double X { get; init; } = double.NaN;
-    public double Y { get; init; } = double.NaN;
-    public double W { get; init; } = 320;
-    public double H { get; init; } = 520;
-}
 
 /// <summary>
 /// Movable side panels: each has a slim title bar with buttons to move it to the other side, float

@@ -102,20 +102,10 @@ static class UiKit
         return g;
     }
 
-    public static string Duration(double seconds)
-    {
-        if (!double.IsFinite(seconds) || seconds < 0) return "–";
-        var t = TimeSpan.FromSeconds(Math.Round(seconds));
-        return t.TotalHours >= 1 ? $"{(int)t.TotalHours} h {t.Minutes:00} min" : t.TotalMinutes >= 1 ? $"{t.Minutes} min {t.Seconds:00} s" : $"{t.Seconds} s";
-    }
+    public static string Duration(double seconds) => PhotonCanvas.Core.TimeText.Duration(seconds);
 
     /// <summary>Short clock-style duration: 45 s, 3:07, 1:02:30.</summary>
-    public static string Clock(double seconds)
-    {
-        if (!double.IsFinite(seconds) || seconds < 0) return "";
-        var t = TimeSpan.FromSeconds(Math.Round(seconds));
-        return t.TotalHours >= 1 ? $"{(int)t.TotalHours}:{t.Minutes:00}:{t.Seconds:00}" : t.TotalMinutes >= 1 ? $"{t.Minutes}:{t.Seconds:00}" : $"{t.Seconds} s";
-    }
+    public static string Clock(double seconds) => PhotonCanvas.Core.TimeText.Clock(seconds);
 
     /// <summary>Configure an object inline and return it (for building menus in one expression).</summary>
     public static T With<T>(this T o, Action<T> setup)

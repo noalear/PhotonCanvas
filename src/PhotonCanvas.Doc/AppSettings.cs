@@ -1,9 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PhotonCanvas.Core;
-using PhotonCanvas.Doc;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Doc;
 
 /// <summary>A job this computer uploaded, so a loaded job can be recognised later.</summary>
 public sealed record SentJob(string TaskId, string Name, DateTime At);
@@ -11,10 +10,20 @@ public sealed record SentJob(string TaskId, string Name, DateTime At);
 /// <summary>A saved set of layer settings, e.g. "3 mm basswood – cut".</summary>
 public sealed record Preset(string Name, LayerMode Mode, LaserSettings Laser, double LinesPerCm);
 
-/// <summary>
-/// Per-user settings and presets in %APPDATA%\PhotonCanvas\app.json. Failures to read
-/// or write never stop the app; they just fall back to defaults.
-/// </summary>
+/// <summary>Where a side panel is: which side, its place there, folded to its title, or floating in its own window.</summary>
+public sealed record PanelPlace
+{
+    public string Side { get; init; } = "Left";
+    public int Order { get; init; }
+    public bool Folded { get; init; }
+    public bool Floating { get; init; }
+    /// <summary>A floating panel's window (screen position and size).</summary>
+    public double X { get; init; } = double.NaN;
+    public double Y { get; init; } = double.NaN;
+    public double W { get; init; } = 320;
+    public double H { get; init; } = 520;
+}
+
 /// <summary>A named G-code snippet for the console.</summary>
 public sealed class Macro
 {
@@ -22,6 +31,11 @@ public sealed class Macro
     public string Gcode { get; set; } = "";
 }
 
+/// <summary>
+/// Per-user settings and presets in the data folder's app.json. Failures to read or write never
+/// stop the app; they just fall back to defaults. The desktop app owns this file: other programs
+/// (the remote server) only read it, because the app would overwrite their changes on its next save.
+/// </summary>
 public sealed class AppSettings
 {
     public List<Preset> Presets { get; set; } = [];

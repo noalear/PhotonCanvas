@@ -2012,7 +2012,7 @@ public partial class MainWindow : Window
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
         var pic = sel.OfType<ImageShape>().FirstOrDefault();
         var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
-        if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to clip it to."; return; }
+        if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to mask it with."; return; }
         _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
         StatusText.Text = "Clipped: only the part inside the shape is engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }

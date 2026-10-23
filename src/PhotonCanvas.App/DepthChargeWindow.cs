@@ -5,6 +5,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;

@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using PhotonCanvas.Core;
 using PhotonCanvas.Device;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;

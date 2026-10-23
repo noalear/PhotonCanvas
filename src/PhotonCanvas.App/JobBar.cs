@@ -67,8 +67,19 @@ public sealed class JobBar : UserControl
     // Where the laser is: the job as sent, followed by elapsed time (the machine only reports that).
     readonly DispatcherTimer _follow = new() { Interval = TimeSpan.FromMilliseconds(100) };
     BuiltJob? _sentJob;
+    // The machine's id for the job sent from here: another job on the machine isn't ours to follow.
+    string? _sentTaskId;
     double? _machineElapsed;
     DateTime _machineElapsedAt;
+
+    /// <summary>
+    /// The job sent from here while it's the one on the machine; null once the machine has another
+    /// (from the phone, xTool Studio or its own screen), so that one isn't followed, timed or logged as
+    /// this design. Firmware that doesn't report job ids: the last job sent, as before.
+    /// </summary>
+    BuiltJob? OwnJob => IsOurs ? _sentJob : null;
+    double? OwnEstimate => IsOurs ? _sentEstimate : null;
+    bool IsOurs => _sentTaskId is { } id && (_machine.LoadedTaskId is not { Length: > 0 } loaded || loaded == id);
 
     // framing
     readonly SplitButton _frame = new() { Height = 54, Width = 96 };
@@ -302,19 +313,12 @@ public sealed class JobBar : UserControl
 
     void UpdateDelayRow() => _delayRow.IsVisible = _passMode.SelectedIndex == 0;
 
-    JobOptions Options => new()
+    // The saved settings (shared with the remote server), with this bar's own controls and choices.
+    JobOptions Options => JobSettings.From(_settings) with
     {
         WholeJobPasses = _passMode.SelectedIndex == 0,
         PassDelayS = (double)(_delay.Value ?? 0),
         PathPauseS = (double)(_pathPause.Value ?? 0),
-        // GRBL machines: their one laser's power (the F2 Ultra's 40 W blue and 60 W MOPA are the defaults).
-        BlueWatts = _settings.ActiveSetup() is { Kind: MachineKind.Grbl } g1 ? g1.PowerW : 40,
-        RedWatts = _settings.ActiveSetup() is { Kind: MachineKind.Grbl } g2 ? g2.PowerW : 60,
-        Mode = WorkModes.From(_settings),
-        Machine = WorkModes.Area(_settings),
-        FanGear = _settings.FanGear,
-        MopaOffset = new Vec2(_settings.MopaOffsetX, _settings.MopaOffsetY),
-        PurifierSpeed = _settings.PurifierSpeed,
         Section = _section,
         OnlyLayer = _onlyLayer,
     };
@@ -573,17 +577,17 @@ public sealed class JobBar : UserControl
                 _pause.IsEnabled = false;
                 _stop.IsEnabled = true;
                 _timeline.Progress = 0;
-                if (_sentEstimate is { } est) _runTimes += $" About {Clock(est)} once started.";
+                if (OwnEstimate is { } est) _runTimes += $" About {Clock(est)} once started.";
                 break;
             case "P_WORKING":
                 ShowRunning(true);
                 if (_pausedAt is { } p) _pausedFor += (DateTime.Now - p).TotalSeconds;
                 _pausedAt = null;
                 if (_startedAt is null && _settings.TimeLapse && _timeLapse is null)
-                    _timeLapse = TimeLapse.Start(_machine.TimeLapseFrameAsync, _settings.TimeLapseSeconds, _sentFrom is { } nm ? Path.GetFileNameWithoutExtension(nm) : "Untitled");
+                    _timeLapse = TimeLapse.Start(_machine.TimeLapseFrameAsync, _settings.TimeLapseSeconds, OwnJob is null ? "Job" : _sentFrom is { } nm ? Path.GetFileNameWithoutExtension(nm) : "Untitled");
                 _startedAt ??= DateTime.Now;
                 _machineElapsedAt = DateTime.Now;
-                if (_sentJob is not null) _follow.Start();
+                if (OwnJob is not null) _follow.Start();
                 _runState.Text = "Running";
                 _pause.Content = "Pause";
                 _pause.IsEnabled = _stop.IsEnabled = true;
@@ -606,12 +610,12 @@ public sealed class JobBar : UserControl
                     bool finished = mode is "P_WORK_DONE" or "P_FINISH";
                     _sendState = finished ? $"Finished in {Clock(took)}." : "The job ended.";
                     if (finished) LearnTiming(took);
-                    if (_sentJob is { } sj)
+                    if (OwnJob is { } sj)
                     {
                         JobHistory.Add(new JobRecord(DateTime.Now, _sentFrom is { } f ? Path.GetFileNameWithoutExtension(f) : "Untitled", sj.EstimateS, took, finished, sj.LayerTimes.Count, sj.Bounds.Width, sj.Bounds.Height));
                         if (finished) Chime();
                     }
-                    if (finished && _sentJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
+                    if (finished && OwnJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
                 }
                 if (_timeLapse is { } lapse)
                 {
@@ -654,8 +658,8 @@ public sealed class JobBar : UserControl
         // Remaining: from the machine's progress when it gives one, else from our estimate.
         double? remaining = null;
         if (fraction is { } f && f > 0.02) remaining = elapsed / f * (1 - f);
-        else if (_sentEstimate is { } est) remaining = Math.Max(0, est * Math.Clamp(_settings.JobTimeScale, 0.3, 5) - elapsed);
-        _timeline.Progress = fraction ?? (_sentEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / (e2 * Math.Clamp(_settings.JobTimeScale, 0.3, 5))) : 0);
+        else if (OwnEstimate is { } est) remaining = Math.Max(0, est * Math.Clamp(_settings.JobTimeScale, 0.3, 5) - elapsed);
+        _timeline.Progress = fraction ?? (OwnEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / (e2 * Math.Clamp(_settings.JobTimeScale, 0.3, 5))) : 0);
         _runTimes = $"Elapsed {Clock(elapsed)}" + (remaining is { } r ? $" · about {Clock(r)} left" : "");
         ShowCaption();
     }
@@ -673,7 +677,7 @@ public sealed class JobBar : UserControl
     /// <summary>Move the "laser is here" marker on the work area.</summary>
     void Follow()
     {
-        if (_sentJob is not { } job || _startedAt is null) return;
+        if (OwnJob is not { } job || _startedAt is null) return;
         // The estimate leaves out acceleration: scale real time back onto it, by what past jobs showed.
         double est = RunningSeconds() / Math.Clamp(_settings.JobTimeScale, 0.3, 5);
         _canvas.ShowRun(job, RunTracker.At(job, est));
@@ -682,7 +686,7 @@ public sealed class JobBar : UserControl
     /// <summary>After a finished job: how much longer it took than estimated, blended into what's learned.</summary>
     void LearnTiming(double tookSeconds)
     {
-        if (_sentJob is not { EstimateS: > 10 } job) return;
+        if (OwnJob is not { EstimateS: > 10 } job) return;
         double ratio = Math.Clamp(tookSeconds / job.EstimateS, 0.5, 4);
         _settings.JobTimeScale = Math.Round(_settings.JobTimeScale * 0.6 + ratio * 0.4, 3);
         _settings.Save();
@@ -856,57 +860,13 @@ public sealed class JobBar : UserControl
             return;
         }
 
-        var sb = new StringBuilder();
-        var sent = JobBuilder.OutputLayers(_doc.State).Where(l => _doc.State.ShapesFor(l).Any()).ToList();
-        static string Line(Layer l)
+        var review = JobChecks.Review(_doc.State, job, Options, _settings, _machine.Distance);
+        if (review.Refusal is { } refusal)
         {
-            var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
-            return $"• {l.Name}: {l.Mode}, {l.Laser.Power:0.#}% at {l.Laser.Speed:0.#} mm/s × {l.Laser.Passes} ({src})";
-        }
-        if (sent.Count <= 8)
-            foreach (var l in sent) sb.AppendLine(Line(l));
-        else
-        {
-            // Many layers (a test grid): the ranges say more than 50 lines would.
-            static string Range(IEnumerable<double> v, string unit) { var a = v.Min(); var b = v.Max(); return a == b ? $"{a:0.#}{unit}" : $"{a:0.#}–{b:0.#}{unit}"; }
-            sb.AppendLine($"{sent.Count} layers: power {Range(sent.Select(l => l.Laser.Power), "%")}, speed {Range(sent.Select(l => l.Laser.Speed), " mm/s")}" +
-                          (sent.Any(l => l.Laser.Light == LightSource.Red)
-                              ? $", MOPA {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.PulseWidthNs), " ns")} at {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.FrequencyKhz), " kHz")}"
-                              : "") + ".");
-            sb.AppendLine($"First: {Line(sent[0])[2..]}");
-            sb.AppendLine($"Last: {Line(sent[^1])[2..]}");
-        }
-        var opt = Options;
-        sb.AppendLine();
-        sb.AppendLine(opt.WholeJobPasses
-            ? $"Passes run over the whole job{(opt.PassDelayS > 0 ? $", {opt.PassDelayS:0.#} s pause between" : "")}."
-            : "Each path runs all its passes before the next.");
-        if (opt.PathPauseS > 0) sb.AppendLine($"A {opt.PathPauseS:0.##} s pause after each path.");
-        sb.AppendLine($"Size {job.Bounds.Width:0.#} × {job.Bounds.Height:0.#} mm · about {Duration(job.EstimateS)}.");
-        if (_machine.Distance is { } d) sb.AppendLine($"Machine focus distance: {d:0.0} mm. Make sure this matches your material.");
-        if (VariableText.Describe(_doc.State) is { } marks) sb.AppendLine($"Fields: {marks}.");
-        if (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat") sb.AppendLine($"Work mode: {WorkModes.Describe(_settings)} (experimental).");
-        if (_section is { } sec) sb.AppendLine($"Marking {sec.Label} only. Is the material where it should be for it?");
-        if (_onlyLayer is { } only && _doc.State.FindLayer(only) is { } ol) sb.AppendLine($"Marking the layer \"{ol.Name}\" only.");
-        // Step-down and focus offsets lower the head: never let it come near the material.
-        double offset = job.Job.Blocks.Select(b => b.FocusOffsetMm).DefaultIfEmpty(0).Max();
-        double deepest = JobBuilder.OutputLayers(_doc.State).Where(l => l.Mode is LayerMode.Cut or LayerMode.Score && (l.StepDownMm > 0 || l.StepDownFirstMm > 0))
-            .Select(l => l.FocusOffsetMm + l.StepDownFirstMm + (Math.Max(1, l.Laser.Passes) - 1) * l.StepDownMm).Append(offset).Max();
-        if (deepest > 0 && _machine.Distance is { } focus && deepest > focus - 3)
-        {
-            await Dialogs.Message(owner, "Can't send", $"Step-down and focus offsets would lower the head {deepest:0.##} mm, but it's only {focus:0.0} mm from the material. Reduce them.");
+            await Dialogs.Message(owner, "Can't send", refusal);
             return;
         }
-        if (job.Job.Blocks.Any(b => b.FocusOffsetMm != 0))
-            sb.AppendLine($"The head moves for focus offsets (down at most {Math.Max(0, offset):0.##} mm) and comes back at the end.");
-        foreach (var w in job.Warnings.Except(job.LeftOut)) sb.AppendLine($"⚠ {w}");
-        if (job.LeftOut.Count > 0)
-        {
-            // First thing in the message: things that look like part of the job but won't be done.
-            var head = new System.Text.StringBuilder().AppendLine("NOT IN THIS JOB:");
-            foreach (var w in job.LeftOut) head.AppendLine($"✖ {w}");
-            sb.Insert(0, head.AppendLine().ToString());
-        }
+        var sb = new StringBuilder(JobChecks.Text(review));
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();
@@ -922,7 +882,7 @@ public sealed class JobBar : UserControl
         {
             var progress = new Progress<double>(f => _progress.Value = f);
             // Sending again replaces a job that's loaded but not started (never one that's running).
-            await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None, replaceLoadedJob: true,
+            _sentTaskId = await _machine.UploadJobAsync(job.Xf, progress, CancellationToken.None, replaceLoadedJob: true,
                 name: _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "Untitled");
             _sentEstimate = job.EstimateS;
             _sentJob = job;

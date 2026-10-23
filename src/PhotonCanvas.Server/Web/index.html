@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14171c">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<title>PhotonCanvas Remote</title>
+<style>
+  :root {
+    --bg: #14171c; --panel: #1d2129; --panel2: #262b35; --line: #323844; --text: #e8ebf0; --muted: #9aa3b2;
+    --accent: #3b82f6; --ok: #22c55e; --warn: #f59e0b; --danger: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { padding: 0 0 72px; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 12px 16px 8px; border-bottom: 1px solid var(--line); }
+  header h1 { margin: 0; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
+  .dot.on { background: var(--ok); } .dot.busy { background: var(--warn); } .dot.off { background: var(--danger); }
+  main { padding: 12px 16px; max-width: 720px; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  .big { font-size: 20px; font-weight: 600; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1 1 auto; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 12px 14px; background: var(--panel2); color: var(--text); min-height: 46px; cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; }
+  button.danger { background: var(--danger); color: #fff; }
+  button.go { background: var(--ok); color: #06210f; }
+  button:disabled { opacity: .45; cursor: default; }
+  .bar { height: 10px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .5s; }
+  .seg { display: flex; background: var(--panel2); border-radius: 10px; padding: 3px; gap: 3px; margin-bottom: 10px; }
+  .seg button { flex: 1; min-height: 38px; padding: 6px; background: transparent; color: var(--muted); }
+  .seg button.on { background: var(--panel); color: var(--text); }
+  .pic { width: 100%; border-radius: 8px; display: block; background: #000; min-height: 120px; object-fit: contain; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 10px; background: rgba(245, 158, 11, .08); border-radius: 4px; font-size: 13px; margin-top: 8px; }
+  .alert { position: sticky; top: 64px; z-index: 6; margin: 8px 16px 0; padding: 12px 14px; border-radius: 10px; background: var(--danger); color: #fff; font-weight: 600; display: none; gap: 10px; align-items: center; }
+  .alert.show { display: flex; } .alert span { flex: 1; } .alert button { min-height: 34px; padding: 6px 10px; background: rgba(0, 0, 0, .25); color: #fff; }
+  nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: var(--panel); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 5; }
+  nav button { flex: 1; border-radius: 0; background: transparent; color: var(--muted); min-height: 58px; }
+  nav button.on { color: var(--text); box-shadow: inset 0 3px 0 var(--accent); }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: flex; gap: 12px; align-items: center; cursor: pointer; }
+  .item .grow { flex: 1; min-width: 0; }
+  .item .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--panel2); color: var(--muted); }
+  .badge.ok { color: var(--ok); } .badge.stop { color: var(--warn); } .badge.phone { color: var(--accent); }
+  .thumbs { display: flex; gap: 6px; }
+  .thumbs img { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; background: #000; }
+  input[type=text], input[type=search] { width: 100%; font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); color: var(--text); }
+  pre.summary { white-space: pre-wrap; font-family: inherit; font-size: 14px; line-height: 1.5; margin: 8px 0 0; color: var(--text); }
+  .sheet { position: fixed; inset: 0; background: rgba(0, 0, 0, .6); z-index: 20; display: none; align-items: flex-end; }
+  .sheet.show { display: flex; }
+  .sheet .box { background: var(--bg); width: 100%; max-height: 92vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); max-width: 720px; margin: 0 auto; }
+  .sheet h3 { margin: 0 0 10px; font-size: 18px; }
+  .preview { width: 100%; border-radius: 8px; background: #fff; display: block; }
+  .toast { position: fixed; left: 16px; right: 16px; bottom: 80px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; z-index: 30; display: none; }
+  .toast.show { display: block; }
+  .hidden { display: none !important; }
+  .err { color: var(--danger); font-size: 14px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span id="dot" class="dot"></span><span id="title">PhotonCanvas Remote</span></h1>
+  <div class="sub" id="subtitle">Connecting…</div>
+</header>
+<div class="alert" id="alert"><span id="alertText"></span><button id="alertClose">OK</button></div>
+
+<!-- First time: the access code -->
+<main id="login" class="hidden">
+  <div class="card">
+    <h2>Connect</h2>
+    <p>Type the access code. It's in the desktop app under <b>Machine → Remote access</b> (or in the server's window when it starts).</p>
+    <input type="text" id="code" placeholder="XXXX-XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off" spellcheck="false">
+    <div class="row" style="margin-top:10px"><button class="primary" id="codeGo">Connect</button></div>
+    <div class="err" id="codeErr"></div>
+  </div>
+</main>
+
+<main id="pageMachine" class="hidden">
+  <div class="card">
+    <h2>Machine</h2>
+    <div class="big" id="state">–</div>
+    <div class="muted" id="machineLine"></div>
+    <div class="err" id="problem"></div>
+  </div>
+
+  <div class="card hidden" id="jobCard">
+    <h2>Job</h2>
+    <div class="big" id="jobName"></div>
+    <div class="muted" id="jobFrom"></div>
+    <div class="bar" id="jobBarWrap"><div id="jobBar"></div></div>
+    <div class="muted" id="jobTimes"></div>
+    <div id="startArea" class="hidden" style="margin-top:12px">
+      <img class="pic hidden" id="startPic" alt="The bed now" style="margin-bottom:8px">
+      <div class="muted" id="startHint">Look at the bed first: the job only starts after that.</div>
+      <div class="row" style="margin-top:8px">
+        <button class="primary" id="btnLook">Look at the bed</button>
+        <button class="go" id="btnStart" disabled>Start job</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnPause">Pause</button>
+      <button class="danger" id="btnStop">Stop</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Camera</h2>
+    <div class="seg" id="camSeg"><button data-cam="overview" class="on">Overview</button><button data-cam="closeup">Close-up</button></div>
+    <img class="pic hidden" id="pic" alt="Camera picture">
+    <div class="muted" id="picLine">No picture yet.</div>
+    <div class="note hidden" id="picBlank">The machine blanks its cameras while a job runs, so pictures come out black until it ends. You'll get a picture of the result when it finishes.</div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="btnPic">Take picture</button></div>
+  </div>
+</main>
+
+<main id="pageDesigns" class="hidden">
+  <input type="search" id="search" placeholder="Find a design">
+  <div class="muted" style="margin:8px 2px" id="designsLine"></div>
+  <div class="list" id="designs"></div>
+</main>
+
+<main id="pageHistory" class="hidden">
+  <div class="list" id="history"></div>
+</main>
+
+<nav id="nav" class="hidden">
+  <button data-page="Machine" class="on">Machine</button>
+  <button data-page="Designs">Designs</button>
+  <button data-page="History">History</button>
+</nav>
+
+<!-- A design: its check, then load, then look and start -->
+<div class="sheet" id="sheet">
+  <div class="box">
+    <h3 id="sheetTitle"></h3>
+    <img class="preview hidden" id="sheetPreview" alt="What will be marked">
+    <pre class="summary" id="sheetText"></pre>
+    <div class="err" id="sheetErr"></div>
+    <img class="pic hidden" id="sheetPic" alt="The bed now" style="margin-top:10px">
+    <div class="muted" id="sheetPicLine"></div>
+    <div class="row" style="margin-top:12px">
+      <button id="sheetClose">Close</button>
+      <button class="primary" id="sheetLoad" disabled>Load onto machine</button>
+      <button class="primary hidden" id="sheetPicAgain">New picture</button>
+      <button class="go hidden" id="sheetStart">Start job</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let code = localStorage.getItem("pc-code") || "";
+let status = null, events = null, cam = "overview", lastPicture = null, designs = [], openDesign = null;
+
+// ---- talking to the server ----
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { ...(opts.headers || {}), Authorization: "Bearer " + code, ...(opts.body ? { "Content-Type": "application/json" } : {}) } });
+  if (r.status === 401 || r.status === 429) { const e = await r.json().catch(() => ({})); showLogin(e.error); throw new Error(e.error || "Access code needed."); }
+  if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.error || ("The server answered " + r.status + ".")); }
+  return r;
+}
+const json = async (path, opts) => (await api(path, opts)).json();
+const post = (path, body) => json(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
+const withCode = url => url + (url.includes("?") ? "&" : "?") + "access_token=" + encodeURIComponent(code);
+
+function showLogin(msg) {
+  if (events) { events.close(); events = null; }
+  for (const p of ["pageMachine", "pageDesigns", "pageHistory"]) $(p).classList.add("hidden");
+  $("nav").classList.add("hidden");
+  $("login").classList.remove("hidden");
+  $("codeErr").textContent = msg || "";
+  $("subtitle").textContent = "Not connected";
+}
+
+async function connect() {
+  try {
+    const info = await json("/api/info");
+    localStorage.setItem("pc-code", code);
+    $("login").classList.add("hidden");
+    $("nav").classList.remove("hidden");
+    show("Machine");
+    listen();
+    return info;
+  } catch (e) { if (!$("login").classList.contains("hidden")) $("codeErr").textContent = e.message; }
+}
+
+function listen() {
+  if (events) events.close();
+  events = new EventSource(withCode("/api/events"));
+  events.addEventListener("status", e => render(JSON.parse(e.data)));
+  events.addEventListener("job", e => onJob(JSON.parse(e.data)));
+  events.addEventListener("alert", e => onAlert(JSON.parse(e.data)));
+  events.onerror = () => { $("dot").className = "dot off"; $("subtitle").textContent = "Lost the server: trying again…"; };
+}
+
+// ---- the machine ----
+const clock = s => { if (s == null || !isFinite(s)) return ""; s = Math.round(s); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : m ? `${m}:${String(x).padStart(2, "0")}` : `${x} s`; };
+const sources = { phone: "Loaded from the phone", computer: "Sent from the desktop app", elsewhere: "From xTool Studio, the machine's screen or another computer" };
+
+function render(s) {
+  status = s;
+  $("dot").className = "dot " + (!s.connected ? "off" : s.mode === "P_WORKING" ? "busy" : "on");
+  $("title").textContent = s.name || "PhotonCanvas Remote";
+  $("subtitle").textContent = s.connected ? s.state : "Not connected to the machine";
+  $("state").textContent = s.state;
+  $("machineLine").textContent = s.connected ? [s.ip, s.focusDistanceMm != null ? `focus distance ${s.focusDistanceMm.toFixed(1)} mm` : null].filter(Boolean).join(" · ") : "";
+  $("problem").textContent = s.problem || "";
+  const j = s.job;
+  $("jobCard").classList.toggle("hidden", !j);
+  if (j) {
+    $("jobName").textContent = j.design;
+    $("jobFrom").textContent = (sources[j.source] || "") + (j.startedFromPhone ? " · started from the phone" : "");
+    const loaded = j.stage === "loaded";
+    $("jobBarWrap").classList.toggle("hidden", loaded);
+    const frac = j.fraction != null ? j.fraction : (j.estimateS && j.remainingS != null ? 1 - j.remainingS / Math.max(1, j.elapsedS + j.remainingS) : null);
+    $("jobBar").style.width = frac != null ? Math.round(Math.min(1, frac) * 100) + "%" : "0";
+    $("jobTimes").textContent = loaded ? (j.estimateS ? `About ${clock(j.estimateS)} once started.` : "Waiting to start.")
+      : `Elapsed ${clock(j.elapsedS)}` + (j.remainingS != null ? ` · about ${clock(j.remainingS)} left` : "") + (j.stage === "paused" ? " · paused" : "");
+    $("btnPause").textContent = j.stage === "paused" ? "Continue" : "Pause";
+    $("btnPause").classList.toggle("hidden", loaded);
+    $("btnStop").textContent = loaded ? "Cancel job" : "Stop";
+    $("startArea").classList.toggle("hidden", !loaded);
+    updateStart();
+  }
+  if (!$("sheet").classList.contains("show")) return;
+  updateSheetStart();
+}
+
+function freshPicture() {
+  return lastPicture && status && status.job && status.job.stage === "loaded" && lastPicture.mode === "loaded" && lastPicture.taskId === status.job.taskId
+    && Date.now() - lastPicture.at < 115000;
+}
+function updateStart() {
+  const ok = freshPicture();
+  $("btnStart").disabled = !ok;
+  $("startPic").classList.toggle("hidden", !ok);
+  if (ok && $("startPic").src !== lastPicture.url) $("startPic").src = lastPicture.url;
+  $("btnLook").textContent = ok ? "New picture" : "Look at the bed";
+  $("startHint").textContent = ok ? `The bed at ${new Date(lastPicture.at).toLocaleTimeString()}. Is the material in place and nothing in the way? Start when ready: the laser will fire.`
+    : "Look at the bed first: the job only starts after that (a picture less than 2 minutes old).";
+}
+$("btnLook").onclick = async () => {
+  const b = $("btnLook"); b.disabled = true; b.textContent = "Taking…";
+  try { await takePicture("overview"); } catch (e) { toast(e.message); }
+  b.disabled = false; updateStart();
+};
+setInterval(() => { if (status) { updateStart(); updateSheetStart(); } }, 5000);
+
+async function takePicture(stream) {
+  const r = await api(`/api/camera/${stream}?width=1400`);
+  const blob = await r.blob();
+  const p = { id: r.headers.get("X-Picture-Id"), at: Date.now(), blanked: r.headers.get("X-Camera-Blanked") === "true", url: URL.createObjectURL(blob),
+    mode: status && status.job && status.job.stage === "loaded" ? "loaded" : "", taskId: status && status.job ? status.job.taskId : null };
+  if (lastPicture && lastPicture.url) URL.revokeObjectURL(lastPicture.url);
+  lastPicture = p;
+  return p;
+}
+
+$("btnPic").onclick = async () => {
+  const b = $("btnPic"); b.disabled = true; b.textContent = "Taking…";
+  try {
+    const p = await takePicture(cam);
+    $("pic").src = p.url; $("pic").classList.remove("hidden");
+    $("picLine").textContent = `${cam === "overview" ? "Overview" : "Close-up"} at ${new Date(p.at).toLocaleTimeString()}`;
+    $("picBlank").classList.toggle("hidden", !p.blanked);
+    updateStart();
+  } catch (e) { toast(e.message); }
+  b.disabled = false; b.textContent = "Take picture";
+};
+for (const b of $("camSeg").children) b.onclick = () => { cam = b.dataset.cam; for (const x of $("camSeg").children) x.classList.toggle("on", x === b); };
+
+async function startJob(button) {
+  if (!lastPicture) return;
+  if (!confirm(`Start "${status.job.design}" now?\n\nThe laser will fire. You looked at the bed a moment ago: the material is in place and nothing is in the way?`)) return;
+  button.disabled = true;
+  try { await post("/api/job/start", { pictureId: lastPicture.id }); toast("Started."); closeSheet(); }
+  catch (e) { alert(e.message); }
+  button.disabled = false;
+}
+$("btnStart").onclick = () => startJob($("btnStart"));
+
+$("btnPause").onclick = async () => {
+  try { await post(status.job.stage === "paused" ? "/api/job/resume" : "/api/job/pause"); } catch (e) { toast(e.message); }
+};
+$("btnStop").onclick = async () => {
+  const loaded = status.job.stage === "loaded";
+  if (!confirm(loaded ? `Cancel "${status.job.design}"? It's loaded but not started.` : `Stop "${status.job.design}" now? It can't be continued afterwards.`)) return;
+  try { await post("/api/job/stop"); toast(loaded ? "Cancelled." : "Stopped."); } catch (e) { toast(e.message); }
+};
+
+function onJob(e) {
+  if (e.kind === "finished" || e.kind === "stopped") { toast(e.text); buzz(); }
+  if (e.kind === "started") toast(`"${e.design}" started.`);
+  if (e.kind === "picture" && !$("pageHistory").classList.contains("hidden")) loadHistory();
+}
+function onAlert(a) {
+  $("alertText").textContent = a.text;
+  $("alert").classList.add("show");
+  buzz(true);
+}
+$("alertClose").onclick = () => $("alert").classList.remove("show");
+function buzz(long) { if (navigator.vibrate) navigator.vibrate(long ? [400, 150, 400, 150, 400] : [200]); }
+let toastTimer;
+function toast(t) { const el = $("toast"); el.textContent = t; el.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove("show"), 4500); }
+
+// ---- designs ----
+async function loadDesigns() {
+  $("designsLine").textContent = "Looking…";
+  try { designs = await json("/api/projects"); drawDesigns(); }
+  catch (e) { $("designsLine").textContent = e.message; }
+}
+function drawDesigns() {
+  const q = $("search").value.trim().toLowerCase();
+  const shown = designs.filter(d => !q || d.name.toLowerCase().includes(q) || d.folder.toLowerCase().includes(q));
+  $("designsLine").textContent = designs.length ? `${shown.length} design${shown.length === 1 ? "" : "s"}: the desktop app's recent files first, then your project folders.` : "No designs found. Save one from the desktop app, or add a folder in Remote access.";
+  const list = $("designs"); list.textContent = "";
+  for (const d of shown) {
+    const el = document.createElement("div"); el.className = "item";
+    el.innerHTML = `<div class="grow"><div class="name"></div><div class="muted"></div></div>`;
+    el.querySelector(".name").textContent = d.name;
+    el.querySelector(".muted").textContent = `${new Date(d.modified).toLocaleString()} · ${d.folder}`;
+    if (d.recent) { const b = document.createElement("span"); b.className = "badge"; b.textContent = "Recent"; el.appendChild(b); }
+    el.onclick = () => openCheck(d);
+    list.appendChild(el);
+  }
+}
+$("search").oninput = drawDesigns;
+
+async function openCheck(d) {
+  openDesign = { design: d, check: null, loaded: false };
+  $("sheetTitle").textContent = d.name;
+  $("sheetText").textContent = "Preparing the job (as the desktop app's Ship It would)…";
+  $("sheetErr").textContent = "";
+  for (const id of ["sheetPreview", "sheetPic", "sheetPicAgain", "sheetStart"]) $(id).classList.add("hidden");
+  $("sheetPicLine").textContent = "";
+  $("sheetLoad").classList.remove("hidden"); $("sheetLoad").disabled = true;
+  $("sheet").classList.add("show");
+  try {
+    const c = await post(`/api/projects/${d.id}/check`);
+    if (openDesign.design !== d) return;
+    openDesign.check = c;
+    $("sheetText").textContent = c.text;
+    $("sheetPreview").src = withCode(c.preview + "?width=900"); $("sheetPreview").classList.remove("hidden");
+    if (c.refusal) $("sheetErr").textContent = "Can't send: " + c.refusal;
+    $("sheetLoad").disabled = !!c.refusal || !(status && status.connected);
+  } catch (e) { $("sheetText").textContent = ""; $("sheetErr").textContent = e.message; }
+}
+$("sheetLoad").onclick = async () => {
+  const b = $("sheetLoad"); b.disabled = true; b.textContent = "Loading…";
+  try {
+    const r = await post(`/api/projects/${openDesign.design.id}/load`);
+    openDesign.loaded = true;
+    $("sheetText").textContent = r.text;
+    $("sheetPreview").classList.add("hidden");
+    b.classList.add("hidden");
+    if (r.picture) {
+      const img = await api(r.picture.url + "?width=1400");
+      if (lastPicture && lastPicture.url) URL.revokeObjectURL(lastPicture.url);
+      lastPicture = { id: r.picture.id, at: Date.now(), blanked: r.picture.blanked, url: URL.createObjectURL(await img.blob()), mode: "loaded", taskId: r.taskId };
+      showSheetPicture();
+    }
+    $("sheetPicAgain").classList.remove("hidden");
+    $("sheetStart").classList.remove("hidden");
+    updateSheetStart();
+  } catch (e) { $("sheetErr").textContent = e.message; b.disabled = false; }
+  b.textContent = "Load onto machine";
+};
+function showSheetPicture() {
+  $("sheetPic").src = lastPicture.url; $("sheetPic").classList.remove("hidden");
+  $("sheetPicLine").textContent = `The bed at ${new Date(lastPicture.at).toLocaleTimeString()}.`;
+}
+$("sheetPicAgain").onclick = async () => {
+  const b = $("sheetPicAgain"); b.disabled = true;
+  try { await takePicture("overview"); showSheetPicture(); updateSheetStart(); } catch (e) { $("sheetErr").textContent = e.message; }
+  b.disabled = false;
+};
+function updateSheetStart() {
+  if (!openDesign || !openDesign.loaded) return;
+  const ok = freshPicture();
+  $("sheetStart").disabled = !ok;
+  if (!ok && status && status.job && status.job.stage === "loaded") $("sheetPicLine").textContent = "That picture is too old to start on: take a new one.";
+}
+$("sheetStart").onclick = () => startJob($("sheetStart"));
+function closeSheet() { $("sheet").classList.remove("show"); openDesign = null; }
+$("sheetClose").onclick = closeSheet;
+
+// ---- history ----
+async function loadHistory() {
+  const list = $("history");
+  try {
+    const items = await json("/api/history?max=60");
+    list.textContent = "";
+    if (!items.length) list.innerHTML = `<div class="muted">No jobs yet. Every job the machine runs (from the phone, the desktop app or its own screen) appears here, with a picture before and after.</div>`;
+    for (const h of items) {
+      const el = document.createElement("div"); el.className = "item";
+      el.innerHTML = `<div class="thumbs"></div><div class="grow"><div class="name"></div><div class="muted"></div><div class="row" style="margin-top:4px;gap:6px"></div></div>`;
+      el.querySelector(".name").textContent = h.design;
+      el.querySelector(".muted").textContent = `${new Date(h.startedAt).toLocaleString()}` + (h.tookS != null ? ` · ${clock(h.tookS)}` : " · running");
+      const badges = el.querySelector(".row");
+      const badge = (t, c) => { const b = document.createElement("span"); b.className = "badge " + c; b.textContent = t; b.style.flex = "none"; badges.appendChild(b); };
+      if (h.endedAt) badge(h.finished ? "Finished" : "Stopped", h.finished ? "ok" : "stop");
+      if (h.startedFromPhone) badge("Started from phone", "phone");
+      const thumbs = el.querySelector(".thumbs");
+      for (const [u, label] of [[h.before, "Before"], [h.after, "After"]]) {
+        if (!u) continue;
+        const img = document.createElement("img"); img.src = withCode(u + "?width=240"); img.alt = label; img.title = label;
+        img.onclick = ev => { ev.stopPropagation(); window.open(withCode(u), "_blank"); };
+        thumbs.appendChild(img);
+      }
+      list.appendChild(el);
+    }
+  } catch (e) { list.textContent = e.message; }
+}
+
+// ---- pages ----
+function show(page) {
+  for (const p of ["Machine", "Designs", "History"]) $("page" + p).classList.toggle("hidden", p !== page);
+  for (const b of $("nav").children) b.classList.toggle("on", b.dataset.page === page);
+  if (page === "Designs" && !designs.length) loadDesigns();
+  if (page === "History") loadHistory();
+}
+for (const b of $("nav").children) b.onclick = () => show(b.dataset.page);
+
+$("codeGo").onclick = () => { code = $("code").value.trim(); connect(); };
+$("code").onkeydown = e => { if (e.key === "Enter") $("codeGo").click(); };
+// Scanned from the desktop app's QR code: the code comes after # (never sent to the server), kept here, then taken off the address.
+const scanned = location.hash.match(/code=([A-Za-z0-9-]+)/);
+if (scanned) { code = scanned[1]; history.replaceState(null, "", location.pathname); }
+if (code) connect(); else showLogin();
+</script>
+</body>
+</html>

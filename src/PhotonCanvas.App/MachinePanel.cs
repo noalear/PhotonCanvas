@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using PhotonCanvas.Core;
 using PhotonCanvas.Core.Camera;
 using PhotonCanvas.Device;
+using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
@@ -995,22 +996,7 @@ public sealed class MachinePanel : UserControl
         });
     }
 
-    static string Describe(string mode) => mode switch
-    {
-        "P_IDLE" => "Ready",
-        "P_WORK" => "Job loaded – waiting for the start button",
-        "P_FRAMING" => "Framing",
-        "P_WORKING" => "Running a job",
-        "P_PAUSE" => "Paused",
-        "P_WORK_DONE" => "Job finished",
-        "P_FINISH" => "Job finished",
-        "P_SLEEP" => "Asleep",
-        "P_AUTOFOCUS" => "Auto-focusing",
-        "P_MEASURE" => "Measuring",
-        "P_ERROR" => "Error: check the machine",
-        "" => "Unknown",
-        _ => mode,
-    };
+    static string Describe(string mode) => DeviceClient.DescribeMode(mode);
 
     void ShowStatus(string mode, double? dist)
     {
@@ -1372,8 +1358,8 @@ public sealed class MachinePanel : UserControl
         SetFraming(false);
     }
 
-    /// <summary>Upload a job. The machine then waits for its start button.</summary>
-    public async Task UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job")
+    /// <summary>Upload a job. The machine then waits for its start button. Returns the job's id on the machine.</summary>
+    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job")
     {
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         var resume = await PauseLive();
@@ -1398,6 +1384,7 @@ public sealed class MachinePanel : UserControl
             if (Mode == "P_WORK") ShowStatus(Mode, Distance);
             LoadedJobChanged?.Invoke();
             Log($"Job \"{name}\" uploaded. Press the start button on the machine.");
+            return taskId;
         }
         finally { resume(); }
     }

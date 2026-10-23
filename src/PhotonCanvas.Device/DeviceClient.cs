@@ -840,7 +840,7 @@ public sealed class DeviceClient : IAsyncDisposable
         }
     }
 
-    // ---- typed helpers (read-only, plus job upload without auto-start) -------------------------
+    // ---- typed helpers (read-only, plus job upload) ----------------------------------------------
 
     public async Task<MachineInfo> GetMachineInfoAsync(CancellationToken cancellationToken = default)
     {
@@ -1137,8 +1137,10 @@ public sealed class DeviceClient : IAsyncDisposable
     /// for its physical button. Refuses unless the machine is <c>P_IDLE</c>, except that with
     /// <paramref name="replaceLoadedJob"/> a job that is loaded but not started (<c>P_WORK</c>) is
     /// cancelled first (the same request xTool Studio sends; nothing moves). Returns the task id.
+    /// With <paramref name="autoStart"/> the job starts as soon as it's loaded (<c>autoStart: 1</c>,
+    /// what xTool Studio's batch mode sends): the laser fires without the button.
     /// </summary>
-    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default, bool replaceLoadedJob = false, string? taskId = null)
+    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress = null, CancellationToken cancellationToken = default, bool replaceLoadedJob = false, string? taskId = null, bool autoStart = false)
     {
         ArgumentNullException.ThrowIfNull(xf);
         if (xf.Length == 0)
@@ -1155,10 +1157,28 @@ public sealed class DeviceClient : IAsyncDisposable
         await RequestAsync("PUT", "/v1/processing/upload/config", new JsonObject
         {
             ["fileType"] = "xf",
-            ["autoStart"] = 0, // never auto-start: the user starts jobs with the machine's button
+            // Normally no auto-start: the user starts jobs with the machine's button (or the phone's Start).
+            ["autoStart"] = autoStart ? 1 : 0,
             ["taskId"] = taskId,
         }, cancellationToken: cancellationToken).ConfigureAwait(false);
         return taskId;
+    }
+
+    /// <summary>
+    /// Starts the job that is loaded and waiting for the machine's button (<c>P_WORK</c>), with the
+    /// request xTool Studio has for it (<c>PUT /v1/processing/state?action=start</c>, the same one that
+    /// continues a paused job). The laser fires. Returns the mode a few seconds later: <c>P_WORKING</c>
+    /// once it has started.
+    /// </summary>
+    public async Task<string> StartLoadedJobAsync(CancellationToken cancellationToken = default)
+    {
+        string mode = await GetRuntimeModeAsync(cancellationToken).ConfigureAwait(false);
+        if (mode != "P_WORK")
+            throw new DeviceException(DeviceException.BusyCode, mode is "P_IDLE" or "P_WORK_DONE" or "P_FINISH"
+                ? "No job is loaded on the machine. Load one first."
+                : BusyMessage(mode));
+        await ProcessingState("start", cancellationToken).ConfigureAwait(false);
+        return await WaitForModeAsync("P_WORKING", TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1236,6 +1256,24 @@ public sealed class DeviceClient : IAsyncDisposable
             await Task.Delay(_options.ModePollInterval, cancellationToken).ConfigureAwait(false);
         }
     }
+
+    /// <summary>The machine's mode in plain words, as the program shows it (desktop and phone).</summary>
+    public static string DescribeMode(string mode) => mode switch
+    {
+        "P_IDLE" => "Ready",
+        "P_WORK" => "Job loaded – waiting for the start button",
+        "P_FRAMING" => "Framing",
+        "P_WORKING" => "Running a job",
+        "P_PAUSE" => "Paused",
+        "P_WORK_DONE" => "Job finished",
+        "P_FINISH" => "Job finished",
+        "P_SLEEP" => "Asleep",
+        "P_AUTOFOCUS" => "Auto-focusing",
+        "P_MEASURE" => "Measuring",
+        "P_ERROR" => "Error: check the machine",
+        "" => "Unknown",
+        _ => mode,
+    };
 
     /// <summary>Why an upload was refused, in plain words.</summary>
     public static string BusyMessage(string mode) => mode switch
