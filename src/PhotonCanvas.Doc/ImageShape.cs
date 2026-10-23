@@ -101,6 +101,26 @@ public sealed class ImageShape : Shape
 
     public override Rect2 Bounds => _bounds ??= Rect2.Bounds(Corners);
 
+    Vec2[]? _shown;
+
+    /// <summary>
+    /// Where the picture can show, world mm: its corners, or the points of its clip outline when it
+    /// has one (a picture clipped to one piece of a bigger design is engraved only there).
+    /// </summary>
+    public Vec2[] ShownPoints => _shown ??= Clip is null ? Corners : [.. Clip.Transform(Transform).Flatten(0.05).SelectMany(f => f.Points)];
+
+    /// <summary>The box round <see cref="ShownPoints"/>, kept within the picture's own box.</summary>
+    public Rect2 ShownBounds
+    {
+        get
+        {
+            var c = Rect2.Bounds(ShownPoints);
+            var b = Bounds;
+            var r = new Rect2(Math.Max(b.MinX, c.MinX), Math.Max(b.MinY, c.MinY), Math.Min(b.MaxX, c.MaxX), Math.Min(b.MaxY, c.MaxY));
+            return r.MaxX > r.MinX && r.MaxY > r.MinY ? r : b;
+        }
+    }
+
     /// <summary>Default physical size: the file's pixels at 254 dpi (0.1 mm each), capped to fit the work area.</summary>
     public static Vec2 DefaultSize(ImageSource src, double maxMm)
     {
@@ -113,6 +133,7 @@ public sealed class ImageShape : Shape
     {
         _corners = null;
         _bounds = null;
+        _shown = null;
     }
 
     /// <summary>

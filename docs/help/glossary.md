@@ -148,6 +148,8 @@ explained in full.
   See [Layer settings](layer-settings.md).
 - **Sections**: marking a design bigger than the work area one part at a time, moving the
   material between parts. See [Work area](work-area.md).
+- **Split onto pieces**: one design marked across several separate pieces that go together (four
+  boards making one picture), a page each, lined up by the camera. See [Work area](work-area.md#split-onto-pieces).
 - **Ship It**: uploads the job to the machine. Nothing moves or fires until you press the
   machine's start button. See [Running a job](running-jobs.md).
 - **Snap**, **snapping**: dragged shapes jumping into line with other shapes, guides, the work

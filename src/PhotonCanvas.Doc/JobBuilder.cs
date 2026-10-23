@@ -781,13 +781,13 @@ public static class JobBuilder
         // resolution (a big file on a small picture would put far more heat in than was set).
         double dpi = layer.PassThrough ? Math.Clamp(Math.Min(OwnDpi(img), layer.Dpi), 10, 2540) : layer.Dpi;
         double pitch = 25.4 / dpi;
-        var b = img.Bounds;
+        // Only where the picture shows: a clipped one (one piece of a bigger design) only over its clip.
+        var b = img.ShownBounds;
         // The grid's axes: along the rows (u) and across them (v); at 0° just X and Y.
         double a = angleDeg * Math.PI / 180;
         var U = angleDeg == 0 ? new Vec2(1, 0) : new Vec2(Math.Cos(a), Math.Sin(a));
         var V = angleDeg == 0 ? new Vec2(0, 1) : new Vec2(-Math.Sin(a), Math.Cos(a));
-        Vec2[] corners = angleDeg == 0 ? [b.TopLeft, b.BottomRight]
-            : [.. new[] { new Vec2(0, 0), new Vec2(img.SizeMm.X, 0), new Vec2(img.SizeMm.X, img.SizeMm.Y), new Vec2(0, img.SizeMm.Y) }.Select(img.Transform.Apply)];
+        Vec2[] corners = angleDeg == 0 ? [b.TopLeft, b.BottomRight] : img.ShownPoints;
         double u0 = corners.Min(p => p.X * U.X + p.Y * U.Y), u1 = corners.Max(p => p.X * U.X + p.Y * U.Y);
         double v0 = corners.Min(p => p.X * V.X + p.Y * V.Y), v1 = corners.Max(p => p.X * V.X + p.Y * V.Y);
         int cols = Math.Max(1, (int)Math.Floor((u1 - u0) / pitch + 1e-9));
@@ -925,7 +925,7 @@ public static class JobBuilder
         JobException.CheckRange("resolution", layer.Dpi, 10, 2540, "dpi");
         int n = Math.Clamp(layer.Slices.Count, 2, DepthSlices.MaxCount);
         double cell = 25.4 / layer.Dpi;
-        var b = img.Bounds;
+        var b = img.ShownBounds;
         int cols = Math.Max(1, (int)Math.Floor(b.Width / cell + 1e-9));
         int rows = Math.Max(1, (int)Math.Floor(b.Height / cell + 1e-9));
         if ((long)cols * rows > MaxImageCells)

@@ -620,6 +620,7 @@ public partial class MainWindow : Window
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
         fit.Large("Cut round prints", "IcCut", () => _ = Guard(CutRoundPrints), "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it");
+        fit.Large("Line up pieces", "IcFitPiece", ShowLineUp, "For a design split onto pieces: the camera keeps looking and moves the page's design onto its piece and the pieces laid beside it, so they line up. No clicking while you place them");
         fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
@@ -659,6 +660,7 @@ public partial class MainWindow : Window
         work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
+        work.Small("Split onto pieces", "IcBreak", () => _ = Guard(SplitOntoPieces), "Mark a design across several pieces that go together (four boards making one picture): select the design and the pieces' material outlines; each piece gets a page with its share, and Line up pieces fits it to the pieces on the bed", HasSel);
         var machine = laser.Group("Machine");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
@@ -1295,6 +1297,7 @@ public partial class MainWindow : Window
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked))),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
+            DoAsync("Split onto pieces…", SplitOntoPieces, n > 1),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
                 DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
@@ -2083,6 +2086,53 @@ public partial class MainWindow : Window
     /// The selected closed shapes are the board in the machine: they move to the Material layer
     /// (shown, never sent), and nesting and the model slicer fill them instead of the whole bed.
     /// </summary>
+    /// <summary>
+    /// The selected design split across the selected material outlines (the pieces it goes over; all
+    /// the ones it touches when none are selected): a page each, then Line up pieces to fit them.
+    /// </summary>
+    async Task SplitOntoPieces()
+    {
+        var s = _doc.State;
+        var sel = _doc.Selection;
+        var material = MaterialOutline.Layer(s)?.Id;
+        var outlines = MaterialOutline.On(s);
+        var pieces = outlines.Where(p => sel.Contains(p.Id)).ToList();
+        var art = s.Shapes.Where(x => sel.Contains(x.Id) && x.LayerId != material).Select(x => x.Id).ToHashSet();
+        if (pieces.Count == 0 && art.Count > 0)
+        {
+            var box = s.Bounds(art);
+            pieces = [.. outlines.Where(p => p.Bounds.Intersects(box))];
+        }
+        if (pieces.Count < 2 || art.Count == 0)
+        {
+            await Dialogs.Message(this, "Split onto pieces",
+                "Select the design and the pieces it goes across. Draw each piece the size it really is (a rectangle 200 × 75 mm for a 200 × 75 mm board), " +
+                "right-click it → Use as material outline, and lay them out as they'll go together. Then put the design over them, select it all, and split.\n\n" +
+                (pieces.Count < 2 ? $"Pieces found: {pieces.Count} (at least 2 are needed)." : "Nothing of the design is selected."));
+            return;
+        }
+        double w = Canvas.Machine.FieldW, h = Canvas.Machine.FieldH;
+        StatusText.Text = "Splitting…";
+        var result = await Task.Run(() => PieceSplit.Split(s, pieces, art, w, h));
+        _doc.Commit("Split onto pieces", result.State, []);
+        _layers.Activate(_doc.ActiveLayer);
+        Canvas.FitField();
+        StatusText.Text = $"Split onto {result.Pieces} pieces: a page each (\"Piece 1 of {result.Pieces}\"…), after the layout. Only each page's piece is sent; the rest shows grey.";
+        if (result.Notes.Count > 0) await Dialogs.Message(this, "Split onto pieces", string.Join("\n", result.Notes));
+        ShowLineUp();
+    }
+
+    LineUpWindow? _lineUp;
+
+    /// <summary>The Line up the pieces window (one at a time).</summary>
+    void ShowLineUp()
+    {
+        if (_lineUp is { IsVisible: true }) { _lineUp.Activate(); return; }
+        _lineUp = new LineUpWindow(_doc, _machine, Canvas.Machine);
+        _lineUp.Closed += (_, _) => _lineUp = null;
+        _lineUp.Show(this);
+    }
+
     void MaterialSel()
     {
         var ids = SelectedPaths().Where(p => p is not (TextShape or CodeShape) && p.Geometry.Subpaths.Any(sp => sp.Closed)).Select(p => p.Id).ToHashSet();

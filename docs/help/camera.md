@@ -23,7 +23,7 @@ work from a photo saved earlier.
 | Group | Buttons |
 |---|---|
 | **See the bed** | **Update photo**, **Live view**, **Close-up**, **Show picture** |
-| **Place** | **Fit to piece**, **Cut round prints**, **Every piece** |
+| **Place** | **Fit to piece**, **Line up pieces**, **Cut round prints**, **Every piece** |
 | **Set up** | **Calibrate**, **Focus on selection**, **Thickness**, **Align MOPA**, **Close-up position** |
 
 ## What each one needs
@@ -33,6 +33,7 @@ work from a photo saved earlier.
 | **Show picture**, **Update photo**, **Live view** on the work area | Connected; the camera calibrated (**Calibrate**) |
 | **Close-up** | Connected. Laying its photo on the work area also needs **Close-up position** at the current focus height |
 | **Fit to piece**, **Every piece** | Connected; the camera calibrated near the piece's height; the design selected |
+| **Line up pieces** | Connected; the camera calibrated near the pieces' height; a piece's page from **Split onto pieces** ([Work area](work-area.md#lining-the-pieces-up)) |
 | **Cut round prints** | Connected; the camera calibrated, or **Close-up position** covering the area |
 | **Focus on selection** | Connected; focused once; the red pointer calibrated (Laser tab → **Curved surface**) |
 | **Thickness** | Connected |

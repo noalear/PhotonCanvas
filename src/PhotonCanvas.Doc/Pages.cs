@@ -63,6 +63,15 @@ public static class Pages
         return Show(s, all, s.PageIndex + 1);
     }
 
+    /// <summary>Pages put in after the current one, in order; the first of them is shown.</summary>
+    public static DocState Insert(DocState s, IReadOnlyList<DesignPage> pages)
+    {
+        if (pages.Count == 0) return s;
+        var all = All(s);
+        all.InsertRange(s.PageIndex + 1, pages);
+        return Show(s, all, s.PageIndex + 1);
+    }
+
     /// <summary>A copy of the current page after it, shown.</summary>
     public static DocState Duplicate(DocState s)
     {

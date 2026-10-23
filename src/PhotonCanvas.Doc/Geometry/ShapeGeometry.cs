@@ -158,6 +158,92 @@ public static class ShapeGeometry
         }
     }
 
+    /// <summary>
+    /// The parts of the lines inside the closed subpaths of <paramref name="region"/> (filled
+    /// even-odd), as open lines: a closed outline is followed round from its start and cut where
+    /// it crosses the region's edge. Pieces that meet where an outline started are joined.
+    /// </summary>
+    public static PathGeometry ClipLines(PathGeometry lines, PathGeometry region, double tolerance = 0.01)
+    {
+        try
+        {
+            double tol = Tol(tolerance);
+            var (closed, open) = ToPaths(lines, tol);
+            var subject = new Paths64(open);
+            foreach (var c in closed)
+            {
+                var loop = new Path64(c) { c[0] };
+                subject.Add(loop);
+            }
+            var clip = ToPaths(region, tol).Closed;
+            if (subject.Count == 0 || clip.Count == 0) return PathGeometry.Empty;
+            var clipper = new Clipper64();
+            clipper.AddOpenSubject(subject);
+            clipper.AddClip(clip);
+            var inClosed = new Paths64();
+            var inOpen = new Paths64();
+            clipper.Execute(ClipType.Intersection, FillRule.EvenOdd, inClosed, inOpen);
+            // Join pieces end to start (a loop that started inside comes back as two).
+            var pieces = inOpen.Where(p => p.Count >= 2).Select(p => new List<Point64>(p)).ToList();
+            for (bool joined = true; joined;)
+            {
+                joined = false;
+                for (int i = 0; i < pieces.Count && !joined; i++)
+                    for (int j = 0; j < pieces.Count && !joined; j++)
+                        if (i != j && pieces[i][^1] == pieces[j][0])
+                        {
+                            pieces[i].AddRange(pieces[j].Skip(1));
+                            pieces.RemoveAt(j);
+                            joined = true;
+                        }
+            }
+            var subs = new List<Subpath>();
+            foreach (var p in pieces)
+            {
+                // Simplified in two halves when it ends where it starts (the simplifier needs two different ends).
+                Path64 simple;
+                if (p.Count > 3 && p[0] == p[^1])
+                {
+                    int far = 0;
+                    double best = -1;
+                    for (int k = 1; k < p.Count - 1; k++)
+                    {
+                        double dx = p[k].X - p[0].X, dy = p[k].Y - p[0].Y, d = dx * dx + dy * dy;
+                        if (d > best) { best = d; far = k; }
+                    }
+                    simple = Clipper.RamerDouglasPeucker(new Path64(p.Take(far + 1)), tol / 2 * Scale);
+                    simple.AddRange(Clipper.RamerDouglasPeucker(new Path64(p.Skip(far)), tol / 2 * Scale).Skip(1));
+                }
+                else simple = Clipper.RamerDouglasPeucker(new Path64(p), tol / 2 * Scale);
+                var pts = simple.Select(q => new Vec2(q.X / Scale, q.Y / Scale)).ToList();
+                if (pts.Count < 2) continue;
+                // A whole loop inside comes back closed (its last line returns to the start, as closed outlines do).
+                bool loop = pts.Count > 3 && pts[0] == pts[^1];
+                subs.Add(new Subpath(pts[0], [.. pts.Skip(1).Select(Seg.Line)], loop));
+            }
+            return subs.Count == 0 ? PathGeometry.Empty : new PathGeometry(subs);
+        }
+        catch (Exception)
+        {
+            return PathGeometry.Empty;
+        }
+    }
+
+    /// <summary>The area the closed subpaths cover (filled even-odd), mm².</summary>
+    public static double Area(PathGeometry g, double tolerance = 0.01)
+    {
+        try
+        {
+            double tol = Tol(tolerance);
+            var closed = ToPaths(g, tol).Closed;
+            return closed.Count == 0 ? 0 : Math.Abs(Clipper.Area(Clipper.Union(closed, FillRule.EvenOdd))) / (Scale * Scale);
+        }
+        catch (Exception)
+        {
+            return 0;
+        }
+    }
+
     static double Tol(double t) => double.IsFinite(t) && t > 0 ? Math.Clamp(t, 1e-3, 10) : 0.01;
 
     static JoinType Joins(JoinStyle j) => j switch

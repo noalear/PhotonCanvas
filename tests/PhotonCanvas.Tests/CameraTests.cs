@@ -311,6 +311,50 @@ public class ShapeFitTests
         Assert.All(F, p => Assert.True(fit.Apply(p).Dist(truth.Apply(p)) < 0.3));
     }
 
+    /// <summary>
+    /// Split onto pieces: board 2 lies in the work area, board 1 (done) butted against its left edge,
+    /// mostly outside the camera's view. Both are 2.5 mm off and turned 0.8° from where the design has
+    /// them; the fit uses all of board 2 and the strip of board 1 it can see.
+    /// </summary>
+    [Fact]
+    public void LinesUpABoardWithTheOneBesideIt()
+    {
+        var field = new Rect2(0, 0, 220, 140);
+        const double mpp = 0.2;
+        IReadOnlyList<Vec2> Board(double x, double y) => [new(x, y), new(x + 200, y), new(x + 200, y + 75), new(x, y + 75)];
+        var two = Board(15, 30);
+        var one = Board(-185, 30);
+        var truth = new FitResult(new Vec2(115, 67.5), new Vec2(2.5, -1.6), 0.8, 1, 1, 0);
+        int w = (int)Math.Round(field.Width / mpp), h = (int)Math.Round(field.Height / mpp);
+        using var bmp = new SKBitmap(new SKImageInfo(w, h, SKColorType.Bgra8888, SKAlphaType.Premul));
+        using (var c = new SKCanvas(bmp))
+        {
+            c.Clear(new SKColor(60, 60, 60));
+            using var wood = new SKPaint { Color = new SKColor(205, 180, 140), IsAntialias = true };
+            using var seam = new SKPaint { Color = new SKColor(120, 105, 80), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = (float)(0.3 / mpp) };
+            foreach (var board in new[] { one, two })
+            {
+                using var path = new SKPath();
+                for (int i = 0; i < board.Count; i++)
+                {
+                    var p = truth.Apply(board[i]);
+                    float px = (float)(p.X / mpp), py = (float)(p.Y / mpp);
+                    if (i == 0) path.MoveTo(px, py); else path.LineTo(px, py);
+                }
+                path.Close();
+                c.DrawPath(path, wood);
+                c.DrawPath(path, seam);
+            }
+        }
+        var img = CameraWarp.ToGray(bmp);
+        var seen = ShapeFit.InView([two, one], field.Inflate(-2));
+        // Board 1: only the strip inside the view (its right end), as open runs.
+        Assert.All(seen.Skip(1), run => Assert.All(run, p => Assert.InRange(p.X, 1.999, 218.001)));
+        var fit = ShapeFit.Fit(img, field, mpp, seen, new FitOptions { MaxRotationDeg = 20, MaxScaleChange = 0, SearchMm = 30 });
+        Assert.True(fit.OnEdge > 0.8, $"on edge {fit.OnEdge:P0}");
+        Assert.All(two, p => Assert.True(fit.Apply(p).Dist(truth.Apply(p)) < 0.3, $"{p}: {fit.Apply(p)} vs {truth.Apply(p)}"));
+    }
+
     [Fact]
     public void ReportsAPoorMatchWhenThePieceIsntThere()
     {

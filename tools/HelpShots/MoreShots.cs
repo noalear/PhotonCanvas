@@ -66,7 +66,6 @@ static class MoreShots
         Summary("window-3d-slices-summary", "Stacked slices: the foot of the settings, with the summary");
         F<CheckBox>(slicer, "_shape").IsChecked = true;
         Slice(slicer);
-        save(slicer.CaptureRenderedFrame(), "window-3d-slices-shaping", "Stacked slices with Shape the edges ticked");
         Summary("window-3d-slices-shaping-summary", "Stacked slices with Shape the edges ticked: the summary's edge shaping line");
         F<CheckBox>(slicer, "_shape").IsChecked = false;
         Slice(slicer);
@@ -224,13 +223,65 @@ static class MoreShots
         var warp = new WarpWindow(doc);
         warp.Show(w);
         settle(600);
-        foreach (var (index, name) in new[] { (4, "round-object"), (5, "cone"), (6, "four-corners") })
+        foreach (var (index, name) in new[] { (4, "round-object"), (6, "four-corners") })
         {
             F<ComboBox>(warp, "_mode").SelectedIndex = index;
             settle(900);
             save(warp.CaptureRenderedFrame(), $"window-warp-{name}", $"Warp, {name.Replace('-', ' ')} mode");
         }
         warp.Close();
+
+        // --- Split onto pieces: a 400 × 150 mm design over four 200 × 75 mm boards laid two by two.
+        {
+            reset();
+            var ps = DocState.New();
+            var cutL = ps.Layers[0] with { Name = "Cut" };
+            var picL = Layer.Default(1, LayerMode.Image) with { Name = "Picture", Dpi = 254 };
+            var scoreL = Layer.Default(2, LayerMode.Score) with { Name = "Score" };
+            ps = ps with { Layers = [scoreL, picL, cutL] };
+            var landscape = (ImageShape)sample.Shapes.First(x => x.Id == ids.Picture);
+            var boards = new List<Shape>();
+            for (int r = 0; r < 2; r++)
+                for (int c = 0; c < 2; c++)
+                    boards.Add(new PathShape { Name = $"Board {r * 2 + c + 1}", LayerId = cutL.Id, Geometry = PathGeometry.Rect(10 + c * 200, 30 + r * 75, 200, 75) });
+            var picture = new ImageShape { Name = "Landscape", LayerId = picL.Id, Source = landscape.Source, SizeMm = new Vec2(380, 130), Transform = Affine.Translate(20, 40) };
+            var sun = new PathShape { Name = "Sun", LayerId = cutL.Id, Geometry = PathGeometry.Ellipse(210, 105, 28, 28) };
+            var title = TextShape.Create("ALONG THE RIDGE", new TextStyle("Arial", 16, Bold: true), scoreL.Id, Affine.Translate(130, 150));
+            ps = Ops.AddShapes(ps, [.. boards, picture, sun, title]);
+            ps = MaterialOutline.Mark(ps, boards.Select(x => x.Id).ToHashSet());
+            doc.Reset(ps, null);
+            canvas.FitRect(new Rect2(-10, 0, 430, 200));
+            doc.Select(doc.State.Shapes.Select(x => x.Id));
+            settle(800);
+            save(w.CaptureRenderedFrame(), "workspace-pieces-layout", "Four boards as material outlines, the design over them, all selected");
+            var split = (Task)typeof(MainWindow).GetMethod("SplitOntoPieces", Any)!.Invoke(w, null)!;
+            for (int i = 0; i < 200 && !split.IsCompleted; i++) settle(50);
+            settle(800);
+            // The job bar rebuilds on a timer after a change (not run here): rebuilt straight away.
+            var bar = F<JobBar>(w, "_job");
+            void Rebuilt()
+            {
+                var t = (Task)typeof(JobBar).GetMethod("Rebuild", Any)!.Invoke(bar, null)!;
+                for (int i = 0; i < 200 && !t.IsCompleted; i++) settle(50);
+                settle(300);
+            }
+            Rebuilt();
+            var lineUp = w.OwnedWindows.OfType<LineUpWindow>().FirstOrDefault();
+            if (lineUp is not null) { lineUp.Position = new PixelPoint(w.Position.X + 2000, w.Position.Y); settle(300); }
+            canvas.FitRect(new Rect2(-200, -10, 240, 240));
+            settle(800);
+            doc.Commit("Show page", Pages.SwitchTo(doc.State, 2), []);
+            canvas.FitRect(new Rect2(-200, -10, 240, 240));
+            Rebuilt();
+            settle(800);
+            save(w.CaptureRenderedFrame(), "workspace-pieces-2", "Piece 2 of 4: moved onto the bed, piece 1 greyed off its left edge");
+            if (lineUp is not null)
+            {
+                save(lineUp.CaptureRenderedFrame(), "window-camera-line-up-pieces", "Line up the pieces, on piece 2, not connected");
+                lineUp.Close();
+            }
+            settle(200);
+        }
 
         // --- The Selection panel's Picture and Text cards (below the size and place, so drawn on their own).
         reset();

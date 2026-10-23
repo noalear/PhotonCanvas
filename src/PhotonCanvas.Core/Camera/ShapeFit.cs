@@ -165,6 +165,54 @@ public static class ShapeFit
         }
     }
 
+    /// <summary>
+    /// Closed outlines (mm, each a loop of points) cut to the part inside <paramref name="view"/>: what
+    /// a fit can use of pieces that run out of the camera's picture. Each loop becomes the runs of it
+    /// that lie inside.
+    /// </summary>
+    public static List<IReadOnlyList<Vec2>> InView(IEnumerable<IReadOnlyList<Vec2>> loops, Rect2 view)
+    {
+        var lines = new List<IReadOnlyList<Vec2>>();
+        foreach (var loop in loops)
+        {
+            var pts = loop.ToList();
+            if (pts.Count > 1 && pts[0] != pts[^1]) pts.Add(pts[0]);
+            List<Vec2>? run = null;
+            for (int i = 0; i + 1 < pts.Count; i++)
+            {
+                if (ClipSegment(pts[i], pts[i + 1], view) is not { } seg)
+                {
+                    if (run is { Count: >= 2 }) lines.Add(run);
+                    run = null;
+                    continue;
+                }
+                if (run is null || run[^1] != seg.A)
+                {
+                    if (run is { Count: >= 2 }) lines.Add(run);
+                    run = [seg.A];
+                }
+                run.Add(seg.B);
+            }
+            if (run is { Count: >= 2 }) lines.Add(run);
+        }
+        return lines;
+    }
+
+    /// <summary>The part of a segment inside a rectangle (Liang–Barsky), or null.</summary>
+    static (Vec2 A, Vec2 B)? ClipSegment(Vec2 a, Vec2 b, Rect2 r)
+    {
+        double t0 = 0, t1 = 1, dx = b.X - a.X, dy = b.Y - a.Y;
+        foreach (var (p, q) in new[] { (-dx, a.X - r.MinX), (dx, r.MaxX - a.X), (-dy, a.Y - r.MinY), (dy, r.MaxY - a.Y) })
+        {
+            if (Math.Abs(p) < 1e-12) { if (q < 0) return null; continue; }
+            double t = q / p;
+            if (p < 0) { if (t > t1) return null; if (t > t0) t0 = t; }
+            else { if (t < t0) return null; if (t < t1) t1 = t; }
+        }
+        if (t1 - t0 < 1e-12) return null;
+        return (t0 == 0 ? a : new Vec2(a.X + t0 * dx, a.Y + t0 * dy), t1 == 1 ? b : new Vec2(a.X + t1 * dx, a.Y + t1 * dy));
+    }
+
     static double Over(double v, double limit) => v > limit ? (v - limit) * (v - limit) : 0;
     static double AngleDiff(double a, double b) => Normalize(a - b);
     static double Normalize(double a) { a %= 360; if (a > 180) a -= 360; if (a <= -180) a += 360; return a; }

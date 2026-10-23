@@ -389,7 +389,10 @@ public sealed class PropertiesPanel : UserControl
         _shapeLayer.SelectedIndex = shapeLayers.Count == 1 ? layers.FindIndex(l => l.Id == shapeLayers[0]) : -1;
         _shapeLayer.PlaceholderText = shapeLayers.Count > 1 ? "Several layers" : "";
 
-        bool outside = b.MinX < -1e-6 || b.MinY < -1e-6 || b.MaxX > _machine.FieldW + 1e-6 || b.MaxY > _machine.FieldH + 1e-6;
+        // Only what's sent has to be on the bed (material outlines, other pieces and guides may hang off it).
+        var sentIds = _doc.State.Shapes.Where(s => sel.Contains(s.Id) && _doc.State.FindLayer(s.LayerId) is { Output: true }).Select(s => s.Id).ToHashSet();
+        var sb = _doc.State.Bounds(sentIds);
+        bool outside = sentIds.Count > 0 && (sb.MinX < -1e-6 || sb.MinY < -1e-6 || sb.MaxX > _machine.FieldW + 1e-6 || sb.MaxY > _machine.FieldH + 1e-6);
         _selInfo.Text = (sel.Count == 1 ? "1 shape selected" : $"{sel.Count} shapes selected") +
                         (outside ? ". ⚠ Partly outside the work area – it can't be sent like this." : ".");
         _selInfo.Foreground = outside ? Brush("Warn") : Brush("TextMuted");

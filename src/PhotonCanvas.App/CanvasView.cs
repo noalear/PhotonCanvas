@@ -529,7 +529,8 @@ public sealed partial class CanvasView : Control
             : _pictures.GetValue(im.Source, s => CameraImaging.ToAvaloniaRgba(s.Pixels));
         var t = im.Transform;
         using (ctx.PushTransform(new Matrix(t.A, t.B, t.C, t.D, t.E, t.F)))
-        using (ctx.PushOpacity(layer.Output ? 1 : 0.5))
+        // A picture that isn't sent (another piece's share, a reference photo) is clearly dimmer than one that is.
+        using (ctx.PushOpacity(layer.Output ? 1 : 0.3))
         {
             // A clipped picture shows only what's inside its outline.
             using var clip = im.Clip is { } c0 ? ctx.PushGeometryClip(ClipGeometry(c0)) : default(DrawingContext.PushedState?);
