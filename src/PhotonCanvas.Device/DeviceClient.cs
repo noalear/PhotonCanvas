@@ -731,6 +731,12 @@ public sealed class DeviceClient : IAsyncDisposable
                 progress?.Report(1.0);
                 return result;
             }
+            catch
+            {
+                // Cancelled or failed part way: tell the machine, so it doesn't keep half a file open (as downloads do).
+                await AbortTransferAsync(channel).ConfigureAwait(false);
+                throw;
+            }
             finally
             {
                 up.Ready.TrySetCanceled();
@@ -959,7 +965,7 @@ public sealed class DeviceClient : IAsyncDisposable
             }
             catch (TimeoutException)
             {
-                throw new DeviceException(DeviceException.FocusFailedCode, $"{what} didn't finish within 2 minutes.");
+                throw new DeviceException(DeviceException.FocusFailedCode, $"{what} didn't finish within {Seconds(timeout ?? TimeSpan.FromMinutes(2))}.");
             }
             if (ev.Type != "FOCUS_FINISHED")
                 throw new DeviceException(DeviceException.FocusFailedCode,

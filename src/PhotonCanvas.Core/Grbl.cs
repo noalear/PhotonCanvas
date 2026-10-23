@@ -224,11 +224,27 @@ public static class GrblWriter
         {
             Mode("M4");
             int s = S(f.Laser.Power);
+            string dwell = (f.LineDwellMs / 1000.0).ToString("0.###", Inv);
             foreach (var seg in Job.FillLines(f))
             {
-                o.AppendLine($"G0 {XY(seg.Start)}");
+                var dir = (seg.End - seg.Start) * (1 / Math.Max(1e-9, seg.Start.Dist(seg.End)));
+                // Run-ups at each end, laser off, as on the galvo (cut short where the bed ends).
+                var runUp = seg.Start - dir * Room(seg.Start, dir * -1, f.OverscanMm);
+                o.AppendLine($"G0 {XY(runUp)}");
+                if (f.LineDwellMs > 0) o.AppendLine($"G4 P{dwell}");
+                if (f.OverscanMm > 0) o.AppendLine($"G1 {XY(seg.Start)}{F(f.Laser.Speed)} S0");
                 o.AppendLine($"G1 {XY(seg.End)}{F(f.Laser.Speed)} S{s}");
+                if (f.OverscanMm > 0) o.AppendLine($"G1 {XY(seg.End + dir * Room(seg.End, dir, f.OverscanMm))} S0");
             }
+        }
+
+        /// <summary>How far from <paramref name="p"/> a run-up can go along <paramref name="dir"/> (at most <paramref name="want"/>) and stay on the bed: GRBL's soft limits would stop the job.</summary>
+        double Room(Vec2 p, Vec2 dir, double want)
+        {
+            double t = want;
+            if (dir.X > 1e-12) t = Math.Min(t, (m.BedW - p.X) / dir.X); else if (dir.X < -1e-12) t = Math.Min(t, -p.X / dir.X);
+            if (dir.Y > 1e-12) t = Math.Min(t, (m.BedH - p.Y) / dir.Y); else if (dir.Y < -1e-12) t = Math.Min(t, -p.Y / dir.Y);
+            return Math.Max(0, t);
         }
 
         public void Dots(PointsBlock p)
@@ -263,7 +279,7 @@ public static class GrblWriter
                 var dir = along * step;
                 // Each dot covers half a pitch either side of its centre.
                 var start = d.At(from, r) - dir * (pitch / 2);
-                o.AppendLine($"G0 {XY(start - dir * m.RasterOverscanMm)}");
+                o.AppendLine($"G0 {XY(start - dir * Room(start, dir * -1, m.RasterOverscanMm))}");
                 o.AppendLine($"G1 {XY(start)}{F(d.Laser.Speed)} S0");
                 int PowerAt(int c) => !d.Bitmap[c, r] ? 0
                     : d.Levels is { } lv ? S(d.MinPower + (d.Laser.Power - d.MinPower) * lv[r * d.Bitmap.Width + c] / 255.0)
@@ -275,7 +291,8 @@ public static class GrblWriter
                     if (c == to || PowerAt(c + step) != s)
                         o.AppendLine($"G1 {XY(d.At(c, r) + dir * (pitch / 2))} S{s}");
                 }
-                o.AppendLine($"G1 {XY(d.At(to, r) + dir * (pitch / 2 + m.RasterOverscanMm))} S0");
+                var end = d.At(to, r) + dir * (pitch / 2);
+                o.AppendLine($"G1 {XY(end + dir * Room(end, dir, m.RasterOverscanMm))} S0");
                 if (!d.Unidirectional) forward = !forward;
             }
         }

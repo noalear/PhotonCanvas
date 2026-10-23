@@ -143,7 +143,8 @@ internal static class Json
         return v.GetValueKind() switch
         {
             JsonValueKind.Number => v.GetValue<double>(),
-            JsonValueKind.String when double.TryParse(v.GetValue<string>(), NumberStyles.Float, CultureInfo.InvariantCulture, out double d) => d,
+            // "NaN" and "Infinity" parse, but aren't numbers the machine means.
+            JsonValueKind.String when double.TryParse(v.GetValue<string>(), NumberStyles.Float, CultureInfo.InvariantCulture, out double d) && double.IsFinite(d) => d,
             _ => null,
         };
     }

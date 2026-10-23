@@ -128,6 +128,56 @@ public class ReviewFindingsTests
         Assert.Throws<OutsideWorkAreaException>(() => new Job(MachineProfile.F2Ultra, [fill]).Validate());
     }
 
+    static readonly Vec2[] Box = [new(60, 60), new(100, 60), new(100, 100), new(60, 100)];
+
+    [Fact]
+    public void StepDownCountsTheBlocksOwnPassesAndTheFocusOffset()
+    {
+        var m = MachineProfile.F2Ultra;
+        // 3 passes of 2 mm (4 mm in all) beside a layer of 8 passes, round by round: fine.
+        var cut = new VectorBlock(Polyline.Loop(Box), LaserSettings.Blue(80, 10).WithPasses(3)) { Drop = new StepDown(0, 2) };
+        var score = new VectorBlock(Polyline.Loop(Box), LaserSettings.Blue(20, 200).WithPasses(8));
+        new Job(m, [cut, score]) { PassMode = new PassMode.Rounds(0) }.Validate();
+        // An 8 mm focus offset and 4 mm of steps would lower the head 12 mm: refused.
+        Assert.Throws<JobException>(() => new Job(m, [cut with { FocusOffsetMm = 8 }]).Validate());
+    }
+
+    [Fact]
+    public void ACurvedSurfaceKeepsThePauseAfterEachPath()
+    {
+        var a = new VectorBlock(Polyline.Loop(Box), LaserSettings.Blue(80, 10)) { PauseAfterS = 5 };
+        var b = new VectorBlock(Polyline.Loop([.. Box.Select(p => p + new Vec2(50, 0))]), LaserSettings.Blue(80, 10)) { PauseAfterS = 5 };
+        var g = new Job(MachineProfile.F2Ultra, [a, b]) { SurfaceHeight = p => 20 + p.X * 0.01, Created = "x" }.Render();
+        Assert.Equal(2, g.Split('\n').Count(l => l.Trim() == "G4P5000"));
+    }
+
+    [Fact]
+    public void ASectionedPathPausesOnceAfterItsLastPiece()
+    {
+        // A zigzag in and out of the section: several pieces, one pause.
+        var zig = Polyline.Open(new Vec2[] { new(0, 10), new(30, 10), new(30, 50), new(0, 50), new(0, 90), new(30, 90) });
+        var pieces = Sections.Cut(new VectorBlock(zig, LaserSettings.Blue(80, 10)) { PauseAfterS = 5 }, new Rect2(10, 0, 40, 100), new Vec2(0, 0)).ToList();
+        Assert.True(pieces.Count > 1);
+        Assert.Equal(5, pieces.Sum(p => p.PauseAfterS));
+        Assert.Equal(5, pieces[^1].PauseAfterS);
+    }
+
+    [Fact]
+    public void GrblRunUpsStayOnTheBed()
+    {
+        var m = MachineSetup.FullSpectrumHobby;
+        var bmp = new Bitmap(4, 2);
+        for (int c = 0; c < 4; c++) { bmp[c, 0] = true; bmp[c, 1] = true; }
+        var dots = new DotBlock(bmp, new Vec2(0.1, 0.1), LaserSettings.Blue(40, 200), 254, 200, 1, "Jarvis");
+        var fill = new FillBlock([[new(0.5, 0.5), new(10, 0.5), new(10, 5), new(0.5, 5)]], LaserSettings.Blue(40, 200), 20) { OverscanMm = 3 };
+        foreach (var line in GrblWriter.Write(new Job(m.Profile, [dots, fill]), m).Split('\n').Where(l => l.StartsWith("G0") || l.StartsWith("G1")))
+            foreach (System.Text.RegularExpressions.Match c in System.Text.RegularExpressions.Regex.Matches(line, @"([XY])(-?[\d.]+)"))
+            {
+                double v = double.Parse(c.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
+                Assert.InRange(v, -1e-6, (c.Groups[1].Value == "X" ? m.BedW : m.BedH) + 1e-6);
+            }
+    }
+
     [Fact]
     public void AShapeSavedOnASubLayerLoadsOnItsParent()
     {

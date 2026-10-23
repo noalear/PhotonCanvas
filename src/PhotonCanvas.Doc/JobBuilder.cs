@@ -584,7 +584,7 @@ public static class JobBuilder
             for (int i = 0; i < steps.Count; i++)
                 steps[i] = steps[i] with { Points = [.. steps[i].Points.Select(p => p + sec.Shift)] };
             var b0 = new Rect2(Math.Max(bounds.MinX, sec.Clip.MinX), Math.Max(bounds.MinY, sec.Clip.MinY), Math.Min(bounds.MaxX, sec.Clip.MaxX), Math.Min(bounds.MaxY, sec.Clip.MaxY));
-            bounds = b0.MaxX > b0.MinX && b0.MaxY > b0.MinY ? new Rect2(b0.MinX + sec.Shift.X, b0.MinY + sec.Shift.Y, b0.MaxX + sec.Shift.X, b0.MaxY + sec.Shift.Y) : Rect2.Empty;
+            bounds = b0.MaxX >= b0.MinX && b0.MaxY >= b0.MinY ? new Rect2(b0.MinX + sec.Shift.X, b0.MinY + sec.Shift.Y, b0.MaxX + sec.Shift.X, b0.MaxY + sec.Shift.Y) : Rect2.Empty;
             if (blocks.Count == 0) throw new JobException($"There's nothing to mark in {sec.Label}.");
         }
 
@@ -622,6 +622,8 @@ public static class JobBuilder
                 : "Conveyor: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first.");
         // A curved piece: the head steps through height bands that follow it.
         Surface? surface = null;
+        if (s.Curve.On && s.Curve.Build() is null)
+            warnings.Add("Curved surface is on, but it needs at least 3 measured heights (or a typed shape): marked as flat.");
         if (s.Curve.On && s.Curve.Build() is { } built)
         {
             if (mode is not WorkMode.Flat)
@@ -633,7 +635,10 @@ public static class JobBuilder
                 if (!s.Curve.Typed && !s.Curve.Area.IsEmpty && !s.Curve.Area.Inflate(1).Contains(bounds.TopLeft) | !s.Curve.Area.Inflate(1).Contains(bounds.BottomRight))
                     warnings.Add("Parts of the design are outside the measured area: the heights there are guessed. Measure a bigger area to be sure.");
                 if (blocks.OfType<VectorBlock>().Any(v => v.Drop is not null))
-                    warnings.Add("Step-down is left out on a curved surface (the head's height follows the surface instead).");
+                    warnings.Add("Step-down on Cut and Score layers is left out on a curved surface (the head's height follows the surface instead).");
+                // Each band's fill lines are marked as they are: no pause before a line, no run-ups, the same angle every pass.
+                if (blocks.OfType<FillBlock>().Any(f => f.LineDwellMs > 0 || f.OverscanMm > 0 || (f.AngleStepDeg != 0 && f.Laser.Passes > 1)))
+                    warnings.Add("On a curved surface, fills leave out the pause before each line, overscan and turning per pass.");
                 blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
             }
         }

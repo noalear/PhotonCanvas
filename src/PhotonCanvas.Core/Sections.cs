@@ -40,8 +40,10 @@ public static class Sections
                     yield return v with { Path = v.Path.Closed ? Polyline.Loop(moved.Take(moved.Count - 1)) : Polyline.Open(moved) };
                     yield break;
                 }
-                foreach (var piece in ClipPolyline(pts, clip))
-                    if (piece.Count >= 2) yield return v with { Path = Polyline.Open(piece.Select(p => p + shift)) };
+                // The pause after the path (cooling) comes once, after its last piece.
+                var parts = ClipPolyline(pts, clip).Where(piece => piece.Count >= 2).ToList();
+                for (int k = 0; k < parts.Count; k++)
+                    yield return v with { Path = Polyline.Open(parts[k].Select(p => p + shift)), PauseAfterS = k == parts.Count - 1 ? v.PauseAfterS : 0 };
                 break;
             case FillBlock f:
                 var inside = f.ClipRect is { } old ? Intersect(old, clip) : clip;

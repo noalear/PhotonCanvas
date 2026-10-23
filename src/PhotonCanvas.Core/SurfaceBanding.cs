@@ -20,6 +20,13 @@ public static class SurfaceBanding
         bandMm = Math.Clamp(bandMm, 0.02, 5);
         var o = new List<Block>();
         var pos = new Vec2(0, 0);
+        // A pause after a block (cooling between paths) stays after the last of the pieces it's banded into.
+        void Add(IEnumerable<Block> made, double pause)
+        {
+            int from = o.Count;
+            o.AddRange(made.Select(x => x with { PauseAfterS = 0 }));
+            if (pause > 0 && o.Count > from) o[^1] = o[^1] with { PauseAfterS = pause };
+        }
         for (int i = 0; i < blocks.Count; i++)
         {
             var b = blocks[i];
@@ -35,23 +42,23 @@ public static class SurfaceBanding
                     {
                         paths.Add(v.Path.EmittedPoints());
                         j++;
+                        if (v.PauseAfterS > 0) break; // the pause comes after this path, so the run ends here
                     }
                     i = j - 1;
-                    o.Add(new BandedVectorBlock(BandPaths(paths, Z, bandMm, ref pos), b.Laser) { FocusOffsetMm = b.FocusOffsetMm });
+                    Add([new BandedVectorBlock(BandPaths(paths, Z, bandMm, ref pos), b.Laser) { FocusOffsetMm = b.FocusOffsetMm }], blocks[i].PauseAfterS);
                     break;
                 }
                 case LoopsBlock l:
-                    o.Add(new BandedVectorBlock(BandPaths([.. l.Loops.Where(x => x.Count >= 2).Select(x => (IReadOnlyList<Vec2>)[.. x, x[0]])], Z, bandMm, ref pos), l.Laser) { FocusOffsetMm = l.FocusOffsetMm });
+                    Add([new BandedVectorBlock(BandPaths([.. l.Loops.Where(x => x.Count >= 2).Select(x => l.Closed ? (IReadOnlyList<Vec2>)[.. x, x[0]] : x)], Z, bandMm, ref pos), l.Laser) { FocusOffsetMm = l.FocusOffsetMm }], l.PauseAfterS);
                     break;
                 case FillBlock f:
-                    o.Add(BandFill(f, Z, bandMm));
+                    Add([BandFill(f, Z, bandMm)], f.PauseAfterS);
                     break;
                 case PointsBlock p:
-                    foreach (var g in Bands(p.Points, Z, bandMm))
-                        o.Add(p with { Points = g.Items, HeadZ = g.HeadZ });
+                    Add(Bands(p.Points, Z, bandMm).Select(g => (Block)(p with { Points = g.Items, HeadZ = g.HeadZ })), p.PauseAfterS);
                     break;
                 case DotBlock d:
-                    o.AddRange(BandDots(d, Z, bandMm));
+                    Add(BandDots(d, Z, bandMm), d.PauseAfterS);
                     break;
                 default:
                     o.Add(b);

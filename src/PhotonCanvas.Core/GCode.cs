@@ -525,7 +525,14 @@ public sealed class Job
                     break;
                 case VectorBlock b:
                     b.Path.Validate();
-                    b.Drop?.Validate(PassMode is PassMode.Rounds ? Rounds : b.Laser.Passes);
+                    if (b.Drop is { } drop)
+                    {
+                        // A block only runs its own passes, round by round or not.
+                        drop.Validate(b.Laser.Passes);
+                        double lowest = b.FocusOffsetMm + drop.DepthFor(b.Laser.Passes);
+                        if (lowest > StepDown.MaxTotalMm + 1e-9)
+                            throw new JobException($"The focus offset ({b.FocusOffsetMm:0.##} mm) and stepping down ({drop.DepthFor(b.Laser.Passes):0.##} mm) together lower the head {lowest:0.##} mm; the limit is {StepDown.MaxTotalMm} mm.");
+                    }
                     var pts = b.Path.EmittedPoints();
                     anyMotion |= pts.Count >= 2;
                     foreach (var p in pts) CheckPoint(p, ctx);
@@ -574,6 +581,8 @@ public sealed class Job
                     break;
                 case PointsBlock b:
                     JobException.CheckRange("dot duration", b.DotUs, 10, 100_000, "µs");
+                    if (b.DotUs % 10 != 0)
+                        throw new JobException($"Dot duration must be a multiple of 10 µs (got {b.DotUs} µs).");
                     foreach (var p in b.Points)
                     {
                         if (!p.IsFinite) throw new JobException("A dot position is not a valid number.");
