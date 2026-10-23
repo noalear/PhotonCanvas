@@ -1,0 +1,123 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PhotonCanvas.Remote.App.RemoteApp"
+             RequestedThemeVariant="Dark">
+  <!-- The same colours as the desktop app and the phone page. -->
+  <Application.Resources>
+    <SolidColorBrush x:Key="Bg0" Color="#14171C"/>
+    <SolidColorBrush x:Key="Bg1" Color="#1D2129"/>
+    <SolidColorBrush x:Key="Bg2" Color="#262B35"/>
+    <SolidColorBrush x:Key="Line" Color="#323844"/>
+    <SolidColorBrush x:Key="TextMain" Color="#E8EBF0"/>
+    <SolidColorBrush x:Key="TextMuted" Color="#9AA3B2"/>
+    <SolidColorBrush x:Key="Accent" Color="#3B82F6"/>
+    <SolidColorBrush x:Key="Ok" Color="#22C55E"/>
+    <SolidColorBrush x:Key="Warn" Color="#F59E0B"/>
+    <SolidColorBrush x:Key="Danger" Color="#EF4444"/>
+  </Application.Resources>
+  <Application.Styles>
+    <FluentTheme/>
+    <Style Selector="TextBlock">
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="TextBlock.h">
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="LetterSpacing" Value="0.6"/>
+    </Style>
+    <Style Selector="TextBlock.big">
+      <Setter Property="FontSize" Value="21"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="{StaticResource Danger}"/>
+      <Setter Property="FontSize" Value="14"/>
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{StaticResource Bg1}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+      <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="48"/>
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="HorizontalAlignment" Value="Stretch"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+      <Setter Property="Background" Value="{StaticResource Bg2}"/>
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource Accent}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#2F6FDB"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{StaticResource Danger}"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.danger:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.danger:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#D63535"/>
+      <Setter Property="Foreground" Value="White"/>
+    </Style>
+    <Style Selector="Button.go">
+      <Setter Property="Background" Value="{StaticResource Ok}"/>
+      <Setter Property="Foreground" Value="#06210F"/>
+    </Style>
+    <Style Selector="Button.go:pointerover /template/ ContentPresenter#PART_ContentPresenter, Button.go:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#1DAE52"/>
+      <Setter Property="Foreground" Value="#06210F"/>
+    </Style>
+    <Style Selector="Button.nav">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="CornerRadius" Value="0"/>
+      <Setter Property="MinHeight" Value="58"/>
+    </Style>
+    <Style Selector="Button.nav.on">
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+      <Setter Property="BorderThickness" Value="0,3,0,0"/>
+    </Style>
+    <Style Selector="Button.seg">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMuted}"/>
+      <Setter Property="MinHeight" Value="38"/>
+    </Style>
+    <Style Selector="Button.seg.on">
+      <Setter Property="Background" Value="{StaticResource Bg1}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextMain}"/>
+    </Style>
+    <Style Selector="Button.item">
+      <Setter Property="Background" Value="{StaticResource Bg1}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Line}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+      <Setter Property="Padding" Value="12"/>
+      <Setter Property="FontWeight" Value="Normal"/>
+    </Style>
+    <Style Selector="TextBox">
+      <Setter Property="MinHeight" Value="46"/>
+      <Setter Property="FontSize" Value="16"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="Height" Value="10"/>
+      <Setter Property="MinHeight" Value="10"/>
+      <Setter Property="CornerRadius" Value="5"/>
+      <Setter Property="Foreground" Value="{StaticResource Accent}"/>
+      <Setter Property="Background" Value="{StaticResource Bg2}"/>
+    </Style>
+  </Application.Styles>
+</Application>

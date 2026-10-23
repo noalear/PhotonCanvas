@@ -120,6 +120,13 @@
     <div class="note hidden" id="picBlank">The machine blanks its cameras while a job runs, so pictures come out black until it ends. You'll get a picture of the result when it finishes.</div>
     <div class="row" style="margin-top:10px"><button class="primary" id="btnPic">Take picture</button></div>
   </div>
+
+  <div class="card hidden" id="appCard">
+    <h2>Android app</h2>
+    <div class="muted">PhotonCanvas Remote does all this as an app, and scans the QR code itself.</div>
+    <div class="row" style="margin-top:10px"><a id="appLink" href="#" style="flex:1"><button style="width:100%">Get the Android app</button></a></div>
+    <div class="muted" style="margin-top:8px">After the download, open it to install. Android asks to allow installing apps from the browser the first time.</div>
+  </div>
 </main>
 
 <main id="pageDesigns" class="hidden">
@@ -188,6 +195,8 @@ async function connect() {
   try {
     const info = await json("/api/info");
     localStorage.setItem("pc-code", code);
+    // Offer the app on Android phones, when this computer has it.
+    if (info.androidApp && /Android/i.test(navigator.userAgent)) { $("appLink").href = info.androidApp; $("appCard").classList.remove("hidden"); }
     $("login").classList.add("hidden");
     $("nav").classList.remove("hidden");
     show("Machine");

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The phone app in a window on the computer: for trying it out and for development. The real thing is PhotonCanvas.Remote.Android. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>PhotonCanvasRemote</AssemblyName>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PhotonCanvas.Remote.App\PhotonCanvas.Remote.App.csproj" />
+  </ItemGroup>
+</Project>

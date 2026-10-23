@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The app talks to PhotonCanvas on the user's own computer, at whatever address they give it (their
+  home network or Tailscale), and that server speaks plain HTTP. Android blocks that unless allowed.
+  The access code goes with every request; on Tailscale the connection is encrypted underneath.
+-->
+<network-security-config>
+  <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

@@ -83,6 +83,31 @@ public sealed class RemoteConfig
         return a.Length > 0 && CryptographicOperations.FixedTimeEquals(a, b);
     }
 
+    /// <summary>Where the server offers the Android app for download (no access code needed: it's only the app).</summary>
+    public const string AndroidAppPath = "/app/PhotonCanvasRemote.apk";
+
+    /// <summary>
+    /// The Android app to offer phones: app\PhotonCanvasRemote.apk beside the server (a release puts it
+    /// there) or, running from source, the newest build of src/PhotonCanvas.Remote.Android. Null if none.
+    /// </summary>
+    public static string? FindAndroidApp(string? startDir = null)
+    {
+        var dir = startDir ?? AppContext.BaseDirectory;
+        var beside = Path.Combine(dir, "app", "PhotonCanvasRemote.apk");
+        if (File.Exists(beside)) return beside;
+        try
+        {
+            for (var d = new DirectoryInfo(dir); d is not null; d = d.Parent)
+            {
+                var bin = Path.Combine(d.FullName, "src", "PhotonCanvas.Remote.Android", "bin");
+                if (Directory.Exists(bin))
+                    return Directory.EnumerateFiles(bin, "*-Signed.apk", SearchOption.AllDirectories).OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault();
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+        return null;
+    }
+
     /// <summary>This computer's addresses a phone can reach: home network ones, and Tailscale's (100.64.0.0/10) marked.</summary>
     public static List<(string Address, bool Tailscale)> Addresses()
     {

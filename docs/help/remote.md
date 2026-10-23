@@ -5,8 +5,9 @@ take pictures with its cameras, pause, continue and stop, pick a design to load,
 phone talks to a small server on this computer, and the server talks to the machine. The computer
 has to stay on; PhotonCanvas itself can be closed.
 
-It works in any phone browser, so no app needs installing. Add the page to the home screen and it
-opens like an app.
+It works in any phone browser, so nothing needs installing: add the page to the home screen and it
+opens like an app. On Android there's also an app, **PhotonCanvas Remote** (see
+[The Android app](#the-android-app)).
 
 > **Safety:** Starting a job from the phone fires the laser, maybe with nobody at the machine. Before
 > it starts, the phone makes you look at a fresh picture of the bed (see
@@ -47,6 +48,12 @@ once from PhotonCanvas first.
   type the new code. Use it if a phone you don't trust has seen the code.
 
 Ten wrong codes from one device lock that device out for five minutes.
+
+### Android app
+
+When this computer has the Android app to give out, a second QR code installs it: scan it with the
+phone, open the download, and allow installing apps from the browser when Android asks (the first
+time only). The server must be running. See [The Android app](#the-android-app).
 
 ### Designs the phone can load
 
@@ -101,6 +108,21 @@ Every job the machine runs while the server is on, whoever started it, with a pi
 when it was loaded and another after it ended. Tap a picture to see it full size. It says whether the
 job finished or was stopped, how long it took, and whether it was started from the phone. Jobs loaded
 from the phone also go into PhotonCanvas's own job history.
+
+## The Android app
+
+**PhotonCanvas Remote** does everything the page does, with the same three tabs, and:
+
+- **Scan the QR code** on its first screen reads the code in **Remote access** with the phone's camera
+  (through Google Play services: the app itself gets no camera permission). Or type the address and
+  the access code.
+- **Try the demo machine** runs everything on a pretend machine: nothing real moves or fires. Handy
+  for learning it, or showing someone.
+- It remembers the computer. **⋯ → Change computer** forgets it; **⋯ → About and privacy** says what it
+  does with your data (nothing leaves the phone except to your own computer).
+
+Install it from **Remote access** (the *Android app* QR code), or, once it's published, from the
+Play store.
 
 ## Starting a job from the phone
 

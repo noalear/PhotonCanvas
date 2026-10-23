@@ -116,6 +116,8 @@ public sealed class RemoteAccessWindow : Window
     readonly Image _qr = new() { Width = 200, Height = 200, Stretch = Stretch.Uniform };
     readonly TextBlock _url = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
     readonly TextBox _code = new() { IsReadOnly = true, FontFamily = new FontFamily("Consolas, Menlo, monospace"), FontSize = 20, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Image _appQr = new() { Width = 140, Height = 140, Stretch = Stretch.Uniform };
+    readonly Control _appCard;
     readonly ListBox _folders = new() { MinHeight = 60, MaxHeight = 120 };
     readonly DispatcherTimer _poll = new() { Interval = TimeSpan.FromSeconds(2) };
     List<(string Address, bool Tailscale)> _addresses = [];
@@ -147,6 +149,10 @@ public sealed class RemoteAccessWindow : Window
         removeFolder.Click += async (_, _) => await RemoveFolder();
         var done = new Button { Content = "Done", Classes = { "primary" }, IsDefault = true, MinWidth = 100, HorizontalAlignment = HorizontalAlignment.Right };
         done.Click += (_, _) => Close();
+        _appCard = Card("Android app",
+            new Border { Background = Brushes.White, Padding = new(18), CornerRadius = new(8), HorizontalAlignment = HorizontalAlignment.Center, Child = _appQr },
+            Hint("PhotonCanvas Remote for Android does the same as the page, and scans the QR code above itself. Scan this code on the phone to download it, then open the download to install (Android asks to allow installs from the browser the first time). The server must be running."));
+        _appCard.IsVisible = RemoteServer.Find() is { } exe && RemoteConfig.FindAndroidApp(Path.GetDirectoryName(exe)) is not null;
 
         Content = new DockPanel
         {
@@ -176,6 +182,7 @@ public sealed class RemoteAccessWindow : Window
                                 _url,
                                 Labelled("Access code", _code),
                                 Row(newCode, new Panel())),
+                            _appCard,
                             Card("Designs the phone can load",
                                 Hint("Your recent designs in PhotonCanvas, and the designs in these folders (and the folders inside them). With no folders, Documents is searched."),
                                 _folders,
@@ -299,11 +306,17 @@ public sealed class RemoteAccessWindow : Window
         }
         string site = $"http://{_addresses[_address.SelectedIndex].Address}:{_config.Port}";
         _url.Text = $"Address: {site}";
-        var (cols, rows, dark) = CodeShape.Encode(CodeKind.QR, $"{site}/#code={_config.AccessCode}");
+        _qr.Source = Qr($"{site}/#code={_config.AccessCode}");
+        _appQr.Source = Qr(site + RemoteConfig.AndroidAppPath);
+    }
+
+    static DrawingImage Qr(string text)
+    {
+        var (cols, rows, dark) = CodeShape.Encode(CodeKind.QR, text);
         var sb = new StringBuilder();
         for (int y = 0; y < rows; y++)
             for (int x = 0; x < cols; x++)
                 if (dark[y * cols + x]) sb.Append($"M{x},{y}h1v1h-1z");
-        _qr.Source = new DrawingImage(new GeometryDrawing { Geometry = Geometry.Parse(sb.ToString()), Brush = Brushes.Black });
+        return new DrawingImage(new GeometryDrawing { Geometry = Geometry.Parse(sb.ToString()), Brush = Brushes.Black });
     }
 }

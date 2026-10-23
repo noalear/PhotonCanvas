@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\src\PhotonCanvas.Device\PhotonCanvas.Device.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Server\PhotonCanvas.Server.csproj" />
+    <ProjectReference Include="..\..\src\PhotonCanvas.Remote\PhotonCanvas.Remote.csproj" />
   </ItemGroup>
 
 </Project>

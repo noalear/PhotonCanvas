@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The app icon: a beam coming down onto a spot, on the work surface (as the phone page's icon). Kept inside the middle 66 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+  <path android:strokeColor="#3B82F6" android:strokeWidth="6" android:strokeLineCap="round" android:pathData="M54,30 L54,54" />
+  <path android:fillColor="#3B82F6" android:pathData="M54,54 m-8,0 a8,8 0 1,0 16,0 a8,8 0 1,0 -16,0" />
+  <path android:strokeColor="#E8EBF0" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M36,74 L72,74" />
+</vector>

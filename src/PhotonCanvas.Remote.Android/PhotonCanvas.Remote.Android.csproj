@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- PhotonCanvas Remote for Android (the screens are in PhotonCanvas.Remote.App). docs/android.md says how to build, test and publish it. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <!-- Android 8 and up. Play needs the newest target (API 36 from 31 August 2026), which net10.0-android is. -->
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <RootNamespace>PhotonCanvas.Remote.Android</RootNamespace>
+    <ApplicationId>org.photoncanvas.remote</ApplicationId>
+    <ApplicationTitle>PhotonCanvas Remote</ApplicationTitle>
+    <Version>0.1.0</Version>
+    <ApplicationDisplayVersion>$(Version)</ApplicationDisplayVersion>
+    <!-- Goes up by one for every build sent to Play. -->
+    <ApplicationVersion>1</ApplicationVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <!-- Always put the app's own code in the package: debug builds otherwise leave it out (the IDE copies it
+         to a phone on a cable), and an APK installed any other way then closes as soon as it opens. -->
+    <EmbedAssembliesIntoApk>true</EmbedAssembliesIntoApk>
+    <!-- The Android tools and bindings warn about things outside this project. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Where docs/android.md installs the Android SDK and JDK (outside AppData, which some launchers redirect), unless set otherwise. -->
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and Exists('$(USERPROFILE)\Android\Sdk')">$(USERPROFILE)\Android\Sdk</AndroidSdkDirectory>
+    <JavaSdkDirectory Condition="'$(JavaSdkDirectory)' == '' and Exists('$(USERPROFILE)\Android\jdk')">$(USERPROFILE)\Android\jdk</JavaSdkDirectory>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!-- What Play takes: an app bundle, trimmed. Signing: see docs/android.md (the key never goes in the repository). -->
+    <AndroidPackageFormat>aab</AndroidPackageFormat>
+    <TrimMode>partial</TrimMode>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Android" Version="11.3.22" />
+    <!-- Google's QR code scanner: Play services shows the camera, the app only gets the code's text (no camera permission). -->
+    <PackageReference Include="Xamarin.GooglePlayServices.Code.Scanner" Version="116.1.0.17" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PhotonCanvas.Remote.App\PhotonCanvas.Remote.App.csproj" />
+  </ItemGroup>
+</Project>

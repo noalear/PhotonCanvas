@@ -42,7 +42,15 @@ Show the text as it is.
 
 ## Status
 
-`GET /api/info` → `{product, version, machine, cameraNote}`. Use it to check the address and code.
+`GET /api/info` → `{product, version, machine, cameraNote, api, androidApp}`. Use it to check the
+address and code. `api` is the API's version (1); `androidApp` is where the server offers the Android
+app for download, or null.
+
+`GET /app/PhotonCanvasRemote.apk` (no access code): the Android app, when the server has it (beside
+the server in `app\`, or the newest build in the source tree).
+
+The records for all of this are in `src/PhotonCanvas.Remote/Contracts.cs`, shared by the server and
+the Android app.
 
 `GET /api/status` →
 

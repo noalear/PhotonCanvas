@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using PhotonCanvas.Core;
 using PhotonCanvas.Device;
 using PhotonCanvas.Doc;
+using PhotonCanvas.Remote;
 
 namespace PhotonCanvas.Server;
 
@@ -11,18 +12,6 @@ public sealed class RemoteException(int status, string message) : Exception(mess
 {
     public int Status { get; } = status;
 }
-
-/// <summary>The job on the machine, as the phone shows it.</summary>
-/// <param name="Source">"phone", "computer" (the desktop app) or "elsewhere".</param>
-/// <param name="Stage">"loaded", "running" or "paused".</param>
-public sealed record JobStatus(
-    string TaskId, string Design, string Source, string Stage, DateTime? LoadedAt, DateTime? StartedAt,
-    double ElapsedS, double? Fraction, double? RemainingS, double? EstimateS, bool StartedFromPhone);
-
-/// <summary>Everything the phone's main screen shows.</summary>
-public sealed record MachineStatus(
-    bool Connected, string? Ip, string? Name, string? Firmware, string Mode, string State,
-    double? FocusDistanceMm, string? Problem, JobStatus? Job, bool CameraBlanked, DateTime At);
 
 /// <summary>
 /// The server's own connection to the machine (beside the desktop app's: the machine takes several).
@@ -101,7 +90,7 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
     void Alert(string kind, string text)
     {
         ServerLog.Write("alert", text);
-        events.Publish("alert", new { kind, text, at = DateTime.Now });
+        events.Publish("alert", new AlertEvent(kind, text, DateTimeOffset.Now));
     }
 
     DeviceClient Client() => _client is { IsConnected: true } c ? c
@@ -381,7 +370,7 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
         if (t.Before is { } b) log.SavePicture(t.RecordId, "before.jpg", b);
         log.Save(new RemoteJobRecord(t.RecordId, t.TaskId, t.Design, t.Source, t.LoadedAt, t.StartedAt!.Value, null, false, t.StartedFromPhone,
             t.Sent?.EstimateS, null, t.Before is not null, false));
-        events.Publish("job", new { kind = "started", id = t.RecordId, design = t.Design, source = t.Source, startedFromPhone = t.StartedFromPhone });
+        events.Publish("job", new JobEvent("started", t.RecordId, t.Design, t.Source, t.StartedFromPhone));
     }
 
     async Task EndedAsync(Tracked t, bool finished, DateTime at)
@@ -391,14 +380,8 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
             log.Save(rec with { EndedAt = at, Finished = finished, TookS = took });
         if (t.Sent is { } s)
             JobHistory.Add(new JobRecord(at, s.Design, s.EstimateS, took, finished, s.Layers, s.WidthMm, s.HeightMm));
-        events.Publish("job", new
-        {
-            kind = finished ? "finished" : "stopped",
-            id = t.RecordId,
-            design = t.Design,
-            tookS = took,
-            text = finished ? $"\"{t.Design}\" finished in {TimeText.Duration(took)}." : $"\"{t.Design}\" stopped after {TimeText.Duration(took)}.",
-        });
+        events.Publish("job", new JobEvent(finished ? "finished" : "stopped", t.RecordId, t.Design, t.Source, t.StartedFromPhone, took,
+            finished ? $"\"{t.Design}\" finished in {TimeText.Duration(took)}." : $"\"{t.Design}\" stopped after {TimeText.Duration(took)}."));
         // The camera works again once the job is over: a picture of the result.
         if (t.RecordId is not { } rid) return;
         try
@@ -407,7 +390,7 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
             var pic = await TakePictureAsync(0, CancellationToken.None);
             log.SavePicture(rid, "after.jpg", pic.Jpeg);
             if (log.Find(rid) is { } r) log.Save(r with { HasAfter = true });
-            events.Publish("job", new { kind = "picture", id = rid, design = t.Design });
+            events.Publish("job", new JobEvent("picture", rid, t.Design));
         }
         catch (Exception e) when (e is RemoteException or DeviceException or IOException or WebSocketException or OperationCanceledException)
         {

@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http.Features;
 using PhotonCanvas.Core;
 using PhotonCanvas.Device;
 using PhotonCanvas.Doc;
+using PhotonCanvas.Remote;
 using PhotonCanvas.Server;
 
 var config = RemoteConfig.LoadOrCreate();
@@ -50,15 +51,15 @@ app.Use(async (ctx, next) =>
 app.MapGet("/", () => Api.Embedded("index.html", "text/html; charset=utf-8"));
 app.MapGet("/manifest.webmanifest", () => Api.Embedded("manifest.webmanifest", "application/manifest+json"));
 app.MapGet("/icon.svg", () => Api.Embedded("icon.svg", "image/svg+xml"));
+// The Android app, for phones to install before it's in the Play store (no access code: it's only the app).
+app.MapGet(RemoteConfig.AndroidAppPath, () => RemoteConfig.FindAndroidApp() is { } apk
+    ? Results.File(apk, "application/vnd.android.package-archive", "PhotonCanvasRemote.apk")
+    : Results.NotFound("This computer doesn't have the Android app to give out."));
 
 // ---- status ----------------------------------------------------------------------------------
-app.MapGet("/api/info", (MachineLink m) => new
-{
-    product = AppIdentity.ProductName,
-    version = typeof(Api).Assembly.GetName().Version?.ToString(3),
-    machine = m.Status().Name,
-    cameraNote = "The machine blanks its cameras while a job runs: pictures come out black until it ends.",
-});
+app.MapGet("/api/info", (MachineLink m) => new ServerInfo(AppIdentity.ProductName, typeof(Api).Assembly.GetName().Version?.ToString(3), m.Status().Name,
+    "The machine blanks its cameras while a job runs: pictures come out black until it ends.",
+    AndroidApp: RemoteConfig.FindAndroidApp() is null ? null : RemoteConfig.AndroidAppPath));
 app.MapGet("/api/status", (MachineLink m) => m.Status());
 app.MapGet("/api/events", Api.Events);
 
@@ -78,7 +79,7 @@ app.MapGet("/api/pictures/{id}", (string id, int? width, MachineLink m, HttpCont
     m.Pictures.Get(id) is { } pic ? Api.Jpeg(ctx, pic, width) : throw new RemoteException(404, "That picture is gone (only the last few are kept). Take a new one."));
 
 // ---- designs ---------------------------------------------------------------------------------
-app.MapGet("/api/projects", (Projects p) => p.List().Select(x => new { x.Id, x.Name, x.Folder, x.Modified, x.Recent }));
+app.MapGet("/api/projects", (Projects p) => p.List().Select(x => new ProjectItem(x.Id, x.Name, x.Folder, x.Modified, x.Recent)).ToList());
 app.MapPost("/api/projects/{id}/check", async (string id, Projects p, MachineLink m, HttpContext ctx) =>
     Api.Check(await Api.Build(id, p, m, ctx.RequestAborted), m));
 app.MapGet("/api/projects/{id}/preview.png", async (string id, int? width, Projects p, MachineLink m, HttpContext ctx) =>
@@ -91,39 +92,29 @@ app.MapPost("/api/projects/{id}/load", async (string id, Projects p, MachineLink
     var b = await Api.Build(id, p, m, ctx.RequestAborted);
     if (b.Review.Refusal is { } refusal) throw new RemoteException(409, refusal);
     var (taskId, pic) = await m.LoadAsync(b, Api.Who(ctx), ctx.RequestAborted);
-    return new
-    {
-        taskId,
-        design = b.Design,
-        estimateS = b.Job.EstimateS,
-        picture = pic is null ? null : Api.PictureInfo(pic),
-        text = pic is null
-            ? $"\"{b.Design}\" is loaded. Take a picture of the bed, look at it, then start."
-            : $"\"{b.Design}\" is loaded. Look at the picture: is the material in place and the bed clear? Then start.",
-    };
+    return new LoadResult(taskId, b.Design, b.Job.EstimateS, pic is null ? null : Api.Describe(pic), pic is null
+        ? $"\"{b.Design}\" is loaded. Take a picture of the bed, look at it, then start."
+        : $"\"{b.Design}\" is loaded. Look at the picture: is the material in place and the bed clear? Then start.");
 });
 
 // ---- the job ---------------------------------------------------------------------------------
 app.MapPost("/api/job/start", async (StartRequest? body, MachineLink m, HttpContext ctx) =>
 {
     string mode = await m.StartAsync(body?.PictureId, Api.Who(ctx), ctx.RequestAborted);
-    return new { mode, state = DeviceClient.DescribeMode(mode) };
+    return new ModeResult(mode, DeviceClient.DescribeMode(mode));
 });
 foreach (var action in new[] { "pause", "resume", "stop" })
     app.MapPost($"/api/job/{action}", async (MachineLink m, HttpContext ctx) =>
     {
         string mode = await m.ControlAsync(action, Api.Who(ctx), ctx.RequestAborted);
-        return new { mode, state = DeviceClient.DescribeMode(mode) };
+        return new ModeResult(mode, DeviceClient.DescribeMode(mode));
     });
 
 // ---- history ---------------------------------------------------------------------------------
-app.MapGet("/api/history", (int? max, JobLog log) => log.Newest(Math.Clamp(max ?? 50, 1, 300)).Select(r => new
-{
-    r.Id, r.Design, r.Source, sourceText = MachineLink.SourceText(r.Source), r.LoadedAt, r.StartedAt, r.EndedAt,
-    r.Finished, r.StartedFromPhone, r.EstimateS, r.TookS,
-    before = r.HasBefore ? $"/api/history/{r.Id}/before.jpg" : null,
-    after = r.HasAfter ? $"/api/history/{r.Id}/after.jpg" : null,
-}));
+app.MapGet("/api/history", (int? max, JobLog log) => log.Newest(Math.Clamp(max ?? 50, 1, 300)).Select(r => new HistoryItem(
+    r.Id, r.Design, r.Source, MachineLink.SourceText(r.Source), r.LoadedAt, r.StartedAt, r.EndedAt, r.Finished, r.StartedFromPhone, r.EstimateS, r.TookS,
+    r.HasBefore ? $"/api/history/{r.Id}/before.jpg" : null,
+    r.HasAfter ? $"/api/history/{r.Id}/after.jpg" : null)).ToList());
 app.MapGet("/api/history/{id}/{name}", (string id, string name, int? width, JobLog log) =>
     log.ReadPicture(id, name) is { } jpg
         ? Results.Bytes(width is { } w ? PictureStore.Scaled(jpg, w) : jpg, "image/jpeg")
@@ -146,9 +137,6 @@ catch (IOException e)
 }
 return 0;
 
-/// <summary>The body of POST /api/job/start.</summary>
-public sealed record StartRequest(string? PictureId);
-
 /// <summary>Small pieces the endpoints share.</summary>
 static class Api
 {
@@ -165,13 +153,7 @@ static class Api
     public static IResult Embedded(string name, string contentType) =>
         typeof(Api).Assembly.GetManifestResourceStream("web/" + name) is { } s ? Results.Stream(s, contentType) : Results.NotFound();
 
-    public static object PictureInfo(Picture p) => new
-    {
-        id = p.Id,
-        takenAt = p.TakenAt,
-        blanked = p.Blanked,
-        url = $"/api/pictures/{p.Id}",
-    };
+    public static PictureInfo Describe(Picture p) => new(p.Id, p.TakenAt, p.Blanked, Routes.Picture(p.Id));
 
     /// <summary>A picture, smaller if asked (default 1280 px across), with what it is in the headers.</summary>
     public static IResult Jpeg(HttpContext ctx, Picture p, int? width)
@@ -187,30 +169,16 @@ static class Api
         await p.BuildAsync(p.Find(id) ?? throw new RemoteException(404, "That design isn't in the list any more."), m.FocusDistanceAsync, ct);
 
     /// <summary>What the desktop's Ship It shows before sending, for the phone.</summary>
-    public static object Check(ProjectBuild b, MachineLink m)
+    public static CheckResult Check(ProjectBuild b, MachineLink m)
     {
         string? loaded = m.LoadedJobNote();
         var text = JobChecks.Text(b.Review);
         if (loaded is not null) text += $"ⓘ {loaded}\n";
         if (b.PhoneNote is { } note) text += $"ⓘ {note}\n";
         text += "\nAfter loading, the machine waits. Nothing moves or fires until you start it: from the phone (after a look at the bed) or with its button.";
-        return new
-        {
-            id = b.Project.Id,
-            design = b.Design,
-            estimateS = b.Job.EstimateS,
-            estimate = TimeText.Duration(b.Job.EstimateS),
-            widthMm = Math.Round(b.Job.Bounds.Width, 1),
-            heightMm = Math.Round(b.Job.Bounds.Height, 1),
-            refusal = b.Review.Refusal,
-            notInJob = b.Review.NotInJob,
-            lines = b.Review.Lines.Where(l => l.Length > 0),
-            warnings = b.Review.Warnings,
-            loadedJob = loaded,
-            phoneNote = b.PhoneNote,
-            text,
-            preview = $"/api/projects/{b.Project.Id}/preview.png",
-        };
+        return new CheckResult(b.Project.Id, b.Design, b.Job.EstimateS, TimeText.Duration(b.Job.EstimateS),
+            Math.Round(b.Job.Bounds.Width, 1), Math.Round(b.Job.Bounds.Height, 1), b.Review.Refusal, b.Review.NotInJob,
+            [.. b.Review.Lines.Where(l => l.Length > 0)], b.Review.Warnings, loaded, b.PhoneNote, text, Routes.Preview(b.Project.Id));
     }
 
     /// <summary>GET /api/events: the status now, then every change, as server-sent events.</summary>

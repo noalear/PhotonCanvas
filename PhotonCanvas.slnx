@@ -5,6 +5,9 @@
     <Project Path="src/PhotonCanvas.Device/PhotonCanvas.Device.csproj" />
     <Project Path="src/PhotonCanvas.Doc/PhotonCanvas.Doc.csproj" />
     <Project Path="src/PhotonCanvas.Server/PhotonCanvas.Server.csproj" />
+    <Project Path="src/PhotonCanvas.Remote/PhotonCanvas.Remote.csproj" />
+    <Project Path="src/PhotonCanvas.Remote.App/PhotonCanvas.Remote.App.csproj" />
+    <Project Path="src/PhotonCanvas.Remote.Desktop/PhotonCanvas.Remote.Desktop.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj" />

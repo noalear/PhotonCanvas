@@ -32,3 +32,9 @@ obj/
 /*.xf
 keys.json
 harnessout/
+
+# Android signing keys for the Play store (docs/android.md): never commit
+*.keystore
+*.jks
+*.aab
+*.apk
