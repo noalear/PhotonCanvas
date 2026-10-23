@@ -64,6 +64,8 @@ public sealed record ProcessSettings
     public double HalftoneAngleDeg { get; init; } = 45;
     public double DotWidthMm { get; init; }
     public double AngleStepDeg { get; init; }
+    /// <summary>Keep turning from run to run (<see cref="Layer.TurnEachRun"/>).</summary>
+    public bool TurnEachRun { get; init; }
     public double FocusOffsetMm { get; init; }
     public DepthSlices Slices { get; init; } = new();
 
@@ -73,7 +75,7 @@ public sealed record ProcessSettings
         ImageMode = l.ImageMode, GrayMinPower = l.GrayMinPower, KerfMm = l.KerfMm, TabCount = l.TabCount, TabWidthMm = l.TabWidthMm,
         OvercutMm = l.OvercutMm, LeadInMm = l.LeadInMm, FillAngleDeg = l.FillAngleDeg, Crosshatch = l.Crosshatch, OverscanMm = l.OverscanMm,
         StepDownMm = l.StepDownMm, StepDownFirstMm = l.StepDownFirstMm, Wobble = l.Wobble, WobbleDiameterMm = l.WobbleDiameterMm, WobbleSpacingMm = l.WobbleSpacingMm,
-        FillStyle = l.FillStyle, AngleStepDeg = l.AngleStepDeg, FocusOffsetMm = l.FocusOffsetMm, Slices = l.Slices,
+        FillStyle = l.FillStyle, AngleStepDeg = l.AngleStepDeg, TurnEachRun = l.TurnEachRun, FocusOffsetMm = l.FocusOffsetMm, Slices = l.Slices,
         HalftoneCpi = l.HalftoneCpi, HalftoneAngleDeg = l.HalftoneAngleDeg, DotWidthMm = l.DotWidthMm,
         Bidirectional = l.Bidirectional, FillTogether = l.FillTogether, PerforateMm = l.PerforateMm, PerforateGapMm = l.PerforateGapMm,
         DotModeMm = l.DotModeMm, RampMm = l.RampMm, PassThrough = l.PassThrough,
@@ -87,7 +89,7 @@ public sealed record ProcessSettings
         ImageMode = ImageMode, GrayMinPower = GrayMinPower, KerfMm = KerfMm, TabCount = TabCount, TabWidthMm = TabWidthMm,
         OvercutMm = OvercutMm, LeadInMm = LeadInMm, FillAngleDeg = FillAngleDeg, Crosshatch = Crosshatch, OverscanMm = OverscanMm,
         StepDownMm = StepDownMm, StepDownFirstMm = StepDownFirstMm, Wobble = Wobble, WobbleDiameterMm = WobbleDiameterMm, WobbleSpacingMm = WobbleSpacingMm,
-        FillStyle = FillStyle, AngleStepDeg = AngleStepDeg, FocusOffsetMm = FocusOffsetMm, Slices = Slices ?? new(),
+        FillStyle = FillStyle, AngleStepDeg = AngleStepDeg, TurnEachRun = TurnEachRun, FocusOffsetMm = FocusOffsetMm, Slices = Slices ?? new(),
         HalftoneCpi = HalftoneCpi, HalftoneAngleDeg = HalftoneAngleDeg, DotWidthMm = DotWidthMm,
         Bidirectional = Bidirectional, FillTogether = FillTogether, PerforateMm = PerforateMm, PerforateGapMm = PerforateGapMm,
         DotModeMm = DotModeMm, RampMm = RampMm, PassThrough = PassThrough,

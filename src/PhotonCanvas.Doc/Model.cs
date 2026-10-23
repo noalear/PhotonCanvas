@@ -193,7 +193,7 @@ public sealed record Layer
     public DepthSlices Slices { get; init; } = new();
 
     /// <summary>Extra turn of the scan lines for this run (<see cref="TurnEachRun"/>), degrees.</summary>
-    public double RunTurnDeg => TurnEachRun ? RunCount * AngleStepDeg * Math.Max(1, Laser.Passes) * (Mode == LayerMode.Image ? Math.Max(1, Slices.Count) : 1) : 0;
+    public double RunTurnDeg => TurnEachRun ? RunCount * AngleStepDeg * Math.Max(1, Laser.Passes) * (Mode == LayerMode.Image && ImageMode == ImageEngraveMode.Slices ? Math.Max(1, Slices.Count) : 1) : 0;
     /// <summary>Fill: extend each scan line this far beyond the shape with the laser off, so the beam is at speed when it burns (mm).</summary>
     public double OverscanMm { get; init; }
 

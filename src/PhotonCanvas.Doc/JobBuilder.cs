@@ -204,7 +204,6 @@ public static class JobBuilder
 
     public static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now = null)
     {
-        if (VariableText.Problems(s).FirstOrDefault() is { } problem) throw new JobException(problem);
         JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
         // The job bar's pause after each path: how many it was put after, and the time they add (heat-ordered layers have their own).
@@ -224,6 +223,8 @@ public static class JobBuilder
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
         var layers = OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).ToList();
+        // Only what's sent has to make sense: a broken code or field on a layer that's off doesn't stop the job.
+        if (VariableText.Problems(s with { Shapes = [.. layers.SelectMany(s.ShapesFor).Distinct()] }).FirstOrDefault() is { } problem) throw new JobException(problem);
         var times = new List<BuiltJob.LayerTime>();
 
         foreach (var (a, b) in StackedShapes(s).Take(3))
@@ -1039,6 +1040,8 @@ public static class JobBuilder
             }
             carry = len - (t - spacing);
         }
+        // Round a closed outline the last dot can land back on the first: it would fire twice there.
+        if (o.Count > 1 && o[^1].Dist(o[0]) < 1e-6) o.RemoveAt(o.Count - 1);
         return o;
     }
 
@@ -1050,6 +1053,9 @@ public static class JobBuilder
         {
             case LayerMode.Cut or LayerMode.Score:
                 JobException.CheckRange("kerf", l.KerfMm, -MaxKerfMm, MaxKerfMm, "mm");
+                // Perforation and dot mode work on scored lines too.
+                if (l.PerforateMm > 0) { JobException.CheckRange("perforation dash", l.PerforateMm, 0.05, 100, "mm"); JobException.CheckRange("perforation gap", l.PerforateGapMm, 0.05, 100, "mm"); }
+                if (l.DotModeMm > 0) { JobException.CheckRange("dot spacing", l.DotModeMm, 0.01, 50, "mm"); JobException.CheckRange("dot time", l.DotUs, 10, 100_000, "µs"); }
                 if (l.Mode == LayerMode.Score) break;
                 JobException.CheckRange("number of tabs", l.TabCount, 0, MaxTabs, "");
                 if (l.TabCount > 0) JobException.CheckRange("tab width", l.TabWidthMm, 0.1, 10, "mm");
@@ -1057,10 +1063,9 @@ public static class JobBuilder
                 JobException.CheckRange("overcut", l.OvercutMm, 0, 10, "mm");
                 JobException.CheckRange("lead-in", l.LeadInMm, 0, 10, "mm");
                 JobException.CheckRange("lead-out", l.LeadOutMm, 0, 10, "mm");
-                if (l.PerforateMm > 0) { JobException.CheckRange("perforation dash", l.PerforateMm, 0.05, 100, "mm"); JobException.CheckRange("perforation gap", l.PerforateGapMm, 0.05, 100, "mm"); }
-                if (l.DotModeMm > 0) { JobException.CheckRange("dot spacing", l.DotModeMm, 0.01, 50, "mm"); JobException.CheckRange("dot time", l.DotUs, 10, 100_000, "µs"); }
                 break;
             case LayerMode.Fill:
+                JobException.CheckRange("line density", l.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
                 JobException.CheckRange("fill angle", l.FillAngleDeg, -360, 360, "degrees");
                 JobException.CheckRange("turn per pass", l.AngleStepDeg, -180, 180, "degrees");
                 JobException.CheckRange("overscan", l.OverscanMm, 0, 20, "mm");
@@ -1187,6 +1192,8 @@ public static class JobBuilder
     static List<(FlatPath Path, int Depth)> Order(List<FlatPath> paths, ref Vec2 pos, PathOrder order = PathOrder.Optimised, bool startNearest = false, List<Vec2>? starts = null)
     {
         // Loops with a start point chosen on them begin exactly there (at the nearest point, even mid-edge).
+        // They're remembered, so Start outlines nearest leaves them be (with kerf they no longer pass through the point itself).
+        var chosen = new HashSet<FlatPath>(ReferenceEqualityComparer.Instance);
         if (starts is { Count: > 0 })
             paths = [.. paths.Select(p =>
             {
@@ -1203,11 +1210,13 @@ public static class JobBuilder
                     while (i + 1 < ring.Count && cum[i + 1] <= near.Along) i++;
                     // Start at the point, go round, and come back to it.
                     List<Vec2> pts = [at.Point, .. ring.Skip(i + 1), .. ring.Take(i + 1)];
-                    return p with { Points = pts.Where((q, k) => k == 0 || q.Dist(pts[k - 1]) > 1e-9).ToList() };
+                    var started = p with { Points = pts.Where((q, k) => k == 0 || q.Dist(pts[k - 1]) > 1e-9).ToList() };
+                    chosen.Add(started);
+                    return started;
                 }
                 return p;
             })];
-        bool Fixed(FlatPath p) => starts is { Count: > 0 } && p.Closed && starts.Any(s => s.Dist(p.Points[0]) < 1e-6);
+        bool Fixed(FlatPath p) => chosen.Contains(p);
         int n = paths.Count;
         var depth = Depths(paths);
         var o = new List<(FlatPath, int)>(n);

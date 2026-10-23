@@ -179,6 +179,55 @@ public class ReviewFindingsTests
     }
 
     [Fact]
+    public void AChosenStartWinsOverStartNearestWithKerf()
+    {
+        var cut = Layer.Default(0) with { KerfMm = 0.2, StartNearest = true };
+        var sq = new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }.WithStart(new Vec2(20, 30));
+        var job = JobBuilder.Build(Ops.AddShapes(new DocState([cut], []), [sq]), new JobOptions()).Job;
+        var first = job.Blocks.OfType<VectorBlock>().Single().Path.Points[0];
+        // The kerf moves the outline 0.1 mm out: the start stays at the chosen point, just outside it.
+        Assert.True(first.Dist(new Vec2(20, 30.1)) < 0.02, $"started at {first}");
+    }
+
+    [Fact]
+    public void ABrokenFieldOnALayerThatIsntSentDoesntStopTheJob()
+    {
+        var cut = Layer.Default(0);
+        var off = Layer.Default(1) with { Name = "Notes", Output = false };
+        var note = TextShape.Create("{nosuchfield}", new TextStyle("Arial", 5), off.Id, Affine.Translate(50, 50));
+        var s = Ops.AddShapes(new DocState([cut, off], []), [Sq(cut.Id, 10), note]);
+        Assert.Single(JobBuilder.Build(s, new JobOptions()).Job.Blocks);
+        // Sent, it does.
+        Assert.Throws<JobException>(() => JobBuilder.Build(s with { Layers = [cut, off with { Output = true }] }, new JobOptions()));
+    }
+
+    [Fact]
+    public void SmallerLayerFindings()
+    {
+        // Dot mode round a closed 40 mm square at 1 mm: 160 dots, the corner where it starts fired once.
+        var dots = JobBuilder.DotsAlong(Polyline.Loop(Box).EmittedPoints(), 1);
+        Assert.Equal(160, dots.Count);
+        Assert.True(dots[0].Dist(dots[^1]) > 0.5);
+
+        // Turning from run to run: a picture in dots turns by its passes, not by a slice count it doesn't use.
+        var pic = Layer.Default(0, LayerMode.Image) with { TurnEachRun = true, RunCount = 1, AngleStepDeg = 10, Laser = LaserSettings.Blue(30, 80).WithPasses(2) };
+        Assert.Equal(20, pic.RunTurnDeg, 9);
+
+        // Copied settings keep "Keep turning from run to run".
+        Assert.True(Doc.Materials.ProcessSettings.From(pic).ApplyTo(Layer.Default(1, LayerMode.Image)).TurnEachRun);
+
+        // Tone curves are equal when their points are, wherever the list came from.
+        var a = new Core.Imaging.ToneCurve([(0.0, 0.0), (0.5, 0.7), (1.0, 1.0)]);
+        var b = new Core.Imaging.ToneCurve([.. a.Points]);
+        Assert.Equal(a, b);
+        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+
+        // A scored line's perforation is checked like a cut's.
+        var score = Layer.Default(0, LayerMode.Score) with { PerforateMm = 0.001, PerforateGapMm = 0 };
+        Assert.Throws<JobException>(() => JobBuilder.Build(Ops.AddShapes(new DocState([score], []), [Sq(score.Id, 10)]), new JobOptions()));
+    }
+
+    [Fact]
     public void AShapeSavedOnASubLayerLoadsOnItsParent()
     {
         var (s, a, fill, _) = WithSubLayer();

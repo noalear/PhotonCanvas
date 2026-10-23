@@ -15,6 +15,19 @@ public sealed record ToneCurve(IReadOnlyList<(double Input, double Lightness)> P
 {
     double[]? _lut;
 
+    /// <summary>Equal when the points and colours are (the lookup table and which list holds the points don't count).</summary>
+    public bool Equals(ToneCurve? other) =>
+        other is not null && Points.SequenceEqual(other.Points) && BareColour == other.BareColour && BurnColour == other.BurnColour;
+
+    public override int GetHashCode()
+    {
+        var h = new HashCode();
+        foreach (var p in Points) h.Add(p);
+        h.Add(BareColour);
+        h.Add(BurnColour);
+        return h.ToHashCode();
+    }
+
     /// <summary>The bare material's colour (0xRRGGBB) as the camera saw it, if measured: for showing pictures as they'll burn.</summary>
     public uint? BareColour { get; init; }
     /// <summary>The colour of the darkest burn these settings make (0xRRGGBB), if measured.</summary>
