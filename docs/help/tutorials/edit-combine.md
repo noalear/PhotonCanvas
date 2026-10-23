@@ -9,7 +9,8 @@ from two circles. Break apart does the opposite, for drawings that arrive as one
 ## Draw a ring
 <!-- target: ribbon:Home/Ellipse -->
 <!-- wait: shapes:+2 -->
-Choose **Ellipse**, hold `Shift` and draw a circle, then a smaller one inside it.
+Choose **Ellipse**, hold `Shift` and draw a circle. **Ellipse** goes back to **Select** after
+each shape, so press `E` (or click **Ellipse**) again and draw a smaller circle inside it.
 
 ## Select both
 <!-- target: canvas -->

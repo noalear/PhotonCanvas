@@ -20,10 +20,10 @@ The icons at the top of the panel (point at one to see its name):
 | Button | What it does |
 |---|---|
 | **Add layer** (+) | A new layer just below the active one, which becomes the active layer. It's called "Layer N", gets the first colour of the palette not used yet, and starts as a Cut layer at 70% and 40 mm/s on the blue diode. Same as `Ctrl+L`. |
-| **Duplicate layer with its shapes** | A copy of the active layer, settings and all, with a copy of every shape on it, placed right below it and called "… copy". The copied shapes sit exactly on top of the originals: move them, or the job's checks will say both get processed. |
+| **Duplicate layer with its shapes** | A copy of the active layer, settings and all, with a copy of every shape on it, placed right below it and called "… copy". The copied shapes sit exactly on top of the originals: move them, or the job's checks will say both get processed. The layer's sub-layers aren't copied. |
 | **Move up (runs earlier)** | Moves the selected layers one place up. Nothing happens if one of them is already at the top. |
 | **Move down (runs later)** | Moves the selected layers one place down. |
-| **Merge selected layers into the top one** | With two or more layers selected: all their shapes go onto the topmost of them, which keeps its own settings. The other layers are deleted. |
+| **Merge selected layers into the top one** | With two or more layers selected: all their shapes go onto the topmost of them, which keeps its own settings. The other layers are deleted, with their sub-layers. |
 | **Delete selected layers (shapes move to the layer above)** | Deletes the selected layers. Their shapes move to the nearest layer above that isn't being deleted (or, if there is none, the first one left below). Their sub-layers go with them. |
 
 > **Note:** Deleting every layer at once leaves one new layer with all the shapes on it (their
@@ -47,7 +47,7 @@ Each layer is a card. From left to right and top to bottom:
 | Padlock | Locked or not. |
 | Material line | Only when the layer has a material: the material, and the name of the saved settings it uses. |
 | Mode chip | **CUT**, **SCORE**, **ENGRAVE** or **PICTURE**. |
-| Summary | Power, speed and passes: "80% · 12 mm/s ×3". A picture layer shows its resolution instead of the speed: "30% · 300 dpi". " · MOPA" is added when it uses the MOPA. |
+| Summary | Power, speed and passes: "80% · 12 mm/s ×3". A picture layer shows its resolution instead of the speed and passes: "30% · 300 dpi". " · MOPA" is added when it uses the MOPA. |
 | Time | About how long the layer takes, all passes included, from the job's estimate. Blank for layers that won't be sent and for empty ones. |
 | Warning | A line in orange when some of its shapes would be left out (see [Shapes on the wrong kind of layer](#shapes-on-the-wrong-kind-of-layer)). |
 
@@ -174,7 +174,8 @@ the whole selection. The menu has:
 **Rename** (one shape only) and **Select its whole group** (grouped shapes only), then the same menu
 as right-clicking shapes on the work area: **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete**,
 **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**, **Convert text to
-paths**, **Lock** / **Unlock**, **Use as material outline**, **Shape operations**, **Array**,
+paths**, **Lock** / **Unlock**, **Use as material outline**, **Split onto pieces…**,
+**Shape operations**, **Array**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
 camera…**, **Trace picture…**, **Depthmap with DepthCharge…**, **Remove picture background…**,
 **Zoom to …**, **Rename…** and **Save to My shapes…**. They're explained in

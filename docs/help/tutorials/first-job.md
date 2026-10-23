@@ -41,7 +41,8 @@ to the right height.
 ## Frame it
 <!-- target: ribbon:Laser/Frame -->
 Click **Frame** (the first time, confirm with **Start framing**). A faint dot traces around the
-job. Move the material until it's right, then click **Stop framing**.
+job. Move the material until it's right, then click **Stop framing** in the job bar under the
+work area (or **Frame** on the ribbon again).
 
 ## Ship it
 <!-- target: ribbon:Laser/Ship It -->

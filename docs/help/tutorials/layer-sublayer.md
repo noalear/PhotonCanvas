@@ -15,8 +15,8 @@ shapes)**. Under an Engrave layer it's a Score layer; under a Cut or Score layer
 
 ## Its card
 <!-- target: panel:Layers -->
-The new card is indented and names its parent ("↳ Engrave badge's shapes"): whatever is on the
-parent layer, it does too.
+The new card is indented under its parent and reads "↳ sub-layer" where other cards count their
+shapes. Point at that to see the parent's name. Whatever is on the parent layer, it does too.
 
 ## Set it up
 <!-- target: panel:Layer settings -->

@@ -16,7 +16,8 @@ is on [Drawing](drawing.md); changing their outlines (weld, offset, trim…) is 
   field can't be sent: the Selection panel warns "⚠ Partly outside the work area". A picture with
   an [image mask](pictures.md#image-mask) only counts where it shows.
 - Each shape is drawn in its layer's colour. Shapes on **Engrave** layers are tinted inside.
-  Layers that aren't sent to the laser (output off) are drawn faded; hidden layers aren't drawn.
+  Layers that aren't sent to the laser (output off) are drawn faded, and their pictures at 30%;
+  hidden layers aren't drawn.
   The shape under the cursor is drawn a little thicker.
 - Pictures are drawn under everything else, whatever their layer: lines and shapes always show on
   top, so a picture can be lined up with them.
@@ -161,7 +162,10 @@ Diameters are always in millimetres.
 ![A selected line: a grip at each end, a filled one in the middle, and its length and angle](images/canvas-line-grips.png)
 - `Esc` while dragging puts everything back where it was.
 - **Double-click** a text to change its words (in the Selection panel), a code to edit it, or any
-  other shape to edit its points (see [Edit points](#edit-points)).
+  other shape to edit its points (see [Edit points](#edit-points)). A rectangle, ellipse, polygon
+  or star drawn with its tool is selected and **Edit points** comes on, but it shows no points:
+  change its size, corners or sides on its **Shape** card, or press `Ctrl+Shift+C` first to make
+  it an ordinary path.
 
 For exact numbers, type them in the Selection panel: see
 [The Selection panel](workspace.md#the-selection-panel). Quarter turns, flips, aligning and
@@ -313,9 +317,10 @@ Guides are lines across the work area to line things up against.
 
 View → **Measure** is a tool for measuring distances and angles on the work area.
 
-1. Drag from one point to another. Each end snaps to the nearest corner or end point of a shape
-   within the snap distance; otherwise it lines up like any drag (edges, centres, guides, grid).
-   Hold `Shift` for steps of 45°, `Ctrl` for no snapping.
+1. Drag from one point to another. Each end lands on the nearest object snap that's on (an end, a
+   middle, a centre, a quadrant, a crossing, and for the second end square onto or touching a line
+   or circle: see [Object snaps](#object-snaps)); otherwise it lines up like any drag (edges,
+   centres, guides, grid). Hold `Shift` for steps of 45°, `Ctrl` for no snapping.
 2. The line is labelled with its length, how far it goes across and down (Δx, Δy) and its angle in
    degrees, counted anticlockwise from pointing right (so a line going up is positive). The status
    bar repeats it ("Measured …").
@@ -376,7 +381,8 @@ do with the selection opens. Items that don't apply are greyed.
 
 - **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete it** (or **Delete these 3**…)
 - **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**,
-  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**
+  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**,
+  **Split onto pieces…** (see [Split onto pieces](work-area.md#split-onto-pieces))
 - **Shape operations**: **Offset…**, **Round corners…**, **Text on path**
   (or **Straighten text**), **Copy along path…**, **Warp…**, **Tidy lines…**, **Weld (union)**,
   **Subtract (bottom minus the rest)**, **Intersect (keep the overlap)**,

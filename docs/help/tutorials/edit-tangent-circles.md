@@ -9,7 +9,9 @@ outside: for geometric patterns of touching circles.
 ## Draw three circles
 <!-- target: ribbon:Home/Ellipse -->
 <!-- wait: shapes:+3 -->
-Choose **Ellipse**, hold `Shift` and draw three circles apart from each other.
+Choose **Ellipse**, hold `Shift` and draw a circle. **Ellipse** goes back to **Select** after
+each shape, so press `E` (or click **Ellipse**) again before each of the other two. Keep the three
+circles apart from each other.
 
 ## Select them
 <!-- target: canvas -->

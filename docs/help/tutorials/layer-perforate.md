@@ -26,5 +26,5 @@ perforation.
 
 ## How long each dot fires
 <!-- target: panel:Layer settings -->
-Each dot fires for the layer's **Dot time µs**, 200 µs unless changed. It's set with the picture
-settings: switch the layer to **Picture**, set it, and switch back.
+Each dot fires for the layer's **Dot time µs**, 200 µs unless changed. It shows in
+**More settings** once **Dot mode every** is above 0.

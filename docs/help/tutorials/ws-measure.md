@@ -3,8 +3,8 @@
 <!-- summary: Measure the distance and angle between two points on the work area. -->
 <!-- page: canvas.md#measure -->
 <!-- order: 100 -->
-Check a gap, the spacing of holes or an angle without doing sums. The ends snap to the corners of
-your shapes.
+Check a gap, the spacing of holes or an angle without doing sums. The ends land on your shapes'
+object snaps: corners and ends, middles, centres, quadrants and crossings.
 
 ## Choose Measure
 <!-- target: ribbon:View/Measure -->

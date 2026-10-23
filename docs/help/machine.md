@@ -193,7 +193,7 @@ The red pointer and the auto-focus light are turned off for photos and live view
 machine is idle or waiting with a job), so they don't show in the picture.
 
 **MACHINE EVENTS**: the last 200 things the machine reported, with times: connecting, status
-changes, *Job loaded*, *Job started*, *Job paused*, *Job finished*, *Job cancelled*, *Lid opened*,
+changes, *Job loaded*, *Job started*, *Job paused*, *Job stopped*, *Job finished*, *Job cancelled*, *Lid opened*,
 *Lid closed*, focusing, and any errors. They're also written to the day's log file.
 
 ### Machines page
@@ -459,8 +459,9 @@ fire the laser. Not yet tried on the machine.
 
 Open it with **Console** on the **Laser** tab (in the **Machine** group), or
 **Settings → Tools → G-code console…**. The console is there while **G-code console** is ticked in
-[Settings → Equipment](#equipment), as it is to begin with; unticked, the ribbon button is hidden
-and the Tools button does nothing. It can also be given a keyboard shortcut.
+[Settings → Equipment](#equipment), as it is to begin with; unticked, the ribbon button is hidden,
+but **G-code console…** under Settings → Tools still opens it. It can also be given a keyboard
+shortcut.
 
 - Type a command in the box at the bottom (*e.g. M114 (Enter sends)*) and press `Enter` or
   **Send**. `↑` and `↓` go back through what you sent.

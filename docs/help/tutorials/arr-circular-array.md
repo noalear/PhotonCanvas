@@ -22,8 +22,9 @@ Click **Circular array**.
 
 ## The centre
 <!-- target: field:Centre X -->
-**Centre X** and **Centre Y** are the point they go round, in mm. It starts just below the
-selection.
+**Centre X** and **Centre Y** are the point they go round, in mm. It starts below the
+selection, as far below its bottom edge as the selection's longer side, so the copies make a
+ring.
 
 ## How far round
 <!-- target: field:Spread (°) -->

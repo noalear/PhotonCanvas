@@ -81,8 +81,8 @@ each line, until you choose another tool or press `Esc`.
 - While a line follows the pointer, its length and angle show beside it ("42.5 mm ∠ 30°": the angle
   counter-clockwise from the right, as on paper).
 - **Type a length** and press `Enter` to end the line that far along the pointer's direction (in the
-  units shown, millimetres or inches). Type `25<30` for 25 at 30°. `Backspace` takes back a
-  character; `Esc` clears what's typed.
+  units shown, millimetres or inches). Type `25<30` for 25 at 30°. A comma works as the decimal
+  point too (`12,5`). `Backspace` takes back a character; `Esc` clears what's typed.
 - The lines drawn this way aren't selected, so handles don't get in the way of the next one.
 - Selected, a line shows a grip at each end and one in the middle instead of the box: drag an end
   to move it (onto object snaps), the middle to move the line. See
@@ -103,7 +103,7 @@ The pen draws any outline point by point.
 A dashed line from the last point follows the mouse. Points snap like the other tools. Choosing
 another tool part-way keeps what you've drawn (two points or more) as an open line. Closed shapes
 are named "Shape" in the layer list, open ones "Path". To change the points later, use **Edit
-points** (see [Editing shapes](editing-shapes.md)).
+points** (see [Edit points](canvas.md#edit-points)).
 
 ### Editable shapes
 
@@ -115,7 +115,7 @@ and the **Selection** panel shows a **Shape** card under the selection card:
 | **W**, **H** | all four | 0.01–2000 mm | The size as seen on the work area. The shape is rebuilt at this size, so corners stay round and sides even, even after stretching it with the handles. |
 | **Corner radius** | rectangles | 0–1000 mm | Rounded corners (0 = square). Never more than half the shorter side. |
 | **Sides / points** | polygons, stars | 3–64 | Corners of a polygon, points of a star. |
-| **Inner size %** | stars | 5–95 | How far in the inner corners are, as a share of the size: smaller is spikier. |
+| **Inner size %** | stars | 5–95 | How far out from the middle the inner corners are, as a share of the outer size: smaller is spikier. |
 
 The shape stays editable until you change its points. To edit its points, first turn it into a
 plain path with `Ctrl+Shift+C`.
@@ -230,7 +230,7 @@ The **Keychain / tag** tab draws a keychain or gift tag with its hole and, if yo
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
-| **Shape** | | Rounded rectangle | **Rounded rectangle** (corners rounded by a fifth of the shorter side), **Circle** (an ellipse of the width and height) or **Tag** (a luggage tag with its left end cut to a blunt point). |
+| **Shape** | | Rounded rectangle | **Rounded rectangle** (corners rounded by a fifth of the shorter side), **Circle** (an ellipse of the width and height) or **Tag** (a luggage tag with its left end cut to a point: sharp when the width is at least twice the height, as at the default size, otherwise blunt, with a short flat end). |
 | **Width**, **Height** | 10–300, 5–300 mm | 50, 25 | The outside size. |
 | **Hole Ø** | 0–30 mm | 4 | The ring hole's diameter; 0 = no hole. |
 | **from the edge** | 0.5–50 mm | 3 | From the left end (the top of a circle) to the edge of the hole. |
@@ -302,8 +302,8 @@ beside the work area, so you can add several.
 - **Search shapes** shows the shapes whose name or category contains what you type.
 - Click a tile to add that shape in the middle of the work area, 40 mm across its longer side,
   on the active layer. Shapes marked "added at its real size" in their tip keep their size.
-  Adding again steps each new one 6 mm down and right so they don't stack exactly. The line under
-  the tiles says what was added.
+  Adding again steps each new one 6 mm down and right so they don't stack exactly; the seventh
+  goes back to the middle and the steps start again. The line under the tiles says what was added.
 - The added shapes are ordinary outlines: resize them, edit their points, combine them.
 
 ### Built-in shapes
@@ -375,7 +375,8 @@ shadows), or to trace only part of an edge.
 4. Click the first point (drawn larger) to close the shape, or press `Enter` or double-click to
    finish an open line.
 
-`Backspace` or `Delete` removes the last point; `Esc` throws the line away. The path along the edge
+`Backspace` or `Delete` removes the last point; `Esc` throws the line away. Choosing another tool
+part-way keeps what you've traced (two points or more) as an open line. The path along the edge
 is worked out up to 60 mm from the last click; beyond that the line goes straight. Click every few
 centimetres, and more often where the edge is faint or other edges run close by. A closed shape is
 fitted with lines and curves ("Traced shape"); an open line is made of straight pieces ("Traced
