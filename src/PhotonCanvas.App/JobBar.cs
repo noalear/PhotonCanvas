@@ -206,7 +206,7 @@ public sealed class JobBar : UserControl
         _passMode.SelectionChanged += (_, _) => { _settings.WholeJobPasses = _passMode.SelectedIndex == 0; _settings.Save(); UpdateDelayRow(); Schedule(); };
         _delay.ValueChanged += (_, _) => { _settings.PassDelayS = (double)(_delay.Value ?? 0); _settings.Save(); Schedule(); };
         _pathPause.ValueChanged += (_, _) => { _settings.PathPauseS = (double)(_pathPause.Value ?? 0); _settings.Save(); Schedule(); };
-        ToolTip.SetTip(_estimate, "Estimated time. It ignores acceleration, so real jobs run a little longer.");
+        ToolTip.SetTip(_estimate, "Estimated time, from how the machine was timed doing the same kinds of work (Help: The estimate).");
         var passes = _passesArea = new StackPanel
         {
             Orientation = Orientation.Horizontal, Spacing = 6, Margin = new(12, 0, 0, 0),
@@ -542,7 +542,7 @@ public sealed class JobBar : UserControl
         _send.IsEnabled = CanSend;
         UpdateFrameButton();
         if (!_sending)
-            _sendState = !_machine.IsConnected ? "Connect the machine (right end of the ribbon) to send or frame."
+            _sendState = !_machine.IsConnected && _settings.ActiveSetup().Kind != MachineKind.Grbl ? "Connect the machine (right end of the ribbon) to send or frame."
                 : _job is null ? "Fix the problem in Checks to send." : "Ready to send.";
         ShowCaption();
     }

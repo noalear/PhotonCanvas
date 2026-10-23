@@ -46,12 +46,13 @@ public sealed class BevelTestWindow : Window
             foreach (var r in m.Recipes.Where(r => r.Purpose == RecipePurpose.Cut))
                 _sources.Add(($"{m.Label} · {r.Title}", r.Settings.ApplyTo(Layer.Default(0, LayerMode.Cut)), m.ThicknessMm));
         _source.ItemsSource = _sources.Select(x => x.Label).ToList();
-        _source.SelectedIndex = _sources.Count > 0 ? 0 : -1;
+        // A library cut knows its board's thickness: filled in when chosen (also the first one, chosen to start with).
         _source.SelectionChanged += (_, _) =>
         {
             if (_sources.ElementAtOrDefault(_source.SelectedIndex).Thickness is { } t && string.IsNullOrWhiteSpace(_thickness.Text))
                 _thickness.Text = t.ToString("0.##", CultureInfo.InvariantCulture);
         };
+        _source.SelectedIndex = _sources.Count > 0 ? 0 : -1;
         var (longMm, shortMm) = Bevel.BarLengths(machine);
         _plan.Text = _sources.Count == 0
             ? "There's nothing to cut it with yet: add a cut layer with settings that go right through your board (the Cut test finds them), or save a cut to the library."

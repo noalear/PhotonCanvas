@@ -26,7 +26,9 @@ public sealed partial class CanvasView
         set { _grid = value; InvalidateVisual(); }
     }
 
-    public bool SnapToObjects { get; set; } = true;
+    /// <summary>Snap to other shapes' edges and centres (the lines are worked out again when it changes).</summary>
+    public bool SnapToObjects { get => _snapToObjects; set { _snapToObjects = value; _preparedState = null; } }
+    bool _snapToObjects = true;
     public bool SnapToGrid { get; set; }
     /// <summary>How close (screen pixels) something must be to snap.</summary>
     public double SnapDistancePx { get; set; } = 8;

@@ -30,7 +30,7 @@ public sealed class MachineHud : UserControl
     readonly Button _photo, _focus;
     readonly ToggleButton _camera = new() { Classes = { "rb" } }, _live = new() { Classes = { "rb" } };
     readonly Button _lights;
-    readonly Slider _opacity = new() { Minimum = 0.1, Maximum = 1, Width = 120 };
+    readonly Slider _opacity = new() { Minimum = 0.15, Maximum = 1, Width = 120 };
     readonly Slider _front = new() { Minimum = 0, Maximum = 100, Width = 160 }, _back = new() { Minimum = 0, Maximum = 100, Width = 160 };
     // Focus height: ▼ [21.6 mm] ▲ as one control.
     readonly TextBox _height = new()

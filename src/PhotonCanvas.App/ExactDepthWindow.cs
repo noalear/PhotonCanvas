@@ -97,7 +97,7 @@ public sealed class ExactDepthWindow : Window
                                    "the next round is worked out from what each pass really took off, so it closes in on the depth instead of guessing all the passes up front.",
                         },
                         new Border { Background = Brush("Bg0"), CornerRadius = new(8), Padding = new(8), Child = _preview },
-                        Hint("Blue dots: where the depth is measured. Grey: just outside, to catch the board or the head shifting. The pointer must see the bottom: keep holes wider than about 3 mm."),
+                        Hint("Blue dots: where the depth is measured. Grey: just outside, to catch the board or the head shifting. The pointer must see the bottom: keep holes at least about 5 mm across (it measures 2.5 mm in from every edge)."),
                         _setup,
                         _steps,
                         Explained("Depth so far", "Each dot is a measurement after a round; the line across is the depth wanted.", _chart),
@@ -190,7 +190,7 @@ public sealed class ExactDepthWindow : Window
     {
         if (_shapes.Count == 0) return;
         var (inside, outside) = DepthRun.PickPoints(Area);
-        if (inside.Count == 0) { _status.Text = "The shapes are too narrow to measure inside (the pointer needs about 3 mm of room)."; return; }
+        if (inside.Count == 0) { _status.Text = "The shapes are too narrow to measure inside (the pointer measures 2.5 mm in from every edge, so holes need about 5 mm across)."; return; }
         // A layer of its own, from the shapes' layer: a fill, its passes set each round.
         var source = _doc.State.Layers.First(l => l.Id == _shapes[0].LayerId);
         double target = (double)(_target.Value ?? 1);

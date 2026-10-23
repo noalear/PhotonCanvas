@@ -212,7 +212,7 @@ public sealed class HotkeysWindow : Window
                 var parts = Keys(other, _settings).Split('|', StringSplitOptions.RemoveEmptyEntries).ToList();
                 if (parts.RemoveAll(p => string.Equals(p, keys, StringComparison.OrdinalIgnoreCase)) == 0) continue;
                 _settings.Hotkeys[other.Id] = string.Join("|", parts);
-                _note.Text = $"{keys} was “{other.Name}”: that one has no shortcut now.";
+                _note.Text = parts.Count == 0 ? $"{keys} was “{other.Name}”: that one has no shortcut now." : $"{keys} was also “{other.Name}”: that one keeps {string.Join(", ", parts)}.";
             }
         _settings.Hotkeys[c.Id] = keys;
         _settings.Save();

@@ -45,6 +45,8 @@ public sealed partial class CanvasView
 
     /// <summary>A line is being drawn click by click (keys go to it: typed lengths, Enter, Esc, Backspace).</summary>
     public bool LineInProgress => _tool == Tool.Line && _lineFrom is not null;
+    /// <summary>The Pen tool has points down (its keys are the pen's until it's finished).</summary>
+    public bool PenInProgress => _tool == Tool.Pen && _pen.Count > 0;
 
     SnapFeatures? FeaturesOf(Shape s) => s switch
     {

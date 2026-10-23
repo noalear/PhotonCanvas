@@ -410,7 +410,8 @@ public partial class MainWindow : Window
         bool Many() => _doc.Selection.Count > 1;
         bool TwoPaths() => SelectedPaths().Count > 1;
         bool HasPicture() => SelectedPicture() is not null;
-        void Use(Tool t) { Canvas.Tool = t; Canvas.Focus(); }
+        // Clicking the tool that's already on leaves it on, and its button pressed.
+        void Use(Tool t) { Canvas.Tool = t; foreach (var (tb, tool) in _toolButtons) tb.IsChecked = tool == t; Canvas.Focus(); }
         ToggleButton ToolLarge(RibbonGroup g, string label, string icon, Tool t, string tip)
         {
             var b = g.LargeToggle(label, icon, _ => Use(t), tip);
@@ -540,9 +541,9 @@ public partial class MainWindow : Window
         codes.Small("Number copies", "IcArrayGrid", NumberCopies, "Selected copies (groups or single shapes) each mark the next serial number or spreadsheet row, back to front and left to right; select one to set it back", HasSel);
         var grp = home.Group("Group");
         grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
-        grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", HasSel);
+        grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", () => _doc.State.Shapes.Any(x => _doc.Selection.Contains(x.Id) && x.GroupId is not null));
         grp.Small("Combine", "IcCombine", Combine, "Combine into one compound shape: overlapping parts make holes (Ctrl+K)", Many);
-        grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", HasSel);
+        grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", () => SelectedPaths().Any(p => p.Geometry.Subpaths.Length > 1));
         var boolean = home.Group("Shape builder");
         boolean.Large("Weld", "IcWeld", () => BooleanSel(BoolOp.Union), "Weld: merge overlapping shapes into one outline (Ctrl+Shift+U)", TwoPaths);
         boolean.Small("Subtract", "IcSubtract", () => BooleanSel(BoolOp.Subtract), "Subtract: the bottom shape minus the ones above it (Ctrl+Shift+M)", TwoPaths);
@@ -553,7 +554,7 @@ public partial class MainWindow : Window
         outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round the sharp corners of the selected shapes", () => SelectedPaths().Count > 0);
         outline.Small("Text on path", "IcTextPath", TextOnPath, "Select a text and a line or shape: the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
         ToolSmall(outline, "Trim", "IcTrim", Tool.Trim, "Trim: click a piece of a line between where it crosses others to cut it away");
-        outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Count > 0);
+        outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Any(p => p is not (TextShape or CodeShape)));
         outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
         ToolSmall(outline, "Scissors", "IcCut", Tool.Scissors, "Scissors: click a line or outline to cut it there");
         ToolSmall(outline, "Place tabs", "IcBreak", Tool.Tabs, "Click outlines to put tabs exactly where you want them (Shift+click removes one); used on Cut layers");
@@ -655,7 +656,7 @@ public partial class MainWindow : Window
         see.Large("Update photo", "IcCamera", () => _ = Guard(_machine.UpdatePhotoAsync), "Take a new photo of the bed and lay it under your design", () => _machine.IsConnected && _machine.HasCalibration);
         see.LargeToggle("Live view", "IcLive", on => _machine.LiveView = on, "Keep the camera picture updating", () => _machine.IsConnected, () => _machine.LiveView);
         see.LargeToggle("Close-up", "IcZoomIn", ToggleCloseUp, "The close-up camera in the laser head, in a corner of the work area: live or one photo at a time", null, () => CloseUpOpen);
-        see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(_machine.CalibrateAsync); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
+        see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(async () => { await _machine.CalibrateAsync(); _ribbon.Refresh(); }); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
         fit.Large("Cut round prints", "IcCut", () => _ = Guard(CutRoundPrints), "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it");
@@ -867,7 +868,7 @@ public partial class MainWindow : Window
         new("tool.measure", "Tools", "Measure", "", () => Canvas.Tool = Tool.Measure),
         new("tool.trim", "Tools", "Trim", "", () => Canvas.Tool = Tool.Trim),
         new("tool.align2", "Tools", "Align by two points", "", () => Canvas.Tool = Tool.Align2),
-        new("job.frame", "Job", "Frame", "", () => _ = Guard(_job.ToggleFrame)),
+        new("job.frame", "Job", "Frame", "", () => { if (_job.CanFrame) _ = Guard(_job.ToggleFrame); }),
         new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(() => _job.Send()); }),
         new("job.console", "Job", "G-code console", "", ShowConsole),
     ];
@@ -886,11 +887,13 @@ public partial class MainWindow : Window
 
     void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
+        // Mid-drag (moving, resizing): commands wait until it's let go.
+        if (_doc.InEdit) return;
         var m = e.KeyModifiers;
         bool ctrl = m.HasFlag(KeyModifiers.Control), shift = m.HasFlag(KeyModifiers.Shift);
         bool typing = TextInputFocused();
-        // Pen, point editing and the magnetic pen use these keys themselves (R rounds a point, it doesn't pick the rectangle).
-        bool toolKeys = !ctrl && (Canvas.Tool is Tool.Pen or Tool.Nodes && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S
+        // A pen with points down, point editing and the magnetic pen use these keys themselves (R rounds a point, it doesn't pick the rectangle).
+        bool toolKeys = !ctrl && ((Canvas.PenInProgress || Canvas.Tool is Tool.Nodes) && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S
             || Canvas.LineInProgress && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape
             || Canvas.Tool is Tool.Nodes && e.Key is Key.R or Key.Y or Key.B
             || Canvas.Tool is Tool.Magnetic && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape);
@@ -1106,7 +1109,7 @@ public partial class MainWindow : Window
             made.Add(plate);
         }
         _doc.Commit("CMYK split", Ops.AddShapes(state, made), made.Select(m => m.Id));
-        StatusText.Text = "Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Laser → Job can ship them one layer at a time.";
+        StatusText.Text = "Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Laser → Layer by layer can ship them one layer at a time.";
     }
 
     async Task CentrelineTrace(ImageShape im)
@@ -1156,6 +1159,7 @@ public partial class MainWindow : Window
 
     async Task HomeZ()
     {
+        if (!_machine.IsConnected) { StatusText.Text = "Z homing: connect the machine first."; return; }
         if (!await Dialogs.Confirm(this, "Home the Z axis?", "The head moves all the way up to find its zero, then you set the focus again (or auto-focus). Keep hands clear of the head.", "Home it", "Cancel")) return;
         StatusText.Text = await _machine.HomeZAsync() is { } err ? $"Z homing: {err}" : "Z axis homed. Set the focus height again before marking.";
     }
@@ -1340,7 +1344,7 @@ public partial class MainWindow : Window
             Do("Combine into one shape (compound)", Combine, paths.Count > 1, "Ctrl+K"),
             Do("Break apart", BreakApart, compound, "Ctrl+Shift+K"),
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
-            Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked))),
+            Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked), shapes.Select(s => s.Id).ToHashSet())),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
             DoAsync("Split onto pieces…", SplitOntoPieces, n > 1),
             Sub("Shape operations",
@@ -1974,7 +1978,7 @@ public partial class MainWindow : Window
     {
         var targets = (_doc.Selection.Count > 0 ? SelectedPaths() : _doc.State.Editable().OfType<PathShape>().ToList())
             .Where(p => p is not (TextShape or CodeShape)).ToList();
-        if (targets.Count == 0) return;
+        if (targets.Count == 0) { StatusText.Text = "Nothing to tidy: it works on outlines (not pictures, text or codes)."; return; }
         var input = await Dialogs.Prompt(this, "Tidy lines", $"Join ends closer than (mm). Works on {(_doc.Selection.Count > 0 ? "the selection" : "the whole design")}.", "0.05");
         if (input is null || !double.TryParse(input.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var tol) || tol < 0) return;
         var r = PathTools.Cleanup([.. targets.Select(t => t.World)], tol);
@@ -2016,7 +2020,7 @@ public partial class MainWindow : Window
         var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
         if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to mask it with."; return; }
         _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
-        StatusText.Text = "Clipped: only the part inside the shape is engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
+        StatusText.Text = "Image mask: only the part inside the shape is shown and engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }
 
     async Task CopyAlongSel()
@@ -2046,7 +2050,7 @@ public partial class MainWindow : Window
     void RemoveOverlapsSel()
     {
         var paths = (_doc.Selection.Count > 0 ? SelectedPaths() : _doc.State.Editable().OfType<PathShape>().ToList()).Where(p => p is not (TextShape or CodeShape)).ToList();
-        if (paths.Count == 0) return;
+        if (paths.Count == 0) { StatusText.Text = "Nothing to check: it works on outlines (not pictures, text or codes)."; return; }
         var (geoms, removed) = EditTools.RemoveOverlaps([.. paths.Select(p => p.World)]);
         if (removed < 1e-3) { StatusText.Text = "No lines lie on top of each other."; return; }
         var s = _doc.State;
@@ -2199,13 +2203,14 @@ public partial class MainWindow : Window
         StatusText.Text = $"Cut into {made.Count} pieces.";
     }
 
-    void LockSel(bool locked)
+    /// <summary>Lock the selection, or unlock every locked shape; with <paramref name="only"/>, just those shapes (the right-click menu).</summary>
+    void LockSel(bool locked, IReadOnlySet<Guid>? only = null)
     {
         var s = _doc.State;
-        IReadOnlySet<Guid> ids = locked ? _doc.Selection : s.Shapes.Where(x => x.Locked).Select(x => x.Id).ToHashSet();
+        IReadOnlySet<Guid> ids = only ?? (locked ? _doc.Selection : s.Shapes.Where(x => x.Locked).Select(x => x.Id).ToHashSet());
         if (ids.Count == 0) return;
         var shapes = s.Shapes.Select(x => ids.Contains(x.Id) && x.Locked != locked ? x.WithLocked(locked) : x);
-        _doc.Commit(locked ? "Lock" : "Unlock all", s with { Shapes = System.Collections.Immutable.ImmutableList.CreateRange(shapes) }, locked ? [] : ids);
+        _doc.Commit(locked ? "Lock" : only is null ? "Unlock all" : "Unlock", s with { Shapes = System.Collections.Immutable.ImmutableList.CreateRange(shapes) }, locked ? [] : ids);
     }
 
     HistoryWindow? _history;

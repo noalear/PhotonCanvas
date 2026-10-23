@@ -120,7 +120,7 @@ public sealed class ShapeLibraryWindow : Window
         var shapes = _selection();
         if (shapes.Count == 0)
         {
-            _status.Text = "Select the shapes to save in the design first (text and pictures: convert text to paths first).";
+            _status.Text = "Select the shapes to save in the design first.";
             return;
         }
         if (await Dialogs.Prompt(this, "Save to My shapes", "Name:", shapes[0].Name is { Length: > 0 } n ? n : "My shape") is not { Length: > 0 } name) return;

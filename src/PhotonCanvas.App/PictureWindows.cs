@@ -105,7 +105,9 @@ public sealed class PictureFilterWindow : Window
         _amount.Minimum = f.Filter == PictureFilter.Saturation ? -1 : 0;
         double a = _amount.Value;
         var small = _src.Width > 900 || _src.Height > 900 ? RasterImage.Decode(_src.EncodePng(900)) : _src;
-        var r = await Task.Run(() => PictureTools.Apply(small, f.Filter, a));
+        // The mosaic's tiles are in pixels: smaller in the reduced preview, so it looks as it will.
+        double shown = f.Filter == PictureFilter.Grid ? a * small.Width / Math.Max(1, _src.Width) : a;
+        var r = await Task.Run(() => PictureTools.Apply(small, f.Filter, shown));
         _result = r;
         var old = _after.Source as IDisposable;
         _after.Source = PictureView.ToBitmap(r);

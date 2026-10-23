@@ -408,6 +408,9 @@ public static class JobBuilder
                     {
                         // Carving deeper: each pass is its own copy, the focus lowered a little more each time.
                         int passes = Math.Max(1, layer.Laser.Passes);
+                        string deep = $"Layer \"{layer.Name}\" lowers the head by up to {layer.StepDownFirstMm + (passes - 1) * layer.StepDownMm:0.##} mm while engraving (step-down). Make sure the material is at least that thick.";
+                        if (!warnings.Contains(deep))
+                            warnings.Add(deep);
                         for (int pass = 1; pass <= passes; pass++)
                         {
                             double drop = layer.StepDownFirstMm + (pass - 1) * layer.StepDownMm;
@@ -761,11 +764,11 @@ public static class JobBuilder
         {
             int paths = on.OfType<PathShape>().Count();
             return paths == 0 ? null
-                : $"Layer \"{layer.Name}\" is a Picture layer, which only engraves pictures, so {(paths == 1 ? "its shape" : $"its {paths} shapes")} won't be done. Change the layer to Cut, Score or Fill, or move {(paths == 1 ? "it" : "them")} to a layer that is.";
+                : $"Layer \"{layer.Name}\" is a Picture layer, which only engraves pictures, so {(paths == 1 ? "its shape" : $"its {paths} shapes")} won't be done. Change the layer to Cut, Score or Engrave, or move {(paths == 1 ? "it" : "them")} to a layer that is.";
         }
         int pictures = on.OfType<ImageShape>().Count();
         return pictures == 0 ? null
-            : $"Layer \"{layer.Name}\" is a {layer.Mode} layer, so {(pictures == 1 ? "its picture" : $"its {pictures} pictures")} won't be engraved. Move {(pictures == 1 ? "it" : "them")} to a Picture layer, or trace {(pictures == 1 ? "it" : "them")} into outlines.";
+            : $"Layer \"{layer.Name}\" is a {(layer.Mode == LayerMode.Fill ? "Engrave" : layer.Mode)} layer, so {(pictures == 1 ? "its picture" : $"its {pictures} pictures")} won't be engraved. Move {(pictures == 1 ? "it" : "them")} to a Picture layer, or trace {(pictures == 1 ? "it" : "them")} into outlines.";
     }
 
     /// <summary>The resolution a picture's own pixels have at its size on the bed.</summary>

@@ -758,7 +758,7 @@ public sealed class LayersPanel : UserControl
                 Item("Copy settings", () => { _copiedSettings = Doc.Materials.ProcessSettings.From(l); }),
                 Item("Paste settings", () => { if (_copiedSettings is { } ps) _doc.Commit("Paste settings", Ops.UpdateLayers(_doc.State, _selected.Contains(l.Id) ? _selected : new HashSet<Guid> { l.Id }, x => ps.ApplyTo(x))); }, _copiedSettings is not null),
                 Item("Rename", () => { _renaming = l.Id; Rebuild(); }),
-                Item("Duplicate with shapes", DuplicateLayer),
+                Item("Duplicate with shapes", () => DuplicateLayer(l.Id)),
                 Item("Show only this layer", () => _doc.Commit("Solo layer", Ops.UpdateLayers(_doc.State, _doc.State.Layers.Select(x => x.Id).ToHashSet(), x => x with { Visible = x.Id == l.Id }))),
                 Item("Show all layers", () => _doc.Commit("Show all layers", Ops.UpdateLayers(_doc.State, _doc.State.Layers.Select(x => x.Id).ToHashSet(), x => x with { Visible = true }))),
                 new Separator(),
@@ -824,9 +824,10 @@ public sealed class LayersPanel : UserControl
         Activate(layer.Id);
     }
 
-    void DuplicateLayer()
+    /// <summary>A copy of a layer and its shapes (the active layer, or the one right-clicked).</summary>
+    void DuplicateLayer(Guid? which = null)
     {
-        var (s, id) = Ops.DuplicateLayer(_doc.State, _doc.ActiveLayer);
+        var (s, id) = Ops.DuplicateLayer(_doc.State, which ?? _doc.ActiveLayer);
         if (id == Guid.Empty) return;
         _doc.Commit("Duplicate layer", s);
         Activate(id);

@@ -47,6 +47,7 @@ public sealed class BackgroundWindow : Window
 
         foreach (var s in new[] { _tolerance, _shrink, _feather }) s.ValueChanged += (_, _) => Schedule();
         _edges.IsCheckedChanged += (_, _) => Schedule();
+        _clickMode.SelectionChanged += (_, _) => Schedule();
         _view.PointerPressed += (_, e) => { Pick(e.GetPosition(_view)); e.Handled = true; };
         var undo = Button("Undo last click");
         undo.Click += (_, _) => { if (_picks.Count > 0) { _picks.RemoveAt(_picks.Count - 1); Schedule(); } };
