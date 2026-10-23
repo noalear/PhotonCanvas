@@ -315,6 +315,11 @@ static class MoreShots
             save(shot(canvas), "canvas-object-snaps", "Drawing a line from a box's corner: the Tangent marker on the circle, the length and angle by the pointer");
             canvas.Tool = Tool.Select;
             settle(100);
+            // A selected line: its grips instead of the box.
+            var gripLine = new PathShape { Name = "Line", LayerId = cutL.Id, Geometry = PathGeometry.Line(new Vec2(100, 75), new Vec2(140, 140)) };
+            doc.Commit("Line", Ops.AddShapes(doc.State, [gripLine]), [gripLine.Id]);
+            settle(400);
+            save(shot(canvas), "canvas-line-grips", "A selected line: a grip at each end and in the middle, and its length and angle");
         }
 
         // --- The Selection panel's Picture and Text cards (below the size and place, so drawn on their own).

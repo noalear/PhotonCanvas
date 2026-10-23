@@ -39,6 +39,12 @@ Point the way the next line should go, type `30` and press `Enter`: a line exact
 Press `Esc` (or `Enter`, or right-click) to stop. The Line tool stays on; `Esc` again goes back to
 **Select**.
 
+## Change a line by its grips
+<!-- target: canvas -->
+Press `Esc` to go back to **Select** and click one of your lines: instead of a box it shows a grip
+at each end and one in the middle. Drag an end grip onto another point to move just that end; drag
+the middle one to move the line.
+
 ## Line up with a point
 <!-- target: canvas -->
 Rest the pointer on a snap point for half a second: a green cross marks it. Move straight across or

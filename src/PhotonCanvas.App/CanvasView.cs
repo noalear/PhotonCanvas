@@ -56,7 +56,7 @@ public sealed partial class CanvasView : Control
     readonly Dictionary<Guid, List<StreamGeometry>> _batchSel = [];
     readonly ConditionalWeakTable<ImageSource, Avalonia.Media.Imaging.Bitmap> _pictures = new();
 
-    enum Drag { None, Pan, Box, Move, Scale, Rotate, Create, PenHandle, NodeAnchor, NodeHandle }
+    enum Drag { None, Pan, Box, Move, Scale, Rotate, Create, PenHandle, NodeAnchor, NodeHandle, LineGrip }
     Drag _drag;
     Point _pressScreen, _lastScreen;
     Vec2 _pressWorld;
@@ -731,6 +731,7 @@ public sealed partial class CanvasView : Control
     void DrawSelection(DrawingContext ctx, Document doc)
     {
         if (doc.Selection.Count == 0 || _drag == Drag.Create) return;
+        if (SelectedLines() is { } lines) { DrawLineGrips(ctx, lines); return; }
         var b = SelectionBounds(doc);
         if (b.IsEmpty) return;
         var r = ToScreen(b).Inflate(4);
@@ -839,7 +840,7 @@ public sealed partial class CanvasView : Control
     /// <summary>0–7 = scale handles (clockwise from top-left), 8 = rotate, -1 = none.</summary>
     int HitHandle(Point screen)
     {
-        if (_doc is null || _doc.Selection.Count == 0) return -1;
+        if (_doc is null || _doc.Selection.Count == 0 || SelectedLines() is not null) return -1;
         var b = SelectionBounds(_doc);
         if (b.IsEmpty) return -1;
         var r = ToScreen(b).Inflate(4);
@@ -861,6 +862,8 @@ public sealed partial class CanvasView : Control
         else if (_tool is Tool.Trim or Tool.Scissors or Tool.Tabs or Tool.Start) c = StandardCursorType.Hand;
         else if (_tool == Tool.Eraser) c = StandardCursorType.Cross;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
+        else if (screen is { } gp && _drag == Drag.None && HitLineGrip(gp) is { } grip)
+            c = grip.Which == 1 ? StandardCursorType.SizeAll : StandardCursorType.Cross;
         else if (screen is { } p && _drag == Drag.None)
         {
             int h = HitHandle(p);
@@ -983,6 +986,7 @@ public sealed partial class CanvasView : Control
             return;
         }
 
+        if (_tool == Tool.Select && LineGripPressed(p)) return;
         int handle = HitHandle(p);
         // On one of the selection's own snap points (a corner, an edge's middle), just inside it: a move by
         // that point, not a resize (the handles sit just outside the selection).
@@ -1052,7 +1056,7 @@ public sealed partial class CanvasView : Control
                     _pick = at;
                     if (_tool == Tool.Line) _createEnd = at;
                 }
-                else if (_tool == Tool.Select && _doc is { } d0 && d0.Selection.Count > 0)
+                else if (_tool == Tool.Select && _doc is { } d0 && d0.Selection.Count > 0 && SelectedLines() is null)
                 {
                     var sel = d0.Selection;
                     _snapHit = FindObjectSnap(w, s => sel.Contains(s.Id), null, GrabKinds);
@@ -1082,6 +1086,9 @@ public sealed partial class CanvasView : Control
                 break;
             case Drag.NodeAnchor or Drag.NodeHandle:
                 NodesMoved(p, w);
+                break;
+            case Drag.LineGrip:
+                LineGripMoved(p, w);
                 break;
             case Drag.Move when _doc is not null && _base is not null:
                 if (!StartEditIfMoved(p)) break;
@@ -1174,10 +1181,12 @@ public sealed partial class CanvasView : Control
                 break;
             case Drag.Create: FinishCreate(); break;
             case Drag.NodeAnchor or Drag.NodeHandle when _editStarted: _doc.EndEdit("Edit points"); break;
+            case Drag.LineGrip when _editStarted: _doc.EndEdit(_grip?.Which == 1 ? "Move line" : "Move line end"); break;
         }
         _editStarted = false;
         _base = null;
         _grab = null;
+        _grip = null;
         if (!PicksPoints) _snapHit = null;
         UpdateCursor(p);
         InvalidateVisual();

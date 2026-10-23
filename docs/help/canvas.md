@@ -145,6 +145,17 @@ Diameters are always in millimetres.
   - The handle snaps along the direction it changes.
 - **Turn**: drag the round handle above the selection. It turns about the middle of the
   selection. Hold `Shift` for steps of 15°.
+- **Lines** have grips instead of the box, as in AutoCAD: when everything selected is a straight
+  line (up to 100 of them), each shows a square at both ends and a filled one in the middle, and
+  one selected line shows its length and angle.
+  - Drag an **end** to move just that end: it lands on object snaps (see
+    [Object snaps](#object-snaps)), and `Shift` keeps the line to 45° steps from its other end.
+  - Drag the **middle** to move the line (with the rest of the selection): its middle lands on snap
+    points; `Shift` keeps the move straight across or down.
+  - To resize or turn lines as a whole, select something else with them (the box comes back), or
+    type the numbers in the Selection panel.
+
+![A selected line: a grip at each end, a filled one in the middle, and its length and angle](images/canvas-line-grips.png)
 - `Esc` while dragging puts everything back where it was.
 - **Double-click** a text to change its words (in the Selection panel), a code to edit it, or any
   other shape to edit its points (see [Edit points](#edit-points)).

@@ -84,6 +84,9 @@ each line, until you choose another tool or press `Esc`.
   units shown, millimetres or inches). Type `25<30` for 25 at 30°. `Backspace` takes back a
   character; `Esc` clears what's typed.
 - The lines drawn this way aren't selected, so handles don't get in the way of the next one.
+- Selected, a line shows a grip at each end and one in the middle instead of the box: drag an end
+  to move it (onto object snaps), the middle to move the line. See
+  [Moving, resizing and turning](canvas.md#moving-resizing-and-turning).
 
 ### Pen
 
