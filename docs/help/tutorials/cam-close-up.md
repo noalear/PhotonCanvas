@@ -12,8 +12,9 @@ This needs the machine connected (see [The machine and settings](machine.md)).
 
 ## Open the close-up camera
 <!-- target: ribbon:Camera/Close-up -->
-Click **Close-up** on the **Camera** tab. It opens in the bottom-right corner of the work area and
-takes a photo.
+Click **Close-up** on the **Camera** tab. It opens in the bottom-right corner of the work area. The
+first time, it takes a photo; after that it shows the last one until you click **Photo** or
+**Live**.
 
 ## Use its buttons
 <!-- target: text:CLOSE-UP CAMERA -->

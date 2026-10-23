@@ -37,8 +37,8 @@ a tab's name for what the tab holds.
 | **View** | Zoom, Grid & snapping, Measure & history, Show | [The View tab](#the-view-tab) below |
 
 - A button that can't do anything right now is greyed out. **Group** needs two or more shapes
-  selected, **Paste** needs something copied, most of the **Picture** tab's commands need a
-  picture selected, and so on.
+  selected, most of the **Picture** tab's commands need a picture selected, and so on. **Paste** is
+  always on, since a picture or SVG copied in another program can be pasted too.
 - When a picture is selected, the **Picture** tab's name lights up.
 - Some buttons and groups only appear when you have the equipment, or have chosen to show the
   feature, in Settings → Equipment: **Work mode** (a rotary or the conveyor), the
@@ -96,6 +96,8 @@ one does. If it still doesn't fit, the ribbon scrolls sideways.
 | **Snap to shapes** | On: dragged shapes line up with other shapes, guides and the work area's edges and centre lines. | [Snapping](canvas.md#snapping-the-grid-and-guides) |
 | **Show grid** | Shows or hides the grid on the work area. | [The grid](canvas.md#the-grid) |
 | **Snap to grid** | On: dragged shapes land on the grid's minor lines. | [The grid](canvas.md#the-grid) |
+| **Object snaps** | On: points you pick land on other shapes' ends, middles, centres, quadrants and crossings, and square onto or touching a line (`F3`). | [Object snaps](canvas.md#object-snaps) |
+| **Snap points…** | A menu to tick each kind of object snap on or off, and **Tracking**. | [Object snaps](canvas.md#object-snaps) |
 | **Grid settings…** | Grid spacing and colours, and how close something must be to snap. | [Grid settings](canvas.md#grid-settings) |
 | **Measure** | A tool: drag between two points to measure. | [Measure](canvas.md#measure) |
 | **History** | Every step you can undo, to go back to any of them (`Ctrl+H`). | [Undo, redo and history](canvas.md#undo-redo-and-history) |
@@ -103,8 +105,8 @@ one does. If it still doesn't fit, the ribbon scrolls sideways.
 | **Processing order** | Colours the paths on the work area by when they run, first to last. | [Processing order](canvas.md#processing-order) |
 | **Pictures as burned** | Shows pictures as they'll come out on their material. | [Pictures as burned](canvas.md#pictures-as-burned) |
 
-The toggles (**Snap to shapes**, **Show grid**, **Snap to grid**, **Processing order**,
-**Pictures as burned**) look pressed while they're on, and are remembered between runs, except
+The toggles (**Snap to shapes**, **Show grid**, **Snap to grid**, **Object snaps**,
+**Processing order**, **Pictures as burned**) look pressed while they're on, and are remembered between runs, except
 **Processing order**, which starts off.
 
 ## The work area

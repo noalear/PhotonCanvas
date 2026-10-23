@@ -17,7 +17,7 @@ Click **Grid array** on the **Arrange** tab.
 
 ## Lay them out
 <!-- wait: closed:Grid array -->
-Set the rows, columns and gaps and click **OK**. All the copies are selected.
+Set the rows, columns and gaps and click **Make copies**. All the copies are selected.
 
 ## Number them
 <!-- target: ribbon:Home/Number copies -->

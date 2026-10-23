@@ -2,12 +2,14 @@
 
 Every keyboard shortcut, as it comes. Most can be changed: see
 [Changing shortcuts](#changing-shortcuts). Help → **Keyboard shortcuts** shows the ones in use on
-one page.
+one page, with only the first key of a command that has more than one.
 
 - Shortcuts work in the main window. While you're typing in a box, only the **File** group's
   shortcuts work; the box keeps `Ctrl+Z`, `Ctrl+A`, `Delete`, the arrows and letters for itself.
 - While the **Pen** or **Edit points** tool is in use, `Delete`, `Backspace`, `Enter`, `Esc` and `S`
-  (without `Ctrl`) go to the tool. See [Keys inside tools](#keys-inside-tools).
+  (without `Ctrl`) go to the tool. **Edit points** also keeps `R`, `Y` and `B`. **Trace edge**, and
+  the **Line** tool while a line is being drawn click by click, keep `Delete`, `Backspace`, `Enter`
+  and `Esc`. See [Keys inside tools](#keys-inside-tools).
 - "—" below means no key to start with: you can give it one.
 
 ## File
@@ -136,7 +138,8 @@ These can't be changed.
 | Nudge the selection | Arrow keys: 1 mm; with `Shift` 10 mm; with `Ctrl` 0.1 mm |
 | Select what's inside a box | Drag from left to right |
 | Select what a box touches | Drag from right to left |
-| Add to or take from the selection | `Shift`+click, or `Shift` while dragging a box |
+| Add a shape to the selection, or take it out | `Shift`+click |
+| Add what a box picks to the selection | `Shift` while dragging a box (it only adds) |
 | Pick one shape out of a group | `Alt`+click |
 | Move only straight across or up and down | Hold `Shift` while dragging |
 | Resize freely with a corner handle | Hold `Shift` (corners keep proportions otherwise) |
@@ -151,9 +154,9 @@ See [Working on the canvas](canvas.md) for all of them.
 
 | Tool | Keys |
 |---|---|
-| **Edit points** | `Delete` or `Backspace` removes the selected point; `S` switches it between smooth and sharp; `Y` makes its handles symmetric; `B` breaks the outline there; `Alt` while starting to drag a handle breaks a smooth point; `Esc` finishes. See [Edit points](canvas.md#edit-points). |
+| **Edit points** | `Delete` or `Backspace` removes the selected point; `S` switches it between smooth and sharp; `Y` makes its handles symmetric; `R` rounds the corner there by 2 mm; `B` breaks the outline there; `Alt` while starting to drag a handle breaks a smooth point; `Esc` finishes. See [Edit points](canvas.md#edit-points). |
 | **Pen** | `Enter` finishes an open line; `Backspace` or `Delete` removes the last point; `Esc` throws away the line being drawn. See [Drawing](drawing.md). |
-| **Trace edge** | `Enter` finishes; `Esc` throws away the line being traced. See [Drawing](drawing.md). |
+| **Trace edge** | `Enter` finishes; `Backspace` or `Delete` takes back the last point; `Esc` throws away the line being traced. See [Drawing](drawing.md). |
 | **Rectangle**, **Ellipse**, **Polygon**, **Star** | Hold `Shift` for a square, a circle or an even shape; `Alt` to draw from the centre. See [Drawing](drawing.md). |
 | **Line** | `Shift` for 45° steps. Drawing click by click: type a length (or `25<30` for an angle) and `Enter` to place it; `Backspace` takes back a character; `Esc` clears what's typed, then stops; `Enter` or a right-click stops. See [Line](drawing.md#line). |
 | Any tool that picks points | Hold `Ctrl` for a point that doesn't snap. `F3` turns object snaps off and on. |
@@ -192,8 +195,8 @@ keys on a button, "—" when it has none.
 - **All back to the defaults** puts back every command's keys.
 - **Close** closes the window. Every change is saved and works at once.
 - Some keys show by the names the computer gives them: `OemPlus` and `OemMinus` are the +/= and
-  -/_ keys, `Add` and `Subtract` the keypad's + and −, `D0` the 0 key, `NumPad0` the keypad's 0,
-  `Back` is `Backspace`.
+  -/_ keys, `OemQuotes` the '/" key, `Add` and `Subtract` the keypad's + and −, `D0` the 0 key,
+  `NumPad0` the keypad's 0, `Back` is `Backspace`.
 - The mouse, the arrow keys, `Space`, `Esc`, `Ctrl+1` to `Ctrl+9` and the keys inside tools can't
   be changed.
 

@@ -43,6 +43,11 @@ Most of these commands replace a shape's outline with a new one, and that has si
 "The bottom shape" is the selected shape furthest back in the drawing order: the one drawn or
 imported first, or sent back with **To back** (see [Arranging](arrange.md)).
 
+These commands also change the drawing order. **Combine** puts its shape where the front one of
+the selected shapes was. **Weld**, **Subtract**, **Intersect**, **Exclude** and **Cut shapes** put
+the result in front of everything else, as if it had just been drawn. On a layer whose **Order** is
+**As drawn**, that changes when it's cut.
+
 ## Group and ungroup
 
 **Group** (`Ctrl+G`) ties two or more selected shapes together: clicking any of them selects them

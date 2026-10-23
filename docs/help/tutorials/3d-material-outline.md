@@ -9,8 +9,8 @@ tried on the machine.
 
 ## Photograph the board
 <!-- target: ribbon:Camera/Update photo -->
-Put the board in the machine and click **Update photo** (the machine must be connected). The photo
-lies under your design.
+Put the board in the machine and click **Update photo** (the machine must be connected and the
+camera calibrated). The photo lies under your design.
 
 ## Outline the board
 <!-- target: ribbon:Home/Pick piece -->

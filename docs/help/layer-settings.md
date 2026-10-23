@@ -184,7 +184,7 @@ dpi. In Depth slices mode it sets the size of the depth cells instead. A picture
   from how close together the dots are. The proven mode.
 - **Greyscale (experimental)**: each dot's power follows the picture: the palest tone that still
   burns gets **Lightest power %**, black gets **Power %**, pure white isn't visited. Marked
-  experimental in the program. **Dithering** is shown but not used in this mode.
+  experimental in the program. **Dithering** is hidden in this mode, since it isn't used.
 - **Depth slices (relief)**: the picture is a depth map (dark = deep), carved in thin slices one
   after another: relief on metal with the MOPA, or on wood. Its settings are under
   **More settings** (see [Depth slices](#depth-slices)). Switching to it sets
@@ -279,15 +279,16 @@ on the kind of layer; the defaults work for most jobs.
 | Settings | Cut | Score | Engrave (Lines) | Engrave (Offset) | Picture (Dots, Greyscale) | Depth slices |
 |---|---|---|---|---|---|---|
 | **Kerf (mm)**, **Start outlines nearest the laser**, **Cut shared edges once**, perforation, **Dot mode every**, **Wobble** | yes | yes | – | – | – | – |
-| **Tabs**, **Tab width (mm)**, **Tab power %**, **Overcut (mm)**, **Lead-in (mm)**, **Lead-out (mm)** | yes | shown, not used | – | – | – | – |
+| **Tabs**, **Tab width (mm)**, **Tab power %**, **Overcut (mm)**, **Lead-in (mm)**, **Lead-out (mm)** | yes | – | – | – | – | – |
 | **Fill style** | – | – | yes | yes | – | – |
 | **Scan angle (°)**, **Overscan (mm)**, **Dot width (mm)**, **Turn per pass (°)**, **Keep turning from run to run** | – | – | yes | – | – | yes |
 | **Pause per line (ms)** | – | – | yes | – | – | shown, not used |
 | Crosshatch, **Burn in both directions**, **All shapes in one scan**, **Scan from the other side**, **Trace the outline after filling** | – | – | yes | – | – | – |
 | **Step down/pass**, **First step down** | yes | yes | yes | shown, not used | – | – |
-| **Lightest power %** | – | – | – | – | Greyscale | – |
+| **Lightest power %** | – | – | – | – | Greyscale, or Dots with Threshold and **Ramp (mm)** above 0 | – |
 | **Ramp (mm)** | – | – | – | – | Dots with Threshold | – |
-| **Pass-through (the file's own pixels)**, **Burn rows in both directions**, scan angle, turning and crosshatch for pictures, **Dot time µs** | – | – | – | – | yes | – |
+| **Pass-through (the file's own pixels)**, **Burn rows in both directions**, scan angle, turning and crosshatch for pictures | – | – | – | – | yes | – |
+| **Dot time µs** | when **Dot mode every** is above 0 | when **Dot mode every** is above 0 | – | – | yes | – |
 | **Slices** and the rest of the relief settings | – | – | – | – | – | yes |
 | **Spread the lines out (less heat)** | – | – | yes | – | yes | – |
 | **Focus offset (mm)** | yes | yes | yes | yes | yes | yes |
@@ -360,9 +361,8 @@ For closed outlines on Cut layers.
 Dot mode wins over perforation, and both win over wobble. Neither works with **Spread the heat**
 (the layer keeps the usual order, and the checks say so).
 
-> **Note:** **Dot time µs** is listed with the picture settings, so it doesn't show on a Cut or
-> Score layer. To change it for dot mode, switch the layer to **Picture**, set **Dot time µs**,
-> and switch back: changing the mode keeps every other setting.
+On a Cut or Score layer, **Dot time µs** shows in **More settings** once **Dot mode every** is
+above 0.
 
 Not yet tried on the machine.
 
@@ -454,8 +454,8 @@ goes back up afterwards. All the steps together may not lower the head more than
   power.
 - **Ramp (mm)** (Dots mode with **Threshold (line art)**): power climbs from the lightest power at
   each edge to full power this far in, 0–10 mm, so the sides slope: rubber stamps, cleaner edges.
-  0 = off. The lightest power is the layer's **Lightest power %**, which only shows in Greyscale
-  mode (10% unless changed).
+  0 = off. The lightest power is the layer's **Lightest power %** (10% unless changed), which
+  shows here once **Ramp (mm)** is above 0.
 - **Pass-through (the file's own pixels)**: engrave the picture's own pixels, one dot each, with no
   resampling, for pictures already prepared at the right size. Never closer together than the
   **Resolution**: a picture with more pixels than that is engraved at the resolution instead, and
@@ -538,6 +538,11 @@ compared.
 deeper into the material (the head goes lower), − is above it (a softer, wider beam). 0 = at the
 surface. The head moves when a layer with a different offset starts, and goes back to where it
 started at the end of the job. Not yet burned on the machine.
+
+**Ship It** won't send a job whose focus offsets, with the step-downs of its Cut and Score layers,
+would bring the head within 3 mm of the material, going by the machine's focus distance. It says
+how far the head would go down and asks you to reduce them (see
+[What happens when you Ship It](running-jobs.md#what-happens-when-you-ship-it)).
 
 ## What has been tried on the machine
 

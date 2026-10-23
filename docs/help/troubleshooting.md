@@ -172,7 +172,7 @@ and send again.
 *Layer "Cut" is a Cut layer, so its picture won't be engraved.* In the confirmation it's first,
 under **NOT IN THIS JOB**.
 
-Pictures only engrave on Picture layers; outlines only on Cut, Score and Fill layers. Change the
+Pictures only engrave on Picture layers; outlines only on Cut, Score and Engrave layers. Change the
 layer's mode, move the shapes to a layer of the right kind, or trace the picture into outlines (see
 [Layers](layers.md) and [Pictures](pictures.md)).
 

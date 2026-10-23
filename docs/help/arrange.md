@@ -119,8 +119,8 @@ is shown but never sent to the laser). **Sheet** in the Nest window then starts 
 **3D to slices** fills it too ([3D models and stacked slices](3d-slices.md)). A hole in the outline
 (a knot, a cut-out) is kept clear.
 
-- The outline must be a closed shape; text can't be one. Outlines whose box is under 25 mm² are
-  ignored.
+- The outline must be a closed shape; text can't be one. Outlines whose box is 25 mm² or less
+  (5 × 5 mm) are ignored.
 - Not yet tried on the machine with a real offcut.
 
 ## Arrays

@@ -29,7 +29,8 @@ Choose how many flat rings hold the fins, at even heights.
 
 ## Add a centre hole
 <!-- target: field:Centre hole Ø -->
-Type the diameter of a dowel to run up the middle, or 0 for none. The fins start this far out.
+Type the diameter of a dowel to run up the middle, or 0 for none. The fins start at the hole's
+edge.
 
 ## Set the slot fit
 <!-- target: field:Slot fit (mm) -->

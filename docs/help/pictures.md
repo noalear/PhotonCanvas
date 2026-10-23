@@ -102,9 +102,10 @@ They're applied in this order: invert, gamma, contrast, brightness. **Reset** pu
 
 - The work area shows the picture's own pixels, not these settings, unless
   [Pictures as burned](#pictures-as-burned) is on.
-- **Engraving**, **Centre-line trace** and **Pictures as burned** use them too. **Trace**, **Colour
-  on metal**, **Diffraction**, **CMYK split** and the filters work from the picture's own pixels and
-  ignore them.
+- **Engraving**, **Centre-line trace** and **Pictures as burned** use them too, all but
+  **Sharpen**. **CMYK split** uses them and copies **Sharpen** onto each plate (see
+  [CMYK split](#cmyk-split)). **Trace**, **Colour on metal**, **Diffraction** and the filters work
+  from the picture's own pixels and ignore them.
 
 ## Pictures as burned
 
@@ -156,7 +157,8 @@ The line under the sliders counts the outlines and segments.
   **New layer** (called "Traced" and the picture's name). It starts on the active layer if that
   can take outlines.
 - In **Colours** mode each colour goes on a layer named after it (**Colour #RRGGBB**), shown in that
-  colour; a layer of that name is reused if there is one.
+  colour; a layer of that name is reused if there is one. A colour too dark to see on the work area
+  (black, for example) is shown in one of the program's layer colours instead, keeping its name.
 - **New layers:** what any new layer does: **Cut**, **Score** or **Engrave (fill)**. You can change
   it later.
 - **Remove the picture after tracing** deletes the picture; otherwise it stays under the outlines.
@@ -198,7 +200,7 @@ shapes, so it engraves crisply with ordinary fill settings instead of dots.
 | **Centre** | two sliders | Rings and spiral: where they start, across then down the picture (default the middle, a little above centre). |
 
 - Lines narrower than 0.06 mm are broken off, so highlights stay clean.
-- The picture's tone settings and image mask are followed.
+- The picture's tone settings (all but **Sharpen**) and image mask are followed.
 - The summary under the settings gives the number of line pieces, the spacing, the widest line and
   the area covered.
 - **Don't engrave the picture itself (its layer off)** (on by default) turns the picture's layer's
@@ -290,7 +292,8 @@ their frequency and pitch range, and the marking time.
 
 **Add grating layers** adds one MOPA Engrave layer per direction or pitch (named like **Grating 45° ·
 1.00 µm**), pixels merged into strips, over the picture. Each layer's frequency is speed ÷ pitch,
-kept within what the pulse width allows, and its scan angle turns with the picture. As with colour
+kept within what the pulse width allows, and its scan angle turns with the picture. Its
+**Overscan (mm)** is set to 0.2, so the beam is at a steady speed where it marks. As with colour
 on metal, the picture's own layer stops being sent if the picture is alone on it.
 
 > **Tip:** Run a grating test first (Laser → Colour test, Diffraction gratings) to find the power and
@@ -326,6 +329,10 @@ on the graphics card if it can (DirectML) or the processor (slower); PhotonCanva
 | **Local close-ups (experimental)** | 518, 728 or 1036 px (518) | Overlapping close-ups for coins and ornament. Slower; can disturb the overall shape. |
 | **Depth Pro (research only)** | 1536 px | Apple's model, sharp boundaries. Non-commercial research licence; needs the Depth Pro download. |
 | **V2 Small (fast)** | 518 px | A quick baseline. |
+
+Once DepthCharge is running without the Depth Pro download, a chosen **DA3 + fine detail** or
+**Depth Pro** goes back to **DA3 Large**. If you generate with one before that, it stops and says
+Depth Pro isn't downloaded (DepthCharge's README says how to get it).
 
 **Large pictures.** The model looks at most at **Detail** pixels at once (1036 for DA3), with the
 whole picture fitted inside that square. A 3762 × 1254 px picture would then get only 1036 × 345
@@ -374,8 +381,9 @@ Up to the depth's own size keeps all its detail; bigger only interpolates. After
 bigger than the box says, the box is raised to the depth's size (and the window says so). **Save as** (8-bit or 16-bit) applies only to **Save PNG…**; the design
 always uses 8 bits.
 
-**Add depthmap to design** puts the map over the original, in the same place and size (a picture
-file picked instead goes in the middle of the work area, up to 100 mm across). It goes on a new
+**Add depthmap to design** puts the map over the original, in the same place and size. A map cropped
+in DepthCharge to another shape is fitted inside the original's box, centred. A picture file picked
+instead goes in the middle of the work area, up to 100 mm across. It goes on a new
 Picture layer, **Relief ·** and the name, set to **Depth slices (relief)** with **Resolution** 254
 dpi, **Lines / cm** 200 and **Turn per pass (°)** 37. Set the slices, power and passes there
 ([Layer settings](layer-settings.md)). The original picture stays on its own layer: turn its output

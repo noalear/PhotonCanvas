@@ -11,7 +11,7 @@ Curved surface → Calibrate the pointer…**).
 ## Select the shapes
 <!-- target: canvas -->
 <!-- wait: selection -->
-Select the closed shapes to engrave deep. Holes narrower than about 3 mm can't be measured.
+Select the closed shapes to engrave deep. Holes narrower than about 5 mm can't be measured.
 
 ## Open Exact depth
 <!-- target: ribbon:Laser/Exact depth -->
