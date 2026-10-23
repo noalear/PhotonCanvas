@@ -542,8 +542,11 @@ public sealed class Job
                         // Cut to a section: only the lines (checked below) need to be in the work area.
                         if (b.ClipRect is null) CheckPoint(p, ctx);
                     }
+                    // Turned per pass, each pass has its own lines and run-ups: check every angle used.
+                    var passFills = Enumerable.Range(1, Math.Max(1, b.Laser.Passes)).Select(b.ForPass)
+                        .DistinctBy(f => Math.Round(((f.AngleDeg % 360) + 360) % 360, 6)).Take(360).ToList();
                     if (b.ClipRect is not null)
-                        foreach (var seg in FillLines(b))
+                        foreach (var seg in passFills.SelectMany(FillLines))
                         {
                             CheckPoint(seg.Start, ctx);
                             CheckPoint(seg.End, ctx);
@@ -561,7 +564,7 @@ public sealed class Job
                     }
                     var lines = FillLines(b);
                     if (b.OverscanMm > 0)
-                        foreach (var seg in lines)
+                        foreach (var seg in passFills.SelectMany(FillLines))
                         {
                             var (runUp, runOut) = Overscan(seg, b.OverscanMm);
                             CheckPoint(runUp, $" (fill overscan, item {i + 1})");
@@ -1012,6 +1015,8 @@ public sealed class Job
         {
             if (segs.Count == 0) continue;
             body.Add($"G1 Z{Trim3(z)} F600 S0");
+            // F is modal: back to the burn speed, or the band's lines would run at the head's 10 mm/s.
+            body.Add($"G1F{l.FValue}S0");
             foreach (var seg in segs)
             {
                 body.Add(first ? $"G0{Pos(seg.Start, Fixed3)}" : $"G1{Pos(seg.Start, Fixed3)}S0");

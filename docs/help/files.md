@@ -131,6 +131,10 @@ and when the copy was made:
   The status bar says *Unsaved work brought back: save it to keep it.*
 - **Discard it** deletes the copy.
 
+If PhotonCanvas was started by opening a file (double-clicking a `.pcanvas`, say) and you open the
+copy, it then asks whether to save the brought-back work before that file opens: **Cancel** keeps
+the copy open instead.
+
 > **Note:** Autosave is a safety net, not a save. Up to two minutes of work can be lost; save often.
 
 ## Earlier versions

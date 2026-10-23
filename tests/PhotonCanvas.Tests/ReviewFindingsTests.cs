@@ -102,6 +102,33 @@ public class ReviewFindingsTests
     }
 
     [Fact]
+    public void ACurvedSurfaceFillBurnsAtItsSpeed()
+    {
+        // The head's Z move between bands is at F600 (10 mm/s); F is modal, so the burn has to set it back.
+        var square = new Vec2[] { new(95, 95), new(125, 95), new(125, 125), new(95, 125) };
+        var g = new Job(MachineProfile.F2Ultra, [new FillBlock([square], LaserSettings.Blue(10, 400), 50)]) { SurfaceHeight = p => 20 + (p.Y - 95) * 0.1, Created = "x" }.Render();
+        var lines = g.Split('\n').Select(l => l.Trim()).ToList();
+        string feed = "F24000";
+        string? now = null;
+        int burns = 0;
+        foreach (var l in lines)
+        {
+            if (System.Text.RegularExpressions.Regex.Match(l, @"F(\d+)") is { Success: true } m && l.StartsWith('G')) now = "F" + m.Groups[1].Value;
+            if (l.StartsWith("G1X") && !l.EndsWith("S0")) { burns++; Assert.Equal(feed, now); }
+        }
+        Assert.True(burns > 100);
+    }
+
+    [Fact]
+    public void OverscanIsCheckedOnEveryTurnedPass()
+    {
+        // Lines across fit with their run-ups; turned 90° on pass 2, the run-ups go above the field.
+        var area = new Vec2[] { new(5, 0.5), new(50, 0.5), new(50, 30), new(5, 30) };
+        var fill = new FillBlock([area], LaserSettings.Blue(10, 400).WithPasses(2), 20) { OverscanMm = 2, AngleStepDeg = 90 };
+        Assert.Throws<OutsideWorkAreaException>(() => new Job(MachineProfile.F2Ultra, [fill]).Validate());
+    }
+
+    [Fact]
     public void AShapeSavedOnASubLayerLoadsOnItsParent()
     {
         var (s, a, fill, _) = WithSubLayer();

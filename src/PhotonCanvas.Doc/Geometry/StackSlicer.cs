@@ -728,6 +728,14 @@ public static class StackLayout
                     sh = shaping! with { Id = Guid.NewGuid(), Name = ShapingLayer, Mode = LayerMode.Fill, Laser = shaping!.Laser.WithPasses(1), ParentId = null };
                     st = Ops.AddLayer(st, sh, st.Layers.FindIndex(l => l.Id == cut.Id));
                 }
+                else
+                {
+                    // Made again: the steps are engraved with the settings chosen this time (each step's depth depends on them).
+                    var had = sh;
+                    sh = shaping! with { Id = had.Id, Name = ShapingLayer, Mode = LayerMode.Fill, Laser = shaping!.Laser.WithPasses(1), ParentId = null, Visible = had.Visible, Output = had.Output, Locked = had.Locked };
+                    var now = sh;
+                    st = st with { Layers = [.. st.Layers.Select(l => l.Id == had.Id ? now : l)] };
+                }
             }
             if (mk is null)
             {

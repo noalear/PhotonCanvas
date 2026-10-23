@@ -173,7 +173,8 @@ public partial class MainWindow : Window
             }
             bool recovered = ConnectOnOpen && await OfferRecovery();
             if (ConnectOnOpen) _ = _machine.AutoConnectAsync();
-            if (OpenPathOnStartup is { } p) await OpenPath(p);
+            // Started with a file after unsaved work was brought back: save the copy, drop it, or keep it open instead.
+            if (OpenPathOnStartup is { } p && (!recovered || await ConfirmDiscard())) await OpenPath(p);
             else if (ConnectOnOpen && !recovered) await ReopenLast();
             _autosave.Tick += (_, _) => Autosave();
             if (ConnectOnOpen) _autosave.Start();
