@@ -17,6 +17,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Pictures and previews use SkiaSharp; on Linux its native library comes from here (the desktop app gets it with Avalonia). -->
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="2.88.9" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\PhotonCanvas.Core\PhotonCanvas.Core.csproj" />
     <ProjectReference Include="..\PhotonCanvas.Device\PhotonCanvas.Device.csproj" />
     <ProjectReference Include="..\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" />

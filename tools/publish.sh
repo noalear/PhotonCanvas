@@ -31,6 +31,9 @@ for rid in "${TARGETS[@]}"; do
   echo "== $rid"
   dotnet publish src/PhotonCanvas.App -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin" -nologo -v q
+  # The remote server for the phone, in its own folder beside the program (Laser → Remote access starts it).
+  dotnet publish src/PhotonCanvas.Server -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
+    -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin/server" -nologo -v q
 
   case "$rid" in
     osx-*)
@@ -65,13 +68,13 @@ for rid in "${TARGETS[@]}"; do
 </dict>
 </plist>
 PLIST
-      chmod +x "$app/Contents/MacOS/PhotonCanvas"
+      chmod +x "$app/Contents/MacOS/PhotonCanvas" "$app/Contents/MacOS/server/PhotonCanvas.Server"
       # Not signed: on first open, right-click → Open (or System Settings → Privacy & Security → Open anyway).
       pack_tar "$app" "dist/PhotonCanvas-$rid.tar.gz"
       ;;
     linux-*)
       mv "$out/bin" "$out/PhotonCanvas"
-      chmod +x "$out/PhotonCanvas/PhotonCanvas"
+      chmod +x "$out/PhotonCanvas/PhotonCanvas" "$out/PhotonCanvas/server/PhotonCanvas.Server"
       cat > "$out/PhotonCanvas/photoncanvas.desktop" <<DESKTOP
 [Desktop Entry]
 Type=Application

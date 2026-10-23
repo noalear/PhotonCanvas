@@ -702,6 +702,7 @@ public partial class MainWindow : Window
         var machine = laser.Group("Machine");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
+        machine.Large("Remote access", "IcPhone", () => new RemoteAccessWindow().Show(this), "Watch and run the laser from your phone: start the remote server, connect the phone with a QR code, choose the designs it can load");
 
         // ---- View ----
         var view = _ribbon.Tab("View", "Zoom, grid and snapping");

@@ -20,5 +20,6 @@
 - [Work area: rotary, curved, layer by layer, sections, pieces](work-area.md)
 - [3D models and stacked slices](3d-slices.md)
 - [The machine and settings](machine.md)
+  - [Phone remote](remote.md)
 - [Troubleshooting](troubleshooting.md)
 - [Glossary](glossary.md)
