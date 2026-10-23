@@ -241,11 +241,13 @@ the job. The common ones:
 | *… open path(s) can't be filled and were skipped.* | Close them, or put them on a Cut or Score layer. |
 | *… mm of lines lying on top of each other will be cut only once.* | Nothing: overlapping lines are removed for you. |
 | *"…" is on highly reflective material and may throw reflections.* | Put it near the exhaust fan, or use anti-reflective marking spray. |
-| *Layer "…" lowers the head by up to … mm while cutting (step-down).* | Check the material is at least that thick. |
+| *Layer "…" lowers the head by up to … mm while cutting (step-down).* (or *while engraving*) | Check the material is at least that thick. |
 | *Layer "…" spreads the heat: … paths …, the sheet stays under about +… °C.* | Information: what the heat order worked out. |
 | *Pausing … s after each of … paths adds about ….* | Lower the pause, or tidy the drawing (see [Troubleshooting](troubleshooting.md#the-pause-after-each-path-adds-hours)). |
 | *Rotary attachment: experimental.* / *Conveyor: experimental.* | Try a small test on scrap first. |
 | *Curved surface: the head follows it in … mm steps. Experimental.* | Try it on scrap first. |
+| *On a curved surface, fills leave out the pause before each line, overscan and turning per pass.* | Information: each band's lines are marked straight. |
+| *Curved surface is on, but it needs at least 3 measured heights…* | Measure more points, or type the shape, in the Curved surface window. |
 
 Everything that stops a job, and what to do about it, is in [Troubleshooting](troubleshooting.md).
 

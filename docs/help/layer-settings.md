@@ -436,14 +436,17 @@ across the belt, so scan angles and turning are left out (see [Work area](work-a
 **Step down/pass** (Cut, Score and Engrave): lower the head this many mm before each pass after
 the first, 0–2 mm, so the focus follows the cut or engraving down into thick material or a deep
 engraving. **First step down**: also lower it this much before the first pass, 0–2 mm. The head
-goes back up afterwards. All the steps together may not lower the head more than 10 mm.
+goes back up afterwards. All the steps together, with the layer's **Focus offset**, may not lower
+the head more than 10 mm.
 
 - With **Path by path** passes each path is cut with all its passes, the head lowered a little more
   each time, then raised. With **Round by round** the head is lowered to that round's depth for the
   layer, and raised again straight after, so other layers keep their focus.
 - The checks warn: "… lowers the head by up to … mm while cutting (step-down). Make sure the
-  material is at least that thick."
-- Not used with **Spread the heat**, on a curved surface, or with the **Offset** fill style.
+  material is at least that thick." (or *while engraving* on an Engrave layer).
+- Not used with **Spread the heat** or the **Offset** fill style. On a curved surface Cut and Score
+  layers leave it out (the head's height follows the surface); an Engrave layer keeps it, each pass
+  that much further below the surface.
 
 ### Picture: more settings
 

@@ -74,9 +74,9 @@ give them.
 ### Show picture
 
 **Show picture** (a toggle) lays the latest photo under the design, or hides it. Turning it on takes
-a fresh photo. If the camera isn't calibrated yet, it opens the calibration instead. The choice is
-remembered: when a calibration exists, the picture is on when the program starts, and a photo is
-taken as soon as the machine connects.
+a fresh photo. If the camera isn't calibrated yet, it opens the calibration instead. When a
+calibration exists, the picture is always on when the program starts (whatever it was last time),
+and a photo is taken as soon as the machine connects.
 
 ### Update photo
 

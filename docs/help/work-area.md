@@ -103,8 +103,12 @@ In the job:
 
 - Parts of the design outside the measured area get guessed heights: the job bar warns. Measure an
   area that covers the whole design.
-- A layer's **Step down/pass** is left out: the head's height follows the surface instead.
+- A Cut or Score layer's **Step down/pass** is left out: the head's height follows the surface
+  instead. An Engrave layer's still lowers each pass further below the surface.
 - A picture layer's scan angle, crosshatch and turning per pass are left out (straight rows).
+- Fills leave out the pause before each line, overscan and turning per pass; the job bar says so.
+- With fewer than 3 measured heights (and no typed shape), the design is marked flat; the job bar
+  says so.
 - With a rotary or conveyor work mode, the curved surface is left out.
 
 ### The window
