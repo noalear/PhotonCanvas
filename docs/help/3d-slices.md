@@ -217,7 +217,7 @@ Best for round things. Not yet tried on the machine.
 |---|---|---|
 | **Fins** | 3 to 72 (12) | Fins round the axis, evenly spaced. Each is the model's outline on one side of the axis. Named Fin 1, Fin 2, … |
 | **Rings** | 1 to 20 (3) | Flat rings at even heights that hold the fins (3 rings sit at a quarter, half and three quarters of the height). Each is the model's cross-section at that height. Named Ring 1, Ring 2, … |
-| **Centre hole Ø** | 0 to 50 mm, steps of 0.5 (6) | A hole up the middle of the rings, for a dowel; the fins start this far out. 0 = none. |
+| **Centre hole Ø** | 0 to 50 mm, steps of 0.5 (6) | A hole up the middle of the rings, for a dowel; the fins start at the hole's edge (half the diameter out from the axis). 0 = none. |
 | **Name each sheet and mark what goes in each slot** | on | As for egg crate. |
 
 - The axis runs up through the middle of the model's footprint, as it stands.
@@ -264,8 +264,8 @@ machine.
 
 Before you make the slices, the biggest part (with 3 mm round it, a quarter turn allowed) is
 checked against the bed or the biggest piece of the chosen outline. If it doesn't fit, the summary
-says "⚠ The biggest slice (W × H mm) doesn't fit on the bed" (or "the material"): make the model
-smaller.
+says "⚠ The biggest slice (W × H mm) doesn't fit on the bed" (or "the material"; for egg crate
+and radial, "The biggest sheet"): make the model smaller.
 
 ## The preview
 

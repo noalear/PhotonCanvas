@@ -205,7 +205,8 @@ On a narrow window the small buttons show only their icons; hover over one to se
 
 Each opens the system's file window. You can pick several files at once: each is brought in, and the
 whole import is one step to undo. Pictures picked with **Import** or **By colour** come in exactly as
-with **Picture**.
+with **Picture**; picked together with drawings, the pictures are one undo step and the drawings
+another.
 
 ### Where imported shapes go
 
@@ -223,12 +224,13 @@ with **Picture**.
 - **Afterwards** the new shapes are selected and the view zooms to them. Groups in the file aren't
   kept, except with **Import, each file grouped…**.
 - **Import notes.** Anything that couldn't be brought in (text, hatches, hidden objects…) is
-  listed in an **Import notes** window afterwards, with what to do about it.
+  listed in an **Import notes** window afterwards, with what to do about it. Each note is listed
+  once, and at most 12 are shown.
 
 ### One layer per colour
 
-**By colour** (and **File → Import, one layer per colour…**) puts each colour in the drawing on its own
-layer. The colour is a shape's outline (stroke) colour, or its fill colour if it has no outline.
+**By colour** (and **File → Import, one layer per colour…**, or holding `Shift` while dropping
+drawings on the window) puts each colour in the drawing on its own layer. The colour is a shape's outline (stroke) colour, or its fill colour if it has no outline.
 
 - Each new layer is a **Cut** layer with the default settings, named *Colour #RRGGBB* (the colour's
   code, for example *Colour #FF0000*), or after the file's own layer where it names them.
@@ -250,8 +252,8 @@ The **Import as…** button opens a menu of three other ways to bring a drawing 
   too. A letter O, for example, comes in as two shapes, the outside and the hole. Normally a shape
   with holes stays one shape.
 - **Import as one picture…**: the drawing is drawn into one black picture, 0.1 mm a pixel (254 dpi):
-  closed shapes filled, open lines drawn 0.2 mm wide. It goes on a picture layer, named after the
-  file. Use it to engrave a drawing as a picture (with dithering and the picture settings) rather than
+  closed shapes filled, open lines drawn 0.2 mm wide. The picture is named after the file and goes
+  on the first visible, unlocked picture layer, or on a new one called **Pictures**. Use it to engrave a drawing as a picture (with dithering and the picture settings) rather than
   as vector fills. Pictures inside the file still come in on their own, on top of it.
 
 ### Pictures
@@ -304,8 +306,9 @@ Details, for when a drawing doesn't come in as expected:
 - Paths, rectangles (with rounded corners), circles, ellipses, lines, polylines, polygons, nested
   groups and SVGs, `use` copies and transforms are read.
 - Size comes from the file's width and height (mm, cm, in, pt, pc or px) and its viewBox. Pixels
-  count as 96 to the inch, as in Inkscape and browsers. An old Illustrator SVG made at 72 to the inch
-  comes in at three quarters of its size: scale it to 133.3 %.
+  count as 96 to the inch, as in Inkscape and browsers, unless you change `SvgPxPerInch` in
+  `app.json` (there's no setting for it in the program). An old Illustrator SVG made at 72 to the
+  inch comes in at three quarters of its size: scale it to 133.3 %.
 - Hidden parts (display none, visibility hidden, opacity 0) are left out. Clipping paths and masks are
   ignored: the full shapes come in, with a note. Shapes with neither outline nor fill come in anyway,
   with a note.
@@ -363,7 +366,8 @@ Details, for when a drawing doesn't come in as expected:
 **HPGL plotter files (.plt, .hpgl, .hpg)**
 
 - Pen moves and circles, in plotter units of 0.025 mm, turned right side up.
-- Each pen number has its own colour, so **By colour** gives a layer per pen.
+- Each pen number has its own colour, so **By colour** gives a layer per pen, with two
+  exceptions: pens 0 and 1 are both black, and pens 8 and up share one colour (orange).
 
 ## Exporting
 
@@ -430,10 +434,17 @@ your user folder (`%USERPROFILE%\PhotonCanvas`, for example `C:\Users\you\Photon
 | `camera.json`, `keys.json` | The camera calibration and the machine's connection keys. |
 | `job-history.jsonl` | The job history. |
 | `logs` | The program's logs, for tracking down problems. |
+| `depth` | Where each **Exact depth** run has got to, so it can carry on. |
+| `graphene-readings.json` | The resistances you typed for a graphene test. |
+| `model-thumbs` | Small pictures of 3D models, kept so the model browser opens faster. |
+| `remote` | The phone remote's settings and records (see [Phone remote](remote.md)). |
+| `data-merged.json` | A note of which files from earlier data folders have been brought over (below). |
 
 Earlier versions of the program kept these under AppData (in a **PhotonCanvas** or **YTool** folder).
 At start, anything there is brought over once, without losing what's here; the old folders are left
-as they are.
+as they are. A file that's in both places is replaced only when the old folder's copy is newer. The
+material libraries are combined recipe by recipe (a recipe in both keeps the copy changed last), and
+the job histories line by line.
 
 > **Tip:** To keep your settings, material library, shapes and templates safe or move them to another computer,
 > use **Back up settings…** in the settings (see [The machine and settings](machine.md)).

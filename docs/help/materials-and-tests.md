@@ -121,7 +121,8 @@ window opens from **Settings → Materials → Material test grid…**.
 | **Any two settings** | Your choice | Your choice | The rest stay as set. |
 | **One square at chosen settings** | 1 step | 1 step | One square at the **from** values, its settings written beside it. |
 
-Focus and line spacing tests always make filled squares, at 200 mm/s (MOPA 1000 mm/s).
+Focus and line spacing tests start as filled squares, at 200 mm/s (MOPA 1000 mm/s). **Squares**
+can still be switched to outlines afterwards.
 
 - *Focus*: the thinnest, sharpest lines are in focus. Use that offset as the layer's **Focus offset
   (mm)** (see [Layer settings](layer-settings.md)), or move the head by it. + means deeper into the
@@ -368,7 +369,8 @@ You need: the machine connected, the focus set on the material, and the pointer 
 The picture shows the shapes with the points it measures: blue dots inside (up to three, each at
 least 2.5 mm from an edge and as far apart as they can be), grey dots 4 mm outside to the left,
 right and top. If the outside points move between readings (the board or the head shifted), that is
-taken off. The pointer must see the floor: keep holes wider than about 3 mm.
+taken off. The pointer must see the floor 2.5 mm in from every edge: keep holes at least about
+5 mm across.
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
@@ -714,7 +716,7 @@ Adds a colour test grid for the MOPA: one setting across, another down, the rest
 | **Across**, **Down** | **Speed mm/s**, **Lines/cm**, **Power %**, **Frequency kHz**, **Pulse ns** | With **from**, **to** and **steps** (1–20). A new choice fills in a range: speed 200–1600, lines 300–1000, power 20–60, frequency 200–1500, pulse 4–200. |
 | **Power %** | 1–100 | Hidden while swept, as are the others. |
 | **Speed mm/s** | 2–15000 | |
-| **Lines/cm** | 10 and up | Fill line density. Finer is longer and hotter. |
+| **Lines/cm** | 10–10000 | Fill line density. Finer is longer and hotter. |
 | **Frequency kHz** | 1–4000 | Brought down to the most the pulse width allows. |
 | **Pulse width** | 2–500 ns | The MOPA's 16 pulse widths; swept values move to the nearest. |
 | **Square (mm)**, **Gap (mm)** | 2–20, 0.5–10 | |

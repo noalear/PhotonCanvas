@@ -354,7 +354,8 @@ After changing the design, close it and open it again. Closing it clears the mar
 ## Time-lapse
 
 **Laser → Time-lapse** (a switch, off to begin with) takes an overview camera photo every 5
-seconds while a job runs, and makes a video of them when the job ends.
+seconds while a job runs, and makes a video of them when the job ends. To change how often, set
+`TimeLapseSeconds` in `app.json` (1–120 seconds); there's no setting for it in the program.
 
 - It starts when the job starts running, if the switch is on then.
 - The photos go in a folder named after the date, time and design in your Pictures folder, under

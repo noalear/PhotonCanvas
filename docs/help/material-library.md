@@ -113,10 +113,11 @@ settings](layer-settings.md).
 ## Colour and grating tests
 
 When a material has colour palettes or grating sets from **Measure colours**, they're listed under
-**COLOUR AND GRATING TESTS**, newest first:
+**COLOUR AND GRATING TESTS**: the palettes first, then the grating sets, each newest first:
 
 - A palette shows its name, date, how many squares and how many clearly different colours, how it was
-  measured, the focus, and a chip of each colour (hover for the settings that made it).
+  measured, the focus, and a chip of each clearly different colour (hover for the settings that made
+  it).
 - A grating set plays its views one after another, lists its strongest squares and where they light
   up, and **Save GIF…** saves the animation.
 

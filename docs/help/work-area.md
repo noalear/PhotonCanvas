@@ -271,7 +271,7 @@ slid along against a fence, use [Sections](#sections).
 3. Put the design over them where you want it, on the layers you'll mark with.
 4. Select the design and the pieces (a box round everything does it), then click **Split onto
    pieces** in the **Work area** group of the **Laser** tab, or right-click → **Split onto
-   pieces…**. With no piece selected, the outlines the design touches are used.
+   pieces…**. With no piece selected, the outlines whose box overlaps the design's box are used.
 
 ![Four boards as material outlines, laid out two by two, with the design over them](images/workspace-pieces-layout.png)
 
@@ -294,8 +294,9 @@ A page for each piece, after the page you split from (which is left as it was): 
   run off the bed.
 - **The page is moved** as little as it takes to bring the piece into the work area, 5 mm in from
   the edge (so the camera still sees the piece's far edge when it lies a little off). A piece
-  already inside isn't moved. A piece bigger than the work area is centred, and a
-  note says only its middle can be marked.
+  already at least 5 mm inside isn't moved; one closer to the edge than that is. A piece too big to
+  sit 5 mm in from both edges is centred, and if it's bigger than the work area a note says only
+  its middle can be marked.
 
 ![Piece 2 of 4: its share of the design, moved onto the bed, with piece 1 greyed off its left edge](images/workspace-pieces-2.png)
 

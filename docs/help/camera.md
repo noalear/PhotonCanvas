@@ -23,7 +23,7 @@ work from a photo saved earlier.
 | Group | Buttons |
 |---|---|
 | **See the bed** | **Update photo**, **Live view**, **Close-up**, **Show picture** |
-| **Place** | **Fit to piece**, **Line up pieces**, **Cut round prints**, **Every piece** |
+| **Place** | **Fit to piece**, **Cut round prints**, **Line up pieces**, **Every piece** |
 | **Set up** | **Calibrate**, **Focus on selection**, **Thickness**, **Align MOPA**, **Close-up position** |
 
 ## What each one needs
@@ -119,8 +119,8 @@ you can watch the material as you place it. Greyed out until the machine is conn
 - **Settings → Machine → Camera**: either camera on its own, live (**Live view on**, with
   **Overview** or **Close-up**), and **Save snapshot…**, which saves a full-size JPEG exactly as the
   camera took it. With **Close-up** chosen, **Straighten** turns the picture for display only:
-  degrees clockwise, −180 to 180 (about −149° on the F2 Ultra; **Close-up position** sets it
-  exactly).
+  degrees clockwise, −180 to 180 (about −149° on the F2 Ultra; **Close-up position** and
+  **Measure colours** set it exactly).
 
 The work-area photo is also what [Pick piece and Trace edge](drawing.md) draw from. The overview
 camera is also used by [Quick on lid close](materials-and-tests.md) to centre a design on the
@@ -131,7 +131,8 @@ material, and for a [time-lapse](running-jobs.md) of a job.
 ### Close-up
 
 **Close-up** (a toggle) opens the close-up camera in the bottom-right corner of the work area, under
-the title **CLOSE-UP CAMERA**, and takes a photo. The camera sits turned in the head; its picture is
+the title **CLOSE-UP CAMERA**. The first time it opens it takes a photo; after that it shows the last
+photo until you click **Photo** or **Live**. The camera sits turned in the head; its picture is
 turned back so the bed looks straight.
 
 | Button | What it does |

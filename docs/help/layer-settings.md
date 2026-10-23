@@ -539,6 +539,11 @@ deeper into the material (the head goes lower), − is above it (a softer, wider
 surface. The head moves when a layer with a different offset starts, and goes back to where it
 started at the end of the job. Not yet burned on the machine.
 
+**Ship It** won't send a job whose focus offsets, with the step-downs of its Cut and Score layers,
+would bring the head within 3 mm of the material, going by the machine's focus distance. It says
+how far the head would go down and asks you to reduce them (see
+[What happens when you Ship It](running-jobs.md#what-happens-when-you-ship-it)).
+
 ## What has been tried on the machine
 
 From the machine tests so far:

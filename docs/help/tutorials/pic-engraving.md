@@ -31,5 +31,6 @@ How wide a line gets at black, as a share of the spacing.
 ## Add them
 <!-- target: button:Add to the design -->
 <!-- wait: closed:Engraving lines -->
-Click **Add to the design**. The lines go on a new Engrave layer; with the box ticked, the picture
-itself stops being engraved.
+Click **Add to the design**. The lines go on a new Engrave layer. With the box ticked, the
+picture's layer is turned off, so the picture itself isn't engraved, but only when the picture is
+alone on that layer; otherwise turn its output off yourself.
