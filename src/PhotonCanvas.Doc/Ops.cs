@@ -355,6 +355,8 @@ public static class Ops
     /// <summary>
     /// Delete layers. Their shapes move to <paramref name="moveShapesTo"/>, or
     /// are deleted when it is null. At least one layer always remains.
+    /// Shapes only ever go onto a layer that holds shapes: a sub-layer's parent, never the
+    /// sub-layer itself; if the chosen layer goes too, the nearest kept layer above.
     /// </summary>
     public static DocState DeleteLayers(DocState s, IReadOnlySet<Guid> ids, Guid? moveShapesTo)
     {
@@ -363,13 +365,21 @@ public static class Ops
         var remaining = s.Layers.RemoveAll(l => ids.Contains(l.Id));
         if (remaining.Count == s.Layers.Count) return s;
         if (remaining.Count == 0) remaining = [Layer.Default(0)];
-        var target = moveShapesTo is { } t && remaining.Any(l => l.Id == t) ? t : (Guid?)null;
+        // Every kept sub-layer's parent is kept too, so there's always a layer without a parent.
+        bool Holds(Guid id) => remaining.Any(l => l.Id == id && l.ParentId is null);
+        Guid Nearest()
+        {
+            int first = s.Layers.FindIndex(l => ids.Contains(l.Id));
+            return s.Layers.Take(Math.Max(0, first)).Reverse().FirstOrDefault(l => Holds(l.Id))?.Id
+                ?? remaining.First(l => l.ParentId is null).Id;
+        }
+        Guid? target = moveShapesTo is { } t ? (Holds(s.Owner(t)) ? s.Owner(t) : Nearest()) : null;
         var shapes = target is { } dest
             ? s.Shapes.Select(x => ids.Contains(x.LayerId) ? x.With(layerId: dest) : x).ToImmutableList()
             : s.Shapes.RemoveAll(x => ids.Contains(x.LayerId));
         // Shapes on a layer that vanished without a target would be orphans.
-        var valid = remaining.Select(l => l.Id).ToHashSet();
-        shapes = shapes.Select(x => valid.Contains(x.LayerId) ? x : x.With(layerId: remaining[0].Id)).ToImmutableList();
+        var orphanHome = target ?? remaining.First(l => l.ParentId is null).Id;
+        shapes = shapes.Select(x => Holds(x.LayerId) ? x : x.With(layerId: orphanHome)).ToImmutableList();
         return s with { Layers = remaining, Shapes = shapes };
     }
 
@@ -387,8 +397,9 @@ public static class Ops
     {
         var ordered = s.Layers.Where(l => ids.Contains(l.Id)).ToList();
         if (ordered.Count < 2) return s;
-        var keep = ordered[0].Id;
-        var drop = ordered.Skip(1).Select(l => l.Id).ToHashSet();
+        // Kept: the first that holds shapes (a sub-layer only borrows its parent's).
+        var keep = (ordered.FirstOrDefault(l => l.ParentId is null) ?? ordered[0]).Id;
+        var drop = ordered.Where(l => l.Id != keep).Select(l => l.Id).ToHashSet();
         return DeleteLayers(s, drop, keep);
     }
 

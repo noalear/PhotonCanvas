@@ -864,8 +864,9 @@ public sealed class LayersPanel : UserControl
             return;
         }
         int first = layers.FindIndex(l => _selected.Contains(l.Id));
-        var survivor = layers.Take(first).LastOrDefault(l => !_selected.Contains(l.Id))
-            ?? layers.First(l => !_selected.Contains(l.Id));
+        // The nearest layer above that holds shapes (not a sub-layer, nor one going with its parent).
+        bool Keeps(Layer l) => !_selected.Contains(l.Id) && l.ParentId is null;
+        var survivor = layers.Take(first).LastOrDefault(Keeps) ?? layers.FirstOrDefault(Keeps) ?? layers.First(l => !_selected.Contains(l.Id));
         _doc.Commit("Delete layers", Ops.DeleteLayers(_doc.State, _selected, survivor.Id));
         Activate(survivor.Id);
     }

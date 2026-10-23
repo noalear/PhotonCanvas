@@ -108,6 +108,7 @@ public static class DocFile
                 ["angleStepDeg"] = l.AngleStepDeg,
                 ["turnEachRun"] = l.TurnEachRun,
                 ["runCount"] = l.RunCount,
+                ["reflective"] = l.Reflective,
                 ["focusOffsetMm"] = l.FocusOffsetMm,
                 ["slices"] = new JsonObject
                 {
@@ -352,6 +353,7 @@ public static class DocFile
                     DotWidthMm = n["dotWidthMm"]?.GetValue<double>() ?? 0,
                     TurnEachRun = n["turnEachRun"]?.GetValue<bool>() ?? false,
                     RunCount = n["runCount"]?.GetValue<int>() ?? 0,
+                    Reflective = n["reflective"]?.GetValue<bool>() ?? false,
                     FocusOffsetMm = n["focusOffsetMm"]?.GetValue<double>() ?? 0,
                     Slices = n["slices"] is JsonObject so ? new DepthSlices
                     {
@@ -379,6 +381,10 @@ public static class DocFile
             }
             if (layers.Count == 0) layers.Add(Layer.Default(0));
             var layerIds = layers.Select(l => l.Id).ToHashSet();
+            // Shapes belong to a layer that holds them: a sub-layer's go to its parent.
+            var holder = new Dictionary<Guid, Guid>();
+            foreach (var l in layers) holder.TryAdd(l.Id, l.ParentId is { } p && layerIds.Contains(p) ? p : l.Id);
+            var firstHolder = holder[layers[0].Id];
 
             var shapes = ImmutableList.CreateBuilder<Shape>();
             foreach (var n in root["shapes"]?.AsArray() ?? [])
@@ -386,7 +392,7 @@ public static class DocFile
                 var type = n?["type"]?.GetValue<string>();
                 if (n is null || type is not ("path" or "image" or "text" or "code" or "param")) continue;
                 var t = n["transform"]?.AsArray().Select(v => v!.GetValue<double>()).ToArray();
-                var layer = Guid.TryParse(n["layer"]?.GetValue<string>(), out var lid) && layerIds.Contains(lid) ? lid : layers[0].Id;
+                var layer = Guid.TryParse(n["layer"]?.GetValue<string>(), out var lid) && holder.TryGetValue(lid, out var h) ? h : firstHolder;
                 var id = Guid.TryParse(n["id"]?.GetValue<string>(), out var gid) ? gid : Guid.NewGuid();
                 var name = n["name"]?.GetValue<string>() ?? "";
                 var transform = t is { Length: 6 } ? new Affine(t[0], t[1], t[2], t[3], t[4], t[5]) : Affine.Identity;

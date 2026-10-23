@@ -276,6 +276,7 @@ public static class JobBuilder
                         int n = masks.Length;
                         double turn = layer.AngleStepDeg, start = layer.FillAngleDeg + layer.RunTurnDeg;
                         var clean = CleanupLaser(layer);
+                        int run = 0; // slices burned so far (empty ones don't count)
                         for (int kk = 0; kk < n; kk++)
                         {
                             int k = sl.DeepestFirst ? n - 1 - kk : kk;
@@ -283,11 +284,13 @@ public static class JobBuilder
                             var r = m.FilledBounds();
                             if (r.IsEmpty) continue;
                             double angle = start + k * turn;
-                            double focus = layer.FocusOffsetMm + sl.DropMm * (k / Math.Max(1, sl.DropEvery));
+                            // The focus follows what's been cut so far: slices run, not which slice (deepest first starts on the surface).
+                            double focus = layer.FocusOffsetMm + sl.DropMm * (run / Math.Max(1, sl.DropEvery));
                             int bm = blocks.Count, sm = steps.Count;
                             // Repeats carry on turning after the last slice.
                             blocks.Add(new FillBlock([], layer.Laser, layer.LinesPerCm) { Mask = m, AngleDeg = angle, AngleStepDeg = turn * n, OverscanMm = layer.OverscanMm, FocusOffsetMm = focus, DotWidthMm = layer.DotWidthMm });
-                            if (sl.CleanupEvery > 0 && (k + 1) % sl.CleanupEvery == 0)
+                            run++;
+                            if (sl.CleanupEvery > 0 && run % sl.CleanupEvery == 0)
                                 blocks.Add(new FillBlock([], clean, sl.CleanupLinesPerCm) { Mask = sl.CleanupWhole ? masks[0] : m, AngleDeg = angle + 90, FocusOffsetMm = focus });
                             steps.Add(new(layer.Id, [r.TopLeft, new(r.MaxX, r.MinY), r.BottomRight, new(r.MinX, r.MaxY)], true, true) { ScanAngleDeg = angle });
                             Link(bm, sm);

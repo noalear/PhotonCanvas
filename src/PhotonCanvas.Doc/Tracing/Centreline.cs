@@ -19,13 +19,16 @@ public static class Centreline
     {
         var skel = Thin(ink, w, h);
         bool On(int x, int y) => x >= 0 && y >= 0 && x < w && y < h && skel[y * w + x];
-        int Neighbours(int x, int y)
+        RemoveStairs(skel, w, h);
+        // How many separate branches leave a pixel: 1 at an end, 2 along a line, 3 or more at a
+        // junction. (Counting neighbours instead takes every diagonal step for a junction.)
+        int Branches(int x, int y)
         {
-            int n = 0;
-            for (int dy = -1; dy <= 1; dy++)
-                for (int dx = -1; dx <= 1; dx++)
-                    if ((dx != 0 || dy != 0) && On(x + dx, y + dy)) n++;
-            return n;
+            int runs = 0;
+            for (int i = 0; i < 8; i++)
+                if (On(x + Ring[i].X, y + Ring[i].Y) && !On(x + Ring[(i + 7) % 8].X, y + Ring[(i + 7) % 8].Y)) runs++;
+            if (runs == 0 && Enumerable.Range(0, 8).All(i => On(x + Ring[i].X, y + Ring[i].Y))) runs = 1;
+            return runs;
         }
         var used = new HashSet<(int, int, int, int)>(); // walked steps, both ways
         var lines = new List<List<Vec2>>();
@@ -40,7 +43,7 @@ public static class Centreline
             while (true)
             {
                 pts.Add(new(cx + 0.5, cy + 0.5));
-                if (Neighbours(cx, cy) != 2) break; // an end or a junction
+                if (Branches(cx, cy) != 2) break; // an end or a junction
                 (int X, int Y)? next = null;
                 // Prefer straight-on neighbours, then diagonals.
                 foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1) })
@@ -64,18 +67,52 @@ public static class Centreline
                 for (int x = 0; x < w; x++)
                 {
                     if (!skel[y * w + x]) continue;
-                    int n = Neighbours(x, y);
+                    int n = Branches(x, y);
                     if (pass == 0 && n == 2) continue;
                     for (int dy = -1; dy <= 1; dy++)
                         for (int dx = -1; dx <= 1; dx++)
                         {
                             if ((dx == 0 && dy == 0) || !On(x + dx, y + dy) || Walked(x, y, x + dx, y + dy)) continue;
                             var line = Follow(x, y, x + dx, y + dy);
-                            if (Length(line) >= minLengthPx) lines.Add(PathTools.Simplify(line, smoothPx));
+                            // Short pieces are dropped only where they stick out (a loose end): a
+                            // short link between two junctions is part of the stroke.
+                            bool loose = n <= 1 || Branches((int)line[^1].X, (int)line[^1].Y) <= 1;
+                            if (Length(line) >= minLengthPx || !loose) lines.Add(PathTools.Simplify(line, smoothPx));
                         }
                     if (pass == 0 && n == 0) continue; // a lone dot
                 }
         return lines;
+    }
+
+    /// <summary>The 8 neighbours, in order round the pixel.</summary>
+    static readonly (int X, int Y)[] Ring = [(0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1)];
+
+    /// <summary>
+    /// The corner pixel of each diagonal step, where the line would still join up without it:
+    /// thinning leaves these, and they'd read as junctions.
+    /// </summary>
+    static void RemoveStairs(bool[] skel, int w, int h)
+    {
+        bool On(int x, int y) => x >= 0 && y >= 0 && x < w && y < h && skel[y * w + x];
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                if (!skel[y * w + x]) continue;
+                // Two neighbours at right angles (north and east, say) with nothing on the far side:
+                // they touch diagonally, so this pixel adds nothing.
+                for (int k = 0; k < 8; k += 2)
+                {
+                    var a = Ring[k];
+                    var b = Ring[(k + 2) % 8];
+                    if (!On(x + a.X, y + a.Y) || !On(x + b.X, y + b.Y)) continue;
+                    var far1 = Ring[(k + 4) % 8];
+                    var far2 = Ring[(k + 5) % 8];
+                    var far3 = Ring[(k + 6) % 8];
+                    if (On(x + far1.X, y + far1.Y) || On(x + far2.X, y + far2.Y) || On(x + far3.X, y + far3.Y)) continue;
+                    skel[y * w + x] = false;
+                    break;
+                }
+            }
     }
 
     static double Length(List<Vec2> p)
