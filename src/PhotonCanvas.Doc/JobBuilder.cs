@@ -140,7 +140,8 @@ public static class JobBuilder
         var b = job.Bounds;
         Vec2[] box = [b.TopLeft, new(b.MaxX, b.MinY), b.BottomRight, new(b.MinX, b.MaxY), b.TopLeft];
         if (shape == FrameShape.Rectangle) return job.Job.Border(box, powerPct, speedMmS);
-        var hull = ConvexHull(job.Steps.SelectMany(st => st.Points));
+        // Kept inside the job's box: one section of a bigger design only frames its own part.
+        var hull = ConvexHull(job.Steps.SelectMany(st => st.Points).Select(q => new Vec2(Math.Clamp(q.X, b.MinX, b.MaxX), Math.Clamp(q.Y, b.MinY, b.MaxY))));
         if (hull.Count < 3) return job.Job.Border(box, powerPct, speedMmS);
         return job.Job.Border([.. hull, hull[0]], powerPct, speedMmS);
     }
@@ -487,7 +488,8 @@ public static class JobBuilder
                         blocks.Add(new VectorBlock(pl, layer.Laser with { Passes = 1 }) { FocusOffsetMm = layer.FocusOffsetMm });
                         steps.Add(new(layer.Id, cut.Points, cut.Closed, false));
                         Link(bm, sm);
-                        bounds = bounds.Union(Rect2.Bounds(cut.Points));
+                        // A wobble burns half its width either side of the line: the frame shows that too.
+                        bounds = bounds.Union(Rect2.Bounds(cut.Points).Inflate(wobble ? layer.WobbleDiameterMm / 2 : 0));
                     }
                     heatExtraSteps += Math.Max(0, steps.Count - heatFirstStep - groups.Count);
                     foreach (var gap in gaps)
@@ -552,7 +554,7 @@ public static class JobBuilder
                             blocks.Add(new VectorBlock(Polyline.Open(gap), layer.Laser with { Power = Math.Min(layer.Laser.Power, layer.TabPowerPct) }) { FocusOffsetMm = layer.FocusOffsetMm });
                         steps.Add(new(layer.Id, p.Points, p.Closed, false));
                         Link(bm, sm);
-                        bounds = bounds.Union(Rect2.Bounds(p.Points));
+                        bounds = bounds.Union(Rect2.Bounds(p.Points).Inflate(wobble ? layer.WobbleDiameterMm / 2 : 0));
                     }
                     // The pause comes once the whole path is done (its tabs and pieces too).
                     if (opt.PathPauseS > 0 && blocks.Count > pathFirst)

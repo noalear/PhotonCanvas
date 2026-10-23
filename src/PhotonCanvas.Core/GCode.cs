@@ -1654,7 +1654,8 @@ public sealed class Job
         int lines = rotary ? b.Bitmap.Height : b.Bitmap.Width, along = rotary ? b.Bitmap.Width : b.Bitmap.Height;
         string park = Fixed3(rotary ? Machine.FieldH / 2 : Machine.FieldW / 2);
         var idx = new List<int>();
-        for (int k = 0; k < lines; k++)
+        // Rows spread out and one way, as on the flat bed.
+        foreach (int k in SpreadOrder(lines, b.Spread, b.Scatter))
         {
             idx.Clear();
             for (int j = 0; j < along; j++)
@@ -1682,7 +1683,7 @@ public sealed class Job
                 body.Add(first ? $"G25{(rotary ? $"X{g}Y{park}" : $"X{park}Y{g}")}{power}" : $"G25{pos}{power}");
                 first = false;
             }
-            forward = !forward;
+            if (!b.Unidirectional) forward = !forward;
         }
         if (first) return [];
         var v = BitmapHead(tag, l, "M523P10");

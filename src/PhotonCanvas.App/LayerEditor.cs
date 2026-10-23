@@ -171,7 +171,7 @@ public sealed class LayerEditor : UserControl
                 _cutOnly[5],
                 Row(Labelled("Perforate: burn mm", _perf, "Perforation: burn this far, then skip the gap, along every line (fold lines, tear-off). 0 = a continuous line."),
                     Labelled("then skip mm", _perfGap, "The gap between perforation dashes.")),
-                Field("Dot mode every", _dotMode, tip: "Dot mode: a single pulse every this many mm instead of a line (stippled marks, dotted lines). The dot time is set under the picture settings' Dot time. 0 = off."),
+                Field("Dot mode every", _dotMode, tip: "Dot mode: a single pulse every this many mm instead of a line (stippled marks, dotted lines). Each dot fires for the Dot time µs that shows once this is above 0. 0 = off."),
 
                 _wobble,
             },
