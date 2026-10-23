@@ -391,7 +391,8 @@ public sealed class PropertiesPanel : UserControl
 
         // Only what's sent has to be on the bed (material outlines, other pieces and guides may hang off it).
         var sentIds = _doc.State.Shapes.Where(s => sel.Contains(s.Id) && _doc.State.FindLayer(s.LayerId) is { Output: true }).Select(s => s.Id).ToHashSet();
-        var sb = _doc.State.Bounds(sentIds);
+        // A masked picture only has to fit where it shows.
+        var sb = _doc.State.Shapes.Where(s => sentIds.Contains(s.Id)).Aggregate(Rect2.Empty, (r, s) => r.Union(s is ImageShape im ? im.ShownBounds : s.Bounds));
         bool outside = sentIds.Count > 0 && (sb.MinX < -1e-6 || sb.MinY < -1e-6 || sb.MaxX > _machine.FieldW + 1e-6 || sb.MaxY > _machine.FieldH + 1e-6);
         _selInfo.Text = (sel.Count == 1 ? "1 shape selected" : $"{sel.Count} shapes selected") +
                         (outside ? ". ⚠ Partly outside the work area – it can't be sent like this." : ".");

@@ -474,6 +474,11 @@ public sealed partial class CanvasView : Control
         var selected = doc.Selection;
         var viewWorld = new Rect2(ToWorld(new Point(0, 0)).X, ToWorld(new Point(0, 0)).Y, ToWorld(new Point(Bounds.Width, Bounds.Height)).X, ToWorld(new Point(Bounds.Width, Bounds.Height)).Y);
         UpdateBatches(doc);
+        // Pictures first, whatever their layer: every line and shape shows on top of them, so a
+        // picture can be lined up with the outlines under it.
+        foreach (var shape in doc.State.Shapes)
+            if (shape is ImageShape im && layers.TryGetValue(im.LayerId, out var picLayer) && picLayer.Visible && im.Bounds.Intersects(viewWorld))
+                DrawPicture(ctx, im, picLayer, selected.Contains(im.Id), _hover == im.Id || _highlight == im.Id, px);
         foreach (var (id, chunks) in _batches)
         {
             if (!layers.TryGetValue(id, out var layer) || !layer.Visible) continue;
@@ -502,11 +507,6 @@ public sealed partial class CanvasView : Control
                         ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, AccentColor.R, AccentColor.G, AccentColor.B)), 5 * px), hg);
                     ctx.DrawGeometry(null, new Pen(new SolidColorBrush(LayerColor(layer)), 2 * px), hg);
                 }
-                continue;
-            }
-            if (shape is ImageShape im)
-            {
-                if (im.Bounds.Intersects(viewWorld)) DrawPicture(ctx, im, layer, selected.Contains(im.Id), _hover == im.Id || _highlight == im.Id, px);
                 continue;
             }
             if (shape is not PathShape ps) continue;
@@ -825,16 +825,18 @@ public sealed partial class CanvasView : Control
         var w = ToWorld(screen);
         double tol = 5 / _scale;
         var layers = _doc.State.Layers.ToDictionary(l => l.Id);
-        // Topmost first; selected shapes win ties so a selection is easy to drag.
-        Shape? hit = null;
+        // Topmost first, pictures under everything else (as drawn); selected shapes win ties so a
+        // selection is easy to drag.
+        Shape? hit = null, picture = null;
         foreach (var s in _doc.State.Shapes.Reverse())
         {
             if (!layers.TryGetValue(s.LayerId, out var l) || !l.Visible || l.Locked || s.Locked) continue;
             if (!s.HitTest(w, tol, insideCounts: l.Mode == LayerMode.Fill)) continue;
             if (_doc.Selection.Contains(s.Id)) return s;
-            hit ??= s;
+            if (s is ImageShape) picture ??= s;
+            else hit ??= s;
         }
-        return hit;
+        return hit ?? picture;
     }
 
     /// <summary>0–7 = scale handles (clockwise from top-left), 8 = rotate, -1 = none.</summary>

@@ -819,6 +819,12 @@ public static class JobBuilder
             }
         });
         var area = Rect2.Bounds([Pos(0, 0), Pos(cols - 1, 0), Pos(0, rows - 1), Pos(cols - 1, rows - 1)]);
+        if (angleDeg != 0)
+        {
+            // A turned grid's box reaches well past the picture; only the part it shows is framed.
+            var shown = b.Inflate(pitch);
+            area = new Rect2(Math.Max(area.MinX, shown.MinX), Math.Max(area.MinY, shown.MinY), Math.Min(area.MaxX, shown.MaxX), Math.Min(area.MaxY, shown.MaxY));
+        }
         if (tone.Sharpen > 0) Core.Imaging.Dither.Sharpen(grey, cols, rows, tone.Sharpen, Math.Max(1, (int)Math.Round(tone.SharpenRadiusMm / pitch)));
         var bitmap = new Bitmap(cols, rows);
         if (layer.ImageMode == ImageEngraveMode.Grayscale)

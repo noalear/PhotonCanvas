@@ -21,8 +21,8 @@ Most of these commands replace a shape's outline with a new one, and that has si
 - **Editable shapes** (rectangles, ellipses, polygons and stars that keep their size, corner radius
   or points, see [Drawing](drawing.md)) become plain outlines in the same way.
 - **Pictures** are never changed by these commands; selected along with vector shapes, they're
-  left as they are. To show only part of a picture, use **Clip to shape** on the Picture tab
-  ([Pictures](pictures.md)).
+  left as they are. To show only part of a picture, use **Image mask** on the Picture tab
+  ([Pictures](pictures.md#image-mask)).
 - **Hand-placed tabs and start points** are dropped from a shape whose outline is rebuilt. Place
   them last. Moving, turning and resizing keep them.
 

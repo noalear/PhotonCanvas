@@ -633,8 +633,8 @@ public partial class MainWindow : Window
         _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclip = picture.Group("Shape");
-        pclip.Large("Clip to shape", "IcIntersect", ClipPicture, "Select a picture and a closed shape: only the part of the picture inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
-        pclip.Small("Remove clip", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove clip", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Show and engrave the whole picture again", () => SelectedPicture() is { Clip: not null });
+        pclip.Large("Image mask", "IcIntersect", ClipPicture, "Select a picture and a closed shape: the shape masks the picture, so only the part inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
+        pclip.Small("Remove mask", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove image mask", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Take the image mask off: the whole picture is shown and engraved again", () => SelectedPicture() is { Clip: not null });
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
         ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
@@ -2006,14 +2006,14 @@ public partial class MainWindow : Window
         StatusText.Text = "The text follows the path. Alignment picks the start, middle or end; the path itself is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }
 
-    /// <summary>A picture and a closed shape selected: the picture is clipped to the shape (the shape stays, as a guide).</summary>
+    /// <summary>A picture and a closed shape selected: the shape becomes the picture's image mask (the shape stays, as a guide).</summary>
     void ClipPicture()
     {
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
         var pic = sel.OfType<ImageShape>().FirstOrDefault();
         var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
         if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to clip it to."; return; }
-        _doc.Commit("Clip picture", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
+        _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
         StatusText.Text = "Clipped: only the part inside the shape is engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }
 

@@ -11,13 +11,13 @@ carved as a relief.
 
 The tab's name turns blue when exactly one picture is selected (click it on the work area or in the
 Layers panel). Buttons that work on a picture stay grey until then. A picture selected together with
-other shapes doesn't count, except for **Clip to shape**.
+other shapes doesn't count, except for **Image mask**.
 
 | Group | Buttons |
 |---|---|
 | Add | [Import picture](#import-a-picture) |
 | Turn it into | [Trace](#trace), [Engraving](#engraving-lines), [Colour on metal](#colour-on-metal), [Diffraction](#diffraction), [Depthmap](#depthmap-with-depthcharge) |
-| Shape | [Clip to shape](#clip-to-shape), [Remove clip](#clip-to-shape), [Shapes to picture](#shapes-to-picture) |
+| Shape | [Image mask](#image-mask), [Remove mask](#image-mask), [Shapes to picture](#shapes-to-picture) |
 | Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop), [CMYK split](#cmyk-split), [Centre-line trace](#centre-line-trace) |
 | Relief | [3D model](#3d-model-relief), [Relief preview](#relief-preview) |
 | Clean up | [Remove background](#remove-background) |
@@ -419,24 +419,28 @@ layer's settings. The window can stay open while you work.
 
 ![The Relief preview window](images/window-picture-relief-preview.png)
 
-## Clip to shape
+## Image mask
 
-**Clip to shape** shows and engraves only the part of a picture inside a closed shape: a photo in a
-circle, a heart, a frame.
+**Image mask** shows and engraves only the part of a picture inside a closed shape: a photo in a
+circle, a heart, a frame. The picture itself isn't changed.
 
 1. Draw or import the closed shape over the picture.
 2. Select the picture and the shape together (`Shift`+click).
-3. Click **Clip to shape**.
+3. Click **Image mask**.
 
-- The clip moves, resizes and turns with the picture, and survives filters, crop and the eraser.
-- Holes in the shape stay holes in the picture. A new clip replaces the old one.
+- The mask moves, resizes and turns with the picture, and survives filters, crop and the eraser.
+- Holes in the shape stay holes in the picture. A new mask replaces the old one.
+- Only the masked part has to fit the work area: the rest of the picture can hang outside it, even
+  when its rows are turned to an angle (**Split onto pieces** relies on this).
+- Pictures are always drawn under lines and shapes, so the outline you line a picture up with stays
+  in sight.
 - The shape itself stays, as a guide. Delete it, or turn its layer's output off, if it shouldn't be
   marked.
 - The picture's own engraving (dots or depth slices) and **Engraving** lines follow the clip.
   **Trace**, **Centre-line trace**, **Colour on metal**, **Diffraction**, **Depthmap** and **CMYK
   split** use the whole picture.
 
-**Remove clip** shows and engraves the whole picture again (select the clipped picture first).
+**Remove mask** shows and engraves the whole picture again (select the masked picture first).
 
 ## Shapes to picture
 
@@ -515,7 +519,7 @@ elsewhere. Each goes on its own new Picture layer (**Cyan ·**, **Magenta ·**, 
   pause between ([Work area](work-area.md)).
 - The plates are made from the picture as its tone settings show it: **Brightness**, **Contrast**,
   **Gamma** and **Invert** are applied to the colours first, so each plate starts with those at
-  their defaults. **Sharpen** is copied onto each plate, and a clip ([Clip to shape](#clip-to-shape))
+  their defaults. **Sharpen** is copied onto each plate, and an image mask ([Image mask](#image-mask))
   is kept. The original picture stays; turn its layer's output off.
 
 ## Remove background

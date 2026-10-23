@@ -130,6 +130,32 @@ public class PieceSplitTests
     }
 
     [Fact]
+    public void AClippedPictureInTurnedRowsStillFitsTheWorkArea()
+    {
+        // Rows at 37°, turned 37° more each pass: the turned grid's corners reach far past the board
+        // (above the work area), but the head only goes to dots on the board.
+        var (s, pieces, art, _, _) = FourBoards();
+        var plain = Layer.Default(2, LayerMode.Image);
+        var picLayer = plain with { Name = "Photo", Dpi = 100, FillAngleDeg = 37, AngleStepDeg = 37, Laser = plain.Laser with { Passes = 3 } };
+        s = Ops.AddLayer(s, picLayer);
+        var px = new byte[8 * 4 * 4];
+        for (int i = 0; i < px.Length; i += 4) { px[i] = px[i + 1] = px[i + 2] = 40; px[i + 3] = 255; }
+        var photo = new ImageShape { Name = "Photo", LayerId = picLayer.Id, Source = ImageSource.FromEncoded(new Core.Imaging.RasterImage(8, 4, px).ToPng()), SizeMm = new Vec2(400, 150) };
+        s = Ops.AddShapes(s, [photo]);
+        var r = PieceSplit.Split(s, pieces, new HashSet<Guid>(art) { photo.Id }, 220, 220);
+        for (int k = 1; k <= 4; k++)
+        {
+            var page = Pages.SwitchTo(r.State, k);
+            page = page with { Layers = [.. page.Layers.Select(l => l with { Output = l.Name == "Photo" })] };
+            var board = MaterialOutline.On(page).Single().Bounds;
+            var built = JobBuilder.Build(page, new JobOptions());
+            var dots = Assert.IsType<DotBlock>(Assert.Single(built.Job.Blocks));
+            Assert.Equal(3, dots.PassBlocks!.Count);
+            Assert.True(board.Inflate(1.5).Contains(built.Bounds), $"piece {k}: framed {built.Bounds}, board {board}");
+        }
+    }
+
+    [Fact]
     public void PiecesAreReadRowByRow()
     {
         var s = DocState.New();

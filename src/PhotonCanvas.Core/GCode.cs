@@ -373,6 +373,24 @@ public sealed record DotBlock(
     /// <summary>The block a pass burns (see <see cref="PassBlocks"/>).</summary>
     public DotBlock ForPass(int pass) => PassBlocks is { Count: > 0 } pb && pass >= 1 ? pb[(pass - 1) % pb.Count] : this;
 
+    /// <summary>
+    /// The first and last burned dot of every row. The head only goes to burned dots, so
+    /// everything it visits lies between these (a grid turned to an angle has corners far
+    /// outside the picture that it never goes near).
+    /// </summary>
+    public IEnumerable<Vec2> RowEnds()
+    {
+        int w = Bitmap.Width;
+        for (int r = 0; r < Bitmap.Height; r++)
+        {
+            int first = Array.IndexOf(Bitmap.Bits, true, r * w, w);
+            if (first < 0) continue;
+            int last = Array.LastIndexOf(Bitmap.Bits, true, r * w + w - 1, w);
+            yield return At(first - r * w, r);
+            if (last != first) yield return At(last - r * w, r);
+        }
+    }
+
     /// <summary>Where dot (column, row) is on the bed.</summary>
     public Vec2 At(int c, int r)
     {
@@ -580,15 +598,9 @@ public sealed class Job
                         throw new JobException("The grey levels do not match the bitmap size.");
                     if (!b.Origin.IsFinite) throw new JobException("Bitmap position is not a valid number.");
                     double pitch = 25.4 / b.Dpi;
-                    // The corners of the pixel grid bound every dot.
-                    if (b.Bitmap.Width > 0 && b.Bitmap.Height > 0)
-                    {
-                        foreach (var pb in b.PassBlocks ?? [b])
-                        {
-                            int w = pb.Bitmap.Width - 1, h = pb.Bitmap.Height - 1;
-                            foreach (var corner in new[] { pb.At(0, 0), pb.At(w, 0), pb.At(0, h), pb.At(w, h) }) CheckPoint(corner, ctx);
-                        }
-                    }
+                    // Each row's first and last burned dot bound every dot the head goes to.
+                    foreach (var pb in b.PassBlocks ?? [b])
+                        foreach (var end in pb.RowEnds()) CheckPoint(end, ctx);
                     anyMotion |= b.Bitmap.Bits.Any(v => v);
                     break;
             }

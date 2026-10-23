@@ -13,10 +13,13 @@ is on [Drawing](drawing.md); changing their outlines (weld, offset, trim…) is 
 - The rulers along the top and left show where you are. A blue mark on each follows the cursor,
   and the status bar shows the cursor's exact position.
 - Shapes can sit on the darker surround outside the field, but a job with anything outside the
-  field can't be sent: the Selection panel warns "⚠ Partly outside the work area".
+  field can't be sent: the Selection panel warns "⚠ Partly outside the work area". A picture with
+  an [image mask](pictures.md#image-mask) only counts where it shows.
 - Each shape is drawn in its layer's colour. Shapes on **Engrave** layers are tinted inside.
   Layers that aren't sent to the laser (output off) are drawn faded; hidden layers aren't drawn.
   The shape under the cursor is drawn a little thicker.
+- Pictures are drawn under everything else, whatever their layer: lines and shapes always show on
+  top, so a picture can be lined up with them.
 - The selection has a dashed blue box with eight square handles, a round handle above it for
   turning, and its size underneath, for example "140 × 100 mm".
 
@@ -71,8 +74,8 @@ The Select tool (Home → **Select**, `V`) is the one you use most: it selects, 
 turns. `Esc` in any other tool brings you back to it.
 
 - **Click** a shape to select it. Click on its outline; on an Engrave layer, and on a picture,
-  anywhere inside counts too. Where shapes overlap the top one is picked, but an already selected
-  shape wins, so a selection is easy to drag.
+  anywhere inside counts too. Where shapes overlap the top one is picked (a line over a picture
+  beats the picture), but an already selected shape wins, so a selection is easy to drag.
 - A shape that's in a group brings its whole group. Hold `Alt` while clicking to pick just that
   one shape.
 - `Shift`+click adds a shape to the selection, or takes it out.
