@@ -328,6 +328,29 @@ public class FillExtrasTests
     static List<string> Lines(string g, Func<string, bool> pick) => g.Split('\n').Where(pick).ToList();
 
     [Fact]
+    public void EstimateCountsWhatTheMachineWasTimedDoing()
+    {
+        // A fill: each line piece costs its burn at the speed, a jump to the next and a little more.
+        var one = new FillBlock([Square], LaserSettings.Blue(60, 500), 100);
+        var apart = new FillBlock([Square, [.. Square.Select(p => p + new Vec2(60, 0))]], LaserSettings.Blue(60, 500), 100);
+        double a = Job.BlockSeconds(one), b = Job.BlockSeconds(apart);
+        int pieces = Job.FillLines(apart).Count;
+        Assert.Equal(400, pieces);
+        // Twice the burning, 200 more pieces, and 200 jumps of about 40 mm at 3000 mm/s (not at the 500 mm/s burn).
+        Assert.InRange(b - 2 * a, 200 * 40 / 3000.0 * 0.9, 200 * 40 / 3000.0 * 1.2);
+
+        // A picture: each dot costs its duration plus a step, whatever the speed; blanks are jumped.
+        var bmp = new Bitmap(100, 10);
+        for (int r = 0; r < 10; r++) { bmp[0, r] = true; bmp[99, r] = true; }
+        var dots = new DotBlock(bmp, new(20, 20), LaserSettings.Blue(30, 80), 254, 200, 1, "grayscale");
+        Assert.Equal(Job.BlockSeconds(dots), Job.BlockSeconds(dots with { Laser = LaserSettings.Blue(30, 400) }), 9);
+        Assert.InRange(Job.BlockSeconds(dots), 20 * 0.00061, 20 * 0.00061 + 10 * 9.8 / 3000 + 1e-6);
+
+        // Every job takes a moment to start.
+        Assert.Equal(Job.StartS + Job.BlockSeconds(dots), new Job(M, [dots]).EstimateSeconds(), 9);
+    }
+
+    [Fact]
     public void ZeroAngleIsUnchanged()
     {
         var plain = new FillBlock([Square], Laser, 100);

@@ -840,20 +840,79 @@ public sealed class Job
         return string.Join("\n", lines);
     }
 
+    // Timings measured on the F2 Ultra against the job history (Oct 2026).
+    /// <summary>Moves with the laser off: galvo jumps, and the moves between a fill's or a picture's pieces (mm/s).</summary>
+    const double Jump = 3000;
+    /// <summary>Starting a job: the smallest jobs took about this much longer than their moves.</summary>
+    public const double StartS = 1.5;
+    /// <summary>Each piece of a fill line: the laser going on and off at its ends (3.2 ms over two fills of 5000 pieces, 2.9 without the start).</summary>
+    const double FillPieceS = 0.0029;
     /// <summary>
-    /// Rough duration in seconds (ignores acceleration; galvo jumps at
-    /// 3000 mm/s). Good for comparing settings and showing progress.
+    /// Each dot of a picture, on top of its own duration: the machine steps dot to dot in about the same
+    /// time however far apart (200 µs dots took 604–614 µs each at 300 to 670 dpi and 80 mm/s, where
+    /// moving at the speed would take 474–1058 µs). Only 80 mm/s has been timed.
+    /// </summary>
+    const double DotStepS = 0.00041;
+
+    /// <summary>
+    /// Duration in seconds, from the moves and the times measured on the machine (the start, each
+    /// fill piece, each dot). Good for comparing settings and showing progress.
     /// </summary>
     public double EstimateSeconds()
     {
-        double work = Blocks.Sum(b => BlockSeconds(b) * b.Laser.Passes);
+        double work = StartS + Blocks.Sum(AllPassesSeconds);
         return PassMode is PassMode.Rounds r ? work + r.DelayS * Math.Max(0, Rounds - 1) : work;
     }
 
-    /// <summary>Rough time for one pass of a block, in seconds (same model as <see cref="EstimateSeconds"/>).</summary>
+    /// <summary>Every pass of a block (a picture turned per pass has a different layout each pass).</summary>
+    public static double AllPassesSeconds(Block b)
+    {
+        if (b is not DotBlock { PassBlocks: { Count: > 0 } pb }) return BlockSeconds(b) * b.Laser.Passes;
+        var each = pb.Select(BlockSeconds).ToArray();
+        return Enumerable.Range(0, Math.Max(1, b.Laser.Passes)).Sum(p => each[p % each.Length]);
+    }
+
+    /// <summary>Pass <paramref name="pass"/> (from 1) of a block.</summary>
+    public static double PassSeconds(Block b, int pass) => BlockSeconds(b is DotBlock d ? d.ForPass(pass) : b);
+
+    /// <summary>A fill: its line pieces at the speed, jumps between them, and the time each piece costs.</summary>
+    static double FillSeconds(FillBlock f)
+    {
+        var segs = FillLines(f);
+        double s = 0;
+        for (int i = 0; i < segs.Count; i++)
+        {
+            s += (segs[i].Start.Dist(segs[i].End) + 2 * f.OverscanMm) / f.Laser.Speed + FillPieceS + f.LineDwellMs / 1000.0;
+            if (i > 0) s += Math.Max(0, segs[i - 1].End.Dist(segs[i].Start) - 2 * f.OverscanMm) / Jump;
+        }
+        return s;
+    }
+
+    /// <summary>A picture: each dot's duration and step, and jumps over the blank stretches of each row.</summary>
+    static double DotSeconds(DotBlock d)
+    {
+        double pitch = 25.4 / d.Dpi;
+        int w = d.Bitmap.Width;
+        var bits = d.Bitmap.Bits;
+        long on = 0;
+        double gaps = 0;
+        for (int r = 0; r < d.Bitmap.Height; r++)
+        {
+            int a = Array.IndexOf(bits, true, r * w, w);
+            if (a < 0) continue;
+            int z = Array.LastIndexOf(bits, true, r * w + w - 1, w), n = 0;
+            for (int i = a; i <= z; i++) if (bits[i]) n++;
+            on += n;
+            gaps += (z - a + 1 - n) * pitch;
+        }
+        return on * (d.DotUs * 1e-6 + DotStepS) + gaps / Jump
+            // One way: the head goes back across each row.
+            + (d.Unidirectional ? d.Bitmap.Height * w * pitch / Jump : 0);
+    }
+
+    /// <summary>Time for one pass of a block, in seconds (same model as <see cref="EstimateSeconds"/>).</summary>
     public static double BlockSeconds(Block b)
     {
-        const double Jump = 3000;
         return b.PauseAfterS + b switch
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
@@ -861,14 +920,10 @@ public sealed class Job
             BandedVectorBlock bv => bv.Pieces.Sum(p => PathLength(p.Points) / bv.Laser.Speed + 10 / Jump)
                 + bv.Pieces.Select(p => p.HeadZ).Distinct().Count() * 0.25,
             BandedFillBlock bf => bf.Bands.Sum(x => x.Segments.Sum(s => s.Start.Dist(s.End) / bf.Laser.Speed + 10 / bf.Fill.LinesPerCm / bf.Laser.Speed) + 0.25),
-            FillBlock f => FillLines(f).Sum(s =>
-                (s.Start.Dist(s.End) + 2 * f.OverscanMm) / f.Laser.Speed + 10 / f.LinesPerCm / f.Laser.Speed + f.LineDwellMs / 1000.0),
+            FillBlock f => FillSeconds(f),
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
             PointsBlock p => p.Points.Count * p.DotUs * 1e-6 + Enumerable.Range(1, Math.Max(0, p.Points.Count - 1)).Sum(i => p.Points[i - 1].Dist(p.Points[i])) / Math.Max(1, p.Laser.Speed),
-            DotBlock d => d.Bitmap.Bits.Count(v => v) *
-                (d.DotUs * 1e-6 + 25.4 / d.Dpi / Math.Max(1, d.Laser.Speed))
-                // One way: the head goes back across each row.
-                + (d.Unidirectional ? d.Bitmap.Height * d.Bitmap.Width * 25.4 / d.Dpi / Jump : 0),
+            DotBlock d => DotSeconds(d),
             _ => 0,
         };
     }

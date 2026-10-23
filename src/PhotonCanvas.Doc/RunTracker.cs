@@ -30,6 +30,8 @@ public static class RunTracker
         }
         if (seconds >= total || spans.Count == 0)
             return new(done, [], null, null, 1, false);
+        // Still starting: nothing marked yet.
+        if (t < spans[0].Start) return new(done, [], null, null, t / total, false);
 
         var span = spans.First(s => s.End > t);
         if (span.IsPause) return new(done, [], null, null, t / total, true);

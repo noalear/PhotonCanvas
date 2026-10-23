@@ -200,12 +200,20 @@ Each layer's time also shows on its row in the [Layers](layers.md) panel.
 ## The estimate
 
 The big time at the right is how long the job should take (*45 s*, *3:07*, *1:02:30*), pauses
-included. It leaves out the head's acceleration, so real jobs run a little longer. *–* means the
-job can't be built.
+included. *–* means the job can't be built. It's worked out the way the F2 Ultra was timed doing
+it (October 2026, within about 2 % on the jobs it was checked against):
+
+| What | Takes |
+|---|---|
+| Starting the job | 1.5 s |
+| Lines (cut, score) | Their length at the layer's speed. |
+| Fills | Each line piece at the speed, plus 2.9 ms for the laser to go on and off. The gaps between pieces are jumped at 3000 mm/s, so a fill of many small shapes (text) costs more than its area suggests. |
+| Pictures | Each dot burned: its **Dot time µs** plus 0.41 ms. Blank stretches are jumped. Timed at 80 mm/s from 300 to 670 dpi, the time didn't follow the speed: the number of dots and their time decide it. |
 
 PhotonCanvas learns from finished jobs: after each one longer than 10 seconds it compares the real
 time with the estimate and keeps a running correction. That correction is used for the time left
-while a job runs and for the laser's position on the work area, not for the estimate itself.
+while a job runs and for the laser's position on the work area, not for the estimate itself. It
+started again from nothing when the estimate changed (October 2026).
 
 ## Checks
 

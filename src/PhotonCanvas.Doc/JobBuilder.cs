@@ -705,7 +705,8 @@ public static class JobBuilder
     static List<BuiltJob.RunSpan> Timeline(Job job, IReadOnlyList<(int First, int Count)> blockSteps)
     {
         var spans = new List<BuiltJob.RunSpan>();
-        double t = 0;
+        // The machine takes a moment to start before anything is marked.
+        double t = Job.StartS;
         var sec = job.Blocks.Select(Job.BlockSeconds).ToList();
         if (job.PassMode is PassMode.Rounds r)
         {
@@ -715,8 +716,9 @@ public static class JobBuilder
                 for (int i = 0; i < job.Blocks.Count; i++)
                 {
                     if (job.Blocks[i].Laser.Passes < round) continue;
-                    spans.Add(new(t, t + sec[i], blockSteps[i].First, blockSteps[i].Count, sec[i]));
-                    t += sec[i];
+                    double d = Job.PassSeconds(job.Blocks[i], round);
+                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d));
+                    t += d;
                 }
                 if (round < rounds && r.DelayS > 0)
                 {
@@ -728,7 +730,7 @@ public static class JobBuilder
         else
             for (int i = 0; i < job.Blocks.Count; i++)
             {
-                double d = sec[i] * job.Blocks[i].Laser.Passes;
+                double d = Job.AllPassesSeconds(job.Blocks[i]);
                 spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, sec[i]));
                 t += d;
             }

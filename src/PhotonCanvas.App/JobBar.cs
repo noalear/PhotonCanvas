@@ -658,8 +658,8 @@ public sealed class JobBar : UserControl
         // Remaining: from the machine's progress when it gives one, else from our estimate.
         double? remaining = null;
         if (fraction is { } f && f > 0.02) remaining = elapsed / f * (1 - f);
-        else if (OwnEstimate is { } est) remaining = Math.Max(0, est * Math.Clamp(_settings.JobTimeScale, 0.3, 5) - elapsed);
-        _timeline.Progress = fraction ?? (OwnEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / (e2 * Math.Clamp(_settings.JobTimeScale, 0.3, 5))) : 0);
+        else if (OwnEstimate is { } est) remaining = Math.Max(0, est * Math.Clamp(TimeScale(), 0.3, 5) - elapsed);
+        _timeline.Progress = fraction ?? (OwnEstimate is { } e2 && e2 > 0 ? Math.Min(0.99, elapsed / (e2 * Math.Clamp(TimeScale(), 0.3, 5))) : 0);
         _runTimes = $"Elapsed {Clock(elapsed)}" + (remaining is { } r ? $" · about {Clock(r)} left" : "");
         ShowCaption();
     }
@@ -678,8 +678,8 @@ public sealed class JobBar : UserControl
     void Follow()
     {
         if (OwnJob is not { } job || _startedAt is null) return;
-        // The estimate leaves out acceleration: scale real time back onto it, by what past jobs showed.
-        double est = RunningSeconds() / Math.Clamp(_settings.JobTimeScale, 0.3, 5);
+        // Scale real time back onto the estimate, by what past jobs showed.
+        double est = RunningSeconds() / Math.Clamp(TimeScale(), 0.3, 5);
         _canvas.ShowRun(job, RunTracker.At(job, est));
     }
 
@@ -688,8 +688,21 @@ public sealed class JobBar : UserControl
     {
         if (OwnJob is not { EstimateS: > 10 } job) return;
         double ratio = Math.Clamp(tookSeconds / job.EstimateS, 0.5, 4);
-        _settings.JobTimeScale = Math.Round(_settings.JobTimeScale * 0.6 + ratio * 0.4, 3);
+        _settings.JobTimeScale = Math.Round(TimeScale() * 0.6 + ratio * 0.4, 3);
         _settings.Save();
+    }
+
+    /// <summary>What's been learned, started again at 1 when the estimate itself changed.</summary>
+    double TimeScale()
+    {
+        const int Model = 2;
+        if (_settings.JobTimeModel != Model)
+        {
+            _settings.JobTimeScale = 1;
+            _settings.JobTimeModel = Model;
+            _settings.Save();
+        }
+        return _settings.JobTimeScale;
     }
 
     async Task PauseOrResume()

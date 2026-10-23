@@ -137,6 +137,8 @@ public sealed class AppSettings
     /// from finished jobs; keeps the "laser is here" marker in step with the machine.
     /// </summary>
     public double JobTimeScale { get; set; } = 1.0;
+    /// <summary>Which estimate <see cref="JobTimeScale"/> was learned against (2: the one timed on the machine, Oct 2026).</summary>
+    public int JobTimeModel { get; set; }
     /// <summary>The machine controls on the work area are folded down to the status.</summary>
     public bool MachineHudFolded { get; set; }
     /// <summary>Ribbon tab last used.</summary>

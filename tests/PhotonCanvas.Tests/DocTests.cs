@@ -417,12 +417,12 @@ public class JobBuilderTests
         Assert.Equal([fill.Id, cut.Id], perPath.LayerTimes.Select(t => t.LayerId));
         Assert.Equal(3, perPath.LayerTimes[1].Passes);
         Assert.Equal(160 / 10.0 * 3, perPath.LayerTimes[1].TotalSeconds, 0.2);
-        Assert.Equal(perPath.EstimateS, perPath.LayerTimes.Sum(t => t.TotalSeconds), 1e-6);
+        Assert.Equal(perPath.EstimateS, Job.StartS + perPath.LayerTimes.Sum(t => t.TotalSeconds), 1e-6);
         Assert.Null(perPath.RoundDelayS);
 
         var rounds = JobBuilder.Build(s, new JobOptions { WholeJobPasses = true, PassDelayS = 5 });
         Assert.Equal(5, rounds.RoundDelayS);
-        Assert.Equal(rounds.EstimateS, rounds.LayerTimes.Sum(t => t.TotalSeconds) + 2 * 5, 1e-6);
+        Assert.Equal(rounds.EstimateS, Job.StartS + rounds.LayerTimes.Sum(t => t.TotalSeconds) + 2 * 5, 1e-6);
     }
 
     [Fact]
@@ -470,7 +470,12 @@ public class RunTrackerTests
         Assert.Equal(2, job.Timeline.Count);
         Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
 
-        var start = RunTracker.At(job, 0.01);
+        // The first moment or so the machine is starting: nothing yet.
+        var starting = RunTracker.At(job, Job.StartS / 2);
+        Assert.Empty(starting.Done);
+        Assert.Empty(starting.Current);
+
+        var start = RunTracker.At(job, job.Timeline[0].Start + 0.01);
         Assert.Empty(start.Done);
         Assert.Single(start.Current);
         Assert.NotNull(start.Head);
@@ -520,7 +525,7 @@ public class RunTrackerAngleTests
         s = s with { Layers = [fill] };
         s = Ops.AddShapes(s, [new PathShape { LayerId = fill.Id, Geometry = PathGeometry.Rect(10, 10, 20, 20) }]);
         var job = JobBuilder.Build(s, new JobOptions());
-        var m = RunTracker.At(job, job.Timeline[0].PassSeconds / 2);
+        var m = RunTracker.At(job, job.Timeline[0].Start + job.Timeline[0].PassSeconds / 2);
         var (a, b) = m.Sweep!.Value;
         // Lines scanned at 90° run up and down, and the scan moves across: a vertical line midway.
         Assert.Equal(a.X, b.X, 6);
