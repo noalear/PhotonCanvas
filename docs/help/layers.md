@@ -128,7 +128,14 @@ layer. Otherwise they go onto the first shown, unlocked layer that isn't a Pictu
 
 ## Moving shapes between layers
 
-Select the shapes on the work area (or in a layer's shape list), then:
+**Drag them.** Open a layer's shape list (the ▸ on its card), and drag a shape from it onto another
+layer's card (or onto that layer's own list). The card you're over lights up and says "Let go to move
+1 shape here"; let go and the shape is on that layer. If the shape is one of several selected, all of
+them go. Drag a group's **Group of N** line to move the whole group. Letting go anywhere else, or on
+the layer they're already on, changes nothing. A sub-layer can't take shapes (it has none of its
+own), so it doesn't light up. It's one step: `Ctrl+Z` puts them back.
+
+Or select the shapes on the work area (or in a layer's shape list), then:
 
 - `Ctrl+M`: moves them to the active layer.
 - `Ctrl+1` … `Ctrl+9`: moves them to the 1st … 9th layer in the list.

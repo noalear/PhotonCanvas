@@ -75,6 +75,7 @@ public partial class MainWindow : Window
         _layers = new LayersPanel(_doc);
         _layers.ShapeHovered += id => Canvas.HighlightShape = id;
         _layers.ShapeActions = ShapeActions;
+        _layers.Moved += (n, layer) => StatusText.Text = $"{(n == 1 ? "1 shape" : $"{n} shapes")} moved to \"{layer}\". Ctrl+Z puts {(n == 1 ? "it" : "them")} back.";
         _props = new PropertiesPanel(_doc, _layers, _settings);
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);

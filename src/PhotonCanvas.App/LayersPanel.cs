@@ -43,6 +43,12 @@ public sealed class LayersPanel : UserControl
     bool _dragging;
     int _dropIndex = -1;
 
+    // dragging shapes onto another layer
+    IReadOnlySet<Guid>? _dragShapes;
+    Guid? _clickSelects; // a click (no drag) on a shape of a bigger selection selects just it
+    bool _shapeDragging;
+    Guid? _shapeDropLayer;
+
     IReadOnlyDictionary<Guid, double> _times = new Dictionary<Guid, double>();
 
     /// <summary>Each layer's estimated time in seconds (from the job), shown on its card.</summary>
@@ -63,7 +69,14 @@ public sealed class LayersPanel : UserControl
         _doc.Changed += _ => { if (!_doc.InEdit) Rebuild(); };
         _rows.PointerMoved += (_, e) => OnRowMoved(e);
         _rows.PointerReleased += (_, e) => OnRowReleased(e);
-        _rows.PointerCaptureLost += (_, _) => { if (_dragging) { _dragLayer = null; _dragging = false; _dropIndex = -1; Rebuild(); } };
+        _rows.PointerCaptureLost += (_, _) =>
+        {
+            bool was = _dragging || _shapeDragging;
+            _dragLayer = null; _dragging = false; _dropIndex = -1;
+            _dragShapes = null; _shapeDragging = false; _shapeDropLayer = null; _clickSelects = null;
+            _rows.Cursor = null;
+            if (was) Rebuild();
+        };
         var add = IconButton("IcPlus", "Add layer");
         add.Click += (_, _) => AddLayer();
         var dup = IconButton("IcCopy", "Duplicate layer with its shapes");
@@ -88,7 +101,7 @@ public sealed class LayersPanel : UserControl
         var root = new DockPanel();
         DockPanel.SetDock(header, Dock.Top);
         root.Children.Add(header);
-        ToolTip.SetTip(header, "Top layer runs first. Click a layer for its settings; Ctrl/Shift-click to edit several at once; drag to reorder; double-click to rename. The arrow lists a layer's shapes: click one to select it, right-click for more.");
+        ToolTip.SetTip(header, "Top layer runs first. Click a layer for its settings; Ctrl/Shift-click to edit several at once; drag to reorder; double-click to rename. The arrow lists a layer's shapes: click one to select it, drag it onto another layer to move it there, right-click for more.");
         root.Children.Add(scroll);
         Content = root;
         _selected = [_doc.ActiveLayer];
@@ -286,6 +299,16 @@ public sealed class LayersPanel : UserControl
             ToolTip.SetTip(warn, left);
             lines.Children.Add(warn);
         }
+        // Shapes dragged over this card: what letting go does.
+        if (_shapeDragging && _shapeDropLayer == l.Id && _dragShapes is { } dragged)
+        {
+            int n = dragged.Count(id => _doc.State.FindShape(id) is { } sh && sh.LayerId != l.Id);
+            lines.Children.Add(new TextBlock
+            {
+                Text = $"Let go to move {(n == 1 ? "1 shape" : $"{n} shapes")} here",
+                FontSize = 11.5, FontWeight = FontWeight.SemiBold, Foreground = Res("Accent"), Margin = new(20, 3, 4, 0),
+            });
+        }
 
         var grid = new Grid { ColumnDefinitions = new("Auto,*"), Margin = new(5, 5, 3, 6) };
         grid.Children.Add(bar);
@@ -293,12 +316,13 @@ public sealed class LayersPanel : UserControl
         grid.Children.Add(lines);
 
         bool drop = _dragging && _dropIndex == index;
+        bool shapesHere = _shapeDragging && _shapeDropLayer == l.Id;
         var row = new Border
         {
-            Background = active ? Res("Bg3") : selected ? Res("SelBg") : Res("Bg2"),
+            Background = shapesHere ? Res("SelBg") : active ? Res("Bg3") : selected ? Res("SelBg") : Res("Bg2"),
             CornerRadius = new(8),
-            BorderThickness = drop ? new(1, 3, 1, 1) : new(1),
-            BorderBrush = drop || active || selected ? Res("Accent") : Res("Line"),
+            BorderThickness = drop ? new(1, 3, 1, 1) : shapesHere ? new(2) : new(1),
+            BorderBrush = drop || shapesHere || active || selected ? Res("Accent") : Res("Line"),
             Child = grid,
             Opacity = _dragging && _dragLayer == l.Id ? 0.5 : 1,
             Tag = l.Id,
@@ -373,11 +397,13 @@ public sealed class LayersPanel : UserControl
                 },
             },
         };
-        ToolTip.SetTip(row, "Click to select the whole group");
+        ToolTip.SetTip(row, "Click to select the whole group; drag it onto another layer to move it there");
         row.PointerPressed += (_, e) =>
         {
             if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
-            _doc.Select(members.Select(m => m.Id));
+            var ids = members.Select(m => m.Id).ToHashSet();
+            _doc.Select(ids);
+            StartShapeDrag(ids, e, clickSelects: null);
             e.Handled = true;
         };
         return row;
@@ -448,7 +474,7 @@ public sealed class LayersPanel : UserControl
             Margin = new(30 + indent * 14, 0, 2, 0),
             Padding = new(4, 2),
             Child = grid,
-            Opacity = l.Visible ? 1 : 0.55,
+            Opacity = _shapeDragging && _dragShapes?.Contains(s.Id) == true ? 0.4 : l.Visible ? 1 : 0.55,
         };
         ToolTip.SetTip(row, b.IsEmpty ? Label(s) : $"{Label(s)}\n{Units.Num(b.Width)} × {Units.Num(b.Height)} {Units.Name} at X {Units.Num(b.MinX)}, Y {Units.Num(b.MinY)}");
         row.PointerEntered += (_, _) => ShapeHovered?.Invoke(s.Id);
@@ -488,11 +514,86 @@ public sealed class LayersPanel : UserControl
         }
         else
         {
-            _doc.Select([s.Id]);
+            // Part of a bigger selection: keep it, so a drag takes all of it (a plain click picks just this one).
+            bool keep = _doc.Selection.Contains(s.Id) && _doc.Selection.Count > 1;
+            if (!keep) _doc.Select([s.Id]);
             _shapeAnchor = s.Id;
+            StartShapeDrag(keep ? _doc.Selection : new HashSet<Guid> { s.Id }, e, clickSelects: keep ? s.Id : null);
         }
         e.Handled = true;
     }
+
+    /// <summary>Shapes picked up from the list: dragged onto another layer's card, they move to that layer.</summary>
+    void StartShapeDrag(IReadOnlySet<Guid> ids, PointerPressedEventArgs e, Guid? clickSelects)
+    {
+        _dragShapes = ids;
+        _clickSelects = clickSelects;
+        _shapeDragging = false;
+        _shapeDropLayer = null;
+        _dragStart = e.GetPosition(_rows);
+        // Captured on the list itself: rows are rebuilt as the selection changes and would lose it.
+        e.Pointer.Capture(_rows);
+    }
+
+    /// <summary>The layer whose card (or shape list) is under the pointer; null over a sub-layer (it has no shapes of its own) or nothing.</summary>
+    Guid? LayerAt(Point p)
+    {
+        foreach (var child in _rows.Children)
+        {
+            if (child.Tag is not Guid id) continue;
+            var b = child.Bounds;
+            if (p.Y >= b.Y && p.Y < b.Y + b.Height + 5)
+                return _doc.State.FindLayer(id) is { ParentId: null } ? id : null;
+        }
+        return null;
+    }
+
+    void OnShapeDragMoved(PointerEventArgs e)
+    {
+        var p = e.GetPosition(_rows);
+        if (!_shapeDragging && Math.Abs(p.Y - _dragStart.Y) < 6 && Math.Abs(p.X - _dragStart.X) < 6) return;
+        if (!_shapeDragging)
+        {
+            _shapeDragging = true;
+            _rows.Cursor = new Cursor(StandardCursorType.DragMove);
+        }
+        var over = LayerAt(p);
+        // Only a layer some of them aren't on already is somewhere to move them.
+        if (over is { } target && _dragShapes!.All(id => _doc.State.FindShape(id)?.LayerId == target)) over = null;
+        if (over != _shapeDropLayer)
+        {
+            _shapeDropLayer = over;
+            Rebuild();
+        }
+    }
+
+    void OnShapeDragReleased(PointerReleasedEventArgs e)
+    {
+        var ids = _dragShapes;
+        bool dragged = _shapeDragging;
+        var target = _shapeDropLayer;
+        var click = _clickSelects;
+        _dragShapes = null;
+        _shapeDragging = false;
+        _shapeDropLayer = null;
+        _clickSelects = null;
+        _rows.Cursor = null;
+        e.Pointer.Capture(null);
+        if (!dragged)
+        {
+            if (click is { } one) _doc.Select([one]);
+            return;
+        }
+        if (ids is null || target is not { } layer || _doc.State.FindLayer(layer) is not { } to) { Rebuild(); return; }
+        var moving = ids.Where(id => _doc.State.FindShape(id) is { } sh && sh.LayerId != layer).ToHashSet();
+        if (moving.Count == 0) { Rebuild(); return; }
+        _expanded.Add(layer);
+        _doc.Commit(moving.Count == 1 ? "Move to layer" : $"Move {moving.Count} shapes to layer", Ops.MoveToLayer(_doc.State, moving, layer), ids);
+        Moved?.Invoke(moving.Count, to.Name);
+    }
+
+    /// <summary>Shapes were dragged onto a layer: how many, and its name (for the status line).</summary>
+    public event Action<int, string>? Moved;
 
     ContextMenu ShapeMenu(Shape s)
     {
@@ -590,6 +691,7 @@ public sealed class LayersPanel : UserControl
 
     void OnRowMoved(PointerEventArgs e)
     {
+        if (_dragShapes is not null && e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) { OnShapeDragMoved(e); return; }
         if (_dragLayer is null || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
         var p = e.GetPosition(_rows);
         if (!_dragging && Math.Abs(p.Y - _dragStart.Y) < 6) return;
@@ -611,6 +713,7 @@ public sealed class LayersPanel : UserControl
 
     void OnRowReleased(PointerReleasedEventArgs e)
     {
+        if (_dragShapes is not null) { OnShapeDragReleased(e); return; }
         var id = _dragLayer;
         bool dragging = _dragging;
         int drop = _dropIndex;

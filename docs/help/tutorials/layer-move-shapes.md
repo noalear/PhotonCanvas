@@ -1,6 +1,6 @@
 # Move shapes between layers
 <!-- category: Layers and settings -->
-<!-- summary: Put shapes on the right layer with a key or the menu, and find them in a layer's shape list. -->
+<!-- summary: Put shapes on the right layer by dragging them in the Layers panel, with a key, or with the menu. -->
 <!-- page: layers.md#moving-shapes-between-layers -->
 <!-- order: 30 -->
 A shape gets the settings of the layer it's on. Moving it to another layer is how you change what
@@ -11,7 +11,13 @@ the laser does with it: cut it instead of scoring it, engrave it instead of cutt
 <!-- wait: selection -->
 Click a shape on the work area. If there's none, draw one first (Home → **Rectangle**).
 
-## Move it with a key
+## Drag it to another layer
+<!-- target: panel:Layers -->
+Its layer's shape list opens in the **Layers** panel with it highlighted. Drag it from the list onto
+another layer's card: the card lights up and says "Let go to move 1 shape here". Let go. Several
+selected shapes go together.
+
+## Or with a key
 <!-- target: panel:Layers -->
 Press `Ctrl+1` to move it to the first layer in the list, `Ctrl+2` to the second, up to `Ctrl+9`.
 `Ctrl+M` moves it to the active layer.
