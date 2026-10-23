@@ -89,6 +89,7 @@ one page.
 | Fit work area | `Home`, `Ctrl+0` or `Ctrl` and the keypad's `0` |
 | Fit selection | `F` |
 | Grid settings… | `Ctrl+'` |
+| Object snaps on or off | `F3` |
 
 ## Tools
 
@@ -153,7 +154,9 @@ See [Working on the canvas](canvas.md) for all of them.
 | **Edit points** | `Delete` or `Backspace` removes the selected point; `S` switches it between smooth and sharp; `Y` makes its handles symmetric; `B` breaks the outline there; `Alt` while starting to drag a handle breaks a smooth point; `Esc` finishes. See [Edit points](canvas.md#edit-points). |
 | **Pen** | `Enter` finishes an open line; `Backspace` or `Delete` removes the last point; `Esc` throws away the line being drawn. See [Drawing](drawing.md). |
 | **Trace edge** | `Enter` finishes; `Esc` throws away the line being traced. See [Drawing](drawing.md). |
-| **Rectangle**, **Ellipse**, **Polygon**, **Star** | Hold `Shift` for a square, a circle or an even shape; `Alt` to draw from the centre. **Line**: `Shift` for 45° steps. See [Drawing](drawing.md). |
+| **Rectangle**, **Ellipse**, **Polygon**, **Star** | Hold `Shift` for a square, a circle or an even shape; `Alt` to draw from the centre. See [Drawing](drawing.md). |
+| **Line** | `Shift` for 45° steps. Drawing click by click: type a length (or `25<30` for an angle) and `Enter` to place it; `Backspace` takes back a character; `Esc` clears what's typed, then stops; `Enter` or a right-click stops. See [Line](drawing.md#line). |
+| Any tool that picks points | Hold `Ctrl` for a point that doesn't snap. `F3` turns object snaps off and on. |
 | **Measure** | Hold `Shift` for 45° steps, `Ctrl` for no snapping. See [Measure](canvas.md#measure). |
 
 ## In the guide and the tutorials

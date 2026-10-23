@@ -11,6 +11,16 @@ things end up straight and evenly placed without measuring.
 **Snap to shapes** (on to start with): dragged shapes line up with other shapes' edges and
 centres, guides and the work area's edges and middle. A pink line shows it.
 
+## Object snaps
+<!-- target: ribbon:View/Object snaps -->
+**Object snaps** (on to start with, `F3`): points you pick land on other shapes' ends, middles,
+centres and crossings, with a yellow marker saying which. The tutorial on precise lines shows them
+in use.
+
+## Choose which
+<!-- target: ribbon:View/Snap points… -->
+**Snap points…** ticks each kind of object snap on or off, and **Tracking**.
+
 ## Show the grid
 <!-- target: ribbon:View/Show grid -->
 **Show grid** turns the grid on and off: major lines every 10 mm, minor every 1 mm.

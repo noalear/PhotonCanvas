@@ -16,13 +16,15 @@ public sealed partial class CanvasView
     sealed record PenNode(Vec2 At, Vec2 In, Vec2 Out);
 
     readonly List<PenNode> _pen = [];
+    /// <summary>Where a click would land now (snapped), for the pen's rubber band.</summary>
+    Vec2? _pick;
+    IReadOnlySet<Guid>? _nodeSkip;
 
     const double PenSnapPx = 9;
 
     void PenPressed(PointerPressedEventArgs e)
     {
-        PrepareSnap(new HashSet<Guid>());
-        var w = SnapPoint(_pressWorld);
+        var w = SnapPick(_pressWorld, null, _pen.Count > 0 ? _pen[^1].At : null);
         _guides.Clear();
         // Click the first point to close the shape.
         if (_pen.Count >= 2 && Dist(ToScreen(_pen[0].At), _pressScreen) <= PenSnapPx)
@@ -101,7 +103,7 @@ public sealed partial class CanvasView
         var pen = new Pen(new SolidColorBrush(AccentColor), 1.5 * px);
         if (_pen.Count >= 2) ctx.DrawGeometry(null, pen, ToStream(PenGeometry(_pen, false)));
         // Rubber band to the cursor.
-        if (_cursor is { } c && _drag == Drag.None)
+        if ((_pick ?? _cursor) is { } c && _drag == Drag.None)
             ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, AccentColor.R, AccentColor.G, AccentColor.B)), px, new DashStyle([4, 3], 0)),
                 ToStream(PenGeometry([_pen[^1], new PenNode(c, c, c)], false)));
         var handlePen = new Pen(new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)), px);
@@ -196,7 +198,7 @@ public sealed partial class CanvasView
                     _node = n;
                     _drag = Drag.NodeAnchor;
                     _base = _doc.State;
-                    PrepareSnap(new HashSet<Guid> { target.Id });
+                    _nodeSkip = new HashSet<Guid> { target.Id };
                     InvalidateVisual();
                     return;
                 }
@@ -231,7 +233,8 @@ public sealed partial class CanvasView
     {
         if (_doc is null || _base is null || _node is not { } n || !StartEditIfMoved(p)) return;
         if (_base.FindShape(_doc.Selection.FirstOrDefault()) is not PathShape target) return;
-        var local = LocalOf(target, _drag == Drag.NodeAnchor ? SnapPoint(w) : w);
+        // A point snaps onto other shapes' points (not its own shape's, which move with it).
+        var local = LocalOf(target, _drag == Drag.NodeAnchor ? SnapPick(w, _nodeSkip) : w);
         var g = _drag == Drag.NodeAnchor
             ? NodeEdit.MoveAnchor(target.Geometry, n, local)
             : NodeEdit.MoveHandle(target.Geometry, n, _dragHandle, local, _mirrorHandle);

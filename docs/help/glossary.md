@@ -150,6 +150,9 @@ explained in full.
   material between parts. See [Work area](work-area.md).
 - **Split onto pieces**: one design marked across several separate pieces that go together (four
   boards making one picture), a page each, lined up by the camera. See [Work area](work-area.md#split-onto-pieces).
+- **Object snap**: a picked point landing exactly on another shape's end, middle, centre, quadrant
+  or crossing (or perpendicular or tangent to it), with a marker saying which, as in AutoCAD. See
+  [Object snaps](canvas.md#object-snaps).
 - **Ship It**: uploads the job to the machine. Nothing moves or fires until you press the
   machine's start button. See [Running a job](running-jobs.md).
 - **Snap**, **snapping**: dragged shapes jumping into line with other shapes, guides, the work

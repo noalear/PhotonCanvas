@@ -27,32 +27,12 @@ public sealed partial class CanvasView
     // two-point align: the clicked points, source pair then target pair
     readonly List<Vec2> _align = [];
 
-    /// <summary>A shape's corner or end near <paramref name="w"/> (within snapping distance), else the usual snapping.</summary>
+    /// <summary>A measured or aligned point: on an object snap near <paramref name="w"/> (an end, middle, centre, crossing…), else the usual snapping.</summary>
     Vec2 SnapVertex(Vec2 w)
     {
-        if (_doc is null || SnapSuspended) return w;
-        double tol = SnapDistancePx / _scale, best = tol;
-        Vec2? hit = null;
-        var visible = _doc.State.Layers.Where(l => l.Visible).Select(l => l.Id).ToHashSet();
-        foreach (var s in _doc.State.Shapes)
-        {
-            if (s is not PathShape ps || !visible.Contains(s.LayerId) || !ps.Bounds.Inflate(tol).Contains(w)) continue;
-            foreach (var sp in ps.World.Subpaths)
-            {
-                void Try(Vec2 p)
-                {
-                    double d = p.Dist(w);
-                    if (d < best) { best = d; hit = p; }
-                }
-                Try(sp.Start);
-                foreach (var seg in sp.Segs) Try(seg.To);
-            }
-        }
-        if (hit is { } h) return h;
-        PrepareSnap(new HashSet<Guid>());
-        var snapped = SnapPoint(w);
+        var at = SnapPick(w, null, _tool == Tool.Measure && _measuring ? _measureA : null);
         _guides.Clear();
-        return snapped;
+        return at;
     }
 
     // ---- guides ------------------------------------------------------------------------

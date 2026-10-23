@@ -283,6 +283,40 @@ static class MoreShots
             settle(200);
         }
 
+        // --- Object snaps: a line from a box's corner, about to touch a circle (the Tangent marker).
+        {
+            reset();
+            var os = DocState.New();
+            var cutL = os.Layers[0];
+            os = Ops.AddShapes(os,
+            [
+                new PathShape { Name = "Box", LayerId = cutL.Id, Geometry = PathGeometry.Rect(40, 40, 60, 35) },
+                new PathShape { Name = "Circle", LayerId = cutL.Id, Geometry = PathGeometry.Ellipse(150, 120, 25, 25) },
+            ]);
+            doc.Reset(os, null);
+            canvas.FitRect(new Rect2(25, 25, 190, 160));
+            settle(400);
+            canvas.Tool = Tool.Line;
+            var toScreen = typeof(CanvasView).GetMethod("ToScreen", Any, [typeof(Vec2)])!;
+            Point At(Vec2 mm) => canvas.TranslatePoint((Point)toScreen.Invoke(canvas, [mm])!, w)!.Value;
+            var start = new Vec2(100, 75);
+            var press = At(start + new Vec2(0.4, 0.3));
+            w.MouseMove(press, Avalonia.Input.RawInputModifiers.None);
+            settle(100);
+            w.MouseDown(press, Avalonia.Input.MouseButton.Left);
+            settle(40);
+            w.MouseUp(press, Avalonia.Input.MouseButton.Left);
+            settle(150);
+            var c = new Vec2(150, 120);
+            double dist = start.Dist(c), a0 = Math.Atan2(start.Y - c.Y, start.X - c.X), b0 = Math.Acos(25 / dist);
+            var touch = c + new Vec2(Math.Cos(a0 - b0), Math.Sin(a0 - b0)) * 25;
+            w.MouseMove(At(touch + new Vec2(0.4, 0.3)), Avalonia.Input.RawInputModifiers.None);
+            settle(300);
+            save(shot(canvas), "canvas-object-snaps", "Drawing a line from a box's corner: the Tangent marker on the circle, the length and angle by the pointer");
+            canvas.Tool = Tool.Select;
+            settle(100);
+        }
+
         // --- The Selection panel's Picture and Text cards (below the size and place, so drawn on their own).
         reset();
         var props = F<Control>(w, "_props");

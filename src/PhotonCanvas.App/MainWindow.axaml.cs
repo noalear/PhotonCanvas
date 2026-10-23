@@ -338,7 +338,44 @@ public partial class MainWindow : Window
         Canvas.SnapToObjects = _settings.SnapToObjects;
         Canvas.SnapToGrid = _settings.SnapToGrid;
         Canvas.SnapDistancePx = _settings.SnapDistancePx;
+        Canvas.ObjectSnapOn = _settings.ObjectSnap;
+        Canvas.ObjectSnaps = (Doc.Geometry.SnapKinds)_settings.ObjectSnapKinds;
+        Canvas.Tracking = _settings.SnapTracking;
         _ribbon.Refresh();
+    }
+
+    void ToggleObjectSnaps()
+    {
+        _settings.ObjectSnap = !_settings.ObjectSnap;
+        SaveAndApplyGrid();
+        StatusText.Text = _settings.ObjectSnap ? "Object snaps on." : "Object snaps off (F3 turns them back on).";
+    }
+
+    /// <summary>The object snap kinds and tracking, ticked on and off (they apply at once).</summary>
+    MenuFlyout SnapKindsMenu()
+    {
+        var menu = new MenuFlyout();
+        void Opened()
+        {
+            menu.Items.Clear();
+            foreach (var (kind, name, about) in GridWindow.SnapKindNames)
+            {
+                var item = new MenuItem { Header = $"{name}: {about}", ToggleType = MenuItemToggleType.CheckBox, IsChecked = (_settings.ObjectSnapKinds & (int)kind) != 0 };
+                item.Click += (_, _) =>
+                {
+                    _settings.ObjectSnapKinds ^= (int)kind;
+                    SaveAndApplyGrid();
+                };
+                menu.Items.Add(item);
+            }
+            menu.Items.Add(new Separator());
+            var track = new MenuItem { Header = "Tracking: pause on a snap point to line up with it", ToggleType = MenuItemToggleType.CheckBox, IsChecked = _settings.SnapTracking };
+            track.Click += (_, _) => { _settings.SnapTracking = !_settings.SnapTracking; SaveAndApplyGrid(); };
+            menu.Items.Add(track);
+        }
+        menu.Opening += (_, _) => Opened();
+        Opened();
+        return menu;
     }
 
     void SaveAndApplyGrid()
@@ -677,6 +714,9 @@ public partial class MainWindow : Window
         grid.LargeToggle("Snap to shapes", "IcMagnet", on => { _settings.SnapToObjects = on; SaveAndApplyGrid(); }, "Snap to shapes and the work area: edges, centres and centrelines (hold Ctrl while dragging to move freely)", null, () => _settings.SnapToObjects);
         grid.SmallToggle("Show grid", "IcGrid", on => { _settings.ShowGrid = on; SaveAndApplyGrid(); }, "Show the grid", null, () => _settings.ShowGrid);
         grid.SmallToggle("Snap to grid", "IcGrid", on => { _settings.SnapToGrid = on; SaveAndApplyGrid(); }, "Snap to the grid's minor lines", null, () => _settings.SnapToGrid);
+        grid.LargeToggle("Object snaps", "IcMagnet", on => { _settings.ObjectSnap = on; SaveAndApplyGrid(); }, "Points you pick land on other shapes' ends, middles, centres, quadrants and crossings, and on the perpendicular or tangent from where a line starts, as in AutoCAD; a marker shows which (F3 turns them off and on; hold Ctrl for a free point)", null, () => _settings.ObjectSnap);
+        var kinds = grid.Small("Snap points…", "IcSettings", () => { }, "Which object snaps are on, and tracking");
+        kinds.Flyout = SnapKindsMenu();
         grid.Small("Grid settings…", "IcSettings", () => _ = Guard(ShowGridSettings), "Grid spacing and colours, snap distance (Ctrl+')");
         var tools = view.Group("Measure & history");
         ToolLarge(tools, "Measure", "IcMeasure", Tool.Measure, "Measure: drag between two points (snaps to corners; Shift = 45° steps)");
@@ -808,6 +848,7 @@ public partial class MainWindow : Window
         new("view.fit", "View", "Fit work area", "Home|Ctrl+D0|Ctrl+NumPad0", Canvas.FitField),
         new("view.fitsel", "View", "Fit selection", "F", Canvas.FitSelection),
         new("view.grid", "View", "Grid settings…", "Ctrl+OemQuotes", () => _ = Guard(ShowGridSettings)),
+        new("view.osnap", "View", "Object snaps on or off", "F3", ToggleObjectSnaps),
         new("tool.select", "Tools", "Select", "V", () => Canvas.Tool = Tool.Select),
         new("tool.rect", "Tools", "Rectangle", "R", () => Canvas.Tool = Tool.Rect),
         new("tool.ellipse", "Tools", "Ellipse", "E", () => Canvas.Tool = Tool.Ellipse),
@@ -848,6 +889,7 @@ public partial class MainWindow : Window
         bool typing = TextInputFocused();
         // Pen, point editing and the magnetic pen use these keys themselves (R rounds a point, it doesn't pick the rectangle).
         bool toolKeys = !ctrl && (Canvas.Tool is Tool.Pen or Tool.Nodes && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S
+            || Canvas.LineInProgress && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape
             || Canvas.Tool is Tool.Nodes && e.Key is Key.R or Key.Y or Key.B
             || Canvas.Tool is Tool.Magnetic && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape);
         foreach (var c in Commands())

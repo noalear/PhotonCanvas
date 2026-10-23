@@ -17,6 +17,22 @@ public sealed class GridWindow : Window
     readonly CheckBox _snapObjects = new() { Content = "Snap to shapes and the work area (edges, centres, centrelines)" };
     readonly CheckBox _snapGrid = new() { Content = "Snap to grid (minor lines)" };
     readonly NumericUpDown _distance = Number(2, 40, 1, "0");
+    readonly CheckBox _osnap = new() { Content = "Object snaps (F3): land on other shapes' points, as in AutoCAD" };
+    readonly List<(Doc.Geometry.SnapKinds Kind, CheckBox Box)> _kinds = [];
+    readonly CheckBox _tracking = new() { Content = "Tracking: pause on a snap point to line up with it across or down" };
+
+    /// <summary>Each object snap: its name and what it finds.</summary>
+    public static readonly (Doc.Geometry.SnapKinds Kind, string Name, string About)[] SnapKindNames =
+    [
+        (Doc.Geometry.SnapKinds.Endpoint, "Endpoint", "corners and the ends of lines"),
+        (Doc.Geometry.SnapKinds.Midpoint, "Midpoint", "the middle of a line or curve"),
+        (Doc.Geometry.SnapKinds.Center, "Centre", "of circles and arcs (point at the edge), ellipses and closed shapes"),
+        (Doc.Geometry.SnapKinds.Quadrant, "Quadrant", "the top, bottom and sides of circles and ellipses"),
+        (Doc.Geometry.SnapKinds.Intersection, "Intersection", "where lines cross"),
+        (Doc.Geometry.SnapKinds.Perpendicular, "Perpendicular", "square onto a line from where yours starts"),
+        (Doc.Geometry.SnapKinds.Tangent, "Tangent", "touching a circle from where yours starts"),
+        (Doc.Geometry.SnapKinds.Nearest, "Nearest", "anywhere on a line (makes everything sticky)"),
+    ];
     readonly TextBlock _note = Hint();
     bool _loading;
 
@@ -40,6 +56,10 @@ public sealed class GridWindow : Window
         _snapObjects.IsChecked = settings.SnapToObjects;
         _snapGrid.IsChecked = settings.SnapToGrid;
         _distance.Value = (decimal)settings.SnapDistancePx;
+        _osnap.IsChecked = settings.ObjectSnap;
+        _tracking.IsChecked = settings.SnapTracking;
+        foreach (var (kind, name, about) in SnapKindNames)
+            _kinds.Add((kind, new CheckBox { Content = $"{name}: {about}", IsChecked = (settings.ObjectSnapKinds & (int)kind) != 0, Margin = new(22, 0, 0, 0) }));
         _loading = false;
 
         var presets = new WrapPanel();
@@ -70,8 +90,11 @@ public sealed class GridWindow : Window
                     new TextBlock { Text = "SNAPPING", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
                     _snapObjects,
                     _snapGrid,
+                    _osnap,
+                    KindsPanel(),
+                    _tracking,
                     Field("Snap distance (px)", _distance, tip: "How close, on screen, something has to be before it snaps."),
-                    Hint("Hold Ctrl while dragging to move freely without snapping."),
+                    Hint("Hold Ctrl while dragging or clicking for a point that doesn't snap."),
                     close,
                 },
             },
@@ -79,8 +102,15 @@ public sealed class GridWindow : Window
         foreach (var n in new[] { _major, _minor, _distance }) n.ValueChanged += (_, _) => Changed();
         _majorColor.ColorChanged += (_, _) => Changed();
         _minorColor.ColorChanged += (_, _) => Changed();
-        foreach (var c in new[] { _show, _snapObjects, _snapGrid }) c.IsCheckedChanged += (_, _) => Changed();
+        foreach (var c in new[] { _show, _snapObjects, _snapGrid, _osnap, _tracking }.Concat(_kinds.Select(k => k.Box))) c.IsCheckedChanged += (_, _) => Changed();
         UpdateNote();
+    }
+
+    StackPanel KindsPanel()
+    {
+        var panel = new StackPanel { Spacing = 2 };
+        foreach (var (_, box) in _kinds) panel.Children.Add(box);
+        return panel;
     }
 
     static Color Parse(string? s, Color fallback) => Color.TryParse(s, out var c) ? c : fallback;
@@ -97,6 +127,9 @@ public sealed class GridWindow : Window
         _settings.SnapToObjects = _snapObjects.IsChecked == true;
         _settings.SnapToGrid = _snapGrid.IsChecked == true;
         _settings.SnapDistancePx = (double)(_distance.Value ?? 8);
+        _settings.ObjectSnap = _osnap.IsChecked == true;
+        _settings.SnapTracking = _tracking.IsChecked == true;
+        _settings.ObjectSnapKinds = _kinds.Where(k => k.Box.IsChecked == true).Aggregate(0, (a, k) => a | (int)k.Kind);
         _settings.Save();
         UpdateNote();
         _apply();

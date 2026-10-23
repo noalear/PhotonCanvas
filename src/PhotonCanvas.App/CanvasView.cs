@@ -118,6 +118,7 @@ public sealed partial class CanvasView : Control
             _wandTicket++;
             _node = null;
             ResetPointTools();
+            ResetSnaps();
             _tool = value;
             if (value is Tool.Wand or Tool.Magnetic) PreparePhoto();
             CancelDrag();
@@ -459,7 +460,9 @@ public sealed partial class CanvasView : Control
             DrawGuidelines(ctx);
             DrawTabs(ctx);
             if (_drag == Drag.Box) DrawBox(ctx);
-            if (_drag != Drag.None) DrawGuides(ctx);
+            if (_drag != Drag.None || PicksPoints) DrawGuides(ctx);
+            DrawLineInProgress(ctx);
+            DrawSnaps(ctx);
         }
         DrawRulers(ctx);
     }
@@ -895,6 +898,15 @@ public sealed partial class CanvasView : Control
             UpdateCursor(p);
             return;
         }
+        if (pt.Properties.IsRightButtonPressed && LineInProgress)
+        {
+            // Right-click finishes the lines, as Enter does.
+            _lineFrom = null;
+            _typed = "";
+            e.Handled = true;
+            InvalidateVisual();
+            return;
+        }
         if (pt.Properties.IsRightButtonPressed && _tool is Tool.Select or Tool.Nodes && _drag == Drag.None)
         {
             // Right-click acts on what's under the mouse: select it (with its group) unless it's already selected.
@@ -942,11 +954,17 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Tabs) { TabPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
         if (_tool == Tool.Start) { StartPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
         if (_tool == Tool.Eraser) { if (ErasePressed(p)) e.Pointer.Capture(this); return; }
+        if (_tool == Tool.Line && _lineFrom is { } start)
+        {
+            // Click by click: this click ends the line, and the next one starts here.
+            AddLine(start, LineEnd(start, SnapPick(_pressWorld, null, start)));
+            InvalidateVisual();
+            return;
+        }
         if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line)
         {
             _drag = Drag.Create;
-            PrepareSnap(new HashSet<Guid>());
-            _pressWorld = SnapPoint(_pressWorld);
+            _pressWorld = SnapPick(_pressWorld);
             _guides.Clear();
             _createEnd = _pressWorld;
             return;
@@ -966,6 +984,13 @@ public sealed partial class CanvasView : Control
         }
 
         int handle = HitHandle(p);
+        // On one of the selection's own snap points (a corner, an edge's middle), just inside it: a move by
+        // that point, not a resize (the handles sit just outside the selection).
+        if (handle is >= 0 and not 8 && SelectionBounds(_doc).Contains(_pressWorld) && HitShape(p) is not null)
+        {
+            var picked = _doc.Selection;
+            if (FindObjectSnap(_pressWorld, s => picked.Contains(s.Id), null, GrabKinds) is not null) handle = -1;
+        }
         if (handle >= 0)
         {
             _handle = handle;
@@ -995,6 +1020,9 @@ public sealed partial class CanvasView : Control
             _dragBounds = SelectionBounds(_doc);
             _base = _doc.State;
             PrepareSnap(_dragIds);
+            // Picked up by one of its snap points (a corner, a centre…): that point snaps onto other shapes' points.
+            var sel = _doc.Selection;
+            _grab = FindObjectSnap(_pressWorld, s => sel.Contains(s.Id), null, GrabKinds)?.At;
             return;
         }
 
@@ -1013,9 +1041,22 @@ public sealed partial class CanvasView : Control
 
         if (_guideDrag is not null) { GuideMoved(p); _lastScreen = p; return; }
         if (_tool == Tool.Eraser) { EraseMoved(w); _lastScreen = p; InvalidateVisual(); return; }
+        _snapHit = null;
         switch (_drag)
         {
             case Drag.None:
+                // Where a click would land: the snap marker shows before clicking.
+                if (PicksPoints && _tool != Tool.Measure)
+                {
+                    var at = SnapPick(w, null, PickFrom);
+                    _pick = at;
+                    if (_tool == Tool.Line) _createEnd = at;
+                }
+                else if (_tool == Tool.Select && _doc is { } d0 && d0.Selection.Count > 0)
+                {
+                    var sel = d0.Selection;
+                    _snapHit = FindObjectSnap(w, s => sel.Contains(s.Id), null, GrabKinds);
+                }
                 if (_tool == Tool.Pen && _pen.Count > 0) InvalidateVisual();
                 if (_tool == Tool.Wand) ScheduleWandPreview(w);
                 if (_tool == Tool.Measure) MeasureMoved(w);
@@ -1033,7 +1074,7 @@ public sealed partial class CanvasView : Control
                 InvalidateVisual();
                 break;
             case Drag.Create:
-                _createEnd = SnapPoint(w);
+                _createEnd = SnapPick(w, null, _tool == Tool.Line ? _pressWorld : null);
                 InvalidateVisual();
                 break;
             case Drag.PenHandle:
@@ -1048,7 +1089,15 @@ public sealed partial class CanvasView : Control
                 if (mods.HasFlag(KeyModifiers.Shift)) d = Math.Abs(d.X) >= Math.Abs(d.Y) ? new(d.X, 0) : new(0, d.Y);
                 bool lockY = mods.HasFlag(KeyModifiers.Shift) && d.Y == 0, lockX = mods.HasFlag(KeyModifiers.Shift) && d.X == 0;
                 var moved = new Rect2(_dragBounds.MinX + d.X, _dragBounds.MinY + d.Y, _dragBounds.MaxX + d.X, _dragBounds.MaxY + d.Y);
-                d += SnapBox(moved, allowX: !lockX, allowY: !lockY);
+                var dragged = _dragIds;
+                if (_grab is { } grab && !SnapSuspended && FindObjectSnap(grab + d, s => !dragged.Contains(s.Id), null) is { } onto)
+                {
+                    // The point it's held by lands on another shape's point.
+                    d = onto.At - grab;
+                    _snapHit = onto;
+                    _guides.Clear();
+                }
+                else d += SnapBox(moved, allowX: !lockX, allowY: !lockY);
                 _doc.UpdateEdit(Ops.Move(_base, _dragIds, d.X, d.Y));
                 break;
             case Drag.Scale when _doc is not null && _base is not null:
@@ -1118,11 +1167,18 @@ public sealed partial class CanvasView : Control
             case Drag.Scale when _editStarted: _doc.EndEdit("Resize"); break;
             case Drag.Rotate when _editStarted: _doc.EndEdit("Rotate"); break;
             case Drag.Box: FinishBox(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); break;
+            case Drag.Create when _tool == Tool.Line && Dist(p, _pressScreen) < DragThreshold:
+                // A click, not a drag: lines click by click from here.
+                _lineFrom = _pressWorld;
+                _createEnd = _pressWorld;
+                break;
             case Drag.Create: FinishCreate(); break;
             case Drag.NodeAnchor or Drag.NodeHandle when _editStarted: _doc.EndEdit("Edit points"); break;
         }
         _editStarted = false;
         _base = null;
+        _grab = null;
+        if (!PicksPoints) _snapHit = null;
         UpdateCursor(p);
         InvalidateVisual();
     }
@@ -1138,6 +1194,7 @@ public sealed partial class CanvasView : Control
         base.OnPointerExited(e);
         _cursor = null;
         _hover = null;
+        _snapHit = null;
         _wandPreview = null;
         _wandTicket++;
         CursorMoved?.Invoke(null);
@@ -1251,8 +1308,10 @@ public sealed partial class CanvasView : Control
             Tool.Star => ParamShape.Create(ParamKind.Star, bb.Width, bb.Height, 0, Math.Clamp(StarPoints, 3, 64), Math.Clamp(StarInner, 0.05, 0.95), lay.Id, Affine.Translate(bb.MinX, bb.MinY)),
             _ => new PathShape { Name = name, LayerId = lay.Id, Geometry = g },
         };
-        _doc.Commit($"Draw {name.ToLowerInvariant()}", Ops.AddShapes(_doc.State, [shape]), [shape.Id]);
-        Tool = Tool.Select;
+        // A line isn't selected (the Line tool carries on, and handles would be in the way); other shapes are.
+        _doc.Commit($"Draw {name.ToLowerInvariant()}", Ops.AddShapes(_doc.State, [shape]), _tool == Tool.Line ? [] : [shape.Id]);
+        // The Line tool stays on for the next line; the other shapes go back to Select.
+        if (_tool != Tool.Line) Tool = Tool.Select;
     }
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
@@ -1287,6 +1346,7 @@ public sealed partial class CanvasView : Control
         }
         if (_drag == Drag.Create) { InvalidateVisual(); }
         if (_tool == Tool.Pen && PenKey(e)) { e.Handled = true; return; }
+        if (_tool == Tool.Line && LineKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Magnetic && MagneticKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Nodes && NodesKey(e)) { e.Handled = true; return; }
         if (e.Key == Key.Escape)

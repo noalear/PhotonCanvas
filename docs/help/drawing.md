@@ -22,9 +22,11 @@ the `{x}` icon and **Number copies** the four squares.
   away (see [The workspace](workspace.md)).
 - Corners and points snap to the grid and to other shapes when snapping is on (see
   [Working on the canvas](canvas.md)).
-- **Rectangle**, **Ellipse**, **Polygon**, **Star**, **Line** and **Text** go back to **Select**
-  after one shape. **Pen**, **Pick piece** and **Trace edge** stay on until you choose another tool
+- **Rectangle**, **Ellipse**, **Polygon**, **Star** and **Text** go back to **Select** after one
+  shape. **Line**, **Pen**, **Pick piece** and **Trace edge** stay on until you choose another tool
   or press `Esc`.
+- Points land on other shapes' ends, middles, centres and crossings with **Object snaps** on (a
+  yellow marker shows which; see [Object snaps](canvas.md#object-snaps)).
 - `Ctrl+Z` undoes anything here.
 
 ## Drawing tools
@@ -35,7 +37,7 @@ the `{x}` icon and **Number copies** the four squares.
 | **Ellipse** | `E` | Drag the box it fills. | `Shift` circle, `Alt` from the centre |
 | **Polygon** | `O` | Drag the box it fills. | `Shift` square box, `Alt` from the centre |
 | **Star** | `S` | Drag the box it fills. | `Shift` square box, `Alt` from the centre |
-| **Line** | `L` | Drag from one end to the other. | `Shift` 45° steps |
+| **Line** | `L` | Drag from one end to the other, or click each end (and carry on from there). | `Shift` 45° steps; type a length |
 | **Pen** | `P` | Click for corners, drag for curves. | See [Pen](#pen) |
 | **Text** | `T` | Click where the text starts. | |
 
@@ -67,8 +69,21 @@ square. Both stay editable afterwards (see [Editable shapes](#editable-shapes)).
 
 ### Line
 
-A straight line from where you press to where you let go. `Shift` keeps it to 45° steps. It's an
-open line, not a closed shape.
+A straight line: an open line, not a closed shape. Each end lands on the nearest object snap (an
+end, a middle, a centre, a crossing, square onto a line or touching a circle: see
+[Object snaps](canvas.md#object-snaps)); `Shift` keeps it to 45° steps. The Line tool stays on after
+each line, until you choose another tool or press `Esc`.
+
+- **Drag** from one end to the other for one line.
+- **Click** where it starts, then **click** where it ends: the line is drawn, and the next one starts
+  from its end, so you can click round a shape line by line. `Enter`, `Esc` or a right-click stops
+  (the lines drawn so far stay).
+- While a line follows the pointer, its length and angle show beside it ("42.5 mm ∠ 30°": the angle
+  counter-clockwise from the right, as on paper).
+- **Type a length** and press `Enter` to end the line that far along the pointer's direction (in the
+  units shown, millimetres or inches). Type `25<30` for 25 at 30°. `Backspace` takes back a
+  character; `Esc` clears what's typed.
+- The lines drawn this way aren't selected, so handles don't get in the way of the next one.
 
 ### Pen
 

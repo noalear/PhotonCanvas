@@ -104,6 +104,12 @@ public sealed class AppSettings
     public bool SnapToObjects { get; set; } = true;
     public bool SnapToGrid { get; set; }
     public double SnapDistancePx { get; set; } = 8;
+    /// <summary>Object snaps (ends, middles, centres, crossings… as in AutoCAD) on; F3 turns them off and on.</summary>
+    public bool ObjectSnap { get; set; } = true;
+    /// <summary>Which object snaps are on (<see cref="Doc.Geometry.SnapKinds"/>).</summary>
+    public int ObjectSnapKinds { get; set; } = (int)Doc.Geometry.SnapKinds.Default;
+    /// <summary>Pause on a snap point to line up with it across or down.</summary>
+    public bool SnapTracking { get; set; } = true;
     /// <summary>Version of the safety notice and terms the user accepted (0 = never).</summary>
     public int AcceptedTermsVersion { get; set; }
     /// <summary>Show the less common layer settings (kerf, tabs, overscan, fiber pulse…).</summary>

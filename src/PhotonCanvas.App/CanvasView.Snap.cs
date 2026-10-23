@@ -44,6 +44,7 @@ public sealed partial class CanvasView
     /// <summary>Collect what can be snapped to, leaving out the shapes being moved.</summary>
     void PrepareSnap(IReadOnlySet<Guid> exclude)
     {
+        _preparedState = null; // the lists below are rebuilt: what was worked out for picking points is gone
         _snapX.Clear();
         _snapY.Clear();
         _guides.Clear();

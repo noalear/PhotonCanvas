@@ -190,6 +190,43 @@ It snaps when something is within the **Snap distance**: 8 pixels on screen to s
 feels the same at any zoom. A pink line shows what it lined up with. Hold `Ctrl` while dragging to
 move freely. With **Snap to shapes** off, guides don't attract either.
 
+### Object snaps
+
+View → **Object snaps** (on to start with; `F3` turns them off and on). As in AutoCAD, a point you
+pick lands exactly on a point of another shape near the pointer, and a yellow marker with its name
+shows which, before you click. It works wherever you pick a point: drawing lines, rectangles,
+ellipses, polygons and stars, pen points, dragging points in **Edit points**, **Measure** and
+**Align 2 points**. Hold `Ctrl` for a point that doesn't snap.
+
+![Drawing a line: the marker shows it will touch the circle (Tangent), with the line's length and angle](images/canvas-object-snaps.png)
+
+| Snap | Marker | Lands on |
+|---|---|---|
+| **Endpoint** | square | Corners, and the ends of lines and curves. |
+| **Midpoint** | triangle | The middle of a straight line or a curve (halfway along it). |
+| **Centre** | circle | The centre of a circle or arc: point at its edge and the centre is found, however far away. Also the centre of an ellipse and the middle of a closed shape (a rectangle's centre). |
+| **Quadrant** | diamond | The top, bottom, left and right of a circle or ellipse. |
+| **Intersection** | X | Where two lines cross (of two shapes, or of one shape with itself). |
+| **Perpendicular** | ⊥ | Square onto a line or circle, from where the line you're drawing starts (when that point is near the pointer). |
+| **Tangent** | circle with a bar | Touching a circle, from where the line you're drawing starts. |
+| **Nearest** | hourglass | Anywhere on a line. Off to start with: it makes everything sticky. |
+
+- When several are near, the one nearest the pointer wins, with ends and crossings ahead of the
+  rest and **Nearest** last.
+- **Snap points…** (View tab, next to **Object snaps**) ticks each kind on or off, and **Tracking**.
+  The same choices are in the **Grid & snapping** window.
+- It finds points on shapes on visible layers (material outlines too), and on pictures: their
+  corners, the middles of their sides and their centre. Text and codes are left out (their letters
+  would snap everywhere).
+- **Tracking**: pause on a snap point for half a second and a small green cross marks it. Moving
+  straight across or down from it then lines the pointer up with it (a pink line shows it), as do the
+  start of the line you're drawing. Two tracked points give the corner where their lines meet. Pause
+  on a marked point again to let it go. Up to four are kept; choosing another tool clears them.
+- **Moving a shape by one of its points**: select it, press on one of its own snap points (a corner,
+  the middle of an edge, its centre) just inside it, and drag. That point lands on the other shapes'
+  points: a box's corner onto the end of a line, a hole's centre onto a crossing. The marker shows
+  the point it lands on. (Press on a handle, just outside the selection, to resize as usual.)
+
 ### The grid
 
 - View → **Show grid** (on to start with): major lines every 10 mm and minor lines every 1 mm,
@@ -219,7 +256,9 @@ between runs. **Done** closes it.
 | **Show the grid** | | The same as View → **Show grid**. |
 | **Snap to shapes and the work area (edges, centres, centrelines)** | | The same as View → **Snap to shapes**. |
 | **Snap to grid (minor lines)** | | The same as View → **Snap to grid**. |
-| **Snap distance (px)** | 2 to 40, 8 to start with | How close, on screen, something has to be before it snaps. |
+| **Object snaps (F3): land on other shapes' points, as in AutoCAD** | | The same as View → **Object snaps**. The ticks under it turn each kind on or off (**Endpoint** to **Nearest**, see [Object snaps](#object-snaps)). |
+| **Tracking: pause on a snap point to line up with it across or down** | | Tracking, as in [Object snaps](#object-snaps). |
+| **Snap distance (px)** | 2 to 40, 8 to start with | How close, on screen, something has to be before it snaps (object snaps too). |
 
 When the major spacing isn't a whole number of minor spacings, a tip under the colours says the
 lines won't line up.
