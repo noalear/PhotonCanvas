@@ -9,7 +9,17 @@ namespace PhotonCanvas.App;
 public sealed record DepthChargeHealth(bool Gpu, bool Quality, bool Fast, bool DepthPro);
 
 /// <summary>A depth job's progress.</summary>
-public sealed record DepthJob(string Id, string Status, string? Error, int Width, int Height, int? PatchesDone, double? Seconds);
+public sealed record DepthJob(string Id, string Status, string? Error, int Width, int Height, int? PatchesDone, double? Seconds)
+{
+    /// <summary>Tiles done and in all while a large picture is looked at in tiles; once ready, the depth's own size.</summary>
+    public int? TilesDone { get; init; }
+    public int? TilesTotal { get; init; }
+    public int? DepthWidth { get; init; }
+    public int? DepthHeight { get; init; }
+}
+
+/// <summary>How DepthCharge looks at a picture bigger than its model or far from square.</summary>
+public enum DepthTiles { Auto, Fine, Off }
 
 /// <summary>
 /// Post-processing applied when fetching a depthmap (no new inference), exactly as
@@ -31,6 +41,8 @@ public sealed record DepthTone
     public double DetailScale { get; init; } = 12;
     public double Texture { get; init; }
     public bool RemoveBackground { get; init; }
+    /// <summary>Tiled pictures: strength of the fine detail the tiles found (0–2; 1 as found, 0 the whole picture's shape alone).</summary>
+    public double TileDetail { get; init; } = 1;
 }
 
 /// <summary>
@@ -126,8 +138,11 @@ public sealed class DepthChargeService : IDisposable
 
     IEnumerable<string> LastOutput() { lock (_output) return _output.TakeLast(8).ToList(); }
 
-    /// <summary>Start a depth estimate. Models: quality (DA3 Large), fast (V2 Small), relief, hybrid, depthpro.</summary>
-    public async Task<DepthJob> SubmitAsync(byte[] image, string name, string model, int size, CancellationToken ct = default)
+    /// <summary>
+    /// Start a depth estimate. Models: quality (DA3 Large), fast (V2 Small), relief, hybrid, depthpro.
+    /// Tiles: a big or wide picture is looked at in overlapping tiles fitted to the whole picture's shape.
+    /// </summary>
+    public async Task<DepthJob> SubmitAsync(byte[] image, string name, string model, int size, DepthTiles tiles = DepthTiles.Auto, CancellationToken ct = default)
     {
         using var form = new MultipartFormDataContent();
         var file = new ByteArrayContent(image);
@@ -135,6 +150,7 @@ public sealed class DepthChargeService : IDisposable
         form.Add(file, "file", string.IsNullOrWhiteSpace(name) ? "image.png" : name + ".png");
         form.Add(new StringContent(model), "model");
         form.Add(new StringContent(size.ToString(CultureInfo.InvariantCulture)), "size");
+        form.Add(new StringContent(tiles.ToString().ToLowerInvariant()), "tiles");
         using var r = await _http.PostAsync("/api/jobs", form, ct);
         return Job(await Read(r, ct));
     }
@@ -151,7 +167,7 @@ public sealed class DepthChargeService : IDisposable
         static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
         var q = $"longest={longest}&bits={bits}&gamma={F(t.Gamma)}&smooth={F(t.Smooth)}&black={F(t.Black)}&white={F(t.White)}&clip={F(t.Clip)}" +
                 $"&polarity={(t.Deboss ? "deboss" : "emboss")}&detail={F(t.ArtworkDetail)}&blend={F(t.Blend)}&detail_scale={F(t.DetailScale)}" +
-                $"&texture={F(t.Texture)}&remove_background={(t.RemoveBackground ? "true" : "false")}";
+                $"&texture={F(t.Texture)}&remove_background={(t.RemoveBackground ? "true" : "false")}&tile_detail={F(t.TileDetail)}";
         using var r = await _http.GetAsync($"/api/jobs/{id}/depth?{q}", ct);
         if (!r.IsSuccessStatusCode) throw new InvalidOperationException(Detail(await r.Content.ReadAsStringAsync(ct), r));
         return await r.Content.ReadAsByteArrayAsync(ct);
@@ -175,7 +191,15 @@ public sealed class DepthChargeService : IDisposable
         j["id"]!.GetValue<string>(), j["status"]?.GetValue<string>() ?? "?", j["error"]?.ToString(),
         j["width"]?.GetValue<int>() ?? 0, j["height"]?.GetValue<int>() ?? 0,
         j["patches_done"] is JsonValue pd && pd.TryGetValue<int>(out var n) ? n : null,
-        j["seconds"] is JsonValue s && s.TryGetValue<double>(out var sec) ? sec : null);
+        j["seconds"] is JsonValue s && s.TryGetValue<double>(out var sec) ? sec : null)
+    {
+        TilesDone = Int(j, "tiles_done"),
+        TilesTotal = Int(j, "tiles_total"),
+        DepthWidth = Int(j, "depth_width"),
+        DepthHeight = Int(j, "depth_height"),
+    };
+
+    static int? Int(JsonObject j, string key) => j[key] is JsonValue v && v.TryGetValue<int>(out var n) ? n : null;
 
     /// <summary>Stop DepthCharge if this program started it (leave one the user started alone).</summary>
     public void Dispose()

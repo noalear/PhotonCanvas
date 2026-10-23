@@ -327,6 +327,24 @@ on the graphics card if it can (DirectML) or the processor (slower); PhotonCanva
 | **Depth Pro (research only)** | 1536 px | Apple's model, sharp boundaries. Non-commercial research licence; needs the Depth Pro download. |
 | **V2 Small (fast)** | 518 px | A quick baseline. |
 
+**Large pictures.** The model looks at most at **Detail** pixels at once (1036 for DA3), with the
+whole picture fitted inside that square. A 3762 × 1254 px picture would then get only 1036 × 345
+depth, and every export of it is that blown up. Tiles fix this: the model looks at overlapping
+squares of the full-size picture, each filling its whole input, and each is fitted to the whole
+picture's depth where it lies. The overall shape stays the whole picture's (tiles can't bend it);
+the tiles bring the fine detail.
+
+| Large pictures | What it does | The 3762 × 1254 example |
+|---|---|---|
+| **Automatic tiles · when needed** (default) | Tiles when the picture is more than 1.25 × **Detail** or further from square than 5:4. Each tile up to twice **Detail**. | 4 tiles, 3108 × 1036 depth, about 1.2 s |
+| **Fine tiles · a depth sample per pixel** | Tiles the size of **Detail**: one depth sample per picture pixel. Slower. | 10 tiles, 3762 × 1254 depth, about 2.7 s |
+| **Whole picture only** | As before tiles. | 1036 × 345 depth |
+
+The times are with the model already loaded, on the graphics card. The depth is at most 4096 px
+on its longest side. Tiles don't apply to **Local close-ups**, which are their own kind of tiling.
+They add resolution, not accuracy: the depth is still the model's guess, relative and not in
+millimetres. While it runs, the window counts the tiles; when done it says how big the depth is.
+
 **Generate depthmap** runs the model (the first run takes longer while it loads). The window shows
 the picture and the depth map side by side.
 
@@ -339,6 +357,7 @@ the picture and the depth map side by side.
 | **Black point** | 0 to 99 (0) | Percent of the range treated as deepest. |
 | **White point** | 1 to 100 (100) | Percent of the range treated as shallowest. |
 | **Ignore tails %** | 0 to 10 (0) | Ignores this share of extreme depths at each end before scaling; 0.5–2 tames edge spikes. |
+| **Tile detail** | 0 to 2 (1) | Tiled pictures only: the fine detail the tiles found. 1 as found, 0 the whole picture's shape alone (as without tiles), 2 doubled. |
 | **Direction** | **Emboss · raised relief** | Emboss raises the subject; **Deboss · recessed relief** sinks it. White is always shallow. |
 | **Artwork detail** | 0 to 1 (0.25) | Local close-ups only: adds detail from the picture's brightness. Keeps lettering, but shadows and paint can become false depth. |
 | **Model detail** | 0 to 2 (0.5) | DA3 + fine detail only: how much of Depth Pro's detail is added. |
@@ -350,8 +369,9 @@ the picture and the depth map side by side.
 rectangle or circle, masks and a 3D view. Crops and masks saved there are used here after
 **Refresh preview**.
 
-**Output.** **Longest edge (px)** (64 to 8192, default 2048) is the size of the map added or saved;
-bigger only interpolates. **Save as** (8-bit or 16-bit) applies only to **Save PNG…**; the design
+**Output.** **Longest edge (px)** (64 to 8192, default 2048) is the size of the map added or saved.
+Up to the depth's own size keeps all its detail; bigger only interpolates. After a tiled depth
+bigger than the box says, the box is raised to the depth's size (and the window says so). **Save as** (8-bit or 16-bit) applies only to **Save PNG…**; the design
 always uses 8 bits.
 
 **Add depthmap to design** puts the map over the original, in the same place and size (a picture

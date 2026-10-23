@@ -21,9 +21,16 @@ Click **Depthmap**. The top card says whether DepthCharge was found.
 <!-- target: button:Choose DepthCharge folder -->
 If it wasn't found, click **Choose DepthCharge folder…** and pick the folder you set it up in.
 
+## Large pictures
+<!-- target: field:Large pictures -->
+Leave **Automatic tiles**: a picture bigger than the model sees at once, or a wide one, is looked
+at in overlapping tiles, so its depth keeps the picture's detail. **Fine tiles** is sharper still
+and slower.
+
 ## Generate
 <!-- target: button:Generate depthmap -->
-Choose a **Model** and click **Generate depthmap**. The first run takes longer.
+Choose a **Model** and click **Generate depthmap**. The first run takes longer. A tiled picture
+counts its tiles, then says how big its depth is.
 
 ## Shape the relief
 <!-- target: field:Midtone lift -->

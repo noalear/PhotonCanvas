@@ -38,6 +38,8 @@ public sealed class DepthChargeWindow : Window
     readonly ComboBox _model = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly ComboBox _size = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly TextBlock _modelHint = Hint();
+    readonly ComboBox _tiles = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Automatic tiles · when needed", "Fine tiles · a depth sample per pixel", "Whole picture only" }, SelectedIndex = 0 };
+    readonly TextBlock _tilesHint = Hint("The model sees at most 1036 px at once, so a 3762 × 1254 picture would get only 1036 × 345 depth. Tiles look at overlapping squares of the full-size picture, each fitted to the whole picture's shape: the shape stays right and the depth keeps the picture's detail.");
     readonly Button _generate = new() { Content = "Generate depthmap", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
     readonly ProgressBar _busy = new() { IsIndeterminate = true, IsVisible = false, Height = 4 };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
@@ -53,7 +55,8 @@ public sealed class DepthChargeWindow : Window
     readonly Slider _scale = new() { Minimum = 2, Maximum = 64, Value = 12 };
     readonly Slider _texture = new() { Minimum = 0, Maximum = 1, Value = 0 };
     readonly CheckBox _removeBg = new() { Content = "Remove plain background" };
-    readonly Control _artworkRow, _hybridRows;
+    readonly Slider _tileDetail = new() { Minimum = 0, Maximum = 2, Value = 1 };
+    readonly Control _artworkRow, _hybridRows, _tileRow;
     readonly Border _toneCard;
 
     readonly NumericUpDown _longest = Number(64, 8192, 256, "0");
@@ -89,7 +92,7 @@ public sealed class DepthChargeWindow : Window
         _chooseFolder.Click += async (_, _) => await ChooseFolder();
         _generate.Click += async (_, _) => await Generate();
         _longest.Value = 2048;
-        foreach (var s in new[] { _gamma, _smooth, _black, _white, _clip, _artwork, _blend, _scale, _texture }) s.ValueChanged += (_, _) => SchedulePreview();
+        foreach (var s in new[] { _gamma, _smooth, _black, _white, _clip, _artwork, _blend, _scale, _texture, _tileDetail }) s.ValueChanged += (_, _) => SchedulePreview();
         _polarity.SelectionChanged += (_, _) => SchedulePreview();
         _removeBg.IsCheckedChanged += (_, _) => SchedulePreview();
         _add.Click += async (_, _) => await Add();
@@ -100,6 +103,8 @@ public sealed class DepthChargeWindow : Window
         refresh.Click += (_, _) => SchedulePreview();
         Closing += (_, _) => _cts?.Cancel();
 
+        _tileRow = Labeled("Tile detail", _tileDetail, "The fine detail the tiles found: 1 as found, 0 the whole picture's shape alone (as without tiles), 2 doubled.");
+        _tileRow.IsVisible = false;
         _artworkRow = Labeled("Artwork detail", _artwork, "Brightness-assisted detail for local reconstruction. Keeps lettering, but shadows and paint can become false depth. 0 = model geometry only.");
         _hybridRows = new StackPanel
         {
@@ -119,7 +124,7 @@ public sealed class DepthChargeWindow : Window
             Labeled("White point", _white, "Percent of the range treated as shallowest."),
             Labeled("Ignore tails %", _clip, "Ignore this percent of extreme depths at each end before scaling (0.5–2 tames edge spikes)."),
             Field("Direction", _polarity, tip: "Emboss raises the subject; deboss sinks it. White is always shallow, black deep."),
-            _artworkRow, _hybridRows,
+            _tileRow, _artworkRow, _hybridRows,
             Row(refresh, _open));
         _toneCard.IsEnabled = false;
 
@@ -131,9 +136,11 @@ public sealed class DepthChargeWindow : Window
                 Children =
                 {
                     Card("DepthCharge", _where, _chooseFolder),
-                    Card("Estimate depth", Field("Model", _model), Field("Detail", _size), _modelHint, _generate, _busy, _status),
+                    Card("Estimate depth", Field("Model", _model), Field("Detail", _size), _modelHint,
+                        Field("Large pictures", _tiles, tip: "Automatic: tiles when the picture is bigger than the model or not square (up to twice the model's size each). Fine: tiles the model's size, one depth sample per picture pixel; slower. Whole picture only: as before."),
+                        _tilesHint, _generate, _busy, _status),
                     _toneCard,
-                    Card("Output", Field("Longest edge (px)", _longest, tip: "Pixel size of the depthmap added or saved. Bigger only interpolates; it doesn't add detail."),
+                    Card("Output", Field("Longest edge (px)", _longest, tip: "Pixel size of the depthmap added or saved. Up to the depth's own size (shown after generating) keeps all its detail; bigger only interpolates."),
                         Field("Save as", _bits, tip: "Only for Save PNG. The design always uses 8 bits per pixel."),
                         Hint("White = shallow (left alone), black = deepest. Added as a picture over the original, on its own layer.")),
                 },
@@ -200,6 +207,8 @@ public sealed class DepthChargeWindow : Window
         _size.ItemsSource = m.Sizes.Select(s => s switch { 518 => "Standard · 518 px", 728 => "Fine · 728 px", 1036 => "Maximum · 1036 px", _ => $"{s} px" }).ToList();
         _size.SelectedIndex = Array.IndexOf(m.Sizes, m.DefaultSize);
         _modelHint.Text = m.Hint;
+        // Local close-ups are their own kind of tiling.
+        _tiles.IsEnabled = _tilesHint.IsVisible = m.Id != "relief";
     }
 
     DepthChargeHealth? _health;
@@ -260,14 +269,15 @@ public sealed class DepthChargeWindow : Window
                 return;
             }
             _status.Text = "Loading the model and estimating depth… (the first run takes longer)";
-            var job = await _service.SubmitAsync(_source, _name, m.Id, size, cts.Token);
+            var job = await _service.SubmitAsync(_source, _name, m.Id, size, (DepthTiles)Math.Max(0, _tiles.SelectedIndex), cts.Token);
             var started = DateTime.Now;
             while (job.Status is "queued" or "running")
             {
                 await Task.Delay(600, cts.Token);
                 job = await _service.StatusAsync(job.Id, cts.Token);
                 _status.Text = job.Status == "queued" ? "Waiting in DepthCharge's queue…"
-                    : $"Estimating depth… {(DateTime.Now - started).TotalSeconds:0} s" + (job.PatchesDone is { } n ? $" · {n} close-ups" : "");
+                    : $"Estimating depth… {(DateTime.Now - started).TotalSeconds:0} s" + (job.PatchesDone is { } n ? $" · {n} close-ups" : "")
+                      + (job.TilesTotal is { } total ? $" · tile {job.TilesDone ?? 0} of {total}" : "");
             }
             if (job.Status != "ready")
             {
@@ -277,6 +287,18 @@ public sealed class DepthChargeWindow : Window
             _jobId = job.Id;
             _jobModel = m.Id;
             _status.Text = $"Done{(job.Seconds is { } s ? $" in {s:0.0} s" : "")}. Shape it with the sliders; they don't re-run the model.";
+            if (job is { DepthWidth: { } dw, DepthHeight: { } dh })
+            {
+                // Tiled: the depth has (up to) the picture's own resolution, so export at least that.
+                int own = Math.Max(dw, dh);
+                _status.Text += $"\nLooked at in {job.TilesTotal} tiles: the depth is {dw} × {dh} px.";
+                if ((_longest.Value ?? 0) < own)
+                {
+                    _longest.Value = Math.Min(own, 8192);
+                    _status.Text += $" Longest edge set to {own} px to keep all of it.";
+                }
+            }
+            _tileRow.IsVisible = job.DepthWidth is not null;
             _artworkRow.IsVisible = m.Id == "relief";
             _hybridRows.IsVisible = m.Id == "hybrid";
             _toneCard.IsEnabled = _add.IsEnabled = _save.IsEnabled = _open.IsEnabled = true;
@@ -308,6 +330,7 @@ public sealed class DepthChargeWindow : Window
         DetailScale = _scale.Value,
         Texture = _texture.Value,
         RemoveBackground = _removeBg.IsChecked == true,
+        TileDetail = _tileDetail.Value,
     };
 
     void SchedulePreview()
