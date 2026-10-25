@@ -448,10 +448,25 @@ public class StackSlicerTests
             Assert.Equal(5, AssemblyBooklet.SavePdf(stack, new BookletOptions { Title = "Chin" }, path));
             using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
             var text = string.Join(" ", pdf.GetPages().Select(pg => pg.Text));
-            Assert.Contains("Side build A: 2b hangs from the slice above", text);
+            Assert.Contains("Side build A: 2b has nothing under it yet", text);
             Assert.Contains("It joins the model in step 3.", text);
             Assert.Contains("Glue 3 onto side build A, inside the marked line on 2b.", text);
             Assert.Contains("Glue 3 (with side build A under it) onto slice 2", text);
+        }
+        finally { File.Delete(path); }
+        // Two hanging branches on one shared base that hangs too: one side build, joining when the
+        // model first reaches it (the body over its left branch), not two.
+        var fork = new List<Tri>([.. Box(0, 0, 0, 10, 10, 15), .. Box(0, 0, 15, 60, 10, 20), .. Box(30, 0, 5, 50, 10, 8), .. Box(30, 0, 8, 34, 10, 15), .. Box(46, 0, 8, 50, 10, 15)]);
+        var forked = StackSlicer.Slice(fork, new SliceOptions { ThicknessMm = 2.5, HeightMm = 20, KeepJoined = false });
+        path = Path.Combine(Path.GetTempPath(), $"booklet-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            AssemblyBooklet.SavePdf(forked, new BookletOptions { Title = "Fork" }, path);
+            using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
+            var text = string.Join(" ", pdf.GetPages().Select(pg => pg.Text));
+            Assert.Contains("Side build A", text);
+            Assert.DoesNotContain("Side build B", text);
+            Assert.Contains("onto side build A", text);
         }
         finally { File.Delete(path); }
     }

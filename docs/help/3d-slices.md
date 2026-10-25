@@ -393,14 +393,18 @@ Each step shows:
 - **What to do**, in words: "Glue 3a and 3b onto slice 2, over its pins, inside the marked lines.
   Push 2 pins into the holes, with a drop of glue."
 
-### Side builds: parts that hang from the slice above
+### Side builds: parts with nothing under them yet
 
-Not every part sits on the slice below it. A tail that curls up off the ground, a chin, a raised
-paw: the bottom part of it has nothing under it, so it can't be glued on in its own step. The
-booklet finds these. A part that doesn't rest on anything standing on the base, but is joined to a
-part of the slice above, starts a **side build**: a little stack built up off to the side, on the
-table, one part per step in its own slice's steps as usual. Side builds are lettered A, B… in the
-order they start.
+Not every part has something under it when its step comes. A tail that curls up off the ground, a
+chin, a raised paw: its lowest part has nothing on the model to sit on, so it can't be glued on in
+its own step. The booklet finds these, going up a slice at a time. A part with nothing on the model
+under it starts a **side build**: a little stack built up off to the side, on the table, one part
+per step in its own slice's steps as usual. Parts that sit on a side build go on it, and two side
+builds that meet (two branches on one base) are one. Side builds are lettered A, B… in the order
+they start.
+
+A side build joins the model in the first step where a part on the model sits on it. From then on,
+whatever is left of it above that goes on the model in its own steps, like any other part.
 
 ![Steps 9 and 10: the chin is a side build, and joins the model under the head in step 10](images/booklet-side-build.png)
 
@@ -408,11 +412,11 @@ order they start.
   showing it so far with its new part in colour, and saying which step it joins the model in.
 - Its parts are in the step's blue box as "1× 3a (side A)", and the words say what to do: start it
   ("lay 3a flat on the table, marks up"), then "glue 4a onto it, inside the marked line".
-- In the step where it joins, the part it hangs from is listed as "1× 27 + side A": glue that part
-  onto the side build's top first, inside the marked line, then glue the two together onto the
-  model. The side build hangs down beside the slice below.
-- A part that rests only on a part that itself hangs is part of the same side build: it isn't
-  standing on anything yet either.
+- In the step where it joins, the part on the model that sits on it is listed as "1× 27 + side A":
+  glue that part onto the side build's top first, inside the marked line, then glue the two
+  together onto the model. The side build hangs down beside the slice below.
+- A side build the model never reaches (a piece joined to nothing) isn't one: its parts are red,
+  glued on by eye in their own steps.
 
 ### Which way the pictures look
 

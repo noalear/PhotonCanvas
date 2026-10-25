@@ -42,8 +42,8 @@ public sealed record BookletOptions
 /// the finished model, a list of every part, then one step per slice from the bottom up. Each step
 /// shows the parts to add (with their labels), the stack so far with the new parts picked out in
 /// colour, the pins that go in, and where the new parts sit seen from above. Parts with nothing
-/// under them that hang from the slice above (a chin, a tail) are built up off to the side, in
-/// their own steps, and join the model under the part they hang from. Saved as a PDF.
+/// under them yet (a tail curling up off the ground, a chin) are built up off to the side, in
+/// their own steps, and join the model when it reaches them. Saved as a PDF.
 /// </summary>
 public static class AssemblyBooklet
 {
@@ -116,53 +116,90 @@ public static class AssemblyBooklet
     }
 
     /// <summary>
-    /// The order things go together. Most parts rest on the slice below and go on at their own
-    /// slice's step. One with nothing under it that hangs from a part of the slice above (which
-    /// may hang from the next, and so on) is built up off to the side, and the chain goes on the
-    /// model with the part at its top, the one that does rest on something. A part joined to
-    /// nothing either way stays at its own step, glued on by eye.
+    /// The order things go together, slice by slice from the bottom. A part goes on the model in its
+    /// own slice's step when it rests on something already on the model. One that doesn't (the tip of
+    /// a tail curling up off the ground, a chin) starts a side build, built up off to the side: the
+    /// parts resting on it join it, and side builds that meet become one. A side build goes on the
+    /// model in the first step where a part on the model sits on it: that part is glued onto it, and
+    /// they go on together; from then on its parts above go on the model in their own steps. One the
+    /// model never touches stays at its own steps, glued on by eye.
     /// </summary>
     sealed class Plan
     {
-        public readonly Dictionary<Flat, Flat> HangsFrom = [];
         public readonly Dictionary<Flat, int> StepOf = [];
         /// <summary>Each pin, and the part it rises from (null when no part holds it).</summary>
         public readonly List<(Vec2 At, int Slice, Flat? From)> Pins = [];
+        /// <summary>The side builds, lettered A, B… in the order they start.</summary>
+        public readonly List<Side> Sides = [];
+        readonly Dictionary<Flat, Side> _sideOf = [];
 
         public Plan(List<Flat> parts, SliceStack stack)
         {
             var bySlice = parts.GroupBy(p => p.Slice).ToDictionary(g => g.Key, g => g.ToList());
             List<Flat> At(int s) => bySlice.TryGetValue(s, out var l) ? l : [];
-            // Standing on the base through the slices below it (resting on a part that itself hangs isn't enough).
-            var grounded = new HashSet<Flat>();
-            foreach (var p in parts.OrderBy(p => p.Slice))
+            var overlaps = new Dictionary<(Flat, Flat), bool>();
+            bool Sits(Flat upper, Flat lower) => overlaps.TryGetValue((upper, lower), out var v) ? v : overlaps[(upper, lower)] = Overlap(upper, lower) > 0.5;
+            var on = new HashSet<Flat>();
+            // Parts off the model so far, in groups that sit on each other (one group, one side build).
+            var parent = new Dictionary<Flat, Flat>();
+            Flat Find(Flat x) => parent[x] == x ? x : parent[x] = Find(parent[x]);
+            var joined = new List<(List<Flat> Members, List<Flat> Joiners, int Join)>();
+            int top = parts.Max(p => p.Slice);
+            for (int s = 1; s <= top; s++)
             {
-                if (p.Slice == 1 || At(p.Slice - 1).Any(q => grounded.Contains(q) && Overlap(p, q) > 0.5)) { grounded.Add(p); continue; }
-                var above = At(p.Slice + 1).Select(q => (Q: q, A: Overlap(p, q))).Where(x => x.A > 0.5).ToList();
-                if (above.Count > 0) HangsFrom[p] = above.MaxBy(x => x.A).Q;
+                var left = At(s).ToList();
+                for (bool changed = true; changed;)
+                {
+                    changed = false;
+                    foreach (var p in left.ToList())
+                        if (s == 1 || At(s - 1).Any(q => on.Contains(q) && Sits(p, q)))
+                        {
+                            on.Add(p);
+                            StepOf[p] = s;
+                            left.Remove(p);
+                            changed = true;
+                        }
+                    // A side build that a part now on the model sits on goes on with it.
+                    foreach (var group in parent.Keys.Where(q => !on.Contains(q)).GroupBy(Find).ToList())
+                    {
+                        var members = group.OrderBy(q => q.Slice).ThenBy(q => q.Label).ToList();
+                        var joiners = At(s).Where(p => on.Contains(p) && members.Any(m => m.Slice == s - 1 && Sits(p, m))).ToList();
+                        if (joiners.Count == 0) continue;
+                        foreach (var m in members) { on.Add(m); StepOf[m] = s; }
+                        joined.Add((members, joiners, s));
+                        changed = true;
+                    }
+                }
+                // What's left starts a side build, or joins the ones it sits on (joining them up).
+                foreach (var p in left)
+                {
+                    parent[p] = p;
+                    foreach (var q in At(s - 1).Where(q => parent.ContainsKey(q) && !on.Contains(q) && Sits(p, q))) parent[Find(q)] = Find(p);
+                }
             }
-            foreach (var p in parts) StepOf[p] = Top(p).Slice;
-            var chains = parts.Where(Hangs).GroupBy(Top).Select(g => (Top: g.Key, Members: g.OrderBy(p => p.Slice).ThenBy(p => p.Label).ToList()))
-                .OrderBy(g => g.Members[0].Slice).ThenBy(g => g.Top.Slice).ToList();
-            for (int i = 0; i < chains.Count; i++) Sides.Add((Letters(i), chains[i].Top, chains[i].Members));
+            // Never touched by the model: glued on by eye, each at its own step.
+            foreach (var p in parts.Where(p => !StepOf.ContainsKey(p))) StepOf[p] = p.Slice;
+            foreach (var (j, i) in joined.OrderBy(j => j.Members[0].Slice).ThenBy(j => j.Join).Select((j, i) => (j, i)))
+            {
+                var side = new Side(Letters(i), j.Members, j.Joiners, j.Join);
+                Sides.Add(side);
+                foreach (var m in j.Members) _sideOf[m] = side;
+            }
             foreach (var (s, at) in stack.Pins)
                 Pins.Add((at, s, At(s).FirstOrDefault(p => p.Box.Contains(at) && p.Loops.Any(l => Geom.Inside(l, at)))));
         }
 
-        /// <summary>The part at the top of the chain this one hangs from (itself when it rests on something).</summary>
-        public Flat Top(Flat p) => HangsFrom.TryGetValue(p, out var h) ? Top(h) : p;
+        /// <summary>Built in a side build (it doesn't rest on the model when its slice's step comes).</summary>
+        public bool Hangs(Flat p) => _sideOf.ContainsKey(p);
 
-        public bool Hangs(Flat p) => HangsFrom.ContainsKey(p);
-
-        /// <summary>
-        /// Side builds: each chain of hanging parts, built up off to the side a slice at a time (in
-        /// their own slices' steps), lettered A, B… in the order they start. The part at the top of
-        /// the chain is glued onto it when its own step comes, and goes on the model with it under it.
-        /// </summary>
-        public readonly List<(string Name, Flat Top, List<Flat> Members)> Sides = [];
-
-        public (string Name, Flat Top, List<Flat> Members)? SideOf(Flat p) => Hangs(p) ? Sides.First(g => g.Top == Top(p)) : null;
+        public Side? SideOf(Flat p) => _sideOf.GetValueOrDefault(p);
     }
+
+    /// <summary>
+    /// A side build: its parts (bottom first), built up off to the side in their own slices' steps,
+    /// and the parts on the model glued onto it in step <see cref="Join"/>, where it goes on the model.
+    /// </summary>
+    sealed record Side(string Name, List<Flat> Members, List<Flat> Joiners, int Join);
 
     static List<Action<SKCanvas>> Pages(SliceStack stack, BookletOptions o)
     {
@@ -209,7 +246,7 @@ public static class AssemblyBooklet
             foreach (var line in facts) { Text(c, "•  " + line, Margin, y, f, Ink); y += 18; }
             using var hint = Font(10);
             Wrap(c, "Every part has its label lightly marked on its top face, and the outline of the part that goes on it. Build from step 1 upwards, marks facing up, one slice at a time." +
-                    (plan.Sides.Count > 0 ? " Parts that hang from the slice above them (a tail, a chin) are built up off to the side, a \"side build\", and join the model under the part they hang from." : ""),
+                    (plan.Sides.Count > 0 ? " Parts with nothing under them yet (a tail curling up, a chin) are built up off to the side, a \"side build\", and join the model when it reaches them." : ""),
                 Margin, y + 8, o.PageWidth - 2 * Margin, hint, Muted);
         });
 
@@ -286,7 +323,7 @@ public static class AssemblyBooklet
         return pages;
 
         // Red only for a part joined to nothing, below or above: it really is glued on by eye.
-        bool Floats(Flat p) => p.Part.Floating && !plan.Hangs(p) && plan.StepOf[p] == p.Slice && !parts.Any(q => plan.HangsFrom.TryGetValue(q, out var h) && h == p);
+        bool Floats(Flat p) => p.Part.Floating && !plan.Hangs(p) && !plan.Sides.Any(g => g.Joiners.Contains(p));
 
         // The parts to take for a step, in a box: each over its "1× 3a", in rows, as big as fits.
         float PartsBox(SKCanvas c, float left, float top, float width, List<Flat> show, Func<Flat, string> caption, int pinCount, SKColor fill, SKColor edge)
@@ -340,15 +377,15 @@ public static class AssemblyBooklet
             var hot = parts.Where(p => plan.StepOf[p] == s).ToList();
             var main = parts.Where(p => p.Slice == s && !plan.Hangs(p)).ToList();
             var side = parts.Where(p => p.Slice == s && plan.Hangs(p)).ToList();
-            var joining = plan.Sides.Where(g => g.Top.Slice == s).ToList();
-            var active = plan.Sides.Where(g => g.Members[0].Slice <= s && s < g.Top.Slice).ToList();
+            var joining = plan.Sides.Where(g => g.Join == s).ToList();
+            var active = plan.Sides.Where(g => g.Members[0].Slice <= s && s < g.Join).ToList();
             var pins = plan.Pins.Where(p => p.Slice == s && (p.From is null || !plan.Hangs(p.From))).ToList();
             var sidePins = plan.Pins.Where(p => p.Slice == s && p.From is { } f && plan.Hangs(f)).ToList();
             using var num = Font(40, bold: true);
             Text(c, $"{s}", r.Left, r.Top + 38, num, Ink);
             float boxW = 190;
             string Caption(Flat p) => plan.SideOf(p) is { } g ? $"1× {p.Label} (side {g.Name})"
-                : joining.FirstOrDefault(g => g.Top == p) is { Name: { } j } ? $"1× {p.Label} + side {j}" : $"1× {p.Label}";
+                : joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"1× {p.Label} + side {j}" : $"1× {p.Label}";
             var take = main.Concat(side).ToList();
             float under = r.Top + 50;
             if (take.Count > 0) under = PartsBox(c, r.Left, r.Top + 50, boxW, take, Caption, pins.Count + sidePins.Count, Callout, CalloutEdge);
@@ -356,10 +393,10 @@ public static class AssemblyBooklet
             // What to do, in words (first, so the pictures leave room for it).
             var what = new List<string>();
             foreach (var g in joining)
-                what.Add($"Glue {g.Top.Name} onto side build {g.Name}, inside the marked line on {Join([.. g.Members.Where(m => m.Slice == s - 1).Select(m => m.Name)])}.");
+                what.Add($"Glue {Join([.. g.Joiners.Select(m => m.Name)])} onto side build {g.Name}, inside the marked line{(g.Joiners.Count > 1 ? "s" : "")} on {Join([.. g.Members.Where(m => m.Slice == s - 1).Select(m => m.Name)])}.");
             if (main.Count > 0)
             {
-                var names = Join([.. main.Select(p => joining.FirstOrDefault(g => g.Top == p) is { Name: { } j } ? $"{p.Name} (with side build {j} under it)" : p.Name)]);
+                var names = Join([.. main.Select(p => joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"{p.Name} (with side build {j} under it)" : p.Name)]);
                 what.Add(s == 1
                     ? $"Lay {names} flat on the board, marks facing up."
                     : $"Glue {names} onto slice {s - 1}{(o.PinMm > 0 && plan.Pins.Any(p => p.Slice == s - 1 && (p.From is null || !plan.Hangs(p.From))) ? ", over its pins," : "")} inside the marked line{(main.Count > 1 ? "s" : "")}.");
@@ -369,11 +406,11 @@ public static class AssemblyBooklet
             }
             foreach (var g in active)
             {
-                var now = side.Where(p => plan.SideOf(p)?.Name == g.Name).Select(p => p.Name).ToList();
+                var now = side.Where(p => plan.SideOf(p) == g).Select(p => p.Name).ToList();
                 if (now.Count == 0) continue;
-                int gp = sidePins.Count(p => plan.SideOf(p.From!)?.Name == g.Name);
+                int gp = sidePins.Count(p => plan.SideOf(p.From!) == g);
                 what.Add(g.Members[0].Slice == s
-                    ? $"Side build {g.Name}: {Join(now)} {(now.Count == 1 ? "hangs" : "hang")} from the slice above, so start {(now.Count == 1 ? "it" : "them")} off to the side: lay {Join(now)} flat on the table, marks up. It joins the model in step {g.Top.Slice}."
+                    ? $"Side build {g.Name}: {Join(now)} {(now.Count == 1 ? "has" : "have")} nothing under {(now.Count == 1 ? "it" : "them")} yet, so start {(now.Count == 1 ? "it" : "them")} off to the side: lay {Join(now)} flat on the table, marks up. It joins the model in step {g.Join}."
                     : $"Side build {g.Name}: glue {Join(now)} onto it, inside the marked line{(now.Count > 1 ? "s" : "")}.");
                 if (gp > 0) what.Add($"Push {gp} pin{(gp == 1 ? "" : "s")} into side build {g.Name}.");
             }
@@ -423,11 +460,11 @@ public static class AssemblyBooklet
                     using var head = Font(10, bold: true);
                     Text(c, $"Side build {g.Name}", panel.Left + 8, panel.Top + 14, head, Ink);
                     using var note = Font(8);
-                    Text(c, $"joins the model in step {g.Top.Slice}", panel.Left + 8, panel.Top + 25, note, Muted);
+                    Text(c, $"joins the model in step {g.Join}", panel.Left + 8, panel.Top + 25, note, Muted);
                     var view = new SKRect(panel.Left + 4, panel.Top + 28, panel.Right - 4, panel.Bottom - 4);
                     if (view.Height > 20)
                         new Iso(g.Members, t, turn).Draw(c, view, g.Members.Where(m => m.Slice <= s), m => m.Slice == s,
-                            [.. sidePins.Where(p => plan.SideOf(p.From!)?.Name == g.Name).Select(p => (p.At, p.Slice))], o.PinMm);
+                            [.. sidePins.Where(p => plan.SideOf(p.From!) == g).Select(p => (p.At, p.Slice))], o.PinMm);
                 }
                 right = new SKRect(right.Left, right.Top, right.Right - panelW - 10, right.Bottom);
             }

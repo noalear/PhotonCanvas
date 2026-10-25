@@ -35,4 +35,4 @@ it's saved, otherwise in the Booklets folder.
 ## Open it
 <!-- target: button:Open the booklet -->
 Click **Open the booklet** to read or print it. Build from step 1 up, each step's new parts in orange.
-Parts that hang from the slice above, like a tail, are built off to the side in a purple side build.
+Parts with nothing under them yet, like a tail curling up, are built off to the side in a purple side build.
