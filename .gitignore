@@ -38,3 +38,6 @@ harnessout/
 *.jks
 *.aab
 *.apk
+
+# Claude Code agent worktrees (other sessions)
+.claude/worktrees/

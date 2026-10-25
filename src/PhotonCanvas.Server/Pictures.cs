@@ -1,4 +1,5 @@
 using SkiaSharp;
+using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Server;
 
@@ -57,6 +58,13 @@ public sealed class PictureStore
 public static class StartGuard
 {
     public static readonly TimeSpan MaxAge = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Why the phone can't start the job, in plain words; null when it can. Nothing starts from the phone
+    /// unless the user has turned that on (<see cref="PhoneStart"/>).
+    /// </summary>
+    public static string? Problem(bool phoneStartAllowed, Picture? picture, DateTime now, string machineMode, string? loadedTaskId) =>
+        phoneStartAllowed ? Problem(picture, now, machineMode, loadedTaskId) : PhoneStart.OffMessage;
 
     /// <summary>Why the job can't be started on this picture, in plain words; null when it can.</summary>
     public static string? Problem(Picture? picture, DateTime now, string machineMode, string? loadedTaskId)

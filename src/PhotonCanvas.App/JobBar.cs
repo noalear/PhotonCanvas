@@ -883,7 +883,7 @@ public sealed class JobBar : UserControl
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();
-        sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button.");
+        sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button (or start it from the phone, if you've allowed that in Remote access).");
         if ((!quick || job.Warnings.Count > 0) && !await Dialogs.Confirm(owner, "Ship it to the machine?", sb.ToString(), "Ship It", "Cancel")) return;
 
         _sending = true;

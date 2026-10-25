@@ -4,8 +4,8 @@
 <!-- page: machine.md#connection-keys -->
 <!-- order: 10 -->
 xTool machines only answer programs that know three short codes. They don't come with PhotonCanvas:
-it reads them once from your own copy of xTool Studio and keeps them on this computer. You need
-xTool Studio installed on this computer (you can uninstall it afterwards).
+it reads them once from your own copy of xTool Studio and keeps them on this computer. This needs
+xTool Studio installed on this computer; without it, type the keys in if you have them.
 
 ## Open Settings
 <!-- target: header:Settings -->

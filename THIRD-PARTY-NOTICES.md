@@ -1,6 +1,11 @@
 # Third-party notices
 
 PhotonCanvas is licensed under the GNU General Public License v3 or later (see `LICENSE`).
+The program is published as ready-to-run builds; anyone who has received it can get the
+complete corresponding source code on request (GPLv3 section 6 written offer, valid for at
+least three years), through an issue at
+<https://github.com/noalear/PhotonCanvas-releases/issues>.
+
 It uses the following open-source components, each under its own licence. Their
 licence texts ship inside their NuGet packages and are linked below.
 
@@ -20,7 +25,60 @@ licence texts ship inside their NuGet packages and are linked below.
 
 Test-only: xUnit (Apache 2.0), Microsoft.NET.Test.Sdk (MIT), coverlet (MIT).
 
-The Python protocol prototype in `src/ytool` (not part of the app) uses websockets
+## earcut (mapbox)
+
+`src/PhotonCanvas.Doc/Import/Step/Earcut.cs` follows the design of Mapbox's
+[earcut](https://github.com/mapbox/earcut) polygon triangulation, under the ISC licence:
+
+```
+ISC License
+
+Copyright (c) 2016, Mapbox
+
+Permission to use, copy, modify, and/or distribute this software for any purpose
+with or without fee is hereby granted, provided that the above copyright notice
+and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND ISC DISCLAIMS ALL WARRANTIES WITH REGARD TO
+THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.
+IN NO EVENT SHALL ISC BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
+CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA
+OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+```
+
+## The Android app (PhotonCanvas Remote)
+
+Besides Avalonia, SkiaSharp/Skia, HarfBuzzSharp/HarfBuzz and the Inter font (above), the
+Android app bundles these libraries, through their .NET for Android binding packages (the
+`Xamarin.*` packages, MIT, .NET Foundation):
+
+| Libraries | Licence |
+|-----------|---------|
+| AndroidX: Activity, Annotation (incl. Experimental), AppCompat (incl. AppCompatResources), Arch Core, Collection, Compose Runtime Annotation, Concurrent Futures, Core (incl. Core KTX, ViewTree), CursorAdapter, CustomView, DrawerLayout, Emoji2 (incl. ViewsHelper), ExifInterface, Fragment, Interpolator, Lifecycle (Common, LiveData Core, Process, Runtime, Runtime KTX, ViewModel, ViewModel KTX, ViewModel SavedState), Loader, NavigationEvent, ProfileInstaller, ResourceInspection Annotation, SavedState (incl. KTX), Startup Runtime, Tracing, VectorDrawable (incl. Animated), VersionedParcelable, ViewPager | Apache License 2.0 |
+| Kotlin standard library (incl. JDK 7 and JDK 8 extensions), kotlinx.coroutines (Core, Android), kotlinx.serialization (Core), kotlinx atomicfu | Apache License 2.0 |
+| JetBrains Java annotations, JSpecify, javax.inject, Guava ListenableFuture, Error Prone annotations | Apache License 2.0 |
+| Firebase Components, Annotations and Encoders (JSON, Proto); Google Android DataTransport (API, runtime, CCT backend) | Apache License 2.0 |
+| Google Play services (Base, Basement, Tasks, Code Scanner), ML Kit (Common, Vision Common, Barcode Scanning Common), ODML Image | Google's terms: the Android Software Development Kit License and the Google APIs Terms of Service. Not open source. |
+
+The Apache License 2.0 text is at <https://www.apache.org/licenses/LICENSE-2.0>.
+
+The QR code scanner is Google Play services' code scanner, a Google component: it runs inside
+Google Play services on the phone, under Google's terms, and may communicate with Google. The app
+itself only receives the text of the scanned code.
+
+### Additional permission (GNU GPL v3, section 7)
+
+As the sole copyright holder of PhotonCanvas, I give this additional permission: if you modify
+PhotonCanvas, or any covered work, by linking or combining it with the Google Play services
+libraries or the ML Kit code scanner libraries (or modified versions of them), and the libraries
+they need, containing parts covered by the terms of Google's licences for them, you are
+permitted to convey the resulting work. The Corresponding Source for a non-source form of such a
+combination does not need to include the source code of those libraries, but does include the
+source code of the parts of PhotonCanvas used. You may remove this additional permission from
+your own copies or versions of PhotonCanvas.
+
+The Python protocol prototype in `src/pcprobe` (not part of the app) uses websockets
 (BSD 3-Clause), cryptography (Apache 2.0 / BSD) and Pillow (MIT-CMU).
 
 ## Trademarks
@@ -31,7 +89,8 @@ by or supported by xTool or Makeblock.
 
 ## Interoperability
 
-This program contains no code from xTool Studio. The machine protocol and file
-formats were worked out from the behaviour of the user's own machine and software,
-for the purpose of interoperability. The three connection keys the machines expect
-are not included: each user reads them from their own installed copy of xTool Studio.
+This program contains no code from xTool Studio. The machine's network protocol and
+the G-code, job and project file formats were studied for interoperability with the
+author's own machine and software. The three connection keys the machines expect are
+not included: PhotonCanvas reads them from the user's own installed copy of xTool
+Studio, or the user types them in.

@@ -228,6 +228,9 @@ public sealed record MaterialRef(Guid MaterialId, string Label, Guid? RecipeId =
 /// <summary>What happened on import.</summary>
 public sealed record ImportResult(int NewMaterials, int NewRecipes, int Skipped, string? From);
 
+/// <summary>What went into a .pcmat file, and how many of xTool's own settings were left out.</summary>
+public sealed record ExportResult(int Materials, int Recipes, int XToolLeftOut);
+
 /// <summary>
 /// The user's material and cutting library: materials, each with recipes that record what
 /// settings did on it. Kept as JSON plus a photo folder; shared as a .pcmat zip.
@@ -342,10 +345,27 @@ public sealed class MaterialLibrary
 
     // ---- sharing --------------------------------------------------------------------------
 
-    /// <summary>Write <paramref name="materials"/> (and their photos) to a .pcmat file for someone else.</summary>
-    public void Export(Stream output, IEnumerable<Material> materials, string? author)
+    /// <summary>Who tested the settings brought in from xTool Studio's own library (see <see cref="PhotonCanvas.Doc.Import.XToolPresets"/>).</summary>
+    public const string XToolTester = "xTool";
+
+    /// <summary>
+    /// One of xTool's own tested settings, read from the user's xTool Studio. They are xTool's to give
+    /// out, not ours: they stay in this library and are never written to a .pcmat file.
+    /// </summary>
+    public static bool IsXToolPreset(Recipe r) => r.TestedBy == XToolTester;
+
+    /// <summary>
+    /// Write <paramref name="materials"/> (and their photos) to a .pcmat file for someone else. xTool's own
+    /// settings are left out (<see cref="IsXToolPreset"/>), and so are materials left with nothing of yours.
+    /// </summary>
+    public ExportResult Export(Stream output, IEnumerable<Material> materials, string? author)
     {
-        var list = materials.ToList();
+        var all = materials.ToList();
+        int leftOut = all.Sum(m => m.Recipes.Count(IsXToolPreset));
+        var list = all
+            .Where(m => m.Recipes.Any(r => !IsXToolPreset(r)) || !m.Recipes.Any(IsXToolPreset) || m.Palettes.Count > 0 || m.Gratings.Count > 0)
+            .Select(m => m with { Recipes = m.Recipes.RemoveAll(IsXToolPreset) })
+            .ToList();
         using var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true);
         var body = new FileBody(FileFormat, 1, string.IsNullOrWhiteSpace(author) ? null : author.Trim(), DateTime.Now, list);
         using (var w = new StreamWriter(zip.CreateEntry("library.json").Open()))
@@ -353,6 +373,7 @@ public sealed class MaterialLibrary
         foreach (var name in list.SelectMany(m => m.Recipes).Select(r => r.Photo).OfType<string>().Concat(list.SelectMany(m => m.Gratings).SelectMany(GratingFiles)).Distinct())
             if (PhotoPath(name) is { } path)
                 zip.CreateEntryFromFile(path, "photos/" + name, CompressionLevel.NoCompression);
+        return new ExportResult(list.Count, list.Sum(m => m.Recipes.Count), leftOut);
     }
 
     /// <summary>

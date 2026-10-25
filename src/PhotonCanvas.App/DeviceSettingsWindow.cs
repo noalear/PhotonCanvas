@@ -57,14 +57,10 @@ public sealed class DeviceSettingsWindow : Window
 
         var rename = Button("Rename");
         rename.Click += async (_, _) => await Do("Renamed.", () => _c.SetDeviceNameAsync(_name.Text ?? ""));
-        Wire(_flame, "flameAlarm", on => on, "Turn the flame alarm off?",
-            "Without it the machine won't stop if the material catches fire. Only turn it off if it gives false alarms, and never leave a job running unwatched.");
-        Wire(_moved, "workingMode", on => on ? "NORMAL" : "HANDLE", "Keep running when moved?",
-            "The machine won't stop if it's knocked or tilted during a job.");
-        Wire(_lidStops, "gapCheck", on => on, "Keep running with the lid open?",
-            "Laser light can escape when the lid is open. Wear the right safety glasses.");
-        Wire(_overheat, "laserTempAlarmEnable", on => on, "Turn the overheat alarm off?",
-            "The MOPA laser could be damaged by running too hot.");
+        Wire(_flame, "flameAlarm", on => on, "Turn the flame alarm off?", FlameOffWarning);
+        Wire(_moved, "workingMode", on => on ? "NORMAL" : "HANDLE", "Keep running when moved?", MovedOffWarning);
+        Wire(_lidStops, "gapCheck", on => on, "Keep running with the lid open?", LidStopOffWarning);
+        Wire(_overheat, "laserTempAlarmEnable", on => on, "Turn the overheat alarm off?", OverheatOffWarning);
         Wire(_beep, "beepEnable", on => on, null, null);
         Wire(_purifierBeep, "purifierBeepEnable", on => on, null, null);
         Wire(_sleep, "autoSleepEnable", on => on, null, null);
@@ -160,13 +156,41 @@ public sealed class DeviceSettingsWindow : Window
         g.Children.Add(c);
     }
 
-    /// <summary>A switch stored on the machine; turning a safety one off asks first.</summary>
+    const string StoredOnMachine =
+        "This setting is stored on the machine and stays off until you turn it on again, whichever program sends the job. " +
+        "You use it entirely at your own risk; this software comes with no warranty.";
+
+    public const string FlameOffWarning =
+        "With this off, the machine won't stop or warn you when its camera sees fire. Lasers set material alight, and a small flame can become a fire in seconds.\n\n" +
+        "• Never leave a job running unattended, not even for a moment.\n" +
+        "• Keep a fire extinguisher suitable for electrical fires within reach, and know how to use it.\n" +
+        "• Only turn it off if it gives false alarms on a material you know, and turn it back on afterwards.\n\n" + StoredOnMachine;
+
+    public const string MovedOffWarning =
+        "With this off, the machine keeps firing if it is knocked, moved or tilted during a job. The beam can then land outside the material: on the bed, the enclosure, or out through the window.\n\n" +
+        "• Direct or reflected laser light can permanently blind you or anyone nearby in a fraction of a second.\n" +
+        "• A beam in the wrong place can start a fire.\n" +
+        "• Keep the machine on a stable surface, never leave it running unattended, and keep children and pets away.\n\n" + StoredOnMachine;
+
+    public const string LidStopOffWarning =
+        "With this off, the machine keeps running when the lid is opened during a job. The lid is what blocks the laser's light, smoke and sparks. With it open:\n\n" +
+        "• Direct or reflected laser light can permanently blind you or anyone nearby in a fraction of a second. Everyone in the room must wear safety glasses rated for this laser's wavelengths (455 nm blue and 1064 nm infrared).\n" +
+        "• Smoke and fumes escape into the room, and fires can start or spread faster. Never leave the machine running unattended.\n" +
+        "• Keep children and pets away.\n\n" + StoredOnMachine;
+
+    public const string OverheatOffWarning =
+        "With this off, the machine won't stop when the MOPA laser gets too hot.\n\n" +
+        "• Running too hot can permanently damage the laser source, which is costly to replace.\n" +
+        "• An overheating machine is a fire risk. Never leave a job running unattended.\n" +
+        "• If the alarm goes off, let the machine cool and check its ventilation and room temperature instead of turning the alarm off.\n\n" + StoredOnMachine;
+
+    /// <summary>A switch stored on the machine; turning a safety one off asks first, with the full warning.</summary>
     void Wire(CheckBox box, string key, Func<bool, JsonNode> value, string? offTitle, string? offWarning)
     {
         box.IsCheckedChanged += async (_, _) =>
         {
             if (_loading || box.IsChecked is not bool on) return;
-            if (!on && offTitle is not null && !await Dialogs.Confirm(this, offTitle, offWarning!, "Turn it off", "Keep it on"))
+            if (!on && offTitle is not null && !await Dialogs.Confirm(this, offTitle, offWarning!, "I understand, turn it off", "Keep it on"))
             {
                 _loading = true;
                 box.IsChecked = true;

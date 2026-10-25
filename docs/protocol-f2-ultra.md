@@ -1,22 +1,19 @@
 # F2 Ultra (`GS004-CLASS-4`) device protocol
 
-Source: `reference/exts/GS004-CLASS-4/index.js` (ext 1.5.31, versionId 54).
+What the machine accepts on the network and the formats it takes, as far as PhotonCanvas needs
+them. This was worked out for interoperability with the user's own machine and software.
 
-Supporting sources:
-- Transport: `app/.vite/renderer/packages/shared-cdn/core/atomm-sharedworker.js`
-- Discovery: `app/.vite/build/discover-worker.*.cjs` (unminified)
-- File channel: `app/.vite/renderer/editor/static/js/src.DzJfpp3_.js`
-
-**Status:** the section "Verified on hardware" below was tested on the user's F2 Ultra (firmware 40.54.021). Everything else was read from code. Items marked (?) are inferred.
+**Status:** the sections headed "Verified on hardware" were tested on the user's F2 Ultra
+(firmware 40.54.021). The rest is not yet confirmed on the machine. Items marked (?) are inferred.
 
 ## Verified on hardware (2026-10-12, F2 Ultra, fw 40.54.021.00.ht6)
 
-Implemented in `src/ytool/`.
+Implemented in `src/pcprobe/`.
 
 - **Discovery:** V2 encrypted multicast works. The device answers with `deviceCode: GS004-CLASS-4`, `platformVersion: 1.5`, `netType: wlan`.
 - **Framing:** framing and CRC16 work as documented below. Device JSON responses are pretty-printed with tabs.
 - **Pairing:** `/v1/user/parity` with `userID: "mk-guest"` returns `code 0, "user auth success"` and **no** sessionToken. No button press is needed, and every read endpoint works afterwards.
-  - **A random UUID as userID makes the device drop the connection (1006).** The stock app's logged-in userUuid must have some other format.
+  - **A random UUID as userID makes the device drop the connection (1006).** Other user IDs must have some other format.
 - **All channels share one id:** the instruction, file and media sockets must all use the **same** `?id=`, because the device pairs them by it. With different ids, file requests are silently ignored.
 - **`machineInfo`:**
   - `laserType: ["RED","BLUE"]`, `laserPower: [60,40]`: RED = 60 W fiber, BLUE = 40 W diode.
@@ -25,7 +22,7 @@ Implemented in `src/ytool/`.
   - `packageFormat: ["xf"]`.
 - **Snapshot:** `GET /v1/camera/snap` needs `params: {name: "main"|"deep", stream: "0"|"1"}`. The params must go in `params`, not `data`; otherwise the device returns `-1 "name is not string"`. It returns `{filename: "/tmp/main_<ts>.jpg"}`, which is then downloaded over the file channel.
   - Images are 4000×3000 JPEGs: about 630 KB for the overview, about 1 MB for the close-up.
-  - The file request packet is sent with no body CRC (type 33 | 0x80), the same as the stock app.
+  - The file request packet is sent with no body CRC (type 33 | 0x80).
 - **Snapshot polling rate:** **3.9 fps** for the overview and 2.8 fps for the close-up, in a sequential loop on WiFi.
 - **Live stream: not available on this firmware.**
   - `POST /v1/platform/camera/live {name, stream, action:"start"}` returns success.
@@ -33,17 +30,17 @@ Implemented in `src/ytool/`.
   - `/v1/platform/camera/list` fails with "getCameraList failed".
   - `/v1/camera/live` returns 404.
 
-  The live view is therefore built on snapshot polling (`ytool view`).
+  The live view is therefore built on snapshot polling (`pcprobe view`).
 - **Not found (404):** `/v1/camera`, `/v1/camera/resolution`, `/v1/platform/camera/resolution`.
 - **Close-up camera field (Camera → Close-up position, 2026-10-20, 21.1 mm focus):** found from 10 burned dots to within 0.03 mm.
   - It sees a turned, slightly keystoned area about 155 × 118 mm, centred near the middle of the bed. Its corners on the bed are (147, 201), (12, 125), (77, 26) and (199, 96).
   - About 27 px/mm in the middle of its 4000 × 3000 picture. That shows 0.4 mm patterns, but not single 0.05 mm lines.
   - The picture is turned −151.8° to look straight. The largest straight rectangle inside it is 83 × 74 mm: (67, 75) to (150, 149).
-- **After a job (seen in logs, 2026-10-18/19):** the mode goes `P_WORKING` → `P_WORK_DONE` and stays there until the machine's button is pressed (then `P_IDLE`). PhotonCanvas now sends `PUT /v1/device/mode {mode:"P_IDLE"}` before an upload when it sees `P_WORK_DONE`. xTool Studio uses the same request to leave sleep and focusing. Not yet confirmed that this clears `P_WORK_DONE` on the machine.
+- **After a job (seen in logs, 2026-10-18/19):** the mode goes `P_WORKING` → `P_WORK_DONE` and stays there until the machine's button is pressed (then `P_IDLE`). PhotonCanvas now sends `PUT /v1/device/mode {mode:"P_IDLE"}` before an upload when it sees `P_WORK_DONE`. The same request leaves sleep and focusing. Not yet confirmed that this clears `P_WORK_DONE` on the machine.
 - **Several connections at once (2026-10-23, `tools/RemoteProbe`, during a running job):** three clients were connected together (the desktop app plus two probe connections, each with its own `?id=` and its own `mk-guest` pairing). All three could read status, all three got every push, and none was dropped. The job was not disturbed. A remote-control server can therefore sit beside the desktop app.
 - **Camera during a job (same run):** `/v1/camera/snap` still answers while `P_WORKING`. Each overview or close-up picture took 0.15 to 0.3 s, and 12 pictures 5 s apart all arrived. Back to back it managed only 1.1 pictures a second, and 1 of 8 failed with `-1 "get camera snap failed"`.
   - **But the pictures are black.** They are full 4000×3000 frames, but they average a brightness of 1 out of 255 (about 185 KB, against about 630 KB idle). Only the laser dot shows, plus a faint trail next to it when brightened.
-  - `POST /v1/camera` (params `{exp, stream, exp_time?}`) is accepted during a job but changes nothing. That covers `exp 0` (the stock app's normal setting) and `exp 2` with `exp_time` 2, 20, 100, 500 and 2000. The overview was left at `exp 0` afterwards.
+  - `POST /v1/camera` (params `{exp, stream, exp_time?}`) is accepted during a job but changes nothing. That covers `exp 0` (the normal setting) and `exp 2` with `exp_time` 2, 20, 100, 500 and 2000. The overview was left at `exp 0` afterwards.
   - `GET /v1/peripheral/param?type=fill_light` reports `{front:165, back:79}` (on) during the job. `type=ir_led` returns `-3 "error action type !"`.
   - **The machine blanks both cameras for the whole job.** Five seconds after the job ended (`P_WORK_DONE`), with the same lighting, the overview averaged 82 and the close-up 113, both clear. During the job, every picture over a full minute was black, so the blanking isn't just while the beam is on. The user confirms the machine always does this. A time-lapse during a job therefore needs pauses, separate passes, or an outside camera.
 
@@ -88,7 +85,7 @@ Implemented in `src/ytool/`.
 
 ### Machine keys
 
-Three fixed strings are needed: the discovery request key, the discovery reply key and the pairing key. They are not published here or built into the program. The desktop app's **Settings → Connection → Connection keys** finds them in the user's own installed xTool Studio (`resourcespp.asar`) by matching SHA-256 fingerprints, or the user can paste them in; they are saved to `%APPDATA%\PhotonCanvas\keys.json`.
+Three fixed strings are needed: the discovery request key, the discovery reply key and the pairing key. They are not published here or built into the program. The desktop app's **Settings → Connection → Connection keys** reads them from the user's own installed xTool Studio, or the user can type them in; they are saved to `keys.json` in the data folder.
 
 ### HTTP probes (V1)
 
@@ -131,7 +128,7 @@ Three fixed strings are needed: the discovery request key, the discovery reply k
    - `406`: the user must press the machine's button. Poll `GET /v1/user/auth-status` every 1 s until it returns 0. A `410` means the wait timed out.
    - `409` or `503`: blocked.
 
-The stock app also uploads the token to the xTool cloud. We don't have to.
+Nothing has to be sent anywhere else: pairing is between the program and the machine only.
 
 ## V2 endpoints (instruction socket)
 
@@ -153,7 +150,7 @@ The stock app also uploads the token to the xTool cloud. We don't have to.
 | Raw command | `POST /v1/cnc/cmd` |
 | Camera exposure | `POST /v1/camera {exp, stream, exp_time}` |
 | Camera snapshot | `GET /v1/camera/snap` → `{filename}` → file download (fileType 5) |
-| Live camera (?) | `POST /v1/platform/camera/live` + media_stream socket. It is in the shared API but **the F2U ext never calls it**. Test this first. |
+| Live camera (?) | `POST /v1/platform/camera/live` + media_stream socket. Accepted, but sends no frames on this firmware (see above). |
 | Alarms / stats / log | `GET /v1/device/alarms`, `/v1/device/statistics`, `/v1/log` |
 | File transfer | `PUT /v1/filetransfer/upload\|download\|finish` |
 
@@ -195,7 +192,7 @@ Firmware updates use port 8087: `/upgrade_version`, `/package?action=burn`.
 
 The upload uses V2 fileType 1 with name `tmp.xf`, followed by the upload/config call.
 
-### G-code dialect (from the JS templates; the motion body comes from the native lib)
+### G-code dialect (outline; see [gcode-f2-ultra.md](gcode-f2-ultra.md) for verified samples)
 
 **Head:**
 ```
@@ -234,30 +231,29 @@ M6 P1
 
 There is no signing or encryption. Integrity checks are the MD5 on file transfers and CRC16 per frame.
 
-## Raw commands and stored settings (from the stock app; not yet tried)
+## Raw commands and stored settings (not yet tried)
 
-- `POST /v1/cnc/cmd` with `{cmd: "<one G-code line>"}` as the **query parameters** (not the body) runs one command at once, outside a job. The stock app uses it to point the galvo (`G0X…Y…F60000`) and to stop the U axis (`M108U0`). PhotonCanvas's console uses it, only for what the user types or runs.
+- `POST /v1/cnc/cmd` with `{cmd: "<one G-code line>"}` as the **query parameters** (not the body) runs one command at once, outside a job, for example pointing the galvo (`G0X…Y…F60000`) or stopping the U axis (`M108U0`). PhotonCanvas's console uses it, only for what the user types or runs.
 - `GET /v1/device/configs` returns the machine's stored settings, e.g. `ConveyorURate` (0.7459 × 100 ÷ calibration %) and `ConveyorAngleCompensate`.
 - Conveyor belt moves outside a job: `PUT /v1/peripheral/param?type=conveyor` `{u: mm, action: "goto" | "stop" | "lock" | "free", speed: 9600}` (not used by PhotonCanvas yet).
 
 ## Camera
 
 - **Two cameras:** stream 0 is the "main" overview camera, and stream 1 is the "deep" close-up camera. The close-up is used with the IR LED for height measurement.
-- **Stills only in the stock app.** The stock app grabs snapshots, which is why there is no live view. Getting video means either (a) testing `/v1/platform/camera/live` plus the media_stream socket, or (b) polling snapshots fast enough to approximate it.
-- **Calibration files:** downloaded on connect as `global_calib.json`, `global_ir.json` and `local_ir.txt` (fileType 3).
-- **Correction:** done by the native `GS004_GS007_CORRECT_IMAGE {src_jpg, dst_jpg, calib_json}`. The calibration schema is unknown; capture real files to work it out.
+- **Stills only.** The machine gives snapshots; the live view polls them (see above).
+- **Calibration files:** the machine holds `global_calib.json`, `global_ir.json` and `local_ir.txt` (fileType 3). Their schema is unknown; PhotonCanvas calibrates the overview camera itself.
 
 ## Pause between passes
 
-The stock app can't do this. Passes are a device-side loop in one file, and resuming requires the physical button. Our options:
+Passes are a device-side loop in one file, and resuming requires the physical button. Our options:
 
 1. **Split passes into separate jobs.** Generate one `.xf` per pass (with the same origin) and upload the next one when the user is ready. This is fully under our control.
 2. **Pause on progress.** Watch `/v1/processing/progress` and send `action=pause` at pass boundaries. This depends on how precisely progress is reported.
-3. **Test resume.** Test whether `action=start` after a pause resumes the job. The stock code has the call but never uses it.
+3. **Test resume.** Test whether `action=start` after a pause resumes the job.
 
 ## Unknowns to capture from a real machine or export
 
-- The G-code motion body produced by `lib_path_planning.dll`: galvo specifics, S scaling, how fill and bitmap are encoded. → Export an `.xf` from the stock app for a few simple test shapes and diff them.
+- The motion body for every kind of layer: galvo specifics, S scaling, how fill and bitmap are encoded. → Export G-code from xTool Studio for a few simple test shapes and compare (see [gcode-f2-ultra.md](gcode-f2-ultra.md)).
 - The `.bgcode` binary format, if this firmware reports `gcodeFormat: bin`.
 - The calibration JSON schema.
 - Whether live camera works.
@@ -282,7 +278,7 @@ The stock app can't do this. Passes are a device-side loop in one file, and resu
 - **Head Z** reads within about 0.06 mm of the commanded value (27.058 for 27). Distance = z − 6.
 - **Cameras** are black while a job runs, because the fill lights are off.
 - **`G4 P` is milliseconds (verified).** A 2-pass job at 0% power with `G4P10000` between passes reported `timeUse: 10`, and the job finished 11.3 s after `WORK_STARTED`.
-- **Lid-open processing:** `PUT /v1/device/configs {alias:"config", type:"user", kv:{gapCheckWithKey:false}}` turns on xTool's "Enclosure-opened processing", which lets the button start jobs with the lid open. The setting is stored on the machine. Read it back with `GET` and `kv:["gapCheckWithKey"]`. It was turned ON for the user on 2026-10-12, at their request (`ytool lid-open <ip> on|off`).
+- **Lid-open processing:** `PUT /v1/device/configs {alias:"config", type:"user", kv:{gapCheckWithKey:false}}` turns on xTool's "Enclosure-opened processing", which lets the button start jobs with the lid open. The setting is stored on the machine. Read it back with `GET` and `kv:["gapCheckWithKey"]`. It was turned ON for the user on 2026-10-12, at their request (`pcprobe lid-open <ip> on|off`).
 - **Loaded job state (2026-10-13):** `GET /v1/device/runtime-infos` reports a job waiting for the button as `curMode {mode:"Work", subMode:"workReady", taskId}`; running is `subMode:"working"`, paused `"workPause"`, framing has `desc:"frame"`. MODE_CHANGE events call the same states `P_WORK`/`P_WORKING`/`P_PAUSE`. Idle is `P_IDLE` in both. `taskId` is the one sent in `upload/config`. A loaded job survives reconnecting; `PUT /v1/processing/state?action=stop` clears it (no motion), after which a new upload is accepted. The MODE_CHANGE `P_WORK` event for an upload arrives a few ms before the `upload/config` reply.
-- **Framing (?, from xTool Studio's extension, not yet run on hardware):** upload the border G-code as `tmpFrame.gcode` (file type 1), then `PUT /v1/processing/upload/config {fileType:"txt", autoStart:1, loopPrint:1, gcodeType:"frame"}`; it starts at once and loops. Moving the outline: upload `tmpFrameNew.gcode`, then `PUT /v1/processing/frame/replace {loopPrint:1}`. Stop: `PUT /v1/processing/state?action=stop`. runtime-infos reports `mode:"Work"` with `desc:"frame"` (or `frameExt`) while framing. The frame G-code is the job's `border.gcode`.
-- **Pointer lights out of photos (?, from xTool Studio, not yet confirmed on hardware):** before a photo xTool Studio sends `PUT /v1/peripheral/param?type=ir_led {action:"off", index:0}` (auto-focus IR light) and `PUT /v1/laser-head/parameter {action:"power", ctrl:"set", value:0}` (centre pointer), waits 100 ms, takes the photo, then sends `action:"on"` and `value:<focusPower>` (read with `GET /v1/device/configs kv:["focusPower"]`; 21 on the user's machine).
+- **Framing (?, not yet run on hardware):** upload the border G-code as `tmpFrame.gcode` (file type 1), then `PUT /v1/processing/upload/config {fileType:"txt", autoStart:1, loopPrint:1, gcodeType:"frame"}`; it starts at once and loops. Moving the outline: upload `tmpFrameNew.gcode`, then `PUT /v1/processing/frame/replace {loopPrint:1}`. Stop: `PUT /v1/processing/state?action=stop`. runtime-infos reports `mode:"Work"` with `desc:"frame"` (or `frameExt`) while framing. The frame G-code is the job's `border.gcode`.
+- **Pointer lights out of photos (?, not yet confirmed on hardware):** before a photo, send `PUT /v1/peripheral/param?type=ir_led {action:"off", index:0}` (auto-focus IR light) and `PUT /v1/laser-head/parameter {action:"power", ctrl:"set", value:0}` (centre pointer), waits 100 ms, takes the photo, then sends `action:"on"` and `value:<focusPower>` (read with `GET /v1/device/configs kv:["focusPower"]`; 21 on the user's machine).

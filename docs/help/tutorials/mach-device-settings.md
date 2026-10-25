@@ -20,7 +20,7 @@ On the **Machine** page, under **STATUS**, click **Device settings…**.
 ## Safety
 <!-- target: tabitem:Safety -->
 The flame alarm, stopping when the machine is moved or the lid opens, and the MOPA overheat alarm.
-Turning one off asks first.
+Turning one off shows a full warning first; read it before you accept.
 
 ## Exhaust and sleep
 <!-- target: tabitem:Exhaust & sleep -->

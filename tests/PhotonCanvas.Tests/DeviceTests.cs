@@ -21,7 +21,7 @@ public class DeviceFrameTests
     {
         Assert.Equal(0xBB3D, Crc16.Compute("123456789"u8));
         Assert.Equal(0x0000, Crc16.Compute([]));
-        // Values below come from the verified Python implementation (src/ytool/frame.py).
+        // Values below come from the verified Python implementation (src/pcprobe/frame.py).
         Assert.Equal(0x30C0, Crc16.Compute("A"u8));
         Assert.Equal(0xBAD3, Crc16.Compute([.. Enumerable.Range(0, 256).Select(i => (byte)i)]));
     }

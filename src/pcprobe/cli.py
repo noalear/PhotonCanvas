@@ -1,12 +1,12 @@
-"""ytool: read-only probe for xTool F-series lasers (F2 Ultra first).
+"""pcprobe: read-only probe for xTool F-series lasers (F2 Ultra first).
 
-    python -m ytool discover
-    python -m ytool info <ip>
-    python -m ytool watch <ip>
-    python -m ytool snap <ip> [-o out.jpg] [--stream 0|1]
-    python -m ytool view <ip> [--stream 0|1]     live camera window
-    python -m ytool get <ip> /v1/some/url
-    python -m ytool capture <ip> [-o captures/jobs]     save every job sent by the stock app
+    python -m pcprobe discover
+    python -m pcprobe info <ip>
+    python -m pcprobe watch <ip>
+    python -m pcprobe snap <ip> [-o out.jpg] [--stream 0|1]
+    python -m pcprobe view <ip> [--stream 0|1]     live camera window
+    python -m pcprobe get <ip> /v1/some/url
+    python -m pcprobe capture <ip> [-o captures/jobs]     save every job sent by the stock app
 
 Nothing here moves the head or fires the laser.
 """
@@ -40,7 +40,7 @@ async def _connected(args):
     except (OSError, asyncio.TimeoutError) as e:
         await dev.close()
         sys.exit(f"could not open wss://{args.ip}:28900 ({e!r}). "
-                 f"The machine may use the older V1 protocol; try: python -m ytool info {args.ip} --v1")
+                 f"The machine may use the older V1 protocol; try: python -m pcprobe info {args.ip} --v1")
     return dev
 
 
@@ -268,7 +268,7 @@ async def cmd_get(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(prog="ytool", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="pcprobe", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--trace", action="store_true", help="print every frame sent/received")
     sub = p.add_subparsers(dest="cmd", required=True)
 

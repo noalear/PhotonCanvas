@@ -31,8 +31,8 @@ PhotonCanvas doesn't come with the three codes xTool machines expect. Click
 - *Found 1 of 3 keys. The rest can be typed in below.*: type the others under
   **Or type / paste them in**.
 - ✗ beside a key you typed: it isn't right. Check for spaces or a missing character.
-- No xTool Studio at all: install it from xTool's website, set up the keys, then you can uninstall
-  it.
+- No xTool Studio on this computer: the keys can't be found for you. Type them in under
+  **Or type / paste them in** if you have them.
 
 ### No machines answered
 

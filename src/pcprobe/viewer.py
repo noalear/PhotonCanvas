@@ -44,7 +44,7 @@ class Viewer:
     def run(self):
         threading.Thread(target=self._worker, daemon=True).start()
         root = tk.Tk()
-        root.title(f"YTool live: {self.ip} ({'close-up' if self.stream else 'overview'})")
+        root.title(f"pcprobe live: {self.ip} ({'close-up' if self.stream else 'overview'})")
         root.geometry("1000x780")
         label = tk.Label(root, bg="black")
         label.pack(fill="both", expand=True)

@@ -180,7 +180,7 @@ public static class XToolPresets
                 var recipe = new Recipe
                 {
                     Purpose = s.Mode switch { LayerMode.Cut => RecipePurpose.Cut, LayerMode.Score => RecipePurpose.Score, LayerMode.Fill => RecipePurpose.Engrave, _ => RecipePurpose.Picture },
-                    Title = t, Settings = s, Tested = !f.Yours, TestedBy = f.Yours ? "" : "xTool", Machine = deviceCode,
+                    Title = t, Settings = s, Tested = !f.Yours, TestedBy = f.Yours ? "" : MaterialLibrary.XToolTester, Machine = deviceCode,
                     Notes = f.Yours ? "Made in xTool Studio." : "xTool's own tested setting, from xTool Studio's library.",
                 };
                 int at = recipes.FindIndex(x => x.Title == t);

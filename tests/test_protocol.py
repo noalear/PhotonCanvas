@@ -4,12 +4,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from ytool.discovery import decrypt, encrypt
+from pcprobe.discovery import decrypt, encrypt
 
 # Stand-in keys: the tests never contain or need the real ones.
 REQUEST_KEY = b"test-request-key-0123456789abcde"
 REPLY_KEY = b"test-reply-key-0123456789abcdefg"
-from ytool.frame import FrameDecoder, ProtocolType, crc16, encode
+from pcprobe.frame import FrameDecoder, ProtocolType, crc16, encode
 
 
 def test_crc16_arc_check_value():
@@ -38,7 +38,7 @@ def test_discovery_crypto_roundtrip():
 
 
 def test_bgcode_decode():
-    from ytool.bgcode import decode, tidy_numbers
+    from pcprobe.bgcode import decode, tidy_numbers
     raw = (b"\xc3 GS004-4 HEAD\n"
            b"\xe7\x00\xf8\x01\x43\xce\x67\x40\xf9\x01\x04\xce\x87\x40\n"   # G0X0143.6740Y0104.8740
            b"\xe7\x01\xf3\x07\x00\xe6\x24\x00\n"                              # G1S0700F2400

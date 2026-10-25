@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-from ytool.gcode import AIR_ENGRAVE, BLUE, RED, DotBitmap, Fill, Job, Laser, VectorPath
+from pcprobe.gcode import AIR_ENGRAVE, BLUE, RED, DotBitmap, Fill, Job, Laser, VectorPath
 
 GC = Path(__file__).parent.parent / "captures" / "gc"
 

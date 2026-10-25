@@ -6,19 +6,19 @@ Target machine: **xTool F2 Ultra** (`GS004-CLASS-4`, dual diode + fiber galvo).
 
 | Complaint | Root cause found | Plan |
 |---|---|---|
-| No live camera view | The stock app only takes snapshots (`/v1/camera/snap`) | Test `POST /v1/platform/camera/live` and the `media_stream` socket. If that fails, poll snapshots continuously and lens-correct them locally. |
+| No live camera view | The machine only gives snapshots (`/v1/camera/snap`) | Test `POST /v1/platform/camera/live` and the `media_stream` socket. If that fails, poll snapshots continuously and lens-correct them locally. |
 | Can't pause between passes | Passes are a device-side `G104 P<n>`…`G105` loop in one file, and resuming needs the physical button | Option to emit each pass as its own job, with a "next pass" prompt (and optional changes between passes). |
 | Inconsistent laser control | Settings go through profile/patch/binding layers, and the native planner is a black box | We generate our own G-code with explicit, visible parameters. A preview shows exactly what is sent. |
 | Settings aren't explained | (none; UX problem) | Built-in docs per parameter, with units, the value actually sent to the device (e.g. power ×10, speed ×60), and effect. |
 | Layers take manual work | Layers are just colour keys (`layerData`) | Real layer operations: bulk assign, presets, copying settings between layers, ordering. |
 | Cloud, login, telemetry | Sentry, Sensors Analytics, GA, Firebase, network probes every 5–10 s | None of it. Fully offline, LAN only. |
-| Slow / bloated | ~10 renderer processes, duplicated bundles, single-worker native server | A single-process app. |
+| Slow / heavy | A large multi-process app | A single-process app. |
 | Unreliable jobs | (to be observed) | Explicit connection state, retries, and a logged protocol trace. |
 
 ## Phases
 
 1. **Device link (CLI).** Discovery (V1 multicast + V2 AES UDP), WebSocket framing with CRC16, pairing, machineInfo, status, events. Proves we can talk to the machine.
-2. **Capture ground truth.** Export `.xf` jobs from the stock app for simple test shapes (square cut, filled square, bitmap), at different power, speed and pass settings, for both blue and red sources. Diff them to learn the motion G-code dialect. Download the calibration files.
+2. **Capture ground truth.** Export G-code from xTool Studio for simple test shapes (square cut, filled square, bitmap), at different power, speed and pass settings, for both blue and red sources. Diff them to learn the motion G-code dialect. Download the calibration files.
 3. **Camera.** Snapshots, then test the live stream, then lens correction from `global_calib.json`.
 4. **Job generation.** Our own G-code for vector cut/engrave, then fill, then bitmap. Package `xtool.xf`, upload over the file channel, framing, start/pause/stop, and pass-by-pass mode.
 5. **Editor.** Canvas, `.xs` import/export, layers, settings with explanations.
@@ -42,12 +42,11 @@ All done:
 
 ### Still to confirm on the machine
 
-- **Rotary and conveyor** use the U axis exactly as xTool Studio's templates do (`M535U…`,
-  `G100`, `G0 U0`, `G101`; see docs/gcode-f2-ultra.md), but two details are inferred: the
+- **Rotary and conveyor** use the U axis (`M535U…`, `G100`, `G0 U0`, `G101`; see
+  docs/gcode-f2-ultra.md), but two details are inferred: the
   `# gc=` header lines and where the galvo's other axis parks. One rotary job and one conveyor
   job exported from xTool Studio would settle both.
-- **Console**: `POST /v1/cnc/cmd` with the command in the query parameters, as the stock app
-  sends its pointer moves. Not yet tried.
+- **Console**: `POST /v1/cnc/cmd` with the command in the query parameters. Not yet tried.
 - Everything new in G-code (focus offsets, turned passes, slices, offset fill, sections) is built
   from commands already verified, but hasn't been burned yet.
 
@@ -153,7 +152,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Movable, dockable panels (LightBurn): layers, selection and layer settings move between the sides, float in their own windows or fold to their titles; kept between runs (View → Reset panels)
 - [x] Mac and Linux builds (LightBurn): `tools/publish.sh`; built and packaged, not yet run on a Mac or Linux machine
 - [x] User-defined machines (Settings → Machines): GRBL machines added and described (bed, laser, speeds, power scale, origin, port, air assist), with a Full Spectrum 5th Gen Hobby 20×12 starting point; jobs written as GRBL 1.1 laser-mode G-code and streamed over USB (character-counting flow control), with home, unlock, frame, pause, stop and Save G-code. Not yet run on a real GRBL machine
-- [x] Other xTool machines (Settings → Machines): F2 Ultra (Single), F1 Ultra, F2, F1 Lite and F2 Ultra UV with their work areas and G-code tags (same protocol and G-code as the F2 Ultra, from xTool Studio's model list); fiber settings only where the limits are known; a connected machine of another model is pointed out. Untested on those machines
+- [x] Other xTool machines (Settings → Machines): F2 Ultra (Single), F1 Ultra, F2, F1 Lite and F2 Ultra UV with their work areas and G-code tags (same protocol and G-code as the F2 Ultra); fiber settings only where the limits are known; a connected machine of another model is pointed out. Untested on those machines
 
 ### Material library and tests
 - [x] xTool's own tested F2 Ultra settings, and the user's own from xTool Studio: Library → Import from xTool Studio reads its cache (Chromium IndexedDB: LevelDB, Snappy, V8 values) read-only, materials and settings only; nothing kept in our repo
@@ -196,7 +195,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 
 ### To check at the machine test
 
-Built from xTool Studio's own requests but not yet tried on the machine:
+Built but not yet tried on the machine:
 - Device settings: every switch reads back what the machine shows; renaming; exhaust run-on.
 - Galvo timing: values read match xTool Studio's (shown ×10); saving one value; factory reset.
 - Power-cut resume: the offer appears after pulling the plug mid-job (scrap material), and Carry on waits for the button.

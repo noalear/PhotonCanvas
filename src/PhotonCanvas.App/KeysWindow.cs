@@ -83,7 +83,7 @@ public sealed class KeysWindow : Window
                                "They don't come with this program. If xTool Studio is installed on this computer, " + AppIdentity.ProductName + " can read them from it for you.",
                     },
                     Hint("Only those three codes are read, they stay on this computer, and nothing is sent anywhere. " +
-                         "Don't have xTool Studio? Install it from xTool's website, run this once, then you can uninstall it."),
+                         "Without xTool Studio on this computer they can't be found for you; type them in below if you have them."),
                     _auto,
                     _choose,
                     _progress,

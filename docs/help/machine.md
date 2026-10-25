@@ -42,8 +42,8 @@ page (shown while the keys are missing) and from **Settings → Connection → C
 - **Save** is ready once all three are right. They're saved in `keys.json` in the
   [data folder](#the-data-folder).
 
-Don't have xTool Studio? Install it from xTool's website, set up the keys once, then you can
-uninstall it.
+Without xTool Studio on this computer, PhotonCanvas can't find the keys for you; type them in
+if you have them.
 
 ### Finding and connecting
 
@@ -376,8 +376,10 @@ job are all on the list for the next machine test.
 
 ### Safety tab
 
-Switches stored on the machine. Turning off one of the first four asks first (**Turn it off** or
-**Keep it on**).
+Switches stored on the machine. Turning off one of the first four shows a full warning first: what
+can go wrong without it (blinding laser light, fire, a damaged laser), that it stays off on the
+machine whichever program sends the job, and that it's at your own risk. Choose **I understand, turn
+it off** or **Keep it on**.
 
 | Switch | When on |
 |---|---|

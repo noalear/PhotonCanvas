@@ -51,6 +51,34 @@ public class RemoteServerTests
     }
 
     [Fact]
+    public void StartingFromThePhoneIsOffUntilTheUserTurnsItOn()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "pc-phonestart-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Assert.False(PhoneStart.IsAllowed(dir));
+            PhoneStart.Set(true, dir);
+            Assert.True(PhoneStart.IsAllowed(dir));
+            PhoneStart.Set(false, dir);
+            Assert.False(PhoneStart.IsAllowed(dir));
+            File.WriteAllText(PhoneStart.FilePath(dir), "not json");
+            Assert.False(PhoneStart.IsAllowed(dir));
+            File.WriteAllText(PhoneStart.FilePath(dir), "{\"allowed\":\"yes\"}");
+            Assert.False(PhoneStart.IsAllowed(dir));
+        }
+        finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+    }
+
+    [Fact]
+    public void WhileItsOffEvenAFreshPictureStartsNothing()
+    {
+        var pic = Pic("P_WORK", "job-1", TimeSpan.FromSeconds(10));
+        Assert.Equal(PhoneStart.OffMessage, StartGuard.Problem(false, pic, Now, "P_WORK", "job-1"));
+        Assert.Null(StartGuard.Problem(true, pic, Now, "P_WORK", "job-1"));
+        Assert.Contains("Take a picture", StartGuard.Problem(true, null, Now, "P_WORK", "job-1"));
+    }
+
+    [Fact]
     public void PicturesTakenWhileAJobRunsAreMarkedBlanked()
     {
         Assert.True(Pic("P_WORKING", "j", TimeSpan.Zero).Blanked);

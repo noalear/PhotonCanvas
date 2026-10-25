@@ -130,7 +130,11 @@ sets, and their photos.
 
 - Type your name in **Your name (shown to people you share with)**: it goes in the files you export,
   and people who import them see their recipes as tested by you.
-- **Export…** saves the materials picked in the list, or all of them if none is picked.
+- **Export…** saves the materials picked in the list, or all of them if none is picked. xTool's own
+  settings (the ones marked *(xTool)*, brought in with **Import from xTool Studio…**) are always left
+  out: they're xTool's work and theirs to give out, not ours to pass on. The line under the buttons
+  says how many were left out. Your own settings, including ones you made in xTool Studio, are
+  shared as usual. Anyone with xTool Studio can bring xTool's settings in for themselves.
 - **Import…** reads one or more `.pcmat` files.
 
 On import:
@@ -171,6 +175,8 @@ What comes in:
   new one is added with its category.
 - xTool's settings get *(xTool)* after their title and are marked tested by xTool. Yours from xTool
   Studio come in untested.
+- xTool's settings stay in your own library: **Export…** leaves them out of `.pcmat` files (see
+  [Sharing materials](#sharing-materials)).
 - Importing again updates settings with the same title, and adds new ones.
 
 xTool's settings are for their own materials: try any of them on scrap first.

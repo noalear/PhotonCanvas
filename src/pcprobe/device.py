@@ -19,7 +19,9 @@ PORT = 28900
 PING_TXID = 65510
 FILE_REQUEST, FILE_DATA = 0x01, 0x81
 WINDOW = 5 * 1024 * 1024
-STATE_DIR = Path.home() / ".ytool"
+STATE_DIR = Path.home() / ".pcprobe"
+# Where this probe kept its pairing token before it was renamed: still read when there's no new one.
+LEGACY_STATE_DIR = Path.home() / ".ytool"
 
 
 class DeviceError(Exception):
@@ -29,10 +31,12 @@ class DeviceError(Exception):
 
 
 def _load_state():
-    try:
-        return json.loads((STATE_DIR / "state.json").read_text())
-    except (OSError, ValueError):
-        return {}
+    for d in (STATE_DIR, LEGACY_STATE_DIR):
+        try:
+            return json.loads((d / "state.json").read_text())
+        except (OSError, ValueError):
+            continue
+    return {}
 
 
 def _save_state(state):

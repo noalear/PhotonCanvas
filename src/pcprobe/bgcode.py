@@ -9,7 +9,7 @@ Format, worked out from real files (see docs/protocol-f2-ultra.md):
 
 Unknown bytes are printed as <xx> so new tokens stand out.
 
-Usage: python -m ytool.bgcode motion.bgcode [out.gcode]
+Usage: python -m pcprobe.bgcode motion.bgcode [out.gcode]
 """
 import sys
 

@@ -97,6 +97,26 @@ public sealed class MaterialTests : IDisposable
     }
 
     [Fact]
+    public void XToolsOwnSettingsAreNeverExported()
+    {
+        var mine = new MaterialLibrary(Path.Combine(_dir, "xt"));
+        var bass = Basswood();
+        var xtool = new Recipe { Purpose = RecipePurpose.Cut, Title = "Cut (xTool)", Tested = true, TestedBy = MaterialLibrary.XToolTester };
+        mine.Upsert(bass with { Recipes = bass.Recipes.Add(xtool) });
+        mine.Upsert(new Material { Name = "Walnut", ThicknessMm = 3, Recipes = [xtool with { Id = Guid.NewGuid() }] });
+        using var file = new MemoryStream();
+        var done = mine.Export(file, mine.Materials, "Noa");
+        Assert.Equal((1, 2, 2), (done.Materials, done.Recipes, done.XToolLeftOut));
+
+        var friend = new MaterialLibrary(Path.Combine(_dir, "xt-friend"));
+        file.Position = 0;
+        friend.Import(file, "shared.pcmat");
+        var got = Assert.Single(friend.Materials);
+        Assert.DoesNotContain(got.Recipes, MaterialLibrary.IsXToolPreset);
+        Assert.Equal(2, got.Recipes.Count);
+    }
+
+    [Fact]
     public void ImportDoesNotTrustTheFile()
     {
         // Out-of-range settings, a path-escaping photo name, a nameless material.

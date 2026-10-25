@@ -2,7 +2,7 @@
 
 Neither format is encrypted. `.xs` is a ZIP of pretty-printed JSON; `.xcs` is one JSON document. The default save format is v2 `.xs`. `.txs` and `.txcs` are the template variants.
 
-Real samples to test against: `reference/exts/<MODEL>/assets/Tutorial-*.xs` (23 files). A real v1 `.xcs` (an F2 Ultra colour test grid) has also been imported successfully.
+Tested against real `.xs` project files (the tutorial projects that come with xTool Studio) and a real v1 `.xcs` (an F2 Ultra colour test grid).
 
 ## Detecting the format
 
@@ -27,7 +27,7 @@ vectors/svg/index.json, data-0.json       optional: large dPaths stored out of l
 ```
 
 Writer details:
-- Entries are deflated at level 6 (fflate), and JSON is written with `JSON.stringify(v, null, 2)`.
+- Entries are deflated, and JSON is indented with 2 spaces.
 - Floats in displays are rounded to 6 decimal places.
 - Readers accept `schemaVersion` "2.0.0" or "1.0.0".
 
@@ -97,29 +97,21 @@ Common `values` keys:
 
 ## v1 `.xcs` (single JSON)
 
-- **Maps:** JS Maps are encoded as `{"dataType":"Map","value":[[k,v],...]}`.
+- **Maps:** maps are encoded as `{"dataType":"Map","value":[[k,v],...]}`.
 - **Top level:** `version, name, canvasId, canvas[], projectTraceID, created, modify, cover, minRequiredVersion, extId, extName, device{...}, meta[]`.
 - **`canvas[]` entries:** `{id, title, hidden, displays[], layerData, groupData, ...}`. Displays use the same shape as in v2.
 - **`device.data`:** `Map<canvasId, {mode, data:{<MODE>:{material,...}}, displays: Map<displayId, {processingType, data:{<PROCESSING_TYPE>:{parameter:{official|customize:{power,speed,repeat,...}}}}}>}>`.
 
 ## Enums
 
-Both are defined in `exts/ext-runtime/*/xcs-ext-base.js`.
+Values seen in files:
 
 - **processingType (laser):** `VECTOR_CUTTING`, `VECTOR_ENGRAVING`, `FILL_VECTOR_ENGRAVING`, `BITMAP_ENGRAVING`, `COLOR_ENGRAVE`, `COLOR_FILL_ENGRAVE`, `RELIEF`, `INTAGLIO`, `INNER_*`.
 - **modes:** `LASER_PLANE`, `LASER_FIXTURE`, `LASER_CYLINDER(_ROLLER/_CATCH)`, `FREE_PLANE`, `PASS_THROUGH`, `SUPER_LASER_PLANE`, `LASER_CONVEYOR_FEEDER`, `CURVE_PROCESS`, `BATCH_PROCESS`, `RELIEF_PROCESS`.
 
-## Design → job pipeline (theirs)
-
-1. **JS preparation.** `GcodeBuilder` in `xcs-ext-base.js` renders each element to SVG/PNG files and writes a `manifest.json`. Fields seen so far: `type, filename, dpi, layer_id, priority_id, merge_id, repeat, processDirection`. Power is ×10 (per-mille), speed is ×60 (mm/min), and device-specific G-code head/tail templates are included.
-2. **Native path planning.** It then calls `path_planning.genGCodeSync({dir, dst, manifest})` in the native `lib_path_planning.dll`.
-3. **Output.** The result is `gcode.txt`, or `gcode.bgc` when the device's `gcodeFormat` includes "bin".
-4. **Upload.** The output is uploaded to the device.
-
 ## Open questions
 
 - The `power: [..]` array on the device record is unclear.
-- The full key set of the G-code `manifest.json` input is not yet known.
 
 ## Placement convention (verified)
 

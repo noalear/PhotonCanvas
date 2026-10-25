@@ -15,9 +15,9 @@ public class RemoteClientTests
     [Fact]
     public void TheQrCodeFromRemoteAccessGivesAddressPortAndCode()
     {
-        var c = ConnectionInfo.TryParse("http://192.168.50.247:8740/#code=4CL5-7RF3-MPZL-TZHJ");
-        Assert.Equal(new ConnectionInfo("192.168.50.247", 8740, "4CL5-7RF3-MPZL-TZHJ"), c);
-        Assert.Equal(new Uri("http://192.168.50.247:8740/"), c!.BaseUri);
+        var c = ConnectionInfo.TryParse("http://192.168.1.50:8740/#code=ABCD-EFGH-JKLM-NPQR");
+        Assert.Equal(new ConnectionInfo("192.168.1.50", 8740, "ABCD-EFGH-JKLM-NPQR"), c);
+        Assert.Equal(new Uri("http://192.168.1.50:8740/"), c!.BaseUri);
     }
 
     [Theory]
@@ -102,7 +102,7 @@ public class RemoteClientTests
         var b = new Broadcaster();
         using var sub = b.Subscribe();
         var job = new JobStatus("t1", "freddie", "phone", "running", DateTimeOffset.Now.AddMinutes(-3), DateTimeOffset.Now.AddMinutes(-2), 120.5, null, 600, 720, true);
-        b.Publish("status", new MachineStatus(true, "192.168.50.48", "F2 Ultra", "40.54", "P_WORKING", "Running a job", 21.3, null, job, true, DateTimeOffset.Now));
+        b.Publish("status", new MachineStatus(true, "192.168.1.60", "F2 Ultra", "40.54", "P_WORKING", "Running a job", 21.3, null, job, true, DateTimeOffset.Now));
         b.Publish("job", new JobEvent("finished", "r1", "freddie", "phone", true, 61.5, "\"freddie\" finished in 1 min 01 s."));
         b.Publish("alert", new AlertEvent("flame", "The machine reports a possible flame. Check it now.", DateTimeOffset.Now));
         b.Publish("something-new", new { x = 1 });

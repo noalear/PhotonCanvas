@@ -21,7 +21,8 @@ Click a material in the list (`Ctrl`-click for several). With none picked, all a
 
 ## Export
 <!-- target: button:Export -->
-Click **Export…** and choose where to save the `.pcmat` file.
+Click **Export…** and choose where to save the `.pcmat` file. xTool's own settings, marked *(xTool)*,
+are left out: they came from xTool Studio and are xTool's to share, not ours.
 
 ## Import someone's file
 <!-- target: button:Import -->

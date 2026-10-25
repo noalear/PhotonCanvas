@@ -62,8 +62,11 @@ straight to the machine over your own network.
 - Time-lapse videos of jobs (with ffmpeg installed), job history and a job-done sound
 - A G-code console with macros, for advanced use
 
-Jobs are uploaded with `autoStart: 0`: nothing moves or fires until you press the
-machine's start button.
+Jobs are uploaded with `autoStart: 0`: the desktop app never starts a job by itself, and
+nothing moves or fires until the job is started. That is the machine's start button, or, only if
+you turn on **Allow starting jobs from the phone** (off by default, in Remote access), the
+[phone remote](docs/help/remote.md), which starts a job already loaded on the machine and only
+after you've looked at a picture of the bed taken in the last 2 minutes.
 
 ## The workspace
 
@@ -123,8 +126,8 @@ code is its own.
    xTool Studio** (Settings → Connection or the welcome screen) and they are read from your own
    copy in a few seconds and saved to `keys.json` in the data folder (see [Where things are kept](#where-things-are-kept)). You can also point
    it at xTool Studio's `resources\app.asar`, or paste them in; each one is checked
-   against a fingerprint. Don't have xTool Studio? Install it, run the setup once, then
-   uninstall it.
+   against a fingerprint. Without xTool Studio on your computer, PhotonCanvas can't find
+   them for you; type them in if you have them.
 4. Turn the laser on. PhotonCanvas finds and connects to it (its status shows at the right end of the ribbon); the first time, press
    the machine's button to allow this computer.
 
@@ -163,7 +166,7 @@ src/PhotonCanvas.Device   F2 Ultra link: discovery, V2 WebSocket protocol, pairi
 src/PhotonCanvas.Doc      document model: shapes, layers, undo/redo, imports, tracing, job builder, .pcanvas files
 src/PhotonCanvas.App      desktop editor (Avalonia)
 tests/PhotonCanvas.Tests  xUnit; sample tests compare against captures/gc when present
-src/ytool                 Python protocol prototype (read-only probe; reads the same keys.json)
+src/pcprobe               Python protocol prototype (read-only probe; reads the same keys.json)
 docs/                     protocol, G-code and file-format notes
 ```
 
@@ -199,19 +202,21 @@ system.
   `dotnet run --project tools/HelpShots -- shots` retakes the guide's screenshots, and `-- walk`
   steps through the tutorials in the real program and lists targets it can't find.
 
-To regenerate `reference/` from your own install:
-
-```bash
-R="$LOCALAPPDATA/Programs/xTool Studio/resources"
-python -I tools/extract_asar.py "$R/app.asar" reference/app
-python -I -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall('reference/exts')" "$R/exts.zip"
-```
-
 ## Licence
 
-GNU General Public License v3 or later: see [LICENSE](LICENSE). You may use, share and
-change it; if you distribute a changed version, it must stay under the same licence
-with its source available. Third-party components and their licences are listed in
+PhotonCanvas is free software under the GNU General Public License v3 or later: see
+[LICENSE](LICENSE). The program is published as ready-to-run builds on the
+[releases page](https://github.com/noalear/PhotonCanvas-releases/releases).
+
+**Source code on request.** Anyone who has received PhotonCanvas (the desktop program, its remote
+server or the Android app) can get the complete corresponding source code for that version, as GPLv3
+section 6 requires, by asking the author through an
+[issue on the releases repository](https://github.com/noalear/PhotonCanvas-releases/issues). This
+written offer is valid for at least three years after the last time that version was published, and
+costs nothing beyond what providing the source physically costs, if anything.
+
+You may use, share and change PhotonCanvas; if you distribute a changed version, it must stay under
+the same licence with its source available. Third-party components and their licences are listed in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 xTool is a trademark of its owner, used here only to name the machines this works with.

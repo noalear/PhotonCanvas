@@ -4,14 +4,23 @@ using System.Text.Json;
 namespace PhotonCanvas.Core;
 
 /// <summary>
-/// New versions: published as releases on a public, releases-only GitHub repository (the source
-/// stays private). At start, if the user allows it, the program asks GitHub for the latest
-/// release (nothing about the user is sent, beyond what any web request carries) and offers it.
+/// New versions: published as releases on a public, releases-only GitHub repository. The program is
+/// GPL-3.0-or-later; its source repository is private, and anyone who has received a build can get the
+/// complete corresponding source on request (GPLv3 section 6 written offer, valid at least three years)
+/// through that repository's issues (<see cref="SourceOffer"/>). At start, if the user allows it, the
+/// program asks GitHub for the latest release (nothing about the user is sent, beyond what any web
+/// request carries) and offers it.
 /// </summary>
 public static class Updates
 {
     /// <summary>Where releases are published.</summary>
     public const string Repo = "noalear/PhotonCanvas-releases";
+
+    /// <summary>The GPLv3 section 6 written offer, as the About box and the release notes give it.</summary>
+    public const string SourceOffer =
+        "Source code on request: anyone who has received this program can get its complete corresponding source code " +
+        "(GNU GPL v3, section 6) by asking through an issue at https://github.com/" + Repo + "/issues. " +
+        "This offer is valid for at least three years after this version was last published.";
 
     /// <summary>This program's version ("0.2.0"), from the build.</summary>
     public static string Current { get; } = Clean(

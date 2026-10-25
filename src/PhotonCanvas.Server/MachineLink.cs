@@ -506,6 +506,11 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
     /// </summary>
     public async Task<string> StartAsync(string? pictureId, string who, CancellationToken ct)
     {
+        if (!PhoneStart.IsAllowed())
+        {
+            ServerLog.Write("job", $"Start from {who} refused: starting from the phone is turned off.");
+            throw new RemoteException(403, PhoneStart.OffMessage);
+        }
         var c = Client();
         await _jobOps.WaitAsync(ct);
         try
@@ -515,7 +520,7 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
             string mode;
             string? task;
             lock (_gate) (mode, task) = (_mode, _taskId);
-            if (StartGuard.Problem(Pictures.Get(pictureId), DateTime.Now, mode, task) is { } why)
+            if (StartGuard.Problem(PhoneStart.IsAllowed(), Pictures.Get(pictureId), DateTime.Now, mode, task) is { } why)
                 throw new RemoteException(409, why);
             lock (_gate) _phoneStartFor = task;
             ServerLog.Write("job", $"Start from {who} (job {task}, on picture {pictureId}).");

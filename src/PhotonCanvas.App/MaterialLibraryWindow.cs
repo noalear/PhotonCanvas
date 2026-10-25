@@ -80,7 +80,7 @@ public sealed class MaterialLibraryWindow : Window
         del.Click += async (_, _) => await DeleteMaterials();
         var import = Button("Import…", tip: "Add materials and recipes from a .pcmat file someone shared.");
         import.Click += async (_, _) => await Import();
-        var export = Button("Export…", tip: "Save the selected materials (or all, if none is selected) to a .pcmat file to share.");
+        var export = Button("Export…", tip: "Save the selected materials (or all, if none is selected) to a .pcmat file to share. xTool's own settings (imported from xTool Studio) are left out: they're xTool's to give out.");
         export.Click += async (_, _) => await Export();
         var xtool = Button("Import from xTool Studio…", tip: "xTool's tested F2 Ultra settings and your own from xTool Studio, read from its folder on this computer (read only; nothing is sent).");
         xtool.Click += async (_, _) => await ImportXTool();
@@ -329,7 +329,7 @@ public sealed class MaterialLibraryWindow : Window
         var stars = new Stars { Value = r.Rating };
         stars.Changed += () => UpdateRecipe(m, r with { Rating = stars.Value });
         var tested = new CheckBox { Content = "Tested", IsChecked = r.Tested };
-        tested.IsCheckedChanged += (_, _) => UpdateRecipe(m, r with { Tested = tested.IsChecked == true, TestedOn = tested.IsChecked == true ? r.TestedOn ?? DateTime.Now : null, TestedBy = tested.IsChecked == true ? r.TestedBy : "" });
+        tested.IsCheckedChanged += (_, _) => UpdateRecipe(m, r with { Tested = tested.IsChecked == true, TestedOn = tested.IsChecked == true ? r.TestedOn ?? DateTime.Now : null, TestedBy = tested.IsChecked == true || MaterialLibrary.IsXToolPreset(r) ? r.TestedBy : "" });
         var rename = Button("Rename…");
         rename.Click += async (_, _) =>
         {
@@ -482,8 +482,9 @@ public sealed class MaterialLibraryWindow : Window
         try
         {
             using var s = File.Create(path);
-            _lib.Export(s, materials, _settings.LibraryAuthor);
-            _status.Text = $"Saved {materials.Count} material(s) to {Path.GetFileName(path)}.";
+            var done = _lib.Export(s, materials, _settings.LibraryAuthor);
+            _status.Text = $"Saved {done.Materials} material(s) to {Path.GetFileName(path)}." + (done.XToolLeftOut == 0 ? "" :
+                $" {done.XToolLeftOut} of xTool's own settings were left out: they came from xTool Studio and are xTool's to share, not ours. Anyone with xTool Studio can import them with Import from xTool Studio.");
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _status.Text = e.Message; }
     }

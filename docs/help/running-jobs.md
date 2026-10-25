@@ -4,8 +4,9 @@ The job bar along the bottom of the window always shows the job as it would run 
 the order it runs in, how long it takes and anything worth knowing first. It's rebuilt a quarter of
 a second after every change to the design or its settings, so it's never out of date.
 
-Sending a job only uploads it. Nothing moves or fires until you press the start button on the
-machine.
+Sending a job only uploads it. PhotonCanvas never starts it by itself: nothing moves or fires until
+you press the start button on the machine (or start it from the phone, only if you've turned on
+**Allow starting jobs from the phone** in [Remote access](remote.md)).
 
 ![The job bar: Ship It, Frame, the passes and pauses, the timeline, Checks, Order, Export and the estimate](images/job-bar.png)
 
@@ -81,7 +82,8 @@ sender instead (see [Sending to a GRBL machine](machine.md#sending-to-a-grbl-mac
 - Every check, each with ⚠.
 - *ⓘ A job is already loaded on the machine and not started. It will be replaced by this one.*
   and whose it is, when there's one.
-- *After upload the machine waits. Nothing moves or fires until you press its start button.*
+- *After upload the machine waits. Nothing moves or fires until you press its start button (or start
+  it from the phone, if you've allowed that in Remote access).*
 
 **Ship It** uploads; **Cancel** doesn't.
 
