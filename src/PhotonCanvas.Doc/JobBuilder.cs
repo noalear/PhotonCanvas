@@ -463,7 +463,9 @@ public static class JobBuilder
                 {
                     if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
                         throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
-                    int passes = Math.Max(1, layer.Laser.Passes);
+                    // Passes count only when written out: per path, with no step-down or pause, the machine's own loop repeats one copy.
+                    bool looped = !opt.WholeJobPasses && drop is null && opt.PathPauseS <= 0 && layer.Order != PathOrder.Heat;
+                    int passes = looped ? 1 : Math.Max(1, layer.Laser.Passes);
                     double lengthMm = paths.Sum(f => (f.Closed ? Polyline.Loop(f.Points) : Polyline.Open(f.Points)).Length);
                     long moves = Wobble.MoveCount(lengthMm, layer.WobbleSpacingMm) * passes;
                     if (wobbleMoves + moves > Wobble.MaxMovesPerJob)
@@ -471,7 +473,7 @@ public static class JobBuilder
                         long room = Wobble.MaxMovesPerJob - wobbleMoves;
                         // The spacing that would fit, rounded up to the box's 0.005 mm steps.
                         double fits = room > 0 ? Math.Ceiling(lengthMm * passes * Wobble.PointsPerLoop / room / 0.005) * 0.005 : double.PositiveInfinity;
-                        throw new JobException($"Layer \"{layer.Name}\": wobble would make {moves / 1e6:0.#} million moves ({lengthMm:N0} mm of path × {passes} pass{(passes == 1 ? "" : "es")}, " +
+                        throw new JobException($"Layer \"{layer.Name}\": wobble would make {moves / 1e6:0.#} million moves ({lengthMm:N0} mm of path{(passes > 1 ? $" × {passes} passes" : "")}, " +
                                                $"{Wobble.PointsPerLoop / layer.WobbleSpacingMm:N0} per mm at {layer.WobbleSpacingMm:0.###} mm spacing)" +
                                                (wobbleMoves > 0 ? $" on top of {wobbleMoves / 1e6:0.#} million from layers before it" : "") + $", more than one job can hold ({Wobble.MaxMovesPerJob / 1e6:0} million). " +
                                                (fits <= Wobble.MaxSpacingMm ? $"Set the wobble spacing to at least {fits:0.###} mm, or wobble fewer paths." : "Wobble fewer paths, or turn wobble off on other layers."));

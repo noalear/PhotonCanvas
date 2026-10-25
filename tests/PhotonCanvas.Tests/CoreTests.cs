@@ -355,6 +355,10 @@ public class LayerDescentWobbleTests
         var job = PhotonCanvas.Doc.JobBuilder.Build(ok, new PhotonCanvas.Doc.JobOptions());
         Assert.InRange(((VectorBlock)job.Job.Blocks[0]).Path.Points.Count, 1_150_000, 1_160_000); // 800 mm × 1440 per mm
 
+        // Passes per path with no step-down use the machine's own loop: one copy, so 0.015 mm fits.
+        var looped = PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false });
+        Assert.Contains("G104 P7", looped.Motion);
+
         // And the expansion itself refuses a path too long to hold.
         Assert.Throws<JobException>(() => Wobble.Expand([new Vec2(0, 0), new Vec2(5000, 0)], 0.05, 0.015));
     }
