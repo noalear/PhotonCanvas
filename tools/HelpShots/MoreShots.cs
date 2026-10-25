@@ -69,6 +69,15 @@ static class MoreShots
         Summary("window-3d-slices-shaping-summary", "Stacked slices with Shape the edges ticked: the summary's edge shaping line");
         F<CheckBox>(slicer, "_shape").IsChecked = false;
         Slice(slicer);
+        // Pins cut from a dowel: the settings and the picture of the cuts.
+        F<CheckBox>(slicer, "_cutPins").IsChecked = true;
+        settle(400);
+        F<TextBlock>(slicer, "_pinNote").BringIntoView();
+        settle(600);
+        save(slicer.CaptureRenderedFrame(), "window-3d-slices-dowel-pins", "Stacked slices with Cut the pins from a dowel too ticked: the dowel's settings and the cuts");
+        F<CheckBox>(slicer, "_cutPins").IsChecked = false;
+        F<TextBlock>(slicer, "_summary").FindAncestorOfType<ScrollViewer>()?.ScrollToHome();
+        settle(300);
         F<ComboBox>(slicer, "_look").SelectedIndex = 1;
         F<Slider>(slicer, "_from").Value = 6;
         F<Slider>(slicer, "_to").Value = 14;

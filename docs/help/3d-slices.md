@@ -166,11 +166,49 @@ through.
 | **Mark where the next slice sits** | on | Lightly marks the outline of the slice above on each part, where it falls inside the part (at least 0.6 mm in from its edge). Glue the next slice inside the line. |
 | **Keep every slice joined** | on | Where the model slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. At each place two slices meet, any piece of the model's cross-section they don't already share enough of (6 mm², or most of a small piece) is added to both, so they overlap enough to glue and pin. Sand it back to the shape. The summary counts these "steep spots". |
 | **Pin holes Ø** | 0 to 20 mm, steps of 0.5 (2) | Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Two pins, well apart, where there's room (that stops the parts turning), else one. Placed where the slices around them hide the holes when they can, clear of the part's edges, of the pin holes already in it and of the dowel holes, with a wall of material between. The pins need only be twice the material's thickness long; the summary says how many. 0 = none. |
+| **Cut the pins from a dowel too** | off | Shown when **Pin holes Ø** is above 0. Also makes a page with a cutting job for the pins: lay a long dowel in the machine and cut every pin the slices need in one go. See [Cutting the pins from a dowel](#cutting-the-pins-from-a-dowel). |
+| **Dowel Ø (mm)** | 0.5 to 20 mm (follows **Pin holes Ø**) | The dowel's diameter, measured with calipers. It follows the pin holes until you change it; if the two differ, the note under the preview warns that the pins won't fit snugly. Each cut line is 1.2 times this long, so it goes right across a dowel lying a little off the line. |
+| **Dowel length (mm)** | 10 to 2000 mm (300) | How long your dowel is. Only as much as fits along the bed's long side (inside 10 mm margins: 200 mm on the F2 Ultra) is cut in one go. |
+| **Pins shorter by (%)** | 0 to 40 % (15) | A pin goes through two slices. Cutting it this much shorter means it never stops them closing up, even with a drop of glue in the hole: 3 mm slices and 15 % make 5.1 mm pins. |
+| **Spare pins (%)** | 0 to 100 % (10) | Extra pins on top of the ones the holes need, rounded up, for the ones that roll away or break: 21 holes and 10 % make 24 pins. |
+| **Cut the dowel with** | As set on the pins' cut layer | Cut settings from your library for the dowel's wood. A dowel is as thick as it is wide, so it needs settings that cut that deep. The recipe's kerf is allowed for in the spacing between cuts (0.2 mm when there's none). |
 | **Dowels Ø** | 0 to 20 mm, steps of 0.5 (0) | Two holes through every slice, as far apart as they fit, for long dowels through the whole stack. Only where every slice has room (1.5 mm round each hole); otherwise the summary says "No room for dowel holes in every slice". 0 = none. |
 | **Number each slice (light mark, 1 at the bottom)** | on | Marks each part with its slice number, 1 at the bottom, at the spot furthest from its edges and holes, as large as fits (up to 6 mm). Parts too narrow for a number get none. |
 
 A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's **Kerf (mm)** (see
 [Layer settings](layer-settings.md)) so the holes come out at their size and the pins fit snugly.
+
+### Cutting the pins from a dowel
+
+![Cut the pins from a dowel too ticked: the dowel's settings, the picture of the first few cuts, and the note saying how many pins](images/window-3d-slices-dowel-pins.png)
+
+Tick **Cut the pins from a dowel too** and the slicer works out the pins as well as the holes. The
+picture under the settings shows the first few pins on the dowel, with the cut lines across it, the
+pin length, the dowel's width and each cut line's length written on it, and how much of the dowel
+the pins use. The note under it spells it out: how many pins the holes need, how many spares, how
+long each is, and how many cuts (one squaring off the dowel's end, then one after each pin).
+
+When you click **Make the slices**, a page of its own called "*model* pins" goes after the slices'
+pages. On it, the dowel is drawn on the **Material** layer (grey, never sent) along the bed's long
+side, and the cut lines are on a cut layer called **Pins · cut**, all grouped. To cut them:
+
+1. Lay the dowel along the bed's long side and tape it down at both ends, so it can't roll and the
+   pins can't jump about once they're free.
+2. Set the distance to the dowel's top, not the bed.
+3. Move the group onto the dowel in the camera picture (the grey outline over the dowel).
+4. Give **Pins · cut** settings that go through the dowel's whole thickness, or choose them in **Cut
+   the dowel with** before making.
+
+Warnings in the note:
+
+- **Only N fit along the bed**: the dowel is longer than the bed. Run the job, slide the dowel along,
+  move the first cut onto its new end and run it again.
+- **The dowel makes only N of the M**: the dowel is too short for every pin and spare. Cut the rest
+  from another dowel, or ask for fewer spares.
+- **The dowel is X mm but the pin holes are Y mm**: set **Pin holes Ø** to the dowel's size.
+
+The job hasn't been tried on the machine yet. Round stock cuts deepest through its middle, so
+check the first cut goes all the way through before leaving it to run.
 
 ### What the slicer leaves out and warns about
 

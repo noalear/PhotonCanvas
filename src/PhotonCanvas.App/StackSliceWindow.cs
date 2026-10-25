@@ -71,6 +71,13 @@ public sealed class StackSliceWindow : Window
     readonly NumericUpDown _step = Number(0.02m, 2, 0.01m, "0.0##");
     readonly TextBlock _shapeNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
     readonly Doc.Materials.MaterialLibrary? _library;
+    // Pins cut from a dowel laid in the machine: a page of its own beside the slices.
+    readonly CheckBox _cutPins = new() { Content = "Cut the pins from a dowel too" };
+    readonly NumericUpDown _pinDowel = Number(0.5m, 20, 0.5m, "0.##"), _pinDowelLength = Number(10, 2000, 10, "0"), _pinShorter = Number(0, 40, 1, "0"), _pinSpare = Number(0, 100, 5, "0");
+    readonly ComboBox _pinCutWith = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly DowelPinPreview _pinPreview = new() { Margin = new(0, 4, 0, 0) };
+    readonly TextBlock _pinNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
+    StackPanel _pinPanel = null!;
 
     public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null, Doc.Materials.MaterialLibrary? library = null)
     {
@@ -97,6 +104,13 @@ public sealed class StackSliceWindow : Window
         open.Click += async (_, _) => await Open();
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Reslice(); };
         foreach (var n in new[] { _thick, _dowel, _pin }) n.ValueChanged += (_, _) => Later();
+        _pinDowel.Value = 2; _pinDowelLength.Value = 300; _pinShorter.Value = 15; _pinSpare.Value = 10;
+        // The dowel follows the pin holes until it's set apart from them.
+        _pin.ValueChanged += (_, e) => { if (e.OldValue is { } was && _pinDowel.Value == was && e.NewValue is > 0) _pinDowel.Value = e.NewValue; };
+        foreach (var n in new[] { _pinDowel, _pinDowelLength, _pinShorter, _pinSpare }) n.ValueChanged += (_, _) => Pins();
+        _cutPins.IsCheckedChanged += (_, _) => Pins();
+        _pinCutWith.SelectionChanged += (_, _) => Pins();
+        ToolTip.SetTip(_cutPins, "A page of its own with a straight cut across a dowel every pin length, for laying the dowel on the bed and cutting all the pins in one go. Made with the slices.");
         _outline.SelectionChanged += (_, _) => Later();
         // Turning or standing it another way changes what X, Y and Z are: sizes follow (height kept).
         _up.SelectionChanged += (_, _) => { Natural(); Resize(_height); };
@@ -152,6 +166,21 @@ public sealed class StackSliceWindow : Window
                         _marks, _joined,
                         Field("Pin holes Ø", _pin, tip: "Matching holes wherever a part sits on the one below, for short pins (toothpicks, skewers, brads) that line them up. Placed where the slices around them hide the holes when they can. 0 = none."),
                         Hint("A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's kerf so the pins fit snugly; pins need only be twice the material thick."),
+                        _cutPins,
+                        (_pinPanel = new StackPanel
+                        {
+                            Spacing = 10,
+                            Children =
+                            {
+                                Field("Dowel Ø (mm)", _pinDowel, tip: "The dowel's diameter, measured with calipers (bought dowels are often a little under their size). Follows the pin holes until you change it."),
+                                Field("Dowel length (mm)", _pinDowelLength, tip: "How long your dowel is. Only as much as fits on the bed is cut in one go."),
+                                Field("Pins shorter by (%)", _pinShorter, tip: "A pin goes through two slices; a little shorter means it never stops them closing up, even with a drop of glue in the hole."),
+                                Field("Spare pins (%)", _pinSpare, tip: "Extra pins on top of the ones the holes need (rounded up), for the ones that roll away or break."),
+                                Field("Cut the dowel with", _pinCutWith, tip: "Cut settings from your library for the dowel's wood. A dowel is as thick as it is wide, so it needs settings that cut that deep."),
+                                _pinPreview,
+                                _pinNote,
+                            },
+                        }),
                         Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
                     },
                 }),
@@ -228,6 +257,7 @@ public sealed class StackSliceWindow : Window
         // Now the settings sit in their rows: hide the shaping rows (labels too) unless it's on.
         ShowShaping();
         ShowMethod();
+        Pins();
     }
 
     /// <summary>Show a model already read (and slice it).</summary>
@@ -402,6 +432,8 @@ public sealed class StackSliceWindow : Window
             ? $"{x.M.Label} · {x.R.Title}" + (x.R.SlotFitMm is { } f ? $" (fit {f:+0.##;-0.##;0} mm)" : "")
             : "As set on the cut layer").ToList();
         _cutWith.SelectedIndex = 0;
+        _pinCutWith.ItemsSource = _cuts.Select(c => c is { } x ? $"{x.M.Label} · {x.R.Title}" : "As set on the pins' cut layer").ToList();
+        _pinCutWith.SelectedIndex = 0;
         _etches = [.. mats.SelectMany(m => m.Recipes.Where(r => r.EtchMmPerPass is > 0).Select(r => (m, r)))];
         _etchWith.ItemsSource = _etches.Count == 0 ? ["No etch-rate results yet"] : _etches.Select(x => $"{x.M.Label} · {x.R.Title} ({x.R.EtchMmPerPass:0.###} mm a pass)").ToList();
         _etchWith.SelectedIndex = 0;
@@ -420,6 +452,57 @@ public sealed class StackSliceWindow : Window
         _shapeNote.Text = _etches.Count == 0
             ? "Measure the depth a pass first (Laser → Etch rate test, saved to the library); until then the depth here is a guess, and the shaping will be too deep or too shallow."
             : "Engraved before the cut, on its own layer (\"Slices · shaping\", one pass a step). Where the model narrows downward the steps are underneath: those are sanded.";
+    }
+
+    /// <summary>The library's cut settings chosen for the dowel, if any.</summary>
+    (Doc.Materials.Material M, Doc.Materials.Recipe R)? PinCut() =>
+        _pinCutWith.SelectedIndex > 0 && _pinCutWith.SelectedIndex < _cuts.Count ? _cuts[_pinCutWith.SelectedIndex] : null;
+
+    /// <summary>The pins to cut from the dowel for the slices as they are now (null = not asked for, or no pin holes).</summary>
+    DowelPinPlan? PinPlan()
+    {
+        if (_cutPins.IsChecked != true || _stack is not { } stack || (double)(_pin.Value ?? 0) <= 0 || _method.SelectedIndex != (int)SliceMethod.Stacked) return null;
+        double kerf = PinCut() is { } c && c.R.Settings.KerfMm > 0 ? c.R.Settings.KerfMm : 0.2;
+        return DowelPins.Plan(new DowelPinOptions
+        {
+            PinsNeeded = stack.Pins.Count,
+            SpareShare = (double)(_pinSpare.Value ?? 10) / 100,
+            ThicknessMm = (double)(_thick.Value ?? 3),
+            ShorterShare = (double)(_pinShorter.Value ?? 15) / 100,
+            DowelDiameterMm = (double)(_pinDowel.Value ?? 2),
+            DowelLengthMm = (double)(_pinDowelLength.Value ?? 300),
+            KerfMm = kerf,
+        }, PinRoomMm);
+    }
+
+    /// <summary>How much dowel fits along the bed's longer side, inside the margins.</summary>
+    double PinRoomMm => Math.Max(_machine.FieldW, _machine.FieldH) - 20;
+
+    /// <summary>The dowel settings shown only when they're wanted, and the preview and what it makes, spelled out.</summary>
+    void Pins()
+    {
+        // (Not until the window's built.)
+        if (_pinPanel is null) return;
+        bool on = _cutPins.IsChecked == true;
+        _pinPanel.IsVisible = on;
+        _cutPins.IsVisible = (double)(_pin.Value ?? 0) > 0;
+        DowelPinPlan? plan = null;
+        try { plan = PinPlan(); } catch (ArgumentException) { }
+        double dia = (double)(_pinDowel.Value ?? 2), length = (double)(_pinDowelLength.Value ?? 300);
+        _pinPreview.Show(plan, dia, length);
+        if (plan is null) { _pinNote.Text = _stack is null ? "Open a model first: the pins needed come from its slices." : ""; return; }
+        int needed = _stack!.Pins.Count, spare = plan.Wanted - needed;
+        var note = needed == 0
+            ? "These slices have no pin holes, so there are no pins to cut."
+            : $"{needed} pin{(needed == 1 ? "" : "s")} needed, {spare} spare: {plan.Wanted} to cut, each {plan.PinLengthMm:0.##} mm long (two slices are {2 * (double)(_thick.Value ?? 3):0.##} mm). " +
+              $"{plan.CutsAtMm.Count} cuts, one {(plan.CutsAtMm.Count > plan.Made ? "squaring the dowel's end and one " : "")}after each pin, allowing {(PinCut() is { } c && c.R.Settings.KerfMm > 0 ? $"your {c.R.Settings.KerfMm:0.###} mm kerf" : "0.2 mm for the kerf")}.";
+        if (plan.Short)
+            note += length > PinRoomMm
+                ? $"\n⚠ Only {plan.Made} fit along the bed ({PinRoomMm:0} mm of dowel at a time): run the job, slide the dowel along, square its end and run it again."
+                : $"\n⚠ The {length:0} mm dowel makes only {plan.Made} of the {plan.Wanted}: cut the rest from another dowel (or fewer spares).";
+        if (Math.Abs(dia - (double)(_pin.Value ?? 0)) > 0.05)
+            note += $"\n⚠ The dowel is {dia:0.##} mm but the pin holes are {(double)(_pin.Value ?? 0):0.##} mm: they won't fit snugly. Set the pin holes to the dowel's size.";
+        _pinNote.Text = note + "\nLay the dowel along the bed's long side, taped down so the pins can't roll, and set the distance to its top. Then move the cuts onto it in the camera picture.";
     }
 
     /// <summary>Cut settings chosen from the library: the material's thickness and the cut test's slot fit come with them.</summary>
@@ -447,6 +530,7 @@ public sealed class StackSliceWindow : Window
             var stack = await Task.Run(() => StackSlicer.Slice(mesh, o, cts.Token), cts.Token);
             if (cts.IsCancellationRequested) return;
             _stack = stack;
+            Pins();
             _view.Show(stack, o.ThicknessMm);
             // The range slider spans the new stack (all of it, unless a range was already picked within it).
             bool all = _to.Value >= _to.Maximum && _from.Value <= 1;
@@ -481,7 +565,7 @@ public sealed class StackSliceWindow : Window
                             (stack.LeftOut > 0 ? $" {stack.LeftOut} sliver{(stack.LeftOut == 1 ? " was" : "s were")} too small to cut and left out." : "") +
                             (stack.Joined > 0 ? $" {stack.Joined} steep spot{(stack.Joined == 1 ? " was" : "s were")} widened so the slices there overlap: sand back to the shape." : "") +
                             (stack.Parts.Count(p => p.Floating) is var fl and > 0 ? $"\n⚠ {fl} part{(fl == 1 ? "" : "s")} start in mid-air with nothing under them (red in the preview): separate pieces of the model, to glue on by eye or leave out." : "") +
-                            (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each {2 * o.ThicknessMm:0.#} mm long." : "") +
+                            (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each up to {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
                             (o.ShapeStepMm > 0 ? Shaping(stack, o) : "") +
                             (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
@@ -516,9 +600,22 @@ public sealed class StackSliceWindow : Window
             if (_cutWith.SelectedIndex > 0 && _cutWith.SelectedIndex < _cuts.Count && _cuts[_cutWith.SelectedIndex] is { } c)
                 s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == "Slices · cut",
                     l => c.R.Settings.ApplyTo(l) with { Material = new Doc.Materials.MaterialRef(c.M.Id, c.M.Label, c.R.Id, c.R.Title) });
+            // The pins from the dowel: a page after the slices' last one, the slices' first page still shown.
+            string pinsMade = "";
+            if (PinPlan() is { Made: > 0 } plan)
+            {
+                int slicesShown = s.PageIndex;
+                s = DowelPins.Place(Pages.SwitchTo(s, slicesShown + sheets - 1), plan, (double)(_pinDowel.Value ?? 2), (double)(_pinDowelLength.Value ?? 300), _machine, title: $"{_name} pins");
+                // The kerf is allowed for in the spacing (lines are cut as drawn), so none on the layer.
+                if (PinCut() is { } pc)
+                    s = Pages.UpdateLayers(s, s.PageIndex, 1, l => l.Name == DowelPins.CutLayer,
+                        l => pc.R.Settings.ApplyTo(l) with { KerfMm = 0, Material = new Doc.Materials.MaterialRef(pc.M.Id, pc.M.Label, pc.R.Id, pc.R.Title) });
+                s = Pages.SwitchTo(s, slicesShown);
+                pinsMade = $" The {plan.Made} pins are on their own page, \"{_name} pins\" (layer \"{DowelPins.CutLayer}\"): move the cuts onto the dowel in the camera picture.";
+            }
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +
-                            " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\".";
+                            " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\"." + pinsMade;
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }
     }
