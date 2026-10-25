@@ -21,6 +21,7 @@ public sealed class NestWindow : Window
     readonly NumericUpDown _margin = Number(0, 50, 0.5m, "0.##");
     readonly ComboBox _rotation = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Don't rotate", "Quarter turns (90°)", "45° steps", "15° steps (slower)", "5° steps (slow)" }, SelectedIndex = 1 };
     readonly ComboBox _quality = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Normal (0.5 mm grid)", "Tight (0.25 mm grid, slower)", "Quick (1 mm grid)" }, SelectedIndex = 0 };
+    readonly ComboBox _start = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "The middle, working outward", "The top-left corner (leftover stays in one piece)" }, SelectedIndex = 0 };
     readonly NumericUpDown _copies = Number(1, 500, 1, "0");
     readonly CheckBox _fill = new() { Content = "Fill the sheet with as many as fit" };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap };
@@ -69,6 +70,7 @@ public sealed class NestWindow : Window
                     Field("Edge margin", _margin, tip: "Space kept from the sheet's edge, mm."),
                     Field("Rotation", _rotation),
                     Field("Packing", _quality),
+                    Field("Start from", _start, tip: "Where the first (biggest) part goes. From the middle, the rest gather around it. From the corner, the unused material is left as one piece along the far edges."),
                     Field("Copies of each", _copies, tip: "1 = just the parts you selected. More makes copies."),
                     _fill,
                     _busy,
@@ -93,6 +95,7 @@ public sealed class NestWindow : Window
             ResolutionMm = _quality.SelectedIndex switch { 1 => 0.25, 2 => 1, _ => 0.5 },
             Copies = (int)(_copies.Value ?? 1),
             FillSheet = _fill.IsChecked == true,
+            FromCenter = _start.SelectedIndex != 1,
         };
         var state = _doc.State;
         go.IsEnabled = false;

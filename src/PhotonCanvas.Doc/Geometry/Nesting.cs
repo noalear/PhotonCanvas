@@ -24,6 +24,8 @@ public sealed record NestOptions
     public int MaxCopies { get; init; } = 500;
     /// <summary>The shape used as the sheet (it isn't an obstacle).</summary>
     public Guid? SheetShapeId { get; init; }
+    /// <summary>Start in the middle of the sheet and work outward (true), or pack from the top-left corner, keeping the leftover in one piece (false).</summary>
+    public bool FromCenter { get; init; } = true;
 }
 
 /// <summary>What nesting did.</summary>
@@ -31,8 +33,9 @@ public sealed record NestReport(int Placed, int DidNotFit, IReadOnlyList<Guid> A
 
 /// <summary>
 /// True-shape nesting on a grid: each part's silhouette (holes filled, grown by the spacing)
-/// is slid over the sheet, top-left first, at each allowed rotation, and placed at the first
-/// spot where it touches nothing. Shapes already on the sheet are avoided. Parts are never put
+/// is slid over the sheet at each allowed rotation and placed at the free spot nearest the
+/// sheet's middle (or the first free spot from the top-left, when packing from the corner).
+/// Shapes already on the sheet are avoided. Parts are never put
 /// inside another part's holes (the cut order would make that unsafe).
 /// </summary>
 public static class Nesting
@@ -109,8 +112,8 @@ public static class Nesting
                     c.DrawRect(new SKRect((float)within.MinX, (float)within.MinY, (float)within.MaxX, (float)within.MaxY), band);
                 }
         });
-        // What's already there: other visible shapes, then each part as it's placed.
-        var occupied = Rasterize(W, H, area, r, c =>
+        // What's already there: other visible shapes (each part is added as it's placed).
+        var obstacles = Rasterize(W, H, area, r, c =>
         {
             c.Clear(SKColors.Black);
             using var obstacle = new SKPaint { Color = SKColors.White, IsAntialias = false, Style = SKPaintStyle.Fill };
@@ -144,14 +147,34 @@ public static class Nesting
                 }
             }
         }
+        // The same from the other side: the first blocked cell at or right of it (W = none).
+        void First(bool[] g, int[] first, int y0, int y1)
+        {
+            for (int y = y0; y < y1; y++)
+            {
+                int run = W;
+                for (int x = W - 1; x >= 0; x--)
+                {
+                    if (g[y * W + x]) run = x;
+                    first[y * W + x] = run;
+                }
+            }
+        }
         var edgeLast = new int[W * H];
-        var occLast = new int[W * H];
+        var edgeFirst = new int[W * H];
+        var obstacleLast = new int[W * H];
+        var obstacleFirst = new int[W * H];
         Last(edge, edgeLast, 0, H);
-        Last(occupied, occLast, 0, H);
+        First(edge, edgeFirst, 0, H);
+        Last(obstacles, obstacleLast, 0, H);
+        First(obstacles, obstacleFirst, 0, H);
+        // Obstacles plus the parts placed so far (reset for each packing tried).
+        bool[] occupied = [];
+        int[] occLast = [], occFirst = [];
 
         // -1 when the part fits at (x, y); otherwise the next x worth trying in this row (every spot
         // before it overlaps the same blocked cell).
-        int Blocked(Variant v, int x, int y)
+        int Blocked(Variant v, int x, int y, int[] occ)
         {
             foreach (var (row, lo, hi) in v.Body.RunList())
             {
@@ -160,10 +183,75 @@ public static class Nesting
             }
             foreach (var (row, lo, hi) in v.Grown.RunList())
             {
-                int b = occLast[(y + row) * W + x + hi];
+                int b = occ[(y + row) * W + x + hi];
                 if (b >= x + lo) return b - lo + 1;
             }
             return -1;
+        }
+        // Scanning leftward: int.MaxValue when the part fits at (x, y); otherwise the next x worth trying to the left.
+        int BlockedLeft(Variant v, int x, int y)
+        {
+            foreach (var (row, lo, hi) in v.Body.RunList())
+            {
+                int b = edgeFirst[(y + row) * W + x + lo];
+                if (b <= x + hi) return b - hi - 1;
+            }
+            foreach (var (row, lo, hi) in v.Grown.RunList())
+            {
+                int b = occFirst[(y + row) * W + x + lo];
+                if (b <= x + hi) return b - hi - 1;
+            }
+            return int.MaxValue;
+        }
+
+        // The middle of the sheet, in grid cells.
+        double midX = (within.Center.X - area.MinX) / r, midY = (within.Center.Y - area.MinY) / r;
+
+        // The free spot whose centre is nearest the middle: rows outward from the middle, and in
+        // each row the first free spot to the right and to the left of it.
+        (int X, int Y, Variant V)? FindNearMiddle(List<Variant> vs)
+        {
+            (int X, int Y, Variant V)? best = null;
+            double bestD = double.MaxValue;
+            foreach (var v in vs)
+            {
+                var g = v.Grown;
+                if (g.W > W || g.H > H) continue;
+                int maxX = W - g.W, maxY = H - g.H;
+                double hx = g.W / 2.0, hy = g.H / 2.0;
+                int x0 = Math.Clamp((int)Math.Round(midX - hx), 0, maxX), y0 = Math.Clamp((int)Math.Round(midY - hy), 0, maxY);
+                for (int d = 0; ; d++)
+                {
+                    bool any = false;
+                    foreach (var y in d == 0 ? new[] { y0 } : new[] { y0 + d, y0 - d })
+                    {
+                        if (y < 0 || y > maxY) continue;
+                        double dy2 = (y + hy - midY) * (y + hy - midY);
+                        if (dy2 >= bestD) continue;
+                        any = true;
+                        for (int x = x0; x <= maxX;)
+                        {
+                            double dx = x + hx - midX;
+                            if (dx * dx + dy2 >= bestD) break;
+                            int next = Blocked(v, x, y, occLast);
+                            if (next < 0) { bestD = dx * dx + dy2; best = (x, y, v); break; }
+                            x = Math.Max(next, x + 1);
+                        }
+                        for (int x = x0 - 1; x >= 0;)
+                        {
+                            double dx = x + hx - midX;
+                            if (dx * dx + dy2 >= bestD) break;
+                            int next = BlockedLeft(v, x, y);
+                            if (next == int.MaxValue) { bestD = dx * dx + dy2; best = (x, y, v); break; }
+                            x = Math.Min(next, x - 1);
+                        }
+                    }
+                    ct.ThrowIfCancellationRequested();
+                    // Rows only get farther from the middle from here on.
+                    if (!any) break;
+                }
+            }
+            return best;
         }
 
         (int X, int Y, Variant V)? FindSpot(List<Variant> vs)
@@ -178,7 +266,7 @@ public static class Nesting
                     for (int x = 0; x + g.W <= W;)
                     {
                         if (best is { } bb && y == bb.Y && x >= bb.X) break;
-                        int next = Blocked(v, x, y);
+                        int next = Blocked(v, x, y, occLast);
                         if (next >= 0) { x = Math.Max(next, x + 1); continue; }
                         best = (x, y, v);
                         break;
@@ -195,6 +283,70 @@ public static class Nesting
             var body = v.Body;
             foreach (var i in body.SetList()) occupied[(y + i / body.W) * W + x + i % body.W] = true;
             Last(occupied, occLast, y, y + body.H);
+            First(occupied, occFirst, y, y + body.H);
+        }
+
+        // Every part (originals first, then copies in turn) given a spot on a fresh sheet.
+        (List<(int Ui, int X, int Y, Variant V, bool Copy)> Spots, int Failed, List<int> Unplaced) Pack(bool fromMiddle)
+        {
+            occupied = (bool[])obstacles.Clone();
+            occLast = (int[])obstacleLast.Clone();
+            occFirst = (int[])obstacleFirst.Clone();
+            (int X, int Y, Variant V)? Find(List<Variant> vs) => fromMiddle ? FindNearMiddle(vs) : FindSpot(vs);
+            var spots = new List<(int Ui, int X, int Y, Variant V, bool Copy)>();
+            var left = new List<int>();
+            int failed = 0, copies = 0;
+            foreach (var ui in order)
+            {
+                ct.ThrowIfCancellationRequested();
+                if (Find(variants[ui]) is { } spot)
+                {
+                    spots.Add((ui, spot.X, spot.Y, spot.V, false));
+                    Occupy(spot.X, spot.Y, spot.V);
+                }
+                else
+                {
+                    failed++;
+                    left.Add(ui);
+                }
+            }
+            int extraEach = o.FillSheet ? int.MaxValue : Math.Max(0, o.Copies - 1);
+            var full = new HashSet<int>();
+            for (int round = 0; round < extraEach && full.Count < order.Count && copies < o.MaxCopies; round++)
+            {
+                foreach (var ui in order)
+                {
+                    if (full.Contains(ui) || copies >= o.MaxCopies) continue;
+                    ct.ThrowIfCancellationRequested();
+                    if (Find(variants[ui]) is not { } spot)
+                    {
+                        full.Add(ui);
+                        if (!o.FillSheet) failed++;
+                        continue;
+                    }
+                    spots.Add((ui, spot.X, spot.Y, spot.V, true));
+                    copies++;
+                    Occupy(spot.X, spot.Y, spot.V);
+                }
+            }
+            return (spots, failed, left);
+        }
+
+        // A corner packing moved as a block (all the way, or as far toward it as it can) so it sits around the middle.
+        List<(int Ui, int X, int Y, Variant V, bool Copy)> Centred(List<(int Ui, int X, int Y, Variant V, bool Copy)> spots)
+        {
+            if (spots.Count == 0) return spots;
+            int minX = spots.Min(p => p.X), minY = spots.Min(p => p.Y);
+            int maxX = spots.Max(p => p.X + p.V.Grown.W), maxY = spots.Max(p => p.Y + p.V.Grown.H);
+            int dx = (int)Math.Round(midX - (minX + maxX) / 2.0), dy = (int)Math.Round(midY - (minY + maxY) / 2.0);
+            bool Fits(Variant v, int x, int y) => x >= 0 && y >= 0 && x + v.Grown.W <= W && y + v.Grown.H <= H && Blocked(v, x, y, obstacleLast) < 0;
+            foreach (var f in new[] { 1, 0.75, 0.5, 0.25 })
+            {
+                int sx = (int)Math.Round(dx * f), sy = (int)Math.Round(dy * f);
+                if (spots.All(p => Fits(p.V, p.X + sx, p.Y + sy)))
+                    return [.. spots.Select(p => p with { X = p.X + sx, Y = p.Y + sy })];
+            }
+            return spots;
         }
 
         Affine Placement(int ui, int x, int y, Variant v)
@@ -204,48 +356,31 @@ public static class Nesting
             return Affine.RotateAbout(c, v.AngleDeg).Then(Affine.Translate(target - v.Origin));
         }
 
+        var packed = Pack(o.FromCenter);
+        if (o.FromCenter && (packed.Failed > 0 || o.FillSheet))
+        {
+            // Starting in the middle can leave odd gaps at the edges; when packing from the corner
+            // fits more, use that, moved toward the middle as far as the sheet allows.
+            var corner = Pack(false);
+            if (corner.Spots.Count > packed.Spots.Count) packed = (Centred(corner.Spots), corner.Failed, corner.Unplaced);
+        }
+
         var state = s;
         var added = new List<Guid>();
-        var unplaced = new List<Guid>();
-        int placed = 0, failed = 0;
-        // Originals first, then copies in turn.
-        foreach (var ui in order)
+        foreach (var (ui, x, y, v, copy) in packed.Spots)
         {
-            ct.ThrowIfCancellationRequested();
-            if (FindSpot(variants[ui]) is { } spot)
+            if (!copy)
             {
-                state = Ops.Transform(state, units[ui].Select(x => x.Id).ToHashSet(), Placement(ui, spot.X, spot.Y, spot.V));
-                Occupy(spot.X, spot.Y, spot.V);
-                placed++;
+                state = Ops.Transform(state, units[ui].Select(sh => sh.Id).ToHashSet(), Placement(ui, x, y, v));
+                continue;
             }
-            else
-            {
-                failed++;
-                unplaced.AddRange(units[ui].Select(x => x.Id));
-            }
+            // Copy of the original part (as it was before nesting), then placed like a fresh one.
+            var copies = Ops.CopyAsUnit(units[ui], Placement(ui, x, y, v));
+            state = Ops.AddShapes(state, copies);
+            added.AddRange(copies.Select(c => c.Id));
         }
-        int extraEach = o.FillSheet ? int.MaxValue : Math.Max(0, o.Copies - 1);
-        var full = new HashSet<int>();
-        for (int round = 0; round < extraEach && full.Count < order.Count && added.Count < o.MaxCopies; round++)
-        {
-            foreach (var ui in order)
-            {
-                if (full.Contains(ui) || added.Count >= o.MaxCopies) continue;
-                ct.ThrowIfCancellationRequested();
-                if (FindSpot(variants[ui]) is not { } spot)
-                {
-                    full.Add(ui);
-                    if (!o.FillSheet) failed++;
-                    continue;
-                }
-                // Copy of the original part (as it was before nesting), then placed like a fresh one.
-                var copies = Ops.CopyAsUnit(units[ui], Placement(ui, spot.X, spot.Y, spot.V));
-                state = Ops.AddShapes(state, copies);
-                added.AddRange(copies.Select(c => c.Id));
-                Occupy(spot.X, spot.Y, spot.V);
-                placed++;
-            }
-        }
+        var unplaced = packed.Unplaced.SelectMany(ui => units[ui].Select(sh => sh.Id)).ToList();
+        int placed = packed.Spots.Count, failed = packed.Failed;
         double usable = 0, used = 0;
         for (int i = 0; i < edge.Length; i++) if (!edge[i]) usable++;
         foreach (var x in state.Shapes.Where(x => ids.Contains(x.Id) || added.Contains(x.Id)))

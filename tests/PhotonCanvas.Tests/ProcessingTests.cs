@@ -539,6 +539,22 @@ public class NestingTests
     }
 
     [Fact]
+    public void StartsInTheMiddleAndWorksOutward()
+    {
+        var (s, ids) = Parts(Enumerable.Range(0, 4).Select(i => PathGeometry.Rect(300 + i, 300, 20, 20)).ToArray());
+        var sheet = PathGeometry.Rect(0, 0, 200, 200);
+        var (after, report) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = sheet, SpacingMm = 2, MarginMm = 2 }, M);
+        Assert.Equal((4, 0), (report.Placed, report.DidNotFit));
+        var boxes = ids.Select(id => after.FindShape(id)!.Bounds).ToList();
+        NoOverlaps(boxes, 2);
+        // Gathered around the middle, not along an edge.
+        Assert.All(boxes, b => Assert.True(b.Center.Dist(new Vec2(100, 100)) < 40, $"{b} is far from the middle"));
+        // From the corner they go along the top instead.
+        var (corner, _) = Nesting.Nest(s, ids.ToHashSet(), new NestOptions { Sheet = sheet, SpacingMm = 2, MarginMm = 2, FromCenter = false }, M);
+        Assert.All(ids, id => Assert.True(corner.FindShape(id)!.Bounds.MinY < 5));
+    }
+
+    [Fact]
     public void RotatesALongPartToFit()
     {
         var (s, ids) = Parts(PathGeometry.Rect(0, 0, 90, 10));

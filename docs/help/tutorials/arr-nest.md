@@ -34,6 +34,11 @@ The space between parts (at least the cut width), and **Edge margin** from the s
 Quarter turns is quick; finer steps pack closer but take longer. **Copies of each** or **Fill the
 sheet with as many as fit** add copies.
 
+## Where to start
+<!-- target: field:Start from -->
+**The middle, working outward** gathers the parts in the middle of the sheet. **The top-left
+corner** packs from the top left, so the leftover material stays in one piece.
+
 ## Nest them
 <!-- target: button:Nest -->
 Click **Nest**. The line above the buttons says how many were placed; `Ctrl+Z` undoes it.

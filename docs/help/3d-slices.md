@@ -313,8 +313,8 @@ The parts go on three layers of their own (made if they aren't there yet), in th
 - **Groups:** each part is grouped with its marks, so it moves as one. Parts are named "Slice 4"
   (or X3, Fin 2, Ring 1); shaping steps "Slice 4 · step 2"; marks "Where slice 5 goes".
 - **Nesting:** the parts are packed by their true shape, biggest first, with quarter turns and
-  small parts in the gaps, 3 mm apart and 3 mm from the edge, to fill each bed before starting the
-  next.
+  small parts in the gaps, 3 mm apart and 3 mm from the edge, starting in the middle of the bed
+  (or material) and working outward, to fill each bed before starting the next.
 - **Pages:** with **The whole bed**, if the current page already has something on it, the parts
   start on a new page named after the model. Parts that don't fit go on further pages ("model 2",
   "model 3"…): the tabs above the work area (see [The workspace](workspace.md)). Each page is a
