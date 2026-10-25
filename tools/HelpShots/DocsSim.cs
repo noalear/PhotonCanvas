@@ -171,7 +171,7 @@ static class DocsSim
                 string tab = key[..key.IndexOf('/')];
                 // What the command works on: a picture, a few shapes, or the outline.
                 if (tab == "Picture" || key.EndsWith("Colour on metal") || key.EndsWith("Diffraction")) doc.Select([ids.Picture]);
-                else if (tab == "Arrange" || key.Contains("Weld") || key.Contains("Subtract") || key.Contains("Intersect") || key.Contains("Exclude") || key.EndsWith("Cut shapes")) doc.Select([ids.Outline, ids.Badge, ids.Ring]);
+                else if (tab == "Arrange" || key.Contains("Weld") || key.Contains("Subtract") || key.Contains("Intersect") || key.Contains("Exclude") || key.EndsWith("Cut shapes") || key.EndsWith("Mask with shape")) doc.Select([ids.Outline, ids.Badge, ids.Ring]);
                 else if (key.EndsWith("Text on path")) doc.Select([ids.Text, ids.Ring]);
                 else doc.Select([ids.Outline]);
                 Settle(150);

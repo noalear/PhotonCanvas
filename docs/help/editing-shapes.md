@@ -35,6 +35,7 @@ Most of these commands replace a shape's outline with a new one, and that has si
 | **Round corners**, **Stencil bridges…** | become outlines | the same shapes, layer and group |
 | **Simplify**, **Tidy lines**, **Extend lines to meet the next shape**, **Remove overlapping lines** | left out | the same shapes, layer and group |
 | **Cut shapes** | left out | new pieces on the bottom shape's layer, in no group |
+| **Mask with shape** | left out (they can be the mask) | the same shapes, layer and group, cut to the mask; a shape left with nothing is removed |
 | **Trim**, **Scissors**, **Place tabs**, **Start point** | can't be clicked | the same shape, layer and group |
 | **Drop shadow…**, **3D shadow…** | used (the text stays) | a new shadow shape on the same layer |
 | **Warp** (Arrange tab) | become outlines | the same shapes, layer and group |
@@ -103,6 +104,38 @@ shape's layer.
   says so and nothing changes.
 - To weld the letters of a text and keep it editable, tick **Weld letters together** for the text
   in the Selection panel instead ([Drawing](drawing.md)).
+
+## Mask with shape
+<!-- windows: MaskShapesWindow -->
+
+**Mask with shape** (in the **Shape builder** group, and **Shape operations** on the right-click
+menu) cuts the selected shapes to the outline of one of them, the mask: everything past the mask's
+edge is removed. Use it to keep [depth outlines](pictures.md#depth-outlines), a traced pattern or
+hatching only inside a frame or some lettering. Unlike **Intersect**, it keeps open lines (they're
+cut where they cross the mask's edge), keeps each shape on its own layer, and leaves the mask alone.
+
+Select the shapes to cut and the mask together, then click **Mask with shape**. A window shows the
+result before anything changes: the shapes as they were in faint brown, what's kept in dark brown,
+and the mask's outline dashed in blue.
+
+![The Mask with shape window](images/window-home-mask-with-shape.png)
+
+| Setting | What it does |
+|---|---|
+| **Mask** | The shape whose outline does the cutting, listed by name and size. Only its closed outlines count. It starts on the simplest closed shape selected (the one with the fewest outlines, so a frame or some lettering rather than a thousand traced lines); pick another if that's wrong. |
+| **Keep what's inside the mask** / **Keep what's outside the mask** | Which side survives. Inside is the default. |
+| **Keep the mask shape too** | Ticked (default): the mask stays as it is. Unticked: it's deleted once it has done the cutting. |
+
+The line under the settings says how many shapes are cut, how many pieces they had and will have,
+and which shapes are left with nothing (they're removed). **Mask** applies it as one undo step.
+
+- Lines are cut where they cross the mask's edge. Filled (closed) outlines are cut to the mask's
+  shape, so a filled ribbon that crosses the edge ends exactly on it.
+- A mask with holes (letters such as "o" and "e") keeps the holes out: what lies in a hole counts
+  as outside.
+- Text and codes are never cut, but either can be the mask. Pictures have their own
+  [Image mask](pictures.md#image-mask).
+- The cut shapes keep their name, layer and group, but lose their tabs and start point.
 
 ## Offset
 
@@ -396,6 +429,7 @@ when a text is selected.
 - [Cut a line with scissors](tutorial:edit-scissors)
 - [Simplify a shape](tutorial:edit-simplify)
 - [Cut overlapping shapes into pieces](tutorial:edit-cut-shapes)
+- [Mask shapes with a shape](tutorial:edit-mask)
 - [Place tabs by hand](tutorial:edit-tabs)
 - [Choose where a cut starts](tutorial:edit-start-point)
 - [Extend lines to meet](tutorial:edit-extend-lines)

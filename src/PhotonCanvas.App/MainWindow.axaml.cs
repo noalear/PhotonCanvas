@@ -549,6 +549,7 @@ public partial class MainWindow : Window
         boolean.Small("Subtract", "IcSubtract", () => BooleanSel(BoolOp.Subtract), "Subtract: the bottom shape minus the ones above it (Ctrl+Shift+M)", TwoPaths);
         boolean.Small("Intersect", "IcIntersect", () => BooleanSel(BoolOp.Intersect), "Intersect: keep only where they overlap", TwoPaths);
         boolean.Small("Exclude", "IcExclude", () => BooleanSel(BoolOp.Exclude), "Exclude: remove where they overlap", TwoPaths);
+        boolean.Small("Mask with shape", "IcIntersect", () => _ = Guard(MaskSel), "Cut the selected shapes to the inside (or outside) of one of them: lines past its edge and the parts of filled shapes outside it are removed", TwoPaths);
         var outline = home.Group("Outline");
         outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: a new outline a set distance outside or inside (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
         outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round the sharp corners of the selected shapes", () => SelectedPaths().Count > 0);
@@ -1360,6 +1361,7 @@ public partial class MainWindow : Window
                 Do("Weld (union)", () => BooleanSel(BoolOp.Union), paths.Count > 1),
                 Do("Subtract (bottom minus the rest)", () => BooleanSel(BoolOp.Subtract), paths.Count > 1),
                 Do("Intersect (keep the overlap)", () => BooleanSel(BoolOp.Intersect), paths.Count > 1),
+                DoAsync("Mask with shape…", MaskSel, paths.Count > 1),
                 Do("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), paths.Count > 1)),
             Sub("Array",
                 DoAsync("Nest on material…", NestSel),
@@ -2015,6 +2017,13 @@ public partial class MainWindow : Window
     }
 
     /// <summary>A picture and a closed shape selected: the shape becomes the picture's image mask (the shape stays, as a guide).</summary>
+    async Task MaskSel()
+    {
+        var paths = SelectedPaths();
+        if (paths.Count < 2 || !paths.Any(p => p.World.Subpaths.Any(sp => sp.Closed))) { StatusText.Text = "Select the shapes to cut and a closed shape to mask them with."; return; }
+        await new MaskShapesWindow(_doc, paths).ShowDialog(this);
+    }
+
     void ClipPicture()
     {
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
