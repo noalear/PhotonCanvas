@@ -138,40 +138,81 @@ public class ColourTests
 
 public class MopaLimitTests
 {
-    static MopaLimit At(int ns) => MachineProfile.F2Ultra.MopaLimitFor(ns)!.Value;
+    // Made-up limits, to test the rules without depending on whose table is in use.
+    static readonly MopaLimit Long = new(200, 70, 900, 50), Short = new(6, 800, 2000);
+    static readonly MachineProfile Machine = MachineProfile.F2Ultra with { Mopa = [Short, Long] };
 
     [Fact]
     public void OnReflectiveMaterialLongPulsesSkipTheRangeTheSourceIsProtectedFrom()
     {
-        // 200 ns: full power from 65 kHz; 48–64 kHz kept out of on reflective work (as the stock software does).
-        var l = At(200);
-        Assert.True(l.InGap(48));
-        Assert.True(l.InGap(64));
-        Assert.False(l.InGap(47));
-        Assert.False(l.InGap(65));
-        Assert.Equal(65, l.Safe(50, reflective: true));
-        Assert.Equal(50, l.Safe(50)); // everywhere else the whole range is there
-        Assert.Equal(47, l.Safe(47, reflective: true));
-        Assert.Equal(1000, l.Safe(5000)); // and never above its maximum
+        // Full power from 70 kHz; 50–69 kHz kept out of on reflective work.
+        var l = Long;
+        Assert.True(l.InGap(50));
+        Assert.True(l.InGap(69));
+        Assert.False(l.InGap(49));
+        Assert.False(l.InGap(70));
+        Assert.Equal(70, l.Safe(55, reflective: true));
+        Assert.Equal(55, l.Safe(55)); // everywhere else the whole range is there
+        Assert.Equal(49, l.Safe(49, reflective: true));
+        Assert.Equal(900, l.Safe(5000)); // and never above its maximum
         Assert.Equal(1, l.Safe(0));
         // Short pulses have no such range.
-        Assert.Null(At(6).GapFromKhz);
-        Assert.Equal(300, At(6).Safe(300));
+        Assert.Null(Short.GapFromKhz);
+        Assert.Equal(300, Short.Safe(300));
 
-        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra, reflective: true));
-        Assert.Contains("48–64 kHz", ex.Message);
-        LaserSettings.Red(50, 500, 200, 55).Validate(MachineProfile.F2Ultra);
-        LaserSettings.Red(50, 500, 200, 65).Validate(MachineProfile.F2Ultra);
-        LaserSettings.Red(50, 500, 200, 40).Validate(MachineProfile.F2Ultra);
+        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 60).Validate(Machine, reflective: true));
+        Assert.Contains("50–69 kHz", ex.Message);
+        Assert.Contains("49 kHz or less", ex.Message);
+        LaserSettings.Red(50, 500, 200, 60).Validate(Machine);
+        LaserSettings.Red(50, 500, 200, 70).Validate(Machine);
+        LaserSettings.Red(50, 500, 200, 40).Validate(Machine, reflective: true);
     }
 
     [Fact]
     public void BelowFullPowerFrequencyTheSourceGivesLess()
     {
-        var l = At(6); // full power from 850 kHz
-        Assert.Equal(1, l.PowerAvailable(850));
+        var l = Short; // full power from 800 kHz
+        Assert.Equal(1, l.PowerAvailable(800));
         Assert.Equal(1, l.PowerAvailable(2000));
-        Assert.Equal(300 / 850.0, l.PowerAvailable(300), 9);
+        Assert.Equal(300 / 800.0, l.PowerAvailable(300), 9);
+    }
+
+    [Fact]
+    public void WithoutXToolStudioTheBuiltInTableIsCautious()
+    {
+        // The tests run on it (PHOTONCANVAS_MOPA_TABLE=builtin, see TestSetup).
+        Assert.Same(MopaTable.Fallback, MachineProfile.F2Ultra.Mopa);
+        Assert.Null(MopaTable.ReadFrom);
+        Assert.Equal(LaserSettings.PulseWidths, MopaTable.Fallback.Select(l => l.PulseWidthNs));
+        Assert.All(MopaTable.Fallback, l =>
+        {
+            Assert.InRange(l.MaxKhz, 1, 2000);
+            Assert.True(l.MaxKhz * l.PulseWidthNs <= 100_000); // at most a 10% duty cycle
+            Assert.InRange(l.DefaultKhz, Math.Min(120, l.MaxKhz), l.MaxKhz);
+            Assert.Equal(l.PulseWidthNs >= 100 ? 1 : null, l.GapFromKhz);
+        });
+        var at200 = MachineProfile.F2Ultra.MopaLimitFor(200)!.Value;
+        Assert.Equal((120, 500), (at200.DefaultKhz, at200.MaxKhz));
+        // From 100 ns up, everything below full power stays off reflective work; the message makes sense.
+        var ex = Assert.Throws<JobException>(() => LaserSettings.Red(50, 500, 200, 65).Validate(MachineProfile.F2Ultra, reflective: true));
+        Assert.Contains("Use 120 kHz or more.", ex.Message);
+        Assert.DoesNotContain("0 kHz or less", ex.Message);
+    }
+
+    [Fact]
+    public void TheTableIsReadFromTheExtensionsCode()
+    {
+        // Shaped like the extension's code; the numbers are made up.
+        var code = "x=1,a={1:[2,3]},T={3:[900,1500],7:[400,1500],12:[200,800],40:[90,600],90:[66,500],300:[55,300,40]},b=[1,2,3]";
+        var t = MopaTable.Parse(code)!;
+        Assert.Equal([new MopaLimit(3, 900, 1500), new MopaLimit(7, 400, 1500), new MopaLimit(12, 200, 800), new MopaLimit(40, 90, 600), new MopaLimit(90, 66, 500), new MopaLimit(300, 55, 300, 40)], t);
+        Assert.Equal(1500, MopaTable.Parse(code.Replace("1500", "1.5e3"))![0].MaxKhz);
+        // Nothing that doesn't make sense, and no guessing between two tables.
+        Assert.Null(MopaTable.Parse("T={3:[900,800],7:[400,1500],12:[200,800],40:[90,600],90:[66,500],300:[55,300,40]}")); // full power above the top
+        Assert.Null(MopaTable.Parse("T={3:[900,1500],7:[400,1500],12:[200,800],40:[90,600],90:[66,500],300:[55,300,60]}")); // protected range above full power
+        Assert.Null(MopaTable.Parse("T={7:[900,1500],3:[400,1500],12:[200,800],40:[90,600],90:[66,500],300:[55,300]}")); // pulse widths out of order
+        Assert.Null(MopaTable.Parse(code + ";U=" + code[(code.IndexOf("T=") + 2)..]));
+        Assert.Null(MopaTable.Parse("nothing here"));
     }
 
     [Fact]
@@ -183,7 +224,7 @@ public class MopaLimitTests
             LinesPerCm = 99999,
         }.Clamped(MachineProfile.F2Ultra);
         Assert.Equal(200, s.Laser.PulseWidthNs);
-        Assert.Equal(1000, s.Laser.FrequencyKhz);
+        Assert.Equal(MachineProfile.F2Ultra.MopaLimitFor(200)!.Value.MaxKhz, s.Laser.FrequencyKhz);
         Assert.Equal(FillBlock.MaxLinesPerCm, s.LinesPerCm);
     }
 
@@ -301,8 +342,9 @@ public class ReflectiveTests
         var plain = JobBuilder.Build(s, new JobOptions());
         Assert.DoesNotContain(plain.Warnings, w => w.Contains("reflective"));
         var shiny = Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { Reflective = true });
-        Assert.Contains("48–64 kHz", Assert.Throws<JobException>(() => JobBuilder.Build(shiny, new JobOptions())).Message);
-        var ok = Ops.UpdateLayers(shiny, new HashSet<Guid> { layer.Id }, l => l with { Laser = l.Laser with { FrequencyKhz = 65 } });
+        var full = MachineProfile.F2Ultra.MopaLimitFor(200)!.Value.DefaultKhz;
+        Assert.Contains($"–{full - 1} kHz", Assert.Throws<JobException>(() => JobBuilder.Build(shiny, new JobOptions())).Message);
+        var ok = Ops.UpdateLayers(shiny, new HashSet<Guid> { layer.Id }, l => l with { Laser = l.Laser with { FrequencyKhz = full } });
         Assert.Contains(JobBuilder.Build(ok, new JobOptions()).Warnings, w => w.Contains("black marking spray"));
     }
 

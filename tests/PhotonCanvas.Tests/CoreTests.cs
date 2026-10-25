@@ -43,9 +43,11 @@ public class SettingsTests
     public void ValidatesMopaTable()
     {
         LaserSettings.Red(70, 40, 200, 65).Validate(M);
-        LaserSettings.Red(70, 40, 200, 1000).Validate(M);
-        Assert.Throws<JobException>(() => LaserSettings.Red(70, 40, 200, 1001).Validate(M));
-        LaserSettings.Red(70, 40, 2, 4000).Validate(M);
+        // The built-in (cautious) table: 200 ns up to 500 kHz, 2 ns up to 2000 kHz.
+        LaserSettings.Red(70, 40, 200, 500).Validate(M);
+        Assert.Throws<JobException>(() => LaserSettings.Red(70, 40, 200, 501).Validate(M));
+        LaserSettings.Red(70, 40, 2, 2000).Validate(M);
+        Assert.Throws<JobException>(() => LaserSettings.Red(70, 40, 2, 2001).Validate(M));
         Assert.Throws<JobException>(() => LaserSettings.Red(70, 40, 201, 65).Validate(M));
         Assert.Throws<JobException>(() => LaserSettings.Red(70, 40, 200, 0).Validate(M));
         // Blue ignores fiber parameters entirely.

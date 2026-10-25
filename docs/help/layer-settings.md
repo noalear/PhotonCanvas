@@ -87,35 +87,44 @@ Only on layers that use the MOPA.
 
 Each pulse can only carry so much energy, and the longer the pulse the more it may carry. Below a
 certain frequency the source caps each pulse, so it gives less than its 60 W. The line under
-**Frequency** says where full power is at this pulse width, for example "Full power from 132 to
-2000 kHz at 45 ns." Below that it turns orange and says how much is left, for example: "At 30 kHz
+**Frequency** says where full power is at this pulse width, for example "Full power from … to
+… kHz at 45 ns." Below that it turns orange and says how much is left, for example: "At 30 kHz
 each pulse is already as big as the source allows, so it gives only about 46% of its 60 W (100%
 power here ≈ 46% at full power). Fine for colour and gentle marks." The share is roughly the
 frequency divided by the full-power frequency.
 
+**Where the limits come from.** PhotonCanvas doesn't carry xTool's table of these limits. When
+xTool Studio is installed on this computer, it reads the table from it each time it starts (read
+only, nothing is changed or sent anywhere), so the numbers are exactly the ones xTool Studio uses.
+Without xTool Studio it uses a cautious table of its own, which allows less:
+
 | Pulse width | Full power from | Highest | Kept out of on reflective material |
 |---|---|---|---|
-| 2 ns | 1950 kHz | 4000 kHz | – |
-| 4 ns | 1350 kHz | 4000 kHz | – |
-| 6 ns | 850 kHz | 4000 kHz | – |
-| 9 ns | 600 kHz | 4000 kHz | – |
-| 13 ns | 360 kHz | 3000 kHz | – |
-| 20 ns | 252 kHz | 3000 kHz | – |
-| 30 ns | 187 kHz | 3000 kHz | – |
-| 45 ns | 132 kHz | 2000 kHz | – |
-| 60 ns | 115 kHz | 2000 kHz | – |
-| 80 ns | 90 kHz | 2000 kHz | – |
-| 100 ns | 80 kHz | 1000 kHz | – |
-| 150 ns | 70 kHz | 1000 kHz | 57–69 kHz |
-| 200 ns | 65 kHz | 1000 kHz | 48–64 kHz |
-| 250 ns | 65 kHz | 900 kHz | 46–64 kHz |
-| 350 ns | 60 kHz | 600 kHz | 35–59 kHz |
-| 500 ns | 60 kHz | 500 kHz | 30–59 kHz |
+| 2 ns | 2000 kHz | 2000 kHz | – |
+| 4 ns | 1500 kHz | 2000 kHz | – |
+| 6 ns | 1000 kHz | 2000 kHz | – |
+| 9 ns | 670 kHz | 2000 kHz | – |
+| 13 ns | 470 kHz | 2000 kHz | – |
+| 20 ns | 300 kHz | 2000 kHz | – |
+| 30 ns | 200 kHz | 2000 kHz | – |
+| 45 ns | 140 kHz | 2000 kHz | – |
+| 60 ns | 120 kHz | 1660 kHz | – |
+| 80 ns | 120 kHz | 1250 kHz | – |
+| 100 ns | 120 kHz | 1000 kHz | 1–119 kHz |
+| 150 ns | 120 kHz | 660 kHz | 1–119 kHz |
+| 200 ns | 120 kHz | 500 kHz | 1–119 kHz |
+| 250 ns | 120 kHz | 400 kHz | 1–119 kHz |
+| 350 ns | 120 kHz | 280 kHz | 1–119 kHz |
+| 500 ns | 120 kHz | 200 kHz | 1–119 kHz |
 
-These limits come from xTool's own table for the F2 Ultra. Changing the pulse width keeps the
-frequency where it can (colour work tunes it): above the new width's highest it comes down to the
-highest, and on reflective material one in the protected range goes up to the full-power
-frequency.
+It keeps the highest frequency lower, says full power needs a higher frequency (so the power left
+below it is never overstated), and on reflective material keeps long pulses (100 ns and longer) out
+of everything below full power. With it, 200 ns at 65 kHz shows about half power, and on reflective
+material it moves up to 120 kHz. Installing xTool Studio brings in the real limits.
+
+Changing the pulse width keeps the frequency where it can (colour work tunes it): above the new
+width's highest it comes down to the highest, and on reflective material one in the protected range
+goes up to the full-power frequency.
 
 ## Highly reflective material
 
@@ -123,8 +132,8 @@ frequency.
 mirror finishes. It's ticked or cleared by itself when you pick a material, from the material's
 tag in the library; you can change it by hand.
 
-- On long pulses (150 ns and longer) the MOPA keeps out of the range in the last column of the
-  table above: the largest pulses at nearly full power, which a shiny surface can bounce back into
+- On long pulses the MOPA keeps out of a protected range (xTool Studio's, or the last column of
+  the cautious table above): the largest pulses at nearly full power, which a shiny surface can bounce back into
   the fiber and damage it. A frequency in that range is moved up to the full-power frequency, and
   the line under **Frequency** says "On this reflective material … kHz is skipped to protect the
   source."

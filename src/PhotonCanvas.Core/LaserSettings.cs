@@ -60,7 +60,8 @@ public sealed record LaserSettings
             if (reflective && lim.InGap(FrequencyKhz))
                 throw new JobException(
                     $"On highly reflective material, {lim.GapFromKhz}–{lim.DefaultKhz - 1} kHz at {PulseWidthNs} ns is kept out of to protect the laser source " +
-                    $"(the largest pulses at nearly full power, which the material can bounce back into the fiber). Use {lim.DefaultKhz} kHz or more, or {lim.GapFromKhz - 1} kHz or less.");
+                    $"(the largest pulses at nearly full power, which the material can bounce back into the fiber). Use {lim.DefaultKhz} kHz or more" +
+                    (lim.GapFromKhz > 1 ? $", or {lim.GapFromKhz - 1} kHz or less." : "."));
         }
     }
 }

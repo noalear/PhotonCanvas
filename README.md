@@ -42,7 +42,7 @@ straight to the machine over your own network.
 - Relief from a depth map in slices (dark = deep): the focus can follow the floor down, with cleanup passes of their own settings
 - Picture styles: error-diffusion and ordered dithers, halftone, newsprint, line screen and sketch (edges only); dot width correction
 - A material and cutting library: settings that worked, with photos and ratings, shared as `.pcmat` files; test grids (power × speed, focus, line spacing, or any two settings), read from the photo afterwards to point out the best square
-- The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (as the stock software does)
+- The MOPA's real limits: the frequency range each pulse width allows, how much power is really available below its full-power frequency, and the frequencies kept out of on highly reflective materials (read at run time from your own xTool Studio when it's installed; a cautious built-in table otherwise)
 
 **Colour and light on metal (MOPA)** — see [below](#colour-and-gratings-on-metal)
 - Oxide colour tests, measured from close-up camera photos into a palette of the colours your plate really makes; colour pictures in those colours
@@ -174,7 +174,16 @@ docs/                     protocol, G-code and file-format notes
 dotnet test
 ```
 
-The tests never need the real connection keys or a machine.
+The tests never need the real connection keys or a machine, and always use the built-in MOPA
+table (not xTool Studio's), so they give the same result on every computer.
+
+The Python probe and its tests need the packages in `requirements.txt` (websockets, cryptography,
+Pillow, pytest):
+
+```bash
+python -m pip install -r requirements.txt
+python -m pytest tests
+```
 
 ### Ready-to-run builds (Windows, macOS, Linux)
 

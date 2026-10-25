@@ -1,3 +1,4 @@
 websockets>=13
 cryptography
 pillow
+pytest>=8

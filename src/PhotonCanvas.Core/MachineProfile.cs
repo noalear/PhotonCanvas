@@ -30,8 +30,8 @@ public readonly record struct MopaLimit(int PulseWidthNs, int DefaultKhz, int Ma
 }
 
 /// <summary>
-/// Per-model machine limits. Values come from the stock extension for the
-/// model (see docs/) or from measurements on the user's machine.
+/// Per-model machine limits: from xTool's published specifications, measurements on the user's
+/// machine, and (the MOPA table) the user's own xTool Studio at run time.
 /// </summary>
 public sealed record MachineProfile
 {
@@ -71,14 +71,11 @@ public sealed record MachineProfile
         return double.IsFinite(distanceMm) && distanceMm >= 0 && z <= ZMax ? z : null;
     }
 
-    /// <summary>From the GS004 extension's table (pulse width → full-power, max kHz, and the start of the protected range).</summary>
-    public static readonly IReadOnlyList<MopaLimit> F2UltraMopa =
-    [
-        new(2, 1950, 4000), new(4, 1350, 4000), new(6, 850, 4000), new(9, 600, 4000),
-        new(13, 360, 3000), new(20, 252, 3000), new(30, 187, 3000), new(45, 132, 2000),
-        new(60, 115, 2000), new(80, 90, 2000), new(100, 80, 1000), new(150, 70, 1000, 57),
-        new(200, 65, 1000, 48), new(250, 65, 900, 46), new(350, 60, 600, 35), new(500, 60, 500, 30),
-    ];
+    /// <summary>
+    /// Pulse width → full-power and top frequency, and where the protected range starts: read from the
+    /// user's own xTool Studio when it's installed, else a cautious built-in table (<see cref="MopaTable"/>).
+    /// </summary>
+    public static IReadOnlyList<MopaLimit> F2UltraMopa => MopaTable.Current;
 
     /// <summary>xTool F2 Ultra (dual 40 W diode + 60 W MOPA fiber).</summary>
     public static readonly MachineProfile F2Ultra = new()
