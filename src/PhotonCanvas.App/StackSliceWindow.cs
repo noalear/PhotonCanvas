@@ -80,6 +80,7 @@ public sealed class StackSliceWindow : Window
     StackPanel _pinPanel = null!;
     // The assembly instructions: a PDF beside the design (or in the data folder until it's saved).
     readonly CheckBox _booklet = new() { Content = "Make an assembly booklet (PDF)", IsChecked = true };
+    readonly ComboBox _bookletView = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Front", "Right side", "Back", "Left side" }, SelectedIndex = 0 };
     readonly Button _openBooklet = Button("Open the booklet", tip: "Opens the assembly booklet just made, in your PDF viewer, to read or print.");
     string? _bookletPath;
 
@@ -138,6 +139,7 @@ public sealed class StackSliceWindow : Window
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
         _openBooklet.IsVisible = false;
+        _booklet.IsCheckedChanged += (_, _) => BookletShown();
         _openBooklet.Click += (_, _) =>
         {
             if (_bookletPath is null || !File.Exists(_bookletPath)) return;
@@ -219,6 +221,7 @@ public sealed class StackSliceWindow : Window
                 }),
                 _numbers,
                 _booklet,
+                Field("Booklet seen from", _bookletView, tip: "Which side of the model the booklet's pictures look at. Front is the side facing −Y in the file, as almost every 3D program saves it; if your model comes out from behind, choose Back."),
                 Field("Cut with", _cutWith, tip: "Cut settings from your library: the material's thickness, and the kerf and slot fit your cut test measured, go on the slices."),
                 _cutNote,
                 Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
@@ -295,6 +298,13 @@ public sealed class StackSliceWindow : Window
         _radialPanel.IsVisible = _method.SelectedIndex == 2;
         _numbers.Content = _method.SelectedIndex == 0 ? "Number each slice (light mark, 1 at the bottom)" : "Name each sheet and mark what goes in each slot";
         _booklet.IsVisible = _method.SelectedIndex == 0;
+        BookletShown();
+    }
+
+    /// <summary>The booklet's view only when there'll be a booklet.</summary>
+    void BookletShown()
+    {
+        if (_bookletView.Parent is Control row) row.IsVisible = _method.SelectedIndex == 0 && _booklet.IsChecked == true;
     }
 
     static Control Col(Control c, int col)
@@ -655,6 +665,8 @@ public sealed class StackSliceWindow : Window
             PinLengthMm = pinLength,
             DowelMm = (double)(_dowel.Value ?? 0),
             Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
+            View = (BookletView)Math.Max(0, _bookletView.SelectedIndex),
+            TurnDeg = (double)(_turn.Value ?? 0),
         };
         try
         {

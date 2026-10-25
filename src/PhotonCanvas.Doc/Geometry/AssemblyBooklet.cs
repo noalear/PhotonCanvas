@@ -3,6 +3,16 @@ using SkiaSharp;
 
 namespace PhotonCanvas.Doc.Geometry;
 
+/// <summary>Which side of the model the booklet's pictures look at it from.</summary>
+public enum BookletView
+{
+    /// <summary>The model's front: the side facing −Y in the file (as almost every 3D program saves it).</summary>
+    Front,
+    Right,
+    Back,
+    Left,
+}
+
 /// <summary>What the booklet says besides the slices themselves.</summary>
 public sealed record BookletOptions
 {
@@ -15,6 +25,13 @@ public sealed record BookletOptions
     public double DowelMm { get; init; }
     /// <summary>How the slices were cut: says what to sand or fill at the end.</summary>
     public SliceOutline Outline { get; init; } = SliceOutline.Middle;
+    /// <summary>
+    /// The side the pictures look from. <see cref="TurnDeg"/> is how far the model was turned for
+    /// slicing (<see cref="SliceOptions.TurnDeg"/>), so "front" stays the model's own front.
+    /// </summary>
+    public BookletView View { get; init; } = BookletView.Front;
+    /// <summary>How far the model was turned for slicing (degrees).</summary>
+    public double TurnDeg { get; init; }
     /// <summary>Page size in points (1/72 in): US Letter unless set. Everything stays inside A4 too.</summary>
     public float PageWidth { get; init; } = 612;
     public float PageHeight { get; init; } = 792;
@@ -24,7 +41,9 @@ public sealed record BookletOptions
 /// Assembly instructions for stacked slices, in the manner of a building-set manual: a cover with
 /// the finished model, a list of every part, then one step per slice from the bottom up. Each step
 /// shows the parts to add (with their labels), the stack so far with the new parts picked out in
-/// colour, the pins that go in, and where the new parts sit seen from above. Saved as a PDF.
+/// colour, the pins that go in, and where the new parts sit seen from above. Parts with nothing
+/// under them that hang from the slice above (a chin, a tail) are built up off to the side, in
+/// their own steps, and join the model under the part they hang from. Saved as a PDF.
 /// </summary>
 public static class AssemblyBooklet
 {
@@ -33,6 +52,7 @@ public static class AssemblyBooklet
     static readonly SKColor Wood = new(0xE6, 0xCF, 0xA8), WoodEdge = new(0x9C, 0x7A, 0x52);
     static readonly SKColor New = new(0xFF, 0xB2, 0x2E), NewEdge = new(0xB0, 0x5A, 0x00);
     static readonly SKColor Pin = new(0xD2, 0x2B, 0x3C), Callout = new(0xE3, 0xEE, 0xF8), CalloutEdge = new(0x9D, 0xB9, 0xD6);
+    static readonly SKColor SideBg = new(0xF4, 0xF0, 0xFB), SideEdge = new(0xA8, 0x96, 0xD0);
     static readonly SKColor Air = new(0xE5, 0x48, 0x4D);
 
     /// <summary>Writes the booklet to <paramref name="path"/>; returns how many pages it has.</summary>
@@ -68,7 +88,12 @@ public static class AssemblyBooklet
     }
 
     /// <summary>A part flattened once, its loops turned so outlines run anticlockwise and holes clockwise.</summary>
-    sealed record Flat(SlicePart Part, string Label, List<List<Vec2>> Loops, Rect2 Box);
+    sealed record Flat(SlicePart Part, string Label, List<List<Vec2>> Loops, Rect2 Box)
+    {
+        /// <summary>Its label in words: the dot after 6 or 9 is only for reading the part upside down.</summary>
+        public string Name => Label.TrimEnd('.');
+        public int Slice => Part.Slice;
+    }
 
     static Flat Prepare(SlicePart p)
     {
@@ -82,13 +107,73 @@ public static class AssemblyBooklet
         return new Flat(p, p.Label ?? $"{p.Slice}", loops, Rect2.Bounds(loops.SelectMany(l => l)));
     }
 
+    /// <summary>How much two parts of neighbouring slices overlap (mm²).</summary>
+    static double Overlap(Flat a, Flat b)
+    {
+        if (!a.Box.Intersects(b.Box)) return 0;
+        var both = ShapeGeometry.Boolean(a.Part.Outline, b.Part.Outline, BoolOp.Intersect);
+        return both.IsEmpty ? 0 : Math.Abs(both.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Sum(f => Geom.SignedArea(f.Points)));
+    }
+
+    /// <summary>
+    /// The order things go together. Most parts rest on the slice below and go on at their own
+    /// slice's step. One with nothing under it that hangs from a part of the slice above (which
+    /// may hang from the next, and so on) is built up off to the side, and the chain goes on the
+    /// model with the part at its top, the one that does rest on something. A part joined to
+    /// nothing either way stays at its own step, glued on by eye.
+    /// </summary>
+    sealed class Plan
+    {
+        public readonly Dictionary<Flat, Flat> HangsFrom = [];
+        public readonly Dictionary<Flat, int> StepOf = [];
+        /// <summary>Each pin, and the part it rises from (null when no part holds it).</summary>
+        public readonly List<(Vec2 At, int Slice, Flat? From)> Pins = [];
+
+        public Plan(List<Flat> parts, SliceStack stack)
+        {
+            var bySlice = parts.GroupBy(p => p.Slice).ToDictionary(g => g.Key, g => g.ToList());
+            List<Flat> At(int s) => bySlice.TryGetValue(s, out var l) ? l : [];
+            // Standing on the base through the slices below it (resting on a part that itself hangs isn't enough).
+            var grounded = new HashSet<Flat>();
+            foreach (var p in parts.OrderBy(p => p.Slice))
+            {
+                if (p.Slice == 1 || At(p.Slice - 1).Any(q => grounded.Contains(q) && Overlap(p, q) > 0.5)) { grounded.Add(p); continue; }
+                var above = At(p.Slice + 1).Select(q => (Q: q, A: Overlap(p, q))).Where(x => x.A > 0.5).ToList();
+                if (above.Count > 0) HangsFrom[p] = above.MaxBy(x => x.A).Q;
+            }
+            foreach (var p in parts) StepOf[p] = Top(p).Slice;
+            var chains = parts.Where(Hangs).GroupBy(Top).Select(g => (Top: g.Key, Members: g.OrderBy(p => p.Slice).ThenBy(p => p.Label).ToList()))
+                .OrderBy(g => g.Members[0].Slice).ThenBy(g => g.Top.Slice).ToList();
+            for (int i = 0; i < chains.Count; i++) Sides.Add((Letters(i), chains[i].Top, chains[i].Members));
+            foreach (var (s, at) in stack.Pins)
+                Pins.Add((at, s, At(s).FirstOrDefault(p => p.Box.Contains(at) && p.Loops.Any(l => Geom.Inside(l, at)))));
+        }
+
+        /// <summary>The part at the top of the chain this one hangs from (itself when it rests on something).</summary>
+        public Flat Top(Flat p) => HangsFrom.TryGetValue(p, out var h) ? Top(h) : p;
+
+        public bool Hangs(Flat p) => HangsFrom.ContainsKey(p);
+
+        /// <summary>
+        /// Side builds: each chain of hanging parts, built up off to the side a slice at a time (in
+        /// their own slices' steps), lettered A, B… in the order they start. The part at the top of
+        /// the chain is glued onto it when its own step comes, and goes on the model with it under it.
+        /// </summary>
+        public readonly List<(string Name, Flat Top, List<Flat> Members)> Sides = [];
+
+        public (string Name, Flat Top, List<Flat> Members)? SideOf(Flat p) => Hangs(p) ? Sides.First(g => g.Top == Top(p)) : null;
+    }
+
     static List<Action<SKCanvas>> Pages(SliceStack stack, BookletOptions o)
     {
         if (stack.Method != SliceMethod.Stacked) throw new ArgumentException("The assembly booklet is for stacked slices.");
         if (stack.Parts.Count == 0) throw new ArgumentException("There are no parts to put together.");
         var parts = stack.Parts.Select(Prepare).ToList();
         double t = stack.ThicknessMm > 0 ? stack.ThicknessMm : stack.StackHeightMm / Math.Max(1, stack.Slices);
-        var iso = new Iso(parts, t, stack.Slices);
+        // Seen from the chosen side, whichever way the model was turned for slicing.
+        double turn = (int)o.View * 90 + o.TurnDeg;
+        var plan = new Plan(parts, stack);
+        var iso = new Iso(parts, t, turn);
         int total = 0;
         var pages = new List<Action<SKCanvas>>();
         // Footer with the page number on every page (the count is known once they're all listed).
@@ -110,7 +195,7 @@ public static class AssemblyBooklet
             using var sub = Font(14);
             Text(c, o.Title, Margin, Margin + 30, big, Ink);
             Text(c, "Assembly instructions", Margin, Margin + 54, sub, Muted);
-            iso.Draw(c, new SKRect(Margin, Margin + 80, o.PageWidth - Margin, o.PageHeight - 190), stack.Slices, highlight: 0, pins: []);
+            iso.Draw(c, new SKRect(Margin, Margin + 80, o.PageWidth - Margin, o.PageHeight - 190), parts, _ => false, []);
             using var f = Font(11);
             var facts = new List<string>
             {
@@ -123,7 +208,8 @@ public static class AssemblyBooklet
             float y = o.PageHeight - 160;
             foreach (var line in facts) { Text(c, "•  " + line, Margin, y, f, Ink); y += 18; }
             using var hint = Font(10);
-            Wrap(c, "Every part has its label lightly marked on its top face, and the outline of the part that goes on it. Build from step 1 upwards, marks facing up, one slice at a time.",
+            Wrap(c, "Every part has its label lightly marked on its top face, and the outline of the part that goes on it. Build from step 1 upwards, marks facing up, one slice at a time." +
+                    (plan.Sides.Count > 0 ? " Parts that hang from the slice above them (a tail, a chin) are built up off to the side, a \"side build\", and join the model under the part they hang from." : ""),
                 Margin, y + 8, o.PageWidth - 2 * Margin, hint, Muted);
         });
 
@@ -148,7 +234,7 @@ public static class AssemblyBooklet
                     var also = new List<string> { $"{parts.Count} parts from {stack.Slices} slices, all drawn to the same scale." };
                     if (o.PinMm > 0 && stack.Pins.Count > 0) also.Add($"Also: {stack.Pins.Count} pins ({o.PinMm:0.#} mm, {PinLength(o, t)}).");
                     if (o.DowelMm > 0 && stack.Dowels.Count > 0) also.Add($"Also: 2 dowels ({o.DowelMm:0.#} mm × {stack.StackHeightMm:0} mm).");
-                    if (parts.Any(p => p.Part.Floating)) also.Add("Parts in red start in mid-air: glue them on by eye.");
+                    if (parts.Any(p => p.Part.Floating && !plan.Hangs(p))) also.Add("Parts in red start in mid-air: glue them on by eye.");
                     foreach (var line in also) { Text(c, line, Margin, top + 6, f, Muted); top += 15; }
                     top += 10;
                 }
@@ -159,7 +245,7 @@ public static class AssemblyBooklet
                     float x = Margin + k % cols * cell, y = top + k / cols * cellH;
                     using var frame = Stroke(Rule, 0.6f);
                     c.DrawRoundRect(new SKRect(x + 3, y + 3, x + cell - 3, y + cellH - 3), 6, 6, frame);
-                    Flatly(c, p, new SKPoint(x + cell / 2, y + (cell - 4) / 2 + 3), listScale, p.Part.Floating ? Air : Wood, WoodEdge, labels: false);
+                    Flatly(c, p, new SKPoint(x + cell / 2, y + (cell - 4) / 2 + 3), listScale, Floats(p) ? Air : Wood, WoodEdge, labels: false);
                     Text(c, p.Label, x + cell / 2, y + cellH - 9, lf, Ink, SKTextAlign.Center);
                 }
             });
@@ -174,12 +260,10 @@ public static class AssemblyBooklet
             Add(c =>
             {
                 Step(c, new SKRect(Margin, Margin, o.PageWidth - Margin, Margin + half), a);
-                if (b <= stack.Slices)
-                {
-                    using var rule = Stroke(Rule, 1);
-                    c.DrawLine(Margin, Margin + half + 5, o.PageWidth - Margin, Margin + half + 5, rule);
-                    Step(c, new SKRect(Margin, Margin + half + 10, o.PageWidth - Margin, o.PageHeight - Margin), b);
-                }
+                if (b > stack.Slices) return;
+                using var rule = Stroke(Rule, 1);
+                c.DrawLine(Margin, Margin + half + 5, o.PageWidth - Margin, Margin + half + 5, rule);
+                Step(c, new SKRect(Margin, Margin + half + 10, o.PageWidth - Margin, o.PageHeight - Margin), b);
             });
         }
 
@@ -188,7 +272,7 @@ public static class AssemblyBooklet
         {
             using var head = Font(24, bold: true);
             Text(c, "Finished", Margin, Margin + 26, head, Ink);
-            iso.Draw(c, new SKRect(Margin, Margin + 50, o.PageWidth - Margin, o.PageHeight - 200), stack.Slices, highlight: 0, pins: []);
+            iso.Draw(c, new SKRect(Margin, Margin + 50, o.PageWidth - Margin, o.PageHeight - 200), parts, _ => false, []);
             using var f = Font(11);
             string finish = o.Outline switch
             {
@@ -201,32 +285,29 @@ public static class AssemblyBooklet
         total = pages.Count;
         return pages;
 
-        void Step(SKCanvas c, SKRect r, int s)
+        // Red only for a part joined to nothing, below or above: it really is glued on by eye.
+        bool Floats(Flat p) => p.Part.Floating && !plan.Hangs(p) && plan.StepOf[p] == p.Slice && !parts.Any(q => plan.HangsFrom.TryGetValue(q, out var h) && h == p);
+
+        // The parts to take for a step, in a box: each over its "1× 3a", in rows, as big as fits.
+        float PartsBox(SKCanvas c, float left, float top, float width, List<Flat> show, Func<Flat, string> caption, int pinCount, SKColor fill, SKColor edge)
         {
-            var mine = parts.Where(p => p.Part.Slice == s).ToList();
-            var pins = stack.Pins.Where(p => p.Slice == s).Select(p => p.At).ToList();
-            using var num = Font(40, bold: true);
-            Text(c, $"{s}", r.Left, r.Top + 38, num, Ink);
-            // What to take for this step, in a box.
-            float boxW = 190, boxTop = r.Top + 50;
-            // Each part over its "1× 3a", in rows across the box: as big as fits, never wider than its label needs.
             using var lf = Font(11, bold: true);
-            double inner = boxW - 20, fit = Math.Min(listScale * 1.6, 90 / Math.Max(1e-6, mine.Select(p => p.Box.Height).DefaultIfEmpty(1).Max()));
-            fit = Math.Min(fit, inner / Math.Max(1e-6, mine.Select(p => p.Box.Width).DefaultIfEmpty(1).Max()));
-            var slots = mine.Select(p => (Part: p, W: Math.Max(p.Box.Width * fit, lf.MeasureText($"1× {p.Label}")) + 8)).ToList();
+            double inner = width - 20, fit = Math.Min(listScale * 1.6, 90 / Math.Max(1e-6, show.Select(p => p.Box.Height).DefaultIfEmpty(1).Max()));
+            fit = Math.Min(fit, inner / Math.Max(1e-6, show.Select(p => p.Box.Width).DefaultIfEmpty(1).Max()));
             var rows = new List<List<(Flat Part, double W)>>();
-            foreach (var slot in slots)
+            foreach (var p in show)
             {
-                if (rows.Count == 0 || rows[^1].Sum(x => x.W) + slot.W > inner) rows.Add([]);
-                rows[^1].Add(slot);
+                double w = Math.Max(p.Box.Width * fit, lf.MeasureText(caption(p))) + 8;
+                if (rows.Count == 0 || rows[^1].Sum(x => x.W) + w > inner) rows.Add([]);
+                rows[^1].Add((p, w));
             }
             var rowH = rows.Select(row => (float)(row.Max(x => x.Part.Box.Height) * fit) + 24).ToList();
-            float boxH = 16 + rowH.Sum() + (pins.Count > 0 ? 24 : 0);
-            using var fill = Fill(Callout);
-            using var edge = Stroke(CalloutEdge, 1);
-            var box = new SKRect(r.Left, boxTop, r.Left + boxW, boxTop + boxH);
-            c.DrawRoundRect(box, 8, 8, fill);
-            c.DrawRoundRect(box, 8, 8, edge);
+            float boxH = 16 + rowH.Sum() + (pinCount > 0 ? 24 : 0);
+            using var f = Fill(fill);
+            using var e = Stroke(edge, 1);
+            var box = new SKRect(left, top, left + width, top + boxH);
+            c.DrawRoundRect(box, 8, 8, f);
+            c.DrawRoundRect(box, 8, 8, e);
             float y = box.Top + 10;
             for (int i = 0; i < rows.Count; i++)
             {
@@ -236,56 +317,139 @@ public static class AssemblyBooklet
                 {
                     float cx = (float)(x + w / 2);
                     Flatly(c, p, new SKPoint(cx, y + tall / 2), fit, New, NewEdge, labels: false);
-                    Text(c, $"1× {p.Label}", cx, y + tall + 16, lf, Ink, SKTextAlign.Center);
+                    Text(c, caption(p), cx, y + tall + 16, lf, Ink, SKTextAlign.Center);
                     x += w;
                 }
                 y += rowH[i];
             }
-            if (pins.Count > 0)
+            if (pinCount > 0)
             {
                 float py = box.Bottom - 16;
                 using var pinPaint = Stroke(Pin, 5);
                 pinPaint.StrokeCap = SKStrokeCap.Round;
                 c.DrawLine(box.Left + 18, py, box.Left + 38, py, pinPaint);
                 using var pf = Font(11, bold: true);
-                Text(c, $"{pins.Count}× pin", box.Left + 46, py + 4, pf, Ink);
+                Text(c, $"{pinCount}× pin", box.Left + 46, py + 4, pf, Ink);
             }
-            // Seen from above: the slice below in grey, the new parts in colour.
-            float insetTop = box.Bottom + 10, insetH = r.Bottom - insetTop - 34;
-            if (insetH > 50)
+            return box.Bottom;
+        }
+
+        void Step(SKCanvas c, SKRect r, int s)
+        {
+            // On the model now: this slice's parts that stand on it, and any side build joining it under one of them.
+            var hot = parts.Where(p => plan.StepOf[p] == s).ToList();
+            var main = parts.Where(p => p.Slice == s && !plan.Hangs(p)).ToList();
+            var side = parts.Where(p => p.Slice == s && plan.Hangs(p)).ToList();
+            var joining = plan.Sides.Where(g => g.Top.Slice == s).ToList();
+            var active = plan.Sides.Where(g => g.Members[0].Slice <= s && s < g.Top.Slice).ToList();
+            var pins = plan.Pins.Where(p => p.Slice == s && (p.From is null || !plan.Hangs(p.From))).ToList();
+            var sidePins = plan.Pins.Where(p => p.Slice == s && p.From is { } f && plan.Hangs(f)).ToList();
+            using var num = Font(40, bold: true);
+            Text(c, $"{s}", r.Left, r.Top + 38, num, Ink);
+            float boxW = 190;
+            string Caption(Flat p) => plan.SideOf(p) is { } g ? $"1× {p.Label} (side {g.Name})"
+                : joining.FirstOrDefault(g => g.Top == p) is { Name: { } j } ? $"1× {p.Label} + side {j}" : $"1× {p.Label}";
+            var take = main.Concat(side).ToList();
+            float under = r.Top + 50;
+            if (take.Count > 0) under = PartsBox(c, r.Left, r.Top + 50, boxW, take, Caption, pins.Count + sidePins.Count, Callout, CalloutEdge);
+
+            // What to do, in words (first, so the pictures leave room for it).
+            var what = new List<string>();
+            foreach (var g in joining)
+                what.Add($"Glue {g.Top.Name} onto side build {g.Name}, inside the marked line on {Join([.. g.Members.Where(m => m.Slice == s - 1).Select(m => m.Name)])}.");
+            if (main.Count > 0)
+            {
+                var names = Join([.. main.Select(p => joining.FirstOrDefault(g => g.Top == p) is { Name: { } j } ? $"{p.Name} (with side build {j} under it)" : p.Name)]);
+                what.Add(s == 1
+                    ? $"Lay {names} flat on the board, marks facing up."
+                    : $"Glue {names} onto slice {s - 1}{(o.PinMm > 0 && plan.Pins.Any(p => p.Slice == s - 1 && (p.From is null || !plan.Hangs(p.From))) ? ", over its pins," : "")} inside the marked line{(main.Count > 1 ? "s" : "")}.");
+                if (pins.Count > 0) what.Add($"Push {pins.Count} pin{(pins.Count == 1 ? "" : "s")} into the holes, with a drop of glue.");
+                var air = main.Where(Floats).Select(p => p.Name).ToList();
+                if (air.Count > 0) what.Add($"{Join(air)} start{(air.Count == 1 ? "s" : "")} in mid-air: glue {(air.Count == 1 ? "it" : "them")} on by eye.");
+            }
+            foreach (var g in active)
+            {
+                var now = side.Where(p => plan.SideOf(p)?.Name == g.Name).Select(p => p.Name).ToList();
+                if (now.Count == 0) continue;
+                int gp = sidePins.Count(p => plan.SideOf(p.From!)?.Name == g.Name);
+                what.Add(g.Members[0].Slice == s
+                    ? $"Side build {g.Name}: {Join(now)} {(now.Count == 1 ? "hangs" : "hang")} from the slice above, so start {(now.Count == 1 ? "it" : "them")} off to the side: lay {Join(now)} flat on the table, marks up. It joins the model in step {g.Top.Slice}."
+                    : $"Side build {g.Name}: glue {Join(now)} onto it, inside the marked line{(now.Count > 1 ? "s" : "")}.");
+                if (gp > 0) what.Add($"Push {gp} pin{(gp == 1 ? "" : "s")} into side build {g.Name}.");
+            }
+            using var wf = Font(10.5f);
+            string words = string.Join(" ", what);
+            float textH = Lines(words, r.Width, wf) * wf.TextSize * 1.3f + 8;
+            float bottom = r.Bottom - textH;
+            Wrap(c, words, r.Left, bottom + 14, r.Width, wf, Ink);
+
+            // Seen from above: what's already there one level down in grey, what goes on the model now in colour.
+            float insetTop = under + 10, insetH = bottom - insetTop - 6;
+            var onModel = hot.Where(p => p.Slice >= s - 1).ToList();
+            if (insetH > 50 && onModel.Count > 0)
             {
                 var inset = new SKRect(r.Left, insetTop, r.Left + boxW, insetTop + insetH);
                 using var cap = Font(8.5f);
                 Text(c, s == 1 ? "From above" : $"From above, on slice {s - 1}", inset.Left, inset.Top + 8, cap, Muted);
-                var below = parts.Where(p => p.Part.Slice == s - 1).ToList();
-                var all = below.Concat(mine).ToList();
-                var bb = all.Select(p => p.Box).Aggregate(Rect2.Empty, (u, q) => u.Union(q));
-                double k = Math.Min((inset.Width - 10) / Math.Max(1e-6, bb.Width), (inset.Height - 20) / Math.Max(1e-6, bb.Height));
+                var below = parts.Where(p => p.Slice == s - 1 && plan.StepOf[p] < s).ToList();
+                var bb = below.Concat(onModel).Select(p => p.Box).Aggregate(Rect2.Empty, (u, q) => u.Union(q));
+                var spin = Turned(bb, turn);
+                double k = Math.Min((inset.Width - 10) / Math.Max(1e-6, spin.Width), (inset.Height - 20) / Math.Max(1e-6, spin.Height));
                 var centre = new SKPoint(inset.MidX, inset.Top + 14 + (inset.Height - 14) / 2);
-                foreach (var p in below) Flatly(c, p, centre, k, new SKColor(0xEC, 0xEC, 0xEC), new SKColor(0xB0, 0xB0, 0xB0), labels: false, around: bb.Center);
-                foreach (var p in mine) Flatly(c, p, centre, k, New, NewEdge, labels: true, around: bb.Center);
+                foreach (var p in below) Flatly(c, p, centre, k, new SKColor(0xEC, 0xEC, 0xEC), new SKColor(0xB0, 0xB0, 0xB0), labels: false, around: bb.Center, turnDeg: turn);
+                foreach (var p in onModel.OrderBy(p => p.Slice)) Flatly(c, p, centre, k, New, NewEdge, labels: true, around: bb.Center, turnDeg: turn);
                 using var dot = Fill(Pin);
-                foreach (var at in pins)
+                foreach (var pin in pins)
                 {
-                    var q = new SKPoint(centre.X + (float)((at.X - bb.Center.X) * k), centre.Y + (float)((at.Y - bb.Center.Y) * k));
-                    c.DrawCircle(q, Math.Max(1.6f, (float)(o.PinMm / 2 * k)), dot);
+                    var v = Spin(pin.At - bb.Center, turn);
+                    c.DrawCircle(new SKPoint(centre.X + (float)(v.X * k), centre.Y + (float)(v.Y * k)), Math.Max(1.6f, (float)(o.PinMm / 2 * k)), dot);
                 }
             }
-            // The stack so far.
-            iso.Draw(c, new SKRect(r.Left + boxW + 16, r.Top + 6, r.Right, r.Bottom - 34), s, highlight: s, pins: pins, pinMm: o.PinMm);
-            // What to do, in words.
-            // (In words, 6 needs no dot: it's only there for reading the part upside down.)
-            string names = Join(mine.Select(p => p.Label.TrimEnd('.')).ToList());
-            string what = s == 1
-                ? $"Lay {names} flat on the board, marks facing up."
-                : $"Glue {names} onto slice {s - 1}{(o.PinMm > 0 && stack.Pins.Any(p => p.Slice == s - 1) ? ", over its pins," : "")} inside the marked line{(mine.Count > 1 ? "s" : "")}.";
-            if (pins.Count > 0) what += $" Then push {pins.Count} pin{(pins.Count == 1 ? "" : "s")} into the holes, with a drop of glue.";
-            var air = mine.Where(p => p.Part.Floating).Select(p => p.Label.TrimEnd('.')).ToList();
-            if (air.Count > 0) what += $" {Join(air)} start{(air.Count == 1 ? "s" : "")} in mid-air: glue {(air.Count == 1 ? "it" : "them")} on by eye.";
-            using var wf = Font(10.5f);
-            Wrap(c, what, r.Left, r.Bottom - 22, r.Width, wf, Ink);
+
+            // The model so far, and beside it each side build so far (its new part in colour).
+            var right = new SKRect(take.Count > 0 ? r.Left + boxW + 16 : r.Left, r.Top + 6, r.Right, bottom - 4);
+            var shownSides = active.Take(3).ToList();
+            if (shownSides.Count > 0)
+            {
+                float panelW = right.Width * 0.36f, panelH = right.Height / shownSides.Count;
+                for (int i = 0; i < shownSides.Count; i++)
+                {
+                    var g = shownSides[i];
+                    var panel = new SKRect(right.Right - panelW, right.Top + i * panelH, right.Right, right.Top + (i + 1) * panelH - 6);
+                    using var bg = Fill(SideBg);
+                    using var edge = Stroke(SideEdge, 1);
+                    c.DrawRoundRect(panel, 8, 8, bg);
+                    c.DrawRoundRect(panel, 8, 8, edge);
+                    using var head = Font(10, bold: true);
+                    Text(c, $"Side build {g.Name}", panel.Left + 8, panel.Top + 14, head, Ink);
+                    using var note = Font(8);
+                    Text(c, $"joins the model in step {g.Top.Slice}", panel.Left + 8, panel.Top + 25, note, Muted);
+                    var view = new SKRect(panel.Left + 4, panel.Top + 28, panel.Right - 4, panel.Bottom - 4);
+                    if (view.Height > 20)
+                        new Iso(g.Members, t, turn).Draw(c, view, g.Members.Where(m => m.Slice <= s), m => m.Slice == s,
+                            [.. sidePins.Where(p => plan.SideOf(p.From!)?.Name == g.Name).Select(p => (p.At, p.Slice))], o.PinMm);
+                }
+                right = new SKRect(right.Left, right.Top, right.Right - panelW - 10, right.Bottom);
+            }
+            iso.Draw(c, right, parts.Where(p => plan.StepOf[p] <= s), p => plan.StepOf[p] == s, [.. pins.Select(p => (p.At, p.Slice))], o.PinMm);
         }
     }
+
+    /// <summary>How many lines <see cref="Wrap"/> takes for this text.</summary>
+    static int Lines(string text, float width, SKPaint font)
+    {
+        int lines = 0;
+        var line = "";
+        foreach (var word in text.Split(' '))
+        {
+            var tryLine = line.Length == 0 ? word : line + " " + word;
+            if (font.MeasureText(tryLine) > width && line.Length > 0) { lines++; line = word; }
+            else line = tryLine;
+        }
+        return lines + (line.Length > 0 ? 1 : 0);
+    }
+
+    static string Letters(int k) => k < 26 ? $"{(char)('A' + k)}" : Letters(k / 26 - 1) + (char)('A' + k % 26);
 
     static string PinLength(BookletOptions o, double t) => o.PinLengthMm is { } l ? $"{l:0.#} mm long" : $"up to {2 * t:0.#} mm long";
 
@@ -296,13 +460,23 @@ public static class AssemblyBooklet
         _ => string.Join(", ", names.Take(names.Count - 1)) + " and " + names[^1],
     };
 
-    /// <summary>A part drawn flat (top view), centred on <paramref name="at"/> (or placed relative to <paramref name="around"/>).</summary>
-    static void Flatly(SKCanvas c, Flat p, SKPoint at, double scale, SKColor fill, SKColor edge, bool labels, Vec2? around = null)
+    /// <summary>A direction turned so the side the pictures look from is at the bottom of a view from above.</summary>
+    static Vec2 Spin(Vec2 v, double turnDeg)
+    {
+        double a = turnDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a);
+        return new(v.X * c - v.Y * s, v.X * s + v.Y * c);
+    }
+
+    static Rect2 Turned(Rect2 box, double turnDeg) =>
+        Rect2.Bounds(new[] { box.TopLeft, box.BottomRight, new Vec2(box.MinX, box.MaxY), new Vec2(box.MaxX, box.MinY) }.Select(v => Spin(v - box.Center, turnDeg)));
+
+    /// <summary>A part drawn flat (top view), centred on <paramref name="at"/> (or placed relative to <paramref name="around"/>, turned to match the 3D pictures).</summary>
+    static void Flatly(SKCanvas c, Flat p, SKPoint at, double scale, SKColor fill, SKColor edge, bool labels, Vec2? around = null, double turnDeg = 0)
     {
         var centre = around ?? p.Box.Center;
-        SKPoint P(Vec2 v) => new(at.X + (float)((v.X - centre.X) * scale), at.Y + (float)((v.Y - centre.Y) * scale));
+        SKPoint P(Vec2 v) { var q = Spin(v - centre, turnDeg); return new(at.X + (float)(q.X * scale), at.Y + (float)(q.Y * scale)); }
         using var path = new SKPath { FillType = SKPathFillType.EvenOdd };
-        foreach (var l in p.Loops) path.AddPoly([.. l.Select(P)], true);
+        foreach (var l in p.Loops) path.AddPoly([.. Thin(l, 0.4 / scale).Select(P)], true);
         using var f = Fill(fill);
         using var e = Stroke(edge, 0.8f);
         c.DrawPath(path, f);
@@ -316,24 +490,62 @@ public static class AssemblyBooklet
         }
     }
 
+    /// <summary>
+    /// A loop with the points that make no visible difference at this size dropped (within
+    /// <paramref name="tol"/> of the line through their neighbours), so pages stay small.
+    /// </summary>
+    static List<Vec2> Thin(List<Vec2> l, double tol)
+    {
+        if (l.Count < 8) return l;
+        var keep = new bool[l.Count];
+        keep[0] = true;
+        // The point farthest from the first splits the loop into two runs, each simplified on its own.
+        int far = Enumerable.Range(1, l.Count - 1).MaxBy(i => l[i].Dist(l[0]));
+        keep[far] = true;
+        var stack = new Stack<(int A, int B)>([(0, far), (far, l.Count)]);
+        while (stack.Count > 0)
+        {
+            var (a, b) = stack.Pop();
+            var pa = l[a];
+            var pb = l[b % l.Count];
+            var d = pb - pa;
+            double len = d.Length, best = -1;
+            int at = -1;
+            for (int i = a + 1; i < b; i++)
+            {
+                double dist = len < 1e-12 ? l[i].Dist(pa) : Math.Abs((l[i] - pa).X * d.Y - (l[i] - pa).Y * d.X) / len;
+                if (dist > best) { best = dist; at = i; }
+            }
+            if (at < 0 || best <= tol) continue;
+            keep[at] = true;
+            stack.Push((a, at));
+            stack.Push((at, b));
+        }
+        var o = new List<Vec2>();
+        for (int i = 0; i < l.Count; i++) if (keep[i]) o.Add(l[i]);
+        return o.Count >= 3 ? o : l;
+    }
+
     /// <summary>The stack seen from above and to one side, always from the same angle and at the same scale, so the steps line up.</summary>
     sealed class Iso
     {
-        readonly List<Flat> _parts;
-        readonly double _t, _cy = Math.Cos(-30 * Math.PI / 180), _sy = Math.Sin(-30 * Math.PI / 180), _cp = Math.Cos(32 * Math.PI / 180), _sp = Math.Sin(32 * Math.PI / 180);
+        readonly double _t, _cy, _sy, _cp = Math.Cos(32 * Math.PI / 180), _sp = Math.Sin(32 * Math.PI / 180);
         readonly Rect2 _box;
 
-        public Iso(List<Flat> parts, double t, int slices)
+        public Iso(IReadOnlyList<Flat> parts, double t, double turnDeg)
         {
-            _parts = parts;
             _t = t;
+            // A three-quarter view: the chosen side towards you, turned a little to show the side beside it.
+            double yaw = (turnDeg - 30) * Math.PI / 180;
+            _cy = Math.Cos(yaw);
+            _sy = Math.Sin(yaw);
             var box = Rect2.Empty;
             foreach (var p in parts)
                 foreach (var l in p.Loops)
                     foreach (var v in l)
                     {
-                        box = box.Include(Screen(v, (p.Part.Slice - 1) * t));
-                        box = box.Include(Screen(v, p.Part.Slice * t + t));
+                        box = box.Include(Screen(v, (p.Slice - 1) * t));
+                        box = box.Include(Screen(v, p.Slice * t + t));
                     }
             _box = box;
         }
@@ -346,24 +558,30 @@ public static class AssemblyBooklet
 
         Vec2 Screen(Vec2 v, double z) { var (x, y, _) = Project(v.X, v.Y, z); return new(x, y); }
 
-        public void Draw(SKCanvas c, SKRect r, int upTo, int highlight, IReadOnlyList<Vec2> pins, double pinMm = 0)
+        /// <summary>
+        /// Draws <paramref name="shown"/>, bottom slice first, the <paramref name="hot"/> ones in colour
+        /// with their labels, and pins standing in the holes of the slice each rises from.
+        /// </summary>
+        public void Draw(SKCanvas c, SKRect r, IEnumerable<Flat> shown, Func<Flat, bool> hot, IReadOnlyList<(Vec2 At, int Slice)> pins, double pinMm = 0, Func<Flat, bool>? ghost = null)
         {
             double k = Math.Min(r.Width / Math.Max(1e-6, _box.Width), r.Height / Math.Max(1e-6, _box.Height)) * 0.94;
             float ox = (float)(r.MidX - _box.Center.X * k), oy = (float)(r.MidY - _box.Center.Y * k);
             SKPoint P(Vec2 v, double z) { var s = Screen(v, z); return new(ox + (float)(s.X * k), oy + (float)(s.Y * k)); }
             // Coarser outlines where they're drawn small: half a point is as fine as print shows.
             double tol = 0.5 / k;
-            for (int s = 1; s <= upTo; s++)
+            foreach (var slice in shown.GroupBy(p => p.Slice).OrderBy(g => g.Key))
             {
-                bool hot = s == highlight;
+                int s = slice.Key;
                 double z0 = (s - 1) * _t, z1 = s * _t;
-                var slice = _parts.Where(p => p.Part.Slice == s).ToList();
+                var loops = slice.Select(p => (Part: p, Hot: hot(p), Loops: p.Loops.Select(l => Thin(l, tol)).ToList())).ToList();
+                // See-through parts: faint faces, firm outlines.
+                byte Alpha(Flat p) => ghost?.Invoke(p) == true ? (byte)70 : (byte)255;
                 // The walls facing this way, farthest first; then the tops, which nothing in the slice covers.
-                var walls = new List<(double D, SKPoint[] Quad, float Light, bool Hot, bool Air)>();
-                foreach (var p in slice)
-                    foreach (var l in p.Loops)
-                    {
-                        var pts = Thin(l, tol);
+                var walls = new List<(double D, SKPoint[] Quad, float Light, SKColor Colour)>();
+                foreach (var (p, isHot, ls) in loops)
+                {
+                    var colour = (isHot ? New : Wood).WithAlpha(Alpha(p));
+                    foreach (var pts in ls)
                         for (int i = 0; i < pts.Count; i++)
                         {
                             var a = pts[i];
@@ -376,39 +594,35 @@ public static class AssemblyBooklet
                             if (rny * _cp <= 0) continue;
                             var mid = Vec2.Lerp(a, b, 0.5);
                             float light = (float)Math.Clamp(0.62 - 0.28 * rnx, 0.35, 0.9);
-                            walls.Add((Project(mid.X, mid.Y, z0).D, [P(a, z0), P(b, z0), P(b, z1), P(a, z1)], light, hot, p.Part.Floating));
+                            walls.Add((Project(mid.X, mid.Y, z0).D, [P(a, z0), P(b, z0), P(b, z1), P(a, z1)], light, colour));
                         }
-                    }
+                }
                 foreach (var w in walls.OrderBy(w => w.D))
                 {
-                    var baseColour = w.Air ? Air : w.Hot ? New : Wood;
-                    using var f = Fill(Shade(baseColour, w.Light));
+                    using var f = Fill(Shade(w.Colour, w.Light).WithAlpha(w.Colour.Alpha));
                     using var path = new SKPath();
                     path.AddPoly(w.Quad, true);
                     c.DrawPath(path, f);
-                    using var e = Stroke(Shade(baseColour, w.Light * 0.92f), 0.4f);
-                    c.DrawPath(path, e);
                 }
-                foreach (var p in slice)
+                foreach (var (p, isHot, ls) in loops)
                 {
                     using var top = new SKPath { FillType = SKPathFillType.EvenOdd };
-                    foreach (var l in p.Loops) top.AddPoly([.. Thin(l, tol).Select(v => P(v, z1))], true);
-                    using var f = Fill(p.Part.Floating ? Air : hot ? New : Wood);
+                    foreach (var l in ls) top.AddPoly([.. l.Select(v => P(v, z1))], true);
+                    using var f = Fill((isHot ? New : Wood).WithAlpha(Alpha(p)));
                     c.DrawPath(top, f);
-                    using var e = Stroke(hot ? NewEdge : WoodEdge, hot ? 1.1f : 0.5f);
+                    using var e = Stroke(isHot ? NewEdge : WoodEdge, isHot ? 1.1f : 0.5f);
                     c.DrawPath(top, e);
                 }
-                if (!hot) continue;
-                foreach (var p in slice)
+                foreach (var (p, _, _) in loops.Where(x => x.Hot))
                 {
                     float size = (float)Math.Clamp(p.Part.LabelRoomMm * k * 1.1, 7, 16);
                     using var lf = Font(size, bold: true);
                     var q = P(p.Part.LabelAt, z1);
                     Text(c, p.Label, q.X, q.Y + size * 0.35f, lf, Ink, SKTextAlign.Center);
                 }
-                // The pins standing in the new slice's holes, ready for the next one.
+                // The pins standing in this slice's holes, ready for the next one.
                 float rad = Math.Max(1.5f, (float)(pinMm / 2 * k));
-                foreach (var at in pins.OrderBy(v => Project(v.X, v.Y, z1).D))
+                foreach (var (at, _) in pins.Where(p => p.Slice == s).OrderBy(p => Project(p.At.X, p.At.Y, z1).D))
                 {
                     var foot = P(at, z1);
                     var head = P(at, z1 + _t * 0.85);
@@ -418,14 +632,6 @@ public static class AssemblyBooklet
                     c.DrawOval(head, new SKSize(rad, rad * (float)_sp), cap);
                 }
             }
-        }
-
-        /// <summary>Points closer together than the tolerance merged, so small drawings stay light.</summary>
-        static List<Vec2> Thin(List<Vec2> l, double tol)
-        {
-            var o = new List<Vec2>(l.Count) { l[0] };
-            foreach (var v in l.Skip(1)) if (v.Dist(o[^1]) >= tol) o.Add(v);
-            return o.Count >= 3 ? o : l;
         }
     }
 

@@ -374,7 +374,7 @@ slices**. Print it, or keep it open on a tablet beside the glue.
 | Page | What's on it |
 |---|---|
 | Cover | The model's name, the finished stack, how many slices and parts, its size, and what else you need: pins (how many, how thick, how long), dowels, glue. |
-| Parts | Every part, flat, all to the same scale, with its label, slice by slice. Parts that start in mid-air are red. |
+| Parts | Every part, flat, all to the same scale, with its label, slice by slice. Parts joined to nothing, below or above, are red. |
 | Steps | One step per slice, from the bottom up, two to a page. |
 | Finished | The whole model, and what to do last: sand the steps back (**Outer**), fill them (**Inner**), or sand or leave them (**Middle**). |
 
@@ -391,7 +391,37 @@ Each step shows:
   in wood colour and the new parts in orange with their labels, and the pins standing in their
   holes, ready for the next slice.
 - **What to do**, in words: "Glue 3a and 3b onto slice 2, over its pins, inside the marked lines.
-  Then push 2 pins into the holes, with a drop of glue."
+  Push 2 pins into the holes, with a drop of glue."
+
+### Side builds: parts that hang from the slice above
+
+Not every part sits on the slice below it. A tail that curls up off the ground, a chin, a raised
+paw: the bottom part of it has nothing under it, so it can't be glued on in its own step. The
+booklet finds these. A part that doesn't rest on anything standing on the base, but is joined to a
+part of the slice above, starts a **side build**: a little stack built up off to the side, on the
+table, one part per step in its own slice's steps as usual. Side builds are lettered A, B… in the
+order they start.
+
+![Steps 9 and 10: the chin is a side build, and joins the model under the head in step 10](images/booklet-side-build.png)
+
+- While a side build is going, each step has a purple **Side build A** panel beside the model,
+  showing it so far with its new part in colour, and saying which step it joins the model in.
+- Its parts are in the step's blue box as "1× 3a (side A)", and the words say what to do: start it
+  ("lay 3a flat on the table, marks up"), then "glue 4a onto it, inside the marked line".
+- In the step where it joins, the part it hangs from is listed as "1× 27 + side A": glue that part
+  onto the side build's top first, inside the marked line, then glue the two together onto the
+  model. The side build hangs down beside the slice below.
+- A part that rests only on a part that itself hangs is part of the same side build: it isn't
+  standing on anything yet either.
+
+### Which way the pictures look
+
+**Booklet seen from** (**Front**, **Right side**, **Back**, **Left side**; shown when the booklet is
+on) chooses which side of the model the 3D pictures look at, a little from one side and above.
+**Front** is the side facing −Y in the model's file, as almost every 3D program saves it; turning
+the model with **Turned (°)** turns the pictures with it, so the front stays the front. If your
+model comes out seen from behind, choose **Back**. The "From above" pictures are turned the same
+way, the side you're looking from at the bottom.
 
 Where it's saved: next to your design, as "*model* assembly.pdf", once the design has been saved
 (**File → Save**); until then, in the **Booklets** folder of the program's data folder
@@ -402,6 +432,9 @@ make the slices again.
 
 - The pages are US Letter, with margins wide enough to print on A4 too.
 - With **Cut the pins from a dowel too** ticked, the cover gives the pins' real length.
+- The slices are laid out so the glued-up model is the right way round, not a mirror image of the
+  file. Until 25 October 2026 they came out mirrored: parts cut before then still go together,
+  into a mirror-image model, but a booklet made now won't match them.
 - Egg crate and radial get no booklet: their slot names say what goes where.
 
 ## Putting it together

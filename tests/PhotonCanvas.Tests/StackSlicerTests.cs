@@ -424,12 +424,47 @@ public class StackSlicerTests
             for (int k = 0; k < AssemblyBooklet.PageCount(pawn, po); k++) File.WriteAllBytes(Path.Combine(dir, $"pyramid-{k + 1}.png"), AssemblyBooklet.RenderPng(pawn, po, k));
             AssemblyBooklet.SavePdf(pawn, po, Path.Combine(dir, "pyramid.pdf"));
             for (int k = 0; k < 5; k++) File.WriteAllBytes(Path.Combine(dir, $"table-{k + 1}.png"), AssemblyBooklet.RenderPng(stack, o, k));
-            // Four legs, a body, a neck and head (as in the guide's pictures).
+            // Four legs, a body, a head, and a chin hanging under it (as in the guide's pictures).
             var animal = StackSlicer.Slice([.. Box(0, 0, 0, 6, 6, 12), .. Box(44, 0, 0, 50, 6, 12), .. Box(0, 14, 0, 6, 20, 12), .. Box(44, 14, 0, 50, 20, 12),
-                .. Box(0, 0, 12, 50, 20, 27), .. Box(40, 5, 27, 52, 15, 39)], new SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
+                .. Box(0, 0, 12, 50, 20, 27), .. Box(40, 5, 27, 60, 15, 39), .. Box(52, 5, 21, 60, 15, 27)], new SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
             var ao = new BookletOptions { Title = "Animal", PinMm = 2 };
             for (int k = 0; k < AssemblyBooklet.PageCount(animal, ao); k++) File.WriteAllBytes(Path.Combine(dir, $"animal-{k + 1}.png"), AssemblyBooklet.RenderPng(animal, ao, k, 1.2f));
         }
         Assert.Throws<ArgumentException>(() => AssemblyBooklet.PageCount(StackSlicer.Slice(Cylinder(20, 30), new SliceOptions { Method = SliceMethod.Radial, ThicknessMm = 3, HeightMm = 30 }), o));
+    }
+
+    [Fact]
+    public void APartHangingFromTheSliceAboveIsBuiltOffToTheSide()
+    {
+        // A leg, a body on it, and a chin under the body's far end that doesn't reach the ground:
+        // the chin's slice has nothing under it, so it starts a side build that joins under the body.
+        var mesh = new List<Tri>([.. Box(0, 0, 0, 10, 10, 10), .. Box(0, 0, 10, 40, 10, 20), .. Box(28, 0, 5, 40, 10, 10)]);
+        var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 5, HeightMm = 20, KeepJoined = false });
+        Assert.Equal(["1", "2a", "2b", "3", "4"], stack.Parts.Select(p => p.Label));
+        var path = Path.Combine(Path.GetTempPath(), $"booklet-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            // Cover, parts, steps 1–2, steps 3–4, finished.
+            Assert.Equal(5, AssemblyBooklet.SavePdf(stack, new BookletOptions { Title = "Chin" }, path));
+            using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
+            var text = string.Join(" ", pdf.GetPages().Select(pg => pg.Text));
+            Assert.Contains("Side build A: 2b hangs from the slice above", text);
+            Assert.Contains("It joins the model in step 3.", text);
+            Assert.Contains("Glue 3 onto side build A, inside the marked line on 2b.", text);
+            Assert.Contains("Glue 3 (with side build A under it) onto slice 2", text);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void TheStackIsNotAMirrorImageOfTheModel()
+    {
+        // On the bed Y runs towards the front, so a part near the model's back (high Y) lies near the
+        // bed's top edge (low Y): seen from above the parts read as the model does.
+        var mesh = new List<Tri>([.. Box(0, 0, 0, 40, 10, 3), .. Box(0, 30, 0, 10, 40, 3)]);
+        var stack = StackSlicer.Slice(mesh, new SliceOptions { ThicknessMm = 3, HeightMm = 3, KeepJoined = false });
+        var nub = stack.Parts.Single(p => p.Outline.Bounds().Width < 20).Outline.Bounds();
+        var bar = stack.Parts.Single(p => p.Outline.Bounds().Width > 20).Outline.Bounds();
+        Assert.True(nub.Center.Y < bar.Center.Y, $"{nub} {bar}");
     }
 }

@@ -557,8 +557,11 @@ public static class StackSlicer
         double k = scale ? o.HeightMm / Math.Max(1e-9, maxZ - minZ) : 1;
         double kx = scale && o.WidthMm > 0 ? o.WidthMm / Math.Max(1e-9, maxX - minX) : k;
         double ky = scale && o.DepthMm > 0 ? o.DepthMm / Math.Max(1e-9, maxY - minY) : k;
-        V3 Fit(V3 v) => new((v.X - minX) * kx, (v.Y - minY) * ky, (v.Z - minZ) * k);
-        return [.. tris.Select(x => new Tri(Fit(x.A), Fit(x.B), Fit(x.C)))];
+        // Y runs the other way: the parts are laid on the bed seen from above, where Y runs towards the
+        // front of the machine, so without this the glued-up stack came out a mirror image of the
+        // model. (A mirror turns the triangles inside out: two corners swap to keep them facing out.)
+        V3 Fit(V3 v) => new((v.X - minX) * kx, (maxY - v.Y) * ky, (v.Z - minZ) * k);
+        return [.. tris.Select(x => new Tri(Fit(x.A), Fit(x.C), Fit(x.B)))];
     }
 
     /// <summary>The model's cross-section at height <paramref name="z"/>: triangle edges crossing it, joined into closed outlines.</summary>

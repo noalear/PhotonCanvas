@@ -23,6 +23,10 @@ Leave this ticked: the booklet names each part by the label marked on it, like 3
 <!-- target: button:Make an assembly booklet (PDF) -->
 Leave this ticked. It only shows for **Stacked layers (solid)**.
 
+## Choose the side to look from
+<!-- target: field:Booklet seen from -->
+**Front** looks at the model's front. If its pictures show it from behind, choose **Back**.
+
 ## Make the slices
 <!-- target: button:Make the slices -->
 Click **Make the slices**. The summary says where the booklet was saved: next to your design once
@@ -31,3 +35,4 @@ it's saved, otherwise in the Booklets folder.
 ## Open it
 <!-- target: button:Open the booklet -->
 Click **Open the booklet** to read or print it. Build from step 1 up, each step's new parts in orange.
+Parts that hang from the slice above, like a tail, are built off to the side in a purple side build.

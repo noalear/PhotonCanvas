@@ -105,12 +105,13 @@ static class MoreShots
         canvas.FitRect(doc.State.Bounds(doc.State.Shapes.Select(x => x.Id).ToHashSet()).Inflate(25));
         settle(800);
         save(w.CaptureRenderedFrame(), "workspace-after-slices", "The work area after Make the slices: the parts numbered, on the three Slices layers");
-        // The assembly booklet of a four-legged animal: its parts list, and two steps with several pieces each.
+        // The assembly booklet of a four-legged animal: its parts list, two steps with several pieces each, and its chin built off to the side.
         var animal = PhotonCanvas.Doc.Geometry.StackSlicer.Slice([.. Block(0, 0, 0, 6, 6, 12), .. Block(44, 0, 0, 50, 6, 12), .. Block(0, 14, 0, 6, 20, 12), .. Block(44, 14, 0, 50, 20, 12),
-            .. Block(0, 0, 12, 50, 20, 27), .. Block(40, 5, 27, 52, 15, 39)], new PhotonCanvas.Doc.Geometry.SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
+            .. Block(0, 0, 12, 50, 20, 27), .. Block(40, 5, 27, 60, 15, 39), .. Block(52, 5, 21, 60, 15, 27)], new PhotonCanvas.Doc.Geometry.SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
         var booklet = new PhotonCanvas.Doc.Geometry.BookletOptions { Title = "Animal", PinMm = 2 };
         save(new Bitmap(new MemoryStream(PhotonCanvas.Doc.Geometry.AssemblyBooklet.RenderPng(animal, booklet, 1, 1.2f))), "booklet-parts", "Assembly booklet: the parts list, every part to the same scale");
         save(new Bitmap(new MemoryStream(PhotonCanvas.Doc.Geometry.AssemblyBooklet.RenderPng(animal, booklet, 2, 1.2f))), "booklet-steps", "Assembly booklet: steps 1 and 2, the legs in four pieces each");
+        save(new Bitmap(new MemoryStream(PhotonCanvas.Doc.Geometry.AssemblyBooklet.RenderPng(animal, booklet, 6, 1.2f))), "booklet-side-build", "Assembly booklet: steps 9 and 10, the chin built off to the side joining under the head");
         // The model browser, with its pictures drawn.
         var browser = new ModelBrowserWindow(settings);
         browser.Show(w);
