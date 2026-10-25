@@ -449,8 +449,9 @@ goes back up afterwards. All the steps together, with the layer's **Focus offset
 the head more than 10 mm.
 
 - With **Path by path** passes each path is cut with all its passes, the head lowered a little more
-  each time, then raised. With **Round by round** the head is lowered to that round's depth for the
-  layer, and raised again straight after, so other layers keep their focus.
+  each time, then raised. With **Round by round** the head is lowered to that round's depth once
+  and stays there for all the layer's paths in that round; it only moves back for another layer
+  (which keeps its own focus) and goes back up at the end of the job.
 - The checks warn: "… lowers the head by up to … mm while cutting (step-down). Make sure the
   material is at least that thick." (or *while engraving* on an Engrave layer).
 - Not used with **Spread the heat** or the **Offset** fill style. On a curved surface Cut and Score

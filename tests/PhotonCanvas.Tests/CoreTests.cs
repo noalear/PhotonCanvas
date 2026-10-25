@@ -237,6 +237,26 @@ public class StepDownTests
     }
 
     [Fact]
+    public void WholeJobPassesKeepTheHeadDownBetweenPaths()
+    {
+        // Three paths of one cut layer: each round steps down once, not once per path.
+        var laser = LaserSettings.Blue(70, 40).WithPasses(3);
+        var drop = new StepDown(0.2, 0.5);
+        VectorBlock At(double x) => new(Polyline.Loop((x, 100), (x + 10, 100), (x + 10, 110), (x, 110)), laser) { Drop = drop };
+        var g = new Job(MachineProfile.F2Ultra, [At(100), At(130), At(160)]) { PassMode = new PassMode.Rounds(0) }.Render();
+        Assert.Equal([-0.2, -0.5, -0.5, 1.2], ZMoves(g));
+    }
+
+    [Fact]
+    public void PauseAfterEachPassKeepsTheHeadDown()
+    {
+        // Passes written out for the pause: the head steps down between them and only goes up at the end.
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(3)) { Drop = new StepDown(0, 0.4), PauseAfterS = 1 };
+        var g = new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.PerBlock() }.Render();
+        Assert.Equal([-0.4, -0.4, 0.8], ZMoves(g));
+    }
+
+    [Fact]
     public void PerPathPassesEndWhereTheyStarted()
     {
         var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(4)) { Drop = new StepDown(0, 0.3) };

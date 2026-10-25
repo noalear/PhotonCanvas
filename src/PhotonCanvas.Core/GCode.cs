@@ -659,7 +659,9 @@ public sealed class Job
         var lines = Header();
         double focus = 0; // how far the head is lowered now (mm)
         double? headZ = null; // curved surfaces: where the head is now
-        void Focus(Block b)
+        // A step-down cut written one pass at a time: the head goes to that pass's depth here and
+        // stays there for the next path at the same depth, instead of going back up after each one.
+        void Focus(Block b, int? pass = null)
         {
             if (FollowsSurface)
             {
@@ -672,17 +674,19 @@ public sealed class Job
                 else if (b is BandedVectorBlock or BandedFillBlock) headZ = HeadHeights(b).LastOrDefault();
                 return;
             }
-            if (Math.Abs(b.FocusOffsetMm - focus) < 1e-6) return;
-            lines.AddRange(ZMoveAny(-(b.FocusOffsetMm - focus)));
+            double want = b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0);
+            if (Math.Abs(want - focus) < 1e-6) return;
+            lines.AddRange(ZMoveAny(-(want - focus)));
             lines.AddRange(["# MUST", ""]);
-            focus = b.FocusOffsetMm;
+            focus = want;
         }
         switch (PassMode)
         {
             case PassMode.PerBlock:
                 foreach (var b in blocks)
                 {
-                    Focus(b);
+                    bool onePass = b is VectorBlock { Drop: not null } && (b.PauseAfterS > 0 || b.Laser.Passes <= 1);
+                    Focus(b, onePass ? 1 : null);
                     if (b is FillBlock { AngleStepDeg: not 0 } f && f.Laser.Passes > 1)
                         // Each pass turned a little further: written out, the device loop repeats one pattern.
                         for (int p = 1; p <= f.Laser.Passes; p++)
@@ -700,7 +704,8 @@ public sealed class Job
                         // A pause after each pass: the passes written out (the device's loop can't hold one).
                         for (int p = 1; p <= Math.Max(1, b.Laser.Passes); p++)
                         {
-                            lines.AddRange(RenderBlock(b, tag, 1, p));
+                            if (onePass) Focus(b, p);
+                            lines.AddRange(RenderBlock(b, tag, 1));
                             lines.Add("# pause after the path");
                             lines.AddRange(Dwell(b.PauseAfterS));
                             lines.Add("");
@@ -724,8 +729,8 @@ public sealed class Job
                     }
                     foreach (var b in blocks.Where(b => b.Laser.Passes >= round))
                     {
-                        Focus(b);
-                        lines.AddRange(RenderBlock(b switch { FillBlock f => f.ForPass(round), DotBlock d => d.ForPass(round), _ => b }, tag, 1, round));
+                        Focus(b, round);
+                        lines.AddRange(RenderBlock(b switch { FillBlock f => f.ForPass(round), DotBlock d => d.ForPass(round), _ => b }, tag, 1));
                         if (b.PauseAfterS > 0)
                         {
                             lines.Add("# pause after the path");
@@ -1040,11 +1045,11 @@ public sealed class Job
         return v;
     }
 
-    List<string> RenderBlock(Block block, string tag, int passes, int round = 1) => block switch
+    List<string> RenderBlock(Block block, string tag, int passes) => block switch
     {
         BandedVectorBlock b => RenderBandedVector(b, tag, passes),
         BandedFillBlock b => RenderBandedFill(b, tag, passes),
-        VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes, round),
+        VectorBlock { Drop: not null } b => RenderSteppedVector(b, tag, passes),
         VectorBlock b => RenderVector(b, tag, passes),
         FillBlock b => RenderFill(b, tag, passes),
         LoopsBlock b => RenderLoops(b, tag, passes),
@@ -1080,10 +1085,11 @@ public sealed class Job
     /// <summary>
     /// A cut with step-down. With <paramref name="passes"/> &gt; 1 (per-path passes) the passes are
     /// written out one after another, the head lowered before each and raised by the total at the
-    /// end, exactly like xTool Studio. With one pass (whole-job rounds) the head is lowered to this
-    /// round's depth and raised again straight after, so other layers keep their focus.
+    /// end, exactly like xTool Studio. With one pass (whole-job rounds, or a pause after each pass)
+    /// <see cref="Render"/> has already put the head at this pass's depth and leaves it there for
+    /// the next path, so nothing moves Z here.
     /// </summary>
-    List<string> RenderSteppedVector(VectorBlock b, string tag, int passes, int round)
+    List<string> RenderSteppedVector(VectorBlock b, string tag, int passes)
     {
         var pts = b.Path.EmittedPoints();
         if (pts.Count < 2) return [];
@@ -1096,7 +1102,7 @@ public sealed class Job
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
         v.Add($"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}");
-        double first = passes > 1 ? drop.FirstMm : drop.DepthFor(round);
+        double first = passes > 1 ? drop.FirstMm : 0;
         if (first > 0) v.AddRange(ZMoveAny(-first));
         v.AddRange(["# MUST", path[0]]);
         v.AddRange(path);
@@ -1106,7 +1112,7 @@ public sealed class Job
             v.AddRange(path);
         }
         v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
-        double back = passes > 1 ? drop.DepthFor(passes) : first;
+        double back = passes > 1 ? drop.DepthFor(passes) : 0;
         if (back > 0) v.AddRange([.. ZMoveAny(back), "# MUST"]);
         return v;
     }
