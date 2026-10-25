@@ -645,6 +645,7 @@ public partial class MainWindow : Window
         pedit.Small("Centre-line trace", "IcPen", () => { if (SelectedPicture() is { } im) _ = Guard(() => CentrelineTrace(im)); }, "One line down the middle of each stroke (handwriting, line art), on a Score layer", HasPicture);
         var prelief = picture.Group("Relief");
         prelief.Large("3D model", "IcDepth", () => _ = Guard(AddStl), "A 3D model (STL) as a depth map, on a depth-slices layer");
+        prelief.Small("Depth outlines", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }, "Find the edges in a depthmap and mark them as lines over the relief (one laser line, a set width, or swelling with the edge), so it looks less washed out", HasPicture);
         prelief.Small("Relief preview", "IcEye", () => { if (SelectedPicture() is { } im) new ReliefPreviewWindow(im).Show(this); }, "See a depth map as the lit relief it will carve", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
         var pclean = picture.Group("Clean up");
@@ -844,6 +845,7 @@ public partial class MainWindow : Window
         new("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", () => { if (_doc.Selection.Count > 0) _ = Guard(NestSel); }),
         new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
+        new("picture.depthoutlines", "Shapes", "Depth outlines…", "", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }),
         new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
         new("layer.moveto", "Layers", "Move selection to the active layer", "Ctrl+M", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer))),
         new("view.zoomin", "View", "Zoom in", "Ctrl+OemPlus|Ctrl+Add", () => Canvas.ZoomBy(1.25)),

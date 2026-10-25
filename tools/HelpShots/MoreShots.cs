@@ -115,6 +115,37 @@ static class MoreShots
         save(relief.CaptureRenderedFrame(), "window-picture-3d-model", "3D model to relief: a chess pawn seen from the front, as a depth map");
         relief.Close();
 
+        // Depth outlines, on a made-up depthmap: domed pebbles piled on each other.
+        {
+            const int pw = 1200, ph = 600;
+            var z = new double[pw * ph];
+            var rnd = new Random(7);
+            for (int k = 0; k < 26; k++)
+            {
+                double cx = rnd.Next(pw), cy = rnd.Next(ph), rx = 90 + rnd.Next(110), ry = 60 + rnd.Next(80), top = 0.35 + 0.6 * k / 26;
+                for (int y = Math.Max(0, (int)(cy - ry)); y < Math.Min(ph, (int)(cy + ry)); y++)
+                    for (int x = Math.Max(0, (int)(cx - rx)); x < Math.Min(pw, (int)(cx + rx)); x++)
+                    {
+                        double d = Math.Pow((x - cx) / rx, 2) + Math.Pow((y - cy) / ry, 2);
+                        if (d < 1) z[y * pw + x] = Math.Max(z[y * pw + x], top - 0.25 * d);
+                    }
+            }
+            var rgba = new byte[pw * ph * 4];
+            for (int i = 0; i < z.Length; i++)
+            {
+                byte v = (byte)Math.Clamp(z[i] * 255, 0, 255);
+                rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = v;
+                rgba[i * 4 + 3] = 255;
+            }
+            var depth = new ImageShape { Name = "pebbles depthmap", LayerId = doc.State.Layers[0].Id, Source = ImageSource.FromEncoded(new PhotonCanvas.Core.Imaging.RasterImage(pw, ph, rgba).EncodePng()), SizeMm = new Vec2(120, 60) };
+            var outlines = new DepthOutlinesWindow(doc, depth);
+            outlines.Show(w);
+            F<Slider>(outlines, "_amount").Value = 45;
+            settle(3000);
+            save(outlines.CaptureRenderedFrame(), "window-picture-depth-outlines", "Depth outlines: the edges of a depthmap of piled pebbles, as lines that swell on the tall steps (How many edges at 45%)");
+            outlines.Close();
+        }
+
         // --- Spread the heat: a thin aluminium mask, a plate with rows of holes.
         reset();
         var hs = DocState.New();

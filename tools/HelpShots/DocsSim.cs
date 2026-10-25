@@ -157,7 +157,7 @@ static class DocsSim
             var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 "Home/Import", "Home/Picture", "Home/By colour", "Home/Import as…", "Home/Select by…", "Home/More…", "Home/Paste",
-                "Picture/Import picture", "Picture/Depthmap", "Picture/3D model",
+                "Picture/Import picture", "Picture/Depthmap", "Picture/3D model", "Picture/Depth outlines",
                 "Camera/Update photo", "Camera/Live view", "Camera/Close-up", "Camera/Show picture", "Camera/Calibrate", "Camera/Focus on selection",
                 "Camera/Thickness", "Camera/Cut round prints",
                 "Laser/Split onto pieces", "Camera/Line up pieces", // set up in MoreShots

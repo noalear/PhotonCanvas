@@ -153,7 +153,7 @@ public sealed class TraceWindow : Window
         Opened += async (_, _) => await Prepare();
     }
 
-    static Control Slide(string label, Slider s, TextBlock value)
+    internal static Control Slide(string label, Slider s, TextBlock value)
     {
         var head = new DockPanel();
         value.HorizontalAlignment = HorizontalAlignment.Right;
@@ -366,6 +366,9 @@ sealed class TracePreview : Control
     bool _faint;
     /// <summary>Show the picture very faintly, so the traced colours stand out (colour modes).</summary>
     public bool FaintPicture { get => _faint; set { _faint = value; InvalidateVisual(); } }
+    bool _marks;
+    /// <summary>Draw the result as the marks it makes (filled dark, lines as thin strokes) instead of traced outlines.</summary>
+    public bool Marks { get => _marks; set { _marks = value; InvalidateVisual(); } }
 
     /// <summary>A click (not a drag) on the picture, in preview-bitmap pixels.</summary>
     public event Action<Vec2>? Clicked;
@@ -407,6 +410,13 @@ sealed class TracePreview : Control
             using (ctx.PushTransform(Matrix.CreateScale(1 / PixelScale, 1 / PixelScale)))
             {
                 double px = PixelScale / _zoom;
+                if (_marks)
+                {
+                    var ink = new SolidColorBrush(Color.Parse("#3B2616"));
+                    foreach (var part in _result.Parts)
+                        ctx.DrawGeometry(ink, new Pen(ink, 1.4 * px), ToAvalonia(part.Geometry, FillRule.NonZero));
+                    return;
+                }
                 foreach (var part in _result.Parts)
                 {
                     var c = part.Rgb is { } rgb ? Color.FromRgb((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb) : Color.Parse("#111827");
@@ -417,14 +427,14 @@ sealed class TracePreview : Control
         }
     }
 
-    static StreamGeometry ToAvalonia(PathGeometry pg)
+    static StreamGeometry ToAvalonia(PathGeometry pg, FillRule rule = FillRule.EvenOdd)
     {
         var g = new StreamGeometry();
         using var c = g.Open();
-        c.SetFillRule(FillRule.EvenOdd);
+        c.SetFillRule(rule);
         foreach (var sp in pg.Subpaths)
         {
-            c.BeginFigure(new Point(sp.Start.X, sp.Start.Y), true);
+            c.BeginFigure(new Point(sp.Start.X, sp.Start.Y), sp.Closed);
             foreach (var seg in sp.Segs)
             {
                 if (seg.Kind == SegKind.Line) c.LineTo(new Point(seg.To.X, seg.To.Y));
