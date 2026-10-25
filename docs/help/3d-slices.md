@@ -173,7 +173,7 @@ through.
 | **Spare pins (%)** | 0 to 100 % (10) | Extra pins on top of the ones the holes need, rounded up, for the ones that roll away or break: 21 holes and 10 % make 24 pins. |
 | **Cut the dowel with** | As set on the pins' cut layer | Cut settings from your library for the dowel's wood. A dowel is as thick as it is wide, so it needs settings that cut that deep. The recipe's kerf is allowed for in the spacing between cuts (0.2 mm when there's none). |
 | **Dowels Ø** | 0 to 20 mm, steps of 0.5 (0) | Two holes through every slice, as far apart as they fit, for long dowels through the whole stack. Only where every slice has room (1.5 mm round each hole); otherwise the summary says "No room for dowel holes in every slice". 0 = none. |
-| **Number each slice (light mark, 1 at the bottom)** | on | Marks each part with its slice number, 1 at the bottom, at the spot furthest from its edges and holes, as large as fits (up to 6 mm). Parts too narrow for a number get none. |
+| **Number each slice (light mark, 1 at the bottom)** | on | Marks each part with its label, at the spot furthest from its edges and holes, as large as fits (up to 6 mm). The label is the slice number, 1 at the bottom; where a slice is in several pieces, each gets a letter too (3a, 3b, 3c…), lettered left to right as the model stands, so no two parts share a label. A number that reads as another one upside down gets a dot after it (6., 9., 16.), because the parts are turned round on the bed. Parts too narrow for a label get none. |
 
 A toothpick is about 2 mm, a bamboo skewer 3 mm. Set the cut layer's **Kerf (mm)** (see
 [Layer settings](layer-settings.md)) so the holes come out at their size and the pins fit snugly.
@@ -215,7 +215,7 @@ check the first cut goes all the way through before leaving it to run.
 - **Slivers:** pieces smaller than 1 mm², or narrower than 1 mm, are too small to cut or handle and
   are left out. The summary counts them.
 - **Slices in several pieces:** where the model branches (an animal's legs), a slice is several
-  parts, each numbered with its slice.
+  parts, each labelled with its slice and a letter: 3a, 3b and so on, left to right.
 - **Parts in mid-air** (red in the preview): a part that isn't joined, through the slices, to
   anything on the bottom slice starts with nothing under it. It's a separate piece of the model:
   glue it on by eye, or leave it out. The summary warns about them.
@@ -348,8 +348,9 @@ The parts go on three layers of their own (made if they aren't there yet), in th
 | **Slices · shaping** | Fill, one pass | The edge-shaping steps (only with **Shape the edges** on). |
 | **Slices · cut** | Cut | The parts' outlines, holes and slots. |
 
-- **Groups:** each part is grouped with its marks, so it moves as one. Parts are named "Slice 4"
-  (or X3, Fin 2, Ring 1); shaping steps "Slice 4 · step 2"; marks "Where slice 5 goes".
+- **Groups:** each part is grouped with its marks, so it moves as one. Parts are named after their
+  label, "Slice 4" or "Slice 4b" (or X3, Fin 2, Ring 1); shaping steps "Slice 4b · step 2"; marks
+  "Where slice 5 goes".
 - **Nesting:** the parts are packed by their true shape, biggest first, with quarter turns and
   small parts in the gaps, 3 mm apart and 3 mm from the edge, starting in the middle of the bed
   (or material) and working outward, to fill each bed before starting the next.
@@ -362,9 +363,50 @@ The parts go on three layers of their own (made if they aren't there yet), in th
 Before you send it, check the **Slices · cut** layer's settings and **Kerf (mm)** (see [Layer
 settings](layer-settings.md)), and the marks layer's power on your material.
 
+## The assembly booklet
+
+**Make an assembly booklet (PDF)** (on; stacked layers only) also writes step-by-step instructions
+for putting the slices together, laid out like a building-set manual, when you click **Make the
+slices**. Print it, or keep it open on a tablet beside the glue.
+
+![The booklet's parts list: every part to the same scale, with its label](images/booklet-parts.png)
+
+| Page | What's on it |
+|---|---|
+| Cover | The model's name, the finished stack, how many slices and parts, its size, and what else you need: pins (how many, how thick, how long), dowels, glue. |
+| Parts | Every part, flat, all to the same scale, with its label, slice by slice. Parts that start in mid-air are red. |
+| Steps | One step per slice, from the bottom up, two to a page. |
+| Finished | The whole model, and what to do last: sand the steps back (**Outer**), fill them (**Inner**), or sand or leave them (**Middle**). |
+
+![Steps 1 and 2 of an animal: the legs, four pieces a slice](images/booklet-steps.png)
+
+Each step shows:
+
+- **The step number**, the same as the slice number.
+- **A blue box** with the parts to add (drawn flat, with their labels: "1× 3a"), and how many pins
+  go in at this step.
+- **From above:** the slice below in grey, with the new parts on it in colour where they go, their
+  labels, and red dots where the pins go in.
+- **The stack so far**, always from the same angle and at the same size, the slices already glued
+  in wood colour and the new parts in orange with their labels, and the pins standing in their
+  holes, ready for the next slice.
+- **What to do**, in words: "Glue 3a and 3b onto slice 2, over its pins, inside the marked lines.
+  Then push 2 pins into the holes, with a drop of glue."
+
+Where it's saved: next to your design, as "*model* assembly.pdf", once the design has been saved
+(**File → Save**); until then, in the **Booklets** folder of the program's data folder
+(`%USERPROFILE%\PhotonCanvas\Booklets` on Windows). Making the slices again replaces it. The summary
+says where it went and how many pages it has, and **Open the booklet** opens it in your PDF viewer.
+If it's open in a viewer that locks it, the summary says it couldn't be saved: close it there and
+make the slices again.
+
+- The pages are US Letter, with margins wide enough to print on A4 too.
+- With **Cut the pins from a dowel too** ticked, the cover gives the pins' real length.
+- Egg crate and radial get no booklet: their slot names say what goes where.
+
 ## Putting it together
 
-- **Stacked:** start with slice 1 and glue each slice on the one below, numbers in order, inside
+- **Stacked:** follow the assembly booklet, or start with slice 1 and glue each slice on the one below, numbers in order, inside
   the marked line. Pins or dowels through the holes line them up. Then sand back what sticks out
   (with **Outer**) or fill the steps (with **Inner**), and sand any steep spots and undersides the
   summary mentions.
@@ -389,6 +431,7 @@ settings](layer-settings.md)), and the marks layer's power on your material.
 
 - [Slice a 3D model into stacked layers](tutorial:3d-stacked-slices)
 - [Line the slices up: numbers, marks, pins and dowels](tutorial:3d-assembly)
+- [Make an assembly booklet for the slices](tutorial:3d-booklet)
 - [Shape the edges with engraved steps](tutorial:3d-edge-shaping)
 - [Use your cut test on the slices](tutorial:3d-cut-test-results)
 - [Build a model as an egg crate](tutorial:3d-egg-crate)

@@ -105,6 +105,12 @@ static class MoreShots
         canvas.FitRect(doc.State.Bounds(doc.State.Shapes.Select(x => x.Id).ToHashSet()).Inflate(25));
         settle(800);
         save(w.CaptureRenderedFrame(), "workspace-after-slices", "The work area after Make the slices: the parts numbered, on the three Slices layers");
+        // The assembly booklet of a four-legged animal: its parts list, and two steps with several pieces each.
+        var animal = PhotonCanvas.Doc.Geometry.StackSlicer.Slice([.. Block(0, 0, 0, 6, 6, 12), .. Block(44, 0, 0, 50, 6, 12), .. Block(0, 14, 0, 6, 20, 12), .. Block(44, 14, 0, 50, 20, 12),
+            .. Block(0, 0, 12, 50, 20, 27), .. Block(40, 5, 27, 52, 15, 39)], new PhotonCanvas.Doc.Geometry.SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
+        var booklet = new PhotonCanvas.Doc.Geometry.BookletOptions { Title = "Animal", PinMm = 2 };
+        save(new Bitmap(new MemoryStream(PhotonCanvas.Doc.Geometry.AssemblyBooklet.RenderPng(animal, booklet, 1, 1.2f))), "booklet-parts", "Assembly booklet: the parts list, every part to the same scale");
+        save(new Bitmap(new MemoryStream(PhotonCanvas.Doc.Geometry.AssemblyBooklet.RenderPng(animal, booklet, 2, 1.2f))), "booklet-steps", "Assembly booklet: steps 1 and 2, the legs in four pieces each");
         // The model browser, with its pictures drawn.
         var browser = new ModelBrowserWindow(settings);
         browser.Show(w);
@@ -401,6 +407,19 @@ static class MoreShots
         save(shot(canvas), "canvas-edit-points", "Edit points on a heart: its corner and curve points");
         canvas.Tool = Tool.Select;
         reset();
+    }
+
+    // A box from corner to corner (for the booklet's animal).
+    static List<StlDepth.Triangle> Block(double x0, double y0, double z0, double x1, double y1, double z1)
+    {
+        StlDepth.Vec3 P(double x, double y, double z) => new(x, y, z);
+        IEnumerable<StlDepth.Triangle> Quad(StlDepth.Vec3 a, StlDepth.Vec3 b, StlDepth.Vec3 c, StlDepth.Vec3 d) => [new(a, b, c), new(a, c, d)];
+        return
+        [
+            .. Quad(P(x0, y0, z0), P(x1, y0, z0), P(x1, y1, z0), P(x0, y1, z0)), .. Quad(P(x0, y0, z1), P(x0, y1, z1), P(x1, y1, z1), P(x1, y0, z1)),
+            .. Quad(P(x0, y0, z0), P(x0, y0, z1), P(x1, y0, z1), P(x1, y0, z0)), .. Quad(P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)),
+            .. Quad(P(x0, y0, z0), P(x0, y1, z0), P(x0, y1, z1), P(x0, y0, z1)), .. Quad(P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0)),
+        ];
     }
 
     // A profile turned round the Z axis: (radius, height) pairs from the bottom up.

@@ -78,6 +78,10 @@ public sealed class StackSliceWindow : Window
     readonly DowelPinPreview _pinPreview = new() { Margin = new(0, 4, 0, 0) };
     readonly TextBlock _pinNote = new() { Classes = { "hint" }, TextWrapping = TextWrapping.Wrap };
     StackPanel _pinPanel = null!;
+    // The assembly instructions: a PDF beside the design (or in the data folder until it's saved).
+    readonly CheckBox _booklet = new() { Content = "Make an assembly booklet (PDF)", IsChecked = true };
+    readonly Button _openBooklet = Button("Open the booklet", tip: "Opens the assembly booklet just made, in your PDF viewer, to read or print.");
+    string? _bookletPath;
 
     public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null, Doc.Materials.MaterialLibrary? library = null)
     {
@@ -133,6 +137,14 @@ public sealed class StackSliceWindow : Window
         ToolTip.SetTip(_shape, "Each slice's top is engraved down in steps, a pass a step, wherever the model slopes away inside the slice, so the stack's steps become the model's slopes. Needs the depth one engrave pass takes off: Laser → Etch rate test.");
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
+        _openBooklet.IsVisible = false;
+        _openBooklet.Click += (_, _) =>
+        {
+            if (_bookletPath is null || !File.Exists(_bookletPath)) return;
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(_bookletPath) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { _summary.Text += $"\nCouldn't open it: {e.Message}"; }
+        };
+        ToolTip.SetTip(_booklet, "Instructions for putting the slices together, like a building-set manual: the finished model, every part, then a step per slice from the bottom up, showing the stack so far with the new parts in colour, their labels, and where the pins go. Saved beside your design when you make the slices.");
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
         close.Click += (_, _) => Close();
         Closing += (_, _) => _cts?.Cancel();
@@ -206,11 +218,13 @@ public sealed class StackSliceWindow : Window
                     },
                 }),
                 _numbers,
+                _booklet,
                 Field("Cut with", _cutWith, tip: "Cut settings from your library: the material's thickness, and the kerf and slot fit your cut test measured, go on the slices."),
                 _cutNote,
                 Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
                 Field("Cut from", _stock, tip: "Where the parts go. To use the board actually in the machine, outline it first (draw it, or Pick piece from camera), right-click it: Use as material outline. Further beds get the same outline on new pages."),
                 _summary,
+                _openBooklet,
             },
         };
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new(0, 10, 0, 0), Children = { close, _make } };
@@ -280,6 +294,7 @@ public sealed class StackSliceWindow : Window
         _eggPanel.IsVisible = _method.SelectedIndex == 1;
         _radialPanel.IsVisible = _method.SelectedIndex == 2;
         _numbers.Content = _method.SelectedIndex == 0 ? "Number each slice (light mark, 1 at the bottom)" : "Name each sheet and mark what goes in each slot";
+        _booklet.IsVisible = _method.SelectedIndex == 0;
     }
 
     static Control Col(Control c, int col)
@@ -616,7 +631,44 @@ public sealed class StackSliceWindow : Window
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +
                             " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\"." + pinsMade;
+            if (_booklet.IsChecked == true && stack.Method == SliceMethod.Stacked) _ = Booklet(stack, PinPlan() is { Made: > 0 } bp ? bp.PinLengthMm : null);
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }
+    }
+
+    /// <summary>Where the booklet goes: beside the design when it's saved, else in the data folder's Booklets.</summary>
+    string BookletPath()
+    {
+        var name = string.Concat((string.IsNullOrWhiteSpace(_name) ? "Slices" : _name).Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+        var dir = _doc.FilePath is { } saved && Path.GetDirectoryName(saved) is { Length: > 0 } d ? d : Path.Combine(AppIdentity.DataDir, "Booklets");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, $"{name} assembly.pdf");
+    }
+
+    /// <summary>Writes the assembly booklet (in the background: a tall model has many pages) and says where.</summary>
+    async Task Booklet(SliceStack stack, double? pinLength)
+    {
+        var o = new BookletOptions
+        {
+            Title = string.IsNullOrWhiteSpace(_name) ? "Slices" : _name,
+            PinMm = (double)(_pin.Value ?? 0),
+            PinLengthMm = pinLength,
+            DowelMm = (double)(_dowel.Value ?? 0),
+            Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
+        };
+        try
+        {
+            var path = BookletPath();
+            int pages = await Task.Run(() => AssemblyBooklet.SavePdf(stack, o, path));
+            _bookletPath = path;
+            _openBooklet.IsVisible = true;
+            _summary.Text += $"\nAssembly booklet ({pages} pages): {path}";
+        }
+        catch (IOException e) { _summary.Text += $"\nCouldn't save the assembly booklet (is it open in a PDF viewer?): {e.Message}"; }
+        catch (Exception e) when (e is UnauthorizedAccessException or ArgumentException)
+        {
+            AppLog.Error("assembly booklet", e);
+            _summary.Text += $"\nCouldn't make the assembly booklet: {e.Message}";
+        }
     }
 }

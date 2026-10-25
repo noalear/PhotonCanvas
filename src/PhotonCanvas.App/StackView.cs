@@ -80,7 +80,7 @@ public sealed class StackView : Control
     }
 
     /// <summary>Slotted sheets (egg crate, radial) rather than a stack of slices.</summary>
-    static bool Sheets(SliceStack st) => st.Parts.Any(p => p.Label is not null);
+    static bool Sheets(SliceStack st) => st.Method != SliceMethod.Stacked;
 
     IEnumerable<SlicePart> Shown(SliceStack st) => st.Parts.Where(p => p.Slice >= From && p.Slice <= Math.Min(To, st.Slices));
 

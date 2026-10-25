@@ -160,7 +160,8 @@ public class StackSlicerTests
         Assert.Equal(0, s.PageIndex);
         // Every slice once, across the pages.
         var texts = Enumerable.Range(0, sheets).SelectMany(i => Pages.SwitchTo(s, i).Shapes.OfType<TextShape>().Select(t => t.Text)).ToList();
-        Assert.Equal(Enumerable.Range(1, 40).Select(i => $"{i}").Order(), texts.Order());
+        Assert.Equal(Enumerable.Range(1, 40).Select(i => StackSlicer.NotUpsideDown($"{i}")).Order(), texts.Order());
+        Assert.Contains("6.", texts);
         for (int i = 0; i < sheets; i++)
         {
             var page = Pages.SwitchTo(s, i);
@@ -374,5 +375,61 @@ public class StackSlicerTests
         Assert.False(In(rings[0], new Vec2(20 + 18, 20)));       // fin 1's slot near the edge
         Assert.True(In(rings[0], new Vec2(20 + 5, 20)));         // whole near the middle
         Assert.Equal(8, rings[0].Notes.Count);
+    }
+    [Fact]
+    public void EveryPartHasItsOwnLabel()
+    {
+        // Two legs under a body: the leg slices are in two pieces, lettered left to right.
+        var legs = new List<Tri>([.. Box(0, 0, 0, 10, 10, 10), .. Box(30, 0, 0, 40, 10, 10), .. Box(0, 0, 10, 40, 10, 20)]);
+        var stack = StackSlicer.Slice(legs, new SliceOptions { ThicknessMm = 5, HeightMm = 20, PinMm = 2 });
+        var labels = stack.Parts.Select(p => p.Label).ToList();
+        Assert.Equal(labels.Count, labels.Distinct().Count());
+        Assert.Equal(["1a", "1b", "2a", "2b", "3", "4"], labels);
+        Assert.True(stack.Parts.Single(p => p.Label == "1a").LabelAt.X < 20);
+        // Read upside down, 6 is 9: a dot says which way up it is. 8 and 11 read the same either way.
+        Assert.Equal("6.", StackSlicer.PartLabel(6, 0, 1));
+        Assert.Equal("9.", StackSlicer.PartLabel(9, 0, 1));
+        Assert.Equal("16.", StackSlicer.PartLabel(16, 0, 1));
+        Assert.Equal("8", StackSlicer.PartLabel(8, 0, 1));
+        Assert.Equal("11", StackSlicer.PartLabel(11, 0, 1));
+        Assert.Equal("10", StackSlicer.PartLabel(10, 0, 1));
+        Assert.Equal("6b", StackSlicer.PartLabel(6, 1, 2));
+        Assert.Equal("3aa", StackSlicer.PartLabel(3, 26, 30));
+        // On the bed, each part's name is its own too.
+        var (s, _) = StackLayout.Place(DocState.New(), stack, MachineProfile.F2Ultra, numbers: true, marks: true);
+        var names = s.Shapes.OfType<PathShape>().Where(sh => s.Layers.First(l => l.Id == sh.LayerId).Name == "Slices · cut").Select(sh => sh.Name).ToList();
+        Assert.Equal(names.Count, names.Distinct().Count());
+    }
+
+    [Fact]
+    public void TheBookletHasAStepForEverySlice()
+    {
+        var legs = new List<Tri>([.. Box(0, 0, 0, 10, 10, 10), .. Box(30, 0, 0, 40, 10, 10), .. Box(0, 0, 10, 40, 10, 20)]);
+        var stack = StackSlicer.Slice(legs, new SliceOptions { ThicknessMm = 5, HeightMm = 20, PinMm = 2 });
+        var o = new BookletOptions { Title = "Table", PinMm = 2 };
+        // Cover, parts, two pages of two steps, finished.
+        Assert.Equal(5, AssemblyBooklet.PageCount(stack, o));
+        var path = Path.Combine(Path.GetTempPath(), $"booklet-{Guid.NewGuid():N}.pdf");
+        try
+        {
+            Assert.Equal(5, AssemblyBooklet.SavePdf(stack, o, path));
+            var head = File.ReadAllBytes(path);
+            Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(head, 0, 4));
+        }
+        finally { File.Delete(path); }
+        if (Environment.GetEnvironmentVariable("BOOKLET_OUT") is { Length: > 0 } dir)
+        {
+            var pawn = StackSlicer.Slice(Pyramid(40, 36), new SliceOptions { ThicknessMm = 3, HeightMm = 36, PinMm = 2 });
+            var po = new BookletOptions { Title = "Pyramid", PinMm = 2 };
+            for (int k = 0; k < AssemblyBooklet.PageCount(pawn, po); k++) File.WriteAllBytes(Path.Combine(dir, $"pyramid-{k + 1}.png"), AssemblyBooklet.RenderPng(pawn, po, k));
+            AssemblyBooklet.SavePdf(pawn, po, Path.Combine(dir, "pyramid.pdf"));
+            for (int k = 0; k < 5; k++) File.WriteAllBytes(Path.Combine(dir, $"table-{k + 1}.png"), AssemblyBooklet.RenderPng(stack, o, k));
+            // Four legs, a body, a neck and head (as in the guide's pictures).
+            var animal = StackSlicer.Slice([.. Box(0, 0, 0, 6, 6, 12), .. Box(44, 0, 0, 50, 6, 12), .. Box(0, 14, 0, 6, 20, 12), .. Box(44, 14, 0, 50, 20, 12),
+                .. Box(0, 0, 12, 50, 20, 27), .. Box(40, 5, 27, 52, 15, 39)], new SliceOptions { ThicknessMm = 3, HeightMm = 39, PinMm = 2 });
+            var ao = new BookletOptions { Title = "Animal", PinMm = 2 };
+            for (int k = 0; k < AssemblyBooklet.PageCount(animal, ao); k++) File.WriteAllBytes(Path.Combine(dir, $"animal-{k + 1}.png"), AssemblyBooklet.RenderPng(animal, ao, k, 1.2f));
+        }
+        Assert.Throws<ArgumentException>(() => AssemblyBooklet.PageCount(StackSlicer.Slice(Cylinder(20, 30), new SliceOptions { Method = SliceMethod.Radial, ThicknessMm = 3, HeightMm = 30 }), o));
     }
 }

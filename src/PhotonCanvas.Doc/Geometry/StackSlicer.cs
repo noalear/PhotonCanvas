@@ -96,7 +96,10 @@ public sealed record SlicePart(int Slice, PathGeometry Outline, Vec2 LabelAt, do
 {
     /// <summary>Where it sits in the model (for the 3D view).</summary>
     public Frame3 Frame { get; init; }
-    /// <summary>Its name, marked on it ("X3", "Fin 2"); null = its slice number.</summary>
+    /// <summary>
+    /// Its name, marked on it: unique in the stack ("3", or "3a", "3b" where slice 3 is in several
+    /// pieces; "X3", "Fin 2" for sheets); null = its slice number.
+    /// </summary>
     public string? Label { get; init; }
     /// <summary>Small notes marked on it: beside each slot, the name of the sheet that goes in it.</summary>
     public IReadOnlyList<(string Text, Vec2 At)> Notes { get; init; } = [];
@@ -121,6 +124,10 @@ public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, doub
     public int Joined { get; init; }
     /// <summary>Pins joining neighbouring slices: where each goes, and the slice it rises from (it sits in that slice and the one above).</summary>
     public IReadOnlyList<(int Slice, Vec2 At)> Pins { get; init; } = [];
+    /// <summary>How it's built: stacked slices, or slotted sheets.</summary>
+    public SliceMethod Method { get; init; } = SliceMethod.Stacked;
+    /// <summary>The material's thickness (one slice or sheet each), mm.</summary>
+    public double ThicknessMm { get; init; }
 }
 
 /// <summary>
@@ -200,7 +207,8 @@ public static class StackSlicer
                 if (Math.Abs(loops.Sum(Geom.SignedArea)) < o.MinPartMm2 || Pole(loops).Room * 2 < o.MinPartWidthMm) { leftOut++; continue; }
                 keep.Add(island);
             }
-            islands.Add(keep);
+            // Left to right (then front to back), so a slice's pieces are lettered in the order they're seen.
+            islands.Add([.. keep.OrderBy(g => Math.Round(g.Bounds().Center.X, 1)).ThenBy(g => g.Bounds().Center.Y)]);
         }
         // Pins: wherever a part overlaps the part above it, matching holes in both.
         var holes = islands.Select(l => l.Select(_ => new List<Vec2>()).ToList()).ToList();
@@ -250,6 +258,7 @@ public static class StackSlicer
                 var (shaping, under) = o.ShapeStepMm > 0 ? Shape(tris, part, i * slab, slab, o) : ([], 0);
                 parts.Add(new SlicePart(i + 1, part, at, room, marks)
                 {
+                    Label = PartLabel(i + 1, k, islands[i].Count),
                     Shaping = shaping,
                     UndersideMm2 = under,
                     Floating = n > 1 && !Touches(i, k),
@@ -258,7 +267,32 @@ public static class StackSlicer
             }
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
-        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined };
+        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined, ThicknessMm = o.ThicknessMm };
+    }
+
+    /// <summary>
+    /// A stacked part's name: its slice number, with a letter when the slice is in several pieces
+    /// (3a, 3b… then 3aa after 3z), so no two parts share one.
+    /// </summary>
+    public static string PartLabel(int slice, int piece, int pieces) => pieces > 1 ? $"{slice}{Letters(piece)}" : NotUpsideDown($"{slice}");
+
+    static string Letters(int k) => k < 26 ? $"{(char)('a' + k)}" : Letters(k / 26 - 1) + (char)('a' + k % 26);
+
+    /// <summary>
+    /// Nesting turns parts round, so a number that reads as another one upside down (6 and 9, 16 and
+    /// 91, 68 and 89) gets a dot after it: "6." is never mistaken for 9.
+    /// </summary>
+    public static string NotUpsideDown(string label)
+    {
+        static char? Turned(char c) => c switch { '0' => '0', '1' => '1', '6' => '9', '8' => '8', '9' => '6', _ => null };
+        var turned = new char[label.Length];
+        for (int i = 0; i < label.Length; i++)
+        {
+            if (Turned(label[^(i + 1)]) is not { } t) return label;
+            turned[i] = t;
+        }
+        var other = new string(turned);
+        return other != label && other[0] != '0' ? label + "." : label;
     }
 
     /// <summary>
@@ -447,12 +481,12 @@ public static class StackSlicer
                 parts.Add(new SlicePart(index, island, at, room, [])
                 {
                     Frame = s.Frame,
-                    Label = islands.Count > 1 ? $"{s.Label}{(char)('a' + Math.Min(k, 25))}" : s.Label,
+                    Label = islands.Count > 1 ? $"{s.Label}{Letters(k)}" : s.Label,
                     Notes = notes,
                 });
             }
         }
-        return new SliceStack(parts, sheets.Count, maxZ, maxX, maxY, [], []) { LeftOut = leftOut };
+        return new SliceStack(parts, sheets.Count, maxZ, maxX, maxY, [], []) { LeftOut = leftOut, Method = o.Method, ThicknessMm = o.ThicknessMm };
     }
 
     /// <summary>Area covered (outlines minus holes), mm².</summary>
@@ -755,14 +789,15 @@ public static class StackLayout
         {
             var box = part.Outline.Bounds();
             if (box.IsEmpty) continue;
+            string name = stack.Method == SliceMethod.Stacked ? $"Slice {(part.Label ?? $"{part.Slice}").TrimEnd('.')}" : part.Label ?? $"Slice {part.Slice}";
             if (Math.Min(box.Width, box.Height) + 2 * gapMm > Math.Min(machine.FieldW, machine.FieldH) || Math.Max(box.Width, box.Height) + 2 * gapMm > Math.Max(machine.FieldW, machine.FieldH))
-                throw new InvalidOperationException($"{part.Label ?? $"Slice {part.Slice}"} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
+                throw new InvalidOperationException($"{name} is {box.Width:0} × {box.Height:0} mm: bigger than the bed. Make the model smaller.");
             var move = Affine.Translate(gapMm - box.MinX, gapMm - box.MinY);
-            var shapes = new List<Shape> { new PathShape { Name = part.Label is { } nm ? nm : $"Slice {part.Slice}", LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
+            var shapes = new List<Shape> { new PathShape { Name = name, LayerId = cutLayer.Id, Geometry = part.Outline.Transform(move) } };
             if (shape)
                 foreach (var (area, k) in part.Shaping.Select((a, k) => (a, k)))
                 {
-                    var step = new PathShape { Name = $"Slice {part.Slice} · step {k + 1}", LayerId = shapeLayer!.Id, Geometry = area.Transform(move) };
+                    var step = new PathShape { Name = $"{name} · step {k + 1}", LayerId = shapeLayer!.Id, Geometry = area.Transform(move) };
                     shapingIds.Add(step.Id);
                     shapes.Add(step);
                 }

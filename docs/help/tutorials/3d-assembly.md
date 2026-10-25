@@ -18,7 +18,8 @@ Click **Open a 3D model…** and double-click a model. Press **Next** when it sh
 
 ## Number the slices
 <!-- target: button:Number each slice (light mark, 1 at the bottom) -->
-Leave this ticked. Each part is lightly marked with its slice number, 1 at the bottom.
+Leave this ticked. Each part is lightly marked with its label: its slice number, 1 at the bottom,
+with a letter (3a, 3b…) where a slice is in several pieces.
 
 ## Mark where the next slice sits
 <!-- target: button:Mark where the next slice sits -->
