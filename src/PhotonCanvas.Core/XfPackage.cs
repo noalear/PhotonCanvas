@@ -26,7 +26,16 @@ public static class XfPackage
         public string Mode { get; init; } = "LASER_PLANE";
         /// <summary>The mechanical axis used ("U" with an attachment, else empty).</summary>
         public string Axis { get; init; } = "";
+        /// <summary>
+        /// The job's estimated duration in seconds. Written as <c>time</c> (whole seconds, as text),
+        /// which the machine's screen counts down from; left out when unknown or zero, and for the
+        /// modes xTool Studio leaves it out of (curved surfaces, roller and chuck rotaries).
+        /// </summary>
+        public double? EstimatedSeconds { get; init; }
     }
+
+    /// <summary>The modes xTool Studio gives the F2 Ultra a time for.</summary>
+    static readonly HashSet<string> TimedModes = ["LASER_PLANE", "RELIEF_PROCESS", "LASER_CYLINDER", "CONVEYOR_EXTENSION", "SCREEN_PRINT"];
 
     public static byte[] Build(Parts parts)
     {
@@ -36,9 +45,11 @@ public static class XfPackage
             ["light"] = parts.Light,
             ["create_time"] = parts.Created.ToString("yyyy/MM/dd HH:mm:ss"),
             ["axis"] = parts.Axis,
-            ["processingParams"] = parts.Params.DeepClone(),
-            ["material"] = 1,
         };
+        if (parts.EstimatedSeconds is { } s && s >= 0.5 && double.IsFinite(s) && TimedModes.Contains(parts.Mode))
+            desc["time"] = Math.Round(s).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        desc["processingParams"] = parts.Params.DeepClone();
+        desc["material"] = 1;
         var members = new (string Name, byte[] Data)[]
         {
             ("preview.jpg", parts.PreviewJpeg),

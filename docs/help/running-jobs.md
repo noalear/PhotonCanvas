@@ -219,6 +219,11 @@ That correction is used for the time left while a job runs and for the laser's p
 work area, not for the estimate itself. It
 started again from nothing when the estimate changed (October 2026).
 
+The estimate also goes to the machine with the job, rounded to the second, in the same place
+xTool Studio puts its own, so the machine's screen can show how long the job takes and count it
+down. It's left out, as xTool Studio leaves it out, for jobs on a [curved surface](work-area.md#curved-surface)
+and when the estimate is under half a second. Exported .xf files carry it too.
+
 ## Checks
 
 The chip at the right of the timeline says how the job looks:

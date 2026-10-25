@@ -20,7 +20,8 @@ top left corner is on the bed.
 ## The estimate
 <!-- target: panel:Job -->
 The big time on the right is how long the job takes, pauses included. It's worked out the way the
-machine was timed doing jobs: within about 2 % on the jobs it was checked against.
+machine was timed doing jobs: within about 2 % on the jobs it was checked against. It's sent with
+the job too, so the machine's screen can count it down.
 
 ## Checks
 <!-- target: panel:Job -->

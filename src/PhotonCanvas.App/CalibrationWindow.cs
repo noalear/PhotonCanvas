@@ -204,7 +204,7 @@ public sealed class CalibrationWindow : Window
             var motion = job.Render();
             var corners = new Vec2[] { new(5, 5), new(215, 5), new(215, 215), new(5, 215), new(5, 5) };
             var preview = _grid.Select(p => (IReadOnlyList<Vec2>)Geom.Arc(p.X, p.Y, 2, 2, 0, 360, 0.5)).ToList();
-            xf = XfPackage.Build(new() { Motion = motion, Border = job.Border(corners), PreviewJpeg = XfPackage.PreviewJpeg(preview), Light = "blue" });
+            xf = XfPackage.Build(new() { Motion = motion, Border = job.Border(corners), PreviewJpeg = XfPackage.PreviewJpeg(preview), Light = "blue", EstimatedSeconds = job.EstimateSeconds() });
         }
         catch (JobException e)
         {

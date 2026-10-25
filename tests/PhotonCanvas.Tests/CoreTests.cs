@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Nodes;
 using PhotonCanvas.Core;
 
 namespace PhotonCanvas.Tests;
@@ -202,6 +203,21 @@ public class XfTests
         var members = XfPackage.Read(xf);
         Assert.Equal(["preview.jpg", "border.gcode", "motion.gcode", "description.json"], members.Select(m => m.Name));
         Assert.Equal("G0X0Y0"u8.ToArray(), members[2].Data);
+    }
+
+    [Fact]
+    public void DescriptionCarriesTheEstimatedTimeForTheMachineScreen()
+    {
+        string Desc(XfPackage.Parts p) => Encoding.UTF8.GetString(XfPackage.Read(XfPackage.Build(p)).Single(m => m.Name == "description.json").Data);
+        var flat = new XfPackage.Parts { Motion = "x", Border = "y", PreviewJpeg = [1], Light = "blue", EstimatedSeconds = 83.6 };
+        var desc = JsonNode.Parse(Desc(flat))!.AsObject();
+        Assert.Equal("84", desc["time"]!.GetValue<string>());
+        Assert.Equal(["mode", "light", "create_time", "axis", "time", "processingParams", "material"], desc.Select(kv => kv.Key));
+        // Unknown, zero, and the modes xTool Studio gives no time leave it out.
+        Assert.DoesNotContain("\"time\"", Desc(flat with { EstimatedSeconds = null }));
+        Assert.DoesNotContain("\"time\"", Desc(flat with { EstimatedSeconds = 0 }));
+        Assert.DoesNotContain("\"time\"", Desc(flat with { Mode = "CURVE_PROCESS" }));
+        Assert.Contains("\"time\":\"84\"", Desc(flat with { Mode = "LASER_CYLINDER", Axis = "U" }));
     }
 
     [Fact]

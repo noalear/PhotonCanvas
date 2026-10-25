@@ -694,6 +694,7 @@ public static class JobBuilder
                 ["repeat"] = l.Laser.Passes,
                 ["isFill"] = l.Mode == LayerMode.Fill,
             });
+        double estimate = job.EstimateSeconds();
         var xf = XfPackage.Build(new()
         {
             Motion = motion,
@@ -704,8 +705,9 @@ public static class JobBuilder
             Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => surface is not null ? "CURVE_PROCESS" : "LASER_PLANE" },
             Axis = mode is WorkMode.Flat ? "" : "U",
             Created = now ?? DateTimeOffset.Now,
+            EstimatedSeconds = estimate,
         });
-        return new BuiltJob(job, motion, border, xf, job.EstimateSeconds(), bounds, warnings, steps)
+        return new BuiltJob(job, motion, border, xf, estimate, bounds, warnings, steps)
         {
             LayerTimes = times,
             LeftOut = leftOut,
