@@ -36,6 +36,25 @@ public sealed record JobOptions
     public Section? Section { get; init; }
     /// <summary>Mark only this layer (and its sub-layers): one layer at a time, e.g. one screen per colour.</summary>
     public Guid? OnlyLayer { get; init; }
+    /// <summary>
+    /// Which part (0 = the first) of a job too big to send in one go: a set of whole pieces, see
+    /// <see cref="JobBuilder.WobbleParts"/>. Ignored when the job fits in one; null on one that
+    /// doesn't refuses it with <see cref="TooBigForOneJobException"/>.
+    /// </summary>
+    public int? Part { get; init; }
+}
+
+/// <summary>One of the jobs a design too big for one is sent as: whole pieces, from <paramref name="First"/> to <paramref name="Last"/> in canvas order.</summary>
+public sealed record JobPart(int Index, int Count, string First, string Last)
+{
+    public string Label => $"part {Index + 1} of {Count}";
+    public string Pieces => First == Last ? First : $"{First} to {Last}";
+}
+
+/// <summary>The job is too big to send in one go but can go in <see cref="Parts"/> parts (<see cref="JobOptions.Part"/>).</summary>
+public sealed class TooBigForOneJobException(string message, int parts) : JobException(message)
+{
+    public int Parts { get; } = parts;
 }
 
 /// <summary>One section of a design bigger than the work area.</summary>
@@ -105,6 +124,8 @@ public sealed record BuiltJob(
     public double? RoundDelayS { get; init; }
     /// <summary>How many paths the job cuts, marks or fills. Steps can be more: a heat-ordered layer has a step for every piece of every pass.</summary>
     public int Paths { get; init; }
+    /// <summary>Which part of a design too big for one job this is; null when it's the whole design.</summary>
+    public JobPart? Part { get; init; }
 
     /// <summary>
     /// One stretch of the run, in the order it happens: seconds from the start (by the same
@@ -226,6 +247,21 @@ public static class JobBuilder
         var pos = new Vec2(0, 0);
         var bounds = Rect2.Empty;
         var layers = OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).ToList();
+        JobPart? part = null;
+        if (WobbleParts(s, layers, opt) is { } tooBig)
+        {
+            // Too much wobble for one job: one part of it, whole pieces only.
+            int n = tooBig.Parts.Count;
+            string why = $"its wobble makes {tooBig.Moves / 1e6:0.#} million moves and one job holds {Wobble.MaxMovesPerJob / 1e6:0} million";
+            if (opt.Part is not { } want)
+                throw new TooBigForOneJobException($"This job is too big to send in one go: {why}. It can be sent in {n} parts of whole pieces, one after another.", n);
+            int i = Math.Clamp(want, 0, n - 1);
+            var keep = tooBig.Parts[i];
+            var ids = keep.Select(sh => sh.Id).ToHashSet();
+            s = s with { Shapes = [.. s.Shapes.Where(sh => ids.Contains(sh.Id))] };
+            part = new JobPart(i, n, Label(keep[0]), Label(keep[^1]));
+            warnings.Add($"Too big for one job ({why}), so it's sent in {n} parts, one after another, each a set of whole pieces. Leave the material where it is between parts. This is {part.Label}: {part.Pieces}.");
+        }
         // Only what's sent has to make sense: a broken code or field on a layer that's off doesn't stop the job.
         if (VariableText.Problems(s with { Shapes = [.. layers.SelectMany(s.ShapesFor).Distinct()] }).FirstOrDefault() is { } problem) throw new JobException(problem);
         var times = new List<BuiltJob.LayerTime>();
@@ -463,10 +499,8 @@ public static class JobBuilder
                 {
                     if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
                         throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
-                    // Passes count only when written out: per path, with no step-down or pause, the machine's own loop repeats one copy.
-                    bool looped = !opt.WholeJobPasses && drop is null && opt.PathPauseS <= 0 && layer.Order != PathOrder.Heat;
-                    int passes = looped ? 1 : Math.Max(1, layer.Laser.Passes);
-                    double lengthMm = paths.Sum(f => (f.Closed ? Polyline.Loop(f.Points) : Polyline.Open(f.Points)).Length);
+                    int passes = WrittenPasses(layer, opt);
+                    double lengthMm = paths.Sum(LengthOf);
                     long moves = Wobble.MoveCount(lengthMm, layer.WobbleSpacingMm) * passes;
                     if (wobbleMoves + moves > Wobble.MaxMovesPerJob)
                     {
@@ -730,7 +764,55 @@ public static class JobBuilder
             RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
             Timeline = Timeline(job, blockSteps),
             Paths = steps.Count - heatExtraSteps,
+            Part = part,
         };
+    }
+
+    /// <summary>The parts a design too big for one job is sent in (empty when it fits in one).</summary>
+    public static IReadOnlyList<JobPart> Parts(DocState s, JobOptions opt)
+    {
+        var layers = OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).ToList();
+        if (WobbleParts(s, layers, opt) is not { } split) return [];
+        return [.. split.Parts.Select((p, i) => new JobPart(i, split.Parts.Count, Label(p[0]), Label(p[^1])))];
+    }
+
+    static double LengthOf(FlatPath f) => (f.Closed ? Polyline.Loop(f.Points) : Polyline.Open(f.Points)).Length;
+
+    /// <summary>
+    /// How many copies of a layer's paths the G-code holds: each pass is written out, except per
+    /// path with no step-down or pause, where the machine's own loop (<c>G104</c>) repeats one copy.
+    /// </summary>
+    static int WrittenPasses(Layer layer, JobOptions opt) =>
+        !opt.WholeJobPasses && layer.StepDownMm <= 0 && layer.StepDownFirstMm <= 0 && opt.PathPauseS <= 0 && layer.Order != PathOrder.Heat
+            ? 1 : Math.Max(1, layer.Laser.Passes);
+
+    /// <summary>
+    /// A job with more wobble than one can hold (<see cref="Wobble.MaxMovesPerJob"/>), split into
+    /// parts of whole pieces (a group stays together) in canvas order, each with a tenth to spare:
+    /// the parts and all the moves. Null when it fits in one, or when one piece alone is too much
+    /// (nothing can split that: the build then names a spacing that fits).
+    /// </summary>
+    internal static (List<List<Shape>> Parts, long Moves)? WobbleParts(DocState s, IReadOnlyList<Layer> layers, JobOptions opt)
+    {
+        var moves = new Dictionary<Guid, long>();
+        foreach (var l in layers.Where(l => l.Wobble && l.Mode is not (LayerMode.Fill or LayerMode.Image) && l.DotModeMm <= 0 && l.PerforateMm <= 0 && l.WobbleSpacingMm >= Wobble.MinSpacingMm))
+            foreach (var sh in s.ShapesFor(l).OfType<PathShape>())
+                moves[sh.Id] = moves.GetValueOrDefault(sh.Id) + Wobble.MoveCount(sh.World.Flatten(opt.Tolerance).Sum(LengthOf), l.WobbleSpacingMm) * WrittenPasses(l, opt);
+        long total = moves.Values.Sum();
+        if (total <= Wobble.MaxMovesPerJob) return null;
+        // Pieces: a group's shapes together, in the order they first appear.
+        var pieces = s.Shapes.GroupBy(sh => sh.GroupId ?? sh.Id).Select(g => (Shapes: g.ToList(), Moves: g.Sum(sh => moves.GetValueOrDefault(sh.Id)))).ToList();
+        long budget = Wobble.MaxMovesPerJob * 9 / 10;
+        if (pieces.Any(p => p.Moves > budget)) return null;
+        var parts = new List<List<Shape>>();
+        long inPart = 0;
+        foreach (var (shapes, m) in pieces)
+        {
+            if (parts.Count == 0 || inPart + m > budget) { parts.Add([]); inPart = 0; }
+            parts[^1].AddRange(shapes);
+            inPart += m;
+        }
+        return (parts, total);
     }
 
     /// <summary>The run in order, the way <see cref="Job.Render"/> lays it out (rounds or per-path passes).</summary>

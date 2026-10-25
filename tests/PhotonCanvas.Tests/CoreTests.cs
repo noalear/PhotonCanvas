@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Text.Json.Nodes;
 using PhotonCanvas.Core;
 
@@ -358,6 +358,27 @@ public class LayerDescentWobbleTests
         // Passes per path with no step-down use the machine's own loop: one copy, so 0.015 mm fits.
         var looped = PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false });
         Assert.Contains("G104 P7", looped.Motion);
+
+        // Many pieces that together are too much: sent in parts of whole pieces, each under the limit.
+        var many = s;
+        for (int k = 1; k < 4; k++)
+            many = PhotonCanvas.Doc.Ops.AddShapes(many, [new PhotonCanvas.Doc.PathShape { LayerId = layer.Id, Name = $"Piece {k + 1}", Geometry = PhotonCanvas.Doc.PathGeometry.Rect(10 + k * 2, 10 + k * 2, 100, 100) }]);
+        many = PhotonCanvas.Doc.Ops.UpdateLayers(many, new HashSet<Guid> { layer.Id }, l => l with { Laser = l.Laser.WithPasses(3) });
+        var tooBig = Assert.Throws<PhotonCanvas.Doc.TooBigForOneJobException>(() => PhotonCanvas.Doc.JobBuilder.Build(many, new PhotonCanvas.Doc.JobOptions()));
+        Assert.Equal(2, tooBig.Parts); // (800 + 3 × 400 mm) × 3 passes × 2400 per mm = 14.4 million: 8.6 + 5.8
+        Assert.Equal(2, PhotonCanvas.Doc.JobBuilder.Parts(many, new PhotonCanvas.Doc.JobOptions()).Count);
+        var shapesSent = 0;
+        for (int i = 0; i < tooBig.Parts; i++)
+        {
+            var pj = PhotonCanvas.Doc.JobBuilder.Build(many, new PhotonCanvas.Doc.JobOptions { Part = i });
+            Assert.Equal((i, 2), (pj.Part!.Index, pj.Part.Count));
+            Assert.Contains(pj.Warnings, w => w.Contains($"part {i + 1} of 2"));
+            Assert.True(pj.Job.Blocks.OfType<VectorBlock>().Sum(b => (long)b.Path.Points.Count) * 3 <= Wobble.MaxMovesPerJob);
+            shapesSent += pj.Paths;
+        }
+        Assert.Equal(4, shapesSent); // every piece, once
+        // Fitting in one: the part is ignored.
+        Assert.Null(PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false, Part = 3 }).Part);
 
         // And the expansion itself refuses a path too long to hold.
         Assert.Throws<JobException>(() => Wobble.Expand([new Vec2(0, 0), new Vec2(5000, 0)], 0.05, 0.015));
