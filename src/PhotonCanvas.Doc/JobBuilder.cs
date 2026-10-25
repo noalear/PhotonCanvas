@@ -212,6 +212,8 @@ public static class JobBuilder
         // Heat-ordered layers add a step per piece per pass: the extra ones beyond one per path.
         int heatExtraSteps = 0;
         double fixedPauseS = 0;
+        // Wobble moves so far, every pass counted: checked before any are made, as a dense wobble on long cuts runs out of memory.
+        long wobbleMoves = 0;
         var leftOut = new List<string>();
         var blocks = new List<Block>();
         var steps = new List<BuiltJob.Step>();
@@ -455,8 +457,27 @@ public static class JobBuilder
                 var extras = new CutExtras(layer) { ManualTabs = [.. shapes.SelectMany(sh => sh.TabsWorld)] };
                 List<Vec2> startPoints = [.. shapes.Select(sh => sh.StartWorld).OfType<Vec2>()];
                 StepDown? drop = layer.StepDownMm > 0 || layer.StepDownFirstMm > 0 ? new StepDown(layer.StepDownFirstMm, layer.StepDownMm) : null;
-                // The beam tracing small circles as it goes: a matter of motion, so either laser.
-                bool wobble = layer.Wobble;
+                // The beam tracing small circles as it goes: a matter of motion, so either laser. Dots and dashes don't wobble.
+                bool wobble = layer.Wobble && layer.DotModeMm <= 0 && layer.PerforateMm <= 0;
+                if (wobble)
+                {
+                    if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
+                        throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
+                    int passes = Math.Max(1, layer.Laser.Passes);
+                    double lengthMm = paths.Sum(f => (f.Closed ? Polyline.Loop(f.Points) : Polyline.Open(f.Points)).Length);
+                    long moves = Wobble.MoveCount(lengthMm, layer.WobbleSpacingMm) * passes;
+                    if (wobbleMoves + moves > Wobble.MaxMovesPerJob)
+                    {
+                        long room = Wobble.MaxMovesPerJob - wobbleMoves;
+                        // The spacing that would fit, rounded up to the box's 0.005 mm steps.
+                        double fits = room > 0 ? Math.Ceiling(lengthMm * passes * Wobble.PointsPerLoop / room / 0.005) * 0.005 : double.PositiveInfinity;
+                        throw new JobException($"Layer \"{layer.Name}\": wobble would make {moves / 1e6:0.#} million moves ({lengthMm:N0} mm of path × {passes} pass{(passes == 1 ? "" : "es")}, " +
+                                               $"{Wobble.PointsPerLoop / layer.WobbleSpacingMm:N0} per mm at {layer.WobbleSpacingMm:0.###} mm spacing)" +
+                                               (wobbleMoves > 0 ? $" on top of {wobbleMoves / 1e6:0.#} million from layers before it" : "") + $", more than one job can hold ({Wobble.MaxMovesPerJob / 1e6:0} million). " +
+                                               (fits <= Wobble.MaxSpacingMm ? $"Set the wobble spacing to at least {fits:0.###} mm, or wobble fewer paths." : "Wobble fewer paths, or turn wobble off on other layers."));
+                    }
+                    wobbleMoves += moves;
+                }
                 if (drop is not null)
                     warnings.Add($"Layer \"{layer.Name}\" lowers the head by up to {drop.DepthFor(Math.Max(1, layer.Laser.Passes)):0.##} mm while cutting (step-down). Make sure the material is at least that thick.");
                 bool heat = layer.Order == PathOrder.Heat && layer.DotModeMm <= 0 && layer.PerforateMm <= 0;
@@ -475,8 +496,6 @@ public static class JobBuilder
                     var settings = HeatSettingsFor(layer, opt);
                     var plan = HeatOrder.Plan(groups, settings, opt.HeatProgress, opt.Cancel);
                     int heatFirstStep = steps.Count;
-                    if (wobble && (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm))
-                        throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
                     foreach (var cut in plan.Cuts)
                     {
                         var pl = cut.Closed ? Polyline.Loop(cut.Points) : Polyline.Open(cut.Points);
@@ -541,12 +560,7 @@ public static class JobBuilder
                             bounds = bounds.Union(Rect2.Bounds(p.Points));
                             continue;
                         }
-                        if (wobble)
-                        {
-                            if (layer.WobbleDiameterMm is < Wobble.MinDiameterMm or > Wobble.MaxDiameterMm || layer.WobbleSpacingMm is < Wobble.MinSpacingMm or > Wobble.MaxSpacingMm)
-                                throw new JobException($"Layer \"{layer.Name}\": wobble diameter must be {Wobble.MinDiameterMm}–{Wobble.MaxDiameterMm} mm and spacing {Wobble.MinSpacingMm}–{Wobble.MaxSpacingMm} mm.");
-                            pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
-                        }
+                        if (wobble) pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
                         int bm = blocks.Count, sm = steps.Count;
                         blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
                         // Tabs cut at low power, right after their outline's pieces.

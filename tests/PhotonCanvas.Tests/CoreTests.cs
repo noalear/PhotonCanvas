@@ -334,4 +334,28 @@ public class LayerDescentWobbleTests
         Assert.DoesNotContain(bj.Warnings, w => w.Contains("wobble"));
         Assert.InRange(((VectorBlock)bj.Job.Blocks[0]).Path.Points.Count, 191_000, 193_000);
     }
+
+    [Fact]
+    public void TooMuchWobbleIsRefusedBeforeItRunsOutOfMemory()
+    {
+        // "catstack": 4 m of cuts × 7 passes at 0.015 mm made 69 million moves and crashed the app.
+        // 800 mm × 7 passes is 13 million: refused at once, naming a spacing that fits.
+        var s = PhotonCanvas.Doc.DocState.New();
+        var layer = s.Layers[0] with { Laser = LaserSettings.Blue(100, 50).WithPasses(7), Wobble = true, WobbleDiameterMm = 0.05, WobbleSpacingMm = 0.015 };
+        s = s with { Layers = [layer] };
+        s = PhotonCanvas.Doc.Ops.AddShapes(s, [new PhotonCanvas.Doc.PathShape { LayerId = layer.Id, Geometry = PhotonCanvas.Doc.PathGeometry.Rect(10, 10, 200, 200) }]);
+        var before = GC.GetTotalAllocatedBytes();
+        var e = Assert.Throws<JobException>(() => PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions()));
+        Assert.True(GC.GetTotalAllocatedBytes() - before < 50_000_000, "checked before any wobble is made");
+        Assert.Contains("13.4 million moves", e.Message);
+        Assert.Contains("at least 0.025 mm", e.Message);
+
+        // The spacing it names fits.
+        var ok = PhotonCanvas.Doc.Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { WobbleSpacingMm = 0.025 });
+        var job = PhotonCanvas.Doc.JobBuilder.Build(ok, new PhotonCanvas.Doc.JobOptions());
+        Assert.InRange(((VectorBlock)job.Job.Blocks[0]).Path.Points.Count, 1_150_000, 1_160_000); // 800 mm × 1440 per mm
+
+        // And the expansion itself refuses a path too long to hold.
+        Assert.Throws<JobException>(() => Wobble.Expand([new Vec2(0, 0), new Vec2(5000, 0)], 0.05, 0.015));
+    }
 }

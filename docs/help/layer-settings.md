@@ -390,6 +390,12 @@ Each loop is drawn as 36 points, the way xTool Studio does it. The beam goes rou
 the layer's speed, so a wobbled path takes about π × size ÷ spacing times as long as a plain one
 (about 10 times with the starting values).
 
+Every point is a line of the job, so a fine wobble on long cuts gets big fast: at the starting
+0.015 mm spacing it is 2,400 points per mm, times the passes. One job holds at most 10 million
+wobble points, all layers together (about 200 MB of job). Past that the job bar says so and names
+the spacing that would fit, for example: 4 m of cuts × 7 passes needs a spacing of at least
+0.11 mm. Widen the spacing, or wobble only the paths that need it.
+
 ### Engrave: fill style and lines
 
 **Fill style** (Engrave layers):

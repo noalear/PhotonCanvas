@@ -128,6 +128,17 @@ public static class Wobble
     public const int PointsPerLoop = 36;
     public const double MinDiameterMm = 0.01, MaxDiameterMm = 5, MinSpacingMm = 0.005, MaxSpacingMm = 5;
 
+    /// <summary>
+    /// The most wobble moves one job may hold, every layer and pass together: about 200 MB of
+    /// G-code. Each move is a line of text, and past a billion characters the app can't hold the
+    /// job however much memory the PC has (a 4 m cut wobbled at 0.015 mm, 7 passes, is 69 million).
+    /// The app's limit, not one measured on the machine.
+    /// </summary>
+    public const long MaxMovesPerJob = 10_000_000;
+
+    /// <summary>Moves a wobble along <paramref name="lengthMm"/> of path makes.</summary>
+    public static long MoveCount(double lengthMm, double spacingMm) => (long)Math.Ceiling(lengthMm / (spacingMm / PointsPerLoop)) + 1;
+
     public static List<Vec2> Expand(IReadOnlyList<Vec2> path, double diameterMm, double spacingMm)
     {
         if (path.Count < 2) return [.. path];
@@ -135,7 +146,9 @@ public static class Wobble
         for (int i = 1; i < path.Count; i++) cum[i] = cum[i - 1] + path[i - 1].Dist(path[i]);
         double total = cum[^1], r = diameterMm / 2, step = spacingMm / PointsPerLoop;
         long n = (long)Math.Ceiling(total / step);
-        var o = new List<Vec2>((int)Math.Min(n + 1, int.MaxValue / 2));
+        if (n > MaxMovesPerJob)
+            throw new JobException($"A wobble along {total:N0} mm at {spacingMm:0.###} mm spacing would make {n / 1e6:0.#} million moves, more than one job can hold. Widen the spacing.");
+        var o = new List<Vec2>((int)n + 1);
         int seg = 1;
         for (long i = 0; i <= n; i++)
         {

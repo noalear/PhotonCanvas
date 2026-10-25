@@ -22,4 +22,6 @@ Under **More settings**, tick **Wobble**. Two settings appear under it.
 ## Spacing
 <!-- target: field:Wobble spacing -->
 **Wobble spacing**: how far the circles move forward per loop. Smaller is denser and slower; the
-job's time goes up a lot, so check it on the job bar.
+job's time goes up a lot, so check it on the job bar. On long cuts with many passes a fine spacing
+makes more points than one job can hold (10 million); the job bar then tells you the spacing that
+fits.
