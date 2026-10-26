@@ -129,12 +129,12 @@ public static class Wobble
     public const double MinDiameterMm = 0.01, MaxDiameterMm = 5, MinSpacingMm = 0.005, MaxSpacingMm = 5;
 
     /// <summary>
-    /// The most wobble moves one job may hold, every layer and pass together: about 200 MB of
-    /// G-code. Each move is a line of text, and past a billion characters the app can't hold the
-    /// job however much memory the PC has (a 4 m cut wobbled at 0.015 mm, 7 passes, is 69 million).
-    /// The app's limit, not one measured on the machine.
+    /// The most wobble moves one job may hold, every layer and pass together: about 1.9 GB of
+    /// G-code, under the 2.1 GB the app can send as one job (the F2 Ultra loaded a 2 GB test job,
+    /// 2026-10-26). Checked before any are made, so a job that can't be sent fails at once instead
+    /// of after minutes of building. A 4 m cut wobbled at 0.015 mm, 7 passes, is 69 million.
     /// </summary>
-    public const long MaxMovesPerJob = 10_000_000;
+    public const long MaxMovesPerJob = 100_000_000;
 
     /// <summary>Moves a wobble along <paramref name="lengthMm"/> of path makes.</summary>
     public static long MoveCount(double lengthMm, double spacingMm) => (long)Math.Ceiling(lengthMm / (spacingMm / PointsPerLoop)) + 1;
@@ -659,7 +659,10 @@ public sealed class Job
     };
 
     /// <summary>The complete motion file. Validates first.</summary>
-    public string Render()
+    public string Render() => RenderText().ToString();
+
+    /// <summary>The complete motion file as bytes, for jobs of any size (a dense wobble can be more than one string holds). Validates first.</summary>
+    public GcodeText RenderText()
     {
         Validate();
         if (FollowsSurface && !Flat) throw new JobException("Curved surfaces work on the flat bed only (not with the rotary or conveyor).");
@@ -669,7 +672,7 @@ public sealed class Job
                 if (!double.IsFinite(z) || z < MinHeadZ - 1e-9 || z > MaxHeadZ + 1e-9)
                     throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");
         var tag = Machine.GcodeTag;
-        var lines = Header();
+        var lines = new GcodeText(Header());
         double focus = 0; // how far the head is lowered now (mm)
         double? headZ = null; // curved surfaces: where the head is now
         // A step-down cut written one pass at a time: the head goes to that pass's depth here and
@@ -764,7 +767,7 @@ public sealed class Job
         // Curved: leave Z mode at the start of the tail, as xTool Studio does.
         if (FollowsSurface) tail.Insert(tail.IndexOf($"# {tag} TAIL") + 1, "G103");
         lines.AddRange(tail);
-        return string.Join("\n", lines);
+        return lines;
     }
 
     List<string> Header()

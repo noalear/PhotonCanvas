@@ -392,16 +392,11 @@ the layer's speed, so a wobbled path takes about π × size ÷ spacing times as 
 
 Every point is a line of the job, so a fine wobble on long cuts gets big fast: at the starting
 0.015 mm spacing it is 2,400 points per mm, times the passes (step-down and whole-job passes write
-each pass out; per-path passes without step-down are repeated by the machine and count once). One
-job holds at most 10 million wobble points, all layers together (about 200 MB of job).
-
-A design with more than that, made of several pieces, is sent in **parts**: each part is a set of
-whole pieces (a group stays together), in canvas order, with all its layers and passes. The job
-bar shows **Part 1 of 9 ▾** and which pieces it holds; click it to pick another part. Send a part,
-let it finish, and the next one is ready to send: leave the material where it is in between. A
-single piece with too much wobble can't be split: the job bar then names the spacing that fits
-(for example 4 m of cuts × 7 passes needs at least 0.11 mm). These sizes are the app's own limit;
-the biggest job the machine itself takes hasn't been measured.
+each pass out; per-path passes without step-down are repeated by the machine and count once). For
+example 4 m of cuts × 7 passes is 69 million points: a 1.2 GB job, which takes about half a minute
+to build and a while to upload. One job holds at most 100 million wobble points, all layers
+together (about 2 GB, the most the app can send at once; the machine has loaded a 2 GB job). Past
+that the job bar says so and names the spacing that would fit.
 
 ### Engrave: fill style and lines
 

@@ -14,7 +14,9 @@ public static class XfPackage
 {
     public sealed record Parts
     {
-        public required string Motion { get; init; }
+        /// <summary>The motion G-code: as text, or as <see cref="MotionText"/> for a job too big for one string.</summary>
+        public string? Motion { get; init; }
+        public GcodeText? MotionText { get; init; }
         public required string Border { get; init; }
         public required byte[] PreviewJpeg { get; init; }
         /// <summary><c>blue</c>, <c>red</c> or <c>mixed</c>.</summary>
@@ -50,24 +52,30 @@ public static class XfPackage
             desc["time"] = Math.Round(s).ToString(System.Globalization.CultureInfo.InvariantCulture);
         desc["processingParams"] = parts.Params.DeepClone();
         desc["material"] = 1;
-        var members = new (string Name, byte[] Data)[]
+        var motion = parts.MotionText ?? new GcodeText(parts.Motion is { } m ? [m] : throw new ArgumentException("No motion G-code."));
+        var members = new (string Name, long Length, Action<byte[], long> Write)[]
         {
-            ("preview.jpg", parts.PreviewJpeg),
-            ("border.gcode", Encoding.UTF8.GetBytes(parts.Border)),
-            ("motion.gcode", Encoding.UTF8.GetBytes(parts.Motion)),
-            ("description.json", Encoding.UTF8.GetBytes(desc.ToJsonString(new JsonSerializerOptions { WriteIndented = false }))),
+            Bytes("preview.jpg", parts.PreviewJpeg),
+            Bytes("border.gcode", Encoding.UTF8.GetBytes(parts.Border)),
+            ("motion.gcode", motion.Length, motion.CopyTo),
+            Bytes("description.json", Encoding.UTF8.GetBytes(desc.ToJsonString(new JsonSerializerOptions { WriteIndented = false }))),
         };
+        static (string, long, Action<byte[], long>) Bytes(string name, byte[] data) => (name, data.Length, (to, at) => data.CopyTo(to, at));
         long mtime = parts.Created.ToUnixTimeSeconds();
-        using var ms = new MemoryStream();
-        foreach (var (name, data) in members)
+        // Written straight into one array (each member padded to 512 bytes, two zero blocks to end).
+        long total = members.Sum(x => 512 + (x.Length + 511) / 512 * 512) + 1024;
+        if (total > Array.MaxLength)
+            throw new JobException($"The job is {total / 1e9:0.0} GB, more than the 2.1 GB the app can send as one job. Widen the wobble spacing, use fewer passes, or send fewer pieces at a time.");
+        var o = new byte[total];
+        long pos = 0;
+        foreach (var (name, length, write) in members)
         {
-            ms.Write(UstarHeader(name, data.Length, mtime));
-            ms.Write(data);
-            int pad = (512 - data.Length % 512) % 512;
-            ms.Write(new byte[pad]);
+            UstarHeader(name, length, mtime).CopyTo(o, pos);
+            pos += 512;
+            write(o, pos);
+            pos += (length + 511) / 512 * 512;
         }
-        ms.Write(new byte[1024]); // two zero blocks end the archive
-        return ms.ToArray();
+        return o;
     }
 
     static byte[] UstarHeader(string name, long size, long mtime)

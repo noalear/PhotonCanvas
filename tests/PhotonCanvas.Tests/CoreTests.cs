@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json.Nodes;
 using PhotonCanvas.Core;
 
@@ -338,49 +338,48 @@ public class LayerDescentWobbleTests
     [Fact]
     public void TooMuchWobbleIsRefusedBeforeItRunsOutOfMemory()
     {
-        // "catstack": 4 m of cuts × 7 passes at 0.015 mm made 69 million moves and crashed the app.
-        // 800 mm × 7 passes is 13 million: refused at once, naming a spacing that fits.
+        // "catstack": 4 m of cuts × 7 passes at 0.015 mm is 69 million moves, 1.2 GB of G-code: one
+        // job now (it once crashed the app, as one string). Past what one job can be sent as, it's
+        // refused at once, naming a spacing that fits: 800 mm × 20 passes at 0.005 mm is 115 million.
         var s = PhotonCanvas.Doc.DocState.New();
-        var layer = s.Layers[0] with { Laser = LaserSettings.Blue(100, 50).WithPasses(7), Wobble = true, WobbleDiameterMm = 0.05, WobbleSpacingMm = 0.015 };
+        var layer = s.Layers[0] with { Laser = LaserSettings.Blue(100, 50).WithPasses(20), Wobble = true, WobbleDiameterMm = 0.05, WobbleSpacingMm = 0.005 };
         s = s with { Layers = [layer] };
         s = PhotonCanvas.Doc.Ops.AddShapes(s, [new PhotonCanvas.Doc.PathShape { LayerId = layer.Id, Geometry = PhotonCanvas.Doc.PathGeometry.Rect(10, 10, 200, 200) }]);
         var before = GC.GetTotalAllocatedBytes();
         var e = Assert.Throws<JobException>(() => PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions()));
         Assert.True(GC.GetTotalAllocatedBytes() - before < 50_000_000, "checked before any wobble is made");
-        Assert.Contains("13.4 million moves", e.Message);
-        Assert.Contains("at least 0.025 mm", e.Message);
+        Assert.Contains("115.2 million moves", e.Message);
+        Assert.Contains("at least 0.01 mm", e.Message);
+        Assert.True(Wobble.MoveCount(800, 0.01) * 20 <= Wobble.MaxMovesPerJob);
 
-        // The spacing it names fits.
-        var ok = PhotonCanvas.Doc.Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { WobbleSpacingMm = 0.025 });
-        var job = PhotonCanvas.Doc.JobBuilder.Build(ok, new PhotonCanvas.Doc.JobOptions());
-        Assert.InRange(((VectorBlock)job.Job.Blocks[0]).Path.Points.Count, 1_150_000, 1_160_000); // 800 mm × 1440 per mm
-
-        // Passes per path with no step-down use the machine's own loop: one copy, so 0.015 mm fits.
-        var looped = PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false });
+        // Passes per path with no step-down use the machine's own loop: one copy.
+        var looped = PhotonCanvas.Doc.JobBuilder.Build(PhotonCanvas.Doc.Ops.UpdateLayers(s, new HashSet<Guid> { layer.Id }, l => l with { WobbleSpacingMm = 0.015, Laser = l.Laser.WithPasses(7) }),
+            new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false });
         Assert.Contains("G104 P7", looped.Motion);
 
-        // Many pieces that together are too much: sent in parts of whole pieces, each under the limit.
-        var many = s;
-        for (int k = 1; k < 4; k++)
-            many = PhotonCanvas.Doc.Ops.AddShapes(many, [new PhotonCanvas.Doc.PathShape { LayerId = layer.Id, Name = $"Piece {k + 1}", Geometry = PhotonCanvas.Doc.PathGeometry.Rect(10 + k * 2, 10 + k * 2, 100, 100) }]);
-        many = PhotonCanvas.Doc.Ops.UpdateLayers(many, new HashSet<Guid> { layer.Id }, l => l with { Laser = l.Laser.WithPasses(3) });
-        var tooBig = Assert.Throws<PhotonCanvas.Doc.TooBigForOneJobException>(() => PhotonCanvas.Doc.JobBuilder.Build(many, new PhotonCanvas.Doc.JobOptions()));
-        Assert.Equal(2, tooBig.Parts); // (800 + 3 × 400 mm) × 3 passes × 2400 per mm = 14.4 million: 8.6 + 5.8
-        Assert.Equal(2, PhotonCanvas.Doc.JobBuilder.Parts(many, new PhotonCanvas.Doc.JobOptions()).Count);
-        var shapesSent = 0;
-        for (int i = 0; i < tooBig.Parts; i++)
-        {
-            var pj = PhotonCanvas.Doc.JobBuilder.Build(many, new PhotonCanvas.Doc.JobOptions { Part = i });
-            Assert.Equal((i, 2), (pj.Part!.Index, pj.Part.Count));
-            Assert.Contains(pj.Warnings, w => w.Contains($"part {i + 1} of 2"));
-            Assert.True(pj.Job.Blocks.OfType<VectorBlock>().Sum(b => (long)b.Path.Points.Count) * 3 <= Wobble.MaxMovesPerJob);
-            shapesSent += pj.Paths;
-        }
-        Assert.Equal(4, shapesSent); // every piece, once
-        // Fitting in one: the part is ignored.
-        Assert.Null(PhotonCanvas.Doc.JobBuilder.Build(s, new PhotonCanvas.Doc.JobOptions { WholeJobPasses = false, Part = 3 }).Part);
-
         // And the expansion itself refuses a path too long to hold.
-        Assert.Throws<JobException>(() => Wobble.Expand([new Vec2(0, 0), new Vec2(5000, 0)], 0.05, 0.015));
+        Assert.Throws<JobException>(() => Wobble.Expand([new Vec2(0, 0), new Vec2(20000, 0)], 0.05, 0.005));
+    }
+
+    [Fact]
+    public void GcodeTextIsTheLinesJoined()
+    {
+        // More than one 16 MB chunk, and a comment that isn't plain ASCII.
+        var lines = Enumerable.Range(0, 1_200_000).Select(i => $"G1X{i % 200}.{i % 1000:000}Y{i % 150}.5").Prepend("# Layer \"Slices · cut\"").ToList();
+        var text = new GcodeText(lines);
+        string joined = string.Join("\n", lines);
+        Assert.True(text.Length > 16 << 20);
+        Assert.Equal(System.Text.Encoding.UTF8.GetByteCount(joined), text.Length);
+        Assert.Equal(lines.Count, text.Lines);
+        Assert.Equal(joined, text.ToString());
+        using var ms = new MemoryStream();
+        text.WriteTo(ms);
+        Assert.Equal(System.Text.Encoding.UTF8.GetBytes(joined), ms.ToArray());
+
+        // The job package is the same whether the G-code comes as text or as bytes.
+        var at = new DateTimeOffset(2026, 10, 26, 0, 0, 0, TimeSpan.Zero);
+        XfPackage.Parts Parts(string? m, GcodeText? t) => new() { Motion = m, MotionText = t, Border = "G0X0Y0", PreviewJpeg = [1, 2, 3], Light = "blue", Created = at };
+        string small = string.Join("\n", lines.Take(1000));
+        Assert.Equal(XfPackage.Build(Parts(small, null)), XfPackage.Build(Parts(null, new GcodeText(lines.Take(1000)))));
     }
 }

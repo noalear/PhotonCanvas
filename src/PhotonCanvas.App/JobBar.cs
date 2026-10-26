@@ -240,10 +240,6 @@ public sealed class JobBar : UserControl
         DockPanel.SetDock(passes, Dock.Right);
         head.Children.Add(title);
         head.Children.Add(passes);
-        DockPanel.SetDock(_partPick, Dock.Left);
-        _partPick.Click += (_, _) => ShowPartMenu();
-        ToolTip.SetTip(_partPick, "This job is too big to send in one go, so it goes in parts of whole pieces, one after another. Click to pick which part to send.");
-        head.Children.Add(_partPick);
         _summary.VerticalAlignment = VerticalAlignment.Center;
         head.Children.Add(_summary);
         var foot = new DockPanel();
@@ -325,28 +321,7 @@ public sealed class JobBar : UserControl
         PathPauseS = (double)(_pathPause.Value ?? 0),
         Section = _section,
         OnlyLayer = _onlyLayer,
-        Part = _part,
     };
-
-    // A design too big for one job goes in parts: the one this bar builds and sends (null: the whole design).
-    int? _part;
-    // Said once a part has finished: which one is next.
-    string? _nextPartNote;
-    readonly Button _partPick = new() { IsVisible = false, Height = 24, Padding = new(8, 0), Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-
-    /// <summary>Pick which part to build and send: each part's pieces, in order.</summary>
-    void ShowPartMenu()
-    {
-        var menu = new MenuFlyout { Placement = PlacementMode.TopEdgeAlignedLeft };
-        foreach (var p in JobBuilder.Parts(_doc.State, Options with { Part = null }))
-        {
-            var item = new MenuItem { Header = $"Part {p.Index + 1} of {p.Count}: {p.Pieces}", FontWeight = p.Index == _part ? FontWeight.Bold : FontWeight.Normal };
-            int i = p.Index;
-            item.Click += (_, _) => { _part = i; _nextPartNote = null; Schedule(); };
-            menu.Items.Add(item);
-        }
-        menu.ShowAt(_partPick);
-    }
 
     Guid? _onlyLayer;
 
@@ -482,23 +457,10 @@ public sealed class JobBar : UserControl
         var build = Task.Run(() => JobBuilder.Build(state, opt));
         _pending = (state, plain, build);
         try { job = await build; }
-        catch (TooBigForOneJobException) when (plain.Part is null && v == _version)
-        {
-            // Too big for one job: start with its first part.
-            _part = 0;
-            await Rebuild();
-            return;
-        }
         catch (JobException e) { error = e.Message; }
         catch (OperationCanceledException) { return; }
         if (v != _version) return;
         ShowPlanning(null);
-        if (job is not null && job.Part?.Index != _part)
-        {
-            // It fits in one now, or has fewer parts: follow what was built.
-            _part = job.Part?.Index;
-            plain = Options;
-        }
         _job = job;
         _jobFor = (state, plain);
         _error = error;
@@ -525,14 +487,12 @@ public sealed class JobBar : UserControl
         _messages.Children.Clear();
         _messages.Children.Add(new TextBlock { Text = "CHECKS", Classes = { "h" } });
         ShowTimeline();
-        _partPick.IsVisible = _job?.Part is not null;
-        if (_job?.Part is { } part) _partPick.Content = $"Part {part.Index + 1} of {part.Count} ▾";
         if (_job is { } j)
         {
             _estimate.Text = Clock(j.EstimateS);
             int layers = j.LayerTimes.Count;
             int rounds = j.LayerTimes.Count == 0 ? 1 : j.LayerTimes.Max(t => t.Passes);
-            _summary.Text = (j.Part is { } jp ? $"{jp.Pieces} · " : "") + (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") +
+            _summary.Text = (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") +
                             (_onlyLayer is { } ol && _doc.State.FindLayer(ol) is { } oll ? $"Only {oll.Name} · " : "") + (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat" ? $"{_settings.WorkMode} · " : "") +
                             $"{layers} layer{(layers == 1 ? "" : "s")} · {j.Paths:N0} path{(j.Paths == 1 ? "" : "s")}" + (j.Steps.Count > j.Paths ? $" ({j.Steps.Count:N0} cuts with the passes)" : "") +
                             (j.RoundDelayS is not null && rounds > 1 ? $" · {rounds} rounds" : "") +
@@ -583,7 +543,7 @@ public sealed class JobBar : UserControl
         UpdateFrameButton();
         if (!_sending)
             _sendState = !_machine.IsConnected && _settings.ActiveSetup().Kind != MachineKind.Grbl ? "Connect the machine (right end of the ribbon) to send or frame."
-                : _job is null ? "Fix the problem in Checks to send." : _nextPartNote ?? "Ready to send.";
+                : _job is null ? "Fix the problem in Checks to send." : "Ready to send.";
         ShowCaption();
     }
 
@@ -656,14 +616,6 @@ public sealed class JobBar : UserControl
                         if (finished) Chime();
                     }
                     if (finished && OwnJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
-                    if (finished && OwnJob?.Part is { } done && done.Index < done.Count - 1)
-                    {
-                        // One part of a job too big for one: the next one ready to send.
-                        _part = done.Index + 1;
-                        _nextPartNote = $"Part {done.Index + 1} of {done.Count} finished. Part {done.Index + 2} is ready: leave the material where it is and Ship It.";
-                        Schedule();
-                    }
-                    else if (finished && OwnJob?.Part is not null) _nextPartNote = null;
                 }
                 if (_timeLapse is { } lapse)
                 {
@@ -789,7 +741,12 @@ public sealed class JobBar : UserControl
         });
         if (file?.TryGetLocalPath() is not { } path) return;
         if (xf) await File.WriteAllBytesAsync(path, job.Xf);
-        else await File.WriteAllTextAsync(path, job.Motion, new UTF8Encoding(false));
+        else
+        {
+            // Written as it is: a big wobble job is more G-code than one string holds.
+            await using var gcode = File.Create(path);
+            job.MotionText.WriteTo(gcode);
+        }
     }
 
     FrameShape CurrentFrameShape => _frameOutline.IsChecked == true ? FrameShape.Outline : FrameShape.Rectangle;
@@ -949,10 +906,7 @@ public sealed class JobBar : UserControl
             _sentJob = job;
             _sentFrom = _doc.FilePath;
             // A section of a bigger design: the fields move on only after the last one.
-            _nextPartNote = null;
             _sentMidSections = _section is { } s && s.Index < s.Count - 1
-                // One part of a job too big for one: done after the last part.
-                || job.Part is { } jp && jp.Index < jp.Count - 1
                 // Layer by layer: the piece is done after its last layer, not each one.
                 || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.ShapesFor(l).Any()).LastOrDefault()?.Id != onlyOne;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";

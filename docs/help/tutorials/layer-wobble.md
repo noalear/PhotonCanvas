@@ -23,12 +23,6 @@ Under **More settings**, tick **Wobble**. Two settings appear under it.
 <!-- target: field:Wobble spacing -->
 **Wobble spacing**: how far the circles move forward per loop. Smaller is denser and slower; the
 job's time goes up a lot, so check it on the job bar. On long cuts with many passes a fine spacing
-makes more points than one job can hold (10 million).
-
-## Too big for one job
-<!-- target: panel:Job -->
-When that happens on a design of several pieces, the job bar splits it into parts of whole pieces
-and shows **Part 1 of N ▾** with the pieces it holds. Ship It sends that part; when it finishes,
-the next part is ready. Leave the material where it is between parts. Click the part button to
-pick another one, for example to redo a part. One piece alone that's too big can't be split: the
-job bar then names the spacing that fits.
+makes a big job (69 million points, 1.2 GB, for 4 m of cuts × 7 passes at 0.015 mm), slower to
+build and upload. Past about 2 GB, the most one job can be, the job bar tells you the spacing that
+fits.
