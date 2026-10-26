@@ -25,7 +25,7 @@ Leave this ticked. It only shows for **Stacked layers (solid)**.
 
 ## Choose the side to look from
 <!-- target: field:Booklet seen from -->
-**Front** looks at the model's front. If its pictures show it from behind, choose **Back**.
+Each button shows your model as the booklet will show it from that side. Click the one you like.
 
 ## Make the slices
 <!-- target: button:Make the slices -->

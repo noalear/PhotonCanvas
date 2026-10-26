@@ -73,6 +73,22 @@ public static class AssemblyBooklet
 
     public static int PageCount(SliceStack stack, BookletOptions o) => Pages(stack, o).Count;
 
+    /// <summary>
+    /// The finished model as the booklet's pictures show it from <paramref name="view"/>, as a PNG
+    /// on a clear background (for choosing the side to look from).
+    /// </summary>
+    public static byte[] RenderView(SliceStack stack, BookletView view, double turnDeg, int width, int height)
+    {
+        var parts = stack.Parts.Select(Prepare).ToList();
+        double t = stack.ThicknessMm > 0 ? stack.ThicknessMm : stack.StackHeightMm / Math.Max(1, stack.Slices);
+        using var surface = SKSurface.Create(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        surface.Canvas.Clear(SKColors.Transparent);
+        new Iso(parts, t, (int)view * 90 + turnDeg).Draw(surface.Canvas, new SKRect(2, 2, width - 2, height - 2), parts, _ => false, []);
+        using var img = surface.Snapshot();
+        using var data = img.Encode(SKEncodedImageFormat.Png, 90);
+        return data.ToArray();
+    }
+
     /// <summary>One page as a PNG, <paramref name="scale"/> pixels a point (for previews and checks).</summary>
     public static byte[] RenderPng(SliceStack stack, BookletOptions o, int page, float scale = 1.5f)
     {

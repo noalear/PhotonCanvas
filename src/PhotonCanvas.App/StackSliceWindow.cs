@@ -80,7 +80,12 @@ public sealed class StackSliceWindow : Window
     StackPanel _pinPanel = null!;
     // The assembly instructions: a PDF beside the design (or in the data folder until it's saved).
     readonly CheckBox _booklet = new() { Content = "Make an assembly booklet (PDF)", IsChecked = true };
-    readonly ComboBox _bookletView = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Front", "Right side", "Back", "Left side" }, SelectedIndex = 0 };
+    // The side the booklet looks from: a picture of the model from each, to pick by sight.
+    readonly Avalonia.Controls.Primitives.UniformGrid _bookletView = new() { Columns = 4 };
+    readonly List<Avalonia.Controls.Primitives.ToggleButton> _viewPicks = [];
+    readonly List<Image> _viewPictures = [];
+    int _viewIndex;
+    CancellationTokenSource? _viewCts;
     readonly Button _openBooklet = Button("Open the booklet", tip: "Opens the assembly booklet just made, in your PDF viewer, to read or print.");
     string? _bookletPath;
 
@@ -139,7 +144,25 @@ public sealed class StackSliceWindow : Window
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
         _openBooklet.IsVisible = false;
-        _booklet.IsCheckedChanged += (_, _) => BookletShown();
+        _booklet.IsCheckedChanged += (_, _) => { BookletShown(); _ = ViewPictures(); };
+        foreach (var (name, i) in new[] { "Front", "Right side", "Back", "Left side" }.Select((n, i) => (n, i)))
+        {
+            var picture = new Image { Width = 72, Height = 64, Stretch = Stretch.Uniform };
+            var pick = new Avalonia.Controls.Primitives.ToggleButton
+            {
+                IsChecked = i == 0,
+                Padding = new(2),
+                Margin = new(0, 0, i < 3 ? 4 : 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                Content = new StackPanel { Spacing = 2, Children = { picture, new TextBlock { Text = name, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center } } },
+            };
+            ToolTip.SetTip(pick, $"The booklet's pictures look at the model from this side: {name.ToLowerInvariant()}.");
+            pick.Click += (_, _) => { _viewIndex = i; for (int k = 0; k < _viewPicks.Count; k++) _viewPicks[k].IsChecked = k == i; };
+            _viewPicks.Add(pick);
+            _viewPictures.Add(picture);
+            _bookletView.Children.Add(pick);
+        }
         _openBooklet.Click += (_, _) =>
         {
             if (_bookletPath is null || !File.Exists(_bookletPath)) return;
@@ -221,7 +244,7 @@ public sealed class StackSliceWindow : Window
                 }),
                 _numbers,
                 _booklet,
-                Field("Booklet seen from", _bookletView, tip: "Which side of the model the booklet's pictures look at. Front is the side facing −Y in the file, as almost every 3D program saves it; if your model comes out from behind, choose Back."),
+                Field("Booklet seen from", _bookletView, tip: "Which side of the model the booklet's pictures look at: each picture is the model as the booklet will show it. Pick the one that shows it the way you want to build it."),
                 Field("Cut with", _cutWith, tip: "Cut settings from your library: the material's thickness, and the kerf and slot fit your cut test measured, go on the slices."),
                 _cutNote,
                 Field("Slot fit (mm)", _fit, tip: "Slots are the material's thickness plus this. Raise it if the sheets won't go together, lower it (even below 0) if they're loose. The cut layer's kerf counts too."),
@@ -299,6 +322,29 @@ public sealed class StackSliceWindow : Window
         _numbers.Content = _method.SelectedIndex == 0 ? "Number each slice (light mark, 1 at the bottom)" : "Name each sheet and mark what goes in each slot";
         _booklet.IsVisible = _method.SelectedIndex == 0;
         BookletShown();
+    }
+
+    /// <summary>The model as the booklet would show it from each side (in the background: a big model takes a moment).</summary>
+    async Task ViewPictures()
+    {
+        if (_stack is not { Method: SliceMethod.Stacked } stack || _booklet.IsChecked != true || _method.SelectedIndex != 0) return;
+        _viewCts?.Cancel();
+        var cts = _viewCts = new CancellationTokenSource();
+        double turn = (double)(_turn.Value ?? 0);
+        try
+        {
+            for (int i = 0; i < _viewPictures.Count; i++)
+            {
+                int k = i;
+                var png = await Task.Run(() => AssemblyBooklet.RenderView(stack, (BookletView)k, turn, 216, 192), cts.Token);
+                if (cts.IsCancellationRequested) return;
+                var old = _viewPictures[k].Source as IDisposable;
+                _viewPictures[k].Source = new Avalonia.Media.Imaging.Bitmap(new MemoryStream(png));
+                old?.Dispose();
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException) { AppLog.Error("booklet view pictures", e); }
     }
 
     /// <summary>The booklet's view only when there'll be a booklet.</summary>
@@ -556,6 +602,7 @@ public sealed class StackSliceWindow : Window
             if (cts.IsCancellationRequested) return;
             _stack = stack;
             Pins();
+            _ = ViewPictures();
             _view.Show(stack, o.ThicknessMm);
             // The range slider spans the new stack (all of it, unless a range was already picked within it).
             bool all = _to.Value >= _to.Maximum && _from.Value <= 1;
@@ -665,7 +712,7 @@ public sealed class StackSliceWindow : Window
             PinLengthMm = pinLength,
             DowelMm = (double)(_dowel.Value ?? 0),
             Outline = (SliceOutline)Math.Max(0, _outline.SelectedIndex),
-            View = (BookletView)Math.Max(0, _bookletView.SelectedIndex),
+            View = (BookletView)_viewIndex,
             TurnDeg = (double)(_turn.Value ?? 0),
         };
         try

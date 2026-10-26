@@ -64,6 +64,20 @@ static class MoreShots
             settle(300);
         }
         Summary("window-3d-slices-summary", "Stacked slices: the foot of the settings, with the summary");
+        // The booklet's sides to look from, each a picture of the model from that side (drawn in the
+        // background): the block animal, which looks different from each side, unlike the pawn.
+        slicer.Load([.. Block(0, 0, 0, 6, 6, 12), .. Block(44, 0, 0, 50, 6, 12), .. Block(0, 14, 0, 6, 20, 12), .. Block(44, 14, 0, 50, 20, 12),
+            .. Block(0, 0, 12, 50, 20, 27), .. Block(40, 5, 27, 60, 15, 39), .. Block(52, 5, 21, 60, 15, 27)], "animal.stl");
+        Slice(slicer);
+        settle(2000);
+        if (F<Avalonia.Controls.Primitives.UniformGrid>(slicer, "_bookletView") is { } picks)
+        {
+            picks.BringIntoView();
+            settle(500);
+            save(slicer.CaptureRenderedFrame(), "window-3d-slices-booklet-view", "Stacked slices: Booklet seen from, a block animal from each side");
+        }
+        slicer.Load(pawn, "pawn.stl");
+        Slice(slicer);
         F<CheckBox>(slicer, "_shape").IsChecked = true;
         Slice(slicer);
         Summary("window-3d-slices-shaping-summary", "Stacked slices with Shape the edges ticked: the summary's edge shaping line");

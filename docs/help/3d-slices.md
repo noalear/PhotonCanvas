@@ -420,12 +420,17 @@ whatever is left of it above that goes on the model in its own steps, like any o
 
 ### Which way the pictures look
 
-**Booklet seen from** (**Front**, **Right side**, **Back**, **Left side**; shown when the booklet is
-on) chooses which side of the model the 3D pictures look at, a little from one side and above.
+**Booklet seen from** (shown when the booklet is on) chooses which side of the model the 3D
+pictures look at, a little from one side and above. Its four buttons, **Front**, **Right side**,
+**Back** and **Left side**, each show your model as the booklet will show it from that side, drawn
+again whenever the model is sliced again: click the one that looks the way you want to build it.
+The one chosen is blue.
+
+![Booklet seen from: a block animal from each side, Front chosen](images/window-3d-slices-booklet-view.png)
+
 **Front** is the side facing −Y in the model's file, as almost every 3D program saves it; turning
-the model with **Turned (°)** turns the pictures with it, so the front stays the front. If your
-model comes out seen from behind, choose **Back**. The "From above" pictures are turned the same
-way, the side you're looking from at the bottom.
+the model with **Turned (°)** turns the pictures with it. The "From above" pictures in the steps
+are turned the same way, the side you're looking from at the bottom.
 
 Where it's saved: next to your design, as "*model* assembly.pdf", once the design has been saved
 (**File → Save**); until then, in the **Booklets** folder of the program's data folder
