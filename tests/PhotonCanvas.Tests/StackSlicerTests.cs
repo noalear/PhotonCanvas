@@ -448,7 +448,8 @@ public class StackSlicerTests
             Assert.Equal(5, AssemblyBooklet.SavePdf(stack, new BookletOptions { Title = "Chin" }, path));
             using var pdf = UglyToad.PdfPig.PdfDocument.Open(path);
             var text = string.Join(" ", pdf.GetPages().Select(pg => pg.Text));
-            Assert.Contains("Side build A: 2b has nothing under it yet", text);
+            Assert.Contains("Side build A: b has nothing under it yet", text);
+            Assert.DoesNotContain("1×", text);
             Assert.Contains("It joins the model in step 3.", text);
             Assert.Contains("Glue 3 onto side build A, inside the marked line on 2b.", text);
             Assert.Contains("Glue 3 (with side build A under it) onto slice 2", text);

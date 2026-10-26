@@ -383,15 +383,16 @@ slices**. Print it, or keep it open on a tablet beside the glue.
 Each step shows:
 
 - **The step number**, the same as the slice number.
-- **A blue box** with the parts to add (drawn flat, with their labels: "1× 3a"), and how many pins
+- **A blue box** with the parts to add (drawn flat, each with its label: "3a"), and how many pins
   go in at this step.
 - **From above:** the slice below in grey, with the new parts on it in colour where they go, their
   labels, and red dots where the pins go in.
 - **The stack so far**, always from the same angle and at the same size, the slices already glued
   in wood colour and the new parts in orange with their labels, and the pins standing in their
   holes, ready for the next slice.
-- **What to do**, in words: "Glue 3a and 3b onto slice 2, over its pins, inside the marked lines.
-  Push 2 pins into the holes, with a drop of glue."
+- **What to do**, in words: "Glue a and b onto slice 2, over its pins, inside the marked lines.
+  Push 2 pins into the holes, with a drop of glue." This step's parts go by their letter alone
+  (the step number says which slice they're from); parts of other slices keep their whole label.
 
 ### Side builds: parts with nothing under them yet
 
@@ -410,9 +411,9 @@ whatever is left of it above that goes on the model in its own steps, like any o
 
 - While a side build is going, each step has a purple **Side build A** panel beside the model,
   showing it so far with its new part in colour, and saying which step it joins the model in.
-- Its parts are in the step's blue box as "1× 3a (side A)", and the words say what to do: start it
-  ("lay 3a flat on the table, marks up"), then "glue 4a onto it, inside the marked line".
-- In the step where it joins, the part on the model that sits on it is listed as "1× 27 + side A":
+- Its parts are in the step's blue box as "3a (side A)", and the words say what to do: start it
+  ("lay a flat on the table, marks up" in step 3), then "glue a onto it, inside the marked line".
+- In the step where it joins, the part on the model that sits on it is listed as "27 + side A":
   glue that part onto the side build's top first, inside the marked line, then glue the two
   together onto the model. The side build hangs down beside the slice below.
 - A side build the model never reaches (a piece joined to nothing) isn't one: its parts are red,

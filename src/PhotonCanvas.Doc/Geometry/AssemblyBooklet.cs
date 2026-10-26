@@ -341,7 +341,7 @@ public static class AssemblyBooklet
         // Red only for a part joined to nothing, below or above: it really is glued on by eye.
         bool Floats(Flat p) => p.Part.Floating && !plan.Hangs(p) && !plan.Sides.Any(g => g.Joiners.Contains(p));
 
-        // The parts to take for a step, in a box: each over its "1× 3a", in rows, as big as fits.
+        // The parts to take for a step, in a box: each over its "3a", in rows, as big as fits.
         float PartsBox(SKCanvas c, float left, float top, float width, List<Flat> show, Func<Flat, string> caption, int pinCount, SKColor fill, SKColor edge)
         {
             using var lf = Font(11, bold: true);
@@ -400,8 +400,10 @@ public static class AssemblyBooklet
             using var num = Font(40, bold: true);
             Text(c, $"{s}", r.Left, r.Top + 38, num, Ink);
             float boxW = 190;
-            string Caption(Flat p) => plan.SideOf(p) is { } g ? $"1× {p.Label} (side {g.Name})"
-                : joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"1× {p.Label} + side {j}" : $"1× {p.Label}";
+            // In the words, this step's parts by their letter alone (the step number says the slice): "a, b and c".
+            string Short(Flat p) => p.Slice == s && p.Name.Length > $"{s}".Length && char.IsLetter(p.Name[^1]) ? p.Name[$"{s}".Length..] : p.Name;
+            string Caption(Flat p) => plan.SideOf(p) is { } g ? $"{p.Label} (side {g.Name})"
+                : joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"{p.Label} + side {j}" : p.Label;
             var take = main.Concat(side).ToList();
             float under = r.Top + 50;
             if (take.Count > 0) under = PartsBox(c, r.Left, r.Top + 50, boxW, take, Caption, pins.Count + sidePins.Count, Callout, CalloutEdge);
@@ -409,20 +411,20 @@ public static class AssemblyBooklet
             // What to do, in words (first, so the pictures leave room for it).
             var what = new List<string>();
             foreach (var g in joining)
-                what.Add($"Glue {Join([.. g.Joiners.Select(m => m.Name)])} onto side build {g.Name}, inside the marked line{(g.Joiners.Count > 1 ? "s" : "")} on {Join([.. g.Members.Where(m => m.Slice == s - 1).Select(m => m.Name)])}.");
+                what.Add($"Glue {Join([.. g.Joiners.Select(Short)])} onto side build {g.Name}, inside the marked line{(g.Joiners.Count > 1 ? "s" : "")} on {Join([.. g.Members.Where(m => m.Slice == s - 1).Select(m => m.Name)])}.");
             if (main.Count > 0)
             {
-                var names = Join([.. main.Select(p => joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"{p.Name} (with side build {j} under it)" : p.Name)]);
+                var names = Join([.. main.Select(p => joining.FirstOrDefault(g => g.Joiners.Contains(p)) is { Name: { } j } ? $"{Short(p)} (with side build {j} under it)" : Short(p))]);
                 what.Add(s == 1
                     ? $"Lay {names} flat on the board, marks facing up."
                     : $"Glue {names} onto slice {s - 1}{(o.PinMm > 0 && plan.Pins.Any(p => p.Slice == s - 1 && (p.From is null || !plan.Hangs(p.From))) ? ", over its pins," : "")} inside the marked line{(main.Count > 1 ? "s" : "")}.");
                 if (pins.Count > 0) what.Add($"Push {pins.Count} pin{(pins.Count == 1 ? "" : "s")} into the holes, with a drop of glue.");
-                var air = main.Where(Floats).Select(p => p.Name).ToList();
+                var air = main.Where(Floats).Select(Short).ToList();
                 if (air.Count > 0) what.Add($"{Join(air)} start{(air.Count == 1 ? "s" : "")} in mid-air: glue {(air.Count == 1 ? "it" : "them")} on by eye.");
             }
             foreach (var g in active)
             {
-                var now = side.Where(p => plan.SideOf(p) == g).Select(p => p.Name).ToList();
+                var now = side.Where(p => plan.SideOf(p) == g).Select(Short).ToList();
                 if (now.Count == 0) continue;
                 int gp = sidePins.Count(p => plan.SideOf(p.From!) == g);
                 what.Add(g.Members[0].Slice == s
