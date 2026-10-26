@@ -2029,6 +2029,11 @@ public partial class MainWindow : Window
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
         var pic = sel.OfType<ImageShape>().FirstOrDefault();
         var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
+        if (pic is not null && outline is null && sel.OfType<PathShape>().Any())
+        {
+            StatusText.Text = "Image mask: the selected shape isn't a closed outline (its ends don't join), so it can't mask the picture. Close it with Tidy lines first, or draw a closed shape.";
+            return;
+        }
         if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to mask it with."; return; }
         _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
         StatusText.Text = "Image mask: only the part inside the shape is shown and engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";

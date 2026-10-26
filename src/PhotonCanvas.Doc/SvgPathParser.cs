@@ -20,9 +20,15 @@ static class SvgPathParser
         bool open = false;
         int i = 0;
 
+        // A path that comes back to where it started without a Z (common in files from other
+        // programs) is still an outline: closed, so it can fill, mask and be cut inside-first.
+        bool BackToStart() =>
+            segs.Count > 0 && segs[^1].To.Dist(start) < 1e-6 * Math.Max(1, Math.Max(Math.Abs(start.X), Math.Abs(start.Y)))
+            && (segs.Count >= 3 || segs.Any(s => s.Kind == SegKind.Cubic));
+
         void Flush(bool closed)
         {
-            if (open) subs.Add(new Subpath(start, segs.ToImmutable(), closed));
+            if (open) subs.Add(new Subpath(start, segs.ToImmutable(), closed || BackToStart()));
             segs.Clear();
             open = false;
         }

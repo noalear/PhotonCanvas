@@ -483,6 +483,9 @@ circle, a heart, a frame. The picture itself isn't changed.
 
 - The mask moves, resizes and turns with the picture, and survives filters, crop and the eraser.
 - Holes in the shape stay holes in the picture. A new mask replaces the old one.
+- A shape from another program whose outline comes back to its start point counts as closed, even
+  without a closing command in the file. If the shape really is open (its ends don't meet), the
+  status bar says so: close it with **Tidy lines** first.
 - Only the masked part has to fit the work area: the rest of the picture can hang outside it, even
   when its rows are turned to an angle (**Split onto pieces** relies on this).
 - Pictures are always drawn under lines and shapes, so the outline you line a picture up with stays

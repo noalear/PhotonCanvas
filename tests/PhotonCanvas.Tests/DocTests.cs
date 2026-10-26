@@ -74,6 +74,21 @@ public class PathDataTests
     }
 
     [Fact]
+    public void PathBackAtItsStartIsClosed()
+    {
+        // A rounded rectangle from another program that ends on its start point but has no Z:
+        // still an outline, so it can mask a picture (it used to stay open and Image mask did nothing).
+        var rect = PathGeometry.FromSvgPathData("M0,2.2L0,83.45C0,84.665 0.985,85.65 2.2,85.65L51.8,85.65C53.015,85.65 54,84.665 54,83.45L54,2.2C54,0.985 53.015,0 51.8,0L2.2,0C0.985,0 0,0.985 0,2.2");
+        Assert.True(rect.Subpaths[0].Closed);
+        var pic = new ImageShape { Source = ImageSource.FromEncoded(new Core.Imaging.RasterImage(10, 10, new byte[400]).EncodePng()), SizeMm = new(100, 100) }.WithClip(rect);
+        Assert.True(pic.InClip(new(27, 40)));
+        Assert.False(pic.InClip(new(80, 40)));
+        // A line that only goes out and back, or one that stops short, stays open.
+        Assert.False(PathGeometry.FromSvgPathData("M0 0 L10 0 L0 0").Subpaths[0].Closed);
+        Assert.False(PathGeometry.FromSvgPathData("M0 0 L10 0 L10 10 L0 0.1").Subpaths[0].Closed);
+    }
+
+    [Fact]
     public void EllipseBoundsAreTight()
     {
         var b = PathGeometry.Ellipse(50, 50, 20, 10).Bounds(0.001);
