@@ -307,6 +307,7 @@ public sealed class StackSliceWindow : Window
         _name = name;
         _file.Text = $"{name}: {mesh.Count:N0} triangles.";
         Natural();
+        _view.ResetView();
         OwnSize();
     }
 

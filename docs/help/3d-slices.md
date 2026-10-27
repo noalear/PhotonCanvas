@@ -308,7 +308,17 @@ and radial, "The biggest sheet"): make the model smaller.
 ## The preview
 
 The preview shows the parts in 3D as they'll be put together: slices stacked, or sheets standing
-in place. Drag it to turn it round.
+in place.
+
+| Mouse | What it does |
+|---|---|
+| Drag | Turns the model round. |
+| Mouse wheel | Zooms in or out on what's under the pointer, from a quarter of the size to 40 times. |
+| Right-drag or middle-drag | Moves the view, as on the work area. |
+| Double-click | Shows the whole model again (the angle is kept). Opening another model does this too. |
+
+The line along the bottom of the preview says how many slices it shows and, once you've zoomed or
+moved it, the zoom ("250%").
 
 ![Outlines view, showing slices 6 to 12 of 12: the pin holes show through](images/window-3d-slices-outlines.png)
 
