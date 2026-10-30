@@ -298,7 +298,7 @@ The **?** at the top right opens the help menu:
 | **Getting started** | The short tour shown at the first start, with the connection setup. See [The first start](getting-started.md#the-first-start). |
 | **Keyboard shortcuts** | Every shortcut on one page, with **Change shortcuts…** to change them. See [Keyboard shortcuts](keyboard-shortcuts.md). |
 | **Safety and disclaimer** | The safety notice and the disclaimer you accepted at the first start. |
-| **About PhotonCanvas** | The version, the licence (GNU GPL v3) and credits. |
+| **About PhotonCanvas** | The version, the licence (free to use, all rights reserved) and credits. |
 
 The same items are on the **Help** page of the settings window.
 

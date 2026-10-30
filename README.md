@@ -2,7 +2,7 @@
 
 # PhotonCanvas
 
-A free, offline, open replacement for xTool Studio for the **xTool F2 Ultra** laser.
+A free, offline replacement for xTool Studio for the **xTool F2 Ultra** laser.
 No account, no cloud, no telemetry: designs and jobs stay on your computer and go
 straight to the machine over your own network.
 
@@ -15,8 +15,8 @@ straight to the machine over your own network.
 > This is independent hobby software. It is **not made, endorsed or supported by xTool
 > or Makeblock**, and using it may affect your machine's warranty. It is provided
 > **"as is", without warranty of any kind**. You use it entirely at your own risk; the
-> authors are not liable for injury, fire, or damage to your machine, materials or
-> property (GPL v3, sections 15–16).
+> author is not liable for injury, fire, or damage to your machine, materials or
+> property (see [LICENSE](LICENSE)).
 >
 > **Lid-open mode** ("Allow starting with the lid open" in Settings → Machine) removes the
 > protection the lid gives you. Only turn it on if everyone in the room wears safety
@@ -213,19 +213,13 @@ system.
 
 ## Licence
 
-PhotonCanvas is free software under the GNU General Public License v3 or later: see
-[LICENSE](LICENSE). The program is published as ready-to-run builds on the
+PhotonCanvas is free to use, for personal or commercial work, on any number of your own computers
+and devices. All rights reserved: it may not be sold, rented, redistributed or published in a
+modified form without written permission. The full terms are in [LICENSE](LICENSE). The program is
+published as ready-to-run builds on the
 [releases page](https://github.com/noalear/PhotonCanvas-releases/releases).
 
-**Source code on request.** Anyone who has received PhotonCanvas (the desktop program, its remote
-server or the Android app) can get the complete corresponding source code for that version, as GPLv3
-section 6 requires, by asking the author through an
-[issue on the releases repository](https://github.com/noalear/PhotonCanvas-releases/issues). This
-written offer is valid for at least three years after the last time that version was published, and
-costs nothing beyond what providing the source physically costs, if anything.
-
-You may use, share and change PhotonCanvas; if you distribute a changed version, it must stay under
-the same licence with its source available. Third-party components and their licences are listed in
-[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+PhotonCanvas includes third-party open-source components, each under its own licence; they are
+listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 xTool is a trademark of its owner, used here only to name the machines this works with.

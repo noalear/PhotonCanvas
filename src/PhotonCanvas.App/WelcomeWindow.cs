@@ -31,9 +31,9 @@ public sealed class WelcomeWindow : Window
     public static readonly string DisclaimerText =
         Product + " is free, independent software made by hobbyists. It is not made, endorsed or supported by xTool or Makeblock, " +
         "and using it may not be covered by your machine's warranty.\n\n" +
-        "It is provided \"as is\", with no warranty of any kind. You use it entirely at your own risk: the authors are not responsible for " +
+        "It is provided \"as is\", with no warranty of any kind. You use it entirely at your own risk: the author is not responsible for " +
         "injury, fire, damage to your machine, material or property, or anything else that happens as a result of using it. " +
-        "The full terms are in the LICENSE file (GNU General Public License, version 3, sections 15 and 16).";
+        "The full terms are in the LICENSE file.";
 
     readonly bool _firstRun;
     readonly Func<Task<bool>> _setUpKeys;

@@ -2612,8 +2612,7 @@ public partial class MainWindow : Window
     Task ShowAbout() => Dialogs.Message(this, $"About {AppIdentity.ProductName}",
         $"{AppIdentity.ProductName} {Updates.Current} – an offline, no-telemetry laser workspace for the xTool F2 Ultra.\n\n" +
         "Jobs are generated locally in the same G-code dialect as the stock software, verified line for line against real exports.\n\n" +
-        "Free software under the GNU General Public License v3 or later (see LICENSE and THIRD-PARTY-NOTICES). No warranty.\n\n" +
-        Updates.SourceOffer + "\n\n" +
+        "Free to use; all rights reserved (see LICENSE). Third-party components keep their own licences (see THIRD-PARTY-NOTICES). No warranty.\n\n" +
         "Not affiliated with, endorsed by or supported by xTool or Makeblock. \"xTool\" is their trademark, used only to say which machines this works with.");
 
     /// <summary>Outlines (world mm) of the selected vector shapes; pictures don't count.</summary>

@@ -1,10 +1,7 @@
 # Third-party notices
 
-PhotonCanvas is licensed under the GNU General Public License v3 or later (see `LICENSE`).
-The program is published as ready-to-run builds; anyone who has received it can get the
-complete corresponding source code on request (GPLv3 section 6 written offer, valid for at
-least three years), through an issue at
-<https://github.com/noalear/PhotonCanvas-releases/issues>.
+PhotonCanvas is free to use; all rights reserved (see `LICENSE`). The components below are
+not covered by that licence: each keeps its own, and nothing in PhotonCanvas's licence limits it.
 
 It uses the following open-source components, each under its own licence. Their
 licence texts ship inside their NuGet packages and are linked below.
@@ -66,17 +63,6 @@ The Apache License 2.0 text is at <https://www.apache.org/licenses/LICENSE-2.0>.
 The QR code scanner is Google Play services' code scanner, a Google component: it runs inside
 Google Play services on the phone, under Google's terms, and may communicate with Google. The app
 itself only receives the text of the scanned code.
-
-### Additional permission (GNU GPL v3, section 7)
-
-As the sole copyright holder of PhotonCanvas, I give this additional permission: if you modify
-PhotonCanvas, or any covered work, by linking or combining it with the Google Play services
-libraries or the ML Kit code scanner libraries (or modified versions of them), and the libraries
-they need, containing parts covered by the terms of Google's licences for them, you are
-permitted to convey the resulting work. The Corresponding Source for a non-source form of such a
-combination does not need to include the source code of those libraries, but does include the
-source code of the parts of PhotonCanvas used. You may remove this additional permission from
-your own copies or versions of PhotonCanvas.
 
 The Python protocol prototype in `src/pcprobe` (not part of the app) uses websockets
 (BSD 3-Clause), cryptography (Apache 2.0 / BSD) and Pillow (MIT-CMU).

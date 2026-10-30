@@ -16,7 +16,7 @@ PhotonCanvas designs laser jobs and sends them to an xTool F2 Ultra: a galvo las
   stock software uses, and uploaded as a job package.
 - **The machine waits for you.** Uploading never starts the laser. A job sits on the machine
   until you press its start button.
-- **Free software** under the GNU General Public License v3. It is independent: not made,
+- **Free to use**, all rights reserved (the terms are in the LICENSE file). It is independent: not made,
   endorsed or supported by xTool or Makeblock. Help → **About PhotonCanvas** shows the version.
 
 ## Running it

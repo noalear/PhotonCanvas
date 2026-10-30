@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # Publish a new version for friends: build it, and put the builds up as a release on the public,
-# releases-only GitHub repository. Their PhotonCanvas sees it at start. PhotonCanvas is
-# GPL-3.0-or-later; the source repository is private, and every release carries the GPLv3 section 6
-# written offer (below): anyone who has received the program can get the complete corresponding
-# source on request through the releases repository's issues, for at least three years.
+# releases-only GitHub repository. Their PhotonCanvas sees it at start. PhotonCanvas is free to
+# use, all rights reserved (LICENSE); the source repository is private.
 #
 #   VERSION=0.2.0 tools/release.sh                  # every platform
 #   VERSION=0.2.0 tools/release.sh win-x64 osx-arm64 # just these
@@ -40,7 +38,7 @@ To update: unpack the file for your computer in place of the old one. Your desig
 EOF
 cat >> "$notes" <<EOF
 
-PhotonCanvas is free software under the GNU General Public License v3 or later. Source code on request: anyone who has received this program can get the complete corresponding source code for this version (GPLv3 section 6) by opening an issue at https://github.com/$REPO/issues. This offer is valid for at least three years after this version was last published.
+PhotonCanvas is free to use, for personal or commercial work; all rights reserved. It may not be sold, redistributed or published in a modified form without written permission. The full terms are in the LICENSE file that comes with it.
 EOF
 
 files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz)
