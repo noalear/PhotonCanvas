@@ -720,14 +720,20 @@ Adds a colour test grid for the MOPA: one setting across, another down, the rest
 | **Frequency kHz** | 1–4000 | Brought down to the most the pulse width allows. |
 | **Pulse width** | 2–500 ns | The MOPA's 16 pulse widths; swept values move to the nearest. |
 | **Square (mm)**, **Gap (mm)** | 2–20, 0.5–10 | |
+| **Spread the heat: run each square where the plate is coolest** | on or off | On (the start). Turns on [Spread the heat across the whole job](heat-order.md#across-the-whole-job) for the design when the test is added. |
+| **Sheet metal**, **Thickness (mm)**, **How it's held** | as under **Heat** in the job bar | Stainless steel, 0.5 mm, in air on the honeycomb to start. Greyed while spreading is off. The rest (how warm it may get, a fixed cool-down) is under **Heat** in the job bar. |
 
 Below a pulse width's full-power frequency the MOPA can't deliver all its power, roughly in
 proportion, so low-frequency squares get less than the power says. The line under the settings gives
 the number of squares, the size, the time and, when frequency is swept, the pulse spacing.
 
 **Add to design** puts it 10 mm in from the top-left corner. Each square is its own filled layer
-(`Colour test R3 C5`), lines straight across, and they run from the least energy per area to the
-most, so the plate warms gradually. The axis labels go on **Colour test labels** (MOPA 30 % at
+(`Colour test R3 C5`), lines straight across. The layers are in order from the least energy per
+area to the most. With spreading on, each square runs where the plate is coolest, far from the one
+just done, with waits only where the plate needs them: heat from one square doesn't shift its
+neighbour's colour or bow the plate out of focus. With it off, they run in layer order, so the
+plate warms gradually, but the hottest squares come last on a plate that's already warm. The time
+on the line under the settings leaves out the waits (the job bar's estimate has them). The axis labels go on **Colour test labels** (MOPA 30 % at
 1000 mm/s). Focus on the plate first and keep that focus for everything you mark with these colours:
 a millimetre off changes them. Use a clean, flat plate with the same finish as the real piece.
 

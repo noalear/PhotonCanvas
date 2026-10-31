@@ -239,6 +239,7 @@ public static class DocFile
                 ["csvRow"] = s.Vars.CsvRow,
             },
         };
+        if (SpreadJson(s.Spread) is { } spread) root["spreadHeat"] = spread;
         return root;
     }
 
@@ -503,7 +504,7 @@ public static class DocFile
             if (starts.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && starts.TryGetValue(sh.Id, out var p) ? ps.WithStart(p) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
-            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]) };
+            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Spread = SpreadFrom(root["spreadHeat"]) };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {
@@ -528,6 +529,32 @@ public static class DocFile
             ["axisPoint"] = new JsonArray(c.AxisPoint.X, c.AxisPoint.Y),
             ["topMm"] = c.TopMm,
             ["diameterMm"] = c.DiameterMm,
+        };
+    }
+
+    static JsonNode? SpreadJson(SpreadHeat h) => h == new SpreadHeat() ? null : new JsonObject
+    {
+        ["on"] = h.On,
+        ["sheet"] = h.Sheet,
+        ["thicknessMm"] = h.ThicknessMm,
+        ["limitC"] = h.LimitC,
+        ["backing"] = h.Backing.ToString(),
+        ["cooldownS"] = h.CooldownS,
+    };
+
+    static SpreadHeat SpreadFrom(JsonNode? n)
+    {
+        if (n is not JsonObject o) return new();
+        var d = new SpreadHeat();
+        double D(string k, double def) => o[k] is JsonValue v && v.TryGetValue<double>(out var x) ? x : def;
+        return new SpreadHeat
+        {
+            On = o["on"] is JsonValue on && on.TryGetValue<bool>(out var b) && b,
+            Sheet = SheetMetal.Find(o["sheet"] is JsonValue sv && sv.TryGetValue<string>(out var name) ? name : d.Sheet).Name,
+            ThicknessMm = D("thicknessMm", d.ThicknessMm),
+            LimitC = D("limitC", d.LimitC),
+            Backing = o["backing"] is JsonValue bv && bv.TryGetValue<string>(out var bs) && Enum.TryParse<SheetBacking>(bs, out var back) ? back : d.Backing,
+            CooldownS = D("cooldownS", d.CooldownS),
         };
     }
 

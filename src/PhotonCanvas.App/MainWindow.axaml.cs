@@ -97,7 +97,7 @@ public partial class MainWindow : Window
         // The machine in use (and its work mode) sets the work area.
         Canvas.Machine = WorkModes.Area(_settings);
         _job = new JobBar(_doc, _settings, Canvas, _machine);
-        _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.ToDictionary(t => t.LayerId, t => t.TotalSeconds) ?? new());
+        _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.GroupBy(t => t.LayerId).ToDictionary(g => g.Key, g => g.Sum(t => t.TotalSeconds)) ?? new());
         _job.LayerClicked += id => _layers.Activate(id);
         _hud = new MachineHud(_machine, _settings);
         _hud.SettingsRequested += () => _ = Guard(() => ShowSettings("Machine"));

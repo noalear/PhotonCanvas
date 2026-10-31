@@ -29,10 +29,16 @@ One setting across, another down. Frequency does most of the work, power fine-tu
 <!-- target: text:THE REST -->
 Speed, lines per cm and pulse width for every square, then the square size and gap.
 
+## Keep the plate cool
+<!-- target: button:Spread the heat -->
+Leave **Spread the heat** ticked: each square runs where the plate is coolest, so thin metal stays
+flat and in focus. Set the plate's metal, thickness and how it's held; taped or clamped to a metal
+block cools much faster.
+
 ## Add it
 <!-- target: button:Add to design -->
 <!-- wait: shapes:+1 -->
-The grid goes at the top-left of the work area; the squares run from least energy to most.
+The grid goes at the top-left of the work area. **Heat** in the job bar now reads **Heat: spread**.
 
 ## Burn it
 <!-- target: ribbon:Laser/Ship It -->

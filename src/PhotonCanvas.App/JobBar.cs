@@ -42,6 +42,14 @@ public sealed class JobBar : UserControl
     readonly Button _checks = new() { Classes = { "chip" } };
     readonly StackPanel _messages = new() { Spacing = 8, Width = 380 };
     readonly ToggleButton _order = new() { Classes = { "chip" } };
+    // Spread the heat across the job's layers and objects (kept with the design).
+    readonly Button _heat = new() { Classes = { "chip" } };
+    readonly CheckBox _heatOn = new() { Content = "Spread the heat across layers and objects" };
+    readonly ComboBox _heatSheet = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SheetMetal.All.Select(m => m.Name).ToList() };
+    readonly ComboBox _heatHeld = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SpreadHeat.Backings.Select(b => b.Name).ToList() };
+    readonly NumericUpDown _heatThick = Number(0.05m, 5, 0.05m, "0.0#"), _heatLimit = Number(1, 200, 1, "0"), _heatCool = Number(0, (decimal)SpreadHeat.MaxCooldownS, 1, "0.#");
+    readonly TextBlock _heatSays = Hint(), _heatResult = Hint();
+    bool _heatLoading;
     readonly Button _send = new() { Classes = { "primary" }, Width = 140, Height = 48, Padding = new(12, 0), CornerRadius = new(8), VerticalContentAlignment = VerticalAlignment.Center };
     readonly ProgressBar _progress = new() { Minimum = 0, Maximum = 1, IsVisible = false, Height = 4, Margin = new(0, 3, 0, 0) };
     // Working out a heat order (the finer model takes a while): how far it's got, so it doesn't look stuck.
@@ -231,8 +239,35 @@ public sealed class JobBar : UserControl
         exportGc.Click += async (_, _) => await Export(false);
         more.Flyout = new MenuFlyout { Placement = PlacementMode.TopEdgeAlignedRight, Items = { exportXf, exportGc } };
         ToolTip.SetTip(more, "Save the job to a file instead of sending it.");
-        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _checks, _order, more } };
-        foreach (var c in new Control[] { _checks, _order, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
+        _heat.Flyout = new Flyout
+        {
+            Placement = PlacementMode.TopEdgeAlignedRight,
+            Content = new StackPanel
+            {
+                Spacing = 6, Width = 340,
+                Children =
+                {
+                    new TextBlock { Text = "SPREAD THE HEAT", Classes = { "h" } },
+                    _heatOn,
+                    Hint("Each layer, and each separate shape on an engrave or picture layer, runs where the plate is coolest right now, so a hot square never starts on a spot its neighbour just warmed. " +
+                         "Waits are added only where the plate needs them. For thin metal that warps and goes out of focus, like MOPA colour tests."),
+                    Field("Sheet metal", _heatSheet),
+                    Row(Field("Thickness (mm)", _heatThick), Field("Keep warming under (°C)", _heatLimit, tip: "How much warmer than at the start any patch of the plate may get, averaged over a few mm. 25 °C keeps thin stainless flat and in focus.")),
+                    Field("How it's held", _heatHeld, tip: "What's under the plate decides how fast heat leaves it. A plate taped or clamped to a metal block cools many times faster than one lying on the honeycomb (rough figures)."),
+                    Field("Cool down after each part (s)", _heatCool, tip: "Wait at least this long after every part, laser off, whatever the heat model says. 0 = only the waits the heat needs."),
+                    _heatSays,
+                    _heatResult,
+                },
+            },
+        };
+        ToolTip.SetTip(_heat, "Spread the heat: run the job's layers and objects where the plate is coolest, with waits where it needs them (thin metal that warps).");
+        _heat.Flyout.Opened += (_, _) => LoadHeat();
+        _heatOn.IsCheckedChanged += (_, _) => HeatChanged();
+        _heatSheet.SelectionChanged += (_, _) => HeatChanged();
+        _heatHeld.SelectionChanged += (_, _) => HeatChanged();
+        foreach (var n in new[] { _heatThick, _heatLimit, _heatCool }) n.ValueChanged += (_, _) => HeatChanged();
+        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _checks, _order, _heat, more } };
+        foreach (var c in new Control[] { _checks, _order, _heat, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
 
         var title = new TextBlock { Text = "JOB", Classes = { "h" }, Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         var head = new DockPanel();
@@ -288,6 +323,7 @@ public sealed class JobBar : UserControl
         _passesLabel.IsVisible = _estimatedLabel.IsVisible = !on;
         _frame.Width = on ? 88 : 96;
         _order.Content = on ? Chip("IcPreview", null) : Chip("IcPreview", "Order");
+        ShowHeatChip();
         _export.Content = on ? Chip("IcExport", null) : Chip("IcExport", "Export");
         _estimate.FontSize = on ? 18 : 22;
     }
@@ -430,9 +466,64 @@ public sealed class JobBar : UserControl
         ToolTip.SetTip(_pathPauseLabel, someHeat ? "*Not on layers that spread the heat: they work out their own waits." : null);
     }
 
+    /// <summary>The heat chip says whether it's on.</summary>
+    void ShowHeatChip()
+    {
+        bool on = _doc.State.Spread.On;
+        _heat.Content = _compact == true ? Chip("IcBolt", on ? "On" : null) : Chip("IcBolt", on ? "Heat: spread" : "Heat");
+    }
+
+    /// <summary>The heat settings from the design (opening the flyout, undo).</summary>
+    void LoadHeat()
+    {
+        var h = _doc.State.Spread;
+        _heatLoading = true;
+        _heatOn.IsChecked = h.On;
+        _heatSheet.SelectedIndex = SheetMetal.All.ToList().FindIndex(m => m.Name == SheetMetal.Find(h.Sheet).Name);
+        _heatHeld.SelectedIndex = SpreadHeat.Backings.ToList().FindIndex(b => b.Backing == h.Backing);
+        void Set(NumericUpDown n, double v) { if (n.Value != (decimal)v) n.Value = Math.Clamp((decimal)v, n.Minimum, n.Maximum); }
+        Set(_heatThick, h.ThicknessMm);
+        Set(_heatLimit, h.LimitC);
+        Set(_heatCool, h.CooldownS);
+        _heatLoading = false;
+        ShowHeatText(h);
+    }
+
+    void HeatChanged()
+    {
+        if (_heatLoading) return;
+        var old = _doc.State.Spread;
+        var h = old with
+        {
+            On = _heatOn.IsChecked == true,
+            Sheet = SheetMetal.All[Math.Max(0, _heatSheet.SelectedIndex)].Name,
+            ThicknessMm = (double)(_heatThick.Value ?? 0.5m),
+            LimitC = (double)(_heatLimit.Value ?? 25),
+            Backing = SpreadHeat.Backings[Math.Max(0, _heatHeld.SelectedIndex)].Backing,
+            CooldownS = (double)(_heatCool.Value ?? 0),
+        };
+        ShowHeatText(h);
+        if (h == old) return;
+        _doc.Commit(h.On == old.On ? "Spread the heat settings" : h.On ? "Spread the heat" : "Spread the heat off", _doc.State with { Spread = h }, coalesceKey: h.On == old.On ? "spreadheat" : null);
+    }
+
+    /// <summary>What the settings mean, spelled out: how long this plate takes to lose its heat on its own.</summary>
+    void ShowHeatText(SpreadHeat h)
+    {
+        foreach (var c in new Control[] { _heatSheet, _heatThick, _heatLimit, _heatHeld, _heatCool }) c.IsEnabled = h.On;
+        var metal = SheetMetal.Find(h.Sheet);
+        double tau = metal.HeatPerMm3K * Math.Max(0.01, h.ThicknessMm) / h.LossWmm2K;
+        string held = SpreadHeat.Backings.First(b => b.Backing == h.Backing).Name.ToLowerInvariant();
+        _heatSays.Text = h.On
+            ? $"{h.ThicknessMm:0.0#} mm {metal.Name.ToLowerInvariant()} {held}: a warm patch loses about two thirds of its heat in {TimeText.Duration(tau)} (rough figure). " +
+              $"No patch should get more than {h.LimitC:0} °C warmer than at the start." + (h.CooldownS > 0 ? $" At least {h.CooldownS:0.#} s between parts." : "")
+            : "Off: layers run top to bottom, as the layer list shows.";
+    }
+
     void Schedule()
     {
         UpdatePassControls();
+        ShowHeatChip();
         _debounce.Stop();
         _debounce.Start();
     }
@@ -490,7 +581,7 @@ public sealed class JobBar : UserControl
         if (_job is { } j)
         {
             _estimate.Text = Clock(j.EstimateS);
-            int layers = j.LayerTimes.Count;
+            int layers = j.LayerTimes.Select(t => t.LayerId).Distinct().Count();
             int rounds = j.LayerTimes.Count == 0 ? 1 : j.LayerTimes.Max(t => t.Passes);
             _summary.Text = (_section is { } sec ? $"{char.ToUpper(sec.Label[0])}{sec.Label[1..]} · " : "") +
                             (_onlyLayer is { } ol && _doc.State.FindLayer(ol) is { } oll ? $"Only {oll.Name} · " : "") + (WorkModes.Usable(_settings) && _settings.WorkMode != "Flat" ? $"{_settings.WorkMode} · " : "") +
@@ -498,6 +589,7 @@ public sealed class JobBar : UserControl
                             (j.RoundDelayS is not null && rounds > 1 ? $" · {rounds} rounds" : "") +
                             $" · {j.Bounds.Width:0.#} × {j.Bounds.Height:0.#} mm at {j.Bounds.MinX:0.#}, {j.Bounds.MinY:0.#}";
             foreach (var w in j.Warnings) _messages.Children.Add(Message(w, "Warn"));
+            _heatResult.Text = string.Join("\n", j.Warnings.Where(w => w.StartsWith("Spread the heat", StringComparison.Ordinal)));
             if (j.Warnings.Count == 0) _messages.Children.Add(Message("No problems found.", "Ok"));
             _checks.Content = j.Warnings.Count == 0 ? ChipText("IcCheck", "All clear", "Ok") : ChipText("IcWarn", j.Warnings.Count == 1 ? "1 check" : $"{j.Warnings.Count} checks", "Warn");
         }
@@ -612,7 +704,7 @@ public sealed class JobBar : UserControl
                     if (finished) LearnTiming(took);
                     if (OwnJob is { } sj)
                     {
-                        JobHistory.Add(new JobRecord(DateTime.Now, _sentFrom is { } f ? Path.GetFileNameWithoutExtension(f) : "Untitled", sj.EstimateS, took, finished, sj.LayerTimes.Count, sj.Bounds.Width, sj.Bounds.Height));
+                        JobHistory.Add(new JobRecord(DateTime.Now, _sentFrom is { } f ? Path.GetFileNameWithoutExtension(f) : "Untitled", sj.EstimateS, took, finished, sj.LayerTimes.Select(t => t.LayerId).Distinct().Count(), sj.Bounds.Width, sj.Bounds.Height));
                         if (finished) Chime();
                     }
                     if (finished && OwnJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);

@@ -36,6 +36,8 @@ public sealed record JobOptions
     public Section? Section { get; init; }
     /// <summary>Mark only this layer (and its sub-layers): one layer at a time, e.g. one screen per colour.</summary>
     public Guid? OnlyLayer { get; init; }
+    /// <summary>Spread the heat across layers and objects; null = as the design says (<see cref="DocState.Spread"/>).</summary>
+    public SpreadHeat? Spread { get; init; }
 }
 
 /// <summary>One section of a design bigger than the work area.</summary>
@@ -587,25 +589,32 @@ public static class JobBuilder
             }
         }
 
+        // Which layer each block came from: the per-layer times follow the blocks through reordering and sections.
+        var blockLayer = new List<Layer>(blocks.Count);
+        for (int i = 0; i < starts.Count; i++)
+        {
+            int end = i + 1 < starts.Count ? starts[i + 1].Start : blocks.Count;
+            for (int k = starts[i].Start; k < end; k++) blockLayer.Add(starts[i].Layer);
+        }
+        if ((opt.Spread ?? s.Spread) is { On: true } spread && blocks.Count > 0)
+            SpreadTheHeat(spread, opt, blocks, steps, blockSteps, blockLayer, warnings);
+
         if (opt.Section is { } sec)
         {
             // One section of a bigger design: every block cut to it and moved into the work area.
             var cutBlocks = new List<Block>();
             var cutSteps = new List<(int First, int Count)>();
-            var newIndex = new int[blocks.Count + 1];
+            var cutLayers = new List<Layer>();
             for (int i = 0; i < blocks.Count; i++)
-            {
-                newIndex[i] = cutBlocks.Count;
                 foreach (var piece in Sections.Cut(blocks[i], sec.Clip, sec.Shift))
                 {
                     cutBlocks.Add(piece);
                     cutSteps.Add(blockSteps[i]);
+                    cutLayers.Add(blockLayer[i]);
                 }
-            }
-            newIndex[blocks.Count] = cutBlocks.Count;
-            for (int i = 0; i < starts.Count; i++) starts[i] = (starts[i].Layer, newIndex[starts[i].Start]);
             blocks = cutBlocks;
             blockSteps = cutSteps;
+            blockLayer = cutLayers;
             for (int i = 0; i < steps.Count; i++)
                 steps[i] = steps[i] with { Points = [.. steps[i].Points.Select(p => p + sec.Shift)] };
             var b0 = new Rect2(Math.Max(bounds.MinX, sec.Clip.MinX), Math.Max(bounds.MinY, sec.Clip.MinY), Math.Min(bounds.MaxX, sec.Clip.MaxX), Math.Min(bounds.MaxY, sec.Clip.MaxY));
@@ -613,12 +622,12 @@ public static class JobBuilder
             if (blocks.Count == 0) throw new JobException($"There's nothing to mark in {sec.Label}.");
         }
 
-        for (int i = 0; i < starts.Count; i++)
+        // Each run of one layer's blocks, in run order (a layer comes once, unless the heat was spread across layers).
+        for (int start = 0, end; start < blocks.Count; start = end)
         {
-            var (layer, start) = starts[i];
-            int end = i + 1 < starts.Count ? starts[i + 1].Start : blocks.Count;
+            for (end = start + 1; end < blocks.Count && blockLayer[end].Id == blockLayer[start].Id; end++) { }
             // Passes written out one block each (heat order, step-down) count once.
-            if (end > start) times.Add(new(layer.Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, blocks.Skip(start).Take(end - start).Max(b => b.Laser.Passes))));
+            times.Add(new(blockLayer[start].Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, blocks.Skip(start).Take(end - start).Max(b => b.Laser.Passes))));
         }
 
         if (blocks.Count == 0)
@@ -734,6 +743,129 @@ public static class JobBuilder
             Timeline = Timeline(job, blockSteps),
             Paths = steps.Count - heatExtraSteps,
         };
+    }
+
+    /// <summary>Engrave and picture layers with more separate parts than this are spread as one part.</summary>
+    const int MaxSpreadPartsPerLayer = 300;
+    /// <summary>A job with more parts than this is spread a layer at a time.</summary>
+    const int MaxSpreadParts = 1500;
+
+    /// <summary>
+    /// Spread the heat across the job (<see cref="HeatSpread"/>): the blocks made, put in a new order
+    /// part by part, with waits where the sheet needs them. A part is a layer's blocks; an engrave or
+    /// picture layer is split into one part per separate shape (its blocks and their steps). Cut and
+    /// score layers stay whole: their own order (inside first, heat order, travel) is kept. The steps,
+    /// and which steps each block marks, follow the blocks. Each part's heat is counted with all its
+    /// passes at once, which is on the safe side round by round, where they come a round apart.
+    /// </summary>
+    static void SpreadTheHeat(SpreadHeat h, JobOptions opt, List<Block> blocks, List<BuiltJob.Step> steps, List<(int First, int Count)> blockSteps, List<Layer> blockLayer, List<string> warnings)
+    {
+        JobException.CheckRange("cooldown after each part", h.CooldownS, 0, SpreadHeat.MaxCooldownS, "s");
+        List<(int First, int Count)> Parts(bool split)
+        {
+            var parts = new List<(int First, int Count)>();
+            for (int i = 0, end; i < blocks.Count; i = end)
+            {
+                var layer = blockLayer[i];
+                for (end = i + 1; end < blocks.Count && blockLayer[end].Id == layer.Id; end++) { }
+                var mine = new List<(int First, int Count)>();
+                if (split && layer.Mode is LayerMode.Fill or LayerMode.Image)
+                    for (int k = i; k < end; k++)
+                    {
+                        // A block marking the same steps as the one before (a fill and its outline, crosshatch, a slice's cleanup), or none, goes with it.
+                        if (mine.Count > 0 && (blockSteps[k] == blockSteps[k - 1] || blockSteps[k].Count == 0)) mine[^1] = (mine[^1].First, mine[^1].Count + 1);
+                        else mine.Add((k, 1));
+                    }
+                if (mine.Count is 0 or > MaxSpreadPartsPerLayer) mine = [(i, end - i)];
+                parts.AddRange(mine);
+            }
+            return parts;
+        }
+        var units = Parts(true);
+        if (units.Count > MaxSpreadParts) units = Parts(false);
+        if (units.Count < 2)
+        {
+            warnings.Add("Spread the heat is on, but the job is one part, so there's nothing to reorder.");
+            return;
+        }
+        if (units.Count > MaxSpreadParts)
+        {
+            warnings.Add($"Spread the heat: {units.Count:N0} layers is too many to plan, so they run in the usual order.");
+            return;
+        }
+
+        var heat = units.Select(u =>
+        {
+            var range = Enumerable.Range(u.First, u.Count);
+            var footprint = range.Select(k => blockSteps[k]).Distinct().SelectMany(l => steps.GetRange(l.First, l.Count)).Select(st => Rect2.Bounds(st.Points)).ToList();
+            bool cut = blockLayer[u.First].Mode == LayerMode.Cut;
+            double joules = range.Sum(k =>
+            {
+                var b = blocks[k];
+                double watts = (b.Laser.Light == LightSource.Red ? opt.RedWatts : opt.BlueWatts) * b.Laser.Power / 100;
+                return (cut ? HeatSpread.CutShare : HeatSpread.MarkShare) * watts * Job.AllPassesSeconds(b with { PauseAfterS = 0 });
+            });
+            return new HeatUnit(footprint, joules, range.Sum(k => Job.AllPassesSeconds(blocks[k])), cut);
+        }).ToList();
+        var plan = HeatSpread.Plan(heat, h, opt.HeatProgress, opt.Cancel);
+        string hottest = blockLayer[units[plan.Hottest].First].Name;
+
+        // The blocks in the new order, each wait after the part before it.
+        var newBlocks = new List<Block>(blocks.Count);
+        var newLayers = new List<Layer>(blocks.Count);
+        var oldLinks = new List<(int First, int Count)>(blocks.Count);
+        for (int p = 0; p < plan.Order.Length; p++)
+        {
+            var (first, count) = units[plan.Order[p]];
+            if (plan.WaitBeforeS[p] > 0 && newBlocks.Count > 0)
+                newBlocks[^1] = newBlocks[^1] with { PauseAfterS = newBlocks[^1].PauseAfterS + plan.WaitBeforeS[p] };
+            for (int k = first; k < first + count; k++)
+            {
+                newBlocks.Add(blocks[k]);
+                newLayers.Add(blockLayer[k]);
+                oldLinks.Add(blockSteps[k]);
+            }
+        }
+        // The steps in the order their blocks now run (any no block marks stay at the end).
+        var newSteps = new List<BuiltJob.Step>(steps.Count);
+        var moved = new Dictionary<int, int>();
+        var taken = new bool[steps.Count];
+        var newLinks = new List<(int First, int Count)>(blocks.Count);
+        foreach (var link in oldLinks)
+        {
+            if (link.Count == 0) { newLinks.Add((newSteps.Count, 0)); continue; }
+            if (!moved.TryGetValue(link.First, out int at))
+            {
+                moved[link.First] = at = newSteps.Count;
+                for (int k = link.First; k < link.First + link.Count; k++)
+                {
+                    newSteps.Add(steps[k]);
+                    taken[k] = true;
+                }
+            }
+            newLinks.Add((at, link.Count));
+        }
+        for (int k = 0; k < steps.Count; k++)
+            if (!taken[k]) newSteps.Add(steps[k]);
+        blocks.Clear(); blocks.AddRange(newBlocks);
+        blockLayer.Clear(); blockLayer.AddRange(newLayers);
+        blockSteps.Clear(); blockSteps.AddRange(newLinks);
+        steps.Clear(); steps.AddRange(newSteps);
+
+        int reordered = plan.Order.Where((u, p) => u != p).Count();
+        var metal = SheetMetal.Find(h.Sheet).Name.ToLowerInvariant();
+        warnings.Add($"Spread the heat: {reordered:N0} of {units.Count:N0} parts reordered (each layer, or each separate shape on an engrave or picture layer), " +
+                     $"each starting on {metal} at most about +{plan.PeakC:0} °C warmer than at the start (estimated, on a {plan.CellMm:0.##} mm grid)" +
+                     (plan.WaitS > 0.05 ? $", {Hours(plan.WaitS)} of waits added to let it cool." : ", no waits needed."));
+        double work = blocks.Sum(Job.AllPassesSeconds) - plan.WaitS;
+        if (plan.OneUnitC > h.LimitC)
+            warnings.Add($"Spread the heat: the cut \"{hottest}\" warms the {metal} about +{plan.OneUnitC:0} °C on its own, more than the +{h.LimitC:0} °C allowed. " +
+                         "No order can fix that, so the job waits until each spot it cuts is nearly cold. A heat sink helps most: tape or clamp the plate to a metal block (and say so under How it's held). Or lower the power, go faster, or allow more warming.");
+        if (plan.Capped)
+            warnings.Add($"Spread the heat: some waits reached the {HeatSpread.MaxWait / 60:0}-minute cap, so the {metal} is warmer than allowed where some parts start. " +
+                         "Ordering alone can't keep it cool enough: a heat sink (tape or clamp the plate to a metal block, and say so under How it's held), fewer or smaller parts, or more warming allowed.");
+        else if (plan.WaitS > 0.25 * Math.Max(1, work))
+            warnings.Add($"Spread the heat: the waits ({Hours(plan.WaitS)}) are a big share of the job. A heat sink would cut most of them: tape or clamp the plate to a metal block, and say so under How it's held.");
     }
 
     /// <summary>The run in order, the way <see cref="Job.Render"/> lays it out (rounds or per-path passes).</summary>

@@ -43,6 +43,8 @@ public sealed record ColourTestOptions
     public double OverscanMm { get; init; }
     /// <summary>Label a frequency axis as the grating pitch it makes (µm = speed ÷ frequency).</summary>
     public bool LabelPitch { get; init; }
+    /// <summary>Turn on Spread the heat for the design with these settings (null = leave the design's as it is).</summary>
+    public SpreadHeat? Spread { get; init; }
 
     /// <summary>Diffraction gratings on polished stainless: 60 ns at 300 mm/s, lines 0.06 mm apart; pitch across, power down.</summary>
     public static ColourTestOptions Gratings => new()
@@ -59,9 +61,11 @@ public sealed record ColourTestCell(int Row, int Col, Layer Layer, Rect2 Bounds)
 
 /// <summary>
 /// Builds a colour test grid for the MOPA laser. Every square is its own Fill layer, named
-/// "Colour test R3 C5", and the squares run from the least energy per area to the most, so
-/// the heat builds up gradually. Values that the source can't do (pulse widths it doesn't
-/// have, frequencies above a pulse width's limit) are brought to the nearest it can.
+/// "Colour test R3 C5". With Spread the heat on (the dialog turns it on), the job runs each square
+/// where the plate is coolest; the layers are in order from the least energy per area to the most,
+/// which is the order they run in when it's off, so the heat at least builds up gradually. Values
+/// that the source can't do (pulse widths it doesn't have, frequencies above a pulse width's
+/// limit) are brought to the nearest it can.
 /// </summary>
 public static class ColourTest
 {
@@ -146,9 +150,10 @@ public static class ColourTest
                 cells.Add((r, c, laser, lpcm));
             }
 
+        if (o.Spread is { } spread) s = s with { Spread = spread };
         var shapes = new List<Shape>();
         int layerIndex = s.Layers.Count;
-        // Least energy first: the plate warms gradually instead of a hot square cooking its neighbours' starting point.
+        // Least energy first: without Spread the heat, the plate warms gradually instead of a hot square cooking its neighbours' starting point.
         foreach (var (r, c, laser, lpcm) in cells.OrderBy(x => Energy(x.Laser, x.Lpcm)))
         {
             var layer = Layer.Default(layerIndex++, LayerMode.Fill) with

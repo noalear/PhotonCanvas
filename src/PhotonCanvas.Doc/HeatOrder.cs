@@ -289,7 +289,8 @@ public static class HeatOrder
         double _carry;
         public double Dt { get; }
 
-        public Sheet(Rect2 box, double dx, HeatSettings h)
+        /// <param name="lossBothFaces">Heat leaving the sheet from both faces together (W/mm²·K): still air unless it's backed by metal.</param>
+        public Sheet(Rect2 box, double dx, HeatSettings h, double lossBothFaces = 2 * AirLoss)
         {
             _dx = dx;
             _x0 = box.MinX;
@@ -307,7 +308,7 @@ public static class HeatOrder
             Dt = 0.24 * dx * dx / alpha;
             _r = alpha * Dt / (dx * dx);
             double perArea = h.Sheet.HeatPerMm3K * Math.Max(0.01, h.ThicknessMm);
-            _decay = Math.Exp(-2 * AirLoss / perArea * Dt);
+            _decay = Math.Exp(-lossBothFaces / perArea * Dt);
             _cellHeat = perArea * dx * dx;
             _half = Math.Max(1, (int)Math.Floor(ReadMm / dx / 2)); // 3 × 3 on 1.5 mm cells, 7 × 7 on 0.75 mm
         }
@@ -336,6 +337,29 @@ public static class HeatOrder
             if (samples.Count == 0) samples.Add(Cell(pts[0]));
             var d = samples.GroupBy(c => c).ToDictionary(g => g.Key, g => g.Count() * joules / samples.Count / _cellHeat);
             return (d.Keys.ToArray(), d.Values.ToArray());
+        }
+
+        /// <summary>
+        /// Heat (J) spread evenly over an area (fills, pictures): the cells whose middles lie in any of
+        /// <paramref name="boxes"/>, or the one nearest a box's middle when it's smaller than a cell.
+        /// </summary>
+        public (int[] Cells, double[] Rise) DepositArea(IReadOnlyList<Rect2> boxes, double joules)
+        {
+            var cells = new HashSet<int>();
+            foreach (var b in boxes)
+            {
+                if (b.IsEmpty) continue;
+                int x0 = Math.Max(0, (int)Math.Ceiling((b.MinX - _x0) / _dx)), x1 = Math.Min(_nx - 1, (int)Math.Floor((b.MaxX - _x0) / _dx));
+                int y0 = Math.Max(0, (int)Math.Ceiling((b.MinY - _y0) / _dx)), y1 = Math.Min(_ny - 1, (int)Math.Floor((b.MaxY - _y0) / _dx));
+                if (x0 > x1 || y0 > y1) cells.Add(Cell(b.Center));
+                for (int y = y0; y <= y1; y++)
+                    for (int x = x0; x <= x1; x++)
+                        cells.Add(y * _nx + x);
+            }
+            if (cells.Count == 0) return ([], []);
+            var o = cells.Order().ToArray();
+            double each = joules / o.Length / _cellHeat;
+            return (o, [.. o.Select(_ => each)]);
         }
 
         /// <summary>The warming averaged over a patch about <see cref="ReadMm"/> across (the same on fine cells as on normal ones).</summary>

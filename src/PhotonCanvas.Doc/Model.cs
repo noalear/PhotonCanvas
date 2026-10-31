@@ -445,6 +445,8 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public ImmutableList<Guide> Guides { get; init; } = [];
     /// <summary>The curved piece the design is marked on (off by default).</summary>
     public CurvedSurface Curve { get; init; } = new();
+    /// <summary>Spread the heat across the job's layers and objects (off by default).</summary>
+    public SpreadHeat Spread { get; init; } = new();
     /// <summary>The name of the page on screen.</summary>
     public string PageName { get; init; } = "Page 1";
     /// <summary>Where the page on screen sits among all the pages.</summary>

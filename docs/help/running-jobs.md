@@ -24,11 +24,13 @@ From left to right:
 | The caption | What's going on: what to do next, upload and run progress, or the block under the mouse. |
 | **Checks** | A chip: **All clear**, or how many things to look at. Click it for the list. |
 | **Order** | Shows the processing order on the work area. |
+| **Heat** | Spread the heat across layers and objects: runs the job's layers and shapes where the plate is coolest, with waits only where it needs them (thin metal that warps). Reads **Heat: spread** when on. See [Spread the heat](heat-order.md#across-the-whole-job). |
 | **Export** | Saves the job to a file instead of sending it. |
 | The estimate | How long the job takes, in big numbers. |
 
-In a narrow window the secondary labels (**Passes**, *estimated*) are dropped and **Order** and
-**Export** show only their icons, so the timeline keeps its room.
+In a narrow window the secondary labels (**Passes**, *estimated*) are dropped and **Order**,
+**Heat** and **Export** show only their icons (**Heat** adds *On* when it's on), so the timeline
+keeps its room.
 
 The same commands are on the ribbon's **Laser** tab, in the **Job** group: **Frame**, **Ship It**,
 **Export .xf**, **Export G-code**, **Preview run**, **Show order** and **Time-lapse**. **Frame** and
@@ -174,6 +176,11 @@ Layers whose order is **Spread the heat** work out their own waits and passes (s
 - When only some do, the label *s after each path* gets an asterisk, and its tip says those layers aren't
   paused.
 
+Neither pause helps a job of many small engraved squares (a colour test): the path pause is only
+for cut and score paths, and a one-pass job has no rounds. For that, use **Heat** in the job bar
+([Spread the heat across the whole job](heat-order.md#across-the-whole-job)): it adds waits only
+where the plate needs them, and its own **Cool down after each part (s)** as a fixed minimum.
+
 ## The summary line
 
 After **JOB**: how many layers and paths the job has (*cuts with the passes* when passes or
@@ -250,6 +257,8 @@ the job. The common ones:
 | *"…" is on highly reflective material and may throw reflections.* | Put it near the exhaust fan, or use anti-reflective marking spray. |
 | *Layer "…" lowers the head by up to … mm while cutting (step-down).* (or *while engraving*) | Check the material is at least that thick. |
 | *Layer "…" spreads the heat: … paths …, the sheet stays under about +… °C.* | Information: what the heat order worked out. |
+| *Spread the heat: … of … parts reordered …, each starting on … at most about +… °C warmer than at the start …* | Information: what spreading the heat across the job worked out, and the waits it added. |
+| *Spread the heat: the waits (…) are a big share of the job.* / *some waits reached the 2-minute cap* | Tape or clamp the plate to a metal block and set **How it's held** under **Heat**, or allow more warming. |
 | *Pausing … s after each of … paths adds about ….* | Lower the pause, or tidy the drawing (see [Troubleshooting](troubleshooting.md#the-pause-after-each-path-adds-hours)). |
 | *Rotary attachment: experimental.* / *Conveyor: experimental.* | Try a small test on scrap first. |
 | *Curved surface: the head follows it in … mm steps. Experimental.* | Try it on scrap first. |
@@ -291,8 +300,8 @@ if it isn't saved).
 
 ## Working out the heat order
 
-A layer that spreads the heat works out its cut order from how the sheet warms, which can take a
-while on a big design (more with the finer heat model). When the job takes more than a moment to
+A layer that spreads the heat (or the whole job, with **Heat** on) works out its order from how the
+sheet warms, which can take a while on a big design (more with the finer heat model). When the job takes more than a moment to
 build, **Working out the heat order… 42%** and a bar show under the timeline instead of the
 caption, so it doesn't look stuck. Every change to the design starts it again; the older build is
 stopped. **Ship It** waits for it (**Shipping it…**). See [Spread the heat](heat-order.md).

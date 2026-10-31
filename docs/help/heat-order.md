@@ -1,12 +1,131 @@
 # Spread the heat
 
-**Spread the heat** is an **Order** for Cut and Score layers, for thin sheet metal that warps.
-The program works out how the sheet warms up as the job runs, and cuts every pass of every path
-where the sheet is coolest, long paths in short pieces, waiting only when the whole area is too
-warm.
+Spread the heat is for thin sheet metal that warps, and comes in two kinds:
+
+- **Across the whole job** (the **Heat** chip in the job bar): every layer, and every separate shape
+  on an engrave or picture layer, runs where the plate is coolest. For MOPA colour tests and other
+  jobs made of many small marks. See [Across the whole job](#across-the-whole-job).
+- **Inside one cut layer** (a layer's **Order**): every pass of every path on a Cut or Score layer
+  is cut where the sheet is coolest, long paths in short pieces, waiting only when the whole area is
+  too warm. The rest of this page, from [The problem it solves](#the-problem-it-solves), is about
+  this one.
 
 > **Note:** Not yet tried on the machine. The temperatures it works with are estimates: tune it by
 > how flat your parts come out.
+
+## Across the whole job
+
+A colour test is 48 small squares, each its own layer. Run top to bottom, every square starts on
+plate its neighbour has just heated, and the hottest squares (the test runs from the least energy
+to the most) come last, on a plate that's already warm. Thin metal then bows and goes out of
+focus, and the colours shift. The job bar's pauses don't help: **s after each path** only pauses
+cut and score paths, and **s between rounds** only comes between whole-job rounds.
+
+**Spread the heat across layers and objects** runs the job a part at a time where the plate is
+coolest, and waits only where the plate needs it.
+
+### Turning it on
+
+Click **Heat** in the job bar (beside **Order**) and tick **Spread the heat across layers and
+objects**. The chip then reads **Heat: spread**. The setting is saved with the design, so it's
+still on when you open it again (undo takes it back). The colour test turns it on for you (see
+[Colour test](materials-and-tests.md#colour-test)).
+
+| Setting | Range | Start | What it does |
+|---|---|---|---|
+| **Spread the heat across layers and objects** | on or off | off | Off, the layers run top to bottom as the layer list shows, as before (exactly the same job). |
+| **Sheet metal** | Aluminium, Stainless steel, Steel, Brass, Copper, Titanium | Stainless steel | How fast heat spreads through it and how much it takes to warm it (see [The metals](#the-metals)). |
+| **Thickness (mm)** | 0.05–5 | 0.5 | Thinner plate warms more from the same mark. |
+| **Keep warming under (°C)** | 1–200 | 25 | The plate under a part, averaged over a few mm, may be at most this much warmer than at the start when the part begins. 25 keeps thin stainless flat and in focus (an estimate: tune it by results). |
+| **How it's held** | In air on the honeycomb, Taped to a metal block, Clamped to a thick aluminium block | In air on the honeycomb | What's under the plate decides how fast heat leaves it (below). |
+| **Cool down after each part (s)** | 0–600 | 0 | A wait of at least this long after every part, laser off, whatever the model says. 0 = only the waits the heat needs. |
+
+A line under them spells out what the settings mean, e.g. "0.5 mm stainless steel in air on the
+honeycomb: a warm patch loses about two thirds of its heat in 1 min 07 s (rough figure). No patch
+should get more than 25 °C warmer than at the start." Under that, once the job is built, is what
+the plan came to (the same lines as in **Checks**).
+
+### How it's held
+
+| **How it's held** | Heat leaving the plate (both faces) | 0.5 mm stainless loses two thirds of its heat in |
+|---|---|---|
+| **In air on the honeycomb** | about 30 W per m² per °C | about 1 min |
+| **Taped to a metal block** | about 315 | about 6 s |
+| **Clamped to a thick aluminium block** | about 1,515 | about 1.3 s |
+
+Still air takes about 15 W per m² per °C from each face. Tape to a metal block passes roughly 300
+more, a hard clamp to thick aluminium roughly 1,500: rough figures from handbook contact values,
+not measured on this machine. A heat sink is by far the biggest help: on the starting colour test
+it cuts the waits from about 23 minutes in air to well under a minute.
+
+### What a part is
+
+- Each layer is a part.
+- An **Engrave** (fill) or **Picture** layer with several separate shapes is split: each shape (with
+  its outline-after, crosshatch or slice cleanup) is a part of its own, so several swatches on one
+  layer interleave too. Above 300 shapes on one layer, the layer stays one part.
+- **Cut** and **Score** layers stay whole: their own order (holes first, their own spread-the-heat
+  order, travel) is kept.
+- Above 1,500 parts, the job is spread a layer at a time; above 1,500 layers, it runs in the usual
+  order and **Checks** says so.
+
+### How the order is worked out
+
+The plate is simulated the same way as below ([The simulated sheet](#the-simulated-sheet)): a thin
+plate on a grid of cells covering the work plus 15 mm all round, heat spreading at the metal's rate
+and leaving through the faces as fast as **How it's held** says.
+
+- Each part's heat: the laser's power (40 W blue, 60 W MOPA, × **Power %**) × its time with all its
+  passes (by the same estimate as the job's time) × a share that stays in the plate: 70% for
+  marking (fills, pictures, scores; metal reflects the rest) and 30% for cuts (much is blown away
+  with the melt). Rough figures, not measured. It goes in evenly over the boxes of the part's shapes,
+  a second or so at a time while the part runs.
+- **Next**: of the parts free to go, the one whose patch of plate is coolest right now; of those
+  within half a degree (or 5% of the limit) of it, the one farthest from the part just done.
+- **The limit is on where a part starts.** A colour square heats its own spot a lot whenever it
+  runs (that's how the colour forms); what ordering can do is make sure it never starts on a spot
+  its neighbours already warmed. Cuts also count their own warming, as the cut-layer order does.
+- **Waits**: when even the coolest part would start on plate warmer than **Keep warming under
+  (°C)**, the job waits, laser off, just long enough, at most 2 minutes a time, then at least
+  **Cool down after each part (s)** if that's longer. A wait goes in as a pause after the part
+  before it.
+- **What keeps its order**: parts that overlap keep the order they had (a fill before the score
+  outline on top of it, slices one after another). Cut layers keep their place: everything above a
+  cut layer still runs before it, so parts drop last as before.
+
+### Passes, sections and the rest
+
+- Each part's heat is counted with all its passes at once. With **Round by round** the passes come a
+  round apart, so the plate is really cooler than planned: on the safe side.
+- A wait is a pause after the part before it, so it comes again in each round that part runs in
+  (**Round by round**), or after each of its passes (**Path by path**, where the passes are then
+  written out). More cooling, a little more time; the estimate includes it.
+- **Mark only this section**, the MOPA offset, the curved surface, the rotary and conveyor all work
+  as before: they're applied after the new order is made.
+- The timeline shows the parts in their new order; a layer split into several parts shows once per
+  stretch it runs in. **Order** in the job bar colours them from first to last.
+
+### What the checks say
+
+- "Spread the heat: 46 of 49 parts reordered (each layer, or each separate shape on an engrave or
+  picture layer), each starting on stainless steel at most about +25 °C warmer than at the start
+  (estimated, on a 1.06 mm grid), 23 min of waits added to let it cool." Or "…, no waits needed."
+- "Spread the heat: the waits (23 min) are a big share of the job. A heat sink would cut most of
+  them: tape or clamp the plate to a metal block, and say so under How it's held." When the waits
+  are more than a quarter of the job's own time.
+- "Spread the heat: some waits reached the 2-minute cap, so the stainless steel is warmer than
+  allowed where some parts start. Ordering alone can't keep it cool enough: …" Use a heat sink,
+  fewer or smaller parts, or allow more warming.
+- "Spread the heat: the cut "…" warms the stainless steel about +60 °C on its own, more than the
+  +25 °C allowed. No order can fix that, …" Only for cuts: lower the power, go faster, or allow more
+  warming.
+- "Spread the heat is on, but the job is one part, so there's nothing to reorder."
+
+> **Note:** Not yet tried on the machine. The temperatures are estimates from a simple model and a
+> guessed share of the laser's power: read them as "more" or "less", and tune **Keep warming under
+> (°C)** by how flat the plate stays and how even the colours come out.
+
+Tutorial: [Spread the heat across a colour test](tutorial:job-spread-heat).
 
 ## The problem it solves
 

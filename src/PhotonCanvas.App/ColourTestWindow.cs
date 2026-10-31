@@ -31,6 +31,11 @@ public sealed class ColourTestWindow : Window
     readonly TextBlock _summary = Hint();
     readonly ComboBox _kind = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Oxide colours (stainless, titanium)", "Diffraction gratings (polished stainless)" }, SelectedIndex = 0 };
     readonly TextBlock _about = new() { TextWrapping = TextWrapping.Wrap };
+    readonly CheckBox _spread = new() { Content = "Spread the heat: run each square where the plate is coolest", IsChecked = true };
+    readonly ComboBox _sheet = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SheetMetal.All.Select(m => m.Name).ToList() };
+    readonly NumericUpDown _thick = Number(0.05m, 5, 0.05m, "0.0#");
+    readonly ComboBox _held = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SpreadHeat.Backings.Select(b => b.Name).ToList(), SelectedIndex = 0 };
+    readonly TextBlock _orderHint = Hint();
     bool _loading;
     readonly MachineProfile _machine = MachineProfile.F2Ultra;
     readonly string _font;
@@ -54,6 +59,9 @@ public sealed class ColourTestWindow : Window
         _across.SelectionChanged += (_, _) => { if (_loading) return; Defaults(_across, _aMin, _aMax); Update(); };
         _down.SelectionChanged += (_, _) => { if (_loading) return; Defaults(_down, _dMin, _dMax); Update(); };
         _pulse.SelectionChanged += (_, _) => Update();
+        _sheet.SelectedIndex = SheetMetal.All.ToList().FindIndex(m => m.Name == "Stainless steel");
+        _thick.Value = 0.5m;
+        _spread.IsCheckedChanged += (_, _) => Update();
         foreach (var n in new[] { _aMin, _aMax, _aSteps, _dMin, _dMax, _dSteps, _power, _speed, _lpcm, _freq, _cell, _gap }) n.ValueChanged += (_, _) => { if (!_loading) Update(); };
 
         _powerRow = Field("Power %", _power);
@@ -82,9 +90,12 @@ public sealed class ColourTestWindow : Window
                     new TextBlock { Text = "THE REST", Classes = { "h" }, Margin = new(0, 6, 0, 0) },
                     _powerRow, _speedRow, _lpcmRow, _freqRow, _pulseRow,
                     Row(Field2("Square (mm)", _cell), Field2("Gap (mm)", _gap)),
+                    _spread,
+                    Row(Field2("Sheet metal", _sheet), Field2("Thickness (mm)", _thick), Field2("How it's held", _held)),
+                    _orderHint,
                     _summary,
                     Hint("Focus on the plate first and keep that focus for everything you mark with these colours: a millimetre off changes them. " +
-                         "Use a clean, flat plate with the same finish as the real piece. The squares run from the least energy to the most."),
+                         "Use a clean, flat plate with the same finish as the real piece."),
                     new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, add } },
                 },
             },
@@ -154,11 +165,25 @@ public sealed class ColourTestWindow : Window
         Font = _font,
         OverscanMm = Gratings ? ColourTestOptions.Gratings.OverscanMm : 0,
         LabelPitch = Gratings,
+        Spread = _spread.IsChecked == true
+            ? new SpreadHeat
+            {
+                On = true,
+                Sheet = SheetMetal.All[Math.Max(0, _sheet.SelectedIndex)].Name,
+                ThicknessMm = (double)(_thick.Value ?? 0.5m),
+                Backing = SpreadHeat.Backings[Math.Max(0, _held.SelectedIndex)].Backing,
+            }
+            : null,
     };
 
     void Update()
     {
         var o = Options();
+        _sheet.IsEnabled = _thick.IsEnabled = _held.IsEnabled = o.Spread is not null;
+        _orderHint.Text = o.Spread is not null
+            ? "Each square runs where the plate is coolest, far from the one just done, with waits only where the plate needs them, so heat from one square doesn't shift its neighbour's colour or warp the plate out of focus. " +
+              "The rest (how warm it may get, a fixed cool-down) is under Heat in the job bar."
+            : "The squares run from the least energy to the most, so the heat builds up gradually, but the hottest squares run last on a plate that's already warm.";
         // The swept settings come from the grid, so hide their fixed boxes.
         var swept = new HashSet<ColourParam> { o.Across, o.Down };
         _powerRow.IsVisible = !swept.Contains(ColourParam.Power);
@@ -171,7 +196,7 @@ public sealed class ColourTestWindow : Window
             _summary.Text = "⚠ Across and down need to be different settings.";
             return;
         }
-        var (after, ids) = ColourTest.Add(DocState.New(), o, _machine); // just the test, for its size and time
+        var (after, ids) = ColourTest.Add(DocState.New(), o with { Spread = null }, _machine); // just the test, for its size and time (waits come on top)
         var set = ids.ToHashSet();
         var b = after.Shapes.Where(x => set.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, x) => a.Union(x));
         int n = ColourTest.Cells(after).Count;
@@ -185,6 +210,6 @@ public sealed class ColourTestWindow : Window
             var (lo, hi) = o.Across == ColourParam.FrequencyKhz ? (o.AcrossMin, o.AcrossMax) : (o.DownMin, o.DownMax);
             pitches = $" Pulse spacing {Doc.Colour.Diffraction.PitchUm(o.Speed, (int)Math.Max(1, hi)):0.00}–{Doc.Colour.Diffraction.PitchUm(o.Speed, (int)Math.Max(1, lo)):0.00} µm.";
         }
-        _summary.Text = $"{n} squares, {b.Width:0} × {b.Height:0} mm{time}.{pitches}" + (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.");
+        _summary.Text = $"{n} squares, {b.Width:0} × {b.Height:0} mm{time}{(o.Spread is not null ? " plus any cooling waits" : "")}.{pitches}" + (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.");
     }
 }

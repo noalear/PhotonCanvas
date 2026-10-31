@@ -482,7 +482,7 @@ public sealed class MachineLink(RemoteConfig config, Broadcaster events, JobLog 
         {
             string taskId = Guid.NewGuid().ToString();
             // Remembered first: the machine announces the loaded job (with this id) before the upload call returns.
-            log.AddSent(new SentJobInfo(taskId, b.Design, b.Path, b.Job.EstimateS, b.Job.LayerTimes.Count, b.Job.Bounds.Width, b.Job.Bounds.Height, DateTime.Now));
+            log.AddSent(new SentJobInfo(taskId, b.Design, b.Path, b.Job.EstimateS, b.Job.LayerTimes.Select(t => t.LayerId).Distinct().Count(), b.Job.Bounds.Width, b.Job.Bounds.Height, DateTime.Now));
             ServerLog.Write("job", $"Loading \"{b.Design}\" for {who}.");
             try { await c.UploadJobAsync(b.Job.Xf, null, ct, replaceLoadedJob: true, taskId: taskId); }
             catch (DeviceException e) { throw new RemoteException(409, e.Message); }
