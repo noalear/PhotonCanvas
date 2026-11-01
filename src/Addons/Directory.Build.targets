@@ -1,0 +1,44 @@
+<Project>
+  <!--
+    Shared by every add-on project under src/Addons (docs/addons.md). An add-on project only sets
+    <AddonId> and adds its own files; this:
+      - references the program (App, Doc, Core, Device, Avalonia) for compiling only: those are never
+        copied into the add-on, so at run time the add-on uses the program's own copies;
+      - after each build, copies the add-on's assembly, its own extra libraries, addon.json and help/
+        into the program's output: src/PhotonCanvas.App/bin/<Configuration>/net10.0/addons/<AddonId>/.
+  -->
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AppOutDir>$(MSBuildThisFileDirectory)..\PhotonCanvas.App\bin\$(Configuration)\net10.0\</AppOutDir>
+    <AddonOutDir>$(AppOutDir)addons\$(AddonId)\</AddonOutDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\PhotonCanvas.App\PhotonCanvas.App.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\PhotonCanvas.Core\PhotonCanvas.Core.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)..\PhotonCanvas.Device\PhotonCanvas.Device.csproj" Private="false" ExcludeAssets="runtime" />
+    <PackageReference Include="Avalonia" Version="11.3.22" ExcludeAssets="runtime" PrivateAssets="all" />
+    <None Include="addon.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="help\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="PhotonCanvas.Tests" />
+  </ItemGroup>
+
+  <Target Name="CopyAddonIntoProgram" AfterTargets="Build" Condition="'$(AddonId)' != ''">
+    <Error Condition="!Exists('addon.json')" Text="Add-on $(MSBuildProjectName) has no addon.json beside its project file." />
+    <ItemGroup>
+      <!-- The add-on's own libraries: whatever is in its output that the program doesn't already have. -->
+      <_AddonDll Include="$(OutDir)*.dll;$(OutDir)*.pdb" />
+      <_AddonOwn Include="@(_AddonDll)" Condition="!Exists('$(AppOutDir)%(Filename)%(Extension)')" />
+      <_AddonHelp Include="$(OutDir)help\**\*" />
+    </ItemGroup>
+    <RemoveDir Directories="$(AddonOutDir)" />
+    <Copy SourceFiles="@(_AddonOwn);$(OutDir)addon.json" DestinationFolder="$(AddonOutDir)" SkipUnchangedFiles="false" />
+    <Copy SourceFiles="@(_AddonHelp)" DestinationFolder="$(AddonOutDir)help\%(RecursiveDir)" SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="Add-on $(AddonId) -> $(AddonOutDir)" />
+  </Target>
+</Project>

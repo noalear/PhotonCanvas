@@ -230,6 +230,63 @@ public sealed class Ribbon : UserControl
     {
         if (isChecked is not null) _checked.Add((b, isChecked));
     }
+
+    /// <summary>Forget a control's enabled/checked/visible tests and its name (it is being taken away).</summary>
+    internal void Untrack(Control c)
+    {
+        _conditional.RemoveAll(x => x.Control == c);
+        _checked.RemoveAll(x => x.Button == c);
+        _shown.RemoveAll(x => x.Control == c);
+        foreach (var key in _named.Where(kv => kv.Value == c).Select(kv => kv.Key).ToList()) _named.Remove(key);
+    }
+
+    /// <summary>The tab with this name, made (at the end) if there isn't one.</summary>
+    internal RibbonTab TabFor(string name) =>
+        _tabs.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase)) is { } t ? t : Tab(name).With(t => t.Extra = true);
+
+    /// <summary>Widths change with what's in a tab: measure it again.</summary>
+    internal void Remeasure(RibbonTab tab)
+    {
+        tab.Widths = null;
+        tab.SetLevel(-1);
+        FitLater();
+    }
+
+    /// <summary>Take away a tab made for an add-on, once nothing is left on it.</summary>
+    internal void DropIfEmpty(RibbonTab tab)
+    {
+        if (!tab.Extra || tab.Groups.Count > 0) return;
+        _tabs.Remove(tab);
+        _tabStrip.Children.Remove(tab.Header);
+        if (_current == tab)
+        {
+            _current = null;
+            if (_tabs.Count > 0) Select(_tabs[0]);
+            else _body.Content = null;
+        }
+    }
+
+    /// <summary>
+    /// Add a button for an add-on to a tab's group (both made if there aren't any); dispose the result
+    /// to take it away again (with the group and tab, if they were made for it and are now empty).
+    /// </summary>
+    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add)
+    {
+        var tab = TabFor(tabName);
+        var group = tab.GroupFor(groupTitle);
+        group.Break();
+        var c = add(group);
+        group.Break();
+        Remeasure(tab);
+        return new Addons.AddonUndo(() =>
+        {
+            Untrack(c);
+            group.Remove(c);
+            if (group.IsEmpty && group.Extra) tab.RemoveGroup(group);
+            Remeasure(tab);
+            DropIfEmpty(tab);
+        });
+    }
 }
 
 public sealed class RibbonTab
@@ -245,6 +302,19 @@ public sealed class RibbonTab
 
     internal double[]? Widths { get; set; }
     int _level = -1;
+
+    /// <summary>Made for an add-on (taken away again when it's empty).</summary>
+    internal bool Extra { get; set; }
+
+    /// <summary>The group with this title, made (at the end) if there isn't one.</summary>
+    internal RibbonGroup GroupFor(string title) =>
+        Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } g ? g : Group(title).With(g => g.Extra = true);
+
+    internal void RemoveGroup(RibbonGroup g)
+    {
+        Groups.Remove(g);
+        Panel.Children.Remove(g.Root);
+    }
 
     /// <summary>
     /// 0 = every label. 1…n = the last 1…n groups lose their small-button labels; n+1…2n = the
@@ -287,6 +357,10 @@ public sealed class RibbonGroup
     internal Control Root { get; }
 
     readonly RibbonTab _tab;
+    internal string Title { get; }
+    /// <summary>Made for an add-on (taken away again when it's empty).</summary>
+    internal bool Extra { get; set; }
+    internal bool IsEmpty => _items.Children.Count == 0;
     readonly List<TextBlock> _smallLabels = [];
     readonly List<(Control Button, TextBlock Label)> _largeLabels = [];
 
@@ -304,6 +378,7 @@ public sealed class RibbonGroup
     {
         _ribbon = ribbon;
         _tab = tab;
+        Title = title;
         var grid = new Grid { RowDefinitions = new("*,Auto"), Height = 84, Margin = new(4, 4, 4, 2) };
         grid.Children.Add(_items);
         var label = new TextBlock
@@ -343,7 +418,7 @@ public sealed class RibbonGroup
         HorizontalAlignment = HorizontalAlignment.Center,
         Children =
         {
-            new PathIcon { Data = Icon(icon), Width = 22, Height = 22, HorizontalAlignment = HorizontalAlignment.Center },
+            new PathIcon { Data = IconOrPath(icon), Width = 22, Height = 22, HorizontalAlignment = HorizontalAlignment.Center },
             new TextBlock { Text = label, FontSize = 11, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 66, HorizontalAlignment = HorizontalAlignment.Center },
         },
     };
@@ -354,7 +429,7 @@ public sealed class RibbonGroup
         Spacing = 6,
         Children =
         {
-            new PathIcon { Data = Icon(icon), Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center },
+            new PathIcon { Data = IconOrPath(icon), Width = 14, Height = 14, VerticalAlignment = VerticalAlignment.Center },
             new TextBlock { Text = label, FontSize = 12, VerticalAlignment = VerticalAlignment.Center },
         },
     };
@@ -461,4 +536,18 @@ public sealed class RibbonGroup
 
     /// <summary>Start a new column of small buttons.</summary>
     public void Break() => _column = null;
+
+    /// <summary>Take a button (or custom control) away again, and its column if that's left empty.</summary>
+    internal void Remove(Control c)
+    {
+        _smallLabels.RemoveAll(l => l.GetVisualAncestors().Contains(c));
+        _largeLabels.RemoveAll(x => x.Button == c);
+        if (c.Parent is StackPanel column && column != _items)
+        {
+            column.Children.Remove(c);
+            if (column.Children.Count == 0) _items.Children.Remove(column);
+        }
+        else _items.Children.Remove(c);
+        _column = null;
+    }
 }
