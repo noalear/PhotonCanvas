@@ -1,0 +1,10 @@
+{
+  "id": "recovery",
+  "name": "Knocked-piece recovery",
+  "version": "1.0.0",
+  "description": "When the material gets knocked halfway through a job, a camera photo finds what's already marked on it, and the rest of the job is moved to line up.",
+  "category": "Camera",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

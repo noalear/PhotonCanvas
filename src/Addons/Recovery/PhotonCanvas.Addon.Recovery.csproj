@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Knocked-piece recovery (docs/addons.md): finds a piece bumped halfway through a job by the marks already on it. -->
+  <PropertyGroup>
+    <AddonId>recovery</AddonId>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+</Project>
