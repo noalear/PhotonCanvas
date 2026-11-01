@@ -79,7 +79,7 @@ material outline**.
 
 The outline moves to a layer called "Material" (made if the page has none: grey, output off, so it
 is shown but never sent to the laser). **Sheet** in the Nest window then starts on it, and
-**3D to slices** fills it too ([3D models and stacked slices](3d-slices.md)). A hole in the outline
+**3D to slices** fills it too (3D models and stacked slices). A hole in the outline
 (a knot, a cut-out) is kept clear.
 
 - The outline must be a closed shape; text can't be one. Outlines whose box is 25 mm² or less

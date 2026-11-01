@@ -13,5 +13,6 @@
     <!-- Add-ons whose windows are photographed (their pictures go in their own help/images). -->
     <ProjectReference Include="..\..\src\Addons\DepthOutlines\PhotonCanvas.Addon.DepthOutlines.csproj" />
     <ProjectReference Include="..\..\src\Addons\Warp\PhotonCanvas.Addon.Warp.csproj" />
+    <ProjectReference Include="..\..\src\Addons\Slicer\PhotonCanvas.Addon.Slicer.csproj" />
   </ItemGroup>
 </Project>

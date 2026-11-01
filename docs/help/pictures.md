@@ -371,7 +371,7 @@ its own units. **Add to design** puts it in the middle of the work area on a new
 **Relief ·** and the model's name, with the same depth-slice settings as a depthmap, and makes that
 layer active.
 Set the slices, power and passes there ([Layer settings](layer-settings.md)). For cutting a model
-into stacked sheets instead, see [3D models and stacked slices](3d-slices.md).
+into stacked sheets instead, see 3D models and stacked slices.
 
 Carving depth slices hasn't been tried on the machine yet.
 

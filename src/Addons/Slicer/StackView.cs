@@ -1,3 +1,4 @@
+using PhotonCanvas.App;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -8,7 +9,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc.Geometry;
 using SkiaSharp;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Slicer;
 
 public enum StackLook { Solid, Lines }
 

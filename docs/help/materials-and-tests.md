@@ -206,7 +206,7 @@ same setting, the first 1 pass, the next 2, then 3, and so on. The first circle 
 through gives the material's thickness ÷ passes. Depths you measure on the shallower ones show how
 much it slows down deeper (it usually does: the floor drops out of focus, and smoke and char build
 up). The result goes into the library, where **Inlay**, **Exact depth** and stacked slices shaped to
-their slopes ([3D models and stacked slices](3d-slices.md)) use it.
+their slopes (3D models and stacked slices) use it.
 
 ### Making the etch test
 
@@ -276,7 +276,7 @@ Finds the cut: a grid of small squares at different speeds across and more passe
 The squares that drop out, or push out with a finger without tearing, were cut right through, and
 the quickest of them is your cut setting. At that setting a second test then measures the kerf and
 the slot fit. Both go into the library, where **Inlay**, the **Bevel test** and the stacked-slice
-tools ([3D models and stacked slices](3d-slices.md)) use them.
+tools (3D models and stacked slices) use them.
 
 ### Making the cut test
 

@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using PhotonCanvas.App;
+using PhotonCanvas.Addon.Slicer;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Import;

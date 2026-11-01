@@ -1,3 +1,4 @@
+using PhotonCanvas.App;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -10,7 +11,7 @@ using PhotonCanvas.Doc.Import;
 using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Slicer;
 
 /// <summary>
 /// Picking a 3D model by sight: every STL, OBJ and STEP in a folder as a shaded thumbnail (drawn here,
