@@ -1,7 +1,7 @@
 # See it before you burn it
 <!-- windows: BurnPreviewWindow -->
 
-**View → See it burned** shows your design as the finished piece: drawn on the camera's picture of
+**See it burned** on the **View** tab shows your design as the finished piece: drawn on the camera's picture of
 the material that's really on the bed, each layer as dark and in the colour your own test grids say
 it comes out. Use it before **Ship It** to catch a fill that will be too pale, a colour that isn't
 the one you wanted, or a cut that lands on a knot in the wood. Nothing is sent to the machine and
@@ -46,7 +46,7 @@ would in a photo.
 
 ## Burned on canvas
 
-**View → Burned on canvas** draws the burned look on the work area in place of the camera picture,
+**Burned on canvas** on the **View** tab draws the burned look on the work area in place of the camera picture,
 under your outlines, so you can zoom in on it and keep editing. Turn **Camera on work area** on to
 see it on the real material. A label in the bottom corner says it's on, and whether any layer is a
 guess. Click the button again to see the camera picture as it is.

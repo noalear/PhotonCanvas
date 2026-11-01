@@ -29,3 +29,8 @@ no test for those settings on that material yet.
 <!-- target: button:Show on the canvas -->
 Tick **Show on the canvas** to draw the burned look on the work area, under your outlines, while
 you keep editing.
+
+## Or from the ribbon
+<!-- target: ribbon:View/Burned on canvas -->
+**Burned on canvas** on the **View** tab does the same, with or without the window open. Click it
+again to see the camera picture as it is.
