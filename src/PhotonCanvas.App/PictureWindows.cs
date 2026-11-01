@@ -11,7 +11,7 @@ using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
 
-static class PictureView
+public static class PictureView
 {
     public static Avalonia.Media.Imaging.Bitmap ToBitmap(RasterImage img, int maxSide = 700)
     {

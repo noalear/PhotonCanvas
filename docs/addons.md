@@ -24,9 +24,10 @@ src/Addons/Papercraft/
     tutorials/papercraft.md
 ```
 
-The project file is short; `src/Addons/Directory.Build.targets` does the rest (references the program
-for compiling only, and after every build copies the add-on into
-`src/PhotonCanvas.App/bin/<Configuration>/net10.0/addons/<id>/`, where the program finds it):
+The project file is short; `src/Addons/Directory.Build.props` (target framework) and
+`src/Addons/Directory.Build.targets` do the rest (they reference the program for compiling only, and
+after every build copy the add-on into `src/PhotonCanvas.App/bin/<Configuration>/net10.0/addons/<id>/`,
+where the program finds it; `tools/publish.sh` puts them in the published program the same way):
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -103,6 +104,8 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `CloseUpPhotoAsync()`, `CloseUpSees()` | A close-up photo laid straight on the bed, and where the close-up camera looks. |
 | `Lights`, `SetLights()` | The machine's lights. |
 | `IsConnected` | Is a laser connected. |
+| `FocusDistanceMm`, `CameraCalibratedFor(d)`, `PhotographAreaAsync(area, mmPerPx, d)` | The measured focus distance; is the overview camera calibrated there; a fresh straightened photo of part of the bed (pointers off, nothing moves). |
+| `LastSentJob` | The last `BuiltJob` sent from this session, and when. |
 | `Owner` | The main window, as owner for your dialogs. |
 | `Status(text)`, `Guard(work)` | A status-bar line; run work showing errors as a message, not a crash. |
 | `ShowHelp(file, anchor)` | Open a page of your help (or the program's). |
@@ -160,6 +163,16 @@ Put pages in your `help/` folder in the guide's format (`docs/help/AUTHORING.md`
 guide under **Add-ons** while you're on, and are searched with the rest. Link to your own pages by
 file name; images go in `help/images/`. A `<!-- windows: PapercraftWindow -->` line makes F1 in that
 window open the page. Every add-on needs at least one page and one tutorial.
+
+## Checks
+
+`tests/PhotonCanvas.Tests/HelpTests.Addons.cs` runs for every folder under `src/Addons` with an
+addon.json: it needs a page and a tutorial in `help/`, every link and picture to exist, every
+`new RibbonButton("Tab", "Group", "Label", …)` to be explained (as **Label**) and taught by a tutorial
+(`ribbon:Tab/Label`), and every window to be claimed by a page. The program's own guide must not link
+into an add-on's pages (they come and go). To try the real thing headless, set `PHOTONCANVAS_ADDONS=1`
+(add-ons are off in screenshot/test windows otherwise) and `PHOTONCANVAS_ADDONS_DIR` to a folder of
+built add-ons.
 
 ## Rules
 

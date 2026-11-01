@@ -1,7 +1,9 @@
 using PhotonCanvas.Core;
+using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
+using PhotonCanvas.Doc.Tracing;
 
-namespace PhotonCanvas.Doc.Tracing;
+namespace PhotonCanvas.Addon.DepthOutlines;
 
 /// <summary>How wide the outline lines are.</summary>
 public enum OutlineWidth

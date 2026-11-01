@@ -220,7 +220,7 @@ public sealed class HelpWindow : Window
             _scroll.Content = new TextBlock { Text = _lib.Pages.Count == 0 ? $"The guide's files weren't found (looked in {_lib.Folder})." : $"There's no page called {file}.", Margin = new(24), TextWrapping = TextWrapping.Wrap };
             return;
         }
-        var r = new HelpRenderer(_lib.Folder, Follow);
+        var r = new HelpRenderer(_lib.FolderFor(file), Follow);
         var body = r.Render(page.Blocks);
         // The tutorials for this page, at its end.
         // (Those the page doesn't already link to.)

@@ -7,7 +7,7 @@ namespace PhotonCanvas.App;
 /// machine events as received, warnings and any unexpected errors. Writing
 /// never throws.
 /// </summary>
-static class AppLog
+public static class AppLog
 {
     static readonly object Gate = new();
     public static string Dir { get; } = Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "logs");
