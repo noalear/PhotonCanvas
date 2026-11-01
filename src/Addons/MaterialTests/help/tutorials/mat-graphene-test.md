@@ -1,7 +1,7 @@
 # Try laser-induced graphene
 <!-- category: Materials and tests -->
 <!-- summary: Burn strips at different powers and speeds, and measure which one conducts best. -->
-<!-- page: materials-and-tests.md#graphene-test-experimental -->
+<!-- page: material-tests.md -->
 <!-- order: 72 -->
 Experimental: burning cork, wood or polyimide can turn its surface into conductive carbon, for touch
 pads and simple sensors. This test finds out whether the blue diode does it on your material. You

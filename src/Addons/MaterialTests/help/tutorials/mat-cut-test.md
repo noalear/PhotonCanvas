@@ -1,7 +1,7 @@
 # Find the cut
 <!-- category: Materials and tests -->
 <!-- summary: Cut small squares at different speeds and passes, and keep the quickest one that went through. -->
-<!-- page: materials-and-tests.md#cut-test -->
+<!-- page: material-tests.md -->
 <!-- order: 30 -->
 The best cut is the quickest setting that still goes right through: less char, less time. The cut
 test cuts a grid of small squares, and the ones that drop out went through. You need the material on

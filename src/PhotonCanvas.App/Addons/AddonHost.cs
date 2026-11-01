@@ -45,6 +45,7 @@ public interface IAddonServices
     IDisposable AddCommand(AddonCommand command);
     IDisposable AddContextMenuItem(ContextMenuEntry item);
     IDisposable AddCanvasOverlay(ICanvasOverlay overlay);
+    IDisposable ShowCloseUpAreaWhile(Func<bool> when);
     /// <summary>The add-on's help/ folder appears in the guide; dispose to take it out.</summary>
     IDisposable AddHelp(AddonManifest manifest, string folder);
 }
@@ -203,6 +204,8 @@ public sealed class AddonHost : IAddonHost
         Keep(_s.AddContextMenuItem(item with { Run = Safe(item.Run), Visible = Safe(item.Visible), Enabled = Safe(item.Enabled) }));
 
     public IDisposable AddCanvasOverlay(ICanvasOverlay overlay) => Keep(_s.AddCanvasOverlay(new SafeOverlay(overlay, Manifest.Id)));
+
+    public IDisposable ShowCloseUpAreaWhile(Func<bool> when) => Keep(_s.ShowCloseUpAreaWhile(Safe(when)!));
 
     public IDisposable AddToSlot(string slot, Func<SlotContext, Control?> make) => Keep(AddonSlots.Add(slot, make, this));
 

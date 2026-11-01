@@ -1,7 +1,7 @@
 # Engrave to an exact depth
 <!-- category: Materials and tests -->
 <!-- summary: Burn in rounds, measuring the depth with the red pointer between them, until it's right. -->
-<!-- page: materials-and-tests.md#exact-depth -->
+<!-- page: material-tests.md -->
 <!-- order: 34 -->
 Guessing the passes for a precise depth rarely works: each pass takes off less as the hole deepens.
 Exact depth measures the depth with the red pointer after each round and works out the next. You need

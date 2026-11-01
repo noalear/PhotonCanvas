@@ -322,7 +322,10 @@ public sealed class RibbonTab
         if (Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } had) return had;
         var g = Group(title).With(g => g.Extra = true);
         // Where it belongs, if asked: just after that group.
-        int at = after is null ? -1 : Groups.FindIndex(x => string.Equals(x.Title, after, StringComparison.OrdinalIgnoreCase));
+        // "Tests|Materials": after the first of these there is.
+        int at = -1;
+        foreach (var name in (after ?? "").Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if ((at = Groups.FindIndex(x => string.Equals(x.Title, name, StringComparison.OrdinalIgnoreCase))) >= 0) break;
         if (at >= 0 && at < Groups.Count - 2)
         {
             Groups.Remove(g);

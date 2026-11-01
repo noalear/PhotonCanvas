@@ -1,7 +1,7 @@
 # Measure the beam's slant
 <!-- category: Materials and tests -->
 <!-- summary: Cut four bars through a board and measure them, to learn how much the galvo's beam slants. -->
-<!-- page: materials-and-tests.md#bevel-test -->
+<!-- page: material-tests.md -->
 <!-- order: 70 -->
 Away from the middle of the field the beam comes down at a slant, so cut edges there slope. This test
 measures how much, once for the machine, for bevelled edges later. You need a board at least 4 mm

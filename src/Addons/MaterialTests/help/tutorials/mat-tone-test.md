@@ -1,7 +1,7 @@
 # Match pictures to the material
 <!-- category: Materials and tests -->
 <!-- summary: Burn grey patches, let the camera read them, and correct a picture layer so photos come out as they look. -->
-<!-- page: materials-and-tests.md#tone-test -->
+<!-- page: material-tests.md -->
 <!-- order: 40 -->
 Most materials go dark long before black and barely show the palest greys, so photos come out too
 dark or flat. The tone test measures how your material takes greys with a picture layer's settings,

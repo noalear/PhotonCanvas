@@ -1,7 +1,7 @@
 # Make an inlay
 <!-- category: Materials and tests -->
 <!-- summary: Turn shapes into a pocket in the board and a piece of veneer that sits in it flush. -->
-<!-- page: materials-and-tests.md#inlay -->
+<!-- page: material-tests.md -->
 <!-- order: 50 -->
 An inlay needs a pocket exactly as deep as the veneer and a piece exactly the pocket's size. The inlay
 maker makes both from one design, using your etch-rate result for the depth and your cut test's kerf

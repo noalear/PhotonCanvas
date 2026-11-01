@@ -9,7 +9,9 @@ using PhotonCanvas.Doc.Materials;
 using PhotonCanvas.Device;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// Engrave to an exact depth: the surface is measured with the red pointer, the shapes are burned

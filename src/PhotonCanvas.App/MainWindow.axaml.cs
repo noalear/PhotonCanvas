@@ -122,9 +122,6 @@ public partial class MainWindow : Window
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
-        // While a test read from the close-up camera is in the design, show where that camera sees.
-        void ShowCloseUpArea() => Canvas.CloseUpArea =
-            ToneTestWindow.InDesign(_doc.State) || LineTestWindow.InDesign(_doc.State) ? _machine.CloseUpSees() : null;
         _doc.Changed += _ => ShowCloseUpArea();
         _machine.StateChanged += ShowCloseUpArea;
         _machine.PhotoChanged += p => Canvas.Photo = p;
@@ -270,17 +267,9 @@ public partial class MainWindow : Window
         _props.FontsRequested += () => _ = Guard(ShowFonts);
         _job.RunFinished += from =>
         {
-            // An etch test just finished: straight to its results.
-            if (_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowEtchTest(true)));
-            // A cut test (or its kerf test) likewise.
-            else if (CutTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCutTest(true)));
-            else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
-            else if (LineTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowLineTest(true)));
-            else if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
-            else if (Bevel.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, true).ShowDialog(this)));
+            // A calibration just burned: straight to reading it (the material tests are an add-on and open their own results).
+            if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
             else if (LaserAlignWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, true).ShowDialog(this)));
-            // A depth round burned: measure it next.
-            if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
             if (from != _doc.FilePath) return;
             var next = VariableText.AfterRun(_doc.State, DateTime.Now);
@@ -660,14 +649,6 @@ public partial class MainWindow : Window
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
-        mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => ShowEtchTest(_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null))), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
-        mat.Large("Cut test", "IcTestGrid", () => _ = Guard(() => ShowCutTest(CutTestWindow.InDesign(_doc.State))), "Find the cut: small squares at different speeds and passes, see which drop out; then the kerf and the slot fit at that setting; saved with the material");
-        mat.Large("Exact depth", "IcDepth", () => _ = Guard(ShowExactDepth), "Engrave the selected shapes to an exact depth: the red pointer measures the surface, then the depth after each round of passes, and works out the next round");
-        mat.Large("Tone test", "IcPalette", () => _ = Guard(() => ShowToneTest(ToneTestWindow.InDesign(_doc.State))), "Photos that come out as they look: grey patches burned with a picture layer's settings, read by the camera, and that layer's pictures corrected for the material");
-        mat.Large("Line test", "IcLine", () => _ = Guard(() => ShowLineTest(LineTestWindow.InDesign(_doc.State))), "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side");
-        mat.Small("Inlay", "IcLayers", () => _ = Guard(() => new InlayWindow(_doc, _library, SelectedPaths()).ShowDialog(this)), "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)", () => SelectedPaths().Count > 0);
-        mat.Small("Bevel test", "IcMeasure", () => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, Bevel.InDesign(_doc.State)).ShowDialog(this)), "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges");
-        mat.Small("Graphene test", "IcBolt", () => _ = Guard(() => new GrapheneTestWindow(_doc, _library, Canvas.Machine, GrapheneTestWindow.InDesign(_doc.State)).ShowDialog(this)), "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter");
         mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
@@ -2071,6 +2052,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Selected vector shapes (text included), in drawing order.</summary>
+    /// <summary>While a test read from the close-up camera is in the design (an add-on says so), show where that camera sees.</summary>
+    void ShowCloseUpArea() => Canvas.CloseUpArea = AddonsWantCloseUpArea() ? _machine.CloseUpSees() : null;
+
     List<PathShape> SelectedPaths() => _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList();
 
     void BooleanSel(BoolOp op)
@@ -2487,23 +2471,8 @@ public partial class MainWindow : Window
             : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
     }
 
-    Task ShowExactDepth() => new ExactDepthWindow(_doc, _machine, _library, _doc.Selection).ShowDialog(this);
-
-    Task ShowToneTest(bool results) =>
-        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
-
     Task ShowCloseUpCalibration(bool find) =>
         new CloseUpCalibrationWindow(_doc, _machine, Canvas.Machine, find).ShowDialog(this);
-
-    Task ShowLineTest(bool results) =>
-        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
-
-    Task ShowCutTest(bool results) =>
-        new CutTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
-
-    Task ShowEtchTest(bool results) =>
-        new EtchTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results,
-            d => _machine.CameraMapFor(d) is { } c ? new EtchTestWindow.ImageMapChoiceInfo(c.Exact, c.Description) : null).ShowDialog(this);
 
     async Task PlaceOnEveryPiece()
     {

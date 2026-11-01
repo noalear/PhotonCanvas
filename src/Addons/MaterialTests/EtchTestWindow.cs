@@ -8,7 +8,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// Etch rate: how deep one pass of a setting goes. A ladder of small circles, each burned a

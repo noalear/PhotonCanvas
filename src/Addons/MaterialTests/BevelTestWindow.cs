@@ -7,7 +7,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// The bevel test: how far the galvo's beam slants across the field. Four bars are cut through a

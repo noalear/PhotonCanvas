@@ -8,7 +8,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// Photos that come out as they look: a row of grey patches burned with a picture layer's own

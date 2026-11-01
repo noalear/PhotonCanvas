@@ -7,7 +7,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// Finding the cut: a grid of small squares at speeds across and passes (or power) down; click the

@@ -6,7 +6,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// The inlay maker: the selected shapes as a pocket engraved into the board (as deep as the veneer,

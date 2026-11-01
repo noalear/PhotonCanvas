@@ -1,7 +1,7 @@
 # Hide the rows in pictures
 <!-- category: Materials and tests -->
 <!-- summary: Burn the same piece of a picture with one setting changed each time, and keep the one where rows don't show. -->
-<!-- page: materials-and-tests.md#line-test -->
+<!-- page: material-tests.md -->
 <!-- order: 42 -->
 Pictures are burned in rows, and on some materials the rows show. The line test burns a piece of your
 picture several times side by side, each with one change. You need a picture layer with a picture on

@@ -156,6 +156,12 @@ public interface IAddonHost
     /// <summary>Something drawn on the canvas.</summary>
     IDisposable AddCanvasOverlay(ICanvasOverlay overlay);
 
+    /// <summary>
+    /// Outline where the close-up camera looks on the canvas while <paramref name="when"/> says so
+    /// (asked again after each change to the design or the machine), e.g. while your test is in the design.
+    /// </summary>
+    IDisposable ShowCloseUpAreaWhile(Func<bool> when);
+
     /// <summary>A panel in a named slot of a window (see <see cref="AddonSlots"/> for the slots there are).</summary>
     IDisposable AddToSlot(string slot, Func<SlotContext, Control?> make);
 
@@ -187,7 +193,10 @@ public sealed record RibbonButton(string Tab, string Group, string Label, string
     public Func<bool>? Checked { get; init; }
     /// <summary>Hidden while this says false.</summary>
     public Func<bool>? Visible { get; init; }
-    /// <summary>When the group has to be made: put it after this group of the tab (default: at the end).</summary>
+    /// <summary>
+    /// When the group has to be made: put it after this group of the tab (default: at the end).
+    /// "Tests|Materials" means after Tests, or after Materials when there's no Tests group.
+    /// </summary>
     public string? GroupAfter { get; init; }
 }
 

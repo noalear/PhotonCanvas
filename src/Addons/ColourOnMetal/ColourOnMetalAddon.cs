@@ -31,14 +31,14 @@ public sealed class ColourOnMetalAddon : IAddon
             Tip = "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives",
             Large = true,
             Visible = Shown,
-            GroupAfter = "Materials",
+            GroupAfter = "Tests|Materials",
         });
         host.AddRibbonButton(new RibbonButton("Laser", "Colour on metal", "Measure colours", "IcEyedropper", () => _ = host.Guard(Measure))
         {
             Tip = "Read the colours of a burned colour test from a scan or photo, and save them as a palette",
             Large = true,
             Visible = Shown,
-            GroupAfter = "Materials",
+            GroupAfter = "Tests|Materials",
         });
     }
 

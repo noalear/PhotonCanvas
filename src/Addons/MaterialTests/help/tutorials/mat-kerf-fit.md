@@ -1,7 +1,7 @@
 # Measure kerf and slot fit
 <!-- category: Materials and tests -->
 <!-- summary: Cut a square and a slotted comb at your cut setting, to size parts and slots exactly. -->
-<!-- page: materials-and-tests.md#kerf-and-slot-fit-comb -->
+<!-- page: material-tests.md -->
 <!-- order: 31 -->
 The beam takes a little material with it, so parts come out smaller than drawn. A 20 mm square
 measured with calipers gives that kerf, and a comb of slots shows how tight slots should be. Do the

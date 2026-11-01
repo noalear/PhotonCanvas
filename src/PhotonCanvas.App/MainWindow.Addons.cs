@@ -164,5 +164,21 @@ public partial class MainWindow : IAddonServices
         });
     }
 
+    readonly List<Func<bool>> _closeUpAreaWhen = [];
+
+    /// <summary>Does an add-on want the close-up camera's area shown now.</summary>
+    bool AddonsWantCloseUpArea() => _closeUpAreaWhen.Any(f => f());
+
+    IDisposable IAddonServices.ShowCloseUpAreaWhile(Func<bool> when)
+    {
+        _closeUpAreaWhen.Add(when);
+        ShowCloseUpArea();
+        return new AddonUndo(() =>
+        {
+            _closeUpAreaWhen.Remove(when);
+            ShowCloseUpArea();
+        });
+    }
+
     IDisposable IAddonServices.AddHelp(AddonManifest manifest, string folder) => HelpFiles.AddAddon(manifest.Name, folder);
 }

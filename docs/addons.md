@@ -118,9 +118,10 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 
 | Call | Adds |
 |---|---|
-| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
+| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
 | `AddCommand(AddonCommand)` | A command in the shortcut list and command search; `Keys` like `"Ctrl+Alt+P"` gives it a shortcut (the person can change it). |
 | `AddContextMenuItem(ContextMenuEntry)` | An item on the canvas's right-click menu (`Visible`, `Enabled`, `Gesture`). |
+| `ShowCloseUpAreaWhile(when)` | The outline of where the close-up camera looks, on the canvas while `when()` says so (e.g. while your test is in the design). |
 | `AddCanvasOverlay(ICanvasOverlay)` | Drawing on the canvas: `UnderShapes` (over the camera picture, world mm), `OverShapes` (world mm), or `Screen` (pixels). Keep it fast. |
 | `AddToSlot(slot, make)` | Your panel inside a window's named slot (below). |
 | `AddJobHook(IJobHook)` | A step in making the job (below). |

@@ -1,7 +1,7 @@
 # Measure the etch rate
 <!-- category: Materials and tests -->
 <!-- summary: Find how deep one pass goes, from circles burned 1, 2, 3 … passes until one goes through. -->
-<!-- page: materials-and-tests.md#etch-rate -->
+<!-- page: material-tests.md -->
 <!-- order: 32 -->
 Inlays, exact depths and shaped stacked slices need to know how deep one pass goes. This burns the
 same setting into small circles, each with more passes; the first one that goes right through gives
