@@ -21,7 +21,6 @@ public sealed class PapercraftWindow : Window
 {
     readonly Document _doc;
     readonly MachineProfile _machine;
-    readonly AppSettings? _settings;
     List<StlDepth.Triangle>? _mesh;
     string _name = "";
     PaperNet? _net;
@@ -37,11 +36,10 @@ public sealed class PapercraftWindow : Window
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _make = new() { Content = "Make the papercraft", Classes = { "primary" }, IsEnabled = false, MinWidth = 170 };
 
-    public PapercraftWindow(Document doc, MachineProfile machine, AppSettings? settings = null)
+    public PapercraftWindow(Document doc, MachineProfile machine)
     {
         _doc = doc;
         _machine = machine;
-        _settings = settings;
         Title = "Fold-up papercraft";
         Width = 1100;
         Height = 720;
@@ -126,22 +124,13 @@ public sealed class PapercraftWindow : Window
 
     async Task Open()
     {
-        string? path;
-        if (_settings is not null)
+        // A plain file picker: the slicer's model browser belongs to that add-on, and this one stands alone.
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            var browser = new ModelBrowserWindow(_settings);
-            await browser.ShowDialog(this);
-            path = browser.Chosen;
-        }
-        else
-        {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "3D model to unfold",
-                FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ, STEP)") { Patterns = ["*.stl", "*.obj", "*.stp", "*.step"] }],
-            });
-            path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
-        }
+            Title = "3D model to unfold",
+            FileTypeFilter = [new FilePickerFileType("3D models (STL, OBJ, STEP)") { Patterns = ["*.stl", "*.obj", "*.stp", "*.step"] }],
+        });
+        string? path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
         if (path is null) return;
         _file.Text = $"Reading {Path.GetFileName(path)}…";
         try

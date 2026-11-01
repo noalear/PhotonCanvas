@@ -22,7 +22,7 @@ public sealed class PapercraftAddon : IAddon
         if (_open is { } already) { already.Activate(); return; }
         _ = host.Guard(async () =>
         {
-            var w = new PapercraftWindow(host.Document, host.Machine, host.AppSettings);
+            var w = new PapercraftWindow(host.Document, host.Machine);
             _open = w;
             w.Closed += (_, _) => { if (_open == w) _open = null; };
             await w.ShowDialog(host.Owner);

@@ -30,7 +30,7 @@ Every change unfolds the model again, in the background, a moment after you stop
 
 | Setting | What it does |
 |---|---|
-| **Open a 3D model…** | Pick an STL, OBJ or STEP file (from the model browser, the same as **3D to slices**). |
+| **Open a 3D model…** | Pick an STL, OBJ or STEP file. |
 | **Size (mm)** | The finished model's longest side. Everything else follows in proportion. |
 | **Faces at most** | Makes the model simpler until it has no more than this many flat faces (0 = use it as it is). Fewer faces mean fewer, bigger pieces and less folding; more faces mean a rounder model. A few hundred is plenty to fold by hand; models from 3D printing sites often have tens of thousands. |
 | **Glue tabs (mm)** | How deep each glue tab is. One edge of each glued pair gets a tab. Where a full tab would overlap the piece it's made smaller, or put on the other edge instead. 0 = no tabs. |

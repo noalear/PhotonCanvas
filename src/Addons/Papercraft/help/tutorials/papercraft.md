@@ -13,7 +13,7 @@ Click **3D to papercraft** on the **Home** tab. The **Fold-up papercraft** windo
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->
-Click **Open a 3D model…** and double-click the model you want. Its pieces appear on the left.
+Click **Open a 3D model…** and pick the model file. Its pieces appear on the left.
 
 ## Set the size
 <!-- target: field:Size (mm) -->
