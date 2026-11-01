@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/src/Addons/">
     <Project Path="src/Addons/DepthOutlines/PhotonCanvas.Addon.DepthOutlines.csproj" />
+    <Project Path="src/Addons/ShadowBoard/PhotonCanvas.Addon.ShadowBoard.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj" />
