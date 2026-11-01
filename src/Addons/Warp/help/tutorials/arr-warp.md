@@ -1,7 +1,7 @@
 # Warp a design
 <!-- category: Arranging -->
 <!-- summary: Taper, arch, bulge or wave a design, or correct it for a round object. -->
-<!-- page: arrange.md#warp -->
+<!-- page: warp.md -->
 <!-- order: 90 -->
 Warp bends a design: a taper, an arch for a name, a wave, or a correction so it comes out true on a
 mug or a tapered tumbler marked without a rotary. You see it change as you go.

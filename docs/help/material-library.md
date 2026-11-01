@@ -99,8 +99,8 @@ been deleted from the library shows it as *not in your library*.
 
 Other tools read the library too: **Inlay** offers your etch-rate and cut recipes, **Exact depth**
 starts from the nearest etch rate, the **Bevel test** offers your cut recipes, and stacked slices
-take their cut settings, kerf, slot fit and etch depth from it ([3D models and stacked
-slices](3d-slices.md)). **Picture → Colour on metal** uses the palettes (see [Pictures](pictures.md)).
+take their cut settings, kerf, slot fit and etch depth from it (3D models and stacked
+slices). **Picture → Colour on metal** uses the palettes (see [Pictures](pictures.md)).
 
 ## Saving from a layer
 

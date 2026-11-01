@@ -1,7 +1,7 @@
 # CMYK split for screen printing
 <!-- category: Pictures -->
 <!-- summary: Separate a colour picture into four ink plates, each on its own halftone layer. -->
-<!-- page: pictures.md#cmyk-split -->
+<!-- page: cmyk-split.md -->
 <!-- order: 140 -->
 For four-colour screen printing each ink needs its own screen. CMYK split makes the four plates
 (cyan, magenta, yellow, black) as halftone pictures on their own layers, to mark one at a time.

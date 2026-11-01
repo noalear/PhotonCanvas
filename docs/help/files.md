@@ -199,7 +199,7 @@ ordinary shapes you can edit. The buttons are in the **Bring in** group, near th
 | **Picture** | `Ctrl+J` | Pictures only (PNG, JPG, BMP, GIF, WebP, TIFF), onto a picture layer. |
 | **By colour** | `Ctrl+Shift+I` | A drawing with one layer per colour. |
 | **Import as…** | | A menu: **Import, each file grouped…**, **Import with every piece separate…**, **Import as one picture…** |
-| **3D to slices** | | Slices a 3D model into layers to cut and stack: see [3D models and stacked slices](3d-slices.md). |
+| **3D to slices** | | Slices a 3D model into layers to cut and stack: see 3D models and stacked slices. |
 
 On a narrow window the small buttons show only their icons; hover over one to see its name.
 

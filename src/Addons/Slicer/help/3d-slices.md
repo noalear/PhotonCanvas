@@ -1,5 +1,7 @@
 # 3D models and stacked slices
 
+An add-on (Settings → Add-ons → **3D to slices**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Bring in → 3D to slices**. It includes the assembly booklet and dowel pins.
+
 **3D to slices** turns a 3D model into flat parts that you cut from sheet material and put back
 together into the model: solid layers glued one on another, an open grid of slotted sheets (egg
 crate), or fins slotted onto rings (radial). It reads STL, OBJ and STEP files, sizes the model,

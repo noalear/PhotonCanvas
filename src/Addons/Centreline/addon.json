@@ -1,0 +1,8 @@
+{
+  "id": "centreline",
+  "name": "Centre-line trace",
+  "version": "1.0.0",
+  "description": "One line down the middle of each stroke of handwriting or line art.",
+  "category": "Picture",
+  "apiVersion": 1
+}
