@@ -177,7 +177,7 @@ as right-clicking shapes on the work area: **Cut**, **Copy**, **Paste**, **Dupli
 paths**, **Lock** / **Unlock**, **Use as material outline**, **Split onto pieces…**,
 **Shape operations**, **Array**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
-camera…**, **Trace picture…**, **Depthmap with DepthCharge…**, **Remove picture background…**,
+camera…**, **Trace picture…**, **Remove picture background…**,
 **Zoom to …**, **Rename…** and **Save to My shapes…**. They're explained in
 [Editing shapes](editing-shapes.md) and [Arranging](arrange.md).
 

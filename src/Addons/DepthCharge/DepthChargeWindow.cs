@@ -1,3 +1,4 @@
+using PhotonCanvas.App;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
@@ -8,7 +9,7 @@ using Avalonia.Platform.Storage;
 using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.DepthCharge;
 
 /// <summary>
 /// Turns a picture into a depthmap with the user's DepthCharge: pick a model, generate,

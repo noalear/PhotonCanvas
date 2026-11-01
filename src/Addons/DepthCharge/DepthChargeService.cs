@@ -1,9 +1,10 @@
+using PhotonCanvas.App;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Text.Json.Nodes;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.DepthCharge;
 
 /// <summary>What a running DepthCharge reports about itself.</summary>
 public sealed record DepthChargeHealth(bool Gpu, bool Quality, bool Fast, bool DepthPro);

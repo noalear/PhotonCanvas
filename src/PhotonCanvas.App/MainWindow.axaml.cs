@@ -77,9 +77,9 @@ public partial class MainWindow : Window
         _layers.ShapeActions = ShapeActions;
         _layers.Moved += (n, layer) => StatusText.Text = $"{(n == 1 ? "1 shape" : $"{n} shapes")} moved to \"{layer}\". Ctrl+Z puts {(n == 1 ? "it" : "them")} back.";
         _props = new PropertiesPanel(_doc, _layers, _settings);
+        _props.SlotOwner = this;
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
-        _props.DepthmapRequested += im => _ = Guard(() => MakeDepthmap(im));
         _props.RemoveBackgroundRequested += im => _ = Guard(() => RemoveBackground(im));
         _library = Doc.Materials.MaterialLibrary.Load(Path.Combine(AppIdentity.DataDir, "materials"));
         if (!_settings.PresetsAdopted)
@@ -631,7 +631,6 @@ public partial class MainWindow : Window
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
         _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
         _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
-        pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclip = picture.Group("Shape");
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
@@ -1339,7 +1338,6 @@ public partial class MainWindow : Window
             new Separator(),
             DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
             DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
-            DoAsync("Depthmap with DepthCharge…", () => MakeDepthmap(picture), picture is not null),
             DoAsync("Remove picture background…", () => picture is not null ? RemoveBackground(picture) : Task.CompletedTask, picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
@@ -1347,7 +1345,6 @@ public partial class MainWindow : Window
         ];
     }
 
-    readonly DepthChargeService _depthCharge = new();
 
     async Task RemoveBackground(ImageShape im)
     {
@@ -1394,67 +1391,6 @@ public partial class MainWindow : Window
         var w = new RecordTestWindow(_doc.State, _library, Canvas.Photo, _machine.UpdatePhotoAsync, () => Canvas.Photo, _machine.Distance);
         await w.ShowDialog(this);
         _layerEditor.RefreshMaterials();
-    }
-
-    /// <summary>
-    /// Depthmap of a picture (or a picture file) via DepthCharge. The result goes over the
-    /// original, same place and size, on its own greyscale Image layer.
-    /// </summary>
-    async Task MakeDepthmap(ImageShape? picture)
-    {
-        byte[] bytes;
-        string name;
-        if (picture is not null)
-        {
-            bytes = picture.Source.Encoded;
-            name = string.IsNullOrWhiteSpace(picture.Name) ? "Picture" : picture.Name;
-        }
-        else
-        {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Picture to turn into a depthmap",
-                FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = [.. PictureExtensions.Select(e => "*" + e)] }],
-            });
-            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
-            bytes = await File.ReadAllBytesAsync(path);
-            name = Path.GetFileNameWithoutExtension(path);
-        }
-        var w = new DepthChargeWindow(_depthCharge, _settings, bytes, name, (png, label) => AddDepthmap(png, label, picture));
-        await w.ShowDialog(this);
-    }
-
-    void AddDepthmap(byte[] png, string label, ImageShape? over)
-    {
-        var src = ImageSource.FromEncoded(png);
-        var state = _doc.State;
-        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
-        {
-            Name = $"Relief · {label}",
-            // Darker = deeper, carved in slices; each slice's lines turned to keep the floor smooth.
-            ImageMode = ImageEngraveMode.Slices,
-            Dpi = 254,
-            LinesPerCm = 200,
-            AngleStepDeg = 37,
-        };
-        state = Ops.AddLayer(state, layer, 0);
-        ImageShape shape;
-        if (over is not null)
-        {
-            // Same place and size as the original; a cropped depthmap fits inside it, centred.
-            double s = Math.Min(over.SizeMm.X / src.Width, over.SizeMm.Y / src.Height);
-            var size = new Vec2(src.Width * s, src.Height * s);
-            var inset = (over.SizeMm - size) / 2;
-            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(inset).Then(over.Transform) };
-        }
-        else
-        {
-            var size = ImageShape.DefaultSize(src, 100);
-            var at = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH).Center - size / 2;
-            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(at) };
-        }
-        _doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
-        _layers.Activate(layer.Id);
     }
 
     ShapeLibraryWindow? _shapesWindow;
@@ -2499,7 +2435,6 @@ public partial class MainWindow : Window
             ClearAutosave();
             _addons?.StopAll();
             _machine.Shutdown();
-            _depthCharge.Dispose(); // stops DepthCharge only if this program started it
             return;
         }
         e.Cancel = true;

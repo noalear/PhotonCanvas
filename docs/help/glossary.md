@@ -32,8 +32,8 @@ explained in full.
 - **Depth slices**: a picture mode for relief: the picture is a depth map (dark = deep), engraved
   as thin slices one after another, each covering everything at least that deep. See
   [Layer settings](layer-settings.md).
-- **Depthmap**: a grey picture where darkness means depth, for relief engraving. Picture →
-  **Depthmap** makes one with DepthCharge, a separate program. See [Pictures](pictures.md).
+- **Depthmap**: a grey picture where darkness means depth, for relief engraving. The DepthCharge
+  add-on's **Depthmap** button makes one, using DepthCharge, a separate program. See [Pictures](pictures.md).
 - **Diode** (**Diode · blue**): the 40 W, 455 nm blue laser. A layer uses it unless it's set to
   **MOPA**. See [Layer settings](layer-settings.md).
 - **Dithering**: how the grey tones of a picture become dots, each burned at full power (Jarvis,

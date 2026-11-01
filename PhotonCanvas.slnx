@@ -10,6 +10,7 @@
     <Project Path="src/PhotonCanvas.Remote.Desktop/PhotonCanvas.Remote.Desktop.csproj" />
   </Folder>
   <Folder Name="/src/Addons/">
+    <Project Path="src/Addons/DepthCharge/PhotonCanvas.Addon.DepthCharge.csproj" />
     <Project Path="src/Addons/Slicer/PhotonCanvas.Addon.Slicer.csproj" />
     <Project Path="src/Addons/Centreline/PhotonCanvas.Addon.Centreline.csproj" />
     <Project Path="src/Addons/CmykSplit/PhotonCanvas.Addon.CmykSplit.csproj" />

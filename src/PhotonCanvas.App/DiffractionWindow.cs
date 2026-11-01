@@ -74,7 +74,7 @@ public sealed class DiffractionWindow : Window
                 Field("Point spacing (mm)", _depthPoint, tip: "Distance between the points that get arcs."),
                 _depthOutlines,
                 _depthFlip,
-                Hint("Use a depth map: light = in front, mid-grey = on the surface, dark = behind, white = nothing (Picture → Depthmap makes one). " +
+                Hint("Use a depth map: light = in front, mid-grey = on the surface, dark = behind, white = nothing (the DepthCharge add-on makes one). " +
                      "Each point becomes an arc whose glint slides as you tilt the plate, so it seems to float. If it looks inside out under your light, swap."),
             },
         };

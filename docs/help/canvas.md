@@ -384,10 +384,10 @@ do with the selection opens. Items that don't apply are greyed.
   **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**,
   **Split onto pieces…** (see [Split onto pieces](work-area.md#split-onto-pieces))
 - **Shape operations**: **Offset…**, **Round corners…**, **Text on path**
-  (or **Straighten text**), **Copy along path…**, **Warp…**, **Tidy lines…**, **Weld (union)**,
+  (or **Straighten text**), **Copy along path…**, **Tidy lines…**, **Weld (union)**,
   **Subtract (bottom minus the rest)**, **Intersect (keep the overlap)**,
   **Exclude (remove the overlap)**
-- **Array**: **Nest on material…**, **Grid array…**, **Circular array…**
+- **Array**: **Grid array…**, **Circular array…**
 - **Align and distribute**: **Align left**, **Align centres horizontally**, **Align right**,
   **Align top**, **Align centres vertically**, **Align bottom**, **Distribute horizontally**,
   **Distribute vertically**, **Centre in work area**
@@ -395,9 +395,11 @@ do with the selection opens. Items that don't apply are greyed.
   **Rotate 90° counter-clockwise**
 - **Order**: **Bring to front**, **Send to back**
 - **Move to layer**: every layer of the design
-- **Fit to piece in camera…**, **Trace picture…**, **Depthmap with DepthCharge…**,
+- **Fit to piece in camera…**, **Trace picture…**,
   **Remove picture background…**
 - **Zoom to it**, **Rename…**, **Save to My shapes…**
+- Below a line, the items add-ons put there, such as **Warp…**, **Nest on material…** and
+  **Depthmap with DepthCharge…** (they go when the add-on is turned off)
 
 Right-click on empty space: it selects nothing and offers **Paste**, **Select all**, **Fit work
 area** and **Grid & snapping…**.

@@ -132,6 +132,7 @@ A window with a slot calls `AddonSlots.Fill(slot, panel, window, data, changed)`
 
 | Slot | Where | `Data` |
 |---|---|---|
+| `properties.picture` | Selection panel, Picture settings, under the program's buttons (filled again when another picture is selected or an add-on comes or goes) | the selected `ImageShape` |
 | `stackslice.stacked` | 3D to slices, under the "Stacked layers" settings | `IStackSliceSlot` (read the options, add an `ISliceModifier`); see the slicer add-on |
 
 Ask the add-ons thread for a new slot when you need one in a program window; add slots of your own

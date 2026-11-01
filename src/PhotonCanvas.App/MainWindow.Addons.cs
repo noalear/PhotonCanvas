@@ -28,6 +28,12 @@ public partial class MainWindow : IAddonServices
             });
         _doc.Changed += _ => _documentChanged?.Invoke();
         _machine.PhotoChanged += _ => _photoChanged?.Invoke();
+        // Add-ons coming and going change buttons and the panels' add-on parts.
+        _addons.Changed += () =>
+        {
+            _ribbon.Refresh();
+            _props.Refresh();
+        };
         // Screenshots and tests start without them, so they show the program alone.
         if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
         try { _addons.StartAll(); }

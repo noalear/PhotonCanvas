@@ -1,7 +1,7 @@
 # A relief from a depth map
 <!-- category: Pictures -->
 <!-- summary: Turn a photo into a depth map with DepthCharge and carve it in slices. -->
-<!-- page: pictures.md#depthmap-with-depthcharge -->
+<!-- page: depthcharge.md -->
 <!-- order: 70 -->
 A depth map is a grey picture of heights: white is the surface, black the deepest. DepthCharge, a
 separate program you install, makes one from a photo, and PhotonCanvas carves it in slices. Carving
