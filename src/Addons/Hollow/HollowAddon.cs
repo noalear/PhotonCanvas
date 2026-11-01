@@ -42,9 +42,9 @@ sealed class HollowPanel : StackPanel
             {
                 Field("Wall (mm)", _wall, tip: "How thick the shell is, sideways and at the top and bottom. Thicker is stronger and leaves room for the pins."),
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, Children = { _openBottom, _openTop } },
-                Field("Wire / LED channel Ø", _channel, tip: "A hole straight up through the solid base into the hollow, for a wire or to push an LED in. 0 = none."),
+                Field("Wire hole Ø", _channel, tip: "A hole straight up through the solid base into the hollow, for a wire or to push an LED in. 0 = none."),
                 Field("Magnet Ø", _magnet, tip: "Round pockets in the base for magnets, so the model sticks to a fridge or a steel base. 0 = none."),
-                (_magnetThickRow = Field("Magnet thickness (mm)", _magnetThick, tip: "The pockets go up through as many slices as this takes, with solid above them.")),
+                (_magnetThickRow = Field("Magnet thickness", _magnetThick, tip: "The pockets go up through as many slices as this takes, with solid above them.")),
                 (_magnetsRow = Field("Magnets", _magnets, tip: "How many pockets, spread as far apart as the base allows.")),
             },
         };

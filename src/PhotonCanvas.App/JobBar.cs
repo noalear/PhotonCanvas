@@ -86,6 +86,9 @@ public sealed class JobBar : UserControl
     /// this design. Firmware that doesn't report job ids: the last job sent, as before.
     /// </summary>
     BuiltJob? OwnJob => IsOurs ? _sentJob : null;
+
+    /// <summary>The last job sent from here in this session, and when (for add-ons).</summary>
+    public (BuiltJob Job, DateTimeOffset SentAt)? LastSent { get; private set; }
     double? OwnEstimate => IsOurs ? _sentEstimate : null;
     bool IsOurs => _sentTaskId is { } id && (_machine.LoadedTaskId is not { Length: > 0 } loaded || loaded == id);
 
@@ -996,6 +999,7 @@ public sealed class JobBar : UserControl
                 name: _doc.FilePath is { } fp ? Path.GetFileNameWithoutExtension(fp) : "Untitled");
             _sentEstimate = job.EstimateS;
             _sentJob = job;
+            LastSent = (job, DateTimeOffset.Now);
             _sentFrom = _doc.FilePath;
             // A section of a bigger design: the fields move on only after the last one.
             _sentMidSections = _section is { } s && s.Index < s.Count - 1

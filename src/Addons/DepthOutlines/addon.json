@@ -1,0 +1,8 @@
+{
+  "id": "depth-outlines",
+  "name": "Depth outlines",
+  "version": "1.0.0",
+  "description": "Find the edges in a depthmap and mark them as lines over the relief, so it looks less washed out.",
+  "category": "Picture",
+  "apiVersion": 1
+}

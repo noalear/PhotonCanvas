@@ -24,7 +24,7 @@ Tick **Hollow it out**. The preview shows the slices with their middles cut out.
 How thick the shell is, sideways and at the top and bottom. 5 mm is a good start; thicker leaves more room for the pins.
 
 ## A way in for a wire
-<!-- target: field:Wire / LED channel Ø -->
+<!-- target: field:Wire hole Ø -->
 Type a size to get a hole up through the base into the hollow, for a wire or an LED. 0 = none.
 
 ## Magnets in the base

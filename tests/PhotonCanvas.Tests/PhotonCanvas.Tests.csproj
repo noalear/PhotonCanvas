@@ -25,6 +25,8 @@
     <ProjectReference Include="..\..\src\Addons\Hollow\PhotonCanvas.Addon.Hollow.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Server\PhotonCanvas.Server.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Remote\PhotonCanvas.Remote.csproj" />
+    <!-- Add-ons with tests (their own geometry). -->
+    <ProjectReference Include="..\..\src\Addons\DepthOutlines\PhotonCanvas.Addon.DepthOutlines.csproj" />
   </ItemGroup>
 
 </Project>

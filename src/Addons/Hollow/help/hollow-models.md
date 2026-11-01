@@ -11,7 +11,6 @@ slicer makes solid slices exactly as before.
 > **Note:** Hollow slices haven't been tried on the machine yet. Cut a small model in scrap first.
 
 ## Hollow a model
-<!-- windows: StackSliceWindow -->
 
 1. Open a model in **3D to slices** (Home tab) and choose **Stacked layers (solid)**.
 2. Tick **Hollow it out** in the stacked settings.
@@ -32,9 +31,9 @@ The middles that come out are whole pieces of material: keep them for small part
 | **Wall (mm)** | 1 to 50 mm (5) | How thick the shell is, sideways and at the top and bottom. Thicker is stronger and leaves room for the pins. |
 | **Open bottom** | off | The hollow runs out through the base: for a lamp shade, or a cover that goes over a light. |
 | **Open top** | off | The hollow runs out through the top: a pot or a bowl. |
-| **Wire / LED channel Ø** | 0 to 30 mm (0) | A round hole straight up through the solid base into the hollow, at the roomiest spot, for a wire or to push an LED in. Only where there's a straight way up through solid (a model standing on legs may have none). 0 = none. |
+| **Wire hole Ø** | 0 to 30 mm (0) | A round hole straight up through the solid base into the hollow, at the roomiest spot, for a wire or to push an LED in. Only where there's a straight way up through solid (a model standing on legs may have none). 0 = none. |
 | **Magnet Ø** | 0 to 40 mm (0) | Round pockets in the base for magnets, so the model sticks to a fridge or a steel base. 0 = none. |
-| **Magnet thickness (mm)** | 0.5 to 20 mm (3) | How thick the magnets are: the pockets go up through as many slices as that takes, with solid material above them. |
+| **Magnet thickness** | 0.5 to 20 mm (3) | How thick the magnets are: the pockets go up through as many slices as that takes, with solid material above them. |
 | **Magnets** | 1 to 8 (2) | How many pockets, spread as far apart as the base allows. |
 
 ## Pins, dowels and labels

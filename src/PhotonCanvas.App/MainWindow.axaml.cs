@@ -95,7 +95,7 @@ public partial class MainWindow : Window
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
         if (_settings.ActiveSetup().Kind == MachineKind.XTool && !WorkModes.Usable(_settings)) _settings.WorkMode = "Flat";
         // The machine in use (and its work mode) sets the work area.
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.GroupBy(t => t.LayerId).ToDictionary(g => g.Key, g => g.Sum(t => t.TotalSeconds)) ?? new());
         _job.LayerClicked += id => _layers.Activate(id);
@@ -116,6 +116,7 @@ public partial class MainWindow : Window
         RibbonHost.Content = _ribbon;
 
         BuildRibbon();
+        StartAddons();
         WireTools();
         ApplyGrid();
         Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {Units.Num(v.X)}   Y {Units.Num(v.Y)} {Units.Name}" : "";
@@ -646,7 +647,6 @@ public partial class MainWindow : Window
         pedit.Small("Centre-line trace", "IcPen", () => { if (SelectedPicture() is { } im) _ = Guard(() => CentrelineTrace(im)); }, "One line down the middle of each stroke (handwriting, line art), on a Score layer", HasPicture);
         var prelief = picture.Group("Relief");
         prelief.Large("3D model", "IcDepth", () => _ = Guard(AddStl), "A 3D model (STL) as a depth map, on a depth-slices layer");
-        prelief.Small("Depth outlines", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }, "Find the edges in a depthmap and mark them as lines over the relief (one laser line, a set width, or swelling with the edge), so it looks less washed out", HasPicture);
         prelief.Small("Relief preview", "IcEye", () => { if (SelectedPicture() is { } im) new ReliefPreviewWindow(im).Show(this); }, "See a depth map as the lit relief it will carve", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
         var pclean = picture.Group("Clean up");
@@ -727,6 +727,7 @@ public partial class MainWindow : Window
         ToolLarge(tools, "Measure", "IcMeasure", Tool.Measure, "Measure: drag between two points (snaps to corners; Shift = 45° steps)");
         tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
+        panels.Small("Add-ons", "IcPlug", () => _ = Guard(ShowAddons), "Extra features: turn each on or off, or install new ones, without restarting");
         panels.Small("Reset panels", "IcLayers", () => _docking.Reset(), "Put the layers, selection and layer settings panels back where they started (each panel's title bar moves, floats or folds it)");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Colour the paths by when they run: blue first, through green and yellow, to red last (a key shows at the top of the work area)", null, () => _job.ShowOrder);
         panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
@@ -774,6 +775,10 @@ public partial class MainWindow : Window
                 new("Connection keys…", "The one-time setup that lets this program talk to the machine.", async () => await _machine.SetUpKeys()),
                 new("Calibrate camera…", "Line the camera picture up with where the laser marks (once per material height).", _machine.CalibrateAsync),
             ]),
+            ("Add-ons",
+            [
+                new("Add-ons…", "Extra features: turn each on or off, install new ones or remove them, while the program runs.", ShowAddons),
+            ]),
             ("Tools",
             [
                 new("Home the Z axis", "Send the head up to find its zero again (if the focus height seems off).", HomeZ),
@@ -804,7 +809,9 @@ public partial class MainWindow : Window
     List<HotCommand>? _commands;
 
     /// <summary>Everything that has (or can be given) a keyboard shortcut. Changed ones are in the settings.</summary>
-    IReadOnlyList<HotCommand> Commands() => _commands ??=
+    IReadOnlyList<HotCommand> Commands() => _addonCommands.Count == 0 ? BuiltInCommands() : [.. BuiltInCommands(), .. _addonCommands];
+
+    IReadOnlyList<HotCommand> BuiltInCommands() => _commands ??=
     [
         new("file.new", "File", "New design", "Ctrl+N", () => _ = Guard(NewDoc), true),
         new("file.open", "File", "Open…", "Ctrl+O", () => _ = Guard(OpenDoc), true),
@@ -846,7 +853,6 @@ public partial class MainWindow : Window
         new("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", () => { if (_doc.Selection.Count > 0) _ = Guard(NestSel); }),
         new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
-        new("picture.depthoutlines", "Shapes", "Depth outlines…", "", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }),
         new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
         new("layer.moveto", "Layers", "Move selection to the active layer", "Ctrl+M", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer))),
         new("view.zoomin", "View", "Zoom in", "Ctrl+OemPlus|Ctrl+Add", () => Canvas.ZoomBy(1.25)),
@@ -874,6 +880,7 @@ public partial class MainWindow : Window
         new("job.frame", "Job", "Frame", "", () => { if (_job.CanFrame) _ = Guard(_job.ToggleFrame); }),
         new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(() => _job.Send()); }),
         new("job.console", "Job", "G-code console", "", ShowConsole),
+        new("settings.addons", "Settings", "Add-ons…", "", () => _ = Guard(ShowAddons)),
     ];
 
     readonly Dictionary<string, KeyGesture[]> _gestures = [];
@@ -938,7 +945,7 @@ public partial class MainWindow : Window
             _settings.Save();
             StatusText.Text = "Work mode: flat bed (the attachment it used isn't in your equipment).";
         }
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         _job.Refresh();
         _ribbon.Refresh();
     }
@@ -1234,7 +1241,7 @@ public partial class MainWindow : Window
     /// <summary>The canvas shows the mode's work area; the job is built for it.</summary>
     void ApplyWorkMode()
     {
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         Canvas.FitField();
         _job.Refresh();
         _ribbon.Refresh();
@@ -1584,6 +1591,7 @@ public partial class MainWindow : Window
             menu.Items.Add(fit);
             menu.Items.Add(grid);
         }
+        AddAddonMenuItems(menu);
         menu.Open(Canvas);
     }
 
@@ -2569,6 +2577,7 @@ public partial class MainWindow : Window
         {
             if (ConnectOnOpen) RememberOpen();
             ClearAutosave();
+            _addons?.StopAll();
             _machine.Shutdown();
             _depthCharge.Dispose(); // stops DepthCharge only if this program started it
             return;

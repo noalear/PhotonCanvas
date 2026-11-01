@@ -168,11 +168,13 @@ static class MoreShots
                 rgba[i * 4 + 3] = 255;
             }
             var depth = new ImageShape { Name = "pebbles depthmap", LayerId = doc.State.Layers[0].Id, Source = ImageSource.FromEncoded(new PhotonCanvas.Core.Imaging.RasterImage(pw, ph, rgba).EncodePng()), SizeMm = new Vec2(120, 60) };
-            var outlines = new DepthOutlinesWindow(doc, depth);
+            var outlines = new PhotonCanvas.Addon.DepthOutlines.DepthOutlinesWindow(doc, depth);
             outlines.Show(w);
             F<Slider>(outlines, "_amount").Value = 45;
             settle(3000);
-            save(outlines.CaptureRenderedFrame(), "window-picture-depth-outlines", "Depth outlines: the edges of a depthmap of piled pebbles, as lines that swell on the tall steps (How many edges at 45%)");
+            // An add-on's pictures go in its own help folder.
+            var addonImages = Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", "DepthOutlines", "help", "images");
+            outlines.CaptureRenderedFrame()?.Save(Path.Combine(addonImages, "window-picture-depth-outlines.png"));
             outlines.Close();
         }
 
