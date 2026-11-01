@@ -532,7 +532,7 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
-        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
+        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine, _library).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");

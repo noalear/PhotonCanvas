@@ -207,6 +207,7 @@ A box with finger joints, drawn as flat panels that slot together.
 | **Material** | 0.5–20 mm | 3 | The thickness of your sheet. Measure it: the joints depend on it. |
 | **Finger width** | 1–100 mm | 9 | Roughly how wide each finger is. About three times the thickness is a good start. |
 | **With a lid** | | on | Adds a lid panel jointed like the floor. Without it the walls' top edges are plain. |
+| **Cut with** | your library's cut recipes | the first with a kerf measured | Cut settings from the [material library](material-library.md). The panels go on a cut layer named after the material, with the recipe's settings and its kerf, and **Material** is set to the material's thickness. Recipes with a kerf measured come first; one without says so. **The design's cut layer, as it is** puts the panels on the first cut layer, as before. |
 
 How it's built:
 
@@ -218,9 +219,11 @@ How it's built:
 - The panels are laid in a row from 10 mm in from the work area's top-left corner, 3 mm apart. A
   box is usually wider than the 220 mm work area: ungroup (`Ctrl+Shift+G`) and arrange or nest the
   panels (see [Arranging](arrange.md)), and cut what doesn't fit in a second run.
-- The panels are drawn at their exact size. Set the Cut layer's kerf (in its **More settings**,
-  see [Layer settings](layer-settings.md)) so the fingers fit snugly; the cut test measures it (see
-  [Materials and tests](materials-and-tests.md)).
+- The panels are drawn at their exact size, fingers and the gaps for them the same width. With
+  the kerf on the cut layer they come out that size, so they press together snugly: pick a recipe
+  under **Cut with** whose kerf was measured (the cut test's kerf and fit test, see
+  [Materials and tests](materials-and-tests.md), or the Kerf gauge add-on), or set the Cut layer's
+  kerf yourself (in its **More settings**, see [Layer settings](layer-settings.md)).
 
 ### Keychain and tag
 
