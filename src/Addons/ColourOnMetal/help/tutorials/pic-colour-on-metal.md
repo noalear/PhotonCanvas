@@ -1,7 +1,7 @@
 # A colour picture on metal
 <!-- category: Pictures -->
 <!-- summary: A picture in the colours your stainless or titanium plate really made, one layer per colour. -->
-<!-- page: pictures.md#colour-on-metal -->
+<!-- page: colour-on-metal.md -->
 <!-- order: 50 -->
 The MOPA laser colours stainless steel and titanium. This turns a picture into the colours your own
 plate made, one layer per colour. You need a measured palette first (Laser → Colour test, then

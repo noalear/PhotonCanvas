@@ -15,7 +15,9 @@ using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 using Bitmap = Avalonia.Media.Imaging.Bitmap;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.ColourOnMetal;
 
 /// <summary>
 /// Measure a burned colour test: take a close-up camera photo of it (the truest colour), or open

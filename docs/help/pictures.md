@@ -16,18 +16,18 @@ other shapes doesn't count, except for **Image mask**.
 | Group | Buttons |
 |---|---|
 | Add | [Import picture](#import-a-picture) |
-| Turn it into | [Trace](#trace), [Colour on metal](#colour-on-metal) |
+| Turn it into | [Trace](#trace) |
 | Shape | [Shapes to picture](#shapes-to-picture) |
 | Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop) |
 
-Add-ons add more buttons to the tab while they're on: **Engraving**, **Diffraction** and
-**Depthmap** in Turn it into, **Image mask** and **Remove mask** in Shape, **CMYK split** and
+Add-ons add more buttons to the tab while they're on: **Colour on metal**, **Engraving**,
+**Diffraction** and **Depthmap** in Turn it into, **Image mask** and **Remove mask** in Shape, **CMYK split** and
 **Centre-line trace** in Edit, a **Relief** group (**3D model**, **Relief preview**, **Depth
 outlines**) and **Remove background** in **Clean up**. Each has its own page under **Add-ons** in
 the contents; turn them on or off in Settings → Add-ons.
 
-**Colour on metal** and **Diffraction** are MOPA-only features. They show by default; to hide or
-show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
+**Colour on metal** and **Diffraction** (both add-ons) are MOPA-only features. While their add-ons
+are on they show by default; to hide or show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
 **Colour on metal** and **Diffraction gratings** under **Features to show**. Unticking **Colour on
 metal** also hides the **Colour test** and **Measure colours** buttons on the Laser tab. Hiding a
 feature only takes it out of the ribbon: nothing is lost. See [The machine and settings](machine.md).
@@ -173,42 +173,6 @@ The line under the sliders counts the outlines and segments.
 holes). Pictures larger than 2000 pixels along their longer side are traced from a copy averaged
 down to 2000; the outlines are still placed at full size.
 
-## Colour on metal
-<!-- windows: ColourPictureWindow -->
-
-**Colour on metal** makes a colour picture on stainless steel or titanium with the MOPA laser, using
-the colours your plate really made. Each pixel becomes the nearest measured colour, with dots of
-neighbouring colours mixed in for the shades between, and each colour becomes one Engrave layer
-with the settings that made it.
-
-It needs a measured palette first: burn a **Colour test** (Laser tab), read it with **Measure
-colours** and save the palette. See [Materials and tests](materials-and-tests.md). Until then the
-window says there are no palettes and **Add colour layers** stays grey.
-
-![The Colour picture on metal window before any palette is measured](images/window-picture-colour-on-metal.png)
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Palette** | | A measured palette from the material library: material, palette name and date. |
-| **Dot size (mm)** | 0.05 to 3 (0.3) | Size of one colour dot. Smaller = finer, but heat makes neighbouring colours bleed: 0.2–0.5 mm is a good start. |
-| **Mix colours with dots for in-between shades** | on | Dithering between palette colours. Off: each dot takes the nearest colour only (posterised). |
-| **Fit the picture's light and dark to the palette** | on | Squeezes the picture's lightness into the range the palette really has, so shadows and highlights both land on a colour. |
-| **Use bare metal as a colour** | on | Unmarked metal counts as a colour (usually the lightest). If the palette has no bare-metal reading, a light grey stands in. |
-| **Merge colours closer than ΔE** | 2 to 20 (5) | Palette colours closer than this count as one: fewer layers, fewer near-duplicates. |
-| **Overscan (mm)** | 0 to 2 (0) | Run-up past each line with the laser off: steadier colour right to the edges, a little slower. |
-
-The right half shows the picture and the result simulated in the measured colours. **Colours used**
-shows a chip per colour; hover one for the settings that made it and its share of the picture. The
-summary gives the dots, colours, layers and the marking time.
-
-**Add colour layers** adds one Engrave layer per colour (named **Colour ·**, the colour and its test
-square, e.g. **R2 C5**), least energy first, over the picture at the same place, size and angle.
-Bare metal needs no layer. If the picture is alone on its layer, that layer stops being sent; if it
-shares it, turn its output off yourself. See-through parts stay bare.
-
-> **Tip:** Use the same plate, finish and focus as the colour test, and the same lights for judging.
-> Colours shift with the viewing angle, as on the test.
-
 ## Shapes to picture
 
 **Shapes to picture** turns the selected shapes into a picture, for example to engrave a logo with a
@@ -275,7 +239,6 @@ the picture gets smaller by the part cut away. Its tone settings and image mask 
 
 - [Import a picture and set its tone](tutorial:pic-import)
 - [Trace a picture into outlines](tutorial:pic-trace)
-- [A colour picture on metal](tutorial:pic-colour-on-metal)
 - [Turn shapes into a picture](tutorial:pic-shapes-to-picture)
 - [Picture filters](tutorial:pic-filters)
 - [Rub out parts of a picture](tutorial:pic-eraser)

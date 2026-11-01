@@ -7,7 +7,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Colour;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.ColourOnMetal;
 
 /// <summary>
 /// Makes a colour test grid for the MOPA laser on metal: one setting across, another down, the

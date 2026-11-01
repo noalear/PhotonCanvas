@@ -279,7 +279,7 @@ updating from a version that didn't ask. Change it here any time.
 
 | Tick | Shows |
 |---|---|
-| **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**). |
+| **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**), while the Colour on metal add-on is on. |
 | **Diffraction gratings** (on) | **Picture → Diffraction** (while the Diffraction pictures add-on is on). |
 | **G-code console** (on) | **Laser → Console** (see [The G-code console](#the-g-code-console)). |
 

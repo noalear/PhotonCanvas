@@ -628,7 +628,6 @@ public partial class MainWindow : Window
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
-        _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
         var pclip = picture.Group("Shape");
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
@@ -670,9 +669,6 @@ public partial class MainWindow : Window
         mat.Small("Bevel test", "IcMeasure", () => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, Bevel.InDesign(_doc.State)).ShowDialog(this)), "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges");
         mat.Small("Graphene test", "IcBolt", () => _ = Guard(() => new GrapheneTestWindow(_doc, _library, Canvas.Machine, GrapheneTestWindow.InDesign(_doc.State)).ShowDialog(this)), "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter");
         mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
-        var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
-        colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
-        colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
         job.Large("Ship It", "IcSend", () => _ = Guard(() => _job.Send()), "Upload the job; the machine waits for its start button", () => _job.CanSend);
@@ -2533,38 +2529,6 @@ public partial class MainWindow : Window
             StatusText.Text = $"A copy on each of {placements.Count} pieces." + (VariableText.Used(_doc.State).Count > 0 ? " Each one marks the next serial number / spreadsheet row." : "");
         });
         await w.ShowDialog(this);
-    }
-
-    /// <summary>Colour layers over a picture from a measured palette; the picture stops being sent when it's alone on its layer.</summary>
-    async Task MakeColourPicture(ImageShape picture)
-    {
-        var w = new ColourPictureWindow(picture, _library);
-        await w.ShowDialog(this);
-        if (w.Result is not { } r) return;
-        var (state, added) = Doc.Colour.ColourPicture.Add(_doc.State, picture, r.Palette, r.Options);
-        if (added.Count == 0) return;
-        bool alone = state.ShapesOn(picture.LayerId).Count() == 1;
-        if (alone) state = Ops.UpdateLayers(state, new HashSet<Guid> { picture.LayerId }, l => l with { Output = false });
-        _doc.Commit("Colour picture", state, added);
-        StatusText.Text = $"Added {added.Count} colour layers." + (alone ? " The picture's own layer is now a guide only (not sent)." : " The picture shares its layer, which is still sent: turn its output off if you only want the colours.");
-    }
-
-
-    async Task AddColourTest()
-    {
-        var w = new ColourTestWindow(_settings.TextFont);
-        await w.ShowDialog(this);
-        if (w.Result is not { } o) return;
-        var (state, added) = Doc.Colour.ColourTest.Add(_doc.State, o);
-        _doc.Commit("Colour test", state, added);
-        Canvas.FitField();
-    }
-
-    async Task MeasureColours()
-    {
-        var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance, _machine);
-        await w.ShowDialog(this);
-        _layerEditor.RefreshMaterials();
     }
 
     /// <summary>Make a new code (<paramref name="id"/> null) or change one.</summary>

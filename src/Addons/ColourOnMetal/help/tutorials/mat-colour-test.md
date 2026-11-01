@@ -1,7 +1,7 @@
 # Burn a colour test on metal
 <!-- category: Materials and tests -->
 <!-- summary: A grid of MOPA settings on stainless or titanium, to see which colours your plate gives. -->
-<!-- page: materials-and-tests.md#colour-test -->
+<!-- page: colour-on-metal.md -->
 <!-- order: 60 -->
 The colours stainless steel and titanium give depend on the plate, its finish and the focus, so a
 test on your own plate is the way to know them. You need a clean, flat plate with the same finish as

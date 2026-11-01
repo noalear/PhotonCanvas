@@ -1,7 +1,7 @@
 # Measure a colour test
 <!-- category: Materials and tests -->
 <!-- summary: Read every square's colour from a close-up photo or a scan, and save them as a palette. -->
-<!-- page: materials-and-tests.md#measure-colours -->
+<!-- page: colour-on-metal.md -->
 <!-- order: 62 -->
 This turns a burned colour test into numbers: each square's colour, which ones are clearly different,
 and which hues the plate reaches. Saved as a palette on the material, they're what colour pictures on

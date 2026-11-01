@@ -97,7 +97,7 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `Document` | The open design: `State` (a `DocState`), `Selection`, `ActiveLayer`, `Commit(label, newState, select)` = one undo step; `BeginEdit/UpdateEdit/EndEdit` for live dragging. Build new states with `Ops` (`Ops.AddShapes`, `Ops.AddLayer`, …). |
 | `DocumentChanged` | After any change, undo/redo, or another file opened. |
 | `Machine`, `MachineChanged` | The chosen machine's profile (work area `FieldW/FieldH`, lasers, limits). |
-| `Library` | The material library (recipes, kerf, slot fit…). |
+| `Library`, `RefreshLibrary()` | The material library (recipes, kerf, slot fit…); after changing and saving it, `RefreshLibrary()` updates the program's material lists. |
 | `AppSettings`, `SaveAppSettings()` | The program's settings (read; write only with care). Keep your own settings in `DataFolder`. |
 | `SelectedPicture` | The picture, when exactly one is selected. |
 | `Photo`, `PhotoChanged`, `TakePhotoAsync()` | The overview camera photo of the bed (`RasterImage`, bed `Area`, `MmPerPx`); taking one doesn't move anything. |
@@ -106,10 +106,12 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `IsConnected` | Is a laser connected. |
 | `FocusDistanceMm`, `CameraCalibratedFor(d)`, `PhotographAreaAsync(area, mmPerPx, d)` | The measured focus distance; is the overview camera calibrated there; a fresh straightened photo of part of the bed (pointers off, nothing moves). |
 | `LastSentJob` | The last `BuiltJob` sent from this session, and when. |
+| `JobFinished` | A job sent from this session finished on the machine (argument: the design file it came from). Tests open their results from it. |
+| `MachinePanel` | The program's machine connection itself, for what the members above don't cover (close-up camera placement, the red pointer, measuring). It can move the head and fire: only from a button that plainly says so. Its members may change between versions. |
 | `Owner` | The main window, as owner for your dialogs. |
 | `Status(text)`, `Guard(work)` | A status-bar line; run work showing errors as a message, not a crash. |
 | `ShowHelp(file, anchor)` | Open a page of your help (or the program's). |
-| `InvalidateCanvas()`, `RefreshCommands()` | Redraw the canvas; re-ask buttons' enabled/checked/visible tests. |
+| `InvalidateCanvas()`, `FitWorkArea()`, `RefreshCommands()` | Redraw the canvas; zoom out to the whole work area; re-ask buttons' enabled/checked/visible tests. |
 | `Folder`, `DataFolder`, `Manifest` | Your installed folder (read-only), a folder for your own files (kept across updates and removal), your addon.json. |
 
 ### Adding things

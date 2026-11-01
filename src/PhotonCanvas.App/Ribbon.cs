@@ -181,6 +181,16 @@ public sealed class Ribbon : UserControl
             c.IsVisible = v;
             changed = true;
         }
+        // An add-on's group goes when none of its buttons are showing (they may hide themselves).
+        foreach (var t in _tabs)
+            foreach (var g in t.Groups)
+            {
+                if (!g.Extra) continue;
+                bool any = g.AnyShown;
+                if (g.Root.IsVisible == any) continue;
+                g.Root.IsVisible = any;
+                changed = true;
+            }
         if (!changed) return;
         // Widths change with what's shown: measure the tabs again.
         foreach (var t in _tabs)
@@ -374,6 +384,9 @@ public sealed class RibbonGroup
     /// <summary>Made for an add-on (taken away again when it's empty).</summary>
     internal bool Extra { get; set; }
     internal bool IsEmpty => _items.Children.Count == 0;
+    /// <summary>Is any of its buttons showing.</summary>
+    internal bool AnyShown => _items.Children.Any(Shown);
+    static bool Shown(Control c) => c.IsVisible && (c is not StackPanel p || p.Children.Any(Shown));
     readonly List<TextBlock> _smallLabels = [];
     readonly List<(Control Button, TextBlock Label)> _largeLabels = [];
 

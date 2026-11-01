@@ -28,6 +28,7 @@ public partial class MainWindow : IAddonServices
             });
         _doc.Changed += _ => _documentChanged?.Invoke();
         _machine.PhotoChanged += _ => _photoChanged?.Invoke();
+        _job.RunFinished += from => _jobFinished?.Invoke(from);
         // Add-ons coming and going change buttons and the panels' add-on parts.
         _addons.Changed += () =>
         {
@@ -74,6 +75,7 @@ public partial class MainWindow : IAddonServices
     AppSettings IAddonServices.AppSettings => _settings;
     void IAddonServices.SaveAppSettings() => _settings.Save();
     MaterialLibrary IAddonServices.Library => _library;
+    void IAddonServices.RefreshLibrary() => _layerEditor.RefreshMaterials();
     ImageShape? IAddonServices.SelectedPicture => SelectedPicture();
     bool IAddonServices.IsConnected => _machine.IsConnected;
     CameraPhoto? IAddonServices.Photo => Canvas.Photo;
@@ -94,6 +96,7 @@ public partial class MainWindow : IAddonServices
     Task<SkiaSharp.SKBitmap> IAddonServices.PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm) =>
         _machine.IsConnected ? _machine.CaptureAreaAsync(area, mmPerPx, distanceMm) : throw new InvalidOperationException("Connect the machine first.");
     (BuiltJob Job, DateTimeOffset SentAt)? IAddonServices.LastSentJob => _job.LastSent;
+    MachinePanel IAddonServices.MachinePanel => _machine;
     void IAddonServices.Status(string text) => StatusText.Text = text;
 
     async Task IAddonServices.Guard(Func<Task> work)
@@ -109,12 +112,15 @@ public partial class MainWindow : IAddonServices
 
     void IAddonServices.ShowHelp(string file, string? anchor) => ShowHelp(file, anchor);
     void IAddonServices.InvalidateCanvas() => Canvas.InvalidateVisual();
+    void IAddonServices.FitWorkArea() => Canvas.FitField();
     void IAddonServices.RefreshCommands() => _ribbon.Refresh();
 
     Action? _documentChanged, _machineChanged, _photoChanged;
     event Action? IAddonServices.DocumentChanged { add => _documentChanged += value; remove => _documentChanged -= value; }
     event Action? IAddonServices.MachineChanged { add => _machineChanged += value; remove => _machineChanged -= value; }
     event Action? IAddonServices.PhotoChanged { add => _photoChanged += value; remove => _photoChanged -= value; }
+    Action<string?>? _jobFinished;
+    event Action<string?>? IAddonServices.JobFinished { add => _jobFinished += value; remove => _jobFinished -= value; }
 
     IDisposable IAddonServices.AddRibbonButton(RibbonButton b)
     {

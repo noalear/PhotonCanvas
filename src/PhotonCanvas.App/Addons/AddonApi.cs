@@ -66,6 +66,9 @@ public interface IAddonHost
     /// <summary>The material library.</summary>
     MaterialLibrary Library { get; }
 
+    /// <summary>After you change the library (and saved it): the program refreshes its material lists.</summary>
+    void RefreshLibrary();
+
     /// <summary>The picked picture, when exactly one picture is selected.</summary>
     ImageShape? SelectedPicture { get; }
 
@@ -105,6 +108,20 @@ public interface IAddonHost
     /// <summary>The last job sent to the machine in this session, and when it was sent (null = none yet).</summary>
     (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob { get; }
 
+    /// <summary>
+    /// Raised when a job this session sent has finished on the machine (not when it's stopped part-way).
+    /// The argument is the design file it was sent from (null = unsaved). Tests use it to open their results.
+    /// </summary>
+    event Action<string?>? JobFinished;
+
+    /// <summary>
+    /// The program's machine connection itself, for add-ons that need more than the members above
+    /// (close-up camera placement, the red pointer, measuring). It can move the head and fire the laser:
+    /// do that only from a button that plainly says it will. Its members may change between versions;
+    /// use the host's own members where they do the job.
+    /// </summary>
+    MachinePanel MachinePanel { get; }
+
     /// <summary>The machine's lights (0–100 each), and setting them.</summary>
     (int Front, int Back) Lights { get; }
     void SetLights(int front, int back);
@@ -120,6 +137,9 @@ public interface IAddonHost
 
     /// <summary>Redraw the canvas (after your overlay's data changes).</summary>
     void InvalidateCanvas();
+
+    /// <summary>Zoom the canvas out to the whole work area.</summary>
+    void FitWorkArea();
 
     /// <summary>Ask every button's enabled/checked/visible test again (after your state changes).</summary>
     void RefreshCommands();

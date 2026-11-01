@@ -9,7 +9,9 @@ using PhotonCanvas.Doc.Colour;
 using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.ColourOnMetal;
 
 /// <summary>
 /// A picture in the colours a plate really made (a measured palette from Measure colours): the
