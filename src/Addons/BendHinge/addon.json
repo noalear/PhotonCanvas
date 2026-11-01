@@ -1,0 +1,10 @@
+{
+  "id": "bendhinge",
+  "name": "Bend to shape",
+  "version": "1.0.0",
+  "description": "A living hinge that bends a flat panel into any curve you draw: slits only where it bends, closer where it bends tighter.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
