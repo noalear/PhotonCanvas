@@ -532,7 +532,7 @@ The fill line settings also apply to each slice: **Scan angle (°)**, **Overscan
 (mm)**, **Turn per pass (°)** (each slice turned further; 37° when you switch to this mode) and
 **Keep turning from run to run**. Depth slices haven't been burned on the machine yet: start with a
 small test on scrap. Laser → **Etch rate** measures how deep one pass goes (see
-[Materials and tests](materials-and-tests.md)); [3D models and stacked slices](3d-slices.md) makes
+[Materials and tests](materials-and-tests.md)); 3D models and stacked slices makes
 depth maps from 3D models.
 
 ### Spread the lines out

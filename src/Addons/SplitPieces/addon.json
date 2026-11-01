@@ -1,0 +1,8 @@
+{
+  "id": "split-pieces",
+  "name": "Split onto pieces",
+  "version": "1.0.0",
+  "description": "Mark one design across several separate pieces (four boards making one picture): a page per piece, and the camera lines each piece up with the others.",
+  "category": "Arrange",
+  "apiVersion": 1
+}

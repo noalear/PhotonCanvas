@@ -181,6 +181,16 @@ public sealed class Ribbon : UserControl
             c.IsVisible = v;
             changed = true;
         }
+        // An add-on's group goes when none of its buttons are showing (they may hide themselves).
+        foreach (var t in _tabs)
+            foreach (var g in t.Groups)
+            {
+                if (!g.Extra) continue;
+                bool any = g.AnyShown;
+                if (g.Root.IsVisible == any) continue;
+                g.Root.IsVisible = any;
+                changed = true;
+            }
         if (!changed) return;
         // Widths change with what's shown: measure the tabs again.
         foreach (var t in _tabs)
@@ -270,13 +280,14 @@ public sealed class Ribbon : UserControl
     /// Add a button for an add-on to a tab's group (both made if there aren't any); dispose the result
     /// to take it away again (with the group and tab, if they were made for it and are now empty).
     /// </summary>
-    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add)
+    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add, string? groupAfter = null, int order = 0)
     {
         var tab = TabFor(tabName);
-        var group = tab.GroupFor(groupTitle);
+        var group = tab.GroupFor(groupTitle, groupAfter);
         group.Break();
         var c = add(group);
         group.Break();
+        group.PlaceExtra(order);
         Remeasure(tab);
         return new Addons.AddonUndo(() =>
         {
@@ -307,8 +318,24 @@ public sealed class RibbonTab
     internal bool Extra { get; set; }
 
     /// <summary>The group with this title, made (at the end) if there isn't one.</summary>
-    internal RibbonGroup GroupFor(string title) =>
-        Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } g ? g : Group(title).With(g => g.Extra = true);
+    internal RibbonGroup GroupFor(string title, string? after = null)
+    {
+        if (Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } had) return had;
+        var g = Group(title).With(g => g.Extra = true);
+        // Where it belongs, if asked: just after that group.
+        // "Tests|Materials": after the first of these there is.
+        int at = -1;
+        foreach (var name in (after ?? "").Split('|', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if ((at = Groups.FindIndex(x => string.Equals(x.Title, name, StringComparison.OrdinalIgnoreCase))) >= 0) break;
+        if (at >= 0 && at < Groups.Count - 2)
+        {
+            Groups.Remove(g);
+            Groups.Insert(at + 1, g);
+            Panel.Children.Remove(g.Root);
+            Panel.Children.Insert(Panel.Children.IndexOf(Groups[at].Root) + 1, g.Root);
+        }
+        return g;
+    }
 
     internal void RemoveGroup(RibbonGroup g)
     {
@@ -361,6 +388,9 @@ public sealed class RibbonGroup
     /// <summary>Made for an add-on (taken away again when it's empty).</summary>
     internal bool Extra { get; set; }
     internal bool IsEmpty => _items.Children.Count == 0;
+    /// <summary>Is any of its buttons showing.</summary>
+    internal bool AnyShown => _items.Children.Any(Shown);
+    static bool Shown(Control c) => c.IsVisible && (c is not StackPanel p || p.Children.Any(Shown));
     readonly List<TextBlock> _smallLabels = [];
     readonly List<(Control Button, TextBlock Label)> _largeLabels = [];
 
@@ -536,6 +566,24 @@ public sealed class RibbonGroup
 
     /// <summary>Start a new column of small buttons.</summary>
     public void Break() => _column = null;
+
+    readonly List<(Control Item, int Order, int Arrived)> _extras = [];
+    int _arrivals;
+
+    /// <summary>
+    /// The item just added (an add-on's button, alone in its column) goes among the other add-ons'
+    /// items by <paramref name="order"/>, then by arrival, after the program's own: so the order
+    /// doesn't depend on which add-on started first.
+    /// </summary>
+    internal void PlaceExtra(int order)
+    {
+        if (_items.Children.Count == 0) return;
+        _extras.RemoveAll(x => x.Item.Parent != _items);
+        _extras.Add((_items.Children[^1], order, _arrivals++));
+        var sorted = _extras.OrderBy(x => x.Order).ThenBy(x => x.Arrived).Select(x => x.Item).ToList();
+        foreach (var x in sorted) _items.Children.Remove(x);
+        _items.Children.AddRange(sorted);
+    }
 
     /// <summary>Take a button (or custom control) away again, and its column if that's left empty.</summary>
     internal void Remove(Control c)
