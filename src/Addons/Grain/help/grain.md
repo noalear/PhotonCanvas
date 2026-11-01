@@ -14,7 +14,9 @@ It's an add-on: turn it on or off in **Settings → Add-ons**. Turned off, every
 power and the map and settings stay in the project for when it's back on.
 
 <!-- windows: GrainWindow -->
-Open it with **Picture → Grain**. The window stays open beside the design.
+Open it with **Grain** on the **Picture** tab. The window stays open beside the design.
+
+![The Grain-aware engraving window: the grain mapped, an Engrave layer set to Even it out](images/grain-window.png)
 
 ## Map the grain
 
@@ -99,8 +101,8 @@ dark grain and its light parts on light grain.
 3. Tick **Allow quarter turns** if it may be turned (by 90°, 180° or 270°).
 4. Click **Find the best place**. It tries every place where the whole picture is on the board and
    moves it to the one that matches the grain best. The match is a number from −1 to 1 (1 =
-   perfectly): above about 0.3 the grain clearly helps, below 0.15 this board doesn't have much to
-   offer this picture. `Ctrl+Z` puts it back.
+   perfectly): above about 0.3 the grain clearly helps, below 0.25 it only helps a little, and below
+   0.1 the picture is left where it is (this board has nothing for it). `Ctrl+Z` puts it back.
 
 Put the picture's layer on **Bring out the grain** too, to make the most of it. Also on the canvas's
 right-click menu: **Place on the grain…**.

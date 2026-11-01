@@ -17,6 +17,9 @@ public static class GrainPlacement
     /// <param name="Move">How far its middle moved, mm.</param>
     public sealed record Result(Affine Transform, double Score, double ScoreHere, double TurnDeg, Vec2 Move);
 
+    /// <summary>Below this match the grain does nothing for the picture, and it isn't moved.</summary>
+    public const double WeakScore = 0.1;
+
     /// <summary>Coarse search step, mm (refined afterwards to the map's own cell).</summary>
     public const double CoarseMm = 2;
 

@@ -89,7 +89,7 @@ public sealed class PowerField
     /// factor are joined). Sampled every half cell; pieces are never shorter than
     /// <paramref name="minPieceMm"/> except the last.
     /// </summary>
-    public List<(Vec2 End, double Factor)> Along(Vec2 a, Vec2 b, double step = 0.02, double minPieceMm = 0.2)
+    public List<(Vec2 End, double Factor)> Along(Vec2 a, Vec2 b, double step = 0.025, double minPieceMm = 0.5)
     {
         step = Math.Clamp(step, 0.001, 1);
         double len = a.Dist(b);

@@ -317,7 +317,12 @@ sealed class GrainWindow : Window
         _placeInfo.Text = "Looking for the best place…";
         var r = await Task.Run(() => GrainPlacement.Best(map, img, null, turns));
         if (r is null) { _placeInfo.Text = "The picture doesn't fit on the mapped board. Map the whole board, or make the picture smaller."; return; }
-        if (!double.IsNaN(r.ScoreHere) && r.ScoreHere >= r.Score - 0.005) { _placeInfo.Text = $"It's already in the best place (matches the grain {r.Score:0.00})."; return; }
+        if (r.Score < GrainPlacement.WeakScore)
+        {
+            _placeInfo.Text = $"Nowhere on the mapped board matches this picture well (the best is {r.Score:0.00}, where 1 is perfect), so it's left where it is. Pictures with bold dark shapes that echo the grain's lines work best.";
+            return;
+        }
+        if (!double.IsNaN(r.ScoreHere) && r.ScoreHere >= r.Score - 0.02) { _placeInfo.Text = $"It's already in about the best place (matches the grain {r.ScoreHere:0.00})."; return; }
         var moved = img.With(transform: r.Transform);
         int at = s.Shapes.IndexOf(img);
         if (at < 0) return;
@@ -325,7 +330,7 @@ sealed class GrainWindow : Window
         string here = double.IsNaN(r.ScoreHere) ? "" : $", {r.ScoreHere:0.00} where it was";
         string turn = r.TurnDeg != 0 ? $", turned {r.TurnDeg:0}°" : "";
         _placeInfo.Text = $"Moved {r.Move.Length:0} mm{turn}. It matches the grain {r.Score:0.00} there (1 = perfectly{here}). Undo puts it back."
-            + (r.Score < 0.15 ? " That's weak: this grain doesn't have much to offer this picture." : "");
+            + (r.Score < 0.25 ? " That's a weak match: the grain will only help a little." : "");
     }
 
     // ---- keeping up with the design ----
