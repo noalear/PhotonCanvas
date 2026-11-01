@@ -123,7 +123,7 @@ public partial class MainWindow : IAddonServices
             };
             if (b.Visible is { } v) _ribbon.ShowWhen(c, v);
             return c;
-        });
+        }, b.GroupAfter);
         _ribbon.Refresh();
         return undo;
     }

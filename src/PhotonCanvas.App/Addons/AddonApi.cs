@@ -167,6 +167,8 @@ public sealed record RibbonButton(string Tab, string Group, string Label, string
     public Func<bool>? Checked { get; init; }
     /// <summary>Hidden while this says false.</summary>
     public Func<bool>? Visible { get; init; }
+    /// <summary>When the group has to be made: put it after this group of the tab (default: at the end).</summary>
+    public string? GroupAfter { get; init; }
 }
 
 /// <summary>

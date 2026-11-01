@@ -14,7 +14,7 @@ is on [Drawing](drawing.md); changing their outlines (weld, offset, trim…) is 
   and the status bar shows the cursor's exact position.
 - Shapes can sit on the darker surround outside the field, but a job with anything outside the
   field can't be sent: the Selection panel warns "⚠ Partly outside the work area". A picture with
-  an [image mask](pictures.md#image-mask) only counts where it shows.
+  an image mask only counts where it shows.
 - Each shape is drawn in its layer's colour. Shapes on **Engrave** layers are tinted inside.
   Layers that aren't sent to the laser (output off) are drawn faded, and their pictures at 30%;
   hidden layers aren't drawn.
