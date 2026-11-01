@@ -437,7 +437,7 @@ your user folder (`%USERPROFILE%\PhotonCanvas`, for example `C:\Users\you\Photon
 | `depth` | Where each **Exact depth** run has got to, so it can carry on. |
 | `graphene-readings.json` | The resistances you typed for a graphene test. |
 | `model-thumbs` | Small pictures of 3D models, kept so the model browser opens faster. |
-| `remote` | The phone remote's settings and records (see [Phone remote](remote.md)). |
+| `remote` | The phone remote's settings and records (see the Phone remote add-on). |
 | `data-merged.json` | A note of which files from earlier data folders have been brought over (below). |
 
 Earlier versions of the program kept these under AppData (in a **PhotonCanvas** or **YTool** folder).

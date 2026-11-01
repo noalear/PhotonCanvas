@@ -5,6 +5,9 @@ take pictures with its cameras, pause, continue and stop, pick a design to load,
 phone talks to a small server on this computer, and the server talks to the machine. The computer
 has to stay on; PhotonCanvas itself can be closed.
 
+This is an add-on: it adds **Remote access** to the Laser tab. Turning it off in Settings → Add-ons
+takes the button away; a server that's already running keeps running until you stop it.
+
 It works in any phone browser, so nothing needs installing: add the page to the home screen and it
 opens like an app. On Android there's also an app, **PhotonCanvas Remote** (see
 [The Android app](#the-android-app)).

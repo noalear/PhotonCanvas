@@ -6,7 +6,7 @@ a second after every change to the design or its settings, so it's never out of 
 
 Sending a job only uploads it. PhotonCanvas never starts it by itself: nothing moves or fires until
 you press the start button on the machine (or start it from the phone, only if you've turned on
-**Allow starting jobs from the phone** in [Remote access](remote.md)).
+**Allow starting jobs from the phone** in Remote access, from the Phone remote add-on).
 
 ![The job bar: Ship It, Frame, the passes and pauses, the timeline, Checks, Order, Export and the estimate](images/job-bar.png)
 

@@ -10,7 +10,9 @@ using Microsoft.Win32;
 using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.RemoteAccess;
 
 /// <summary>
 /// The remote server (PhotonCanvas.Server): a separate program, so the phone keeps working when
