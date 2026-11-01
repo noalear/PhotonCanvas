@@ -1,0 +1,8 @@
+{
+  "id": "cmyk-split",
+  "name": "CMYK split",
+  "version": "1.0.0",
+  "description": "Split a picture into four ink plates (cyan, magenta, yellow, black) on their own halftone layers, for screen printing.",
+  "category": "Picture",
+  "apiVersion": 1
+}

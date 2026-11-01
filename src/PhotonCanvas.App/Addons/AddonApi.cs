@@ -66,6 +66,9 @@ public interface IAddonHost
     /// <summary>The material library.</summary>
     MaterialLibrary Library { get; }
 
+    /// <summary>After you change the library (and saved it): the program refreshes its material lists.</summary>
+    void RefreshLibrary();
+
     /// <summary>The picked picture, when exactly one picture is selected.</summary>
     ImageShape? SelectedPicture { get; }
 
@@ -105,6 +108,26 @@ public interface IAddonHost
     /// <summary>The last job sent to the machine in this session, and when it was sent (null = none yet).</summary>
     (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob { get; }
 
+    /// <summary>
+    /// Raised when a job this session sent has finished on the machine (not when it's stopped part-way).
+    /// The argument is the design file it was sent from (null = unsaved). Tests use it to open their results.
+    /// </summary>
+    event Action<string?>? JobFinished;
+
+    /// <summary>A job started running on the machine (also one started from the machine itself). The argument is a name for it (the design's file name, or "Job").</summary>
+    event Action<string>? JobStarted;
+
+    /// <summary>A running job stopped: true when it finished, false when it was stopped or ended otherwise.</summary>
+    event Action<bool>? JobEnded;
+
+    /// <summary>
+    /// The program's machine connection itself, for add-ons that need more than the members above
+    /// (close-up camera placement, the red pointer, measuring). It can move the head and fire the laser:
+    /// do that only from a button that plainly says it will. Its members may change between versions;
+    /// use the host's own members where they do the job.
+    /// </summary>
+    MachinePanel MachinePanel { get; }
+
     /// <summary>The machine's lights (0–100 each), and setting them.</summary>
     (int Front, int Back) Lights { get; }
     void SetLights(int front, int back);
@@ -121,6 +144,12 @@ public interface IAddonHost
     /// <summary>Redraw the canvas (after your overlay's data changes).</summary>
     void InvalidateCanvas();
 
+    /// <summary>Zoom the canvas out to the whole work area.</summary>
+    void FitWorkArea();
+
+    /// <summary>Make a layer the active one and pick it in the Layers panel (e.g. the layer you just added).</summary>
+    void ActivateLayer(Guid layerId);
+
     /// <summary>Ask every button's enabled/checked/visible test again (after your state changes).</summary>
     void RefreshCommands();
 
@@ -135,6 +164,12 @@ public interface IAddonHost
 
     /// <summary>Something drawn on the canvas.</summary>
     IDisposable AddCanvasOverlay(ICanvasOverlay overlay);
+
+    /// <summary>
+    /// Outline where the close-up camera looks on the canvas while <paramref name="when"/> says so
+    /// (asked again after each change to the design or the machine), e.g. while your test is in the design.
+    /// </summary>
+    IDisposable ShowCloseUpAreaWhile(Func<bool> when);
 
     /// <summary>A panel in a named slot of a window (see <see cref="AddonSlots"/> for the slots there are).</summary>
     IDisposable AddToSlot(string slot, Func<SlotContext, Control?> make);
@@ -167,6 +202,13 @@ public sealed record RibbonButton(string Tab, string Group, string Label, string
     public Func<bool>? Checked { get; init; }
     /// <summary>Hidden while this says false.</summary>
     public Func<bool>? Visible { get; init; }
+    /// <summary>
+    /// When the group has to be made: put it after this group of the tab (default: at the end).
+    /// "Tests|Materials" means after Tests, or after Materials when there's no Tests group.
+    /// </summary>
+    public string? GroupAfter { get; init; }
+    /// <summary>Where it goes among add-ons' buttons in the same group: lower first (then in the order they came). The program's own buttons come first.</summary>
+    public int Order { get; init; }
 }
 
 /// <summary>

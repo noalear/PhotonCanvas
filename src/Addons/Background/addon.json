@@ -1,0 +1,8 @@
+{
+  "id": "remove-background",
+  "name": "Remove background",
+  "version": "1.0.0",
+  "description": "Make a picture's backdrop see-through so it isn't engraved (on your computer, nothing sent online).",
+  "category": "Picture",
+  "apiVersion": 1
+}

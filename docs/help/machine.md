@@ -279,8 +279,8 @@ updating from a version that didn't ask. Change it here any time.
 
 | Tick | Shows |
 |---|---|
-| **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**). |
-| **Diffraction gratings** (on) | **Picture → Diffraction**. |
+| **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**), while the Colour on metal add-on is on. |
+| **Diffraction gratings** (on) | **Picture → Diffraction** (while the Diffraction pictures add-on is on). |
 | **G-code console** (on) | **Laser → Console** (see [The G-code console](#the-g-code-console)). |
 
 **EXTRACTION**: sent at the start of every job, as xTool Studio does it. Experimental: these are
@@ -503,7 +503,7 @@ it:
 | `versions`, `autosave` | Earlier versions of your designs, and the crash-recovery copies. |
 | `logs` | A diary per day (the last 14 days): machine events, warnings and errors. Useful when something goes wrong. |
 
-Time-lapses go in your Pictures folder instead (see [Time-lapse](running-jobs.md#time-lapse)).
+Time-lapses (an add-on) go in your Pictures folder instead.
 Data saved by older versions in other places is brought over when the program starts.
 
 ## Try it
