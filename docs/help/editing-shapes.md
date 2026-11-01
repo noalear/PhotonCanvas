@@ -22,7 +22,7 @@ Most of these commands replace a shape's outline with a new one, and that has si
   or points, see [Drawing](drawing.md)) become plain outlines in the same way.
 - **Pictures** are never changed by these commands; selected along with vector shapes, they're
   left as they are. To show only part of a picture, use **Image mask** on the Picture tab
-  ([Pictures](pictures.md#image-mask)).
+  (the Image mask add-on).
 - **Hand-placed tabs and start points** are dropped from a shape whose outline is rebuilt. Place
   them last. Moving, turning and resizing keep them.
 
@@ -134,7 +134,7 @@ and which shapes are left with nothing (they're removed). **Mask** applies it as
 - A mask with holes (letters such as "o" and "e") keeps the holes out: what lies in a hole counts
   as outside.
 - Text and codes are never cut, but either can be the mask. Pictures have their own
-  [Image mask](pictures.md#image-mask).
+  Image mask.
 - The cut shapes keep their name, layer and group, but lose their tabs and start point.
 
 ## Offset

@@ -41,6 +41,5 @@ With Halftone or Line screen, **Cells / inch** sets how big the dots or lines ar
 Under **More settings**, **Dot time µs**: how long each dot fires. Longer is darker.
 
 ## Test it
-<!-- target: ribbon:Laser/Tone test -->
-Laser → **Tone test** burns grey patches with this layer's settings and corrects your pictures for
+Laser → **Tone test** (from the Material tests add-on) burns grey patches with this layer's settings and corrects your pictures for
 the material.

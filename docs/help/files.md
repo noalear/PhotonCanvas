@@ -199,7 +199,7 @@ ordinary shapes you can edit. The buttons are in the **Bring in** group, near th
 | **Picture** | `Ctrl+J` | Pictures only (PNG, JPG, BMP, GIF, WebP, TIFF), onto a picture layer. |
 | **By colour** | `Ctrl+Shift+I` | A drawing with one layer per colour. |
 | **Import as…** | | A menu: **Import, each file grouped…**, **Import with every piece separate…**, **Import as one picture…** |
-| **3D to slices** | | Slices a 3D model into layers to cut and stack: see [3D models and stacked slices](3d-slices.md). |
+| **3D to slices** | | Slices a 3D model into layers to cut and stack: see 3D models and stacked slices. |
 
 On a narrow window the small buttons show only their icons; hover over one to see its name.
 
@@ -437,7 +437,7 @@ your user folder (`%USERPROFILE%\PhotonCanvas`, for example `C:\Users\you\Photon
 | `depth` | Where each **Exact depth** run has got to, so it can carry on. |
 | `graphene-readings.json` | The resistances you typed for a graphene test. |
 | `model-thumbs` | Small pictures of 3D models, kept so the model browser opens faster. |
-| `remote` | The phone remote's settings and records (see [Phone remote](remote.md)). |
+| `remote` | The phone remote's settings and records (see the Phone remote add-on). |
 | `data-merged.json` | A note of which files from earlier data folders have been brought over (below). |
 
 Earlier versions of the program kept these under AppData (in a **PhotonCanvas** or **YTool** folder).

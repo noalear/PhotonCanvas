@@ -1,0 +1,8 @@
+{
+  "id": "image-mask",
+  "name": "Image mask",
+  "version": "1.0.0",
+  "description": "Mask a picture with a closed shape, so only the part inside it is shown and engraved.",
+  "category": "Picture",
+  "apiVersion": 1
+}
