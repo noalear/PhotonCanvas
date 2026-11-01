@@ -100,7 +100,7 @@ been deleted from the library shows it as *not in your library*.
 Other tools read the library too: **Inlay** offers your etch-rate and cut recipes, **Exact depth**
 starts from the nearest etch rate, the **Bevel test** offers your cut recipes, and stacked slices
 take their cut settings, kerf, slot fit and etch depth from it (3D models and stacked
-slices). **Picture → Colour on metal** uses the palettes (see [Pictures](pictures.md)).
+slices). **Picture → Colour on metal** (an add-on) uses the palettes.
 
 ## Saving from a layer
 
@@ -121,7 +121,7 @@ When a material has colour palettes or grating sets from **Measure colours**, th
 - A grating set plays its views one after another, lists its strongest squares and where they light
   up, and **Save GIF…** saves the animation.
 
-The bin icon on each deletes it, after asking. See [Colour on metal](materials-and-tests.md).
+The bin icon on each deletes it, after asking. The Colour on metal add-on's page explains the tests.
 
 ## Sharing materials
 

@@ -44,7 +44,7 @@ static class DocsSim
         void Save(Bitmap? bmp, string name, string what)
         {
             if (bmp is null) { Console.WriteLine($"no picture: {name}"); return; }
-            bmp.Save(Path.Combine(imagesDir, name + ".png"));
+            bmp.Save(Path.Combine(ImageHome.For(imagesDir, name + ".png"), name + ".png"));
             Index.AppendLine($"{name}.png\t{bmp.PixelSize.Width}x{bmp.PixelSize.Height}\t{what}");
         }
         Bitmap? Shot(Control c)
@@ -344,5 +344,32 @@ static class DocsSim
             Recipes = [new Recipe { Purpose = RecipePurpose.Mark, Title = "Black mark (example)", Rating = 3, Settings = new ProcessSettings { Mode = LayerMode.Fill, Laser = LaserSettings.Red(60, 800, 200, 40), LinesPerCm = 200 } }],
         });
         lib.Save();
+    }
+}
+
+/// <summary>
+/// Where a picture is saved: the help/images folder of the add-on whose pages show it (src/Addons/*/help),
+/// else the program's own images folder.
+/// </summary>
+static class ImageHome
+{
+    static Dictionary<string, string>? _map;
+
+    public static string For(string programImages, string file)
+    {
+        _map ??= Build(programImages);
+        return _map.TryGetValue(file, out var dir) ? dir : programImages;
+    }
+
+    static Dictionary<string, string> Build(string programImages)
+    {
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var addons = Path.GetFullPath(Path.Combine(programImages, "..", "..", "..", "src", "Addons"));
+        if (!Directory.Exists(addons)) return map;
+        foreach (var help in Directory.GetDirectories(addons).Select(d => Path.Combine(d, "help")).Where(Directory.Exists))
+            foreach (var md in Directory.GetFiles(help, "*.md", SearchOption.AllDirectories))
+                foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(md), @"\]\(images/([^)]+)\)"))
+                    map[m.Groups[1].Value] = Path.Combine(help, "images");
+        return map;
     }
 }
