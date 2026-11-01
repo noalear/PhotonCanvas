@@ -5,7 +5,7 @@
 laser, each one showing only when the plate is tilted its way: tilt a tag left and right to see a
 name, towards and away from you to see a logo. Banknote security holograms use the same trick.
 
-Each picture becomes diffraction gratings (see [Diffraction](pictures.md#diffraction)) with its own scan
+Each picture becomes diffraction gratings (as with **Picture → Diffraction**) with its own scan
 direction. A grating's light spreads along its scan direction, so it glints when the lamp and your
 eye are on a line along it, and much less across it. The plate is split into small patches, woven
 together like a checkerboard: each patch belongs to one picture and is marked with that picture's
@@ -30,7 +30,7 @@ so use pictures of the same shape.
 | **Mark the light parts** | off | Marks the light parts of the picture instead of the dark. |
 | **Greys as tones** | off | Shows greys as a share of marked patches (an even dither) instead of all or nothing. |
 | **Shows from** | the five views | With **Settings from test**: the view this picture should show from. |
-| **Power %**, **Speed mm/s**, **Pulse width**, **Line spacing mm** | as Diffraction (32, 300, 60 ns, 0.06) | The marking, as for [Diffraction](pictures.md#diffraction). |
+| **Power %**, **Speed mm/s**, **Pulse width**, **Line spacing mm** | as Diffraction (32, 300, 60 ns, 0.06) | The marking, as for **Picture → Diffraction**. |
 
 **Preview** shows the woven patches in each picture's colour (A blue, B orange, C green, D
 purple), or **Tilted to show A** (B, …): that picture bright, the others as a faint ghost, as a
