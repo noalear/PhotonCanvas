@@ -23,6 +23,10 @@ public interface IAddonServices
     Rect2? CloseUpSees();
     (int Front, int Back) Lights { get; }
     void SetLights(int front, int back);
+    double? FocusDistanceMm { get; }
+    bool CameraCalibratedFor(double distanceMm);
+    Task<SkiaSharp.SKBitmap> PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm);
+    (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob { get; }
     void Status(string text);
     Task Guard(Func<Task> work);
     void ShowHelp(string file, string? anchor);
@@ -92,6 +96,10 @@ public sealed class AddonHost : IAddonHost
     public Rect2? CloseUpSees() => _s.CloseUpSees();
     public (int Front, int Back) Lights => _s.Lights;
     public void SetLights(int front, int back) => _s.SetLights(front, back);
+    public double? FocusDistanceMm => _s.FocusDistanceMm;
+    public bool CameraCalibratedFor(double distanceMm) => _s.CameraCalibratedFor(distanceMm);
+    public Task<SkiaSharp.SKBitmap> PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm) => _s.PhotographAreaAsync(area, mmPerPx, distanceMm);
+    public (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob => _s.LastSentJob;
     public void Status(string text) => _s.Status(text);
     public Task Guard(Func<Task> work) => _s.Guard(work);
     public void ShowHelp(string file, string? anchor = null) => _s.ShowHelp(file, anchor);

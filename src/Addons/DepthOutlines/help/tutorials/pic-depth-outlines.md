@@ -1,7 +1,7 @@
 # Outlines over a relief
 <!-- category: Pictures -->
 <!-- summary: Find the edges in a depthmap and mark them as lines over the relief. -->
-<!-- page: pictures.md#depth-outlines -->
+<!-- page: depth-outlines.md -->
 <!-- order: 85 -->
 A relief from a soft depthmap can look washed out. Depth outlines finds where the surface steps
 and marks those edges as lines over the engraving, so the shapes read clearly again.
