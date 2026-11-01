@@ -89,7 +89,7 @@ What it says:
   is added. The photo of the keys in their slots is kept with the recipe, and the notes say what was
   read.
 - From the library the kerf and fit go into: the box generator's **Cut with** (finger joints, see
-  [Drawing](drawing.md)), the slicer's cut and dowel-pin settings ([3D and slices](3d-slices.md)), and
+  [Drawing](drawing.md)), the 3D to slices add-on's cut and dowel-pin settings, and
   the inlay's **Cut with** ([Materials and tests](materials-and-tests.md)).
 - **Layer**, **Put the kerf on this layer**: sets the kerf on a cut layer in this design straight away.
 - **Remove the gauge from the design**: deletes its two layers.
