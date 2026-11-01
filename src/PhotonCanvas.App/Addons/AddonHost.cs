@@ -33,6 +33,7 @@ public interface IAddonServices
     void ShowHelp(string file, string? anchor);
     void InvalidateCanvas();
     void FitWorkArea();
+    void ActivateLayer(Guid layerId);
     void RefreshCommands();
 
     event Action? DocumentChanged;
@@ -112,6 +113,7 @@ public sealed class AddonHost : IAddonHost
     public void ShowHelp(string file, string? anchor = null) => _s.ShowHelp(file, anchor);
     public void InvalidateCanvas() => _s.InvalidateCanvas();
     public void FitWorkArea() => _s.FitWorkArea();
+    public void ActivateLayer(Guid layerId) => _s.ActivateLayer(layerId);
     public void RefreshCommands() => _s.RefreshCommands();
 
     // The add-on's handlers are kept here and unhooked from the program when it stops.

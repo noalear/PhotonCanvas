@@ -141,6 +141,9 @@ public interface IAddonHost
     /// <summary>Zoom the canvas out to the whole work area.</summary>
     void FitWorkArea();
 
+    /// <summary>Make a layer the active one and pick it in the Layers panel (e.g. the layer you just added).</summary>
+    void ActivateLayer(Guid layerId);
+
     /// <summary>Ask every button's enabled/checked/visible test again (after your state changes).</summary>
     void RefreshCommands();
 
@@ -198,6 +201,8 @@ public sealed record RibbonButton(string Tab, string Group, string Label, string
     /// "Tests|Materials" means after Tests, or after Materials when there's no Tests group.
     /// </summary>
     public string? GroupAfter { get; init; }
+    /// <summary>Where it goes among add-ons' buttons in the same group: lower first (then in the order they came). The program's own buttons come first.</summary>
+    public int Order { get; init; }
 }
 
 /// <summary>

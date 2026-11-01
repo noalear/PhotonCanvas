@@ -1,7 +1,7 @@
 # Cut round printed stickers
 <!-- category: Camera -->
 <!-- summary: Print-then-cut: the camera finds printed art on paper and a cut goes round each one. -->
-<!-- page: camera.md#cut-round-prints -->
+<!-- page: camera-placement.md -->
 <!-- order: 70 -->
 Print stickers or labels on any printer, lay the sheet on the bed, and PhotonCanvas finds each
 printed piece and cuts round it with a white border. Not yet tried on real prints.

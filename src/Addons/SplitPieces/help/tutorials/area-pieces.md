@@ -1,7 +1,7 @@
 # One design across several pieces
 <!-- category: Work area -->
 <!-- summary: Split a picture or sign across boards that go together, then mark each one lined up by the camera. -->
-<!-- page: work-area.md#split-onto-pieces -->
+<!-- page: split-pieces.md -->
 <!-- order: 55 -->
 A design can run across several separate pieces, such as four 200 × 75 mm boards making one
 400 × 150 mm picture. Each piece gets a page with its share, and the camera lines each one up with

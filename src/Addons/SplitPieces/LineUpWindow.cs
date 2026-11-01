@@ -8,7 +8,9 @@ using PhotonCanvas.Device;
 using PhotonCanvas.Doc;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.SplitPieces;
 
 /// <summary>
 /// Lines up a page of a design split across pieces (Split onto pieces) with the pieces on the bed.

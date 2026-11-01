@@ -103,6 +103,6 @@ public sealed class DepthChargeAddon : IAddon
             shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(at) };
         }
         doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
-        doc.SetActiveLayer(layer.Id);
+        _host.ActivateLayer(layer.Id);
     }
 }

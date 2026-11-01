@@ -1,7 +1,7 @@
 # A copy on every piece
 <!-- category: Camera -->
 <!-- summary: Photograph the bed, find each piece on it and put a copy of the design on every one. -->
-<!-- page: camera.md#every-piece -->
+<!-- page: camera-placement.md -->
 <!-- order: 60 -->
 For a batch of tags, coasters or keyrings scattered on the bed: one click puts a copy of the design
 on each piece, turned to match, with the next serial number or spreadsheet row on each.

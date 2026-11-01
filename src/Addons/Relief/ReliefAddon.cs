@@ -59,6 +59,6 @@ public sealed class ReliefAddon : IAddon
         var at = new Vec2(m.FieldW / 2 - r.SizeMm.X / 2, m.FieldH / 2 - r.SizeMm.Y / 2);
         var pic = new ImageShape { Name = r.Name, LayerId = layer.Id, Source = ImageSource.FromEncoded(r.Depth.EncodePng()), SizeMm = r.SizeMm, Transform = Affine.Translate(at) };
         doc.Commit("3D model relief", Ops.AddShapes(state, [pic]), [pic.Id]);
-        doc.SetActiveLayer(layer.Id);
+        _host.ActivateLayer(layer.Id);
     }
 }

@@ -280,13 +280,14 @@ public sealed class Ribbon : UserControl
     /// Add a button for an add-on to a tab's group (both made if there aren't any); dispose the result
     /// to take it away again (with the group and tab, if they were made for it and are now empty).
     /// </summary>
-    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add, string? groupAfter = null)
+    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add, string? groupAfter = null, int order = 0)
     {
         var tab = TabFor(tabName);
         var group = tab.GroupFor(groupTitle, groupAfter);
         group.Break();
         var c = add(group);
         group.Break();
+        group.PlaceExtra(order);
         Remeasure(tab);
         return new Addons.AddonUndo(() =>
         {
@@ -565,6 +566,24 @@ public sealed class RibbonGroup
 
     /// <summary>Start a new column of small buttons.</summary>
     public void Break() => _column = null;
+
+    readonly List<(Control Item, int Order, int Arrived)> _extras = [];
+    int _arrivals;
+
+    /// <summary>
+    /// The item just added (an add-on's button, alone in its column) goes among the other add-ons'
+    /// items by <paramref name="order"/>, then by arrival, after the program's own: so the order
+    /// doesn't depend on which add-on started first.
+    /// </summary>
+    internal void PlaceExtra(int order)
+    {
+        if (_items.Children.Count == 0) return;
+        _extras.RemoveAll(x => x.Item.Parent != _items);
+        _extras.Add((_items.Children[^1], order, _arrivals++));
+        var sorted = _extras.OrderBy(x => x.Order).ThenBy(x => x.Arrived).Select(x => x.Item).ToList();
+        foreach (var x in sorted) _items.Children.Remove(x);
+        _items.Children.AddRange(sorted);
+    }
 
     /// <summary>Take a button (or custom control) away again, and its column if that's left empty.</summary>
     internal void Remove(Control c)

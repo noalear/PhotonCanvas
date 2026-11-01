@@ -633,9 +633,6 @@ public partial class MainWindow : Window
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(async () => { await _machine.CalibrateAsync(); _ribbon.Refresh(); }); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
-        fit.Large("Cut round prints", "IcCut", () => _ = Guard(CutRoundPrints), "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it");
-        fit.Large("Line up pieces", "IcFitPiece", ShowLineUp, "For a design split onto pieces: the camera keeps looking and moves the page's design onto its piece and the pieces laid beside it, so they line up. No clicking while you place them");
-        fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
         cal.Small("Focus on selection", "IcFocus", () => _ = Guard(FocusByPointer), "Aimed focus: the red pointer is aimed at the middle of the selection (or of the bed), the close-up camera reads the height there from where its dot lands, and the head moves to focus on it. Nothing touches the material; needs the pointer calibrated (Curved surface)");
@@ -663,7 +660,6 @@ public partial class MainWindow : Window
         work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
-        work.Small("Split onto pieces", "IcBreak", () => _ = Guard(SplitOntoPieces), "Mark a design across several pieces that go together (four boards making one picture): select the design and the pieces' material outlines; each piece gets a page with its share, and Line up pieces fits it to the pieces on the bed", HasSel);
         var machine = laser.Group("Machine");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
@@ -1252,7 +1248,6 @@ public partial class MainWindow : Window
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked), shapes.Select(s => s.Id).ToHashSet())),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
-            DoAsync("Split onto pieces…", SplitOntoPieces, n > 1),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
                 DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
@@ -1955,53 +1950,6 @@ public partial class MainWindow : Window
     /// The selected closed shapes are the board in the machine: they move to the Material layer
     /// (shown, never sent), and nesting and the model slicer fill them instead of the whole bed.
     /// </summary>
-    /// <summary>
-    /// The selected design split across the selected material outlines (the pieces it goes over; all
-    /// the ones it touches when none are selected): a page each, then Line up pieces to fit them.
-    /// </summary>
-    async Task SplitOntoPieces()
-    {
-        var s = _doc.State;
-        var sel = _doc.Selection;
-        var material = MaterialOutline.Layer(s)?.Id;
-        var outlines = MaterialOutline.On(s);
-        var pieces = outlines.Where(p => sel.Contains(p.Id)).ToList();
-        var art = s.Shapes.Where(x => sel.Contains(x.Id) && x.LayerId != material).Select(x => x.Id).ToHashSet();
-        if (pieces.Count == 0 && art.Count > 0)
-        {
-            var box = s.Bounds(art);
-            pieces = [.. outlines.Where(p => p.Bounds.Intersects(box))];
-        }
-        if (pieces.Count < 2 || art.Count == 0)
-        {
-            await Dialogs.Message(this, "Split onto pieces",
-                "Select the design and the pieces it goes across. Draw each piece the size it really is (a rectangle 200 × 75 mm for a 200 × 75 mm board), " +
-                "right-click it → Use as material outline, and lay them out as they'll go together. Then put the design over them, select it all, and split.\n\n" +
-                (pieces.Count < 2 ? $"Pieces found: {pieces.Count} (at least 2 are needed)." : "Nothing of the design is selected."));
-            return;
-        }
-        double w = Canvas.Machine.FieldW, h = Canvas.Machine.FieldH;
-        StatusText.Text = "Splitting…";
-        var result = await Task.Run(() => PieceSplit.Split(s, pieces, art, w, h));
-        _doc.Commit("Split onto pieces", result.State, []);
-        _layers.Activate(_doc.ActiveLayer);
-        Canvas.FitField();
-        StatusText.Text = $"Split onto {result.Pieces} pieces: a page each (\"Piece 1 of {result.Pieces}\"…), after the layout. Only each page's piece is sent; the rest shows grey.";
-        if (result.Notes.Count > 0) await Dialogs.Message(this, "Split onto pieces", string.Join("\n", result.Notes));
-        ShowLineUp();
-    }
-
-    LineUpWindow? _lineUp;
-
-    /// <summary>The Line up the pieces window (one at a time).</summary>
-    void ShowLineUp()
-    {
-        if (_lineUp is { IsVisible: true }) { _lineUp.Activate(); return; }
-        _lineUp = new LineUpWindow(_doc, _machine, Canvas.Machine);
-        _lineUp.Closed += (_, _) => _lineUp = null;
-        _lineUp.Show(this);
-    }
-
     void MaterialSel()
     {
         var ids = SelectedPaths().Where(p => p is not (TextShape or CodeShape) && p.Geometry.Subpaths.Any(sp => sp.Closed)).Select(p => p.Id).ToHashSet();
@@ -2177,31 +2125,6 @@ public partial class MainWindow : Window
             StatusText.Text = $"Quick processing stopped: {e.Message}";
         }
         finally { _quickRunning = false; }
-    }
-
-    /// <summary>Print-then-cut: cuts round printed art the camera finds (close-up when it covers the area, else the overview).</summary>
-    async Task CutRoundPrints()
-    {
-        if (!_machine.IsConnected) { await Dialogs.Message(this, "Cut round prints", "Connect the machine first: this needs a fresh camera photo."); return; }
-        // Where to look: inside the selected shape(s), else the whole bed.
-        var sel = _doc.State.Shapes.Where(x => _doc.Selection.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
-        var within = sel.IsEmpty ? new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH) : sel;
-        var text = await Dialogs.Prompt(this, "Cut round prints", "How far outside the printed art the cut goes (mm): a white border round each sticker.", "1");
-        if (text is null || !double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double margin) || margin < 0) return;
-        StatusText.Text = "Photographing the prints…";
-        CameraPhoto? photo = null;
-        if (_machine.CloseUpSees() is { } sees && sees.Contains(within.TopLeft) && sees.Contains(within.BottomRight)) photo = await _machine.CloseUpBedPhotoAsync();
-        if (photo is null) { await _machine.UpdatePhotoAsync(); photo = Canvas.Photo; }
-        if (photo is null) { StatusText.Text = "No camera photo: calibrate the camera first (Camera → Calibrate)."; return; }
-        var cuts = await Task.Run(() => PrintCut.Find(photo.Image, photo.Area, photo.MmPerPx, within, new PrintCutOptions { MarginMm = margin }));
-        int n = cuts.Subpaths.Length;
-        if (n == 0) { StatusText.Text = "No print found there: is it on white paper, in the camera's view and well lit?"; return; }
-        var s = _doc.State;
-        var layer = s.Layers.FirstOrDefault(l => l.Name == "Print cut") ?? Layer.Default(s.Layers.Count, LayerMode.Cut) with { Name = "Print cut" };
-        if (s.FindLayer(layer.Id) is null) s = Ops.AddLayer(s, layer);
-        var shapes = cuts.Subpaths.Select((sp, i) => (Shape)new PathShape { Name = $"Print {i + 1}", LayerId = layer.Id, Geometry = new PathGeometry([sp]) }).ToList();
-        _doc.Commit("Cut round prints", Ops.AddShapes(s, shapes), shapes.Select(x => x.Id));
-        StatusText.Text = $"{n} print{(n == 1 ? "" : "s")} found: a cut round each, {margin:0.##} mm out, on the \"Print cut\" layer. Set its power for the paper (a kiss cut for stickers).";
     }
 
     /// <summary>Stencil bridges: the middles of O, A, R… kept joined to the stencil by a strip across the letter.</summary>
@@ -2473,32 +2396,6 @@ public partial class MainWindow : Window
 
     Task ShowCloseUpCalibration(bool find) =>
         new CloseUpCalibrationWindow(_doc, _machine, Canvas.Machine, find).ShowDialog(this);
-
-    async Task PlaceOnEveryPiece()
-    {
-        var outline = SelectedOutline();
-        if (outline.Count == 0) { await Dialogs.Message(this, "Every piece", "Select the design to put on each piece first."); return; }
-        if (!_machine.IsConnected) { await Dialogs.Message(this, "Every piece", "Connect to the machine first: finding the pieces needs a fresh camera photo."); return; }
-        var ids = _doc.Selection;
-        var w = new BatchPlaceWindow(_machine, outline, placements =>
-        {
-            // One copy per piece (each its own group); the copies' fields count up in reading order.
-            var originals = _doc.State.Shapes.Where(s => ids.Contains(s.Id)).ToList();
-            var made = new List<Shape>();
-            var s = _doc.State;
-            for (int i = 0; i < placements.Count; i++)
-            {
-                var copy = Ops.CopyAsUnit(originals, placements[i].Move).Select(c => c.WithVarOffset(i)).ToList();
-                s = Ops.AddShapes(s, copy);
-                if (copy.Count > 1) s = Ops.Group(s, copy.Select(c => c.Id).ToHashSet()).Item1;
-                made.AddRange(copy);
-            }
-            s = Ops.Delete(s, ids);
-            _doc.Commit("Place on every piece", s, made.Select(m => m.Id));
-            StatusText.Text = $"A copy on each of {placements.Count} pieces." + (VariableText.Used(_doc.State).Count > 0 ? " Each one marks the next serial number / spreadsheet row." : "");
-        });
-        await w.ShowDialog(this);
-    }
 
     /// <summary>Make a new code (<paramref name="id"/> null) or change one.</summary>
     async Task EditCode(Guid? id)

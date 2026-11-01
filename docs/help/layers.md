@@ -174,12 +174,12 @@ the whole selection. The menu has:
 **Rename** (one shape only) and **Select its whole group** (grouped shapes only), then the same menu
 as right-clicking shapes on the work area: **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete**,
 **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**, **Convert text to
-paths**, **Lock** / **Unlock**, **Use as material outline**, **Split onto pieces…**,
+paths**, **Lock** / **Unlock**, **Use as material outline**,
 **Shape operations**, **Array**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
-camera…**, **Trace picture…**, **Remove picture background…**,
-**Zoom to …**, **Rename…** and **Save to My shapes…**. They're explained in
-[Editing shapes](editing-shapes.md) and [Arranging](arrange.md).
+camera…**, **Trace picture…**,
+**Zoom to …**, **Rename…** and **Save to My shapes…**, then the items add-ons add. They're
+explained in [Editing shapes](editing-shapes.md) and [Arranging](arrange.md).
 
 ## The layer's right-click menu
 

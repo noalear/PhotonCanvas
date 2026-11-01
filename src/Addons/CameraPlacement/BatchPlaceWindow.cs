@@ -10,7 +10,9 @@ using PhotonCanvas.Doc;
 using SkiaSharp;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.CameraPlacement;
 
 /// <summary>Where one copy of the design goes: the move from where the design is now.</summary>
 public sealed record Placement(Affine Move, FoundPiece Piece);

@@ -35,10 +35,17 @@ public partial class MainWindow : IAddonServices
             _ribbon.Refresh();
             _props.Refresh();
         };
-        // Screenshots and tests start without them, so they show the program alone.
-        if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
-        try { _addons.StartAll(); }
-        catch (Exception e) { AppLog.Error("Starting add-ons", e); }
+        // Started once the window opens (ConnectOnOpen is only known then). Tests start without
+        // them, so they see the program alone, unless PHOTONCANVAS_ADDONS=1.
+        bool started = false;
+        Opened += (_, _) =>
+        {
+            if (started) return;
+            started = true;
+            if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
+            try { _addons.StartAll(); }
+            catch (Exception e) { AppLog.Error("Starting add-ons", e); }
+        };
     }
 
     void SetMachine(MachineProfile m)
@@ -113,6 +120,7 @@ public partial class MainWindow : IAddonServices
     void IAddonServices.ShowHelp(string file, string? anchor) => ShowHelp(file, anchor);
     void IAddonServices.InvalidateCanvas() => Canvas.InvalidateVisual();
     void IAddonServices.FitWorkArea() => Canvas.FitField();
+    void IAddonServices.ActivateLayer(Guid layerId) => _layers.Activate(layerId);
     void IAddonServices.RefreshCommands() => _ribbon.Refresh();
 
     Action? _documentChanged, _machineChanged, _photoChanged;
@@ -135,7 +143,7 @@ public partial class MainWindow : IAddonServices
             };
             if (b.Visible is { } v) _ribbon.ShowWhen(c, v);
             return c;
-        }, b.GroupAfter);
+        }, b.GroupAfter, b.Order);
         _ribbon.Refresh();
         return undo;
     }

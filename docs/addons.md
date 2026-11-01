@@ -112,13 +112,14 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `Status(text)`, `Guard(work)` | A status-bar line; run work showing errors as a message, not a crash. |
 | `ShowHelp(file, anchor)` | Open a page of your help (or the program's). |
 | `InvalidateCanvas()`, `FitWorkArea()`, `RefreshCommands()` | Redraw the canvas; zoom out to the whole work area; re-ask buttons' enabled/checked/visible tests. |
+| `ActivateLayer(id)` | Make a layer the active one and pick it in the Layers panel (after adding it). |
 | `Folder`, `DataFolder`, `Manifest` | Your installed folder (read-only), a folder for your own files (kept across updates and removal), your addon.json. |
 
 ### Adding things
 
 | Call | Adds |
 |---|---|
-| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
+| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Order` sorts add-ons' buttons within a group (after the program's own), so the order doesn't depend on which add-on started first. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
 | `AddCommand(AddonCommand)` | A command in the shortcut list and command search; `Keys` like `"Ctrl+Alt+P"` gives it a shortcut (the person can change it). |
 | `AddContextMenuItem(ContextMenuEntry)` | An item on the canvas's right-click menu (`Visible`, `Enabled`, `Gesture`). |
 | `ShowCloseUpAreaWhile(when)` | The outline of where the close-up camera looks, on the canvas while `when()` says so (e.g. while your test is in the design). |

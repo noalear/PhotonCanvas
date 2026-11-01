@@ -381,8 +381,7 @@ do with the selection opens. Items that don't apply are greyed.
 
 - **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete it** (or **Delete these 3**…)
 - **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**,
-  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**,
-  **Split onto pieces…** (see [Split onto pieces](work-area.md#split-onto-pieces))
+  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**
 - **Shape operations**: **Offset…**, **Round corners…**, **Text on path**
   (or **Straighten text**), **Copy along path…**, **Tidy lines…**, **Weld (union)**,
   **Subtract (bottom minus the rest)**, **Intersect (keep the overlap)**,
@@ -398,8 +397,8 @@ do with the selection opens. Items that don't apply are greyed.
 - **Fit to piece in camera…**, **Trace picture…**,
   **Remove picture background…**
 - **Zoom to it**, **Rename…**, **Save to My shapes…**
-- Below a line, the items add-ons put there, such as **Warp…**, **Nest on material…** and
-  **Depthmap with DepthCharge…** (they go when the add-on is turned off)
+- Below a line, the items add-ons put there, such as **Warp…**, **Nest on material…**,
+  **Split onto pieces…** and **Depthmap with DepthCharge…** (they go when the add-on is turned off)
 
 Right-click on empty space: it selects nothing and offers **Paste**, **Select all**, **Fit work
 area** and **Grid & snapping…**.

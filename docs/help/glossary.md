@@ -151,7 +151,8 @@ explained in full.
 - **Sections**: marking a design bigger than the work area one part at a time, moving the
   material between parts. See [Work area](work-area.md).
 - **Split onto pieces**: one design marked across several separate pieces that go together (four
-  boards making one picture), a page each, lined up by the camera. See [Work area](work-area.md#split-onto-pieces).
+  boards making one picture), a page each, lined up by the camera. An add-on, with its own page
+  under **Add-ons**.
 - **Object snap**: a picked point landing exactly on another shape's end, middle, centre, quadrant
   or crossing (or perpendicular or tangent to it), with a marker saying which, as in AutoCAD. See
   [Object snaps](canvas.md#object-snaps).
