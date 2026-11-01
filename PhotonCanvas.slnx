@@ -9,6 +9,9 @@
     <Project Path="src/PhotonCanvas.Remote.App/PhotonCanvas.Remote.App.csproj" />
     <Project Path="src/PhotonCanvas.Remote.Desktop/PhotonCanvas.Remote.Desktop.csproj" />
   </Folder>
+  <Folder Name="/src/Addons/">
+    <Project Path="src/Addons/Hollow/PhotonCanvas.Addon.Hollow.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj" />
   </Folder>

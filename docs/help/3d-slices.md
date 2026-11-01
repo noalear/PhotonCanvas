@@ -210,6 +210,13 @@ Warnings in the note:
 The job hasn't been tried on the machine yet. Round stock cuts deepest through its middle, so
 check the first cut goes all the way through before leaving it to run.
 
+### Hollow it out
+
+With the **Hollow stacked models** add-on on (Settings → Add-ons), **Hollow it out** appears under
+the stacked-layer settings: it keeps a shell round each slice and cuts the middle out, to save
+material and glue, with an optional channel for a wire or LED and pockets for magnets. Its page is
+under **Add-ons** in this guide.
+
 ### What the slicer leaves out and warns about
 
 - **Slivers:** pieces smaller than 1 mm², or narrower than 1 mm, are too small to cut or handle and
