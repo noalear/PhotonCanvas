@@ -159,7 +159,7 @@ when a shape is rebuilt.
 
 ### Help pages and tutorials
 
-Put pages in your `help/` folder in the guide's format (`docs/help/AUTHORING.md`). They join the
+Put pages in your `help/` folder in the guide's format (`docs/help/AUTHORING.md`). You may link to the program's pages and to the pages of add-ons you list under `requires`. They join the
 guide under **Add-ons** while you're on, and are searched with the rest. Link to your own pages by
 file name; images go in `help/images/`. A `<!-- windows: PapercraftWindow -->` line makes F1 in that
 window open the page. Every add-on needs at least one page and one tutorial.

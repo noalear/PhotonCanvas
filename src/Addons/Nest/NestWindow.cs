@@ -5,9 +5,10 @@ using Avalonia.Media;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
+using PhotonCanvas.App;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Nest;
 
 /// <summary>Pack the selected parts onto the material: the work area, or any closed shape (e.g. an offcut picked from the camera).</summary>
 public sealed class NestWindow : Window

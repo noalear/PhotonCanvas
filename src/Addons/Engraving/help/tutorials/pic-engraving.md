@@ -1,7 +1,7 @@
 # Engraving lines
 <!-- category: Pictures -->
 <!-- summary: Redraw a photo as banknote-style lines that swell in the shadows. -->
-<!-- page: pictures.md#engraving-lines -->
+<!-- page: engraving-lines.md -->
 <!-- order: 40 -->
 Engraving lines turn a portrait or photo into lines that swell where it's dark and vanish where it's
 light, like a banknote. They're filled shapes, so they engrave crisply with ordinary fill settings.

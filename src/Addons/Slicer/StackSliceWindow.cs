@@ -1,3 +1,4 @@
+using PhotonCanvas.App;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -11,7 +12,7 @@ using PhotonCanvas.Doc.Geometry;
 using PhotonCanvas.Doc.Import;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Slicer;
 
 /// <summary>
 /// Stacked slices: open a 3D model, choose which way up, its size and the material's thickness,

@@ -16,9 +16,9 @@ other shapes doesn't count, except for **Image mask**.
 | Group | Buttons |
 |---|---|
 | Add | [Import picture](#import-a-picture) |
-| Turn it into | [Trace](#trace), [Engraving](#engraving-lines), [Colour on metal](#colour-on-metal), [Diffraction](#diffraction), [Depthmap](#depthmap-with-depthcharge) |
-| Shape | [Image mask](#image-mask), [Remove mask](#image-mask), [Shapes to picture](#shapes-to-picture) |
-| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop), [CMYK split](#cmyk-split), [Centre-line trace](#centre-line-trace) |
+| Turn it into | [Trace](#trace), Engraving, [Colour on metal](#colour-on-metal), [Diffraction](#diffraction), [Depthmap](#depthmap-with-depthcharge) |
+| Shape | Image mask, Remove mask, [Shapes to picture](#shapes-to-picture) |
+| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop), CMYK split, Centre-line trace |
 | Relief | [3D model](#3d-model-relief), [Relief preview](#relief-preview); **Depth outlines** is an add-on |
 | Clean up | [Remove background](#remove-background) |
 
@@ -104,7 +104,7 @@ They're applied in this order: invert, gamma, contrast, brightness. **Reset** pu
   [Pictures as burned](#pictures-as-burned) is on.
 - **Engraving**, **Centre-line trace** and **Pictures as burned** use them too, all but
   **Sharpen**. **CMYK split** uses them and copies **Sharpen** onto each plate (see
-  [CMYK split](#cmyk-split)). **Trace**, **Colour on metal**, **Diffraction** and the filters work
+  CMYK split). **Trace**, **Colour on metal**, **Diffraction** and the filters work
   from the picture's own pixels and ignore them.
 
 ## Pictures as burned
@@ -167,48 +167,6 @@ The line under the sliders counts the outlines and segments.
 **Add to design** places the outlines exactly over the picture, one shape per colour (holes stay
 holes). Pictures larger than 2000 pixels along their longer side are traced from a copy averaged
 down to 2000; the outlines are still placed at full size.
-
-## Centre-line trace
-
-**Centre-line trace** draws one line down the middle of each dark stroke, instead of an outline round
-both sides: handwriting, signatures, line art, single-stroke text. It has no window.
-
-- Dark means darker than mid-grey after the picture's tone settings; see-through parts are ignored.
-- The strokes are thinned to one pixel and followed end to end; lines shorter than 3 pixels are
-  dropped.
-- The lines go on the first visible, unlocked Score layer, or a new Score layer called
-  **Centre lines**, as one shape ("Centre lines" and the picture's name). The status bar says how
-  many lines it found, or "No dark strokes found to trace."
-- The picture stays; turn its layer's output off if it shouldn't be engraved as well.
-
-## Engraving lines
-<!-- windows: EngravingWindow -->
-
-**Engraving** redraws the picture as engraving lines, like a banknote portrait: each line swells
-where the picture is dark and thins away to nothing where it's light. The result is filled
-shapes, so it engraves crisply with ordinary fill settings instead of dots.
-
-![The Engraving lines window with straight lines at 30°](images/window-picture-engraving.png)
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Lines** | | **Straight lines** (parallel, the classic banknote shading), **Lines following the forms** (parallel lines bent by the picture's light and dark, for a relief look), **Rings** (circles round a centre) or **Spiral** (one spiral from the centre out). |
-| **Apart (mm)** | 0.2 to 5 (0.6) | Line spacing, centre to centre. Closer lines show more detail; keep it at least twice the beam's width so lines stay apart. |
-| **Darkest width (%)** | 10 to 100 (85) | How wide a line gets at black, as a share of the spacing. Below 100 % the lines never quite touch. |
-| **Angle (°)** | −180 to 180 (30) | Straight and following lines: their direction; 0 = left to right. |
-| **Bend** | 0 to 5 (1) | Following lines: how far they bend with the picture's light and dark, in line spacings. More gives a stronger relief. |
-| **Centre** | two sliders | Rings and spiral: where they start, across then down the picture (default the middle, a little above centre). |
-
-- Lines narrower than 0.06 mm are broken off, so highlights stay clean.
-- The picture's tone settings (all but **Sharpen**) and image mask are followed.
-- The summary under the settings gives the number of line pieces, the spacing, the widest line and
-  the area covered.
-- **Don't engrave the picture itself (its layer off)** (on by default) turns the picture's layer's
-  output off, when the picture is the only thing on it.
-
-**Add to the design** puts the lines on a new Engrave layer, **Engraving ·** and the picture's name.
-Set it up as a clean fill: the fill's **Lines / cm** decides how solid each line comes out
-([Layer settings](layer-settings.md)). Close the window to leave without adding anything.
 
 ## Colour on metal
 <!-- windows: ColourPictureWindow -->
@@ -413,7 +371,7 @@ its own units. **Add to design** puts it in the middle of the work area on a new
 **Relief ·** and the model's name, with the same depth-slice settings as a depthmap, and makes that
 layer active.
 Set the slices, power and passes there ([Layer settings](layer-settings.md)). For cutting a model
-into stacked sheets instead, see [3D models and stacked slices](3d-slices.md).
+into stacked sheets instead, see 3D models and stacked slices.
 
 Carving depth slices hasn't been tried on the machine yet.
 
@@ -426,32 +384,6 @@ to 5, default 1) only changes how steep the light makes it look; the real depth 
 layer's settings. The window can stay open while you work.
 
 ![The Relief preview window](images/window-picture-relief-preview.png)
-
-## Image mask
-
-**Image mask** shows and engraves only the part of a picture inside a closed shape: a photo in a
-circle, a heart, a frame. The picture itself isn't changed.
-
-1. Draw or import the closed shape over the picture.
-2. Select the picture and the shape together (`Shift`+click).
-3. Click **Image mask**.
-
-- The mask moves, resizes and turns with the picture, and survives filters, crop and the eraser.
-- Holes in the shape stay holes in the picture. A new mask replaces the old one.
-- A shape from another program whose outline comes back to its start point counts as closed, even
-  without a closing command in the file. If the shape really is open (its ends don't meet), the
-  status bar says so: close it with **Tidy lines** first.
-- Only the masked part has to fit the work area: the rest of the picture can hang outside it, even
-  when its rows are turned to an angle (**Split onto pieces** relies on this).
-- Pictures are always drawn under lines and shapes, so the outline you line a picture up with stays
-  in sight.
-- The shape itself stays, as a guide. Delete it, or turn its layer's output off, if it shouldn't be
-  marked.
-- The picture's own engraving (dots or depth slices) and **Engraving** lines follow the mask.
-  **Trace**, **Centre-line trace**, **Colour on metal**, **Diffraction**, **Depthmap** and **CMYK
-  split** use the whole picture.
-
-**Remove mask** shows and engraves the whole picture again (select the masked picture first).
 
 ## Shapes to picture
 
@@ -515,24 +447,6 @@ Press `Esc` or choose another tool to stop erasing.
 **Crop** keeps the picture's scale: the kept part stays exactly where it was on the work area, and
 the picture gets smaller by the part cut away. Its tone settings and image mask are kept.
 
-## CMYK split
-
-**CMYK split** separates a colour picture into four pictures, one per ink (cyan, magenta, yellow,
-black), for screen printing: each one is black where its ink goes, grey where some of it goes, white
-elsewhere. Each goes on its own new Picture layer (**Cyan ·**, **Magenta ·**, **Yellow ·**,
-**Black ·** and the picture's name, in the ink's colour), in the same place and size, with
-**Halftone (dots)** dithering at the usual screen angles: cyan 15°, magenta 75°, yellow 0°, black
-45°.
-
-![The Layers panel after a CMYK split: a Picture layer for each ink](images/panel-layers-cmyk.png)
-
-- Mark each plate on its own screen. **Laser → Layer by layer** runs one layer at a time with a
-  pause between ([Work area](work-area.md)).
-- The plates are made from the picture as its tone settings show it: **Brightness**, **Contrast**,
-  **Gamma** and **Invert** are applied to the colours first, so each plate starts with those at
-  their defaults. **Sharpen** is copied onto each plate, and an image mask ([Image mask](#image-mask))
-  is kept. The original picture stays; turn its layer's output off.
-
 ## Remove background
 <!-- windows: BackgroundWindow -->
 
@@ -558,17 +472,13 @@ how much of the picture is kept. **Apply** works at full size and replaces the p
 
 - [Import a picture and set its tone](tutorial:pic-import)
 - [Trace a picture into outlines](tutorial:pic-trace)
-- [Centre-line trace](tutorial:pic-centreline)
-- [Engraving lines](tutorial:pic-engraving)
 - [A colour picture on metal](tutorial:pic-colour-on-metal)
 - [A diffraction picture](tutorial:pic-diffraction)
 - [A relief from a depth map](tutorial:pic-depthmap)
 - [A relief from a 3D model](tutorial:pic-3d-model)
-- [Mask a picture with a shape](tutorial:pic-clip)
 - [Turn shapes into a picture](tutorial:pic-shapes-to-picture)
 - [Picture filters](tutorial:pic-filters)
 - [Rub out parts of a picture](tutorial:pic-eraser)
 - [Crop a picture](tutorial:pic-crop)
-- [CMYK split for screen printing](tutorial:pic-cmyk)
 - [Remove a background](tutorial:pic-remove-background)
 - [See pictures as they'll burn](tutorial:pic-as-burned)

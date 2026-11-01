@@ -1,7 +1,7 @@
 # Nest parts on the material
 <!-- category: Arranging -->
 <!-- summary: Pack parts onto the bed or a piece of material as tightly as they fit, with copies if you like. -->
-<!-- page: arrange.md#nest -->
+<!-- page: nest.md -->
 <!-- order: 50 -->
 Nest packs parts by their real shapes, turning them where it helps, and can fill the sheet with
 copies. Use it to get the most parts out of a board or an offcut.

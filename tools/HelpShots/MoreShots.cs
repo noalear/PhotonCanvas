@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using PhotonCanvas.App;
+using PhotonCanvas.Addon.Slicer;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Import;
@@ -20,6 +21,10 @@ static class MoreShots
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
 
     static T F<T>(object o, string name) => (T)o.GetType().GetField(name, Any)!.GetValue(o)!;
+
+    /// <summary>An add-on's pictures go in its own help folder (src/Addons/<folder>/help/images).</summary>
+    static void AddonShot(Bitmap? bmp, string addonFolder, string name) =>
+        bmp?.Save(Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", addonFolder, "help", "images", name + ".png"));
 
     public static void Run(MainWindow w, Document doc, CanvasView canvas, LayersPanel layers, Control editor, string data,
         Action<Bitmap?, string, string> save, Func<Control, Bitmap?> shot, Action<int> settle, Action reset, DocState sample, DocsSim.Ids ids)
@@ -172,9 +177,7 @@ static class MoreShots
             outlines.Show(w);
             F<Slider>(outlines, "_amount").Value = 45;
             settle(3000);
-            // An add-on's pictures go in its own help folder.
-            var addonImages = Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", "DepthOutlines", "help", "images");
-            outlines.CaptureRenderedFrame()?.Save(Path.Combine(addonImages, "window-picture-depth-outlines.png"));
+            AddonShot(outlines.CaptureRenderedFrame(), "DepthOutlines", "window-picture-depth-outlines");
             outlines.Close();
         }
 
@@ -283,14 +286,14 @@ static class MoreShots
         reset();
         doc.Select([ids.Outline]);
         settle(200);
-        var warp = new WarpWindow(doc);
+        var warp = new PhotonCanvas.Addon.Warp.WarpWindow(doc);
         warp.Show(w);
         settle(600);
         foreach (var (index, name) in new[] { (4, "round-object"), (6, "four-corners") })
         {
             F<ComboBox>(warp, "_mode").SelectedIndex = index;
             settle(900);
-            save(warp.CaptureRenderedFrame(), $"window-warp-{name}", $"Warp, {name.Replace('-', ' ')} mode");
+            AddonShot(warp.CaptureRenderedFrame(), "Warp", $"window-warp-{name}");
         }
         warp.Close();
 

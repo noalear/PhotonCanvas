@@ -1,7 +1,7 @@
 # Mask a picture with a shape
 <!-- category: Pictures -->
 <!-- summary: An image mask: show and engrave only the part of a picture inside a closed shape. -->
-<!-- page: pictures.md#image-mask -->
+<!-- page: image-mask.md -->
 <!-- order: 90 -->
 An image mask keeps a picture inside a shape, such as a photo in a circle or a heart, without
 changing the picture itself. The mask can be taken off again at any time.

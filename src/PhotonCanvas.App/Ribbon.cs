@@ -270,10 +270,10 @@ public sealed class Ribbon : UserControl
     /// Add a button for an add-on to a tab's group (both made if there aren't any); dispose the result
     /// to take it away again (with the group and tab, if they were made for it and are now empty).
     /// </summary>
-    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add)
+    public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add, string? groupAfter = null)
     {
         var tab = TabFor(tabName);
-        var group = tab.GroupFor(groupTitle);
+        var group = tab.GroupFor(groupTitle, groupAfter);
         group.Break();
         var c = add(group);
         group.Break();
@@ -307,8 +307,21 @@ public sealed class RibbonTab
     internal bool Extra { get; set; }
 
     /// <summary>The group with this title, made (at the end) if there isn't one.</summary>
-    internal RibbonGroup GroupFor(string title) =>
-        Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } g ? g : Group(title).With(g => g.Extra = true);
+    internal RibbonGroup GroupFor(string title, string? after = null)
+    {
+        if (Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } had) return had;
+        var g = Group(title).With(g => g.Extra = true);
+        // Where it belongs, if asked: just after that group.
+        int at = after is null ? -1 : Groups.FindIndex(x => string.Equals(x.Title, after, StringComparison.OrdinalIgnoreCase));
+        if (at >= 0 && at < Groups.Count - 2)
+        {
+            Groups.Remove(g);
+            Groups.Insert(at + 1, g);
+            Panel.Children.Remove(g.Root);
+            Panel.Children.Insert(Panel.Children.IndexOf(Groups[at].Root) + 1, g.Root);
+        }
+        return g;
+    }
 
     internal void RemoveGroup(RibbonGroup g)
     {

@@ -82,7 +82,7 @@ explained in full.
   keeps out of the frequencies where light bouncing back could harm it. See
   [Layer settings](layer-settings.md).
 - **Image mask**: a closed shape that a picture shows through: only the part inside is shown and
-  engraved, and only that part has to fit the work area. See [Pictures](pictures.md#image-mask).
+  engraved, and only that part has to fit the work area. It comes with the Image mask add-on.
 - **Job**: what's sent to the machine: every visible layer with output on, of the page on screen,
   in order. The job bar shows it. See [Running a job](running-jobs.md).
 - **Kerf**: the width of the cut line. The **Kerf (mm)** setting moves outlines out by half of it,

@@ -1,9 +1,10 @@
+using PhotonCanvas.App;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using PhotonCanvas.Doc.Geometry;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Slicer;
 
 /// <summary>
 /// The dowel as it lies in the machine, from its end: the cut lines across it (the first squaring

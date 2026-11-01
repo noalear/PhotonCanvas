@@ -1,0 +1,8 @@
+{
+  "id": "engraving",
+  "name": "Engraving lines",
+  "version": "1.0.0",
+  "description": "Turn a picture into engraving lines, banknote style.",
+  "category": "Picture",
+  "apiVersion": 1
+}

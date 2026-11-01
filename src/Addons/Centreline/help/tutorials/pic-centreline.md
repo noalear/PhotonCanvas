@@ -1,7 +1,7 @@
 # Centre-line trace
 <!-- category: Pictures -->
 <!-- summary: One line down the middle of each stroke of handwriting or line art. -->
-<!-- page: pictures.md#centre-line-trace -->
+<!-- page: centre-line-trace.md -->
 <!-- order: 30 -->
 An ordinary trace goes round both sides of a stroke. Centre-line trace draws one line down its
 middle instead: quick, clean scoring of signatures, handwriting and line art.
