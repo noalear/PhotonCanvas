@@ -11,6 +11,9 @@ one page, with only the first key of a command that has more than one.
   the **Line** tool while a line is being drawn click by click, keep `Delete`, `Backspace`, `Enter`
   and `Esc`. See [Keys inside tools](#keys-inside-tools).
 - "—" below means no key to start with: you can give it one.
+- Add-ons add commands of their own while they're on (for example **Nest…** with `Ctrl+Alt+N`,
+  **Warp…**, **3D to slices…**). They're listed with the rest in Settings → Shortcuts and can be
+  given keys the same way; each add-on's page names its shortcuts.
 
 ## File
 
@@ -66,11 +69,9 @@ one page, with only the first key of a command that has more than one.
 | Text on path | — |
 | Tidy lines… | — |
 | Copy along a path… | — |
-| Warp… | — |
 | Use as material outline | — |
 | Lock | `Ctrl+Alt+L` |
 | Unlock all | `Ctrl+Alt+Shift+L` |
-| Nest… | `Ctrl+Alt+N` |
 | Fit to piece in camera… | `Ctrl+Shift+F` |
 | Trace picture… | `Ctrl+T` |
 

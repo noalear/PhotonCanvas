@@ -44,11 +44,7 @@ public sealed class PropertiesPanel : UserControl
     /// <summary>The user asked to trace a picture.</summary>
     public event Action<ImageShape>? TraceRequested;
 
-    /// <summary>The user asked for a depthmap of a picture (DepthCharge).</summary>
-    public event Action<ImageShape>? DepthmapRequested;
 
-    /// <summary>The user asked to remove a picture's background.</summary>
-    public event Action<ImageShape>? RemoveBackgroundRequested;
 
     /// <summary>The user asked to snap the selection onto a piece seen by the camera.</summary>
     public event Action? FitToCameraRequested;
@@ -147,10 +143,6 @@ public sealed class PropertiesPanel : UserControl
 
         var trace = Button("Trace into vectors…", tip: "Turn the picture into cut/engrave outlines (Ctrl+T).");
         trace.Click += (_, _) => { if (SelectedPicture() is { } im) TraceRequested?.Invoke(im); };
-        var depth = Button("Depthmap…", tip: "Turn the picture into a relief depthmap with DepthCharge.");
-        depth.Click += (_, _) => { if (SelectedPicture() is { } im) DepthmapRequested?.Invoke(im); };
-        var removeBg = Button("Remove background…", tip: "Make the backdrop see-through so it isn't engraved.");
-        removeBg.Click += (_, _) => { if (SelectedPicture() is { } im) RemoveBackgroundRequested?.Invoke(im); };
         var resetTone = Button("Reset");
         resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
         _picCard = Card("Picture",
@@ -160,8 +152,9 @@ public sealed class PropertiesPanel : UserControl
             Slider("Sharpen", _sharpen, v => v < 0.005 ? "off" : $"{v:0.0}"),
             _invertPic,
             Hint("These change how the picture engraves (Image layers), not the file."),
-            trace, removeBg,
-            Row(depth, resetTone));
+            trace,
+            resetTone,
+            _picExtras);
         _bright.ValueChanged += (_, _) => EditPicture("Picture brightness", t => t with { Brightness = _bright.Value }, "bright");
         _contrast.ValueChanged += (_, _) => EditPicture("Picture contrast", t => t with { Contrast = _contrast.Value }, "contrast");
         _gamma.ValueChanged += (_, _) => EditPicture("Picture gamma", t => t with { Gamma = _gamma.Value }, "gamma");
@@ -296,11 +289,28 @@ public sealed class PropertiesPanel : UserControl
         _doc.Commit(label, Ops.Replace(_doc.State, im.WithTone(tone)), coalesceKey: coalesce is null ? null : $"{coalesce}:{im.Id}");
     }
 
+    /// <summary>Add-ons' buttons for the selected picture (slot "properties.picture", Data = the ImageShape).</summary>
+    readonly StackPanel _picExtras = new() { Spacing = 6 };
+    (Guid Id, int Version) _picExtrasFor;
+
+    /// <summary>The window add-on panels belong to (the main window).</summary>
+    public Window? SlotOwner { get; set; }
+
+    void FillPictureExtras(ImageShape? pic)
+    {
+        var key = (pic?.Id ?? Guid.Empty, Addons.AddonSlots.Version);
+        if (key == _picExtrasFor) return;
+        _picExtrasFor = key;
+        _picExtras.Children.Clear();
+        if (pic is not null && SlotOwner is { } owner) Addons.AddonSlots.Fill("properties.picture", _picExtras, owner, pic);
+    }
+
     void RefreshSelection()
     {
         var sel = _doc.Selection;
         var pic = SelectedPicture();
         _picCard.IsVisible = pic is not null;
+        FillPictureExtras(pic);
         var txt = SelectedText();
         _textCard.IsVisible = txt is not null;
         var param = _doc.Selection.Count == 1 && _doc.State.FindShape(_doc.Selection.First()) is ParamShape ps0 ? ps0 : null;

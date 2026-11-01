@@ -1,0 +1,8 @@
+{
+  "id": "remote-access",
+  "name": "Phone remote",
+  "version": "1.0.0",
+  "description": "Watch and run the laser from your phone: the remote server, connecting the phone with a QR code, and the Android app.",
+  "category": "Laser",
+  "apiVersion": 1
+}

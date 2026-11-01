@@ -40,7 +40,12 @@ public partial class HelpTests
         var own = HelpLibrary.Load(help);
         Assert.True(own.Pages.Count > 0, $"{addon}/help has no page.");
         Assert.True(own.Tutorials.Count > 0, $"{addon}/help/tutorials has no tutorial.");
-        var lib = Lib.Value.WithAddons([(addon, help)]);
+        // Links may go to the program's pages, its own, or those of add-ons it lists under "requires".
+        var requires = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, addon, "addon.json"))).RootElement
+            .TryGetProperty("requires", out var r) ? r.EnumerateArray().Select(x => x.GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase) : [];
+        var needed = AddonNames().Where(a => a != addon && Directory.Exists(Path.Combine(AddonsDir, a, "help"))
+            && requires.Contains(System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, a, "addon.json"))).RootElement.GetProperty("id").GetString()!));
+        var lib = Lib.Value.WithAddons([(addon, help), .. needed.Select(a => (a, Path.Combine(AddonsDir, a, "help")))]);
         var src = AddonSources(addon);
         var problems = new List<string>();
 

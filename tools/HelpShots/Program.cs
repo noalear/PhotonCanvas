@@ -25,6 +25,15 @@ var help = Path.Combine(repo, "docs", "help");
 var images = Path.Combine(help, "images");
 Environment.SetEnvironmentVariable("PHOTONCANVAS_HELP", help);
 Environment.SetEnvironmentVariable(AppIdentity.DataDirVariable, Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-data"));
+// With the add-ons that come with the program on, as a person sees it (build the program first;
+// their pictures go into each add-on's own help/images).
+var builtAddons = new[] { "Release", "Debug" }.Select(c => Path.Combine(repo, "src", "PhotonCanvas.App", "bin", c, "net10.0", "addons")).FirstOrDefault(Directory.Exists);
+if (builtAddons is null) Console.WriteLine("No built add-ons found (build src/PhotonCanvas.App first): the pictures show the program without them.");
+else
+{
+    Environment.SetEnvironmentVariable("PHOTONCANVAS_ADDONS", "1");
+    Environment.SetEnvironmentVariable("PHOTONCANVAS_ADDONS_DIR", builtAddons);
+}
 
 AppBuilder.Configure<App>()
     .UseSkia()
