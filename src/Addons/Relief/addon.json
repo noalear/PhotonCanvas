@@ -1,0 +1,8 @@
+{
+  "id": "relief",
+  "name": "3D model relief",
+  "version": "1.0.0",
+  "description": "Bring in a 3D model (STL) as a depth map to carve as a relief, and preview a depth map as the lit relief it makes.",
+  "category": "Picture",
+  "apiVersion": 1
+}

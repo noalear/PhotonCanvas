@@ -1,0 +1,8 @@
+{
+  "id": "depthcharge",
+  "name": "Depthmap with DepthCharge",
+  "version": "1.0.0",
+  "description": "Turn a photo into a relief depthmap with DepthCharge, ready to engrave in slices.",
+  "category": "Picture",
+  "apiVersion": 1
+}
