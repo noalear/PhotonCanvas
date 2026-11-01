@@ -5,6 +5,6 @@
   "description": "Cut the middle out of stacked slices to save material and glue, with a channel for a wire or LED and pockets for magnets.",
   "category": "Make",
   "apiVersion": 1,
-  "requires": [],
+  "requires": ["slicer"],
   "onByDefault": true
 }

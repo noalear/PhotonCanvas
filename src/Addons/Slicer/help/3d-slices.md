@@ -216,8 +216,8 @@ check the first cut goes all the way through before leaving it to run.
 
 With the **Hollow stacked models** add-on on (Settings → Add-ons), **Hollow it out** appears under
 the stacked-layer settings: it keeps a shell round each slice and cuts the middle out, to save
-material and glue, with an optional channel for a wire or LED and pockets for magnets. Its page is
-under **Add-ons** in this guide.
+material and glue, with an optional channel for a wire or LED and pockets for magnets. Its page,
+**Hollow stacked models**, is under **Add-ons** in this guide.
 
 ### What the slicer leaves out and warns about
 

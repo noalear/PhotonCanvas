@@ -299,7 +299,7 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
         root.Children.Add(buttons);
         root.Children.Add(grid);
         Content = root;
-        Addons.AddonSlots.Fill("stackslice.stacked", _addonPanel, this, data: this, changed: Later);
+        PhotonCanvas.App.Addons.AddonSlots.Fill("stackslice.stacked", _addonPanel, this, data: this, changed: Later);
         Closed += (_, _) => _modifiers.Clear();
         // Now the settings sit in their rows: hide the shaping rows (labels too) unless it's on.
         ShowShaping();

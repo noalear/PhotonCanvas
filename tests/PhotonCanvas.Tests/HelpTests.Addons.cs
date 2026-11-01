@@ -31,6 +31,17 @@ public partial class HelpTests
     static HashSet<string> AddonRibbon(string src) =>
         Regex.Matches(src, @"new RibbonButton\(\s*""([^""]+)"",\s*""[^""]+"",\s*""([^""]+)""").Select(m => $"{m.Groups[1].Value}/{m.Groups[2].Value}").ToHashSet();
 
+    /// <summary>The folders (under src/Addons) of the add-ons this one lists under "requires" in its addon.json.</summary>
+    static List<string> Required(string addon)
+    {
+        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, addon, "addon.json")));
+        if (!json.RootElement.TryGetProperty("requires", out var req)) return [];
+        var ids = req.EnumerateArray().Select(e => e.GetString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return [.. Directory.GetDirectories(AddonsDir).Where(d => File.Exists(Path.Combine(d, "addon.json")))
+            .Where(d => { using var j = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(d, "addon.json"))); return ids.Contains(j.RootElement.GetProperty("id").GetString()); })
+            .Select(Path.GetFileName).OfType<string>()];
+    }
+
     [Theory]
     [MemberData(nameof(Addons))]
     public void EveryAddonExplainsItself(string addon)
@@ -40,8 +51,11 @@ public partial class HelpTests
         var own = HelpLibrary.Load(help);
         Assert.True(own.Pages.Count > 0, $"{addon}/help has no page.");
         Assert.True(own.Tutorials.Count > 0, $"{addon}/help/tutorials has no tutorial.");
-        var lib = Lib.Value.WithAddons([(addon, help)]);
+        // The add-ons it requires are always on with it: their pages, buttons and labels count too.
+        var required = Required(addon);
+        var lib = Lib.Value.WithAddons([(addon, help), .. required.Select(r => (r, Path.Combine(AddonsDir, r, "help")))]);
         var src = AddonSources(addon);
+        var withRequired = string.Join("\n", required.Select(AddonSources).Append(src));
         var problems = new List<string>();
 
         // Links and pictures.
@@ -85,8 +99,8 @@ public partial class HelpTests
             if (!claimed.Contains(m.Groups[1].Value)) problems.Add($"window {m.Groups[1].Value} has no page in {addon}/help (<!-- windows: {m.Groups[1].Value} -->)");
 
         // Tutorial targets: the program's ribbon plus this add-on's buttons; labels from both sources.
-        var commands = RibbonCommands().Concat(AddonRibbon(src)).ToHashSet();
-        var literals = Sources.Value.Values.Append(src).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
+        var commands = RibbonCommands().Concat(AddonRibbon(withRequired)).ToHashSet();
+        var literals = Sources.Value.Values.Append(withRequired).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
         foreach (var t in own.Tutorials)
             foreach (var s in t.Steps)
                 if (s.Target is { } target)
