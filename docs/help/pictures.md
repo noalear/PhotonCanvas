@@ -16,11 +16,15 @@ other shapes doesn't count, except for **Image mask**.
 | Group | Buttons |
 |---|---|
 | Add | [Import picture](#import-a-picture) |
-| Turn it into | [Trace](#trace), Engraving, [Colour on metal](#colour-on-metal), [Diffraction](#diffraction); **Depthmap** is an add-on |
-| Shape | Image mask, Remove mask, [Shapes to picture](#shapes-to-picture) |
-| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop), CMYK split, Centre-line trace |
-| Relief | [3D model](#3d-model-relief), [Relief preview](#relief-preview); **Depth outlines** is an add-on |
-| Clean up | [Remove background](#remove-background) |
+| Turn it into | [Trace](#trace), [Colour on metal](#colour-on-metal) |
+| Shape | [Shapes to picture](#shapes-to-picture) |
+| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop) |
+
+Add-ons add more buttons to the tab while they're on: **Engraving**, **Diffraction** and
+**Depthmap** in Turn it into, **Image mask** and **Remove mask** in Shape, **CMYK split** and
+**Centre-line trace** in Edit, a **Relief** group (**3D model**, **Relief preview**, **Depth
+outlines**) and **Remove background** in **Clean up**. Each has its own page under **Add-ons** in
+the contents; turn them on or off in Settings → Add-ons.
 
 **Colour on metal** and **Diffraction** are MOPA-only features. They show by default; to hide or
 show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
@@ -28,9 +32,8 @@ show them, open **Settings** (the gear at the top right) → **Equipment** and t
 metal** also hides the **Colour test** and **Measure colours** buttons on the Laser tab. Hiding a
 feature only takes it out of the ribbon: nothing is lost. See [The machine and settings](machine.md).
 
-Right-clicking a picture also offers **Trace picture…** and **Remove picture background…**.
-**Depthmap** (in Turn it into, on the right-click menu and in Picture settings) comes from the
-DepthCharge add-on, which has its own page under **Add-ons** in the contents.
+Right-clicking a picture also offers **Trace picture…**, and the add-ons' own items, such as
+**Remove picture background…** and **Depthmap with DepthCharge…**.
 
 ## Import a picture
 
@@ -48,7 +51,7 @@ turn a drawing (SVG, PDF…) into a picture, see **Import as one picture…** in
 - A file that can't be read is listed in a message; the others are still imported.
 
 The file's pixels are kept in the design as they are. Changing the size, the tone settings or the
-layer never alters them; **Filters**, **Crop**, **Eraser** and **Remove background** make a new
+layer never alters them; **Filters**, **Crop** and **Eraser** (and add-ons such as Remove background) make a new
 picture in its place (`Ctrl+Z` brings the old one back).
 
 ## How pictures are engraved
@@ -99,8 +102,8 @@ engraves, not the file, and each picture has its own. Each slider's value shows 
 | **Invert (for dark materials)** | off | Swaps light and dark: what was white burns, what was black doesn't. |
 
 They're applied in this order: invert, gamma, contrast, brightness. **Reset** puts all of them back.
-**Trace into vectors…** and **Remove background…** do the same as the ribbon buttons; add-ons can put
-buttons of their own under them.
+**Trace into vectors…** does the same as the ribbon button; add-ons can put buttons of their own
+under it (such as **Remove background…** and **Depthmap…**).
 
 - The work area shows the picture's own pixels, not these settings, unless
   [Pictures as burned](#pictures-as-burned) is on.
@@ -206,95 +209,6 @@ shares it, turn its output off yourself. See-through parts stay bare.
 > **Tip:** Use the same plate, finish and focus as the colour test, and the same lights for judging.
 > Colours shift with the viewing angle, as on the test.
 
-## Diffraction
-<!-- windows: DiffractionWindow -->
-
-**Diffraction** turns the picture into tiny diffraction gratings on polished (mirror) stainless with
-the MOPA laser. The laser's pulses land a set distance apart along each line (the pitch: speed ÷
-frequency, e.g. 300 mm/s at 300 kHz is 1 µm), and a row of them splits light into rainbow colours.
-Each pixel of the picture becomes a small patch of grating.
-
-![The Diffraction picture window in Shimmer mode](images/window-picture-diffraction.png)
-
-**Mode**
-
-- **Shimmer: brightness → direction:** the scan direction of each pixel follows its brightness
-  (dark 0°, light towards 180°, in **Directions** steps), all at the green pitch. Parts of the
-  picture light up in turn as you tilt it.
-- **Colour: hue → pitch:** each pixel's hue sets its pitch (red to violet), so the colours show from
-  one lighting and viewing angle. All pixels scan in one **Direction °**.
-- **3D: depth map → floating points (experimental):** for a depth map (light = in front, mid-grey =
-  on the surface, dark = behind, white = nothing; the DepthCharge add-on's **Depthmap** makes one). Each point becomes an arc
-  of grating pixels whose glint slides as you tilt the plate, so the point seems to float in front
-  of or behind the metal.
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Pixel (mm)** | 0.1 to 5 (0.5) | Size of one grating pixel. Smaller = more detail, more stop-starts. |
-| **Directions** | 2 to 36 (12) | Shimmer and 3D: how many grating directions (0–180°) brightness is shared out over. More = smoother shimmer, more layers. |
-| **Colours** | 2 to 24 (10) | Colour: how many pitches the hues are shared out over. |
-| **Direction °** | 0 to 179 (0) | Colour: the scan direction for every pixel; colours show when the light and your eye line up along it. |
-| **3D strength (mm)** | 0.5 to 30 (6) | 3D: how wide the arcs grow for the nearest and farthest points. More = deeper 3D, but busier. |
-| **Point spacing (mm)** | 0.2 to 10 (2) | 3D: distance between the points that get arcs. |
-| **Outlines and depth steps only (line art, stepped shapes)** | off | 3D: arcs only on outlines and sudden depth changes; off puts points all over (smooth reliefs). |
-| **Swap in front and behind** | off | 3D: if it looks inside out under your light. |
-| **Pitch for green µm** | 0.3 to 5 (1.00) | The pulse spacing that shows green where you'll look from. Smaller shows bluer, larger redder. Shimmer and 3D use it for every pixel. |
-| **Leave white unmarked (bare metal)** | on | Near-white pixels stay bare. |
-| **Leave greys and black unmarked** | on | Colour: greys and near-black stay bare (a grating can't show them). |
-| **Power %** | 1 to 100 (32) | Keep it low: too much heat blurs the grating and warps thin sheet. |
-| **Speed mm/s** | 2 to 15000 (300) | With the frequency, sets the pitch. Each layer's frequency is worked out from it. |
-| **Pulse width** | MOPA pulse widths (60 ns) | The pulse width for every grating layer. |
-| **Line spacing mm** | 0.01 to 0.5 (0.06) | Gap between fill lines. 0.05–0.06 mm covers the area with little heat. |
-
-The preview shows the pixel map on grey steel: shimmer and 3D pixels coloured by direction, colour
-pixels by their colour. The summary gives the pixels, how many are marked, the number of layers,
-their frequency and pitch range, and the marking time.
-
-**Add grating layers** adds one MOPA Engrave layer per direction or pitch (named like **Grating 45° ·
-1.00 µm**), pixels merged into strips, over the picture. Each layer's frequency is speed ÷ pitch,
-kept within what the pulse width allows, and its scan angle turns with the picture. Its
-**Overscan (mm)** is set to 0.2, so the beam is at a steady speed where it marks. As with colour
-on metal, the picture's own layer stops being sent if the picture is alone on it.
-
-> **Tip:** Run a grating test first (Laser → Colour test, Diffraction gratings) to find the power and
-> the pitch that show green for you. Hold the plate flat and focused.
-
-## 3D model relief
-<!-- windows: StlWindow -->
-
-**3D model** turns a 3D model into a depth map, to carve it as a relief: the highest point is the
-surface, the lowest the deepest.
-
-![3D model to relief: a chess pawn seen from the front, its depth map on the right (lighter is higher)](images/window-picture-3d-model.png)
-
-1. **Open STL…** picks the model: STL (binary or text), OBJ or STEP.
-2. **View:** **From the top**, **From the front** or **From the side**.
-3. **Pixels** (100 to 4000, default 800): pixels along the map's longer side. 10 per mm is plenty
-   for most reliefs.
-4. **Size (mm)** (2 to 220, default 60): how big the relief is on the work area, along its longer
-   side.
-5. **Carve around the model (it stands proud)**: off, the area round the model is left as the
-   surface; on, it's carved to the bottom.
-
-The preview shows the depth map, and a line gives the number of triangles and the model's size in
-its own units. **Add to design** puts it in the middle of the work area on a new Picture layer,
-**Relief ·** and the model's name, with the same depth-slice settings as a depthmap, and makes that
-layer active.
-Set the slices, power and passes there ([Layer settings](layer-settings.md)). For cutting a model
-into stacked sheets instead, see 3D models and stacked slices.
-
-Carving depth slices hasn't been tried on the machine yet.
-
-## Relief preview
-<!-- windows: ReliefPreviewWindow -->
-
-**Relief preview** shows the selected depth map as the relief it will carve: a surface lit from the
-top left, light parts high and dark parts deep. **Depth (mm): how deep the deepest part is carved** (0.2
-to 5, default 1) only changes how steep the light makes it look; the real depth comes from the
-layer's settings. The window can stay open while you work.
-
-![The Relief preview window](images/window-picture-relief-preview.png)
-
 ## Shapes to picture
 
 **Shapes to picture** turns the selected shapes into a picture, for example to engrave a logo with a
@@ -337,7 +251,7 @@ engraved. Background clutter, a stray mark, a corner.
   picture doesn't have to be selected.
 - Each stroke is one step to undo (`Ctrl+Z`).
 - Erased parts become white and see-through, so they're never burned, even with **Invert (for dark
-  materials)** ticked. To clear a whole backdrop at once, use [Remove background](#remove-background).
+  materials)** ticked. To clear a whole backdrop at once, use the Remove background add-on.
 
 Press `Esc` or choose another tool to stop erasing.
 
@@ -357,37 +271,13 @@ Press `Esc` or choose another tool to stop erasing.
 **Crop** keeps the picture's scale: the kept part stays exactly where it was on the work area, and
 the picture gets smaller by the part cut away. Its tone settings and image mask are kept.
 
-## Remove background
-<!-- windows: BackgroundWindow -->
-
-**Remove background** makes a picture's backdrop see-through, so it isn't engraved, even with
-**Invert (for dark materials)** ticked. The picture's tone settings and image mask are kept. It works best on
-logos, scans and objects on a plain backdrop, and uses no AI and nothing online.
-
-![The Remove background window: the backdrop removed, the circle kept](images/window-picture-remove-background.png)
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Remove the background around the edges** | on | Finds the main colours along the picture's edges (up to three) and removes them, spreading in from the edges. |
-| **Tolerance** | 1 to 100 (20) | How different a colour can be and still count as background. Raise it if bits of backdrop remain; lower it if the subject's edges get eaten. |
-| **Clicks remove** | **the area clicked** | Click the preview to remove a colour too: **the area clicked** removes the patch joined to the click, **that colour everywhere** removes it all over. **Undo last click** and **Clear clicks** take clicks back. |
-| **Shrink edge** | 0 to 10 px (1) | Pulls the kept edge in, to drop a halo of backdrop colour. |
-| **Soften edge** | 0 to 6 px (1) | Feathers the cut edge over this many pixels. |
-
-The preview shows the result on a checkerboard (see-through) at up to 900 pixels across, and says
-how much of the picture is kept. **Apply** works at full size and replaces the picture's pixels;
-`Ctrl+Z` undoes it.
-
 ## Try it
 
 - [Import a picture and set its tone](tutorial:pic-import)
 - [Trace a picture into outlines](tutorial:pic-trace)
 - [A colour picture on metal](tutorial:pic-colour-on-metal)
-- [A diffraction picture](tutorial:pic-diffraction)
-- [A relief from a 3D model](tutorial:pic-3d-model)
 - [Turn shapes into a picture](tutorial:pic-shapes-to-picture)
 - [Picture filters](tutorial:pic-filters)
 - [Rub out parts of a picture](tutorial:pic-eraser)
 - [Crop a picture](tutorial:pic-crop)
-- [Remove a background](tutorial:pic-remove-background)
 - [See pictures as they'll burn](tutorial:pic-as-burned)

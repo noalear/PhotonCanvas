@@ -1,7 +1,7 @@
 # Remove a background
 <!-- category: Pictures -->
 <!-- summary: Make a picture's backdrop see-through so it isn't engraved. -->
-<!-- page: pictures.md#remove-background -->
+<!-- page: remove-background.md -->
 <!-- order: 150 -->
 A photo of an object or a scanned logo often has a plain backdrop you don't want burned. Remove
 background makes it see-through, with no AI and nothing sent online.

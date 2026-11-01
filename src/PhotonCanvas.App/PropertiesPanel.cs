@@ -45,8 +45,6 @@ public sealed class PropertiesPanel : UserControl
     public event Action<ImageShape>? TraceRequested;
 
 
-    /// <summary>The user asked to remove a picture's background.</summary>
-    public event Action<ImageShape>? RemoveBackgroundRequested;
 
     /// <summary>The user asked to snap the selection onto a piece seen by the camera.</summary>
     public event Action? FitToCameraRequested;
@@ -145,8 +143,6 @@ public sealed class PropertiesPanel : UserControl
 
         var trace = Button("Trace into vectors…", tip: "Turn the picture into cut/engrave outlines (Ctrl+T).");
         trace.Click += (_, _) => { if (SelectedPicture() is { } im) TraceRequested?.Invoke(im); };
-        var removeBg = Button("Remove background…", tip: "Make the backdrop see-through so it isn't engraved.");
-        removeBg.Click += (_, _) => { if (SelectedPicture() is { } im) RemoveBackgroundRequested?.Invoke(im); };
         var resetTone = Button("Reset");
         resetTone.Click += (_, _) => EditPicture("Reset picture", _ => ToneAdjust.None);
         _picCard = Card("Picture",
@@ -156,7 +152,7 @@ public sealed class PropertiesPanel : UserControl
             Slider("Sharpen", _sharpen, v => v < 0.005 ? "off" : $"{v:0.0}"),
             _invertPic,
             Hint("These change how the picture engraves (Image layers), not the file."),
-            trace, removeBg,
+            trace,
             resetTone,
             _picExtras);
         _bright.ValueChanged += (_, _) => EditPicture("Picture brightness", t => t with { Brightness = _bright.Value }, "bright");

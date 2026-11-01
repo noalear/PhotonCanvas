@@ -42,6 +42,6 @@ These sliders reshape the map without running the model again.
 Click **Add depthmap to design**. It goes over the photo on a new depth-slices layer.
 
 ## Preview the relief
-<!-- target: ribbon:Picture/Relief preview -->
-<!-- wait: window:Relief preview -->
-With the depth map selected, **Relief preview** shows it lit as the carved surface.
+With the depth map selected, **Relief preview** on the Picture tab shows it lit as the carved
+surface (it comes with the 3D model relief add-on, so turn that on in Settings → Add-ons if the
+button isn't there).

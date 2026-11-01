@@ -7,7 +7,9 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Colour;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.DiffractionPictures;
 
 /// <summary>
 /// Turns a picture into diffraction-grating pixels for the MOPA laser on polished stainless:

@@ -140,14 +140,14 @@ static class MoreShots
         settle(200);
         if (ownFolder) try { Directory.Delete(models, true); } catch (Exception) { }
         // The pawn as a relief (Picture → 3D model), seen from the front.
-        var relief = new StlWindow();
+        var relief = new PhotonCanvas.Addon.Relief.StlWindow();
         relief.Show(w);
         settle(300);
-        typeof(StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
-        typeof(StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
         F<ComboBox>(relief, "_view").SelectedIndex = 1;
         settle(3000);
-        save(relief.CaptureRenderedFrame(), "window-picture-3d-model", "3D model to relief: a chess pawn seen from the front, as a depth map");
+        AddonShot(relief.CaptureRenderedFrame(), "Relief", "window-picture-3d-model");
         relief.Close();
 
         // Depth outlines, on a made-up depthmap: domed pebbles piled on each other.

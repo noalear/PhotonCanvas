@@ -7,7 +7,9 @@ using Avalonia.Media.Imaging;
 using PhotonCanvas.Core.Imaging;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.Background;
 
 /// <summary>
 /// Remove a picture's background: the plain backdrop found around its edges, plus any colours

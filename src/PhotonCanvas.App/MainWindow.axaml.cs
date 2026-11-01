@@ -80,7 +80,6 @@ public partial class MainWindow : Window
         _props.SlotOwner = this;
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
-        _props.RemoveBackgroundRequested += im => _ = Guard(() => RemoveBackground(im));
         _library = Doc.Materials.MaterialLibrary.Load(Path.Combine(AppIdentity.DataDir, "materials"));
         if (!_settings.PresetsAdopted)
         {
@@ -624,24 +623,18 @@ public partial class MainWindow : Window
         shapeIt.Small("Unlock all", "IcUnlock", () => LockSel(false), "Unlock every locked shape", () => _doc.State.Shapes.Any(s => s.Locked));
 
         // ---- Picture: photos and artwork ----
-        var picture = _ribbon.Tab("Picture", "Trace, depthmaps and background removal (lights up when a picture is selected)");
+        var picture = _ribbon.Tab("Picture", "Trace, filters, crop and what add-ons bring (lights up when a picture is selected)");
         var pin = picture.Group("Add");
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
         _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
-        _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         var pclip = picture.Group("Shape");
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
         ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
         pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
-        var prelief = picture.Group("Relief");
-        prelief.Large("3D model", "IcDepth", () => _ = Guard(AddStl), "A 3D model (STL) as a depth map, on a depth-slices layer");
-        prelief.Small("Relief preview", "IcEye", () => { if (SelectedPicture() is { } im) new ReliefPreviewWindow(im).Show(this); }, "See a depth map as the lit relief it will carve", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
-        var pclean = picture.Group("Clean up");
-        pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
 
         // ---- Camera: what the machine sees ----
         var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, fit designs to pieces, calibration");
@@ -1092,22 +1085,6 @@ public partial class MainWindow : Window
         _doc.Commit("Crop picture", Ops.Replace(_doc.State, Repicture(im, cropped, size, t)), [im.Id]);
     }
 
-    async Task AddStl()
-    {
-        var w = new StlWindow();
-        await w.ShowDialog(this);
-        if (w.Result is not { } r) return;
-        var state = _doc.State;
-        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
-        {
-            Name = $"Relief · {r.Name}", ImageMode = ImageEngraveMode.Slices, Dpi = 254, LinesPerCm = 200, AngleStepDeg = 37,
-        };
-        state = Ops.AddLayer(state, layer);
-        var at = new Vec2(Canvas.Machine.FieldW / 2 - r.SizeMm.X / 2, Canvas.Machine.FieldH / 2 - r.SizeMm.Y / 2);
-        var pic = new ImageShape { Name = r.Name, LayerId = layer.Id, Source = ImageSource.FromEncoded(r.Depth.EncodePng()), SizeMm = r.SizeMm, Transform = Affine.Translate(at) };
-        _doc.Commit("3D model relief", Ops.AddShapes(state, [pic]), [pic.Id]);
-        _layers.Activate(layer.Id);
-    }
 
     async Task HomeZ()
     {
@@ -1338,7 +1315,6 @@ public partial class MainWindow : Window
             new Separator(),
             DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
             DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
-            DoAsync("Remove picture background…", () => picture is not null ? RemoveBackground(picture) : Task.CompletedTask, picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
             Do("Save to My shapes…", ShowShapes, paths.Count > 0),
@@ -1346,19 +1322,6 @@ public partial class MainWindow : Window
     }
 
 
-    async Task RemoveBackground(ImageShape im)
-    {
-        var w = new BackgroundWindow(im.Source.Pixels, result =>
-        {
-            var replaced = new ImageShape
-            {
-                Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = im.Transform,
-                SizeMm = im.SizeMm, Tone = im.Tone, Clip = im.Clip, Source = ImageSource.FromEncoded(result.ToPng()),
-            };
-            _doc.Commit("Remove background", Ops.Replace(_doc.State, replaced), [im.Id]);
-        });
-        await w.ShowDialog(this);
-    }
     readonly Doc.Materials.MaterialLibrary _library;
 
     async Task ShowLibrary()
@@ -2586,21 +2549,6 @@ public partial class MainWindow : Window
         StatusText.Text = $"Added {added.Count} colour layers." + (alone ? " The picture's own layer is now a guide only (not sent)." : " The picture shares its layer, which is still sent: turn its output off if you only want the colours.");
     }
 
-    /// <summary>Grating layers over a picture; the picture itself stops being sent when it's alone on its layer.</summary>
-    async Task MakeDiffraction(ImageShape picture)
-    {
-        var w = new DiffractionWindow(picture);
-        await w.ShowDialog(this);
-        if (w.Result is not { } o) return;
-        var (state, added) = Doc.Colour.Diffraction.Add(_doc.State, picture, o);
-        if (added.Count == 0) return;
-        bool alone = state.ShapesOn(picture.LayerId).Count() == 1;
-        if (alone) state = Ops.UpdateLayers(state, new HashSet<Guid> { picture.LayerId }, l => l with { Output = false });
-        _doc.Commit("Diffraction picture", state, added);
-        StatusText.Text = alone
-            ? $"Added {added.Count} grating layers. The picture's own layer is now a guide only (not sent)."
-            : $"Added {added.Count} grating layers. The picture shares its layer, which is still sent: turn its output off if you only want the gratings.";
-    }
 
     async Task AddColourTest()
     {

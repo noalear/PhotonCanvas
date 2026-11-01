@@ -1,7 +1,7 @@
 # A relief from a 3D model
 <!-- category: Pictures -->
 <!-- summary: Carve a 3D model (STL, OBJ, STEP) into the surface as a relief. -->
-<!-- page: pictures.md#3d-model-relief -->
+<!-- page: relief.md -->
 <!-- order: 80 -->
 A 3D model seen from one side becomes a depth map: its top is the surface, its lowest point the
 deepest. It goes on a depth-slices layer to be carved down step by step. Carving slices hasn't been

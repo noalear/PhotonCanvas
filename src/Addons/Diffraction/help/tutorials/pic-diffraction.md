@@ -1,7 +1,7 @@
 # A diffraction picture
 <!-- category: Pictures -->
 <!-- summary: A picture of tiny gratings on polished stainless that shimmers with rainbow colours. -->
-<!-- page: pictures.md#diffraction -->
+<!-- page: diffraction.md -->
 <!-- order: 60 -->
 On polished stainless the MOPA's pulses can form tiny diffraction gratings that split light into
 rainbows. This turns a picture into grating pixels that light up as the plate tilts. Run a grating

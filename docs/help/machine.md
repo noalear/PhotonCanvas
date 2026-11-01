@@ -280,7 +280,7 @@ updating from a version that didn't ask. Change it here any time.
 | Tick | Shows |
 |---|---|
 | **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**). |
-| **Diffraction gratings** (on) | **Picture → Diffraction**. |
+| **Diffraction gratings** (on) | **Picture → Diffraction** (while the Diffraction pictures add-on is on). |
 | **G-code console** (on) | **Laser → Console** (see [The G-code console](#the-g-code-console)). |
 
 **EXTRACTION**: sent at the start of every job, as xTool Studio does it. Experimental: these are
