@@ -1,6 +1,6 @@
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
-using PhotonCanvas.Doc.Tracing;
+using PhotonCanvas.Addon.DepthOutlines;
 using Xunit;
 
 namespace PhotonCanvas.Tests;

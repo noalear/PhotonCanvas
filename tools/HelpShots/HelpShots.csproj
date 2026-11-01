@@ -10,5 +10,7 @@
     <PackageReference Include="Avalonia.Headless" Version="11.3.22" />
     <PackageReference Include="Avalonia.Skia" Version="11.3.22" />
     <ProjectReference Include="..\..\src\PhotonCanvas.App\PhotonCanvas.App.csproj" />
+    <!-- Add-ons whose windows are photographed (their pictures go in their own help/images). -->
+    <ProjectReference Include="..\..\src\Addons\DepthOutlines\PhotonCanvas.Addon.DepthOutlines.csproj" />
   </ItemGroup>
 </Project>

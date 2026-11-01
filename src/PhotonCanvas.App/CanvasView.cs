@@ -412,6 +412,17 @@ public sealed partial class CanvasView : Control
     static Color LayerColor(Layer l, byte alpha = 255) =>
         Color.FromArgb(alpha, (byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color);
 
+    /// <summary>Add-ons' drawings (see <see cref="Addons.ICanvasOverlay"/>), in the order added.</summary>
+    public List<Addons.ICanvasOverlay> Overlays { get; } = [];
+
+    void DrawOverlays(DrawingContext ctx, Addons.CanvasLayer layer)
+    {
+        if (Overlays.Count == 0) return;
+        var info = new Addons.CanvasDrawInfo(_scale, ToScreen, Rect2.FromPoints(ToWorld(new Point(0, 0)), ToWorld(new Point(Bounds.Width, Bounds.Height))));
+        foreach (var o in Overlays.ToList())
+            if (o.Layer == layer) o.Draw(ctx, info);
+    }
+
     public override void Render(DrawingContext ctx)
     {
         var b = new Rect(Bounds.Size);
@@ -444,7 +455,9 @@ public sealed partial class CanvasView : Control
             var world = Matrix.CreateScale(_scale, _scale) * Matrix.CreateTranslation(_offset.X, _offset.Y);
             using (ctx.PushTransform(world))
             {
+                DrawOverlays(ctx, Addons.CanvasLayer.UnderShapes);
                 DrawShapes(ctx, doc);
+                DrawOverlays(ctx, Addons.CanvasLayer.OverShapes);
                 if (_preview is not null) DrawPreview(ctx, _preview);
                 if (_run is { } run) DrawRun(ctx, run.Job, run.Marker);
                 if (_drag == Drag.Create) DrawCreatePreview(ctx);
@@ -463,6 +476,7 @@ public sealed partial class CanvasView : Control
             if (_drag != Drag.None || PicksPoints) DrawGuides(ctx);
             DrawLineInProgress(ctx);
             DrawSnaps(ctx);
+            DrawOverlays(ctx, Addons.CanvasLayer.Screen);
         }
         DrawRulers(ctx);
     }

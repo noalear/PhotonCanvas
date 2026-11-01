@@ -34,6 +34,11 @@ for rid in "${TARGETS[@]}"; do
   # The remote server for the phone, in its own folder beside the program (Laser → Remote access starts it).
   dotnet publish src/PhotonCanvas.Server -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin/server" -nologo -v q
+  # The add-ons that come with the program, each in addons/<id> beside it (docs/addons.md).
+  for proj in src/Addons/*/PhotonCanvas.Addon.*.csproj; do
+    [ -f "$proj" ] || continue
+    dotnet build "$proj" -c Release -p:Version="$VERSION" -p:AppOutDir="$PWD/$out/bin/" -nologo -v q
+  done
 
   case "$rid" in
     osx-*)

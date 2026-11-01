@@ -43,7 +43,9 @@ public sealed class AddonManager
     readonly List<AddonEntry> _entries = [];
     internal readonly Dictionary<Type, (object Service, string Owner)> Services = [];
 
-    public static string BuiltInFolder => Path.Combine(AppContext.BaseDirectory, "addons");
+    /// <summary>The add-ons that come with the program (PHOTONCANVAS_ADDONS_DIR points elsewhere, for tools and tests).</summary>
+    public static string BuiltInFolder =>
+        Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS_DIR") is { Length: > 0 } custom ? custom : Path.Combine(AppContext.BaseDirectory, "addons");
     public static string UserFolder => Path.Combine(AppIdentity.DataDir, "addons");
     public static string DataRoot => Path.Combine(AppIdentity.DataDir, "addon-data");
 

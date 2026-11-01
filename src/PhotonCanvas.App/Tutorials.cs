@@ -258,7 +258,7 @@ public sealed class TutorialRunner
         var step = _tutorial.Steps[i];
         _atStart = _host.Counts();
         _counter.Text = $"{i + 1} / {_tutorial.Steps.Count}";
-        var r = new HelpRenderer(HelpFiles.Folder, t => { if (t.StartsWith("tutorial:")) { } else _readGuide(t); }) { Compact = true };
+        var r = new HelpRenderer(HelpFiles.Library.FolderForTutorial(_tutorial.Id), t => { if (t.StartsWith("tutorial:")) { } else _readGuide(t); }) { Compact = true };
         var blocks = new List<Block>();
         if (i > 0 || step.Title != _tutorial.Title) blocks.Add(new Heading(2, step.Title, ""));
         blocks.AddRange(step.Body);
@@ -523,7 +523,7 @@ public sealed class TutorialRunner
     }
 }
 
-static class LogicalExtensions
+public static class LogicalExtensions
 {
     /// <summary>Every logical descendant (controls not drawn yet included).</summary>
     public static IEnumerable<Control> GetLogicalDescendantsOf(this Control root)
