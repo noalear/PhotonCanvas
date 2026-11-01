@@ -20,6 +20,8 @@ public sealed class ShadowBoardAddon : IAddon
         _host = host;
         host.AddRibbonButton(new RibbonButton("Laser", "Make", "Shadow board", "IcFitPiece", Open)
         {
+            Large = true,
+            GroupAfter = "Tests|Materials",
             Tip = "Lay your tools on the bed: the camera outlines them and makes a drawer insert with a pocket, finger notches and a label for each",
         });
         host.AddCommand(new AddonCommand("shadowboard.open", "Shapes", "Shadow board…", "", Open));
