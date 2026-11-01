@@ -1,0 +1,8 @@
+{
+  "id": "warp",
+  "name": "Warp",
+  "version": "1.0.0",
+  "description": "Bend the selection: perspective taper, arch, bulge or wave.",
+  "category": "Arrange",
+  "apiVersion": 1
+}

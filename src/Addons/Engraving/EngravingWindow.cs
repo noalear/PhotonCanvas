@@ -5,10 +5,11 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
+using PhotonCanvas.App;
 using static PhotonCanvas.App.UiKit;
 using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.Engraving;
 
 /// <summary>
 /// A picture redrawn as engraving lines, banknote style: lines that swell in the shadows and thin

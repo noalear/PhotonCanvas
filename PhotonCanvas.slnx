@@ -10,6 +10,10 @@
     <Project Path="src/PhotonCanvas.Remote.Desktop/PhotonCanvas.Remote.Desktop.csproj" />
   </Folder>
   <Folder Name="/src/Addons/">
+    <Project Path="src/Addons/Centreline/PhotonCanvas.Addon.Centreline.csproj" />
+    <Project Path="src/Addons/CmykSplit/PhotonCanvas.Addon.CmykSplit.csproj" />
+    <Project Path="src/Addons/Engraving/PhotonCanvas.Addon.Engraving.csproj" />
+    <Project Path="src/Addons/Warp/PhotonCanvas.Addon.Warp.csproj" />
     <Project Path="src/Addons/ImageMask/PhotonCanvas.Addon.ImageMask.csproj" />
     <Project Path="src/Addons/Nest/PhotonCanvas.Addon.Nest.csproj" />
     <Project Path="src/Addons/DepthOutlines/PhotonCanvas.Addon.DepthOutlines.csproj" />
