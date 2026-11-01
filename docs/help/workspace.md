@@ -33,7 +33,7 @@ a tab's name for what the tab holds.
 | **Arrange** | Align, Flip & rotate, Order, Repeat, Transform | [Arranging](arrange.md) |
 | **Picture** | Add, Turn it into, Shape, Edit, Relief, Clean up | [Pictures](pictures.md) |
 | **Camera** | See the bed, Place, Set up | [Camera](camera.md) |
-| **Laser** | Materials, Colour on metal, Job, Work area, Machine | [Materials and tests](materials-and-tests.md), [Running a job](running-jobs.md), [Work area](work-area.md), [The machine and settings](machine.md) |
+| **Laser** | Materials, Job, Work area, Machine (and the add-ons' Tests and Colour on metal) | [Materials and tests](materials-and-tests.md), [Running a job](running-jobs.md), [Work area](work-area.md), [The machine and settings](machine.md) |
 | **View** | Zoom, Grid & snapping, Measure & history, Show | [The View tab](#the-view-tab) below |
 
 - A button that can't do anything right now is greyed out. **Group** needs two or more shapes

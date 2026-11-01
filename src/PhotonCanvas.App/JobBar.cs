@@ -392,15 +392,6 @@ public sealed class JobBar : UserControl
     /// <summary>The job as built now (null when it can't be built).</summary>
     public BuiltJob? CurrentJob => _job;
 
-    TimeLapse? _timeLapse;
-
-    async Task FinishTimeLapse(TimeLapse lapse)
-    {
-        if (await lapse.FinishAsync() is not { } saved) return;
-        _sendState = File.Exists(saved) ? $"Time-lapse saved: {saved}" : $"Time-lapse photos saved in {saved} (install ffmpeg to get a video).";
-        ShowCaption();
-    }
-
     /// <summary>A short sound when a job finishes (the system's own sound player on a Mac or Linux).</summary>
     static void Chime()
     {
@@ -678,8 +669,7 @@ public sealed class JobBar : UserControl
                 ShowRunning(true);
                 if (_pausedAt is { } p) _pausedFor += (DateTime.Now - p).TotalSeconds;
                 _pausedAt = null;
-                if (_startedAt is null && _settings.TimeLapse && _timeLapse is null)
-                    _timeLapse = TimeLapse.Start(_machine.TimeLapseFrameAsync, _settings.TimeLapseSeconds, OwnJob is null ? "Job" : _sentFrom is { } nm ? Path.GetFileNameWithoutExtension(nm) : "Untitled");
+                if (_startedAt is null) RunStarted?.Invoke(OwnJob is null ? "Job" : _sentFrom is { } nm ? Path.GetFileNameWithoutExtension(nm) : "Untitled");
                 _startedAt ??= DateTime.Now;
                 _machineElapsedAt = DateTime.Now;
                 if (OwnJob is not null) _follow.Start();
@@ -712,11 +702,7 @@ public sealed class JobBar : UserControl
                     }
                     if (finished && OwnJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
                 }
-                if (_timeLapse is { } lapse)
-                {
-                    _timeLapse = null;
-                    _ = FinishTimeLapse(lapse);
-                }
+                if (_startedAt is not null) RunEnded?.Invoke(mode is "P_WORK_DONE" or "P_FINISH");
                 _follow.Stop();
                 _canvas.ShowRun(null, null);
                 _machineElapsed = null;
@@ -929,6 +915,12 @@ public sealed class JobBar : UserControl
 
     /// <summary>A job this bar sent finished on the machine (not cancelled): the design it came from, by file.</summary>
     public event Action<string?>? RunFinished;
+
+    /// <summary>A job started running on the machine (any job, also one started there): its name.</summary>
+    public event Action<string>? RunStarted;
+
+    /// <summary>A job that was running stopped: true when it finished, false when it was stopped or ended otherwise.</summary>
+    public event Action<bool>? RunEnded;
 
     string? _sentFrom;
     bool _sentMidSections;

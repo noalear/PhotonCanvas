@@ -1,0 +1,8 @@
+{
+  "id": "camera-placement",
+  "name": "Camera placement",
+  "version": "1.0.0",
+  "description": "Cut round printed stickers and labels the camera finds (print-then-cut), and put a copy of the design on every piece on the bed.",
+  "category": "Camera",
+  "apiVersion": 1
+}

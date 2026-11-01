@@ -1,0 +1,8 @@
+{
+  "id": "colour-on-metal",
+  "name": "Colour on metal",
+  "version": "1.0.0",
+  "description": "Colour tests, measuring the colours with a scan or the close-up camera, and pictures in the colours your plate really makes (MOPA on stainless or titanium).",
+  "category": "Picture",
+  "apiVersion": 1
+}

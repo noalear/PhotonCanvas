@@ -1,0 +1,8 @@
+{
+  "id": "nest",
+  "name": "Nest",
+  "version": "1.0.0",
+  "description": "Pack copies or parts onto the work area or a piece of material, as tightly as their shapes allow.",
+  "category": "Arrange",
+  "apiVersion": 1
+}

@@ -97,7 +97,7 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `Document` | The open design: `State` (a `DocState`), `Selection`, `ActiveLayer`, `Commit(label, newState, select)` = one undo step; `BeginEdit/UpdateEdit/EndEdit` for live dragging. Build new states with `Ops` (`Ops.AddShapes`, `Ops.AddLayer`, …). |
 | `DocumentChanged` | After any change, undo/redo, or another file opened. |
 | `Machine`, `MachineChanged` | The chosen machine's profile (work area `FieldW/FieldH`, lasers, limits). |
-| `Library` | The material library (recipes, kerf, slot fit…). |
+| `Library`, `RefreshLibrary()` | The material library (recipes, kerf, slot fit…); after changing and saving it, `RefreshLibrary()` updates the program's material lists. |
 | `AppSettings`, `SaveAppSettings()` | The program's settings (read; write only with care). Keep your own settings in `DataFolder`. |
 | `SelectedPicture` | The picture, when exactly one is selected. |
 | `Photo`, `PhotoChanged`, `TakePhotoAsync()` | The overview camera photo of the bed (`RasterImage`, bed `Area`, `MmPerPx`); taking one doesn't move anything. |
@@ -106,19 +106,24 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `IsConnected` | Is a laser connected. |
 | `FocusDistanceMm`, `CameraCalibratedFor(d)`, `PhotographAreaAsync(area, mmPerPx, d)` | The measured focus distance; is the overview camera calibrated there; a fresh straightened photo of part of the bed (pointers off, nothing moves). |
 | `LastSentJob` | The last `BuiltJob` sent from this session, and when. |
+| `JobStarted`, `JobEnded` | A job started running on the machine (its name), and stopped (true = finished). Any job, also one started from the machine. |
+| `JobFinished` | A job sent from this session finished on the machine (argument: the design file it came from). Tests open their results from it. |
+| `MachinePanel` | The program's machine connection itself, for what the members above don't cover (close-up camera placement, the red pointer, measuring). It can move the head and fire: only from a button that plainly says so. Its members may change between versions. |
 | `Owner` | The main window, as owner for your dialogs. |
 | `Status(text)`, `Guard(work)` | A status-bar line; run work showing errors as a message, not a crash. |
 | `ShowHelp(file, anchor)` | Open a page of your help (or the program's). |
-| `InvalidateCanvas()`, `RefreshCommands()` | Redraw the canvas; re-ask buttons' enabled/checked/visible tests. |
+| `InvalidateCanvas()`, `FitWorkArea()`, `RefreshCommands()` | Redraw the canvas; zoom out to the whole work area; re-ask buttons' enabled/checked/visible tests. |
+| `ActivateLayer(id)` | Make a layer the active one and pick it in the Layers panel (after adding it). |
 | `Folder`, `DataFolder`, `Manifest` | Your installed folder (read-only), a folder for your own files (kept across updates and removal), your addon.json. |
 
 ### Adding things
 
 | Call | Adds |
 |---|---|
-| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
+| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Order` sorts add-ons' buttons within a group (after the program's own), so the order doesn't depend on which add-on started first. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. |
 | `AddCommand(AddonCommand)` | A command in the shortcut list and command search; `Keys` like `"Ctrl+Alt+P"` gives it a shortcut (the person can change it). |
 | `AddContextMenuItem(ContextMenuEntry)` | An item on the canvas's right-click menu (`Visible`, `Enabled`, `Gesture`). |
+| `ShowCloseUpAreaWhile(when)` | The outline of where the close-up camera looks, on the canvas while `when()` says so (e.g. while your test is in the design). |
 | `AddCanvasOverlay(ICanvasOverlay)` | Drawing on the canvas: `UnderShapes` (over the camera picture, world mm), `OverShapes` (world mm), or `Screen` (pixels). Keep it fast. |
 | `AddToSlot(slot, make)` | Your panel inside a window's named slot (below). |
 | `AddJobHook(IJobHook)` | A step in making the job (below). |
@@ -132,6 +137,7 @@ A window with a slot calls `AddonSlots.Fill(slot, panel, window, data, changed)`
 
 | Slot | Where | `Data` |
 |---|---|---|
+| `properties.picture` | Selection panel, Picture settings, under the program's buttons (filled again when another picture is selected or an add-on comes or goes) | the selected `ImageShape` |
 | `stackslice.stacked` | 3D to slices, under the "Stacked layers" settings | `IStackSliceSlot` (read the options, add an `ISliceModifier`); see the slicer add-on |
 
 Ask the add-ons thread for a new slot when you need one in a program window; add slots of your own
@@ -159,7 +165,7 @@ when a shape is rebuilt.
 
 ### Help pages and tutorials
 
-Put pages in your `help/` folder in the guide's format (`docs/help/AUTHORING.md`). They join the
+Put pages in your `help/` folder in the guide's format (`docs/help/AUTHORING.md`). You may link to the program's pages and to the pages of add-ons you list under `requires`. They join the
 guide under **Add-ons** while you're on, and are searched with the rest. Link to your own pages by
 file name; images go in `help/images/`. A `<!-- windows: PapercraftWindow -->` line makes F1 in that
 window open the page. Every add-on needs at least one page and one tutorial.
