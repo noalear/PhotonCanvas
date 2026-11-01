@@ -1,8 +1,9 @@
+using Avalonia.Threading;
 using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.KerfTest;
 
-/// <summary>Laser → Materials → Kerf gauge (and its command), opening <see cref="KerfGaugeWindow"/>.</summary>
+/// <summary>Laser → Tests → Kerf gauge (and its command), opening <see cref="KerfGaugeWindow"/>.</summary>
 public sealed class KerfTestAddon : IAddon
 {
     /// <summary>A frame with a tapered slot and a key half way in.</summary>
@@ -14,11 +15,21 @@ public sealed class KerfTestAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Laser", "Materials", "Kerf gauge", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Laser", "Tests", "Kerf gauge", Icon, Open)
         {
+            GroupAfter = "Materials",
+            Order = 10,
             Tip = "Fits first time: cut a tiny tapered-slot gauge, push its keys in, and a close-up photo reads the kerf and the slot fit, saved on the material for finger joints, slices, dowels and inlays",
         });
         host.AddCommand(new AddonCommand("kerftest.open", "Materials", "Kerf gauge…", "", Open));
+        // Show where the close-up camera looks while a gauge is in the design, and open Read it when the job finishes.
+        host.ShowCloseUpAreaWhile(() => KerfGauge.Find(host.Document.State) is not null);
+        host.JobFinished += Finished;
+    }
+
+    void Finished(string? from)
+    {
+        if (KerfGauge.Find(_host.Document.State) is not null) Dispatcher.UIThread.Post(Open);
     }
 
     void Open()
@@ -27,7 +38,12 @@ public sealed class KerfTestAddon : IAddon
         var window = new KerfGaugeWindow(_host, KerfGauge.Find(_host.Document.State) is not null);
         _open = window;
         window.Closed += (_, _) => { if (ReferenceEquals(_open, window)) _open = null; };
-        _ = _host.Guard(() => window.ShowDialog(_host.Owner));
+        _ = _host.Guard(async () =>
+        {
+            await window.ShowDialog(_host.Owner);
+            // Saved readings show up in the program's material lists.
+            _host.RefreshLibrary();
+        });
     }
 
     public void Stop()

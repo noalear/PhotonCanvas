@@ -98,7 +98,7 @@ public sealed class KerfGaugeWindow : Window
                 _plan,
                 Hint("Cut on the honeycomb, in the material the parts will be made from, and stay with it. The scales are marked lightly first."),
                 _add,
-                Hint("Adding the gauge closes this window so you can frame it and send it. When it's cut, open Laser → Kerf gauge again: it opens on Read it."),
+                Hint("Adding the gauge closes this window so you can frame it and send it. When the job finishes, this window opens again on Read it (or open Laser → Kerf gauge)."),
             },
         };
 

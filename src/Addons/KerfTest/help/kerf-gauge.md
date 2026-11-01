@@ -2,7 +2,7 @@
 <!-- windows: KerfGaugeWindow -->
 
 An add-on (Settings → Add-ons → **Fits first time (kerf gauge)**): on when PhotonCanvas is installed,
-and can be turned off or removed. Its button is **Laser → Materials → Kerf gauge**.
+and can be turned off or removed. Its button is **Laser → Tests → Kerf gauge**.
 
 The beam takes a little material away along every cut: the **kerf**. A part comes out half a kerf
 smaller all round and a hole half a kerf bigger, so a finger joint, a dowel hole or an inlay drawn to
@@ -51,7 +51,7 @@ camera's scale, and the sheet never moves after cutting.
 
 ## Read it
 
-When it's cut, open **Kerf gauge** again: it opens on **Read it**.
+When the job finishes, the window opens again on **Read it** (or open **Kerf gauge** again). While a gauge is in the design, the work area outlines where the close-up camera looks.
 
 1. Lift out the window piece and the keys. **Don't move the sheet.**
 2. Push one key, lying flat, into the top slot as far as a firm push takes it.
@@ -90,7 +90,7 @@ What it says:
   read.
 - From the library the kerf and fit go into: the box generator's **Cut with** (finger joints, see
   [Drawing](drawing.md)), the 3D to slices add-on's cut and dowel-pin settings, and
-  the inlay's **Cut with** ([Materials and tests](materials-and-tests.md)).
+  the Material tests add-on's **Inlay** (its **Cut with**), see [Materials and tests](materials-and-tests.md).
 - **Layer**, **Put the kerf on this layer**: sets the kerf on a cut layer in this design straight away.
 - **Remove the gauge from the design**: deletes its two layers.
 
