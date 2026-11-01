@@ -1,0 +1,8 @@
+{
+  "id": "diffraction",
+  "name": "Diffraction pictures",
+  "version": "1.0.0",
+  "description": "Turn a picture into tiny diffraction gratings that shimmer with rainbow colours on polished stainless (MOPA).",
+  "category": "Picture",
+  "apiVersion": 1
+}

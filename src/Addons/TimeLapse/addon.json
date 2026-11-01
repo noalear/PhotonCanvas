@@ -1,0 +1,8 @@
+{
+  "id": "time-lapse",
+  "name": "Time-lapse",
+  "version": "1.0.0",
+  "description": "Take a camera photo every few seconds while a job runs and make a video of it.",
+  "category": "Camera",
+  "apiVersion": 1
+}

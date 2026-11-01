@@ -1,0 +1,8 @@
+{
+  "id": "material-tests",
+  "name": "Material tests",
+  "version": "1.0.0",
+  "description": "Etch rate, cut test (with kerf and slot fit), exact depth, tone, line, bevel and graphene tests, and inlays built on their results.",
+  "category": "Laser",
+  "apiVersion": 1
+}

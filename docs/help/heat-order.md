@@ -28,8 +28,8 @@ coolest, and waits only where the plate needs it.
 
 Click **Heat** in the job bar (beside **Order**) and tick **Spread the heat across layers and
 objects**. The chip then reads **Heat: spread**. The setting is saved with the design, so it's
-still on when you open it again (undo takes it back). The colour test turns it on for you (see
-[Colour test](materials-and-tests.md#colour-test)).
+still on when you open it again (undo takes it back). The colour test (from the Colour on metal
+add-on) turns it on for you.
 
 | Setting | Range | Start | What it does |
 |---|---|---|---|

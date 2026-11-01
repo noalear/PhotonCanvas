@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>material-tests</AddonId>
+  </PropertyGroup>
+</Project>
