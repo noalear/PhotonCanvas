@@ -616,7 +616,6 @@ public partial class MainWindow : Window
         order.Small("To front", "IcFront", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), "Bring to front (drawn last on its layer)", HasSel);
         order.Small("To back", "IcBack", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), "Send to back", HasSel);
         var repeat = arrange.Group("Repeat");
-        repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
         repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
         repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
         repeat.Small("Along a path", "IcAlongPath", () => _ = Guard(CopyAlongSel), "Copies spaced along a path: select what to copy and the path (the longest selected line is the path)", Many);
@@ -850,7 +849,6 @@ public partial class MainWindow : Window
         new("shape.material", "Shapes", "Use as material outline", "", MaterialSel),
         new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
         new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
-        new("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", () => { if (_doc.Selection.Count > 0) _ = Guard(NestSel); }),
         new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
         new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
@@ -1371,7 +1369,6 @@ public partial class MainWindow : Window
                 DoAsync("Mask with shape…", MaskSel, paths.Count > 1),
                 Do("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), paths.Count > 1)),
             Sub("Array",
-                DoAsync("Nest on material…", NestSel),
                 DoAsync("Grid array…", () => ArraySel(circular: false)),
                 DoAsync("Circular array…", () => ArraySel(circular: true))),
             Sub("Align and distribute",
@@ -1547,12 +1544,6 @@ public partial class MainWindow : Window
     }
 
     int _insertCount;
-
-    async Task NestSel()
-    {
-        if (_doc.Selection.Count == 0) return;
-        await new NestWindow(_doc, _doc.Selection, Canvas.Machine).ShowDialog(this);
-    }
 
     void CenterSelInField()
     {
