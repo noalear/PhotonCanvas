@@ -124,7 +124,7 @@ you can watch the material as you place it. Greyed out until the machine is conn
 
 The work-area photo is also what [Pick piece and Trace edge](drawing.md) draw from. The overview
 camera is also used by [Quick on lid close](materials-and-tests.md) to centre a design on the
-material, and for a [time-lapse](running-jobs.md) of a job.
+material, and for a time-lapse of a job (the Time-lapse add-on).
 
 ## The close-up camera
 

@@ -114,6 +114,12 @@ public interface IAddonHost
     /// </summary>
     event Action<string?>? JobFinished;
 
+    /// <summary>A job started running on the machine (also one started from the machine itself). The argument is a name for it (the design's file name, or "Job").</summary>
+    event Action<string>? JobStarted;
+
+    /// <summary>A running job stopped: true when it finished, false when it was stopped or ended otherwise.</summary>
+    event Action<bool>? JobEnded;
+
     /// <summary>
     /// The program's machine connection itself, for add-ons that need more than the members above
     /// (close-up camera placement, the red pointer, measuring). It can move the head and fire the laser:

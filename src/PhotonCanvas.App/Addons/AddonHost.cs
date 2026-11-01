@@ -40,6 +40,8 @@ public interface IAddonServices
     event Action? MachineChanged;
     event Action? PhotoChanged;
     event Action<string?>? JobFinished;
+    event Action<string>? JobStarted;
+    event Action<bool>? JobEnded;
     MachinePanel MachinePanel { get; }
 
     IDisposable AddRibbonButton(RibbonButton button);
@@ -136,6 +138,16 @@ public sealed class AddonHost : IAddonHost
     public event Action<string?>? JobFinished
     {
         add => Hook(value, h => _s.JobFinished += h, h => _s.JobFinished -= h);
+        remove => Unhook(value);
+    }
+    public event Action<string>? JobStarted
+    {
+        add => Hook(value, h => _s.JobStarted += h, h => _s.JobStarted -= h);
+        remove => Unhook(value);
+    }
+    public event Action<bool>? JobEnded
+    {
+        add => Hook(value, h => _s.JobEnded += h, h => _s.JobEnded -= h);
         remove => Unhook(value);
     }
 

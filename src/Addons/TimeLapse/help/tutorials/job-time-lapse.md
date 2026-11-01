@@ -1,7 +1,7 @@
 # Make a time-lapse
 <!-- category: Running jobs -->
 <!-- summary: Photograph a job every few seconds while it runs and turn the photos into a video. -->
-<!-- page: running-jobs.md#time-lapse -->
+<!-- page: time-lapse.md -->
 <!-- order: 90 -->
 A time-lapse takes an overview camera photo every 5 seconds while a job runs and makes a video of
 them at the end. You need the machine connected (**Connect** at the right end of the ribbon); the video needs ffmpeg installed (otherwise the

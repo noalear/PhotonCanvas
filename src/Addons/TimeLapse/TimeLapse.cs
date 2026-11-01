@@ -1,6 +1,8 @@
 using PhotonCanvas.Core;
 
-namespace PhotonCanvas.App;
+using PhotonCanvas.App;
+
+namespace PhotonCanvas.Addon.TimeLapse;
 
 /// <summary>
 /// A time-lapse of a job: a camera photo every few seconds while it runs, made into a video at the

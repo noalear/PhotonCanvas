@@ -654,7 +654,6 @@ public partial class MainWindow : Window
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.Small("Preview run", "IcPreview", () => { if (_job.CurrentJob is { } bj) new RunPreviewWindow(bj, Canvas).Show(this); }, "Play the job back on the work area, sped up: what's marked when", () => _job.CurrentJob is not null);
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
-        job.SmallToggle("Time-lapse", "IcCamera", on => { _settings.TimeLapse = on; _settings.Save(); }, $"Take a camera photo every {_settings.TimeLapseSeconds:0} s while a job runs and make a video of it (needs ffmpeg for the video; otherwise the photos are kept). Saved in Pictures.", null, () => _settings.TimeLapse);
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
         work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");

@@ -503,7 +503,7 @@ it:
 | `versions`, `autosave` | Earlier versions of your designs, and the crash-recovery copies. |
 | `logs` | A diary per day (the last 14 days): machine events, warnings and errors. Useful when something goes wrong. |
 
-Time-lapses go in your Pictures folder instead (see [Time-lapse](running-jobs.md#time-lapse)).
+Time-lapses (an add-on) go in your Pictures folder instead.
 Data saved by older versions in other places is brought over when the program starts.
 
 ## Try it
