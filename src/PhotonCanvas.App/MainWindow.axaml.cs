@@ -636,8 +636,6 @@ public partial class MainWindow : Window
         _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
         pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclip = picture.Group("Shape");
-        pclip.Large("Image mask", "IcIntersect", ClipPicture, "Select a picture and a closed shape: the shape masks the picture, so only the part inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
-        pclip.Small("Remove mask", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove image mask", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Take the image mask off: the whole picture is shown and engraved again", () => SelectedPicture() is { Clip: not null });
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
         ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
@@ -2021,21 +2019,6 @@ public partial class MainWindow : Window
         var paths = SelectedPaths();
         if (paths.Count < 2 || !paths.Any(p => p.World.Subpaths.Any(sp => sp.Closed))) { StatusText.Text = "Select the shapes to cut and a closed shape to mask them with."; return; }
         await new MaskShapesWindow(_doc, paths).ShowDialog(this);
-    }
-
-    void ClipPicture()
-    {
-        var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
-        var pic = sel.OfType<ImageShape>().FirstOrDefault();
-        var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
-        if (pic is not null && outline is null && sel.OfType<PathShape>().Any())
-        {
-            StatusText.Text = "Image mask: the selected shape isn't a closed outline (its ends don't join), so it can't mask the picture. Close it with Tidy lines first, or draw a closed shape.";
-            return;
-        }
-        if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to mask it with."; return; }
-        _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
-        StatusText.Text = "Image mask: only the part inside the shape is shown and engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
     }
 
     async Task CopyAlongSel()

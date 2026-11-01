@@ -291,7 +291,7 @@ A page for each piece, after the page you split from (which is left as it was): 
   - On an **Engrave** layer, the part of its area on the piece.
   - On a **Cut** or **Score** layer, the stretch of its line on the piece (an open line, so a circle
     across the corner of four boards becomes four arcs).
-  - A picture gets the piece as its [image mask](pictures.md#image-mask), and only that part is
+  - A picture gets the piece as its image mask, and only that part is
     engraved; the rest may hang outside the work area.
 - **Everything else**, greyed on a layer called **Other pieces** that's never sent: the other
   pieces' outlines and the whole design, so you can see how this piece fits with the rest. It can
