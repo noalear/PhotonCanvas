@@ -8,9 +8,8 @@
         into the program's output: src/PhotonCanvas.App/bin/<Configuration>/net10.0/addons/<AddonId>/.
   -->
   <PropertyGroup>
-    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
-    <EnableDynamicLoading>true</EnableDynamicLoading>
-    <AppOutDir>$(MSBuildThisFileDirectory)..\PhotonCanvas.App\bin\$(Configuration)\net10.0\</AppOutDir>
+    <!-- Where the program is (tools/publish.sh points it at the published program instead). -->
+    <AppOutDir Condition="'$(AppOutDir)' == ''">$(MSBuildThisFileDirectory)..\PhotonCanvas.App\bin\$(Configuration)\net10.0\</AppOutDir>
     <AddonOutDir>$(AppOutDir)addons\$(AddonId)\</AddonOutDir>
   </PropertyGroup>
 

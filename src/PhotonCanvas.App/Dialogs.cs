@@ -7,7 +7,7 @@ using Avalonia.Media;
 namespace PhotonCanvas.App;
 
 /// <summary>Small modal dialogs (message, confirm, text prompt).</summary>
-static class Dialogs
+public static class Dialogs
 {
     static Window Shell(string title, Control body, double width = 420) => new()
     {

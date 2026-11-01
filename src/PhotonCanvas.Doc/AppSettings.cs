@@ -41,6 +41,8 @@ public sealed class AppSettings
     public List<Preset> Presets { get; set; } = [];
     public string? LastMachineIp { get; set; }
     public bool AutoConnect { get; set; } = true;
+    /// <summary>Add-ons the person turned on (true) or off (false), by id; ones not listed follow their own default.</summary>
+    public Dictionary<string, bool> Addons { get; set; } = [];
     public double PassDelayS { get; set; } = 1;
     public bool WholeJobPasses { get; set; } = true;
     /// <summary>Wait this long after each cut or score path (s), set in the job bar. 0 = none.</summary>
