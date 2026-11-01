@@ -15,6 +15,7 @@ public interface IAddonServices
     AppSettings AppSettings { get; }
     void SaveAppSettings();
     MaterialLibrary Library { get; }
+    void RefreshLibrary();
     ImageShape? SelectedPicture { get; }
     bool IsConnected { get; }
     CameraPhoto? Photo { get; }
@@ -31,16 +32,23 @@ public interface IAddonServices
     Task Guard(Func<Task> work);
     void ShowHelp(string file, string? anchor);
     void InvalidateCanvas();
+    void FitWorkArea();
+    void ActivateLayer(Guid layerId);
     void RefreshCommands();
 
     event Action? DocumentChanged;
     event Action? MachineChanged;
     event Action? PhotoChanged;
+    event Action<string?>? JobFinished;
+    event Action<string>? JobStarted;
+    event Action<bool>? JobEnded;
+    MachinePanel MachinePanel { get; }
 
     IDisposable AddRibbonButton(RibbonButton button);
     IDisposable AddCommand(AddonCommand command);
     IDisposable AddContextMenuItem(ContextMenuEntry item);
     IDisposable AddCanvasOverlay(ICanvasOverlay overlay);
+    IDisposable ShowCloseUpAreaWhile(Func<bool> when);
     /// <summary>The add-on's help/ folder appears in the guide; dispose to take it out.</summary>
     IDisposable AddHelp(AddonManifest manifest, string folder);
 }
@@ -57,7 +65,7 @@ public sealed class AddonHost : IAddonHost
     readonly AddonManager _manager;
     readonly IAddonServices _s;
     readonly List<IDisposable> _added = [];
-    readonly List<(Action Handler, Action Unhook)> _unhook = [];
+    readonly List<(Delegate Handler, Action Unhook)> _unhook = [];
 
     internal AddonHost(AddonManager manager, IAddonServices services, AddonManifest manifest)
     {
@@ -88,6 +96,7 @@ public sealed class AddonHost : IAddonHost
     public AppSettings AppSettings => _s.AppSettings;
     public void SaveAppSettings() => _s.SaveAppSettings();
     public MaterialLibrary Library => _s.Library;
+    public void RefreshLibrary() => _s.RefreshLibrary();
     public ImageShape? SelectedPicture => _s.SelectedPicture;
     public bool IsConnected => _s.IsConnected;
     public CameraPhoto? Photo => _s.Photo;
@@ -100,10 +109,13 @@ public sealed class AddonHost : IAddonHost
     public bool CameraCalibratedFor(double distanceMm) => _s.CameraCalibratedFor(distanceMm);
     public Task<SkiaSharp.SKBitmap> PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm) => _s.PhotographAreaAsync(area, mmPerPx, distanceMm);
     public (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob => _s.LastSentJob;
+    public MachinePanel MachinePanel => _s.MachinePanel;
     public void Status(string text) => _s.Status(text);
     public Task Guard(Func<Task> work) => _s.Guard(work);
     public void ShowHelp(string file, string? anchor = null) => _s.ShowHelp(file, anchor);
     public void InvalidateCanvas() => _s.InvalidateCanvas();
+    public void FitWorkArea() => _s.FitWorkArea();
+    public void ActivateLayer(Guid layerId) => _s.ActivateLayer(layerId);
     public void RefreshCommands() => _s.RefreshCommands();
 
     // The add-on's handlers are kept here and unhooked from the program when it stops.
@@ -123,6 +135,22 @@ public sealed class AddonHost : IAddonHost
         remove => Unhook(value);
     }
 
+    public event Action<string?>? JobFinished
+    {
+        add => Hook(value, h => _s.JobFinished += h, h => _s.JobFinished -= h);
+        remove => Unhook(value);
+    }
+    public event Action<string>? JobStarted
+    {
+        add => Hook(value, h => _s.JobStarted += h, h => _s.JobStarted -= h);
+        remove => Unhook(value);
+    }
+    public event Action<bool>? JobEnded
+    {
+        add => Hook(value, h => _s.JobEnded += h, h => _s.JobEnded -= h);
+        remove => Unhook(value);
+    }
+
     void Hook(Action? h, Action<Action> add, Action<Action> remove)
     {
         if (h is null) return;
@@ -136,7 +164,19 @@ public sealed class AddonHost : IAddonHost
         _unhook.Add((h, () => remove(safe)));
     }
 
-    void Unhook(Action? h)
+    void Hook<T>(Action<T>? h, Action<Action<T>> add, Action<Action<T>> remove)
+    {
+        if (h is null) return;
+        Action<T> safe = x =>
+        {
+            try { h(x); }
+            catch (Exception e) { AppLog.Error($"Add-on {Manifest.Id}", e); }
+        };
+        add(safe);
+        _unhook.Add((h, () => remove(safe)));
+    }
+
+    void Unhook(Delegate? h)
     {
         int at = _unhook.FindLastIndex(x => x.Handler == h);
         if (at < 0) return;
@@ -178,6 +218,8 @@ public sealed class AddonHost : IAddonHost
         Keep(_s.AddContextMenuItem(item with { Run = Safe(item.Run), Visible = Safe(item.Visible), Enabled = Safe(item.Enabled) }));
 
     public IDisposable AddCanvasOverlay(ICanvasOverlay overlay) => Keep(_s.AddCanvasOverlay(new SafeOverlay(overlay, Manifest.Id)));
+
+    public IDisposable ShowCloseUpAreaWhile(Func<bool> when) => Keep(_s.ShowCloseUpAreaWhile(Safe(when)!));
 
     public IDisposable AddToSlot(string slot, Func<SlotContext, Control?> make) => Keep(AddonSlots.Add(slot, make, this));
 

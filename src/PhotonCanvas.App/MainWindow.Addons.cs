@@ -28,10 +28,26 @@ public partial class MainWindow : IAddonServices
             });
         _doc.Changed += _ => _documentChanged?.Invoke();
         _machine.PhotoChanged += _ => _photoChanged?.Invoke();
-        // Screenshots and tests start without them, so they show the program alone.
-        if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
-        try { _addons.StartAll(); }
-        catch (Exception e) { AppLog.Error("Starting add-ons", e); }
+        _job.RunFinished += from => _jobFinished?.Invoke(from);
+        _job.RunStarted += name => _jobStarted?.Invoke(name);
+        _job.RunEnded += finished => _jobEnded?.Invoke(finished);
+        // Add-ons coming and going change buttons and the panels' add-on parts.
+        _addons.Changed += () =>
+        {
+            _ribbon.Refresh();
+            _props.Refresh();
+        };
+        // Started once the window opens (ConnectOnOpen is only known then). Tests start without
+        // them, so they see the program alone, unless PHOTONCANVAS_ADDONS=1.
+        bool started = false;
+        Opened += (_, _) =>
+        {
+            if (started) return;
+            started = true;
+            if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
+            try { _addons.StartAll(); }
+            catch (Exception e) { AppLog.Error("Starting add-ons", e); }
+        };
     }
 
     void SetMachine(MachineProfile m)
@@ -68,6 +84,7 @@ public partial class MainWindow : IAddonServices
     AppSettings IAddonServices.AppSettings => _settings;
     void IAddonServices.SaveAppSettings() => _settings.Save();
     MaterialLibrary IAddonServices.Library => _library;
+    void IAddonServices.RefreshLibrary() => _layerEditor.RefreshMaterials();
     ImageShape? IAddonServices.SelectedPicture => SelectedPicture();
     bool IAddonServices.IsConnected => _machine.IsConnected;
     CameraPhoto? IAddonServices.Photo => Canvas.Photo;
@@ -88,6 +105,7 @@ public partial class MainWindow : IAddonServices
     Task<SkiaSharp.SKBitmap> IAddonServices.PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm) =>
         _machine.IsConnected ? _machine.CaptureAreaAsync(area, mmPerPx, distanceMm) : throw new InvalidOperationException("Connect the machine first.");
     (BuiltJob Job, DateTimeOffset SentAt)? IAddonServices.LastSentJob => _job.LastSent;
+    MachinePanel IAddonServices.MachinePanel => _machine;
     void IAddonServices.Status(string text) => StatusText.Text = text;
 
     async Task IAddonServices.Guard(Func<Task> work)
@@ -103,12 +121,20 @@ public partial class MainWindow : IAddonServices
 
     void IAddonServices.ShowHelp(string file, string? anchor) => ShowHelp(file, anchor);
     void IAddonServices.InvalidateCanvas() => Canvas.InvalidateVisual();
+    void IAddonServices.FitWorkArea() => Canvas.FitField();
+    void IAddonServices.ActivateLayer(Guid layerId) => _layers.Activate(layerId);
     void IAddonServices.RefreshCommands() => _ribbon.Refresh();
 
     Action? _documentChanged, _machineChanged, _photoChanged;
     event Action? IAddonServices.DocumentChanged { add => _documentChanged += value; remove => _documentChanged -= value; }
     event Action? IAddonServices.MachineChanged { add => _machineChanged += value; remove => _machineChanged -= value; }
     event Action? IAddonServices.PhotoChanged { add => _photoChanged += value; remove => _photoChanged -= value; }
+    Action<string?>? _jobFinished;
+    event Action<string?>? IAddonServices.JobFinished { add => _jobFinished += value; remove => _jobFinished -= value; }
+    Action<string>? _jobStarted;
+    Action<bool>? _jobEnded;
+    event Action<string>? IAddonServices.JobStarted { add => _jobStarted += value; remove => _jobStarted -= value; }
+    event Action<bool>? IAddonServices.JobEnded { add => _jobEnded += value; remove => _jobEnded -= value; }
 
     IDisposable IAddonServices.AddRibbonButton(RibbonButton b)
     {
@@ -123,7 +149,7 @@ public partial class MainWindow : IAddonServices
             };
             if (b.Visible is { } v) _ribbon.ShowWhen(c, v);
             return c;
-        }, b.GroupAfter);
+        }, b.GroupAfter, b.Order);
         _ribbon.Refresh();
         return undo;
     }
@@ -149,6 +175,22 @@ public partial class MainWindow : IAddonServices
         {
             Canvas.Overlays.Remove(overlay);
             Canvas.InvalidateVisual();
+        });
+    }
+
+    readonly List<Func<bool>> _closeUpAreaWhen = [];
+
+    /// <summary>Does an add-on want the close-up camera's area shown now.</summary>
+    bool AddonsWantCloseUpArea() => _closeUpAreaWhen.Any(f => f());
+
+    IDisposable IAddonServices.ShowCloseUpAreaWhile(Func<bool> when)
+    {
+        _closeUpAreaWhen.Add(when);
+        ShowCloseUpArea();
+        return new AddonUndo(() =>
+        {
+            _closeUpAreaWhen.Remove(when);
+            ShowCloseUpArea();
         });
     }
 

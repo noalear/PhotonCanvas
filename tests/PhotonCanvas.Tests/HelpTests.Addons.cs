@@ -31,17 +31,6 @@ public partial class HelpTests
     static HashSet<string> AddonRibbon(string src) =>
         Regex.Matches(src, @"new RibbonButton\(\s*""([^""]+)"",\s*""[^""]+"",\s*""([^""]+)""").Select(m => $"{m.Groups[1].Value}/{m.Groups[2].Value}").ToHashSet();
 
-    /// <summary>The folders (under src/Addons) of the add-ons this one lists under "requires" in its addon.json.</summary>
-    static List<string> Required(string addon)
-    {
-        using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, addon, "addon.json")));
-        if (!json.RootElement.TryGetProperty("requires", out var req)) return [];
-        var ids = req.EnumerateArray().Select(e => e.GetString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return [.. Directory.GetDirectories(AddonsDir).Where(d => File.Exists(Path.Combine(d, "addon.json")))
-            .Where(d => { using var j = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(d, "addon.json"))); return ids.Contains(j.RootElement.GetProperty("id").GetString()); })
-            .Select(Path.GetFileName).OfType<string>()];
-    }
-
     [Theory]
     [MemberData(nameof(Addons))]
     public void EveryAddonExplainsItself(string addon)
@@ -51,11 +40,15 @@ public partial class HelpTests
         var own = HelpLibrary.Load(help);
         Assert.True(own.Pages.Count > 0, $"{addon}/help has no page.");
         Assert.True(own.Tutorials.Count > 0, $"{addon}/help/tutorials has no tutorial.");
-        // The add-ons it requires are always on with it: their pages, buttons and labels count too.
-        var required = Required(addon);
-        var lib = Lib.Value.WithAddons([(addon, help), .. required.Select(r => (r, Path.Combine(AddonsDir, r, "help")))]);
+        // Links may go to the program's pages, its own, or those of add-ons it lists under "requires".
+        var requires = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, addon, "addon.json"))).RootElement
+            .TryGetProperty("requires", out var r) ? r.EnumerateArray().Select(x => x.GetString()!).ToHashSet(StringComparer.OrdinalIgnoreCase) : [];
+        var needed = AddonNames().Where(a => a != addon && Directory.Exists(Path.Combine(AddonsDir, a, "help"))
+            && requires.Contains(System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, a, "addon.json"))).RootElement.GetProperty("id").GetString()!));
+        var lib = Lib.Value.WithAddons([(addon, help), .. needed.Select(a => (a, Path.Combine(AddonsDir, a, "help")))]);
         var src = AddonSources(addon);
-        var withRequired = string.Join("\n", required.Select(AddonSources).Append(src));
+        // Tutorial steps may point at the required add-ons' buttons and labels too (a hollow tutorial opens 3D to slices).
+        var withRequired = string.Join("\n", needed.Select(AddonSources).Append(src));
         var problems = new List<string>();
 
         // Links and pictures.

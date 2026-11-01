@@ -32,8 +32,8 @@ explained in full.
 - **Depth slices**: a picture mode for relief: the picture is a depth map (dark = deep), engraved
   as thin slices one after another, each covering everything at least that deep. See
   [Layer settings](layer-settings.md).
-- **Depthmap**: a grey picture where darkness means depth, for relief engraving. Picture →
-  **Depthmap** makes one with DepthCharge, a separate program. See [Pictures](pictures.md).
+- **Depthmap**: a grey picture where darkness means depth, for relief engraving. The DepthCharge
+  add-on's **Depthmap** button makes one, using DepthCharge, a separate program. See [Pictures](pictures.md).
 - **Diode** (**Diode · blue**): the 40 W, 455 nm blue laser. A layer uses it unless it's set to
   **MOPA**. See [Layer settings](layer-settings.md).
 - **Dithering**: how the grey tones of a picture become dots, each burned at full power (Jarvis,
@@ -151,7 +151,8 @@ explained in full.
 - **Sections**: marking a design bigger than the work area one part at a time, moving the
   material between parts. See [Work area](work-area.md).
 - **Split onto pieces**: one design marked across several separate pieces that go together (four
-  boards making one picture), a page each, lined up by the camera. See [Work area](work-area.md#split-onto-pieces).
+  boards making one picture), a page each, lined up by the camera. An add-on, with its own page
+  under **Add-ons**.
 - **Object snap**: a picked point landing exactly on another shape's end, middle, centre, quadrant
   or crossing (or perpendicular or tangent to it), with a marker saying which, as in AutoCAD. See
   [Object snaps](canvas.md#object-snaps).

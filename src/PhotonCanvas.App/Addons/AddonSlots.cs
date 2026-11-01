@@ -18,8 +18,16 @@ public static class AddonSlots
     {
         var entry = (slot, make, owner);
         Panels.Add(entry);
-        return new AddonUndo(() => Panels.Remove(entry));
+        Version++;
+        return new AddonUndo(() =>
+        {
+            Panels.Remove(entry);
+            Version++;
+        });
     }
+
+    /// <summary>Goes up whenever a panel is added or taken away (windows that stay open fill their slots again).</summary>
+    public static int Version { get; private set; }
 
     /// <summary>Is any add-on's panel waiting for this slot.</summary>
     public static bool Any(string slot) => Panels.Any(p => p.Slot == slot);

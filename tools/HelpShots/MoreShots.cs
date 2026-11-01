@@ -140,14 +140,14 @@ static class MoreShots
         settle(200);
         if (ownFolder) try { Directory.Delete(models, true); } catch (Exception) { }
         // The pawn as a relief (Picture → 3D model), seen from the front.
-        var relief = new StlWindow();
+        var relief = new PhotonCanvas.Addon.Relief.StlWindow();
         relief.Show(w);
         settle(300);
-        typeof(StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
-        typeof(StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
         F<ComboBox>(relief, "_view").SelectedIndex = 1;
         settle(3000);
-        save(relief.CaptureRenderedFrame(), "window-picture-3d-model", "3D model to relief: a chess pawn seen from the front, as a depth map");
+        AddonShot(relief.CaptureRenderedFrame(), "Relief", "window-picture-3d-model");
         relief.Close();
 
         // Depth outlines, on a made-up depthmap: domed pebbles piled on each other.
@@ -320,9 +320,10 @@ static class MoreShots
             doc.Select(doc.State.Shapes.Select(x => x.Id));
             settle(800);
             save(w.CaptureRenderedFrame(), "workspace-pieces-layout", "Four boards as material outlines, the design over them, all selected");
-            var split = (Task)typeof(MainWindow).GetMethod("SplitOntoPieces", Any)!.Invoke(w, null)!;
-            for (int i = 0; i < 200 && !split.IsCompleted; i++) settle(50);
-            settle(800);
+            // Split onto pieces is an add-on: run its command.
+            var commands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            commands.FirstOrDefault(c => c.Id == "area.split")?.Run();
+            settle(3000);
             // The job bar rebuilds on a timer after a change (not run here): rebuilt straight away.
             var bar = F<JobBar>(w, "_job");
             void Rebuilt()
@@ -332,7 +333,7 @@ static class MoreShots
                 settle(300);
             }
             Rebuilt();
-            var lineUp = w.OwnedWindows.OfType<LineUpWindow>().FirstOrDefault();
+            var lineUp = w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == "LineUpWindow");
             if (lineUp is not null) { lineUp.Position = new PixelPoint(w.Position.X + 2000, w.Position.Y); settle(300); }
             canvas.FitRect(new Rect2(-200, -10, 240, 240));
             settle(800);

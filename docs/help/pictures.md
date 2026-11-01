@@ -16,20 +16,24 @@ other shapes doesn't count, except for **Image mask**.
 | Group | Buttons |
 |---|---|
 | Add | [Import picture](#import-a-picture) |
-| Turn it into | [Trace](#trace), Engraving, [Colour on metal](#colour-on-metal), [Diffraction](#diffraction), [Depthmap](#depthmap-with-depthcharge) |
-| Shape | Image mask, Remove mask, [Shapes to picture](#shapes-to-picture) |
-| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop), CMYK split, Centre-line trace |
-| Relief | [3D model](#3d-model-relief), [Relief preview](#relief-preview); **Depth outlines** is an add-on |
-| Clean up | [Remove background](#remove-background) |
+| Turn it into | [Trace](#trace) |
+| Shape | [Shapes to picture](#shapes-to-picture) |
+| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop) |
 
-**Colour on metal** and **Diffraction** are MOPA-only features. They show by default; to hide or
-show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
+Add-ons add more buttons to the tab while they're on: **Colour on metal**, **Engraving**,
+**Diffraction** and **Depthmap** in Turn it into, **Image mask** and **Remove mask** in Shape, **CMYK split** and
+**Centre-line trace** in Edit, a **Relief** group (**3D model**, **Relief preview**, **Depth
+outlines**) and **Remove background** in **Clean up**. Each has its own page under **Add-ons** in
+the contents; turn them on or off in Settings → Add-ons.
+
+**Colour on metal** and **Diffraction** (both add-ons) are MOPA-only features. While their add-ons
+are on they show by default; to hide or show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
 **Colour on metal** and **Diffraction gratings** under **Features to show**. Unticking **Colour on
 metal** also hides the **Colour test** and **Measure colours** buttons on the Laser tab. Hiding a
 feature only takes it out of the ribbon: nothing is lost. See [The machine and settings](machine.md).
 
-Right-clicking a picture also offers **Trace picture…**, **Depthmap with DepthCharge…** and
-**Remove picture background…**.
+Right-clicking a picture also offers **Trace picture…**, and the add-ons' own items, such as
+**Remove picture background…** and **Depthmap with DepthCharge…**.
 
 ## Import a picture
 
@@ -47,7 +51,7 @@ turn a drawing (SVG, PDF…) into a picture, see **Import as one picture…** in
 - A file that can't be read is listed in a message; the others are still imported.
 
 The file's pixels are kept in the design as they are. Changing the size, the tone settings or the
-layer never alters them; **Filters**, **Crop**, **Eraser** and **Remove background** make a new
+layer never alters them; **Filters**, **Crop** and **Eraser** (and add-ons such as Remove background) make a new
 picture in its place (`Ctrl+Z` brings the old one back).
 
 ## How pictures are engraved
@@ -98,7 +102,8 @@ engraves, not the file, and each picture has its own. Each slider's value shows 
 | **Invert (for dark materials)** | off | Swaps light and dark: what was white burns, what was black doesn't. |
 
 They're applied in this order: invert, gamma, contrast, brightness. **Reset** puts all of them back.
-**Trace into vectors…**, **Depthmap…** and **Remove background…** do the same as the ribbon buttons.
+**Trace into vectors…** does the same as the ribbon button; add-ons can put buttons of their own
+under it (such as **Remove background…** and **Depthmap…**).
 
 - The work area shows the picture's own pixels, not these settings, unless
   [Pictures as burned](#pictures-as-burned) is on.
@@ -168,223 +173,6 @@ The line under the sliders counts the outlines and segments.
 holes). Pictures larger than 2000 pixels along their longer side are traced from a copy averaged
 down to 2000; the outlines are still placed at full size.
 
-## Colour on metal
-<!-- windows: ColourPictureWindow -->
-
-**Colour on metal** makes a colour picture on stainless steel or titanium with the MOPA laser, using
-the colours your plate really made. Each pixel becomes the nearest measured colour, with dots of
-neighbouring colours mixed in for the shades between, and each colour becomes one Engrave layer
-with the settings that made it.
-
-It needs a measured palette first: burn a **Colour test** (Laser tab), read it with **Measure
-colours** and save the palette. See [Materials and tests](materials-and-tests.md). Until then the
-window says there are no palettes and **Add colour layers** stays grey.
-
-![The Colour picture on metal window before any palette is measured](images/window-picture-colour-on-metal.png)
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Palette** | | A measured palette from the material library: material, palette name and date. |
-| **Dot size (mm)** | 0.05 to 3 (0.3) | Size of one colour dot. Smaller = finer, but heat makes neighbouring colours bleed: 0.2–0.5 mm is a good start. |
-| **Mix colours with dots for in-between shades** | on | Dithering between palette colours. Off: each dot takes the nearest colour only (posterised). |
-| **Fit the picture's light and dark to the palette** | on | Squeezes the picture's lightness into the range the palette really has, so shadows and highlights both land on a colour. |
-| **Use bare metal as a colour** | on | Unmarked metal counts as a colour (usually the lightest). If the palette has no bare-metal reading, a light grey stands in. |
-| **Merge colours closer than ΔE** | 2 to 20 (5) | Palette colours closer than this count as one: fewer layers, fewer near-duplicates. |
-| **Overscan (mm)** | 0 to 2 (0) | Run-up past each line with the laser off: steadier colour right to the edges, a little slower. |
-
-The right half shows the picture and the result simulated in the measured colours. **Colours used**
-shows a chip per colour; hover one for the settings that made it and its share of the picture. The
-summary gives the dots, colours, layers and the marking time.
-
-**Add colour layers** adds one Engrave layer per colour (named **Colour ·**, the colour and its test
-square, e.g. **R2 C5**), least energy first, over the picture at the same place, size and angle.
-Bare metal needs no layer. If the picture is alone on its layer, that layer stops being sent; if it
-shares it, turn its output off yourself. See-through parts stay bare.
-
-> **Tip:** Use the same plate, finish and focus as the colour test, and the same lights for judging.
-> Colours shift with the viewing angle, as on the test.
-
-## Diffraction
-<!-- windows: DiffractionWindow -->
-
-**Diffraction** turns the picture into tiny diffraction gratings on polished (mirror) stainless with
-the MOPA laser. The laser's pulses land a set distance apart along each line (the pitch: speed ÷
-frequency, e.g. 300 mm/s at 300 kHz is 1 µm), and a row of them splits light into rainbow colours.
-Each pixel of the picture becomes a small patch of grating.
-
-![The Diffraction picture window in Shimmer mode](images/window-picture-diffraction.png)
-
-**Mode**
-
-- **Shimmer: brightness → direction:** the scan direction of each pixel follows its brightness
-  (dark 0°, light towards 180°, in **Directions** steps), all at the green pitch. Parts of the
-  picture light up in turn as you tilt it.
-- **Colour: hue → pitch:** each pixel's hue sets its pitch (red to violet), so the colours show from
-  one lighting and viewing angle. All pixels scan in one **Direction °**.
-- **3D: depth map → floating points (experimental):** for a depth map (light = in front, mid-grey =
-  on the surface, dark = behind, white = nothing; **Depthmap** makes one). Each point becomes an arc
-  of grating pixels whose glint slides as you tilt the plate, so the point seems to float in front
-  of or behind the metal.
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Pixel (mm)** | 0.1 to 5 (0.5) | Size of one grating pixel. Smaller = more detail, more stop-starts. |
-| **Directions** | 2 to 36 (12) | Shimmer and 3D: how many grating directions (0–180°) brightness is shared out over. More = smoother shimmer, more layers. |
-| **Colours** | 2 to 24 (10) | Colour: how many pitches the hues are shared out over. |
-| **Direction °** | 0 to 179 (0) | Colour: the scan direction for every pixel; colours show when the light and your eye line up along it. |
-| **3D strength (mm)** | 0.5 to 30 (6) | 3D: how wide the arcs grow for the nearest and farthest points. More = deeper 3D, but busier. |
-| **Point spacing (mm)** | 0.2 to 10 (2) | 3D: distance between the points that get arcs. |
-| **Outlines and depth steps only (line art, stepped shapes)** | off | 3D: arcs only on outlines and sudden depth changes; off puts points all over (smooth reliefs). |
-| **Swap in front and behind** | off | 3D: if it looks inside out under your light. |
-| **Pitch for green µm** | 0.3 to 5 (1.00) | The pulse spacing that shows green where you'll look from. Smaller shows bluer, larger redder. Shimmer and 3D use it for every pixel. |
-| **Leave white unmarked (bare metal)** | on | Near-white pixels stay bare. |
-| **Leave greys and black unmarked** | on | Colour: greys and near-black stay bare (a grating can't show them). |
-| **Power %** | 1 to 100 (32) | Keep it low: too much heat blurs the grating and warps thin sheet. |
-| **Speed mm/s** | 2 to 15000 (300) | With the frequency, sets the pitch. Each layer's frequency is worked out from it. |
-| **Pulse width** | MOPA pulse widths (60 ns) | The pulse width for every grating layer. |
-| **Line spacing mm** | 0.01 to 0.5 (0.06) | Gap between fill lines. 0.05–0.06 mm covers the area with little heat. |
-
-The preview shows the pixel map on grey steel: shimmer and 3D pixels coloured by direction, colour
-pixels by their colour. The summary gives the pixels, how many are marked, the number of layers,
-their frequency and pitch range, and the marking time.
-
-**Add grating layers** adds one MOPA Engrave layer per direction or pitch (named like **Grating 45° ·
-1.00 µm**), pixels merged into strips, over the picture. Each layer's frequency is speed ÷ pitch,
-kept within what the pulse width allows, and its scan angle turns with the picture. Its
-**Overscan (mm)** is set to 0.2, so the beam is at a steady speed where it marks. As with colour
-on metal, the picture's own layer stops being sent if the picture is alone on it.
-
-> **Tip:** Run a grating test first (Laser → Colour test, Diffraction gratings) to find the power and
-> the pitch that show green for you. Hold the plate flat and focused.
-
-## Depthmap with DepthCharge
-<!-- windows: DepthChargeWindow -->
-
-**Depthmap** estimates the depth of the scene in a photo or artwork and makes a depth map: a grey
-picture where white is the surface (left alone) and black the deepest part. On a Picture layer in
-**Depth slices** mode it's carved as a relief. Select a picture first, or click **Depthmap** with
-nothing selected to pick a picture file.
-
-**What it needs.** The depth is worked out by **DepthCharge**, a separate program that is not part of
-PhotonCanvas. It must be installed and set up (its own Setup, once). It runs on your own computer,
-on the graphics card if it can (DirectML) or the processor (slower); PhotonCanvas talks to it at
-127.0.0.1 only and nothing leaves the computer.
-
-- PhotonCanvas looks for it in the folder you chose before, then in
-  `%LOCALAPPDATA%\Programs\DepthCharge`, `Documents\DepthCharge` and `OneDrive\Documents\DepthCharge`.
-  **Choose DepthCharge folder…** points to another folder (the one with its `app.py` and
-  `runtime\python`).
-- If DepthCharge is already running it's used. Otherwise it's started in the background when you
-  click **Generate depthmap**, and stopped again when PhotonCanvas closes. A DepthCharge you started
-  yourself is left running.
-
-**Estimate depth**
-
-| Model | Detail | Notes |
-|---|---|---|
-| **DA3 Large (best all-round)** | 518, 728 or 1036 px (1036) | Whole-image depth; best for photos and most artwork. |
-| **DA3 + fine detail (research)** | 518, 728 or 1036 px (1036) | DA3 for the shape plus Depth Pro's fine detail. Needs DepthCharge's Depth Pro download. |
-| **Local close-ups (experimental)** | 518, 728 or 1036 px (518) | Overlapping close-ups for coins and ornament. Slower; can disturb the overall shape. |
-| **Depth Pro (research only)** | 1536 px | Apple's model, sharp boundaries. Non-commercial research licence; needs the Depth Pro download. |
-| **V2 Small (fast)** | 518 px | A quick baseline. |
-
-Once DepthCharge is running without the Depth Pro download, a chosen **DA3 + fine detail** or
-**Depth Pro** goes back to **DA3 Large**. If you generate with one before that, it stops and says
-Depth Pro isn't downloaded (DepthCharge's README says how to get it).
-
-**Large pictures.** The model looks at most at **Detail** pixels at once (1036 for DA3), with the
-whole picture fitted inside that square. A 3762 × 1254 px picture would then get only 1036 × 345
-depth, and every export of it is that blown up. Tiles fix this: the model looks at overlapping
-squares of the full-size picture, each filling its whole input, and each is fitted to the whole
-picture's depth where it lies. The overall shape stays the whole picture's (tiles can't bend it);
-the tiles bring the fine detail.
-
-| Large pictures | What it does | The 3762 × 1254 example |
-|---|---|---|
-| **Automatic tiles · when needed** (default) | Tiles when the picture is more than 1.25 × **Detail** or further from square than 5:4. Each tile up to twice **Detail**. | 4 tiles, 3108 × 1036 depth, about 1.2 s |
-| **Fine tiles · a depth sample per pixel** | Tiles the size of **Detail**: one depth sample per picture pixel. Slower. | 10 tiles, 3762 × 1254 depth, about 2.7 s |
-| **Whole picture only** | As before tiles. | 1036 × 345 depth |
-
-The times are with the model already loaded, on the graphics card. The depth is at most 4096 px
-on its longest side. Tiles don't apply to **Local close-ups**, which are their own kind of tiling.
-They add resolution, not accuracy: the depth is still the model's guess, relative and not in
-millimetres. While it runs, the window counts the tiles; when done it says how big the depth is.
-
-**Generate depthmap** runs the model (the first run takes longer while it loads). The window shows
-the picture and the depth map side by side.
-
-**Shape the relief.** These sliders reshape the finished depth map without running the model again:
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Midtone lift** | 0.2 to 3 (1) | Raises or lowers the middle heights (gamma). |
-| **Smoothing** | 0 to 5 (0) | Smooths while keeping edges; also smooths the exported map. |
-| **Black point** | 0 to 99 (0) | Percent of the range treated as deepest. |
-| **White point** | 1 to 100 (100) | Percent of the range treated as shallowest. |
-| **Ignore tails %** | 0 to 10 (0) | Ignores this share of extreme depths at each end before scaling; 0.5–2 tames edge spikes. |
-| **Tile detail** | 0 to 2 (1) | Tiled pictures only: the fine detail the tiles found. 1 as found, 0 the whole picture's shape alone (as without tiles), 2 doubled. |
-| **Direction** | **Emboss · raised relief** | Emboss raises the subject; **Deboss · recessed relief** sinks it. White is always shallow. |
-| **Artwork detail** | 0 to 1 (0.25) | Local close-ups only: adds detail from the picture's brightness. Keeps lettering, but shadows and paint can become false depth. |
-| **Model detail** | 0 to 2 (0.5) | DA3 + fine detail only: how much of Depth Pro's detail is added. |
-| **Detail scale** | 2 to 64 (12) | DA3 + fine detail only: size of the detail added, in pixels at 1024 px. |
-| **Image texture** | 0 to 1 (0) | DA3 + fine detail only: adds picture brightness as detail (can turn pigment into false depth). |
-| **Remove plain background** | off | DA3 + fine detail only. |
-
-**Open in DepthCharge (crop, mask, 3D)** opens DepthCharge's own editor in your browser: crop
-rectangle or circle, masks and a 3D view. Crops and masks saved there are used here after
-**Refresh preview**.
-
-**Output.** **Longest edge (px)** (64 to 8192, default 2048) is the size of the map added or saved.
-Up to the depth's own size keeps all its detail; bigger only interpolates. After a tiled depth
-bigger than the box says, the box is raised to the depth's size (and the window says so). **Save as** (8-bit or 16-bit) applies only to **Save PNG…**; the design
-always uses 8 bits.
-
-**Add depthmap to design** puts the map over the original, in the same place and size. A map cropped
-in DepthCharge to another shape is fitted inside the original's box, centred. A picture file picked
-instead goes in the middle of the work area, up to 100 mm across. It goes on a new
-Picture layer, **Relief ·** and the name, set to **Depth slices (relief)** with **Resolution** 254
-dpi, **Lines / cm** 200 and **Turn per pass (°)** 37. Set the slices, power and passes there
-([Layer settings](layer-settings.md)). The original picture stays on its own layer: turn its output
-off if only the relief should run.
-
-Carving depth slices hasn't been tried on the machine yet.
-
-## 3D model relief
-<!-- windows: StlWindow -->
-
-**3D model** turns a 3D model into a depth map, to carve it as a relief: the highest point is the
-surface, the lowest the deepest.
-
-![3D model to relief: a chess pawn seen from the front, its depth map on the right (lighter is higher)](images/window-picture-3d-model.png)
-
-1. **Open STL…** picks the model: STL (binary or text), OBJ or STEP.
-2. **View:** **From the top**, **From the front** or **From the side**.
-3. **Pixels** (100 to 4000, default 800): pixels along the map's longer side. 10 per mm is plenty
-   for most reliefs.
-4. **Size (mm)** (2 to 220, default 60): how big the relief is on the work area, along its longer
-   side.
-5. **Carve around the model (it stands proud)**: off, the area round the model is left as the
-   surface; on, it's carved to the bottom.
-
-The preview shows the depth map, and a line gives the number of triangles and the model's size in
-its own units. **Add to design** puts it in the middle of the work area on a new Picture layer,
-**Relief ·** and the model's name, with the same depth-slice settings as a depthmap, and makes that
-layer active.
-Set the slices, power and passes there ([Layer settings](layer-settings.md)). For cutting a model
-into stacked sheets instead, see 3D models and stacked slices.
-
-Carving depth slices hasn't been tried on the machine yet.
-
-## Relief preview
-<!-- windows: ReliefPreviewWindow -->
-
-**Relief preview** shows the selected depth map as the relief it will carve: a surface lit from the
-top left, light parts high and dark parts deep. **Depth (mm): how deep the deepest part is carved** (0.2
-to 5, default 1) only changes how steep the light makes it look; the real depth comes from the
-layer's settings. The window can stay open while you work.
-
-![The Relief preview window](images/window-picture-relief-preview.png)
-
 ## Shapes to picture
 
 **Shapes to picture** turns the selected shapes into a picture, for example to engrave a logo with a
@@ -427,7 +215,7 @@ engraved. Background clutter, a stray mark, a corner.
   picture doesn't have to be selected.
 - Each stroke is one step to undo (`Ctrl+Z`).
 - Erased parts become white and see-through, so they're never burned, even with **Invert (for dark
-  materials)** ticked. To clear a whole backdrop at once, use [Remove background](#remove-background).
+  materials)** ticked. To clear a whole backdrop at once, use the Remove background add-on.
 
 Press `Esc` or choose another tool to stop erasing.
 
@@ -447,38 +235,12 @@ Press `Esc` or choose another tool to stop erasing.
 **Crop** keeps the picture's scale: the kept part stays exactly where it was on the work area, and
 the picture gets smaller by the part cut away. Its tone settings and image mask are kept.
 
-## Remove background
-<!-- windows: BackgroundWindow -->
-
-**Remove background** makes a picture's backdrop see-through, so it isn't engraved, even with
-**Invert (for dark materials)** ticked. The picture's tone settings and image mask are kept. It works best on
-logos, scans and objects on a plain backdrop, and uses no AI and nothing online.
-
-![The Remove background window: the backdrop removed, the circle kept](images/window-picture-remove-background.png)
-
-| Setting | Range (default) | What it does |
-|---|---|---|
-| **Remove the background around the edges** | on | Finds the main colours along the picture's edges (up to three) and removes them, spreading in from the edges. |
-| **Tolerance** | 1 to 100 (20) | How different a colour can be and still count as background. Raise it if bits of backdrop remain; lower it if the subject's edges get eaten. |
-| **Clicks remove** | **the area clicked** | Click the preview to remove a colour too: **the area clicked** removes the patch joined to the click, **that colour everywhere** removes it all over. **Undo last click** and **Clear clicks** take clicks back. |
-| **Shrink edge** | 0 to 10 px (1) | Pulls the kept edge in, to drop a halo of backdrop colour. |
-| **Soften edge** | 0 to 6 px (1) | Feathers the cut edge over this many pixels. |
-
-The preview shows the result on a checkerboard (see-through) at up to 900 pixels across, and says
-how much of the picture is kept. **Apply** works at full size and replaces the picture's pixels;
-`Ctrl+Z` undoes it.
-
 ## Try it
 
 - [Import a picture and set its tone](tutorial:pic-import)
 - [Trace a picture into outlines](tutorial:pic-trace)
-- [A colour picture on metal](tutorial:pic-colour-on-metal)
-- [A diffraction picture](tutorial:pic-diffraction)
-- [A relief from a depth map](tutorial:pic-depthmap)
-- [A relief from a 3D model](tutorial:pic-3d-model)
 - [Turn shapes into a picture](tutorial:pic-shapes-to-picture)
 - [Picture filters](tutorial:pic-filters)
 - [Rub out parts of a picture](tutorial:pic-eraser)
 - [Crop a picture](tutorial:pic-crop)
-- [Remove a background](tutorial:pic-remove-background)
 - [See pictures as they'll burn](tutorial:pic-as-burned)
