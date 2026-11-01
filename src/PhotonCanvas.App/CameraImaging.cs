@@ -5,7 +5,7 @@ using SkiaSharp;
 
 namespace PhotonCanvas.App;
 
-static class CameraImaging
+public static class CameraImaging
 {
     /// <summary>Copy straight-alpha RGBA pixels into an Avalonia bitmap (safe off the UI thread).</summary>
     public static WriteableBitmap ToAvaloniaRgba(PhotonCanvas.Core.Imaging.RasterImage img)

@@ -90,6 +90,21 @@ public interface IAddonHost
     /// <summary>The part of the bed the close-up camera sees at the current focus height, if known.</summary>
     Rect2? CloseUpSees();
 
+    /// <summary>The focus distance the machine measured (mm), if known.</summary>
+    double? FocusDistanceMm { get; }
+
+    /// <summary>Is the overview camera calibrated for this focus distance.</summary>
+    bool CameraCalibratedFor(double distanceMm);
+
+    /// <summary>
+    /// A fresh overview photo of part of the bed, straightened at <paramref name="mmPerPx"/> (the red pointers
+    /// are switched off for it; nothing moves). Throws if the camera isn't calibrated or no laser is connected.
+    /// </summary>
+    Task<SkiaSharp.SKBitmap> PhotographAreaAsync(Rect2 area, double mmPerPx, double distanceMm);
+
+    /// <summary>The last job sent to the machine in this session, and when it was sent (null = none yet).</summary>
+    (BuiltJob Job, DateTimeOffset SentAt)? LastSentJob { get; }
+
     /// <summary>The machine's lights (0–100 each), and setting them.</summary>
     (int Front, int Back) Lights { get; }
     void SetLights(int front, int back);

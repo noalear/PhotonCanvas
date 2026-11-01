@@ -110,7 +110,7 @@ shape's layer.
 
 **Mask with shape** (in the **Shape builder** group, and **Shape operations** on the right-click
 menu) cuts the selected shapes to the outline of one of them, the mask: everything past the mask's
-edge is removed. Use it to keep [depth outlines](pictures.md#depth-outlines), a traced pattern or
+edge is removed. Use it to keep depth outlines, a traced pattern or
 hatching only inside a frame or some lettering. Unlike **Intersect**, it keeps open lines (they're
 cut where they cross the mask's edge), keeps each shape on its own layer, and leaves the mask alone.
 

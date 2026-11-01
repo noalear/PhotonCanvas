@@ -2,11 +2,12 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
+using PhotonCanvas.App;
 using PhotonCanvas.Doc.Tracing;
 using static PhotonCanvas.App.UiKit;
 using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
-namespace PhotonCanvas.App;
+namespace PhotonCanvas.Addon.DepthOutlines;
 
 /// <summary>
 /// Outlines from a depthmap: finds where the surface steps (a face against the leaves, a leaf over

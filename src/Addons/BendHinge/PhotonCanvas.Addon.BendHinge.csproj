@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <AddonId>bendhinge</AddonId>
-    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 </Project>

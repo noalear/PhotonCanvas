@@ -8,6 +8,8 @@ stretches stay solid and stiff, gentle curves get a few widely spaced lines of s
 get close ones. Use it for curved box sides, lamp shades, round-cornered trays, wavy screens and
 anything else that is one curve seen from above, standing up.
 
+![The Bend to shape window: a rounded rectangle, its corners slit, the straight sides solid](images/window-bend-to-shape.png)
+
 It's an add-on: turn it on or off in **Settings → Add-ons**. When it's on, it's the
 **Bend to shape** button in the **Draw** group of the **Home** tab.
 

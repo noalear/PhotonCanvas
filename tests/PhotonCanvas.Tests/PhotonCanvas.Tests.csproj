@@ -24,6 +24,8 @@
     <ProjectReference Include="..\..\src\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Server\PhotonCanvas.Server.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Remote\PhotonCanvas.Remote.csproj" />
+    <!-- Add-ons with tests (their own geometry). -->
+    <ProjectReference Include="..\..\src\Addons\DepthOutlines\PhotonCanvas.Addon.DepthOutlines.csproj" />
     <ProjectReference Include="..\..\src\Addons\BendHinge\PhotonCanvas.Addon.BendHinge.csproj" />
   </ItemGroup>
 
