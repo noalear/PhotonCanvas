@@ -42,6 +42,5 @@ depth those slices take off.
 next slices cut cleanly. Its power, speed and lines appear under it.
 
 ## Measure the depth per pass
-<!-- target: ribbon:Laser/Etch rate -->
-Laser → **Etch rate** measures how deep one pass goes on your material, to choose the slices and
+Laser → **Etch rate** (from the Material tests add-on) measures how deep one pass goes on your material, to choose the slices and
 the focus drop.
