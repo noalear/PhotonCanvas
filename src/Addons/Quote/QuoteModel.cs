@@ -51,7 +51,7 @@ public sealed class QuoteRates
     /// <summary>Sheet prices by material: the library material's id ("N" format), or <see cref="QuoteMath.OtherKey"/>.</summary>
     public Dictionary<string, SheetPrice> Sheets { get; set; } = [];
 
-    static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+    static readonly JsonSerializerOptions Json = new() { WriteIndented = true, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
 
     /// <summary>The rates saved at <paramref name="path"/>; the defaults when there are none or the file is damaged.</summary>
     public static QuoteRates Load(string path)
@@ -102,7 +102,7 @@ public sealed record QuoteJob
     public TimeSource Time { get; init; }
     public IReadOnlyList<ExtraLine> Extras { get; init; } = [];
 
-    static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() } };
+    static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() }, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
 
     public string ToJson() => JsonSerializer.Serialize(this, Json);
 
