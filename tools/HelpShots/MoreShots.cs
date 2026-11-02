@@ -336,6 +336,20 @@ static class MoreShots
         }
         warp.Close();
 
+        // --- Stencil bridges on a bold text.
+        {
+            reset();
+            var word = TextShape.Create("ROBOT 80", new TextStyle(SizeMm: 28, Bold: true), ids.Cut, Affine.Translate(30, 60));
+            doc.Commit("Text", Ops.AddShapes(doc.State, [word]), [word.Id]);
+            settle(300);
+            var input = PhotonCanvas.Addon.Stencil.StencilEdit.Gather(doc.State, doc.Selection);
+            var stencil = new PhotonCanvas.Addon.Stencil.StencilWindow(doc, input, Path.Combine(data, "stencil-shot"), _ => { });
+            stencil.Show(w);
+            for (int i = 0; i < 40; i++) settle(100);
+            AddonShot(stencil.CaptureRenderedFrame(), "Stencil", "window-stencil-bridges");
+            stencil.Close();
+        }
+
         // --- Split onto pieces: a 400 × 150 mm design over four 200 × 75 mm boards laid two by two.
         {
             reset();
