@@ -106,9 +106,9 @@ public class BuildingsTests
     public void Walls_go_into_the_columns_without_clashing(BuildingKind k)
     {
         var kit = Make(k);
-        var walls = kit.Solids.Where(s => !s.IsFurniture && s.Side is not (WallSide.None or WallSide.Floor) && s.Name != "Front door").ToList();
+        var walls = kit.Solids.Where(s => !s.IsFurniture && s.Side is not (WallSide.None or WallSide.Floor or WallSide.Ground) && s.Name != "Front door").ToList();
         var columns = kit.Solids.Where(s => s.Name is "Corner column" or "Column cap").ToList();
-        var floors = kit.Solids.Where(s => s.Side == WallSide.Floor).ToList();
+        var floors = kit.Solids.Where(s => s.Side is WallSide.Floor or WallSide.Ground).ToList();
         Assert.Equal(4, walls.Count(w => w.Storey == 0));
         Assert.Empty(Clashes(walls, columns));
         Assert.Empty(Clashes(walls, floors));
@@ -168,6 +168,28 @@ public class BuildingsTests
         }
         var structure = kit.Solids.Where(s => !s.IsFurniture).ToList();
         Assert.Empty(Clashes(furniture, structure, 0.4));
+    }
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void The_building_stands_on_floor_tiles_that_cover_it(BuildingKind k)
+    {
+        var spec = BuildingSpec.Preset(k);
+        var kit = BuildingKitMaker.Make(spec);
+        var tiles = kit.Solids.Where(s => s.Side == WallSide.Ground).ToList();
+        Assert.NotEmpty(tiles);
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Floor tile", StringComparison.Ordinal) && p.Sheet == Sheet.Walls);
+        // The tiles' top is where the walls stand, and together they cover the building's outside.
+        Assert.All(tiles, t => Assert.Equal(BuildingKitMaker.StoreyBase(spec, 0), Box(t).Max.Y, 6));
+        double half = spec.ColumnMm / 2;
+        Assert.Equal(-spec.WidthMm / 2 - half, tiles.Min(t => Box(t).Min.X), 1);
+        Assert.Equal(spec.DepthMm / 2 + half, tiles.Max(t => Box(t).Max.Z), 1);
+        double area = tiles.Sum(t => Geo.Area(t.Outline));
+        Assert.InRange(area, (spec.WidthMm + spec.ColumnMm) * (spec.DepthMm + spec.ColumnMm) * 0.98, (spec.WidthMm + spec.ColumnMm) * (spec.DepthMm + spec.ColumnMm) * 1.02);
+
+        var bare = BuildingKitMaker.Make(spec with { FloorTiles = false });
+        Assert.DoesNotContain(bare.Pieces, p => p.Name.StartsWith("Floor tile", StringComparison.Ordinal));
+        Assert.Equal(0, BuildingKitMaker.StoreyBase(spec with { FloorTiles = false }, 0));
     }
 
     [Fact]

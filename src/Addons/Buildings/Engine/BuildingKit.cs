@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.FloorTiles;
 using PhotonCanvas.Addon.Furniture;
 using PhotonCanvas.Addon.Walls;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
@@ -23,7 +24,7 @@ public sealed record Piece(string Name, Sheet Sheet, PathsD Cut, PathsD Etched, 
 /// </summary>
 public sealed record Solid(string Name, PathsD Outline, Pose Pose, double Thickness, PathsD? Etched, List<PathD>? Lines, int Storey, WallSide Side, bool IsFurniture);
 
-public enum WallSide { None, Front, Back, Left, Right, Floor }
+public enum WallSide { None, Front, Back, Left, Right, Floor, Ground }
 
 /// <summary>Everything a building is cut from, where it all goes, and what was found while making it.</summary>
 public sealed record BuildingKit(List<Piece> Pieces, List<Solid> Solids, List<Finding> Findings, double StoreyMm, double WallMm, SetKit? Furniture)
@@ -61,8 +62,11 @@ public static class BuildingKitMaker
     /// <summary>The parapet's height, in whole layers, to the top of the battlements.</summary>
     public static double ParapetHeight(BuildingSpec s) => Layers(s.ParapetHeightMm, s.WallSheetMm);
 
-    /// <summary>Where storey <paramref name="k"/>'s walls stand (mm up from the ground): each storey's walls, then a floor.</summary>
-    public static double StoreyBase(BuildingSpec s, int k) => k * (StoreyHeight(s) + s.WallSheetMm);
+    /// <summary>Where storey <paramref name="k"/>'s walls stand (mm up from the table): on the floor tiles, then each storey's walls and a floor.</summary>
+    public static double StoreyBase(BuildingSpec s, int k) => Ground(s) + k * (StoreyHeight(s) + s.WallSheetMm);
+
+    /// <summary>How high the floor tiles under the building are (0 without them).</summary>
+    public static double Ground(BuildingSpec s) => s.FloorTiles ? s.WallSheetMm : 0;
 
     static double K(BuildingSpec s) => Math.Max(0.2, s.ScaleMm / 28);
 
@@ -192,6 +196,7 @@ public static class BuildingKitMaker
         foreach (var (i, g) in named) solids[i] = solids[i] with { Name = g.Name(wallStoreys, storeys) };
         pieces.AddRange(extras);
 
+        Tiles(s, pieces, solids, findings);
         Columns(s, storeys, wallStoreys, pieces, solids, findings);
         Floors(s, storeys, wallStoreys, pieces, solids, findings);
         var furniture = Furnish(s, frontGround, pieces, solids, findings);
@@ -252,6 +257,42 @@ public static class BuildingKitMaker
             }
         }
         findings.Add(new(Severity.Note, $"Stack each corner column's layers on a {PinMm:0.#} mm pin (a cocktail stick or wire) and glue them; the pin carries on up through the floors into the column above."));
+    }
+
+    /// <summary>The floor tile maker's settings for the tiles under the building: a board as big as its outside (and the yard round it).</summary>
+    public static TileSpec TileSpecFor(BuildingSpec s)
+    {
+        double sq = Math.Max(5, s.SquareMm), yard = Math.Max(0, s.YardMm);
+        var preset = FloorTextures.Preset(s.FloorTexture) ?? FloorTextures.Preset("Flagstones")!;
+        var (a, b) = FloorTextures.SizesFor(preset, sq);
+        return new TileSpec
+        {
+            Mode = TileMode.Board, SquareMm = sq,
+            BoardAcross = Math.Round((s.WidthMm + s.ColumnMm + 2 * yard) / sq, 4),
+            BoardDown = Math.Round((s.DepthMm + s.ColumnMm + 2 * yard) / sq, 4),
+            TileAcross = 2, TileDown = 2, PlainBorder = true,
+            ThicknessMm = s.WallSheetMm,
+            Texture = preset.Name, SizeA = a, SizeB = b, GrooveMm = preset.Groove, Seed = s.Seed + 7, Etch = s.Etch,
+            Join = TileJoin.Jigsaw, FitMm = s.FitMm, TabMm = Math.Round(5 * Math.Clamp(sq / 25.4, 0.6, 2), 1),
+        };
+    }
+
+    /// <summary>The floor tiles the building stands on, from the floor tile maker, lying where they go.</summary>
+    static void Tiles(BuildingSpec s, List<Piece> pieces, List<Solid> solids, List<Finding> findings)
+    {
+        if (!s.FloorTiles) return;
+        var spec = TileSpecFor(s);
+        var kit = TileKitMaker.Make(spec);
+        foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
+            findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Floor tiles: {f.Text}"));
+        if (!kit.Ok) return;
+        foreach (var p in kit.Parts)
+            pieces.Add(new Piece(p.Name == TileKitMaker.ClipName ? "Floor tile clip" : $"Floor tile {p.Name}", Sheet.Walls, p.Cut, p.Etched, p.Lines, p.Copies));
+        // The board's corner at the building's front left (outside the columns and the yard), its rows running back.
+        double x0 = -s.WidthMm / 2 - s.ColumnMm / 2 - Math.Max(0, s.YardMm), z1 = s.DepthMm / 2 + s.ColumnMm / 2 + Math.Max(0, s.YardMm);
+        foreach (var spot in kit.Board)
+            solids.Add(new Solid("Floor tile", spot.Tile.Cut, Pose.Up(x0 + spot.X, s.WallSheetMm / 2, z1 - spot.Y), s.WallSheetMm, Nil(spot.Tile.Etched), Nil(spot.Tile.Lines), 0, WallSide.Ground, false));
+        findings.Add(new(Severity.Note, $"The building stands on {kit.Board.Count} floor tiles ({spec.BoardAcross:0.#} × {spec.BoardDown:0.#} squares of {spec.SquareMm:0.#} mm) that lock together with jigsaw edges."));
     }
 
     /// <summary>Lying flat at <paramref name="y"/>, turned <paramref name="turn"/> degrees round the upright (u along +X when 0, v away from you).</summary>
@@ -329,7 +370,7 @@ public static class BuildingKitMaker
             double x = -s.WidthMm / 2 + WallKitMaker.CentreToEnd(front) + WallKitMaker.PanelLength(front) / 2 - s.DoorWidthMm / 2;
             foreach (var p in dk.Parts)
                 foreach (var pose in p.Poses)
-                    solids.Add(new Solid("Front door", p.Cut, Interior.Move(pose, x, 0, s.DepthMm / 2, 0), s.FurnitureSheetMm, Nil(p.Etched), Nil(p.Lines), 0, WallSide.Front, true));
+                    solids.Add(new Solid("Front door", p.Cut, Interior.Move(pose, x, Ground(s), s.DepthMm / 2, 0), s.FurnitureSheetMm, Nil(p.Etched), Nil(p.Lines), 0, WallSide.Front, true));
         }
         Interior.Lay(s, items, [.. chosen.Select(x => x.Label)], kit, solids, findings);
         if (s.FurnitureSheetMm > s.WallSheetMm + 1e-9 && door)
