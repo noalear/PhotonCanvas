@@ -1,0 +1,10 @@
+{
+  "id": "touchup",
+  "name": "Burn, look, touch up",
+  "version": "1.0.0",
+  "description": "Photograph a finished engraving with the close-up camera, compare it with the design, and make a touch-up job that goes over only the parts that came out too light.",
+  "category": "Camera",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
