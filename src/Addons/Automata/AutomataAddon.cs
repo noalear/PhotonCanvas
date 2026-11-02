@@ -23,7 +23,7 @@ public sealed class AutomataAddon : IAddon
         {
             Tip = "Crank boxes with cut-out figures that bob, nod, peck and spin, and punched strips for paper-strip music boxes",
             Large = true,
-            Order = 10,
+            Order = 33,
         });
         host.AddCommand(new AddonCommand("automata.open", "Shapes", "Toys and automata…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit toy…", Open) { Visible = Selected });
