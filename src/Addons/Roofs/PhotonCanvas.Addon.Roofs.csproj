@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>roofs</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The wall maker (addon.json "requires" it): its geometry, textures and wall settings are shared. Compile against it, never copy it. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
