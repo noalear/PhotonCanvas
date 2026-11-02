@@ -1,0 +1,10 @@
+{
+  "id": "automata",
+  "name": "Toys and automata",
+  "version": "1.0.0",
+  "description": "Crank boxes with cut-out figures that bob, nod, peck and spin, checked moving before you cut; and punched strips for paper-strip music boxes, from notes you type or a MIDI file.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["mechanism"],
+  "onByDefault": true
+}

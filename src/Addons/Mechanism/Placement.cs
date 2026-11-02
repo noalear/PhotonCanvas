@@ -19,6 +19,16 @@ public sealed record PlaceOptions
 }
 
 /// <summary>
+/// Where parts go and how they're tagged: the layers' names and the keys on each shape for which set of parts it
+/// is and the settings it was made from. Other add-ons that make parts the same way (the toys and automata maker)
+/// use their own, so their parts and the mechanism maker's never mix.
+/// </summary>
+public sealed record PlaceTarget(string CutLayer, string MarkLayer, string IdKey, string SpecKey)
+{
+    public static readonly PlaceTarget Mechanism = new(Placement.CutLayer, Placement.MarkLayer, Placement.IdKey, Placement.SpecKey);
+}
+
+/// <summary>
 /// Puts a mechanism's parts in the design: each outline on a Cut layer, its name and marks on a light Score
 /// layer (engraved first, while the sheet is whole), grouped part by part and nested onto the bed by their
 /// true shape; parts that don't fit go on further pages. Every shape carries the mechanism's settings, so
@@ -47,34 +57,34 @@ public static class Placement
         return null;
     }
 
-    static bool Of(Shape x, string mechanism) => x.AddonData.TryGetValue(IdKey, out var v) && v == mechanism;
+    static bool Of(Shape x, string mechanism, string key = IdKey) => x.AddonData.TryGetValue(key, out var v) && v == mechanism;
 
     /// <summary>The shapes of a mechanism on the page shown.</summary>
-    public static HashSet<Guid> ShapesOf(DocState s, Guid mechanism)
+    public static HashSet<Guid> ShapesOf(DocState s, Guid mechanism, PlaceTarget? to = null)
     {
-        string id = mechanism.ToString();
-        return [.. s.Shapes.Where(x => Of(x, id)).Select(x => x.Id)];
+        string id = mechanism.ToString(), key = (to ?? PlaceTarget.Mechanism).IdKey;
+        return [.. s.Shapes.Where(x => Of(x, id, key)).Select(x => x.Id)];
     }
 
     /// <summary>Is any part of the mechanism on any page.</summary>
-    public static bool Exists(DocState s, Guid mechanism)
+    public static bool Exists(DocState s, Guid mechanism, PlaceTarget? to = null)
     {
-        string id = mechanism.ToString();
-        return s.Shapes.Any(x => Of(x, id)) || s.OtherPages.Any(p => p.Shapes.Any(x => Of(x, id)));
+        string id = mechanism.ToString(), key = (to ?? PlaceTarget.Mechanism).IdKey;
+        return s.Shapes.Any(x => Of(x, id, key)) || s.OtherPages.Any(p => p.Shapes.Any(x => Of(x, id, key)));
     }
 
     /// <summary>
     /// Takes a mechanism's parts off every page. Other pages that leaves empty go too (the ones its parts
     /// spilled onto); the page shown stays, and stays shown.
     /// </summary>
-    public static DocState Remove(DocState s, Guid mechanism)
+    public static DocState Remove(DocState s, Guid mechanism, PlaceTarget? to = null)
     {
         int shown = s.PageIndex;
         // From the last page back, so the pages before each one keep their places.
         for (int i = s.OtherPages.Count; i >= 0; i--)
         {
             var page = Pages.SwitchTo(s, i);
-            var mine = ShapesOf(page, mechanism);
+            var mine = ShapesOf(page, mechanism, to);
             if (mine.Count == 0) continue;
             page = Ops.Delete(page, mine);
             if (i != shown && page.Shapes.Count == 0 && page.OtherPages.Count > 0)
@@ -105,13 +115,16 @@ public static class Placement
         }
     }
 
-    public static (DocState State, int Sheets, Guid Id) Place(DocState s, Mechanism m, MechSpec spec, MachineProfile machine, PlaceOptions o, CancellationToken ct = default)
+    public static (DocState State, int Sheets, Guid Id) Place(DocState s, Mechanism m, MechSpec spec, MachineProfile machine, PlaceOptions o, CancellationToken ct = default) =>
+        Place(s, m, spec.ToJson(), machine, o, PlaceTarget.Mechanism, ct);
+
+    /// <summary>Puts the parts in as the other <c>Place</c> does, on the layers and with the keys of <paramref name="to"/>, carrying <paramref name="json"/> as their settings.</summary>
+    public static (DocState State, int Sheets, Guid Id) Place(DocState s, Mechanism m, string json, MachineProfile machine, PlaceOptions o, PlaceTarget to, CancellationToken ct = default)
     {
         var id = o.Replace ?? Guid.NewGuid();
-        string json = spec.ToJson();
         string title = m.Title;
         // Made again: the old parts go (from every page they were on) and the new ones go on the page shown.
-        if (o.Replace is { } old) s = Remove(s, old);
+        if (o.Replace is { } old) s = Remove(s, old, to);
         // A new one: a page of its own when this one already has something on it.
         else if (s.Shapes.Count > 0) s = Pages.Add(s, title);
         int firstPage = s.PageIndex;
@@ -119,20 +132,20 @@ public static class Placement
 
         (Layer Cut, Layer? Marks) Layers(ref DocState st)
         {
-            var cut = st.Layers.FirstOrDefault(l => l.Name == CutLayer);
+            var cut = st.Layers.FirstOrDefault(l => l.Name == to.CutLayer);
             if (cut is null)
             {
-                cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = CutLayer };
+                cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = to.CutLayer };
                 st = Ops.AddLayer(st, cut);
             }
             Layer? mk = null;
             if (o.Marks)
             {
-                mk = st.Layers.FirstOrDefault(l => l.Name == MarkLayer);
+                mk = st.Layers.FirstOrDefault(l => l.Name == to.MarkLayer);
                 if (mk is null)
                 {
                     var score = Layer.Default(st.Layers.Count, LayerMode.Score);
-                    mk = score with { Name = MarkLayer, Laser = score.Laser with { Power = Math.Min(score.Laser.Power, 15) } };
+                    mk = score with { Name = to.MarkLayer, Laser = score.Laser with { Power = Math.Min(score.Laser.Power, 15) } };
                     // Marked before anything is cut: cut parts can shift or drop.
                     var cutId = cut.Id;
                     st = Ops.AddLayer(st, mk, st.Layers.FindIndex(l => l.Id == cutId));
@@ -174,11 +187,11 @@ public static class Placement
             for (int c = 0; c < part.Copies; c++)
             {
                 string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
-                var shapes = new List<Shape> { new PathShape { Name = name, LayerId = cutLayer.Id, Geometry = outline }.WithAddonData(SpecKey, json) };
+                var shapes = new List<Shape> { new PathShape { Name = name, LayerId = cutLayer.Id, Geometry = outline }.WithAddonData(to.SpecKey, json) };
                 if (marks is not null) shapes.Add(new PathShape { Name = $"{name} · marks", LayerId = markLayer!.Id, Geometry = marks });
                 if (label is not null) shapes.Add(label.With(id: Guid.NewGuid(), name: $"{name} · name"));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
-                units.Add([.. shapes.Select(x => x.WithGroup(g).WithAddonData(IdKey, id.ToString()))]);
+                units.Add([.. shapes.Select(x => x.WithGroup(g).WithAddonData(to.IdKey, id.ToString()))]);
             }
         }
         if (units.Count == 0) throw new InvalidOperationException("Nothing to cut.");
@@ -203,7 +216,7 @@ public static class Placement
             (cutLayer, markLayer) = Layers(ref s);
         }
         if (o.CutSettings is { } cutSettings)
-            s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == CutLayer, l => cutSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
+            s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == to.CutLayer, l => cutSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
         return (Pages.SwitchTo(s, firstPage), sheets, id);
     }
 }

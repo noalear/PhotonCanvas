@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>automata</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The mechanism maker's cams, motion view and placement (addon.json "requires" it): compile against it, never copy it. -->
+    <ProjectReference Include="..\Mechanism\PhotonCanvas.Addon.Mechanism.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
