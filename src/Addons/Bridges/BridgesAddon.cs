@@ -22,7 +22,7 @@ public sealed class BridgesAddon : IAddon
         {
             Tip = "Plank footbridges, sagging rope bridges and stone arch bridges that slot together, for tabletop games and models",
             Large = true,
-            Order = 23,
+            Order = 24,
         });
         host.AddCommand(new AddonCommand("bridges.open", "Shapes", "Miniature bridges…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit bridge…", Open) { Visible = Selected });
