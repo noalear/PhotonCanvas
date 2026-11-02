@@ -12,6 +12,7 @@ namespace PhotonCanvas.Addon.Automata;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(FigureBoxSpec), "figures")]
 [JsonDerivedType(typeof(StripSpec), "strip")]
+[JsonDerivedType(typeof(CombSpec), "comb")]
 public abstract record ToySpec
 {
     /// <summary>Sheet thickness (mm).</summary>

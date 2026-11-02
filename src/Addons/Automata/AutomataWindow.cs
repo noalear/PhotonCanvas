@@ -18,17 +18,18 @@ using Mech = PhotonCanvas.Addon.Mechanism.Mechanism;
 namespace PhotonCanvas.Addon.Automata;
 
 /// <summary>
-/// The toys and automata maker: a crank box whose cut-out figures bob, nod, peck and spin, or a punched strip
-/// for a paper-strip music box. Set it up, watch it move (or play) while the check runs, and put the parts in
+/// The toys and automata maker: a crank box whose cut-out figures bob, nod, peck and spin, a punched strip
+/// for a paper-strip music box, or a spring steel comb to play it. Set it up, watch it move (or play) while the check runs, and put the parts in
 /// the design on a cut layer with the material's own kerf.
 /// </summary>
 public sealed class AutomataWindow : Window
 {
-    static readonly string[] Kinds = ["Moving figures", "Music box strip"];
+    static readonly string[] Kinds = ["Moving figures", "Music box strip", "Music box comb"];
     static readonly string[] KindWords =
     [
         "A box with a handle and cut-out figures on top: each one bobs on a rod, nods or pecks on a lever, or spins on a turntable as you turn it. Checked moving, all the way round, before you cut it.",
         "A punched strip for a paper-strip music box: type the tune or open a MIDI file, and each note becomes a hole in its lane. Checked for notes the box hasn't got and holes too close to play.",
+        "A music box comb to cut from thin spring steel: a tine for each lane of the strips, each as long as its note needs (worked out from the metal and its thickness), with stepped clamp bars to hold them.",
     ];
     static readonly string[] MoveNames = ["Bobs up and down", "Nods or pecks on a lever", "Spins on a turntable"];
 
@@ -37,7 +38,7 @@ public sealed class AutomataWindow : Window
     readonly MaterialLibrary? _library;
     readonly string? _dataFolder;
     (Guid Id, ToySpec Spec)? _editing;
-    readonly ToySpec[] _specs = [new FigureBoxSpec(), new StripSpec()];
+    readonly ToySpec[] _specs = [new FigureBoxSpec(), new StripSpec(), new CombSpec()];
 
     readonly TabControl _kind = new() { Margin = new Thickness(14, 8, 14, 0), Padding = new Thickness(0) };
     readonly TextBlock _kindWords = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 2, 0) };
@@ -167,18 +168,20 @@ public sealed class AutomataWindow : Window
         };
     }
 
-    static int KindOf(ToySpec s) => s is StripSpec ? 1 : 0;
+    static int KindOf(ToySpec s) => s switch { StripSpec => 1, CombSpec => 2, _ => 0 };
 
     int Kind => Math.Clamp(_kind.SelectedIndex, 0, Kinds.Length - 1);
 
     FigureBoxSpec Box { get => (FigureBoxSpec)_specs[0]; set => _specs[0] = value; }
     StripSpec Strip { get => (StripSpec)_specs[1]; set => _specs[1] = value; }
+    CombSpec Comb { get => (CombSpec)_specs[2]; set => _specs[2] = value; }
 
     /// <summary>The settings as they are now, made of the sheet chosen (a strip's pieces as long as the bed allows).</summary>
     ToySpec Current()
     {
         var mat = Cut()?.M.Category ?? "";
         if (_specs[Kind] is StripSpec st) return st with { Material = mat, MaxPieceMm = Math.Max(_machine.FieldW, _machine.FieldH) - 10 };
+        if (_specs[Kind] is CombSpec cs) return cs with { Material = mat };
         return _specs[Kind] with { ThicknessMm = (double)(_thick.Value ?? 3), SlotFitMm = (double)(_fit.Value ?? 0.1m), Material = mat };
     }
 
@@ -292,6 +295,9 @@ public sealed class AutomataWindow : Window
             if (c.M.ThicknessMm is { } t) _thick.Value = (decimal)t;
             if (c.R.SlotFitMm is { } fit) _fit.Value = (decimal)fit;
         }
+        // Only a thin sheet's thickness: the clamp plate's (or a wooden sheet's) isn't the comb's.
+        if (Cut() is { M.ThicknessMm: { } ct } && Kind == 2 && _combThick is not null && ct is >= 0.1 and <= 1.2)
+            _combThick.Value = (decimal)ct;
         Note();
         Changed();
     }
@@ -302,6 +308,8 @@ public sealed class AutomataWindow : Window
         {
             _cutNote.Text = Kind == 1
                 ? "Pick your card's cut settings so the holes come out their drawn size (Laser → Tests → Cut test measures the kerf)."
+                : Kind == 2
+                ? "Pick your spring steel's cut settings so the tines come out their drawn width (Laser → Tests → Cut test measures the kerf). The clamp bars go on a page of their own, on a layer for the thicker plate."
                 : "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out looser and holes bigger. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for parts at their drawn size.";
             return;
         }
@@ -344,7 +352,9 @@ public sealed class AutomataWindow : Window
             _make.Content = "Update in the design";
             int parts = m.Parts.Sum(p => p.Copies);
             _status.Text = $"{(replace is null ? "Put" : "Updated")} {parts} part{(parts == 1 ? "" : "s")} in the design on \"{to.CutLayer}\"" +
-                           (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
+                           (m.Parts.FirstOrDefault(x => x.Stock is not null) is { } other
+                               ? $", and the {Say.Lower(other.Name)}s on the next page, on \"{to.CutLayer} ({other.Stock})\" (cut them from that plate with its own settings)"
+                               : sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
                            (cut is { } cc ? $", cut with {cc.M.Label} · {cc.R.Title}" : "") +
                            (marks ? $"; names and marks on \"{to.MarkLayer}\"" : "") + "." +
                            (m.Worst == Severity.Bad ? " ⚠ The check found problems (in red): it may not work as it is." : "");
@@ -372,7 +382,7 @@ public sealed class AutomataWindow : Window
         Note();
         if (_shownKind == k) return;
         _shownKind = k;
-        _settings.Child = k == 0 ? FiguresPanel() : StripPanel();
+        _settings.Child = k switch { 0 => FiguresPanel(), 1 => StripPanel(), _ => CombPanel() };
     }
 
     NumericUpDown Num(decimal min, decimal max, decimal step, string format, double value, Action<double> set, bool narrow = false)
@@ -702,6 +712,77 @@ public sealed class AutomataWindow : Window
                 Field("Beat", Num(2, 40, 0.5m, "0.#", s.BeatMm, v => Strip = Strip with { BeatMm = v }), Hint("Strip for each beat (mm): longer gives repeated notes more room.")),
                 Field("Lead-in", Num(5, 100, 1, "0", s.LeadMm, v => Strip = Strip with { LeadMm = v }), Hint("Blank strip before the first note, to feed it in by (mm).")),
                 Check("Lanes from the other edge", s.Mirror, b => Strip = Strip with { Mirror = b }, "As if the strip were turned over: for a box that reads its lowest note from the other edge.")));
+    }
+
+    // ---- music box comb ----
+
+    NumericUpDown? _combThick;
+    readonly TextBlock _combNote = Hint();
+
+    Control CombPanel()
+    {
+        var s = Comb;
+        var custom = new StackPanel { Spacing = 8 };
+        var boxes = Movement.All.Select(m => m.Name).Append("Another box (set its sizes)").ToArray();
+        int mi = Movement.All.ToList().FindIndex(m => m.Key == s.Movement);
+        void Custom()
+        {
+            custom.Children.Clear();
+            var st = Comb;
+            custom.Children.Add(Field("Strip width", Num(10, 200, 0.5m, "0.##", st.WidthMm, v => Comb = Comb with { WidthMm = v }), Hint("Measure a strip that came with the box (mm).")));
+            custom.Children.Add(Field("Lane spacing", Num(0.8m, 10, 0.1m, "0.##", st.PitchMm, v => Comb = Comb with { PitchMm = v }), Hint("From one note's holes to the next across the strip (mm): the tines are this far apart.")));
+            custom.Children.Add(Field("First lane", Num(1, 50, 0.1m, "0.##", st.FirstMm, v => Comb = Comb with { FirstMm = v }), Hint("From the edge to the lowest note's holes (mm).")));
+            var tracks = new TextBox { Text = st.Tracks, AcceptsReturn = false, TextWrapping = TextWrapping.Wrap };
+            tracks.TextChanged += (_, _) => { Comb = Comb with { Tracks = tracks.Text ?? "" }; Changed(); };
+            custom.Children.Add(Field("Its notes", tracks, Hint("Lowest first, as names: C4 D4 E4 F4…")));
+        }
+        var box = Pick(boxes, mi < 0 ? boxes.Length - 1 : mi, v =>
+        {
+            Comb = v < Movement.All.Length ? Comb.WithMovement(Movement.All[v]) : Comb with { Movement = "custom" };
+            custom.IsVisible = v >= Movement.All.Length;
+            Custom();
+        });
+        custom.IsVisible = mi < 0;
+        Custom();
+        string[] octaves = ["Two octaves down", "An octave down", "As the lanes are named", "An octave up", "Two octaves up"];
+
+        var metals = CombMetal.All.Select(m => m.Name).ToArray();
+        int metal = Math.Max(0, CombMetal.All.ToList().FindIndex(m => m.Key == s.Metal));
+        _combThick = Num(0.1m, 3, 0.01m, "0.###", s.ThicknessMm, v => Comb = Comb with { ThicknessMm = v });
+        _combThick.Width = 130;
+        var suggest = Button("Suggest", tip: $"The thickest shim sold (0.010\" to 0.040\") that keeps the bass tine within {CombSpec.LongestWanted:0} mm and the treble one at least {CombSpec.ShortestWanted:0} mm.");
+        suggest.Click += (_, _) =>
+        {
+            try
+            {
+                double t = Comb.Suggest();
+                _combThick.Value = (decimal)t;
+                _combNote.Text = $"{t:0.###} mm ({t / 25.4:0.000}\") shim.";
+            }
+            catch (InvalidOperationException ex) { _combNote.Text = ex.Message; }
+        };
+        var thickRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _combThick, suggest } };
+
+        return Stack(
+            Explained("The strips it plays", "Its tines are as far apart as the strip's lanes, so the strips this maker punches line up with it: pick the same box.",
+                Field("Box", box), custom,
+                Check("Tines from the other edge", s.Mirror, b => Comb = Comb with { Mirror = b }, "Lowest note at the other end: as \"Lanes from the other edge\" on the strip."),
+                Field("Sounds", Pick(octaves, s.Octave + 2, v => Comb = Comb with { Octave = v - 2 }), Hint("An octave up makes every tine about 71% as long (1/√2); down, about 1.4 times."), "The strips play the same tune whatever octave the comb is in.")),
+            Explained("The metal", "Each tine's length is worked out from how stiff and heavy the metal is and how thick it is (a cantilever's first note). Width doesn't change the note.",
+                Field("Metal", Pick(metals, metal, v => Comb = Comb with { Metal = CombMetal.All[v].Key })),
+                Field("Thickness", thickRow, Hint("The stock's thickness (mm). Thicker is louder but makes every tine longer."), "0.5 mm (0.020\") is a good start for a 15-note comb."),
+                _combNote,
+                Field("Gap", Num(0.1m, 2, 0.05m, "0.##", s.GapMm, v => Comb = Comb with { GapMm = v }), Hint("The slot between tines (mm): each tine is the lane spacing less this wide.")),
+                Field("Tuning allowance", Num(0, 5, 0.1m, "0.#", s.ExtraMm, v => Comb = Comb with { ExtraMm = v }), Hint("Cut each tine this much long (mm) so it comes out flat, and only ever file the tips to tune up."))),
+            Explained("Holding it", "Two thick clamp bars, cut from steel plate with the same stepped edge, pinch the comb at each tine's root. The stiffer they are, the truer and louder the notes.",
+                Check("Line the tips up, as on a real comb", s.AlignTips, b => Comb = Comb with { AlignTips = b }, "Where the strip plucks them. Untick to line the roots up instead, so a plain straight bar clamps it."),
+                Field("Base", Num(6, 40, 1, "0", s.BaseMm, v => Comb = Comb with { BaseMm = v }), Hint("Solid metal behind the longest tine, for the bolts (mm).")),
+                Field("Clamp bars", Num(1, 10, 0.5m, "0.#", s.ClampMm, v => Comb = Comb with { ClampMm = v }), Hint("Their thickness (mm): 3 mm steel or more.")),
+                Field("Bolts", Num(1.5m, 8, 0.5m, "0.#", s.BoltMm, v => Comb = Comb with { BoltMm = v }), Hint("Metric size: 3 is M3."))),
+            Explained("Making it", "The help has all of this in full.",
+                Hint("Stock: blue-tempered 1095 or full-hard 301 shim is already spring-hard, so cut it and use it. Annealed spring steel must be hardened (heated to non-magnetic, about 800 °C, and quenched in warm oil between two steel plates), then tempered at about 370 to 400 °C for an hour, which a kitchen oven can't reach."),
+                Hint("Cutting it on a fiber laser: many quick passes, not a few slow ones, so the thin tines don't heat up and warp. Start at 100% power, about 100 mm/s, 30 to 40 kHz and the longest pulse your laser has (MOPA: 350 to 500 ns), and add passes until it drops through (about 20 to 40 for 0.5 mm). Raise the sheet on spacers so it doesn't weld to the bed, and run a cut test on an offcut first."),
+                Hint("Then smooth each tine's edges along its length with a fine stone, clamp it up, and tune it.")));
     }
 
     async Task OpenMidi()

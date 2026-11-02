@@ -7,7 +7,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The toys and automata maker's pictures (in its own help/images): the figure box moving, and a music box strip.</summary>
+/// <summary>The toys and automata maker's pictures (in its own help/images): the figure box moving, a music box strip and a music box comb.</summary>
 static class AutomataShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -42,5 +42,6 @@ static class AutomataShots
 
         Shot("window-automata-figures", new FigureBoxSpec(), 100);
         Shot("window-automata-strip", new StripSpec(), 1500);
+        Shot("window-automata-comb", new CombSpec(), 6.35 * 360);
     }
 }

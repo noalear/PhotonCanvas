@@ -130,12 +130,15 @@ public static class Placement
         int firstPage = s.PageIndex;
         int sheets = 1;
 
-        (Layer Cut, Layer? Marks) Layers(ref DocState st)
+        // Parts cut from other stock (a comb's thick clamp bars) get a cut layer named after it, on pages of their own.
+        string CutName(string? stock) => stock is null ? to.CutLayer : $"{to.CutLayer} ({stock})";
+        (Layer Cut, Layer? Marks) Layers(ref DocState st, string? stock = null)
         {
-            var cut = st.Layers.FirstOrDefault(l => l.Name == to.CutLayer);
+            string cutName = CutName(stock);
+            var cut = st.Layers.FirstOrDefault(l => l.Name == cutName);
             if (cut is null)
             {
-                cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = to.CutLayer };
+                cut = Layer.Default(st.Layers.Count, LayerMode.Cut) with { Name = cutName };
                 st = Ops.AddLayer(st, cut);
             }
             Layer? mk = null;
@@ -157,7 +160,7 @@ public static class Placement
 
         // Each part (each copy of it) with its marks, made at the bed's corner; the nesting moves it into place.
         if (TooBig(m, machine, o.GapMm).FirstOrDefault() is { } tooBig) throw new InvalidOperationException(tooBig.Text);
-        var units = new List<List<Shape>>();
+        var units = new List<(string? Stock, List<Shape> Shapes)>();
         foreach (var part in m.Parts)
         {
             ct.ThrowIfCancellationRequested();
@@ -170,50 +173,66 @@ public static class Placement
             PathGeometry? marks = null;
             if (markLayer is not null && part.Marks.Count > 0)
                 marks = new PathGeometry(part.Marks.Where(l => l.Count >= 2).SelectMany(l => PathGeometry.Polyline([.. l.Select(Flip)], false).Subpaths)).Transform(move);
-            TextShape? label = null;
-            if (markLayer is not null && part.Label is { } lab)
+            var labels = new List<TextShape>();
+            if (markLayer is not null)
             {
-                var text = TextShape.Create(lab.Text, new TextStyle("Arial", lab.HeightMm, SingleLine: true), markLayer.Id, Affine.Identity);
-                var tb = text.Bounds;
-                var at = move.Apply(Flip(lab.At));
-                var placed = text.With(transform: Affine.Translate(-tb.Center.X, -tb.Center.Y).Then(Affine.Rotate(-lab.AngleDeg)).Then(Affine.Translate(at.X, at.Y)));
-                // Only where it's all on the part (never over a hole or off the edge).
-                var pb = placed.Bounds;
                 var inside = Poly.FromGeometry(outline);
-                if (!pb.IsEmpty && new[] { new Vec2(pb.MinX, pb.MinY), new Vec2(pb.MaxX, pb.MinY), new Vec2(pb.MaxX, pb.MaxY), new Vec2(pb.MinX, pb.MaxY), pb.Center }.All(p => Poly.Inside(inside, p))
-                    && Poly.Area(Poly.Subtract([Poly.Rect(pb.MinX, pb.MinY, pb.MaxX, pb.MaxY)], inside)) < 0.01)
-                    label = (TextShape)placed;
+                foreach (var lab in (part.Label is { } first ? [first] : Array.Empty<PartLabel>()).Concat(part.Labels))
+                {
+                    var text = TextShape.Create(lab.Text, new TextStyle("Arial", lab.HeightMm, SingleLine: true), markLayer.Id, Affine.Identity);
+                    var tb = text.Bounds;
+                    var at = move.Apply(Flip(lab.At));
+                    var placed = text.With(transform: Affine.Translate(-tb.Center.X, -tb.Center.Y).Then(Affine.Rotate(-lab.AngleDeg)).Then(Affine.Translate(at.X, at.Y)));
+                    // Only where it's all on the part (never over a hole or off the edge).
+                    var pb = placed.Bounds;
+                    if (!pb.IsEmpty && new[] { new Vec2(pb.MinX, pb.MinY), new Vec2(pb.MaxX, pb.MinY), new Vec2(pb.MaxX, pb.MaxY), new Vec2(pb.MinX, pb.MaxY), pb.Center }.All(p => Poly.Inside(inside, p))
+                        && Poly.Area(Poly.Subtract([Poly.Rect(pb.MinX, pb.MinY, pb.MaxX, pb.MaxY)], inside)) < 0.01)
+                        labels.Add((TextShape)placed);
+                }
             }
             for (int c = 0; c < part.Copies; c++)
             {
                 string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
                 var shapes = new List<Shape> { new PathShape { Name = name, LayerId = cutLayer.Id, Geometry = outline }.WithAddonData(to.SpecKey, json) };
                 if (marks is not null) shapes.Add(new PathShape { Name = $"{name} · marks", LayerId = markLayer!.Id, Geometry = marks });
-                if (label is not null) shapes.Add(label.With(id: Guid.NewGuid(), name: $"{name} · name"));
+                foreach (var label in labels) shapes.Add(label.With(id: Guid.NewGuid(), name: labels.Count == 1 ? $"{name} · name" : $"{name} · {label.Text}"));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
-                units.Add([.. shapes.Select(x => x.WithGroup(g).WithAddonData(to.IdKey, id.ToString()))]);
+                units.Add((part.Stock, [.. shapes.Select(x => x.WithGroup(g).WithAddonData(to.IdKey, id.ToString()))]));
             }
         }
         if (units.Count == 0) throw new InvalidOperationException("Nothing to cut.");
 
-        // Bed by bed: everything left goes on the page, the nesting places what fits, the rest moves on.
+        // The main sheet's parts first, then each other stock's on pages of their own; bed by bed: everything
+        // left goes on the page, the nesting places what fits, the rest moves on.
         var options = new NestOptions { SpacingMm = o.GapMm, MarginMm = o.GapMm, RotationStepDeg = 90, ResolutionMm = 0.5 };
-        while (units.Count > 0)
+        var stocks = units.Select(u => u.Stock).Distinct().OrderBy(x => x is null ? 0 : 1).ToList();
+        for (int k = 0; k < stocks.Count; k++)
         {
-            ct.ThrowIfCancellationRequested();
-            // Each page has its own layers: the outline is first in its part, the rest are marks.
-            var onPage = units.Select(u => u.Select((sh, k) => sh.With(layerId: k == 0 ? cutLayer.Id : markLayer!.Id)).ToList()).ToList();
-            s = Ops.AddShapes(s, onPage.SelectMany(u => u));
-            var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
-            var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
-            if (report.Placed == 0 && s.Shapes.Count == ids.Count)
-                throw new InvalidOperationException("A part doesn't fit on the bed with the spacing round it. Make it smaller.");
-            var unplaced = report.Unplaced.ToHashSet();
-            s = Ops.Delete(nested, unplaced);
-            units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
-            if (units.Count == 0) break;
-            s = Pages.Add(s, $"{title} {++sheets}");
-            (cutLayer, markLayer) = Layers(ref s);
+            string? stock = stocks[k];
+            var left = units.Where(u => u.Stock == stock).Select(u => u.Shapes).ToList();
+            if (k > 0)
+            {
+                s = Pages.Add(s, $"{title} ({stock})");
+                sheets++;
+            }
+            if (k > 0 || stock is not null) (cutLayer, markLayer) = Layers(ref s, stock);
+            while (left.Count > 0)
+            {
+                ct.ThrowIfCancellationRequested();
+                // Each page has its own layers: the outline is first in its part, the rest are marks.
+                var onPage = left.Select(u => u.Select((sh, i) => sh.With(layerId: i == 0 ? cutLayer.Id : markLayer!.Id)).ToList()).ToList();
+                s = Ops.AddShapes(s, onPage.SelectMany(u => u));
+                var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
+                var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
+                if (report.Placed == 0 && s.Shapes.Count == ids.Count)
+                    throw new InvalidOperationException("A part doesn't fit on the bed with the spacing round it. Make it smaller.");
+                var unplaced = report.Unplaced.ToHashSet();
+                s = Ops.Delete(nested, unplaced);
+                left = [.. left.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
+                if (left.Count == 0) break;
+                s = Pages.Add(s, stock is null ? $"{title} {++sheets}" : $"{title} ({stock}) {++sheets}");
+                (cutLayer, markLayer) = Layers(ref s, stock);
+            }
         }
         if (o.CutSettings is { } cutSettings)
             s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == to.CutLayer, l => cutSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
