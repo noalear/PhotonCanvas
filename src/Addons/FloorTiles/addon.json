@@ -1,0 +1,10 @@
+{
+  "id": "floortiles",
+  "name": "Floor tile maker",
+  "version": "1.0.0",
+  "description": "Floor tiles for tabletop games on a square grid, with flagstones, floorboards, cobbles or your own texture etched on, that lock together with jigsaw edges, clips or magnets.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls"],
+  "onByDefault": true
+}
