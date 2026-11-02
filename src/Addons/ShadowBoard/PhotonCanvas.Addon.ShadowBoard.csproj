@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The shadow board maker: tools on the bed become a drawer insert. src/Addons/Directory.Build.targets does the rest. -->
+  <PropertyGroup>
+    <AddonId>shadowboard</AddonId>
+    <RootNamespace>PhotonCanvas.Addons.ShadowBoard</RootNamespace>
+  </PropertyGroup>
+</Project>
