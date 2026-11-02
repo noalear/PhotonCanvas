@@ -1,0 +1,10 @@
+{
+  "id": "furniture",
+  "name": "Mini furniture maker",
+  "version": "1.0.0",
+  "description": "Flat-pack furniture for tabletop games and models: tables, benches, stools, chairs, bookshelves, chests, crates and beds that slot together, and hinged doors and shelves that fit the wall maker's doorways and mount points, with wood grain etched on.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
