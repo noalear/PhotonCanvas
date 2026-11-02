@@ -149,6 +149,8 @@ public sealed record Axle
     }
 
     public string Words => Square ? $"{SizeMm:0.#} mm square" : $"{SizeMm:0.#} mm";
+
+    public Shaft Shaft => new(Square ? HoleShape.Square : HoleShape.Round, SizeMm, 0);
 }
 
 /// <summary>
@@ -167,6 +169,8 @@ public abstract record MechSpec
     public double ThicknessMm { get; init; } = 3;
     /// <summary>Slots for joints are the thickness plus this (mm).</summary>
     public double SlotFitMm { get; init; } = 0.1;
+    /// <summary>The material library's category for the sheet ("Wood", "Acrylic"…; empty = wood): how tight each hole fit is drawn.</summary>
+    public string Material { get; init; } = "";
 
     public abstract Mechanism Build(CancellationToken ct = default);
 

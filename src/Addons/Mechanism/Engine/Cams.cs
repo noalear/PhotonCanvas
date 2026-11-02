@@ -566,6 +566,10 @@ public sealed record CamSpec : MechSpec
     public Axle Axle { get; init; } = new();
     /// <summary>A hole near the middle of the cam for a peg to turn it by.</summary>
     public bool Handle { get; init; } = true;
+    /// <summary>Where the handle hole goes and what peg it takes.</summary>
+    public Crank Crank { get; init; } = new();
+    /// <summary>The cam's hole for its shaft; null = one that grips the shaft (which turns in the backboard).</summary>
+    public Hole? CamHole { get; init; }
 
     public override Mechanism Build(CancellationToken ct = default)
     {
@@ -573,18 +577,25 @@ public sealed record CamSpec : MechSpec
         var d = new CamDesign(Steps, BaseRadiusMm, Foot, FootMm, dir, ct);
         double t = ThicknessMm;
         var mech = new Mechanism { Title = "Cam and follower" };
-        double holeR = Axle.Square ? Axle.SizeMm * Math.Sqrt(2) / 2 + 0.15 : Axle.SizeMm / 2 + 0.15;
-        double pegR = Math.Max(2, Axle.SizeMm / 2 - 0.03);
+        string mat = Material;
+        var bore = new Bore(CamHole, Axle, false, mat);
+        double holeR = bore.R;
+        var peg = Crank.PegHole(Axle);
+        double pegR = peg.OuterR(mat);
 
         // ---- the cam: its edge, a hole that grips the shaft, a peg hole to turn it by, an arrow for the way it turns ----
         double room = d.MinRadius - holeR;
-        var holes = new Paths64 { Axle.HeldHole(default) };
+        var holes = new Paths64 { bore.Cut(default) };
         Vec2? handle = null;
-        if (Handle && room > 2 * pegR + 6)
+        if (Handle)
         {
-            handle = Shapes.Polar(d.MinRadius - pegR - 3, 0);
-            holes.Add(Poly.Circle(handle.Value, pegR, 0.003));
+            var (at, why) = Crank.Place(holeR, d.MinRadius - 3, pegR, "The cam");
+            if (why is not null && Crank.RadiusMm > 0) mech.Findings.Add(new(Severity.Warn, why));
+            handle = at;
+            if (at is { } a) holes.Add(peg.Cut(a, mat));
         }
+        if (bore.Turns)
+            mech.Findings.Add(new(Severity.Bad, "The cam's hole lets it turn on its shaft, so turning the shaft won't turn it. Use a press or snug fit, or a D or square hole."));
         var cam = Poly.Subtract(d.Outline, holes);
         double arrowR = holeR + room * 0.5;
         var arrow = room > 6 ? Shapes.TurnArrow(default, arrowR, Math.PI / 2 - dir * 0.6, Math.PI / 2 + dir * 0.6) : [];
@@ -614,14 +625,18 @@ public sealed record CamSpec : MechSpec
         double halfW = Math.Max(d.MaxRadius, d.FootR + 2) + 6;
         var box = new Rect2(-halfW, -d.MaxRadius - 6, halfW, hMax + barTop + 4);
         var corners = new[] { new Vec2(box.MinX + 5, box.MinY + 5), new Vec2(box.MaxX - 5, box.MinY + 5), new Vec2(box.MaxX - 5, box.MaxY - 5), new Vec2(box.MinX + 5, box.MaxY - 5) };
-        var boardHoles = new Paths64 { Axle.TurningHole(default), Axle.HeldHole(new Vec2(0, pin1)), Axle.HeldHole(new Vec2(0, pin2)) };
+        var boardHoles = new Paths64 { bore.Frame(default, true), Axle.HeldHole(new Vec2(0, pin1)), Axle.HeldHole(new Vec2(0, pin2)) };
         foreach (var c in corners)
             if (c.Length > d.MaxRadius + 4 && (Math.Abs(c.X) > barW / 2 + 4)) boardHoles.Add(Poly.Circle(c, 1.75, 0.003));
         var board = Poly.Subtract([Shapes.RoundRect(box.MinX, box.MinY, box.MaxX, box.MaxY, 5)], boardHoles);
         mech.Parts.Add(new Part { Name = "Backboard", Shape = board, Label = new PartLabel("Backboard", new Vec2(0, box.MinY + 4), 3) });
-        mech.Shopping.Add($"A shaft: {Axle.Words} dowel or rod, about {Math.Ceiling(2 * t + 12):0} mm long (glue it into the cam; it turns in the backboard)");
+        mech.Shopping.Add($"A shaft: {bore.ShaftWords} dowel or rod, about {Math.Ceiling(2 * t + 12):0} mm long ({(bore.Hole?.Fit == HoleFit.Press ? "pressed into the cam" : "glue it into the cam")}; it turns in the backboard)");
         mech.Shopping.Add($"Two pins for the follower's slot: {Axle.Words} dowel, about {Math.Ceiling(2 * t + 4):0} mm long, glued into the backboard");
-        if (handle is not null) mech.Shopping.Add($"A handle peg: {pegR * 2 + 0.06:0.#} mm dowel, about 25 mm long");
+        if (handle is not null) mech.Shopping.Add($"A handle peg: {peg.Shaft.Words} dowel, about 25 mm long");
+        var drawn = new List<string>();
+        if (bore.Chosen) drawn.Add($"the cam's shaft hole {bore.Words}");
+        if (handle is not null && Crank.Hole is not null) drawn.Add($"its handle hole {peg.Words(mat)}");
+        if (drawn.Count > 0) mech.Findings.Add(new(Severity.Note, $"Holes drawn for {MaterialWords.Of(mat)}: {string.Join("; ", drawn)}."));
 
         // ---- how it moves ----
         var bodies = new List<Body>
@@ -629,11 +644,11 @@ public sealed record CamSpec : MechSpec
             new("Backboard", board, Tints.Frame, _ => Pose.Zero) { Faint = true },
             new("Cam", cam, Tints.Of(0), a => new Pose(default, d.TurnAt(a))) { IsInput = true, Lines = arrow },
             new("Follower", follower, Tints.Of(1), a => new Pose(new Vec2(0, d.HeightAt(a)), 0)),
-            new("Shaft", [Axle.Square ? Axle.HeldHole(default) : Poly.Circle(default, Axle.SizeMm / 2, 0.01)], Tints.Steel, a => new Pose(default, d.TurnAt(a))),
+            new("Shaft", [bore.ShaftOutline()], Tints.Steel, a => new Pose(default, d.TurnAt(a))),
             new("Pin", [Poly.Circle(default, pinR, 0.01)], Tints.Steel, _ => new Pose(new Vec2(0, pin1), 0)),
             new("Pin", [Poly.Circle(default, pinR, 0.01)], Tints.Steel, _ => new Pose(new Vec2(0, pin2), 0)),
         };
-        if (handle is { } h) bodies.Add(new Body("Handle", [Poly.Circle(default, pegR, 0.01)], Tints.Steel, a => new Pose(new Pose(default, d.TurnAt(a)).Apply(h), 0)));
+        if (handle is { } h) bodies.Add(new Body("Handle", [peg.Shaft.Outline(default)], Tints.Steel, a => new Pose(new Pose(default, d.TurnAt(a)).Apply(h), d.TurnAt(a))));
 
         // ---- the motion check ----
         double rpm = d.Check(mech, "The cam", 0, holeR, cam, followerSolid);
