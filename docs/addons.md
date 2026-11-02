@@ -61,8 +61,21 @@ must not copy the program's assemblies (the targets file makes sure of that).
 
 `id`: lower case letters, digits, `-`, `_`, `.`; unique. `category` groups the Add-ons window: use
 Make, Picture, Camera, Laser, Arrange or Other. `requires` lists other add-ons' ids whose services you
-use (they start first, stop after you). Optional: `assembly` (default: the only `PhotonCanvas.Addon.*.dll`)
-and `entry` (default: the only public `IAddon` class).
+use (they start first, stop after you). Optional: `assembly` (default: the only `PhotonCanvas.Addon.*.dll`),
+`entry` (default: the only public `IAddon` class) and `updates` (below).
+
+### Updates
+
+Built-in add-ons are updated with the program (each published version of PhotonCanvas carries
+them; see `.github/workflows/release.yml`). An add-on installed from a `.pcaddon` file can keep
+itself up to date: put `"updates": "owner/repo"` in its addon.json, and publish each new version as
+a GitHub release of that repository (tag `v1.2.0`, the same version as in addon.json) with the
+`.pcaddon` attached (named after the id, e.g. `grain-1.2.0.pcaddon`, when there's more than one)
+and, ideally, a `SHA256SUMS` file (`sha256sum *.pcaddon > SHA256SUMS`): when it's there the
+download must match it. Whenever the program checks for its own updates it looks at the latest
+release; a newer version is installed while the program runs (the add-on is stopped and started
+again, staying on or off as the person had it). A private repository works with the GitHub access
+key from Settings → Updates.
 
 ### The add-on class
 

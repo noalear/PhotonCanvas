@@ -25,6 +25,12 @@ version, whether it **comes with PhotonCanvas** or was **installed**, and what i
 - **Install from file…**: adds an add-on from a `.pcaddon` file (a zip of the add-on's folder), or updates one you already have. It's turned on once installed.
 - **Open add-ons folder**: where the add-ons you install are kept.
 
+Add-ons that come with PhotonCanvas are updated with it. An add-on you installed yourself is kept
+up to date when its maker says where its new versions are published (on GitHub): PhotonCanvas looks
+when it checks for its own new versions (see [Updates](machine.md#updates)), and puts a newer one
+in straight away, stopping and starting it (its windows close). It stays on or off as you had it.
+With **Put new versions in by themselves** off, you're asked first.
+
 If an add-on can't start, a ⚠ line under it says why (for example, it was made for a newer
 PhotonCanvas, or it needs another add-on that isn't installed). The rest of the program carries on
 as normal.

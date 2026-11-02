@@ -12,6 +12,7 @@
     <!-- Status line -->
     <Border DockPanel.Dock="Bottom" Background="{DynamicResource Bg0}" Padding="12,2">
       <StackPanel Orientation="Horizontal" Spacing="18">
+        <Button x:Name="UpdateChip" IsVisible="False" FontSize="11" Padding="8,0" MinHeight="0" VerticalAlignment="Center" Classes="primary" />
         <TextBlock x:Name="CursorText" Classes="muted" FontSize="11" MinWidth="150" />
         <TextBlock x:Name="ZoomText" Classes="muted" FontSize="11" MinWidth="50" />
         <TextBlock x:Name="StatusText" Classes="muted" FontSize="11" />

@@ -218,7 +218,9 @@ PhotonCanvas is free to use, for personal or commercial work, on any number of y
 and devices. All rights reserved: it may not be sold, rented, redistributed or published in a
 modified form without written permission. The full terms are in [LICENSE](LICENSE). The program is
 published as ready-to-run builds on the
-[releases page](https://github.com/noalear/PhotonCanvas-releases/releases).
+[releases page](https://github.com/noalear/PhotonCanvas/releases): every change to `master` is
+built, tested and released by `.github/workflows/release.yml`, and the program downloads and puts
+in new versions by itself (Settings → Updates).
 
 PhotonCanvas includes third-party open-source components, each under its own licence; they are
 listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
