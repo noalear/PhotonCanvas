@@ -1,0 +1,10 @@
+{
+  "id": "stencil",
+  "name": "Stencil bridges",
+  "version": "1.0.0",
+  "description": "Keep the middles of O, A, R and B in a cut-out stencil: short bridges placed for you, changed by a click.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
