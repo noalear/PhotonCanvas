@@ -25,7 +25,9 @@ public static class SewnBuild
 
     public const uint PatternColour = 0x9CA3AF, GrooveColour = 0xF59E0B, HolesColour = 0xEF4444, CutColour = 0x2563EB;
 
-    static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() } };
+    // Its own settings and resolver: shared or default JSON options would keep this add-on in memory after it stops.
+    static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() }, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
+    static readonly JsonSerializerOptions Plain = new() { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
 
     public static string Save(SewnOptions o) => JsonSerializer.Serialize(o, Json);
 
@@ -42,7 +44,7 @@ public static class SewnBuild
     public static SewnLayers LayersOf(DocState s)
     {
         if (s.AddonData.TryGetValue(LayersKey, out var j))
-            try { if (JsonSerializer.Deserialize<SewnLayers>(j) is { } l) return l; } catch (Exception) { }
+            try { if (JsonSerializer.Deserialize<SewnLayers>(j, Plain) is { } l) return l; } catch (Exception) { }
         return new(null, null, null, null);
     }
 
@@ -116,7 +118,7 @@ public static class SewnBuild
         }
         Before(holes, cut);
         Before(groove, holes ?? cut);
-        s = s with { AddonData = s.AddonData.SetItem(LayersKey, JsonSerializer.Serialize(new SewnLayers(pattern, groove, holes, cut))) };
+        s = s with { AddonData = s.AddonData.SetItem(LayersKey, JsonSerializer.Serialize(new SewnLayers(pattern, groove, holes, cut), Plain)) };
 
         // The pieces.
         var made = new List<Guid>();
