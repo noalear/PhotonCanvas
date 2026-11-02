@@ -22,7 +22,7 @@ public sealed class ScatterAddon : IAddon
         {
             Tip = "Barrels, fences, carts, market stalls, wells and gravestones that slot together, for tabletop games and models",
             Large = true,
-            Order = 23,
+            Order = 24,
         });
         host.AddCommand(new AddonCommand("scatter.open", "Shapes", "Scatter terrain…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit scatter terrain…", Open) { Visible = Selected });
