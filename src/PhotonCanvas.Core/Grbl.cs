@@ -233,7 +233,16 @@ public static class GrblWriter
                 o.AppendLine($"G0 {XY(runUp)}");
                 if (f.LineDwellMs > 0) o.AppendLine($"G4 P{dwell}");
                 if (f.OverscanMm > 0) o.AppendLine($"G1 {XY(seg.Start)}{F(f.Laser.Speed)} S0");
-                o.AppendLine($"G1 {XY(seg.End)}{F(f.Laser.Speed)} S{s}");
+                if (f.PowerScale is { Lowest: < 1 } field)
+                {
+                    bool firstPiece = true;
+                    foreach (var (at, k) in field.Along(seg.Start, seg.End))
+                    {
+                        o.AppendLine($"G1 {XY(at)}{(firstPiece ? F(f.Laser.Speed) : "")} S{(int)Math.Round(s * k)}");
+                        firstPiece = false;
+                    }
+                }
+                else o.AppendLine($"G1 {XY(seg.End)}{F(f.Laser.Speed)} S{s}");
                 if (f.OverscanMm > 0) o.AppendLine($"G1 {XY(seg.End + dir * Room(seg.End, dir, f.OverscanMm))} S0");
             }
         }

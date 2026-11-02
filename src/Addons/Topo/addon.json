@@ -1,0 +1,10 @@
+{
+  "id": "topo",
+  "name": "Topo map stacks",
+  "version": "1.0.0",
+  "description": "Pick any place on Earth (or open an elevation file) and get its terrain as stacked contour layers to cut and glue up, sliced by 3D to slices with numbers, marks and dowels.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["slicer"],
+  "onByDefault": true
+}

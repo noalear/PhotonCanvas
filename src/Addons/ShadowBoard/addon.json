@@ -1,0 +1,10 @@
+{
+  "id": "shadowboard",
+  "name": "Shadow board maker",
+  "version": "1.0.0",
+  "description": "Lay your tools on the bed: the camera outlines them and makes a drawer insert with a pocket, finger notches and a label for each.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

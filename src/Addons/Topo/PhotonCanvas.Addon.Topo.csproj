@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>topo</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 3D to slices does the slicing (addon.json "requires" it): compile against it, never copy it. -->
+    <ProjectReference Include="..\Slicer\PhotonCanvas.Addon.Slicer.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>

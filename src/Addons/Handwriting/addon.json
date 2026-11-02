@@ -1,0 +1,10 @@
+{
+  "id": "handwriting",
+  "name": "Handwriting to font",
+  "version": "1.0.0",
+  "description": "Fill in a printed sheet, photograph it, and write anything in your own handwriting as single lines for fast engraving.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

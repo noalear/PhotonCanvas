@@ -327,6 +327,17 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
         OwnSize();
     }
 
+    /// <summary>
+    /// Show a model another tool made (Topo map stacks), starting from its settings: the material's
+    /// thickness its layers were worked out for, and whether slices are joined across steep places.
+    /// </summary>
+    public void Load(List<StlDepth.Triangle> mesh, string name, double thicknessMm, bool keepJoined)
+    {
+        _thick.Value = (decimal)thicknessMm;
+        _joined.IsChecked = keepJoined;
+        Load(mesh, name);
+    }
+
     /// <summary>Burnt edges only mean something on solid wood or card.</summary>
     void BurntShown() => _burnt.IsEnabled = _look.SelectedIndex == 0 && _material.SelectedIndex < (int)StackMaterial.WhiteAcrylic;
 

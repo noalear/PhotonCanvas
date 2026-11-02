@@ -585,10 +585,18 @@ public sealed class RibbonGroup
         _items.Children.AddRange(sorted);
     }
 
+    static bool Within(StyledElement e, Control c)
+    {
+        for (var p = e.Parent; p is not null; p = p.Parent) if (p == c) return true;
+        return false;
+    }
+
     /// <summary>Take a button (or custom control) away again, and its column if that's left empty.</summary>
     internal void Remove(Control c)
     {
-        _smallLabels.RemoveAll(l => l.GetVisualAncestors().Contains(c));
+        // By the logical parents: the visual ones only exist once the tab has been shown, and a label
+        // left here would keep the add-on (its button's click and Checked) in memory.
+        _smallLabels.RemoveAll(l => Within(l, c));
         _largeLabels.RemoveAll(x => x.Button == c);
         if (c.Parent is StackPanel column && column != _items)
         {

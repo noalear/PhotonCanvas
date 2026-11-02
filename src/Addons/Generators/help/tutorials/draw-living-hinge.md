@@ -1,7 +1,7 @@
 # Make a living hinge
 <!-- category: Drawing -->
 <!-- summary: Draw rows of staggered slits that let flat plywood or MDF bend. -->
-<!-- page: drawing.md#living-hinge -->
+<!-- page: generators.md#living-hinge -->
 <!-- order: 64 -->
 A living hinge is a pattern of staggered slits that lets a flat sheet bend. Use it for curved box
 sides, covers and round corners in plywood or MDF.

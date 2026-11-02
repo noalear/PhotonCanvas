@@ -1,0 +1,10 @@
+{
+  "id": "mechanism",
+  "name": "Mechanism maker",
+  "version": "1.0.0",
+  "description": "Gears, gear trains, racks, planetary sets, cams and a whole cam-box automaton, ready to cut: turn them on screen first to see they move freely.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

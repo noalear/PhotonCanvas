@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>generators</AddonId>
+  </PropertyGroup>
+</Project>
