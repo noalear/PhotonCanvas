@@ -426,6 +426,43 @@ static class MoreShots
         settle(800);
         save(shot(layers), "panel-layers-sublayer", "The Layers panel with a sub-layer under the cut layer, and a picture on a Score layer (warned)");
 
+        // --- Object jig (an add-on): a pen's outline and a name over it, made into a jig for six pens.
+        {
+            reset();
+            var js = DocState.New();
+            var cutL = js.Layers[0] with { Name = "Cut" };
+            var fillL = Layer.Default(1, LayerMode.Fill) with { Name = "Name" };
+            js = js with { Layers = [fillL, cutL] };
+            var turn = Affine.Rotate(12).Then(Affine.Translate(110, 95));
+            var pen = new PathShape { Name = "Pen outline", LayerId = cutL.Id, Geometry = PathGeometry.FromSvgPathData("M -70 -5 L 52 -6 C 60 -6 68 -3 72 0 C 68 3 60 6 52 6 L -70 5 C -74 5 -76 3 -76 0 C -76 -3 -74 -5 -70 -5 Z").Transform(turn) };
+            var name = TextShape.Create("ANNA", new TextStyle("Arial", 5, Bold: true), fillL.Id, Affine.Translate(-12, -2.5).Then(turn));
+            js = Ops.AddShapes(js, [pen, name]);
+            doc.Reset(js, null);
+            doc.Select([pen.Id, name.Id]);
+            canvas.FitRect(new Rect2(20, 50, 200, 140));
+            settle(500);
+            var commands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            commands.FirstOrDefault(c => c.Id == "objectjig.open")?.Run();
+            settle(1500);
+            if (w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == "JigWindow") is { } jw)
+            {
+                F<TextBox>(jw, "_name").Text = "Pen";
+                F<NumericUpDown>(jw, "_rows").Value = 4;
+                settle(800);
+                AddonShot(jw.CaptureRenderedFrame(), "ObjectJig", "window-object-jig");
+                Click(F<Avalonia.Controls.Button>(jw, "_make"));
+                settle(1000);
+                canvas.FitRect(new Rect2(0, 0, 220, 220));
+                settle(800);
+                AddonShot(shot(canvas), "ObjectJig", "canvas-object-jig-cut");
+                doc.Commit("Show page", Pages.SwitchTo(doc.State, 2), []);
+                canvas.FitRect(new Rect2(0, 0, 220, 220));
+                settle(800);
+                AddonShot(shot(canvas), "ObjectJig", "canvas-object-jig-objects");
+            }
+            reset();
+        }
+
         // --- Several pages, and Edit points on a heart.
         reset();
         doc.Commit("Add page", Pages.Add(doc.State, "Lid"));
