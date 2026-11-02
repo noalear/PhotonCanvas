@@ -18,7 +18,7 @@ public sealed class TouchUpAddon : IAddon
         host.AddRibbonButton(new RibbonButton("Camera", "Check the burn", "Touch up", "IcEyedropper", Open)
         {
             Large = true,
-            GroupAfter = "Place|See the bed",
+            GroupAfter = "Place",
             Tip = "Burn, look, touch up: photograph a finished engraving, see where it came out too light, and add a touch-up job that goes over only those parts",
             Enabled = () => TouchUpAnalysis.Candidates(TouchUpPage.DesignOf(host.Document.State) ?? host.Document.State).Any(),
         });

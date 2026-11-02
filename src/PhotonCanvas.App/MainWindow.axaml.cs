@@ -523,7 +523,6 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
-        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine, _library).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
@@ -627,12 +626,7 @@ public partial class MainWindow : Window
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
 
         // ---- Camera: what the machine sees ----
-        var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, fit designs to pieces, calibration");
-        var see = camera.Group("See the bed");
-        see.Large("Update photo", "IcCamera", () => _ = Guard(_machine.UpdatePhotoAsync), "Take a new photo of the bed and lay it under your design", () => _machine.IsConnected && _machine.HasCalibration);
-        see.LargeToggle("Live view", "IcLive", on => _machine.LiveView = on, "Keep the camera picture updating", () => _machine.IsConnected, () => _machine.LiveView);
-        see.LargeToggle("Close-up", "IcZoomIn", ToggleCloseUp, "The close-up camera in the laser head, in a corner of the work area: live or one photo at a time", null, () => CloseUpOpen);
-        see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(async () => { await _machine.CalibrateAsync(); _ribbon.Refresh(); }); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
+        var camera = _ribbon.Tab("Camera", "Use the machine's camera: fit designs to pieces, calibration (photo, live view and close-up are in the machine panel at the right)");
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");

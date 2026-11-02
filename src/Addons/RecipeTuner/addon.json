@@ -1,0 +1,10 @@
+{
+  "id": "recipe-tuner",
+  "name": "Recipe tuner",
+  "version": "1.0.0",
+  "description": "Learns from the star ratings in your material library and suggests the next settings to try, as a small round of tries you burn and rate.",
+  "category": "Laser",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

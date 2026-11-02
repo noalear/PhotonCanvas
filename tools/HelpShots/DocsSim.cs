@@ -158,7 +158,7 @@ static class DocsSim
             {
                 "Home/Import", "Home/Picture", "Home/By colour", "Home/Import as…", "Home/Select by…", "Home/More…", "Home/Paste",
                 "Picture/Import picture", "Picture/Depthmap", "Picture/3D model", "Picture/Depth outlines",
-                "Camera/Update photo", "Camera/Live view", "Camera/Close-up", "Camera/Show picture", "Camera/Calibrate", "Camera/Focus on selection",
+                "Camera/Calibrate", "Camera/Focus on selection",
                 "Camera/Thickness", "Camera/Cut round prints",
                 "Laser/Split onto pieces", "Camera/Line up pieces", // set up in MoreShots
                 "Laser/Frame", "Laser/Ship It", "Laser/Export .xf", "Laser/Export G-code", "Laser/Time-lapse", "Laser/Quick on lid close", "Laser/Console",
@@ -252,6 +252,7 @@ static class DocsSim
             });
         }
         if (only is null or "more") MoreShots.Run(w, doc, canvas, layers, editor, data, Save, Shot, Settle, Reset, sample, ids);
+        if (only is null or "more" or "mechanism") { Reset(); MechanismShots.Run(w, doc, canvas.Machine, lib, Settle); }
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "images-index.txt"), Index.ToString());
         Console.WriteLine(Index.ToString());
     }

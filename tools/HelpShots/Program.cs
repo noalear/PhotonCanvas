@@ -1,7 +1,7 @@
 // The help guide's screenshots, and a walk through every tutorial, in the real program run headless.
 // Run from the repository root:
 //
-//   dotnet run --project tools/HelpShots -- shots [main|windows|extra|more]
+//   dotnet run --project tools/HelpShots -- shots [main|windows|extra|more|mechanism]
 //       Retakes the pictures in docs/help/images (all of them, or one group). New pictures no page
 //       shows yet are deleted again unless --keep-new is added: show one on its page, or let it go.
 //   dotnet run --project tools/HelpShots -- guide
@@ -67,7 +67,7 @@ switch (what)
         HelpSim.Run(Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-walk"), Pump, "walk");
         break;
     default:
-        Console.WriteLine("Usage: dotnet run --project tools/HelpShots -- shots [main|windows|extra|more] [--keep-new] | guide | walk [ids]");
+        Console.WriteLine("Usage: dotnet run --project tools/HelpShots -- shots [main|windows|extra|more|mechanism] [--keep-new] | guide | walk [ids]");
         return 1;
 }
 return 0;

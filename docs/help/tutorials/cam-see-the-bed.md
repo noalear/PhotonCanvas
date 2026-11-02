@@ -17,16 +17,16 @@ Click **Auto-focus** at the right end of the ribbon. The picture lines up for th
 machine is focused at.
 
 ## Show the picture
-<!-- target: ribbon:Camera/Show picture -->
-Click **Show picture** on the **Camera** tab. A photo is taken and laid under the design.
+<!-- target: panel:Machine -->
+Click **Show** at the right end of the ribbon. A photo is taken and laid under the design.
 
 ## Take a new photo
-<!-- target: ribbon:Camera/Update photo -->
-Move the material, then click **Update photo** to see it where it is now.
+<!-- target: panel:Machine -->
+Move the material, then click **Photo** to see it where it is now.
 
 ## Watch it live
-<!-- target: ribbon:Camera/Live view -->
-Click **Live view**: the picture keeps updating, 3 to 4 photos a second. Click it again to stop.
+<!-- target: panel:Machine -->
+Click **Live**: the picture keeps updating, 3 to 4 photos a second. Click it again to stop.
 
 ## Make it fainter
 <!-- target: panel:Machine -->

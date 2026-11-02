@@ -70,7 +70,7 @@ public sealed class CloseUpCalibrationWindow : Window
                     Row(Labelled("Apart (mm)", _spacing), Labelled("Dot size (mm)", _dot))),
                 _plan,
                 add,
-                Hint("Adding the dots closes this window. Frame them and watch the close-up view (Camera → Close-up, live): the red light should trace them well inside the picture. " +
+                Hint("Adding the dots closes this window. Frame them and watch the close-up view (Close-up in the machine panel, then Live): the red light should trace them well inside the picture. " +
                      "Move them until it does, set the \"Close-up marks\" layer's power so they come out dark on your material, and send. When the job finishes, this window opens again on Find the dots."),
             },
         };

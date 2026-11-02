@@ -1,7 +1,7 @@
 # Make a pair of earrings
 <!-- category: Drawing -->
 <!-- summary: Draw a matching pair of earring blanks with holes for the hooks. -->
-<!-- page: drawing.md#earrings -->
+<!-- page: generators.md#earrings -->
 <!-- order: 66 -->
 A matching pair of earring blanks with holes for the hooks: teardrops, leaves, circles, hexagons or
 arches. Cut them from wood or acrylic, then engrave or paint them.
