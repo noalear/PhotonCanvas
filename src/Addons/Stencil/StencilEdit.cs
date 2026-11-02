@@ -200,14 +200,17 @@ public static class StencilEdit
         static double N(JsonNode? n) => n?.GetValue<double>() ?? 0;
     }
 
+    /// <summary>The add-on's own JSON options: the shared default ones would keep its types in memory after it stops.</summary>
+    internal static readonly JsonSerializerOptions Json = new() { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
+
     public static StencilOptions? ReadOptions(Shape s)
     {
         if (!s.AddonData.TryGetValue(OptionsKey, out var json)) return null;
-        try { return JsonSerializer.Deserialize<StencilOptions>(json); }
+        try { return JsonSerializer.Deserialize<StencilOptions>(json, Json); }
         catch (JsonException) { return null; }
     }
 
-    static string SaveOptions(StencilOptions o) => JsonSerializer.Serialize(o);
+    static string SaveOptions(StencilOptions o) => JsonSerializer.Serialize(o, Json);
 
     static string SaveBridges(IEnumerable<Bridge> bridges) =>
         new JsonArray([.. bridges.Select(b => (JsonNode)new JsonArray(R(b.A.X), R(b.A.Y), R(b.B.X), R(b.B.Y), R(b.WidthMm)))]).ToJsonString();
