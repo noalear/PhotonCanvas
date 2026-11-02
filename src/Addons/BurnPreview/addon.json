@@ -1,0 +1,10 @@
+{
+  "id": "burn-preview",
+  "name": "See it before you burn it",
+  "version": "1.0.0",
+  "description": "Shows the finished piece on the camera's picture of the actual material, with each layer's darkness and colour taken from your own test grids.",
+  "category": "Camera",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

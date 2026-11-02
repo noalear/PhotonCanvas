@@ -291,7 +291,7 @@ public static class Diffraction
     }
 
     /// <summary>Average colour of a region of the picture (fractions 0–1), as Lab. Mostly transparent regions count as transparent.</summary>
-    internal static Lab Average(RasterImage img, double fx0, double fy0, double fx1, double fy1, out bool transparent)
+    public static Lab Average(RasterImage img, double fx0, double fy0, double fx1, double fy1, out bool transparent)
     {
         int x0 = (int)Math.Floor(fx0 * img.Width), x1 = Math.Max(x0 + 1, (int)Math.Ceiling(fx1 * img.Width));
         int y0 = (int)Math.Floor(fy0 * img.Height), y1 = Math.Max(y0 + 1, (int)Math.Ceiling(fy1 * img.Height));
@@ -317,7 +317,7 @@ public static class Diffraction
 }
 
 /// <summary>Pixel grids made into shapes: each value's pixels as strips (runs along rows, merged down).</summary>
-static class PixelGrid
+public static class PixelGrid
 {
     /// <summary>The pixels holding <paramref name="value"/>, as rectangles of whole pixels (columns c0–c1, rows r0 to r1−1).</summary>
     public static List<(int C0, int C1, int R0, int R1)> Strips(int cols, int rows, int[] cells, int value)

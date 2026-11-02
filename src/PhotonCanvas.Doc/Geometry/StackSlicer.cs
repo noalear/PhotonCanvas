@@ -89,6 +89,52 @@ public sealed record SliceOptions
     public double ShapeStepMm { get; init; }
     /// <summary>Edge shaping never engraves deeper than the slice less this (mm), so it can't go through.</summary>
     public double ShapeSkinMm { get; init; } = 0.4;
+    /// <summary>
+    /// Add-ons that change the stacked parts (hollowing them, say), run in order once every slice's
+    /// parts are chosen and before the pins are placed. None by default.
+    /// </summary>
+    public IReadOnlyList<ISliceModifier> Modifiers { get; init; } = [];
+}
+
+/// <summary>
+/// A step an add-on adds to stacked slicing: it sees every slice's parts once they're chosen (before
+/// pins), and may change their outlines, split or drop them, and say what it did.
+/// </summary>
+public interface ISliceModifier
+{
+    void Modify(SliceWork work, CancellationToken ct);
+}
+
+/// <summary>
+/// What the 3D to slices window passes to add-on panels in its "stackslice.stacked" slot: the
+/// options it slices with now, and a place to put the add-on's slicing step.
+/// </summary>
+public interface IStackSliceSlot
+{
+    /// <summary>The options as the window has them now (without the add-ons' steps).</summary>
+    SliceOptions Options { get; }
+    /// <summary>Use this step when slicing (null takes it away); one per <paramref name="owner"/>. Slices again.</summary>
+    void SetModifier(object owner, ISliceModifier? modifier);
+}
+
+/// <summary>Stacked slicing part-way through, for an <see cref="ISliceModifier"/>.</summary>
+public sealed class SliceWork
+{
+    /// <summary>The model, stood up, turned and sized, starting at 0, 0, 0 (mm).</summary>
+    public required IReadOnlyList<Tri> Mesh { get; init; }
+    public required SliceOptions Options { get; init; }
+    /// <summary>Each slice's height in the model (mm): slice i runs from i·SlabMm to (i+1)·SlabMm.</summary>
+    public required double SlabMm { get; init; }
+    /// <summary>Each slice's whole outline, bottom first (as sliced, before any modifier).</summary>
+    public required IReadOnlyList<PathGeometry> Layers { get; init; }
+    /// <summary>The dowel holes through every slice (already chosen; they're cut after the modifiers).</summary>
+    public required IReadOnlyList<Vec2> Dowels { get; init; }
+    /// <summary>Each slice's parts, bottom slice first: change, add or remove them.</summary>
+    public required List<List<PathGeometry>> Parts { get; init; }
+    /// <summary>Sentences for the slicing summary.</summary>
+    public List<string> Notes { get; } = [];
+    /// <summary>Anything else a modifier wants to hand on (by its own key), kept on the <see cref="SliceStack"/>.</summary>
+    public Dictionary<string, object> Extras { get; } = [];
 }
 
 /// <summary>One part to cut: its outline (with holes), where its number goes, and the next slice's outline to mark on it.</summary>
@@ -128,6 +174,10 @@ public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, doub
     public SliceMethod Method { get; init; } = SliceMethod.Stacked;
     /// <summary>The material's thickness (one slice or sheet each), mm.</summary>
     public double ThicknessMm { get; init; }
+    /// <summary>What the add-ons that ran (<see cref="SliceOptions.Modifiers"/>) said they did, for the summary.</summary>
+    public IReadOnlyList<string> Notes { get; init; } = [];
+    /// <summary>What the add-ons handed on, by their own keys.</summary>
+    public IReadOnlyDictionary<string, object> Extras { get; init; } = new Dictionary<string, object>();
 }
 
 /// <summary>
@@ -210,6 +260,20 @@ public static class StackSlicer
             // Left to right (then front to back), so a slice's pieces are lettered in the order they're seen.
             islands.Add([.. keep.OrderBy(g => Math.Round(g.Bounds().Center.X, 1)).ThenBy(g => g.Bounds().Center.Y)]);
         }
+        // Add-ons (hollowing, say) change the parts before the pins go in, so the pins land where there's material.
+        SliceWork? work = null;
+        if (o.Modifiers.Count > 0)
+        {
+            work = new SliceWork { Mesh = tris, Options = o, SlabMm = slab, Layers = layers, Dowels = dowels, Parts = islands };
+            foreach (var m in o.Modifiers)
+            {
+                ct.ThrowIfCancellationRequested();
+                m.Modify(work, ct);
+            }
+            if (islands.Count != n) throw new InvalidOperationException("A slicing add-on changed how many slices there are.");
+            for (int i = 0; i < n; i++)
+                islands[i] = [.. islands[i].Where(g => !g.IsEmpty).OrderBy(g => Math.Round(g.Bounds().Center.X, 1)).ThenBy(g => g.Bounds().Center.Y)];
+        }
         // Pins: wherever a part overlaps the part above it, matching holes in both.
         var holes = islands.Select(l => l.Select(_ => new List<Vec2>()).ToList()).ToList();
         var pins = new List<(int, Vec2)>();
@@ -267,7 +331,11 @@ public static class StackSlicer
             }
         }
         double w = tris.Max(t => Math.Max(t.A.X, Math.Max(t.B.X, t.C.X))), d = tris.Max(t => Math.Max(t.A.Y, Math.Max(t.B.Y, t.C.Y)));
-        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels) { LeftOut = leftOut, Pins = pins, Joined = joined, ThicknessMm = o.ThicknessMm };
+        return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels)
+        {
+            LeftOut = leftOut, Pins = pins, Joined = joined, ThicknessMm = o.ThicknessMm,
+            Notes = work?.Notes ?? [], Extras = work?.Extras ?? new Dictionary<string, object>(),
+        };
     }
 
     /// <summary>
@@ -490,9 +558,9 @@ public static class StackSlicer
     }
 
     /// <summary>Area covered (outlines minus holes), mm².</summary>
-    static double Area(PathGeometry g) => g.IsEmpty ? 0 : Math.Abs(Loops(g).Sum(Geom.SignedArea));
+    public static double Area(PathGeometry g) => g.IsEmpty ? 0 : Math.Abs(Loops(g).Sum(Geom.SignedArea));
 
-    static List<List<Vec2>> Loops(PathGeometry g) => [.. g.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points)];
+    public static List<List<Vec2>> Loops(PathGeometry g) => [.. g.Flatten(0.05).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points)];
 
     /// <summary>
     /// Where pins go between a part and the part above it: inside both, clear of their edges, and
@@ -621,7 +689,7 @@ public static class StackSlicer
     }
 
     /// <summary>Each separate piece of a layer (an outline with the holes inside it).</summary>
-    static List<PathGeometry> Islands(PathGeometry layer)
+    public static List<PathGeometry> Islands(PathGeometry layer)
     {
         var loops = layer.Subpaths.Where(sp => sp.Closed).Select(sp => (Sp: sp, Pts: sp.Flatten(0.05))).Where(x => x.Pts.Count >= 3).ToList();
         int Depth(int i) => loops.Where((_, j) => j != i).Count(o => Geom.Inside(o.Pts, loops[i].Pts[0]));
@@ -656,7 +724,7 @@ public static class StackSlicer
     }
 
     /// <summary>The point inside furthest from any edge (where the number fits best), and how far that is.</summary>
-    static (Vec2 At, double Room) Pole(List<List<Vec2>> loops)
+    public static (Vec2 At, double Room) Pole(List<List<Vec2>> loops)
     {
         var box = Rect2.Bounds(loops.SelectMany(l => l));
         (Vec2, double) best = (box.Center, 0);
@@ -706,7 +774,7 @@ public static class StackSlicer
     }
 
     /// <summary>Two points inside an area, far apart (for dowels), or none.</summary>
-    static List<Vec2> TwoPointsInside(PathGeometry area)
+    public static List<Vec2> TwoPointsInside(PathGeometry area)
     {
         var loops = area.Flatten(0.1).Where(f => f.Closed && f.Points.Count >= 3).Select(f => f.Points).ToList();
         if (loops.Count == 0) return [];

@@ -19,7 +19,7 @@ namespace PhotonCanvas.Addon.Slicer;
 /// and get every layer as a part to cut, numbered from the bottom up, with where the next layer
 /// sits marked on it. Glue them up in order and the model is back, in wood.
 /// </summary>
-public sealed class StackSliceWindow : Window
+public sealed class StackSliceWindow : Window, IStackSliceSlot
 {
     readonly Document _doc;
     readonly MachineProfile _machine;
@@ -89,6 +89,9 @@ public sealed class StackSliceWindow : Window
     CancellationTokenSource? _viewCts;
     readonly Button _openBooklet = Button("Open the booklet", tip: "Opens the assembly booklet just made, in your PDF viewer, to read or print.");
     string? _bookletPath;
+    // Add-ons' settings (the "stackslice.stacked" slot) and the slicing steps they set (hollowing…).
+    readonly StackPanel _addonPanel = new() { Spacing = 10 };
+    readonly List<(object Owner, ISliceModifier Step)> _modifiers = [];
 
     public StackSliceWindow(Document doc, MachineProfile machine, AppSettings? settings = null, Doc.Materials.MaterialLibrary? library = null)
     {
@@ -220,6 +223,7 @@ public sealed class StackSliceWindow : Window
                             },
                         }),
                         Field("Dowels Ø", _dowel, tip: "Two holes through every slice, for long dowels through the whole stack. Only where every slice has room. 0 = none."),
+                        _addonPanel,
                     },
                 }),
                 (_eggPanel = new StackPanel
@@ -295,10 +299,21 @@ public sealed class StackSliceWindow : Window
         root.Children.Add(buttons);
         root.Children.Add(grid);
         Content = root;
+        PhotonCanvas.App.Addons.AddonSlots.Fill("stackslice.stacked", _addonPanel, this, data: this, changed: Later);
+        Closed += (_, _) => _modifiers.Clear();
         // Now the settings sit in their rows: hide the shaping rows (labels too) unless it's on.
         ShowShaping();
         ShowMethod();
         Pins();
+    }
+
+    SliceOptions IStackSliceSlot.Options => Options() with { Modifiers = [] };
+
+    void IStackSliceSlot.SetModifier(object owner, ISliceModifier? modifier)
+    {
+        _modifiers.RemoveAll(m => ReferenceEquals(m.Owner, owner));
+        if (modifier is not null) _modifiers.Add((owner, modifier));
+        Later();
     }
 
     /// <summary>Show a model already read (and slice it).</summary>
@@ -493,6 +508,7 @@ public sealed class StackSliceWindow : Window
         CoreMm = (double)(_core.Value ?? 6),
         SlotFitMm = (double)(_fit.Value ?? 0.1m),
         ShapeStepMm = _shape.IsChecked == true && (int)Math.Max(0, _method.SelectedIndex) == (int)SliceMethod.Stacked ? (double)(_step.Value ?? 0) : 0,
+        Modifiers = [.. _modifiers.Select(m => m.Step)],
     };
 
     /// <summary>What edge shaping will do, in a sentence or two.</summary>
@@ -653,6 +669,7 @@ public sealed class StackSliceWindow : Window
                             (o.PinMm > 0 ? $" {stack.Pins.Count} pins of {o.PinMm:0.#} mm join the slices, each up to {2 * o.ThicknessMm:0.#} mm long." : "") +
                             (o.DowelMm > 0 ? stack.Dowels.Count == 2 ? $" Two {o.DowelMm:0.#} mm dowel holes through every slice." : " No room for dowel holes in every slice." : "") +
                             (o.ShapeStepMm > 0 ? Shaping(stack, o) : "") +
+                            string.Concat(stack.Notes.Select(n => "\n" + n)) +
                             (fits ? "" : $"\n⚠ The biggest slice ({biggest.Width:0} × {biggest.Height:0} mm) doesn't fit on {where}: make the model smaller.");
             _make.IsEnabled = fits && parts > 0;
         }
