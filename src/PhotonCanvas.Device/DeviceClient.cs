@@ -182,8 +182,9 @@ public sealed class DeviceClient : IAsyncDisposable
         var error = reason as DeviceException
             ?? new DeviceException(DeviceException.DisconnectedCode, $"Lost the connection to the machine at {Ip}: {reason.Message}", inner: reason);
         Log($"disconnected: {error.Message}");
-        _lifetime.Cancel();
+        // Waiting requests are told why first, so one still being sent when the link goes says so too.
         FailAll(error);
+        _lifetime.Cancel();
         _events.Writer.TryComplete();
         _main?.Abort();
         _file?.Abort();
@@ -560,6 +561,8 @@ public sealed class DeviceClient : IAsyncDisposable
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
+                // The link went while this was being sent: the same reason the waiting requests got.
+                if (tcs.Task.IsFaulted && tcs.Task.Exception?.InnerException is DeviceException lost) throw lost;
                 throw new DeviceException(DeviceException.NotConnectedCode, $"The connection to {Ip} was closed.");
             }
             catch (Exception e) when (e is WebSocketException or IOException or ObjectDisposedException)

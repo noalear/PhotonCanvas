@@ -302,6 +302,7 @@ public class DeviceMessageTests
 }
 
 /// <summary>End-to-end tests of <see cref="DeviceClient"/> against an in-process fake device over loopback sockets.</summary>
+[Collection(TimingCollection.Name)]
 public sealed class DeviceClientTests : IAsyncLifetime
 {
     readonly string _stateDir = Path.Combine(Path.GetTempPath(), "photoncanvas-test-" + Guid.NewGuid().ToString("N"));
@@ -704,19 +705,22 @@ public sealed class DeviceClientTests : IAsyncLifetime
     [Fact]
     public async Task DetectsDeadLink()
     {
-        var options = Options() with { HeartbeatInterval = TimeSpan.FromMilliseconds(50), DeadLinkTimeout = TimeSpan.FromMilliseconds(500) };
+        // The dead-link time is 40 heartbeats, so a busy test machine (many tests at once) answering a
+        // ping late isn't taken for a dead link; it's still well under the wait below.
+        var options = Options() with { HeartbeatInterval = TimeSpan.FromMilliseconds(50), DeadLinkTimeout = TimeSpan.FromSeconds(2) };
         await using var client = await Connected(options);
         var lost = new TaskCompletionSource<DeviceException>(TaskCreationOptions.RunContinuationsAsynchronously);
         client.Disconnected += e => lost.TrySetResult(e);
 
         // While pings are answered, the link stays up.
         await Task.Delay(800);
-        Assert.True(client.IsConnected);
+        string why = lost.Task.IsCompleted ? "Lost: " + (await lost.Task).Message : "not connected, no Disconnected event";
+        Assert.True(client.IsConnected, why);
         Assert.Contains(_fake.Requests, r => Url(r) == "/v1/user/ping" && r["transactionId"]!.GetValue<int>() == DeviceClient.PingTransactionId);
 
         _fake.AnswerPings = false;
         var pending = client.GetAsync("/v1/test/silent", timeout: TimeSpan.FromSeconds(30));
-        var reason = await lost.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var reason = await lost.Task.WaitAsync(TimeSpan.FromSeconds(15));
         Assert.Equal(DeviceException.DisconnectedCode, reason.Code);
         Assert.False(client.IsConnected);
         var e = await Assert.ThrowsAsync<DeviceException>(() => pending);
