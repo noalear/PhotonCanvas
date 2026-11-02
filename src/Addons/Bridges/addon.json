@@ -1,0 +1,10 @@
+{
+  "id": "bridges",
+  "name": "Miniature bridge maker",
+  "version": "1.0.0",
+  "description": "Bridges for tabletop games and models: plank footbridges (level or arched, with railings and legs), sagging rope bridges with loose planks, and stone arch bridges with the wall maker's textures etched on, all flat-pack pieces that slot together.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
