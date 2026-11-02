@@ -264,6 +264,7 @@ static class DocsSim
         if (only is null or "more" or "floortiles") { Reset(); FloorTilesShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "roofs") { Reset(); RoofsShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "bases") { Reset(); BasesShots.Run(w, doc, canvas.Machine, lib, Settle); }
+        if (only is null or "more" or "mapterrain") { Reset(); MapTerrainShots.Run(w, doc, canvas.Machine, lib, Settle); }
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "images-index.txt"), Index.ToString());
         Console.WriteLine(Index.ToString());
     }
