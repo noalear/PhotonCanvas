@@ -11,8 +11,8 @@ detail, a burned test, or where the red pointer lands.
 This needs the machine connected (see [The machine and settings](machine.md)).
 
 ## Open the close-up camera
-<!-- target: ribbon:Camera/Close-up -->
-Click **Close-up** on the **Camera** tab. It opens in the bottom-right corner of the work area. The
+<!-- target: panel:Machine -->
+Click **Close-up** at the right end of the ribbon. It opens in the bottom-right corner of the work area. The
 first time, it takes a photo; after that it shows the last one until you click **Photo** or
 **Live**.
 
@@ -24,5 +24,5 @@ first time, it takes a photo; after that it shows the last one until you click *
 - **Bigger** and **Smaller** change its size.
 
 ## Close it
-<!-- target: ribbon:Camera/Close-up -->
+<!-- target: panel:Machine -->
 Click **Close-up** again, or the ✕ on the viewer.

@@ -9,7 +9,7 @@ and the grain becomes part of the engraving.
 ## Pick the board's outline
 <!-- target: ribbon:Home/Pick piece -->
 <!-- wait: tool:Wand -->
-With the board on the bed and the camera picture showing (**Camera → Show picture**), click **Pick
+With the board on the bed and the camera picture showing (**Show** in the machine panel), click **Pick
 piece** on the **Home** tab (or press `W`), then click inside the board. Keep its outline selected.
 
 ## Open Grain

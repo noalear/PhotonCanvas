@@ -7,8 +7,8 @@
 it. Use it when **Pick piece** can't tell the piece from what's around it, or for part of an edge.
 
 ## Show the camera picture
-<!-- target: ribbon:Camera/Show picture -->
-This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show picture** on the **Camera** tab.
+<!-- target: panel:Machine -->
+This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show** in the machine panel at the right end of the ribbon.
 
 ## Choose Trace edge
 <!-- target: ribbon:Home/Trace edge -->

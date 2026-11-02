@@ -20,9 +20,11 @@ work from a photo saved earlier.
 
 ![The Camera tab](images/ribbon-camera.png)
 
+The camera picture itself is worked from the machine panel at the right end of the ribbon, on every
+tab: **Photo**, **Show**, **Live** and **Close-up** (see [The machine and settings](machine.md)).
+
 | Group | Buttons |
 |---|---|
-| **See the bed** | **Update photo**, **Live view**, **Close-up**, **Show picture** |
 | **Place** | **Fit to piece**; add-ons add **Cut round prints** and **Every piece** (Camera placement) and **Line up pieces** (Split onto pieces) |
 | **Set up** | **Calibrate**, **Focus on selection**, **Thickness**, **Align MOPA**, **Close-up position** |
 
@@ -30,7 +32,7 @@ work from a photo saved earlier.
 
 | Feature | Needs |
 |---|---|
-| **Show picture**, **Update photo**, **Live view** on the work area | Connected; the camera calibrated (**Calibrate**) |
+| **Show**, **Photo**, **Live** on the work area | Connected; the camera calibrated (**Calibrate**) |
 | **Close-up** | Connected. Laying its photo on the work area also needs **Close-up position** at the current focus height |
 | **Fit to piece**, **Every piece** | Connected; the camera calibrated near the piece's height; the design selected |
 | **Line up pieces** | Connected; the camera calibrated near the pieces' height; a piece's page from **Split onto pieces** (both from the Split onto pieces add-on) |
@@ -71,17 +73,17 @@ give them.
 > **Tip:** Auto-focus on the material before you rely on the picture. With the picture on, a new
 > photo is taken by itself after auto-focus or after moving the head.
 
-### Show picture
+### Show the picture
 
-**Show picture** (a toggle) lays the latest photo under the design, or hides it. Turning it on takes
+**Show** (a toggle in the machine panel) lays the latest photo under the design, or hides it. Turning it on takes
 a fresh photo. If the camera isn't calibrated yet, it opens the calibration instead. When a
 calibration exists, the picture is always on when the program starts (whatever it was last time),
 and a photo is taken as soon as the machine connects.
 
-### Update photo
+### Take a new photo
 
-**Update photo** takes a new overview photo and lays it under the design, turning **Show picture**
-on if it was off. Use it after moving or changing the material. Greyed out until the machine is
+**Photo** (in the machine panel) takes a new overview photo and lays it under the design, turning
+**Show** on if it was off. Use it after moving or changing the material. Greyed out until the machine is
 connected and the camera calibrated.
 
 What happens for each photo:
@@ -95,8 +97,9 @@ What happens for each photo:
 
 ### Live view
 
-**Live view** (a toggle) keeps the overview camera taking photos one after another, about 3 to 4 a
-second over Wi-Fi. With **Show picture** on, each one is straightened and laid under the design, so
+**Live** (a toggle in the machine panel) keeps the overview camera taking photos one after another,
+about 3 to 4 a second over Wi-Fi. It also turns the picture on when the camera is calibrated. With
+**Show** on, each one is straightened and laid under the design, so
 you can watch the material as you place it. Greyed out until the machine is connected.
 
 - It pauses while a photo, an upload or a frame uses the connection, then carries on.
@@ -106,12 +109,10 @@ you can watch the material as you place it. Greyed out until the machine is conn
 
 ### The other camera controls
 
-- **At the right end of the ribbon** (when connected): **Photo** (as **Update photo**), **Show** (as
-  **Show picture**; right-click it for **Camera picture opacity**), **Live** (live view; it also
-  turns the picture on when the camera is calibrated), **Close-up** and **Lights**. See
-  [The machine and settings](machine.md).
+- **In the machine panel**: right-click **Show** for **Camera picture opacity**; **Lights** for the
+  fill lights. See [The machine and settings](machine.md).
 - **Settings → Machine → Work area camera**: **Camera on work area** (the same switch as
-  **Show picture**), **Opacity** (how strongly the picture shows under the design, 0.15 to 1,
+  **Show**), **Opacity** (how strongly the picture shows under the design, 0.15 to 1,
   default 0.85), **Update photo**, **Calibrate camera…**, and the list of calibrated heights.
 - **Settings → Machine → Camera lights**: the machine's **Front** and **Back** fill lights, off to
   100 %. Saved on the machine. With the picture on and live view off, changing them retakes the
@@ -130,14 +131,14 @@ material, and for a time-lapse of a job (the Time-lapse add-on).
 
 ### Close-up
 
-**Close-up** (a toggle) opens the close-up camera in the bottom-right corner of the work area, under
+**Close-up** (a toggle in the machine panel) opens the close-up camera in the bottom-right corner of the work area, under
 the title **CLOSE-UP CAMERA**. The first time it opens it takes a photo; after that it shows the last
 photo until you click **Photo** or **Live**. The camera sits turned in the head; its picture is
 turned back so the bed looks straight.
 
 | Button | What it does |
 |---|---|
-| **Live** | Keeps the close-up updating (a little under 3 photos a second). The overview's live view stops meanwhile: turn **Live view** on again afterwards. |
+| **Live** | Keeps the close-up updating (a little under 3 photos a second). The overview's live view stops meanwhile: turn the machine panel's **Live** on again afterwards. |
 | **Photo** | Takes one new close-up photo. |
 | **Save** | Saves a full-size close-up photo, exactly as the camera took it: a fresh one when connected, otherwise the last one. |
 | **Bigger** / **Smaller** | Switches between two sizes of the viewer. |
@@ -170,7 +171,7 @@ about 5 minutes and a scrap sheet, once for each material height you use. Checke
 machine.
 
 It also opens from **Calibrate camera…** (the machine status menu at the right end of the ribbon,
-and Settings → Machine), and from **Show picture** while the camera isn't calibrated.
+and Settings → Machine), and from **Show** in the machine panel while the camera isn't calibrated.
 
 The photo is on the left (scroll to zoom, right- or middle-drag to move it about); the five steps
 are on the right.
