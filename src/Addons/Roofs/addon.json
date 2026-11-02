@@ -1,0 +1,10 @@
+{
+  "id": "roofs",
+  "name": "Roofs and towers",
+  "version": "1.0.0",
+  "description": "Pitched, hipped, lean-to and cone roofs with shingles, slates, tiles or thatch etched on, made to lift off the wall maker's buildings, and round towers built from stacked rings with stonework, floors, doors, windows, battlements and slots for walls.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls"],
+  "onByDefault": true
+}
