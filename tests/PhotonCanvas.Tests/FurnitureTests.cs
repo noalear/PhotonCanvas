@@ -95,7 +95,7 @@ public class FurnitureTests
     static bool AllJoined(List<Placed> all, double T)
     {
         // A loose lid and its rim just sit on top.
-        all = [.. all.Where(p => p.Name is not ("Lid rim" or "Lid") || !all.Any(q => q.Name == "Lid rim"))];
+        all = [.. all.Where(p => p.Name is not ("Lid rim" or "Lid rail" or "Lid") || !all.Any(q => q.Name is "Lid rim" or "Lid rail"))];
         if (all.Count < 2) return true;
         bool Joined(Placed a, Placed b)
         {
@@ -168,6 +168,76 @@ public class FurnitureTests
         Assert.Empty(Clashes(all));
         Assert.Empty(EmptySlots(all, t, 0.1));
         Assert.True(AllJoined(all, t), "a piece isn't joined to the others");
+    }
+
+    static readonly FurnitureSet Push = Sheet with { PushFit = true, GripMm = 0.15 };
+
+    /// <summary>The pieces without their grip ribs, to check the rest still fits.</summary>
+    static ItemKit WithoutRibs(ItemKit k) => k with
+    {
+        Parts = [.. k.Parts.Select(p => p with { Cut = Geo.Subtract(p.Cut, Geo.Offset(p.Ribs, 0.005)) })],
+    };
+
+    public static IEnumerable<object[]> PushVariants()
+    {
+        foreach (var k in Defaults.Kinds) yield return [Defaults.For(k.Kind), 2.0];
+        yield return [Defaults.For(ItemKind.Table) with { Legs = LegStyle.Round, WidthMm = 20 }, 2.0];
+        yield return [Defaults.For(ItemKind.Chest) with { Lid = LidStyle.Flat }, 2.0];
+        yield return [Defaults.For(ItemKind.Chest) with { WidthMm = 24, DepthMm = 14, HeightMm = 12 }, 3.0];
+        yield return [Defaults.For(ItemKind.Chair) with { Back = BackStyle.Ladder, WidthMm = 12, HeightMm = 20 }, 1.5];
+        yield return [Defaults.For(ItemKind.WallShelf) with { DepthMm = 8, HeightMm = 8 }, 3.0];
+    }
+
+    [Theory]
+    [MemberData(nameof(PushVariants))]
+    public void Push_fit_furniture_has_ribs_and_still_fits_together(FurnitureItem it, double t)
+    {
+        var push = Make(it, Push with { ThicknessMm = t });
+        Assert.True(push.Ok, string.Join("\n", push.Findings));
+        Assert.All(push.Parts, p => Assert.Equal(1, Geo.Pieces(p.Cut)));
+        // Ribs on the pieces with slots, notches or finger joints, and only on the outline's edge.
+        Assert.True(push.Parts.Sum(p => Geo.Area(p.Ribs)) > 0.01, "no ribs");
+        Assert.All(push.Parts, p => Assert.True(Geo.Area(Geo.Subtract(p.Ribs, p.Cut)) < 1e-6));
+        Assert.All(push.Parts.Where(p => Geo.Area(p.Ribs) > 0), p => Assert.True(Geo.Area(Geo.Offset(p.Ribs, -0.15, round: true)) < 1e-6, $"{p.Name}: a rib taller than 0.3 mm"));
+        // Without the ribs, everything still goes together as before.
+        var all = Assemble(WithoutRibs(push), t);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, t, 0.1));
+        if (it.Kind != ItemKind.WallShelf) Assert.True(AllJoined(all, t), "a piece isn't joined to the others");
+        if (it.Kind != ItemKind.WallShelf) Assert.DoesNotContain(push.Findings, f => f.Level == Severity.Warn);
+        Assert.DoesNotContain(push.Findings, f => f.Text.Contains("glue", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Push_fit_ribs_narrow_each_slot_to_the_sheet_less_the_grip()
+    {
+        const double t = 2, grip = 0.15;
+        var top = Part(Make(Defaults.For(ItemKind.Table), Push), "Top");
+        var holes = Geo.Tidy(top.Cut).Where(p => Clipper.Area(p) < 0).ToList();
+        Assert.NotEmpty(holes);
+        foreach (var hole in holes)
+        {
+            // Across the slot (the way it's as wide as the sheet plus the fit), the rib tips are the corners nearest the middle.
+            var b = Clipper.GetBounds(hole);
+            bool acrossX = Math.Abs(b.right - b.left - 2.1) < 0.01;
+            Assert.True(acrossX || Math.Abs(b.bottom - b.top - 2.1) < 0.01);
+            var at = hole.Select(q => acrossX ? q.x : q.y).ToList();
+            double mid = acrossX ? (b.left + b.right) / 2 : (b.top + b.bottom) / 2;
+            Assert.Equal(t - grip, at.Where(x => x > mid).Min() - at.Where(x => x < mid).Max(), 3);
+        }
+    }
+
+    [Fact]
+    public void Push_fit_chests_and_shelves_need_no_glue()
+    {
+        var chest = Make(Defaults.For(ItemKind.Chest), Push);
+        Assert.Contains(chest.Parts, p => p.Name == "Lid rail" && p.Copies == 2);
+        Assert.DoesNotContain(chest.Parts, p => p.Name == "Lid rim");
+        Assert.Equal(4, Geo.Tidy(Part(chest, "Lid").Cut).Count(p => Clipper.Area(p) < 0));
+        var shelf = Make(Defaults.For(ItemKind.WallShelf) with { WallSheetMm = 2 }, Push);
+        Assert.Equal(2, Geo.Tidy(Part(shelf, "Shelf").Cut).Count(p => Clipper.Area(p) < 0));
+        var door = Make(Defaults.For(ItemKind.WallDoor), Push);
+        Assert.True(Geo.Area(Part(door, "Door clip").Cut) > Geo.Area(Part(Make(Defaults.For(ItemKind.WallDoor)), "Door clip").Cut) + 0.01, "the clip's fork has no ribs");
     }
 
     [Fact]
