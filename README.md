@@ -33,6 +33,7 @@ straight to the machine over your own network.
 - Curved surfaces: measured with the pointer and the close-up camera, or a cylinder or slatted drum typed in; the head follows them in height steps
 - Serial numbers, dates and spreadsheet (CSV) columns as `{fields}` in any text or code, moving on after each finished run; QR codes, Data Matrix and barcodes (Code 128, Code 39, EAN-13, UPC-A)
 - Rounded corners, trim, scissors, extend lines, text on a path, copy along a path, warp (taper, arch, bulge, wave, four corners), align by two points, measure, tidy lines from imported drawings (join, close, de-duplicate), remove overlapping lines, tangent circles, shadows, select by type, size or layer, lock shapes
+- Leather and fabric pieces for sewn goods (add-on): seam allowance, stitch holes spaced evenly with one in every corner (round, pricking-iron slots or diamonds), notches, a stitching groove and mirrored left/right pairs, with safety notes per material (PVC is refused)
 - Shapes that stay editable (corner radius, sides, star points), guidelines dragged from the rulers, text that fits a box, single-line text, generators (finger-jointed boxes, keychains, living hinges, earrings), multi-size copies
 - Undo history, a font manager (star and hide fonts), templates, editable keyboard shortcuts, a light theme and inches
 

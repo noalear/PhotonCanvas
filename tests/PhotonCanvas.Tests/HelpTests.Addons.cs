@@ -47,6 +47,8 @@ public partial class HelpTests
             && requires.Contains(System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(AddonsDir, a, "addon.json"))).RootElement.GetProperty("id").GetString()!));
         var lib = Lib.Value.WithAddons([(addon, help), .. needed.Select(a => (a, Path.Combine(AddonsDir, a, "help")))]);
         var src = AddonSources(addon);
+        // Tutorial steps may point at the required add-ons' buttons and labels too (a hollow tutorial opens 3D to slices).
+        var withRequired = string.Join("\n", needed.Select(AddonSources).Append(src));
         var problems = new List<string>();
 
         // Links and pictures.
@@ -90,8 +92,8 @@ public partial class HelpTests
             if (!claimed.Contains(m.Groups[1].Value)) problems.Add($"window {m.Groups[1].Value} has no page in {addon}/help (<!-- windows: {m.Groups[1].Value} -->)");
 
         // Tutorial targets: the program's ribbon plus this add-on's buttons; labels from both sources.
-        var commands = RibbonCommands().Concat(AddonRibbon(src)).ToHashSet();
-        var literals = Sources.Value.Values.Append(src).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
+        var commands = RibbonCommands().Concat(AddonRibbon(withRequired)).ToHashSet();
+        var literals = Sources.Value.Values.Append(withRequired).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
         foreach (var t in own.Tutorials)
             foreach (var s in t.Steps)
                 if (s.Target is { } target)

@@ -4,6 +4,7 @@ using Avalonia.Layout;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
+using PhotonCanvas.Doc.Materials;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
@@ -15,6 +16,10 @@ public sealed class GeneratorsWindow : Window
     readonly MachineProfile _field;
     readonly NumericUpDown _bw = Number(10, 1000, 5, "0.#"), _bd = Number(10, 1000, 5, "0.#"), _bh = Number(5, 1000, 5, "0.#"), _bt = Number(0.5m, 20, 0.5m, "0.##"), _bf = Number(1, 100, 1, "0.#");
     readonly CheckBox _lid = new() { Content = "With a lid", IsChecked = true };
+    // The box's cut settings from the library: the material's thickness, and the kerf measured for them (Kerf gauge or Cut test).
+    readonly ComboBox _boxCut = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    readonly TextBlock _boxCutNote = Hint();
+    readonly List<(Material M, Recipe R)> _cuts = [];
     readonly ComboBox _tagShape = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Rounded rectangle", "Circle", "Tag" }, SelectedIndex = 0 };
     readonly NumericUpDown _kw = Number(10, 300, 1, "0.#"), _kh = Number(5, 300, 1, "0.#"), _kHole = Number(0, 30, 0.5m, "0.#"), _kInset = Number(0.5m, 50, 0.5m, "0.#");
     readonly TextBox _kText = new() { Watermark = "Text on it (optional; fields like {serial} work)" };
@@ -24,10 +29,15 @@ public sealed class GeneratorsWindow : Window
     readonly ComboBox _eShape = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Teardrop", "Leaf", "Circle", "Hexagon", "Arch" }, SelectedIndex = 0 };
     readonly NumericUpDown _ew = Number(5, 100, 1, "0.#"), _eh = Number(5, 150, 1, "0.#"), _eHole = Number(0, 10, 0.1m, "0.#"), _eInset = Number(0.3m, 20, 0.1m, "0.#");
 
-    public GeneratorsWindow(Document doc, MachineProfile field)
+    public GeneratorsWindow(Document doc, MachineProfile field, MaterialLibrary? library = null)
     {
         _doc = doc;
         _field = field;
+        // Measured recipes first: those are the ones whose fingers fit.
+        _cuts.AddRange((library?.Materials ?? []).SelectMany(m => m.Recipes.Where(r => r.Settings.Mode == LayerMode.Cut).Select(r => (m, r))).OrderByDescending(x => x.r.Settings.KerfMm > 0));
+        _boxCut.ItemsSource = _cuts.Select(x => $"{x.M.Label} · {x.R.Title}" + (x.R.Settings.KerfMm > 0 ? $" (kerf {x.R.Settings.KerfMm:0.###} mm)" : " (no kerf measured)")).Prepend("The design's cut layer, as it is").ToList();
+        _boxCut.SelectedIndex = _cuts.Count > 0 && _cuts[0].R.Settings.KerfMm > 0 ? 1 : 0;
+        _boxCut.SelectionChanged += (_, _) => BoxCut();
         Title = "Generators";
         Width = 600;
         SizeToContent = SizeToContent.Height;
@@ -64,7 +74,8 @@ public sealed class GeneratorsWindow : Window
                             Row(Field("Inside height", _bh), Field("Material", _bt)),
                             Field("Finger width", _bf, tip: "About three times the material thickness is a good start. Each edge gets an odd number of fingers so the corners work out."),
                             _lid,
-                            Hint("The panels go on a Cut layer. Set its kerf (More settings) so the fingers fit snugly."),
+                            Field("Cut with", _boxCut, tip: "Cut settings from your library. The panels go on a cut layer with them, kerf included, so the fingers come out the width they're drawn and press together snugly."),
+                            _boxCutNote,
                             makeBox,
                         },
                     },
@@ -136,6 +147,22 @@ public sealed class GeneratorsWindow : Window
             },
         };
         Content = new Border { Padding = new Thickness(16), Child = tabs };
+        BoxCut();
+    }
+
+    (Material M, Recipe R)? BoxRecipe => _boxCut.SelectedIndex > 0 && _boxCut.SelectedIndex <= _cuts.Count ? _cuts[_boxCut.SelectedIndex - 1] : null;
+
+    void BoxCut()
+    {
+        if (BoxRecipe is not { } c)
+        {
+            _boxCutNote.Text = "The panels go on the design's Cut layer. Set its kerf (More settings) so the fingers fit snugly.";
+            return;
+        }
+        if (c.M.ThicknessMm is { } t) _bt.Value = (decimal)Math.Clamp(t, 0.5, 20);
+        _boxCutNote.Text = c.R.Settings.KerfMm > 0
+            ? $"On a cut layer \"{c.M.Label}\" with a {c.R.Settings.KerfMm:0.###} mm kerf: the fingers press together snugly."
+            : "These settings have no kerf measured yet, so the fingers will be loose: measure it first (Laser → Kerf gauge, or Cut test).";
     }
 
     Layer LayerFor(ref DocState s, LayerMode mode, string name)
@@ -150,7 +177,19 @@ public sealed class GeneratorsWindow : Window
     void MakeBox()
     {
         var s = _doc.State;
-        var layer = LayerFor(ref s, LayerMode.Cut, "Cut");
+        Layer layer;
+        if (BoxRecipe is { } c)
+        {
+            // The recipe's own cut layer: one made before for it, else a new one.
+            var made = s.Layers.FirstOrDefault(l => l.Mode == LayerMode.Cut && l.ParentId is null && l.Material?.RecipeId == c.R.Id && Math.Abs(l.KerfMm - c.R.Settings.KerfMm) < 1e-9);
+            if (made is null)
+            {
+                made = c.R.Settings.ApplyTo(Layer.Default(s.Layers.Count, LayerMode.Cut)) with { Name = c.M.Label, Material = new MaterialRef(c.M.Id, c.M.Label, c.R.Id, c.R.Title) };
+                s = Ops.AddLayer(s, made);
+            }
+            layer = made;
+        }
+        else layer = LayerFor(ref s, LayerMode.Cut, "Cut");
         var panels = Generators.Box((double)(_bw.Value ?? 80), (double)(_bd.Value ?? 60), (double)(_bh.Value ?? 40), (double)(_bt.Value ?? 3), (double)(_bf.Value ?? 9), _lid.IsChecked == true);
         var shapes = panels.Select(p => (Shape)new PathShape { Name = $"Box · {p.Name}", LayerId = layer.Id, Geometry = p.Outline.Transform(Affine.Translate(10, 10)) }).ToList();
         var (ns, gid) = Ops.Group(Ops.AddShapes(s, shapes), shapes.Select(x => x.Id).ToHashSet());

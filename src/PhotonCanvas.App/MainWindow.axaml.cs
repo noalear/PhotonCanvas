@@ -520,7 +520,7 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
-        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
+        draw.Large("Generators", "IcTestGrid", () => _ = Guard(() => new GeneratorsWindow(_doc, Canvas.Machine, _library).ShowDialog(this)), "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
         ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
@@ -557,7 +557,6 @@ public partial class MainWindow : Window
                 Item("Extend lines to meet the next shape", ExtendSel),
                 Item("Remove overlapping lines", RemoveOverlapsSel),
                 Item("Tangent circles (select three circles)", TangentCirclesSel),
-                AsyncItem("Stencil bridges…", StencilSel),
                 AsyncItem("Drop shadow…", () => ShadowSel(false)),
                 AsyncItem("3D shadow…", () => ShadowSel(true)),
                 Item("Clear all guides", () => { if (_doc.State.Guides.Count > 0) _doc.Commit("Clear guides", _doc.State with { Guides = [] }); }),
@@ -2123,28 +2122,6 @@ public partial class MainWindow : Window
             StatusText.Text = $"Quick processing stopped: {e.Message}";
         }
         finally { _quickRunning = false; }
-    }
-
-    /// <summary>Stencil bridges: the middles of O, A, R… kept joined to the stencil by a strip across the letter.</summary>
-    async Task StencilSel()
-    {
-        var shapes = SelectedPaths();
-        if (shapes.Count == 0) { await Dialogs.Message(this, "Stencil bridges", "Select the letters or shapes to cut as a stencil first."); return; }
-        var text = await Dialogs.Prompt(this, "Stencil bridges", "How wide each bridge is (mm). A strip of the sheet this wide is kept across each letter that has a middle (O, A, R, B…), so the middle stays in.", "1");
-        if (text is null || !double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double w) || !(w > 0)) return;
-        var s = _doc.State;
-        int islands = 0, changed = 0;
-        foreach (var sh in shapes)
-        {
-            var (g, n) = PhotonCanvas.Doc.Geometry.Stencil.Bridge(sh.World, w);
-            if (n == 0) continue;
-            islands += n;
-            changed++;
-            s = Ops.Replace(s, new PathShape { Id = sh.Id, Name = sh.Name, LayerId = sh.LayerId, GroupId = sh.GroupId, Geometry = g });
-        }
-        if (changed == 0) { StatusText.Text = "Nothing to bridge: none of the selected shapes has a middle that would fall out."; return; }
-        _doc.Commit("Stencil bridges", s);
-        StatusText.Text = $"Bridged {islands} middle{(islands == 1 ? "" : "s")} in {changed} shape{(changed == 1 ? "" : "s")} with {w:0.##} mm strips.";
     }
 
     async Task OffsetSel()

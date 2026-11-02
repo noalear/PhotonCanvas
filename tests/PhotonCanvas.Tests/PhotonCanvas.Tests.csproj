@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- The add-ons below are not listed in the solution; build them in this build's configuration. -->
+    <ShouldUnsetParentConfigurationAndPlatform>false</ShouldUnsetParentConfigurationAndPlatform>
   </PropertyGroup>
 
   <ItemGroup>
@@ -24,8 +26,8 @@
     <ProjectReference Include="..\..\src\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Server\PhotonCanvas.Server.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Remote\PhotonCanvas.Remote.csproj" />
-    <!-- Add-ons with tests (their own geometry). -->
-    <ProjectReference Include="..\..\src\Addons\DepthOutlines\PhotonCanvas.Addon.DepthOutlines.csproj" />
+    <!-- Every add-on, found by folder, so a new add-on never edits this file. -->
+    <ProjectReference Include="..\..\src\Addons\*\*.csproj" />
   </ItemGroup>
 
 </Project>
