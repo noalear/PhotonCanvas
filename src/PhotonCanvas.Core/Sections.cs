@@ -52,6 +52,7 @@ public static class Sections
                 {
                     Polygons = [.. f.Polygons.Select(poly => (IReadOnlyList<Vec2>)[.. poly.Select(p => p + shift)])],
                     Mask = f.Mask?.Shifted(shift),
+                    PowerScale = f.PowerScale?.Shifted(shift),
                     ClipRect = Move(inside, shift),
                 };
                 break;
