@@ -597,5 +597,7 @@ public sealed class RibbonGroup
         }
         else _items.Children.Remove(c);
         _column = null;
+        // Its click handler belongs to the add-on: don't keep it until the next add-on button arrives.
+        _extras.RemoveAll(x => x.Item.Parent != _items);
     }
 }
