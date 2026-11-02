@@ -140,19 +140,34 @@ public sealed class Updater
 
     // ---- downloading ------------------------------------------------------------------------------
 
-    /// <summary>Download a version, check it against the release's SHA256SUMS and unpack it into the data folder. Returns the unpacked version's folder.</summary>
-    async Task<string> Download(Updates.Release r, Updates.Asset file, string? token, string into, IProgress<double>? progress)
+    /// <summary>
+    /// Download a version, check it against the release's SHA256SUMS and unpack it into the data
+    /// folder. Returns the unpacked version's folder. With <paramref name="changedOnly"/> (updating
+    /// this copy in place) only the files that differ from this copy's are fetched, when the release
+    /// allows it; otherwise, or if that goes wrong, the whole download.
+    /// </summary>
+    async Task<string> Download(Updates.Release r, Updates.Asset file, string? token, string into, IProgress<double>? progress, bool changedOnly = false)
     {
         var sums = r.Named(Updates.SumsFile) ?? throw new InvalidDataException($"The release has no {Updates.SumsFile}, so the download couldn't be checked: not installing it.");
-        var expected = Updates.ParseSums(await Updates.DownloadTextAsync(sums, token)).GetValueOrDefault(file.Name)
+        var table = Updates.ParseSums(await Updates.DownloadTextAsync(sums, token));
+        var expected = table.GetValueOrDefault(file.Name)
             ?? throw new InvalidDataException($"{Updates.SumsFile} doesn't list {file.Name}, so it couldn't be checked: not installing it.");
         Downloading = r.Version;
         Progress = 0;
         Changed?.Invoke();
         var archive = Path.Combine(into, file.Name);
+        var report = new Progress<double>(p => { Progress = p; progress?.Report(p); Changed?.Invoke(); });
         try
         {
-            var report = new Progress<double>(p => { Progress = p; progress?.Report(p); Changed?.Invoke(); });
+            if (changedOnly && file.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                && r.Named(UpdateDelta.ListName(file.Name)) is { } listFile && table.GetValueOrDefault(listFile.Name) is { } listHash)
+            {
+                try { return await DownloadChanged(r, file, listFile, listHash, token, into, report); }
+                catch (Exception e) when (IsTrouble(e) && e is not OperationCanceledException)
+                {
+                    AppLog.Write("updates", $"{r.Version}: getting only the changed files didn't work ({e.Message}); downloading it all.");
+                }
+            }
             await Updates.DownloadAsync(file, archive, token, report);
             if (await Task.Run(() => Updates.Sha256(archive)) != expected)
                 throw new InvalidDataException("The download doesn't match the release's checksum (damaged on the way?), so it wasn't installed.");
@@ -169,12 +184,36 @@ public sealed class Updater
         }
     }
 
+    /// <summary>Only the files that differ from this copy's, read out of the release's zip (see <see cref="UpdateDelta"/>).</summary>
+    static async Task<string> DownloadChanged(Updates.Release r, Updates.Asset file, Updates.Asset listFile, string listHash, string? token, string into, IProgress<double> report)
+    {
+        var listPath = Path.Combine(into, listFile.Name);
+        await Updates.DownloadAsync(listFile, listPath, token);
+        if (await Task.Run(() => Updates.Sha256(listPath)) != listHash) throw new InvalidDataException("the file list doesn't match its checksum");
+        var list = UpdateDelta.ParseList(await File.ReadAllTextAsync(listPath));
+        if (list.Count == 0) throw new InvalidDataException("the file list is empty");
+        var changed = await Task.Run(() => UpdateDelta.Changed(list, UpdateInstall.InstallRoot));
+        var ranges = await Updates.RangesAsync(file, token) ?? throw new IOException("the server won't send parts of the file");
+        var zip = await UpdateDelta.ReadDirectory(ranges.Read, ranges.Length);
+        var plan = UpdateDelta.MakePlan(changed, zip, ranges.Length);
+        if (plan.Bytes > ranges.Length * 0.6) throw new IOException("most of it changed");
+        var top = UpdateDelta.TopFolder(zip).TrimEnd('/');
+        var files = Path.Combine(into, "files");
+        if (Directory.Exists(files)) Directory.Delete(files, recursive: true);
+        var root = Path.Combine(files, top.Length > 0 ? top : AppIdentity.ProductName);
+        await UpdateDelta.Fetch(plan, ranges.Read, root, report);
+        if (UpdateInstall.ReadMarker(UpdateInstall.ProgramDirIn(root)) is null)
+            throw new InvalidDataException("the new version has no update.json");
+        AppLog.Write("updates", $"{r.Version}: {plan.Files.Count} of {list.Count} files changed; downloaded {plan.Bytes / 1048576.0:0.0} MB instead of {ranges.Length / 1048576.0:0} MB.");
+        return root;
+    }
+
     /// <summary>Download a version and leave it to go in when the program closes.</summary>
     async Task Fetch(Updates.Release r, Updates.Asset file, string? token, IProgress<double>? progress)
     {
         UpdateInstall.ClearDownloads();
         var into = Path.Combine(UpdateInstall.UpdatesDir, r.Version);
-        var root = await Download(r, file, token, into, progress);
+        var root = await Download(r, file, token, into, progress, changedOnly: true);
         UpdateInstall.SetPending(new(r.Version, root, UpdateInstall.InstallRoot));
         Ready = r.Version;
         AppLog.Write("updates", $"{r.Version} downloaded; it goes in when {AppIdentity.ProductName} closes.");
@@ -213,7 +252,7 @@ public sealed class Updater
         var bar = new ProgressBar { Minimum = 0, Maximum = 1, IsVisible = false, Height = 6 };
         var status = Hint();
         string about = $"You have {Updates.Current}. " + (inPlace
-            ? $"Update downloads it ({Size(file!.Size)}) and checks it; it goes in when you close {AppIdentity.ProductName}, or straight away with Restart now. Your designs, settings and library are kept."
+            ? $"Update downloads the files that changed (all {Size(file!.Size)} only when most of it did) and checks them; it goes in when you close {AppIdentity.ProductName}, or straight away with Restart now. Your designs, settings and library are kept."
             : installCopy
             ? $"This copy was built from the source code, so it doesn't change itself. Install it puts the published version in {InstallFolder} with shortcuts on the desktop and in the Start menu; that copy keeps itself up to date. Your designs, settings and library are shared, so nothing is lost."
             : file is { } f
@@ -456,7 +495,7 @@ public sealed class Updater
                 new TextBlock { Text = $"This is {AppIdentity.ProductName} {Updates.Current} ({Updates.Platform}).{where}", TextWrapping = TextWrapping.Wrap },
                 check,
                 auto,
-                Hint($"New versions are downloaded in the background and checked against the release's checksums, then put in the next time you close {AppIdentity.ProductName} (or straight away with the restart button at the bottom of the window). Add-ons you installed that say where their updates come from are updated too. Off: you're asked first."),
+                Hint($"New versions are downloaded in the background (only the files that changed, usually a few MB) and checked against the release's checksums, then put in the next time you close {AppIdentity.ProductName} (or straight away with the restart button at the bottom of the window). Add-ons you installed that say where their updates come from are updated too. Off: you're asked first."),
                 now,
                 Hint($"{AppIdentity.ProductName} asks GitHub (github.com/{Updates.Repo}) for the latest version at start and every few hours. Nothing about you or your designs is sent; like any web request it does reveal your internet address to GitHub. Unticking the first box: never asks, except when you click Check now."),
                 new TextBlock { Text = "GITHUB ACCESS KEY", Classes = { "h" }, Margin = new(0, 8, 0, 0) },

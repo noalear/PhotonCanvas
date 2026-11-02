@@ -236,3 +236,89 @@ public class UpdatesTests
         public void Dispose() { try { Directory.Delete(Path, recursive: true); } catch (IOException) { } }
     }
 }
+
+public class UpdateDeltaTests
+{
+    static string Make(string root, params (string Rel, string Text)[] files)
+    {
+        Directory.CreateDirectory(root);
+        var all = files.Append((UpdateInstall.MarkerFile, """{"repo":"noalear/PhotonCanvas","platform":"win-x64"}""")).ToList();
+        foreach (var (rel, text) in all)
+        {
+            var f = Path.Combine(root, rel);
+            Directory.CreateDirectory(Path.GetDirectoryName(f)!);
+            File.WriteAllText(f, text);
+        }
+        File.WriteAllLines(Path.Combine(root, UpdateInstall.ListFile), all.Select(x => "./" + x.Item1).Append("./" + UpdateInstall.ListFile));
+        return root;
+    }
+
+    /// <summary>The file list as tools/publish.sh writes it (sha256sum of every file).</summary>
+    static string ListOf(string root) => string.Join("\n", Directory.GetFiles(root, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal)
+        .Select(f => $"{Updates.Sha256(f)}  ./{Path.GetRelativePath(root, f).Replace('\\', '/')}")) + "\n";
+
+    [Fact]
+    public async Task OnlyTheChangedFilesAreFetchedAndTheResultIsTheNewVersion()
+    {
+        var t = Path.Combine(Path.GetTempPath(), "pc-delta-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var noise = new byte[300_000];
+            new Random(1).NextBytes(noise);
+            var big = Convert.ToBase64String(noise); // a big file that doesn't change: never fetched
+            var install = Make(Path.Combine(t, "installed", "PhotonCanvas"), ("PhotonCanvas.dll", "old app"), ("Runtime.dll", big), ("addons/old/addon.json", "{}"), ("addons/keep/A.dll", "same"));
+            var next = Make(Path.Combine(t, "next", "PhotonCanvas"), ("PhotonCanvas.dll", "new app"), ("Runtime.dll", big), ("addons/keep/A.dll", "same"), ("addons/new/addon.json", "{\"id\":\"new\"}"));
+            var zip = Path.Combine(t, "PhotonCanvas-win-x64.zip");
+            ZipFile.CreateFromDirectory(Path.Combine(t, "next"), zip, CompressionLevel.Optimal, includeBaseDirectory: false);
+
+            var list = UpdateDelta.ParseList(ListOf(next));
+            Assert.Equal(6, list.Count);
+            var changed = UpdateDelta.Changed(list, install);
+            Assert.Equal(["PhotonCanvas.dll", "addons/new/addon.json", "update-files.txt", "update.json"], changed.Select(c => c.Path).Order(StringComparer.Ordinal));
+
+            var read = UpdateDelta.FileReader(zip);
+            long length = new FileInfo(zip).Length;
+            var dir = await UpdateDelta.ReadDirectory(read, length);
+            Assert.Equal("PhotonCanvas/", UpdateDelta.TopFolder(dir));
+            var plan = UpdateDelta.MakePlan(changed, dir, length, joinGap: 0);
+            Assert.True(plan.Bytes < length / 2, $"{plan.Bytes} of {length}");
+
+            var staged = Path.Combine(t, "staged", "PhotonCanvas");
+            await UpdateDelta.Fetch(plan, read, staged);
+            Assert.Equal(4, Directory.GetFiles(staged, "*", SearchOption.AllDirectories).Length);
+
+            UpdateInstall.Apply(staged, install);
+            UpdateInstall.CleanUp(install);
+            Assert.Equal(ListOf(next), ListOf(install)); // exactly the new version, the old add-on gone
+        }
+        finally { try { Directory.Delete(t, recursive: true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public async Task AFileThatDoesntMatchItsChecksumIsRefused()
+    {
+        var t = Path.Combine(Path.GetTempPath(), "pc-delta-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var next = Make(Path.Combine(t, "next", "PhotonCanvas"), ("PhotonCanvas.dll", "new app"));
+            var zip = Path.Combine(t, "v.zip");
+            ZipFile.CreateFromDirectory(Path.Combine(t, "next"), zip, CompressionLevel.Optimal, includeBaseDirectory: false);
+            var list = UpdateDelta.ParseList(ListOf(next)).Select(e => e.Path == "PhotonCanvas.dll" ? e with { Sha256 = new string('0', 64) } : e).ToList();
+            var read = UpdateDelta.FileReader(zip);
+            long length = new FileInfo(zip).Length;
+            var plan = UpdateDelta.MakePlan(list, await UpdateDelta.ReadDirectory(read, length), length);
+            await Assert.ThrowsAsync<InvalidDataException>(() => UpdateDelta.Fetch(plan, read, Path.Combine(t, "staged")));
+        }
+        finally { try { Directory.Delete(t, recursive: true); } catch (IOException) { } }
+    }
+
+    [Fact]
+    public void TheListIsReadSafely()
+    {
+        var a = new string('a', 64);
+        var list = UpdateDelta.ParseList($"{a}  ./PhotonCanvas.exe\n{a}  ./addons/x/A.dll\r\n{a}  ../evil.dll\n{a}  /etc/passwd\n{a}  ./a/../../b\nnot a line\n");
+        Assert.Equal(["PhotonCanvas.exe", "addons/x/A.dll"], list.Select(e => e.Path));
+        Assert.Equal("PhotonCanvas-win-x64.files.txt", UpdateDelta.ListName("PhotonCanvas-win-x64.zip"));
+        Assert.Equal("PhotonCanvas-osx-arm64.files.txt", UpdateDelta.ListName("PhotonCanvas-osx-arm64.tar.gz"));
+    }
+}

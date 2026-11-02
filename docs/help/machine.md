@@ -313,7 +313,8 @@ in the background and puts them in when you close it. The page says which versio
   never asks, except when you click **Check now**.
 - **Put new versions in by themselves** (on to begin with): a newer version is downloaded in the
   background and checked against the release's checksums (a damaged or tampered download is thrown
-  away). While it downloads, the bottom left of the window says so; once it's ready, a button there
+  away). Only the files that changed are downloaded, usually a few MB; the whole version (over
+  100 MB) only when most of it changed or the quick way doesn't work. While it downloads, the bottom left of the window says so; once it's ready, a button there
   says **PhotonCanvas 0.1.43 is ready: restart**. Click it to close and start again with the new
   version straight away (you're asked to save first, as usual), or carry on: it goes in the next
   time you close PhotonCanvas. After it has gone in, the same place says **Updated to 0.1.43:
