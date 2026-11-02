@@ -101,7 +101,7 @@ public static class Tables
             };
             m.Add("Rail", rail, [], railAt.Select(u => Pose.Front(xf1 + T / 2, ys - rh / 2, si + u)), grainAlongU: true, face: [Geo.Rect(0, 0, L, rh)]);
         }
-        if (!rails && style != LegStyle.Legs) m.Note("Without a rail the ends are held only by the top: glue them square, or add the rail.");
+        if (!rails && style != LegStyle.Legs) m.Note(m.PushFit ? "Without a rail the ends are held only by the top: add the rail to keep them square." : "Without a rail the ends are held only by the top: glue them square, or add the rail.");
     }
 
     /// <summary>A round or square top on two legs crossed with a halving joint (stools and round tables).</summary>
