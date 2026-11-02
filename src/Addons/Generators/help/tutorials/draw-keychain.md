@@ -1,7 +1,7 @@
 # Make a keychain or tag
 <!-- category: Drawing -->
 <!-- summary: Draw a keychain or gift tag with its ring hole and engraved words. -->
-<!-- page: drawing.md#keychain-and-tag -->
+<!-- page: generators.md#keychain-and-tag -->
 <!-- order: 62 -->
 A keychain or gift tag with its ring hole and, if you like, engraved words, ready to cut. The words
 can hold a serial number or a name from a spreadsheet, so each tag can be different.

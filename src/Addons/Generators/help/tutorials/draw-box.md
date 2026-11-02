@@ -1,7 +1,7 @@
 # Make a finger-jointed box
 <!-- category: Drawing -->
 <!-- summary: Draw the panels of a box whose finger joints slot together, from its inside size. -->
-<!-- page: drawing.md#box -->
+<!-- page: generators.md#box -->
 <!-- order: 60 -->
 The box generator draws every panel of a box with finger joints that slot together, sized from the
 inside measurements and your material's thickness. Cut the panels, push them together and glue.
