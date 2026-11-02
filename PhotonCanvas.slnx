@@ -9,28 +9,6 @@
     <Project Path="src/PhotonCanvas.Remote.App/PhotonCanvas.Remote.App.csproj" />
     <Project Path="src/PhotonCanvas.Remote.Desktop/PhotonCanvas.Remote.Desktop.csproj" />
   </Folder>
-  <Folder Name="/src/Addons/">
-    <Project Path="src/Addons/RemoteAccess/PhotonCanvas.Addon.RemoteAccess.csproj" />
-    <Project Path="src/Addons/TimeLapse/PhotonCanvas.Addon.TimeLapse.csproj" />
-    <Project Path="src/Addons/SplitPieces/PhotonCanvas.Addon.SplitPieces.csproj" />
-    <Project Path="src/Addons/CameraPlacement/PhotonCanvas.Addon.CameraPlacement.csproj" />
-    <Project Path="src/Addons/MaterialTests/PhotonCanvas.Addon.MaterialTests.csproj" />
-    <Project Path="src/Addons/ColourOnMetal/PhotonCanvas.Addon.ColourOnMetal.csproj" />
-    <Project Path="src/Addons/Background/PhotonCanvas.Addon.Background.csproj" />
-    <Project Path="src/Addons/Relief/PhotonCanvas.Addon.Relief.csproj" />
-    <Project Path="src/Addons/Diffraction/PhotonCanvas.Addon.Diffraction.csproj" />
-    <Project Path="src/Addons/DepthCharge/PhotonCanvas.Addon.DepthCharge.csproj" />
-    <Project Path="src/Addons/Slicer/PhotonCanvas.Addon.Slicer.csproj" />
-    <Project Path="src/Addons/Centreline/PhotonCanvas.Addon.Centreline.csproj" />
-    <Project Path="src/Addons/CmykSplit/PhotonCanvas.Addon.CmykSplit.csproj" />
-    <Project Path="src/Addons/Engraving/PhotonCanvas.Addon.Engraving.csproj" />
-    <Project Path="src/Addons/Warp/PhotonCanvas.Addon.Warp.csproj" />
-    <Project Path="src/Addons/ImageMask/PhotonCanvas.Addon.ImageMask.csproj" />
-    <Project Path="src/Addons/Nest/PhotonCanvas.Addon.Nest.csproj" />
-    <Project Path="src/Addons/DepthOutlines/PhotonCanvas.Addon.DepthOutlines.csproj" />
-    <Project Path="src/Addons/KerfTest/PhotonCanvas.Addon.KerfTest.csproj" />
-    <Project Path="src/Addons/Stencil/PhotonCanvas.Addon.Stencil.csproj" />
-  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj" />
   </Folder>
