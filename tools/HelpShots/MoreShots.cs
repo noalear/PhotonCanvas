@@ -297,6 +297,9 @@ static class MoreShots
         }
         warp.Close();
 
+        // --- Handwriting: a filled-in sheet (letters written with a pen drawn here), read into a font, then written with.
+        Handwriting(w, Click, settle, reset);
+
         // --- Split onto pieces: a 400 × 150 mm design over four 200 × 75 mm boards laid two by two.
         {
             reset();
@@ -441,6 +444,76 @@ static class MoreShots
             .. Quad(P(x0, y0, z0), P(x0, y0, z1), P(x1, y0, z1), P(x1, y0, z0)), .. Quad(P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)),
             .. Quad(P(x0, y0, z0), P(x0, y1, z0), P(x0, y1, z1), P(x0, y0, z1)), .. Quad(P(x1, y0, z0), P(x1, y0, z1), P(x1, y1, z1), P(x1, y1, z0)),
         ];
+    }
+
+    /// <summary>The handwriting add-on's two windows: reading a filled-in sheet, and writing with the font made from it.</summary>
+    static void Handwriting(MainWindow w, Action<Control> click, Action<int> settle, Action reset)
+    {
+        reset();
+        var ribbon = F<Ribbon>(w, "_ribbon");
+        if (!ribbon.Commands.TryGetValue("Home/Handwriting", out var button)) { Console.WriteLine("no Home/Handwriting button (add-on not built?)"); return; }
+        Window? Opened<T>() => w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == typeof(T).Name);
+        click(button);
+        settle(800);
+        if (Opened<PhotonCanvas.Addon.Handwriting.HandwritingWindow>() is not { } first) { Console.WriteLine("Handwriting didn't open"); return; }
+        var host = F<PhotonCanvas.App.Addons.IAddonHost>(first, "_host");
+        // The add-on runs in its own load context: only the program's types cross over, so the store is made again here.
+        var store = new PhotonCanvas.Addon.Handwriting.FontStore(Path.Combine(host.DataFolder, "fonts"));
+        first.Close();
+        settle(200);
+        // A sheet filled in with a pen: the program's own single-line text, nudged about a little like real writing.
+        double ppm = 8, margin = 12;
+        using var sheet = PhotonCanvas.Addon.Handwriting.FontSheet.Picture(ppm, margin);
+        using (var c = new SkiaSharp.SKCanvas(sheet))
+        {
+            c.Scale((float)ppm);
+            c.Translate((float)margin, (float)margin);
+            var family = new[] { "Segoe Print", "Comic Sans MS", "Segoe UI", "DejaVu Sans" }.FirstOrDefault(f => TextLayout.FontFamilies().Contains(f)) ?? "Arial";
+            using var pen = new SkiaSharp.SKPaint { Color = new SkiaSharp.SKColor(25, 30, 70), IsAntialias = true, Style = SkiaSharp.SKPaintStyle.Stroke, StrokeWidth = 0.55f, StrokeCap = SkiaSharp.SKStrokeCap.Round, StrokeJoin = SkiaSharp.SKStrokeJoin.Round };
+            var rnd = new Random(3);
+            var chars = PhotonCanvas.Addon.Handwriting.FontSheet.Characters;
+            for (int i = 0; i < chars.Length; i++)
+            {
+                var g = TextLayout.Build(chars[i], new TextStyle(family, 15, SingleLine: true));
+                if (g.IsEmpty) continue;
+                var b = g.Bounds();
+                var box = PhotonCanvas.Addon.Handwriting.FontSheet.Box(i);
+                // Its baseline on the box's solid line (the font's baseline sits 0.8 em down from the top of the line box, near enough).
+                double baseY = 15 * 0.93;
+                var place = Affine.Translate(-b.MinX - b.Width / 2, -baseY).Then(Affine.SkewX(-8 + rnd.NextDouble() * 6)).Then(Affine.Rotate(rnd.NextDouble() * 4 - 2))
+                    .Then(Affine.Translate(box.MinX + box.Width / 2 + rnd.NextDouble() - 0.5, box.MinY + PhotonCanvas.Addon.Handwriting.FontSheet.Baseline + rnd.NextDouble() * 0.6 - 0.3));
+                foreach (var f in g.Transform(place).Flatten(0.02))
+                {
+                    using var path = new SkiaSharp.SKPath();
+                    path.MoveTo((float)f.Points[0].X, (float)f.Points[0].Y);
+                    foreach (var q in f.Points.Skip(1)) path.LineTo((float)q.X, (float)q.Y);
+                    if (f.Closed) path.Close();
+                    c.DrawPath(path, pen);
+                }
+            }
+        }
+        var photo = new PhotonCanvas.Core.Imaging.RasterImage(sheet.Width, sheet.Height, sheet.Copy(SkiaSharp.SKColorType.Rgba8888).Bytes);
+        var make = new PhotonCanvas.Addon.Handwriting.HandwritingFontWindow(host, store, "My handwriting");
+        make.Show(w);
+        settle(500);
+        typeof(PhotonCanvas.Addon.Handwriting.HandwritingFontWindow).GetMethod("Use", Any)!.Invoke(make, [photo]);
+        for (int i = 0; i < 200 && make.GetType().GetField("_reading", Any)!.GetValue(make) is null; i++) settle(50);
+        settle(800);
+        AddonShot(make.CaptureRenderedFrame(), "Handwriting", "window-handwriting-font");
+        typeof(PhotonCanvas.Addon.Handwriting.HandwritingFontWindow).GetMethod("Save", Any)!.Invoke(make, null);
+        settle(300);
+        if (make.IsVisible) make.Close();
+        click(button);
+        settle(800);
+        if (Opened<PhotonCanvas.Addon.Handwriting.HandwritingWindow>() is not { } write) return;
+        F<TextBox>(write, "_words").Text = "Happy birthday!\nWith love, from all of us";
+        settle(300);
+        // Its preview waits on a timer, which doesn't run headless.
+        write.GetType().GetMethod("Make", Any)!.Invoke(write, null);
+        settle(800);
+        AddonShot(write.CaptureRenderedFrame(), "Handwriting", "window-handwriting");
+        write.Close();
+        settle(200);
     }
 
     // A profile turned round the Z axis: (radius, height) pairs from the bottom up.
