@@ -79,7 +79,7 @@ public sealed class HandFont
             ["name"] = Name,
             ["glyphs"] = glyphs,
         };
-        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+        return root.ToJsonString();
     }
 
     /// <exception cref="FormatException">Not a handwriting font file.</exception>
@@ -242,12 +242,15 @@ public sealed record HandStyle
     /// <summary>Which of the possible variations (a new number gives a different but repeatable result).</summary>
     public int Seed { get; init; } = 1;
 
-    public string ToJson() => JsonSerializer.Serialize(this);
+    /// <summary>Options of our own (docs/addons.md: the program's shared JSON cache would keep the add-on in memory).</summary>
+    static readonly JsonSerializerOptions Json = new() { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
+
+    public string ToJson() => JsonSerializer.Serialize(this, Json);
 
     public static HandStyle? FromJson(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
-        try { return JsonSerializer.Deserialize<HandStyle>(json); }
+        try { return JsonSerializer.Deserialize<HandStyle>(json, Json); }
         catch (JsonException) { return null; }
     }
 }

@@ -48,6 +48,8 @@ takes you through three steps.
 > its letters**. Each letter then has two versions, and when a letter comes up twice the writing
 > switches between them, so words look less stamped.
 
+![Make a handwriting font: a sheet read back, each box with the lines the laser will follow](images/window-handwriting-font.png)
+
 How a box is read: the photo is straightened from the corner squares and each box sampled at 10
 pixels per mm. Pen strokes are thinned to their centre lines and followed end to end; pieces that
 meet straight on are joined back into one stroke, as the pen drew them. Specks under 0.15 mm² are
@@ -70,6 +72,8 @@ starts a new line) and watch the preview.
 | **Align** | **Left**, **Centre** or **Right**, for several lines. |
 | **Natural variation** | 0 writes every letter exactly as on your sheet. More makes each letter a little bigger or smaller, turned or lifted, so words look less regular. |
 | **Another variation** | The same words with a different wobble (and different versions of repeated letters). The result is the same every time you open it. |
+
+![Handwriting: words written with a font made from a filled-in sheet](images/window-handwriting.png)
 
 Under the settings, the window says how many letters it wrote and how big, and which characters
 the font doesn't have (left as a gap). Some are written with a stand-in: an accented letter without
