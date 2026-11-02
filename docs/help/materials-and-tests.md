@@ -76,7 +76,7 @@ The **Bevel test** is done once for the machine, not per material.
 ## How the camera reads results
 
 **Update photo** in a test window takes a fresh photo with the overview camera, the same as
-**Update photo** on the Camera tab: it needs the machine connected and the camera calibrated
+**Photo** in the machine panel: it needs the machine connected and the camera calibrated
 (**Camera → Calibrate**, see [Camera](camera.md)). The photo is straightened onto the bed, and
 each square, circle or patch is cut out of it where its shape is. A camera calibrated at another
 height than the material's shows the wrong spot; **Etch rate** warns when that may be so.

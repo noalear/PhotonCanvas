@@ -32,7 +32,7 @@ a tab's name for what the tab holds.
 | **Home** | Clipboard, Select, Draw, Serial & codes, Group, Shape builder, Outline, Bring in | [Working on the canvas](canvas.md) (Clipboard, Select), [Drawing](drawing.md), [Editing shapes](editing-shapes.md), [Files](files.md) |
 | **Arrange** | Align, Flip & rotate, Order, Repeat, Transform | [Arranging](arrange.md) |
 | **Picture** | Add, Turn it into, Shape, Edit, Relief, Clean up | [Pictures](pictures.md) |
-| **Camera** | See the bed, Place, Set up | [Camera](camera.md) |
+| **Camera** | Place, Set up | [Camera](camera.md) |
 | **Laser** | Materials, Job, Work area, Machine (and the add-ons' Tests and Colour on metal) | [Materials and tests](materials-and-tests.md), [Running a job](running-jobs.md), [Work area](work-area.md), [The machine and settings](machine.md) |
 | **View** | Zoom, Grid & snapping, Measure & history, Show | [The View tab](#the-view-tab) below |
 
@@ -119,7 +119,7 @@ zooming, snapping, guides, measuring, editing points, the right-click menu) is o
 - Drag a file from your computer onto the window to import it, or drop a project file to open
   it. See [Files](files.md).
 - The close-up camera's picture opens in the bottom-right corner of the work area
-  (Camera → **Close-up**). See [Camera](camera.md).
+  (**Close-up** in the machine panel). See [Camera](camera.md).
 
 ## The pages bar
 

@@ -33,7 +33,7 @@ Click **Add the dots to the design**. They go on a "Close-up marks" layer, and t
 
 ## Check where they land
 <!-- target: ribbon:Laser/Frame -->
-Click **Frame** and watch the close-up camera live (**Camera → Close-up**, **Live**): the red light
+Click **Frame** and watch the close-up camera live (**Close-up** in the machine panel, then **Live**): the red light
 should trace the dots well inside the picture. Move them if not.
 
 ## Burn them

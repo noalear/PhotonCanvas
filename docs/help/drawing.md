@@ -239,8 +239,8 @@ Your shapes are included when you back up your settings (**Settings â†’ Tools â†
 
 These two tools draw from the camera picture of the bed: they outline real pieces lying in the
 machine, such as an offcut to fit a design onto. They need the picture showing under the design:
-connect to the machine, calibrate the camera and click **Show picture** on the **Camera** tab
-(**Update photo** takes a new one after you move things; see [Camera](camera.md)). Without it,
+connect to the machine, calibrate the camera and click **Show** in the machine panel at the right end of the ribbon
+(**Photo** takes a new one after you move things; see [Camera](camera.md)). Without it,
 the status line asks you to show the picture first.
 
 The picture is straightened onto the work area at 0.2 mm per pixel, and outlines are only as

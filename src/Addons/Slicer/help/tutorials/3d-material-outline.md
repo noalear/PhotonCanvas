@@ -8,8 +8,8 @@ whole bed. Outline it, mark it as the material, and the slicer packs the parts i
 tried on the machine.
 
 ## Photograph the board
-<!-- target: ribbon:Camera/Update photo -->
-Put the board in the machine and click **Update photo** (the machine must be connected and the
+<!-- target: panel:Machine -->
+Put the board in the machine and click **Photo** in the machine panel at the right end of the ribbon (the machine must be connected and the
 camera calibrated). The photo lies under your design.
 
 ## Outline the board

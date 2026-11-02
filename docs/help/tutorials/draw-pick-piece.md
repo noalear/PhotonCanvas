@@ -7,8 +7,8 @@
 outline to fit a design inside it, cut round it or mark it as your material.
 
 ## Show the camera picture
-<!-- target: ribbon:Camera/Show picture -->
-This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show picture** on the **Camera** tab (see [See the bed under your design](tutorial:cam-see-the-bed)).
+<!-- target: panel:Machine -->
+This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show** in the machine panel at the right end of the ribbon (see [See the bed under your design](tutorial:cam-see-the-bed)).
 
 ## Choose Pick piece
 <!-- target: ribbon:Home/Pick piece -->

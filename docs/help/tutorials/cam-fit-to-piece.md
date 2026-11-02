@@ -14,7 +14,7 @@ This needs the machine connected and the camera calibrated near the piece's heig
 ## Place the design roughly
 <!-- target: canvas -->
 <!-- wait: selection -->
-Turn on **Camera → Show picture**, then select the design (it should include the piece's outline)
+Turn on **Show** in the machine panel at the right end of the ribbon, then select the design (it should include the piece's outline)
 and drag it roughly over the piece.
 
 ## Open Fit to piece

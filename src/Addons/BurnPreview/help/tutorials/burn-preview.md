@@ -7,8 +7,8 @@ Before you send a job, see the finished piece: your design drawn on the real mat
 each layer as dark and in the colour your own tests say.
 
 ## Show the material
-<!-- target: ribbon:Camera/Show picture -->
-Put your material on the bed, focus on it, and click **Show picture** on the **Camera** tab. (No
+<!-- target: panel:Machine -->
+Put your material on the bed, focus on it, and click **Show** in the machine panel at the right end of the ribbon. (No
 machine? You can still go on: the piece is drawn on a stand-in for the material.)
 
 ## Open the preview
