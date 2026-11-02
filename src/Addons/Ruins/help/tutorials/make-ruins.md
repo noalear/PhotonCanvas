@@ -2,7 +2,7 @@
 <!-- category: Drawing -->
 <!-- summary: Make a broken brick wall that matches your walls and slides into their columns, with holes knocked through and a pile of rubble to go with it. -->
 <!-- page: ruins.md -->
-<!-- order: 77 -->
+<!-- order: 80 -->
 Ruins go well with whole walls: a broken section in the same bricks, slid into the same columns, and
 rubble where it fell.
 
