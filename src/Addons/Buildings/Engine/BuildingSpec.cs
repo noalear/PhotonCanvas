@@ -17,6 +17,9 @@ public enum WayUpStyle { Stairs, Spiral, Ladder, None }
 /// <summary>The top of the building: walls cut straight (for a roof), or a floor on top with a low wall of battlements round it.</summary>
 public enum BuildingTop { Straight, Battlements }
 
+/// <summary>The roof on straight walls (the roof maker's): none, pitched with gable ends, hipped, or a lean-to.</summary>
+public enum RoofShape { None, Gable, Hip, LeanTo }
+
 /// <summary>One piece of furniture in the building, the storey it stands on (0 = the ground) and how many.</summary>
 public sealed record RoomItem
 {
@@ -79,6 +82,15 @@ public sealed record BuildingSpec
     public double SillMm { get; init; } = 22;
     public WindowBars Bars { get; init; } = WindowBars.Cross;
 
+    /// <summary>The roof on top of straight walls (none with battlements).</summary>
+    public RoofShape Roof { get; init; } = RoofShape.Gable;
+    /// <summary>What's etched on the roof (a roof maker shingle preset).</summary>
+    public string RoofTexture { get; init; } = "Slate";
+    /// <summary>The roof's slope (degrees from flat).</summary>
+    public double RoofPitchDeg { get; init; } = 45;
+    /// <summary>How far the roof reaches past the walls at the bottom of the slope (mm).</summary>
+    public double RoofEaveMm { get; init; } = 4;
+
     /// <summary>The way up to each floor above.</summary>
     public WayUpStyle WayUp { get; init; } = WayUpStyle.Stairs;
 
@@ -116,8 +128,8 @@ public sealed record BuildingSpec
 
     public static readonly IReadOnlyList<KindInfo> Kinds =
     [
-        new(BuildingKind.Cottage, "Cottage", "One storey of fieldstone with an arched door and windows, furnished with a table, chairs, a bed, a chest and a bookshelf."),
-        new(BuildingKind.Tavern, "Tavern", "Two storeys: stone below and timber frame above. Tables, benches, stools and crates in the taproom, beds and chests in the rooms upstairs."),
+        new(BuildingKind.Cottage, "Cottage", "One storey of fieldstone under a thatched roof, with an arched door and windows, furnished with a table, chairs, a bed, a chest and a bookshelf."),
+        new(BuildingKind.Tavern, "Tavern", "Two storeys: stone below and timber frame above, under a tiled roof. Tables, benches, stools and crates in the taproom, beds and chests in the rooms upstairs."),
         new(BuildingKind.Watchtower, "Watchtower", "A narrow stone tower with arrow slits, two storeys and a floor on top behind battlements. Crates and a chest below, bunks above."),
     ];
 
@@ -146,7 +158,7 @@ public sealed record BuildingSpec
         BuildingKind.Tavern => new BuildingSpec
         {
             Kind = k, WidthMm = 150, DepthMm = 100, Storeys = 2, StoreyHeightMm = 48,
-            Texture = "Stone blocks", UpperTexture = "Timber frame", FloorTexture = "Floorboards",
+            Texture = "Stone blocks", UpperTexture = "Timber frame", FloorTexture = "Floorboards", RoofTexture = "Clay tiles", RoofPitchDeg = 40,
             DoorShape = OpeningShape.Rectangle, DoorWidthMm = 18, DoorHeightMm = 30,
             WindowsFront = 3, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 10, WindowHeightMm = 12, SillMm = 20, Bars = WindowBars.Cross,
             Items =
@@ -158,7 +170,7 @@ public sealed record BuildingSpec
         },
         BuildingKind.Watchtower => new BuildingSpec
         {
-            Kind = k, WidthMm = 72, DepthMm = 72, Storeys = 2, StoreyHeightMm = 45, Top = BuildingTop.Battlements, ParapetHeightMm = 21,
+            Kind = k, WidthMm = 72, DepthMm = 72, Storeys = 2, StoreyHeightMm = 45, Top = BuildingTop.Battlements, ParapetHeightMm = 21, Roof = RoofShape.None,
             Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Ladder, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
             WindowsFront = 1, WindowsSide = 1, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 15, SillMm = 18, Bars = WindowBars.None,
             Items = [I(ItemKind.Crate, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
@@ -166,7 +178,7 @@ public sealed record BuildingSpec
         _ => new BuildingSpec
         {
             Kind = BuildingKind.Cottage, WidthMm = 110, DepthMm = 80, Storeys = 1, StoreyHeightMm = 48,
-            Texture = "Fieldstone",
+            Texture = "Fieldstone", RoofTexture = "Thatch", RoofPitchDeg = 50, RoofEaveMm = 6,
             Items = [I(ItemKind.Table), I(ItemKind.Chair, 0, 2), I(ItemKind.Bed), I(ItemKind.Chest), I(ItemKind.Bookshelf)],
         },
     };
@@ -180,7 +192,7 @@ public sealed record BuildingSpec
             ScaleMm = R(ScaleMm * k),
             WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), SquareMm = R(SquareMm * k), YardMm = R(YardMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
             ColumnMm = Math.Max(WallSheetMm * (TwoSided ? 2 : 1) + 6, R(ColumnMm * k)),
-            DoorWidthMm = R(DoorWidthMm * k), DoorHeightMm = R(DoorHeightMm * k),
+            DoorWidthMm = R(DoorWidthMm * k), DoorHeightMm = R(DoorHeightMm * k), RoofEaveMm = R(RoofEaveMm * k),
             WindowWidthMm = R(WindowWidthMm * k), WindowHeightMm = R(WindowHeightMm * k), SillMm = R(SillMm * k),
             Items = [.. Items.Select(r => r with { Item = ScaledItem(r.Item, k) })],
         };

@@ -1,14 +1,15 @@
 # Whole buildings
 
-An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker** and **Stairs, ladders and floors** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors** and **Roofs and towers** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
 
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
 **Cottage**, a **Tavern** or a **Watchtower** and you get every wall with its doorway and windows,
 the corner columns the walls slide into, the floor tiles it stands on, a floor between the storeys
-with stairs or a ladder up to it, a door that swings open, and the furniture for every room. Each
+with stairs or a ladder up to it, a roof that lifts off, a door that swings open, and the furniture
+for every room. Each
 piece is made the way the wall maker ([Textured walls](walls.md)), the furniture maker
-([Mini furniture](furniture.md)), the floor tile maker ([Floor tiles](floortiles.md)) and the stair
-maker ([Stairs and floors](stairs.md)) make it, so the walls have your texture etched on, the tiles
+([Mini furniture](furniture.md)), the floor tile maker ([Floor tiles](floortiles.md)), the stair
+maker ([Stairs and floors](stairs.md)) and the roof maker ([Roofs and towers](roofs.md)) make it, so the walls have your texture etched on, the tiles
 jigsaw together and the furniture slots together.
 
 > **Note:** The buildings have been checked on screen and in tests (every wall, column and floor is
@@ -42,11 +43,11 @@ changing **Figures** later scales every size, the furniture's too). Everything c
 
 | Building | What you get (at 28 mm) |
 |---|---|
-| **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls on flagstone tiles, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
-| **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows, stairs up and floorboard tiles. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
+| **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls on flagstone tiles under a thatched roof, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
+| **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows, stairs up, floorboard tiles and a clay-tiled roof. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
 | **Watchtower** | A 72 mm square tower of two storeys with arrow slits, a ladder up to each floor, a floor on top with battlements round it, on dungeon flagstones. Crates and a chest below, two bunks, a table and stools above. |
 
-## Size, storeys, floor tiles, door and windows
+## Size, storeys, roof, floor tiles, door and windows
 
 On the **Building** tab:
 
@@ -60,6 +61,13 @@ On the **Building** tab:
   opening in its back right corner, away from the door, with the stair maker's stairs or ladder
   standing under it on the storey below. The furniture is kept clear of them, and of the space
   under the opening upstairs.
+- **Roof** (with straight walls on top): the roof maker's roof, *Pitched, with gable ends*,
+  *Hipped* or *Lean-to*, or *None*. Its ridge runs along the longer side. It's built on a base as
+  big as the column caps, resting on them, with a frame under the base that drops inside the top
+  walls so it can't slide; the gable ends get the top storey's wall texture. It's glued together and
+  lifts off to show the rooms. Pick its **Covering** (slate, wooden shingles, clay tiles, thatch and
+  the rest, etched on the slopes and sized for the figures), its **Pitch** and how far the
+  **Eaves** reach past the walls.
 - **Floor tiles under the building**: the floor tile maker's jigsaw tiles, cut from the wall sheet,
   covering the building's outside and as much **Yard** round it as you like. The walls and columns
   stand on them. Pick their **Texture** (flagstones, floorboards, cobbles and the rest) and the
@@ -77,7 +85,7 @@ On the **Building** tab:
 
 On the **Walls** tab:
 
-- **Thickness**: the wall sheet. The walls, the corner columns, the floors, the stairs and the floor tiles are all cut from it.
+- **Thickness**: the wall sheet. The walls, the corner columns, the floors, the stairs, the roof and the floor tiles are all cut from it.
   Tick **Two panels back to back** for walls textured inside and out (twice as thick).
 - **Slot fit**: added to the wall's thickness for the columns' slots. **Columns**: how wide the
   corner columns are. Pick your material in **Cut with** to bring in its thickness, slot fit and
@@ -114,7 +122,7 @@ of the building still goes in.
 
 The 3D view stands the furniture in its rooms, biggest first, against the back wall and clear of the
 doorway; that's only for the picture, nothing joins it to the floor. **Show** picks *The whole
-building*, *With the front cut away* (the front and right-hand walls left out, to see into the rooms)
+building*, *With the front cut away* (the roof and the front and right-hand walls left out, to see into the rooms)
 or one storey on its own.
 
 ## Putting it together
@@ -131,3 +139,5 @@ or one storey on its own.
 5. Slide the door's clips onto the side of the doorway, one at the floor and one high up, and drop
    the door's pins into them.
 6. Put the furniture together as the furniture maker says and stand it in the rooms.
+7. Glue the roof together on its base as the roof maker says, and lift it onto the top storey's
+   column caps, the frame underneath inside the walls.

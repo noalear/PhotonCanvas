@@ -1,6 +1,6 @@
 # Make a whole cottage
 <!-- category: Drawing -->
-<!-- summary: Pick a cottage, tavern or watchtower and get every wall, column, floor tile, floor, stair, door and piece of furniture at once, ready to cut and slot together. -->
+<!-- summary: Pick a cottage, tavern or watchtower and get every wall, column, floor tile, floor, stair, roof, door and piece of furniture at once, ready to cut and slot together. -->
 <!-- page: buildings.md -->
 <!-- order: 77 -->
 One window makes every piece of a building: textured walls, the columns they slide into, the
@@ -14,7 +14,7 @@ Click **Buildings** on the **Home** tab.
 ## Pick a building
 <!-- target: field:Building -->
 Pick a **Cottage**, **Tavern** or **Watchtower** under **Building**, and the size of your figures
-under **Figures**. Change its size, storeys, the way up, floor tiles, door and windows underneath.
+under **Figures**. Change its size, storeys, roof, the way up, floor tiles, door and windows underneath.
 
 ## Set the wall sheet and texture
 <!-- target: tabitem:Walls -->
