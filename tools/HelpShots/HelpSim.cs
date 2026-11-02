@@ -125,7 +125,8 @@ static class HelpSim
                         }
                     }
                     if (TutorialRunner.Running != run) break;
-                    if (i < t.Steps.Count - 1) run.Next();
+                    // A step whose wait was met has already moved on by itself: don't skip the next one.
+                    if (i < t.Steps.Count - 1 && run.StepIndex == i) run.Next();
                 }
                 run.Stop();
             }
