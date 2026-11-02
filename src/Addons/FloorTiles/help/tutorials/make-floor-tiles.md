@@ -27,6 +27,11 @@ the outside get straight edges.
 On the **Texture** tab, pick **Dungeon flagstones**, or flagstones, cobbles, floorboards, brick or
 metal. Each tile gets its own layout of stones.
 
+## Or pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top of the same tab picks a floor to match the other terrain makers: *Cave* for a
+rough rock floor, *Sci-fi* for deck plates, *Desert* for sandstone, *Gothic* for chequered tiles.
+
 ## Choose the joints
 <!-- target: tabitem:Joints -->
 On the **Joints** tab, **Jigsaw edges** push together from above. Choose **Clips** or **Magnets**

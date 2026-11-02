@@ -72,7 +72,7 @@ public static class Barrels
             {
                 case Layer.Holed: holes.Add(Joints.Centred(R, R, c + f, T + f)); break;
                 case Layer.Rim: holes.Add(Geo.Circle(R, R, r - rim)); break;
-                case Layer.Lid: Lid(R, r, etched, lines); break;
+                case Layer.Lid: if (it.Metal) DrumLid(R, r, lines); else Lid(R, r, etched, lines); break;
                 case Layer.Water: Water(R, r, m.Rnd, lines); break;
             }
             var idx = g.Select(l => l.Index).ToList();
@@ -110,6 +110,18 @@ public static class Barrels
             lines.Add([new(x, c - h), new(x, c + h)]);
         }
         lines.Add(WoodFace.Dot(c + inner * 0.45, c, Math.Clamp(r * 0.1, 0.25, 0.8)));
+    }
+
+    /// <summary>A drum's lid: the rolled rim, a filler cap and a vent.</summary>
+    static void DrumLid(double c, double r, List<PathD> lines)
+    {
+        double rim = Math.Max(0.4, r * 0.12);
+        lines.Add(Geo.Loop(Geo.Circle(c, c, r - rim)));
+        lines.Add(Geo.Loop(Geo.Circle(c, c, r - rim - 0.25)));
+        double cap = Math.Clamp(r * 0.16, 0.4, 1.4), at = (r - rim) * 0.55;
+        lines.Add(WoodFace.Dot(c + at, c, cap));
+        lines.Add(WoodFace.Dot(c + at, c, cap * 0.55));
+        lines.Add(WoodFace.Dot(c - at, c, Math.Max(0.25, cap * 0.5)));
     }
 
     /// <summary>Rings of ripples on the water.</summary>

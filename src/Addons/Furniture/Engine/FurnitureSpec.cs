@@ -14,7 +14,8 @@ public enum LidStyle { Loose, Flat, None }
 public enum DoorShape { Rectangle, Arched, Pointed }
 public enum HingeSide { Left, Right }
 /// <summary>The wood detail etched and scored on the faces.</summary>
-public enum WoodDetail { None, Grain, Planks }
+/// <summary>What's etched on the faces: nothing, wood grain, planks and grain, metal panels with rivets (sci-fi), or stone (cracks and pits).</summary>
+public enum WoodDetail { None, Grain, Planks, Metal, Stone }
 
 /// <summary>
 /// One piece of furniture and how many to cut. Sizes are the outside sizes in millimetres; which of the
@@ -76,6 +77,8 @@ public sealed record FurnitureItem
 /// <summary>Everything cut from one sheet in one go: the pieces of furniture, the sheet and the detail.</summary>
 public sealed record FurnitureSet
 {
+    /// <summary>The look picked to start from (<see cref="FurnitureThemes"/>): it set the detail and the doors' shape, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     public List<FurnitureItem> Items { get; init; } = [Defaults.For(ItemKind.Table)];
     /// <summary>The sheet's thickness (mm): drives every slot and tab.</summary>
     public double ThicknessMm { get; init; } = 2;

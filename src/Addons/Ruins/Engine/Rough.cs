@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 
 namespace PhotonCanvas.Addon.Ruins;
 
@@ -116,7 +117,8 @@ public static class Rough
     }
 
     /// <summary>Is the texture made of separate bricks, stones, tiles or plates that a break can follow?</summary>
-    public static bool Cellular(string texture) => texture is "Brick" or "Tiles" or "Stone blocks" or "Fieldstone" or "Metal plates" or "Hexagons";
+    public static bool Cellular(string texture) => texture is "Brick" or "Tiles" or "Stone blocks" or "Fieldstone" or "Metal plates" or "Hexagons"
+        or ThemeTextures.DungeonBlocks or ThemeTextures.CaveRock or ThemeTextures.SciFiPanels or ThemeTextures.Sandstone;
 
     /// <summary>Wood breaks in splinters.</summary>
     public static bool Wooden(string texture) => texture.StartsWith("Wood planks", StringComparison.Ordinal);

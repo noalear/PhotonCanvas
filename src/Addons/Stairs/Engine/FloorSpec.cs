@@ -66,6 +66,8 @@ public sealed record FloorSpec
 
     /// <summary>A preset of the wall maker's (<see cref="Textures.Presets"/>), the name of your own, or <see cref="Textures.Plain"/>.</summary>
     public string Texture { get; init; } = "Wood planks (across)";
+    /// <summary>The look picked to start from (<see cref="StairThemes"/>): it set the texture and the way up, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     public CustomTexture? Custom { get; init; }
     public double SizeA { get; init; } = 5;
     public double SizeB { get; init; } = 35;

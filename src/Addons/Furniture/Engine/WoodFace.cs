@@ -16,6 +16,8 @@ public static class WoodFace
     public static (PathsD Etched, List<PathD> Lines) Make(PathsD region, bool alongU, WoodDetail detail, bool planks, double plankMm, Random rnd)
     {
         if (detail == WoodDetail.None || region.Count == 0) return ([], []);
+        if (detail == WoodDetail.Metal) return Metal(region, rnd);
+        if (detail == WoodDetail.Stone) return Stone(region, rnd);
         var etched = new PathsD();
         var lines = new List<PathD>();
         var b = Geo.Bounds(region);
@@ -95,6 +97,66 @@ public static class WoodFace
             lines.Add(k);
         }
         return Geo.ClipLines(lines, region);
+    }
+
+    /// <summary>
+    /// Metal: a panel line just inside the face's edge, a rivet in each corner and more along the long
+    /// sides, and now and then a short vent of slots (sci-fi furniture).
+    /// </summary>
+    public static (PathsD Etched, List<PathD> Lines) Metal(PathsD region, Random rnd)
+    {
+        var b = Geo.Bounds(region);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        if (w < 2 || h < 2) return ([], []);
+        var lines = new List<PathD>();
+        var etched = new PathsD();
+        double inset = Math.Clamp(Math.Min(w, h) * 0.12, 0.4, 1.2);
+        lines.AddRange(Geo.Offset(region, -inset).Select(Geo.Loop));
+        double r = 0.22, o = inset + 0.6;
+        if (w > 2 * o + 0.6 && h > 2 * o + 0.6)
+        {
+            int nx = Math.Max(1, (int)Math.Round((w - 2 * o) / 4)), ny = Math.Max(1, (int)Math.Round((h - 2 * o) / 4));
+            for (int i = 0; i <= nx; i++)
+                foreach (double y in new[] { b.top + o, b.bottom - o })
+                    lines.Add(Dot(b.left + o + (w - 2 * o) * i / nx, y, r));
+            for (int j = 1; j < ny; j++)
+                foreach (double x in new[] { b.left + o, b.right - o })
+                    lines.Add(Dot(x, b.top + o + (h - 2 * o) * j / ny, r));
+        }
+        if (w > 6 && h > 6 && rnd.NextDouble() < 0.4)
+        {
+            double cx = b.left + w / 2, cy = b.top + h * (0.3 + 0.4 * rnd.NextDouble()), vw = Math.Min(w * 0.4, 6);
+            for (int k = -1; k <= 1; k++) etched.Add(Geo.Rect(cx - vw / 2, cy + k * 0.9 - 0.25, cx + vw / 2, cy + k * 0.9 + 0.25));
+        }
+        // Rivets and lines must keep inside the face.
+        return (Geo.Intersect(etched, region), Geo.ClipLines(lines, region));
+    }
+
+    /// <summary>Stone: a crack or two wandering in from an edge and a few small pits (stone tables, benches and slabs).</summary>
+    public static (PathsD Etched, List<PathD> Lines) Stone(PathsD region, Random rnd)
+    {
+        var b = Geo.Bounds(region);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        if (w < 2 || h < 2) return ([], []);
+        var lines = new List<PathD>();
+        var etched = new PathsD();
+        int cracks = w * h > 60 ? 2 : 1;
+        for (int c = 0; c < cracks; c++)
+        {
+            bool fromTop = rnd.NextDouble() < 0.5;
+            var p = new PathD { fromTop ? new PointD(b.left + w * (0.15 + 0.7 * rnd.NextDouble()), b.bottom + 0.3) : new PointD(b.left - 0.3, b.top + h * (0.15 + 0.7 * rnd.NextDouble())) };
+            double reach = (fromTop ? h : w) * (0.3 + 0.4 * rnd.NextDouble());
+            for (int k = 1; k <= 4; k++)
+            {
+                var last = p[^1];
+                p.Add(fromTop ? new PointD(last.x + (rnd.NextDouble() - 0.5) * w * 0.2, b.bottom - reach * k / 4) : new PointD(b.left + reach * k / 4, last.y + (rnd.NextDouble() - 0.5) * h * 0.2));
+            }
+            lines.Add(p);
+        }
+        int pits = 1 + (int)(w * h / 40);
+        for (int k = 0; k < Math.Min(pits, 8); k++)
+            etched.Add(Geo.Circle(b.left + w * (0.1 + 0.8 * rnd.NextDouble()), b.top + h * (0.1 + 0.8 * rnd.NextDouble()), 0.15 + 0.2 * rnd.NextDouble(), 0.01));
+        return (Geo.Intersect(etched, region), Geo.ClipLines(lines, region));
     }
 
     /// <summary>A small circle as a scored line: a rivet, a nail head, a ring.</summary>

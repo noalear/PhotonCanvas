@@ -6,7 +6,7 @@ using PhotonCanvas.Addon.Walls;
 
 namespace PhotonCanvas.Addon.Buildings;
 
-public enum BuildingKind { Cottage, Tavern, Watchtower }
+public enum BuildingKind { Cottage, Tavern, Watchtower, Outpost, Chapel, Crypt, AdobeHouse }
 
 /// <summary>The front door: hung on clips so it swings (the furniture maker's), loose in the doorway (the wall maker's), or just a doorway.</summary>
 public enum DoorStyle { Swinging, Loose, Open }
@@ -37,6 +37,8 @@ public sealed record RoomItem
 public sealed record BuildingSpec
 {
     public BuildingKind Kind { get; init; } = BuildingKind.Cottage;
+    /// <summary>The look last picked (one of the terrain themes: see <see cref="BuildingThemes"/>).</summary>
+    public string Theme { get; init; } = "Medieval";
     /// <summary>The figures it's for (mm): only used to rescale the sizes when it's changed.</summary>
     public double ScaleMm { get; init; } = 28;
 
@@ -68,6 +70,8 @@ public sealed record BuildingSpec
 
     public DoorStyle Door { get; init; } = DoorStyle.Swinging;
     public OpeningShape DoorShape { get; init; } = OpeningShape.Arched;
+    /// <summary>What a loose door looks like (the wall maker's): planks, studded, a metal blast door, bars or a stone slab.</summary>
+    public DoorLook DoorLook { get; init; } = DoorLook.Planks;
     public double DoorWidthMm { get; init; } = 16;
     public double DoorHeightMm { get; init; } = 28;
 
@@ -131,6 +135,10 @@ public sealed record BuildingSpec
         new(BuildingKind.Cottage, "Cottage", "One storey of fieldstone under a thatched roof, with an arched door and windows, furnished with a table, chairs, a bed, a chest and a bookshelf."),
         new(BuildingKind.Tavern, "Tavern", "Two storeys: stone below and timber frame above, under a tiled roof. Tables, benches, stools and crates in the taproom, beds and chests in the rooms upstairs."),
         new(BuildingKind.Watchtower, "Watchtower", "A narrow stone tower with arrow slits, two storeys and a floor on top behind battlements. Crates and a chest below, bunks above."),
+        new(BuildingKind.Outpost, "Sci-fi outpost", "A panelled metal bunkhouse under a corrugated lean-to roof, with a blast door and angled windows. Bunks, lockers, a mess table and crates inside."),
+        new(BuildingKind.Chapel, "Gothic chapel", "A tall, narrow chapel of fine-cut stone under a steep slate roof, with a pointed door, tall pointed windows down the sides, pews and an altar on a chequered floor."),
+        new(BuildingKind.Crypt, "Dungeon crypt", "A squat crypt of big worn blocks with a studded door and barred windows high up: a tomb, chests and crates on dungeon flagstones."),
+        new(BuildingKind.AdobeHouse, "Adobe house", "Two storeys of sandstone and mud plaster with a flat roof behind a low wall and a ladder up: stools, a low table and chests below, beds above."),
     ];
 
     public static KindInfo Info(BuildingKind k) => Kinds.First(x => x.Kind == k);
@@ -174,6 +182,58 @@ public sealed record BuildingSpec
             Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Ladder, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
             WindowsFront = 1, WindowsSide = 1, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 15, SillMm = 18, Bars = WindowBars.None,
             Items = [I(ItemKind.Crate, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
+        },
+        BuildingKind.Outpost => new BuildingSpec
+        {
+            Kind = k, Theme = "Sci-fi", WidthMm = 110, DepthMm = 85, Storeys = 1, StoreyHeightMm = 48,
+            Texture = "Sci-fi panels", RoofTexture = "Corrugated metal", Roof = RoofShape.LeanTo, RoofPitchDeg = 15, RoofEaveMm = 5,
+            Door = DoorStyle.Loose, DoorShape = OpeningShape.Chamfered, DoorLook = DoorLook.Metal, DoorWidthMm = 18, DoorHeightMm = 30,
+            WindowsFront = 2, WindowsSide = 1, WindowShape = OpeningShape.Chamfered, WindowWidthMm = 12, WindowHeightMm = 6, SillMm = 24, Bars = WindowBars.None,
+            FloorTexture = "Sci-fi deck", Detail = WoodDetail.Metal, WayUp = WayUpStyle.Ladder,
+            Items =
+            [
+                I(ItemKind.Table, 0, 1, t => t with { Legs = LegStyle.Slab, Top = TopShape.Square }), I(ItemKind.Chair, 0, 2, c => c with { Back = BackStyle.Panel }),
+                I(ItemKind.Bed, 0, 2, b => b with { FootMm = 13 }), I(ItemKind.Bookshelf, 0, 1, b => b with { Books = false }, "Lockers"), I(ItemKind.Crate, 0, 3),
+            ],
+        },
+        BuildingKind.Chapel => new BuildingSpec
+        {
+            Kind = k, Theme = "Gothic", WidthMm = 80, DepthMm = 136, Storeys = 1, StoreyHeightMm = 66,
+            Texture = "Stone blocks", RoofTexture = "Slate", RoofPitchDeg = 60, RoofEaveMm = 4,
+            Door = DoorStyle.Swinging, DoorShape = OpeningShape.Pointed, DoorWidthMm = 18, DoorHeightMm = 34,
+            WindowsFront = 0, WindowsSide = 3, WindowShape = OpeningShape.Pointed, WindowWidthMm = 8, WindowHeightMm = 26, SillMm = 22, Bars = WindowBars.Cross,
+            FloorTexture = "Chequered tiles", Detail = WoodDetail.Grain,
+            Items =
+            [
+                I(ItemKind.Bench, 0, 6, b => b with { WidthMm = 26 }, "Pews"),
+                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 30, DepthMm = 12, HeightMm = 16, Legs = LegStyle.Slab }, "Altar"),
+                I(ItemKind.Chair, 0, 2, c => c with { Back = BackStyle.Ladder, HeightMm = 22 }), I(ItemKind.Bookshelf, 0, 1),
+            ],
+        },
+        BuildingKind.Crypt => new BuildingSpec
+        {
+            Kind = k, Theme = "Dungeon", WidthMm = 100, DepthMm = 100, Storeys = 1, StoreyHeightMm = 45,
+            Texture = "Dungeon blocks", RoofTexture = "Slate", RoofPitchDeg = 35, RoofEaveMm = 4,
+            Door = DoorStyle.Loose, DoorShape = OpeningShape.Arched, DoorLook = DoorLook.Studded, DoorWidthMm = 16, DoorHeightMm = 28,
+            WindowsFront = 0, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 8, WindowHeightMm = 7, SillMm = 30, Bars = WindowBars.Bars,
+            FloorTexture = "Dungeon flagstones", Detail = WoodDetail.Planks,
+            Items =
+            [
+                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 30, DepthMm = 14, HeightMm = 10, Legs = LegStyle.Slab }, "Tomb"),
+                I(ItemKind.Chest, 0, 2), I(ItemKind.Crate, 0, 2), I(ItemKind.Bench, 0, 1),
+            ],
+        },
+        BuildingKind.AdobeHouse => new BuildingSpec
+        {
+            Kind = k, Theme = "Desert", WidthMm = 100, DepthMm = 80, Storeys = 2, StoreyHeightMm = 44, Top = BuildingTop.Battlements, ParapetHeightMm = 18, Roof = RoofShape.None,
+            Texture = "Sandstone", UpperTexture = "Adobe", DoorShape = OpeningShape.Rectangle, DoorWidthMm = 15, DoorHeightMm = 27,
+            WindowsFront = 2, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 6, WindowHeightMm = 8, SillMm = 22, Bars = WindowBars.None,
+            FloorTexture = "Sandstone slabs", Detail = WoodDetail.Grain, WayUp = WayUpStyle.Ladder,
+            Items =
+            [
+                I(ItemKind.Table, 0, 1, t => t with { Legs = LegStyle.Round, HeightMm = 9 }), I(ItemKind.Stool, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Crate, 0, 2),
+                I(ItemKind.Bed, 1, 2), I(ItemKind.Chest, 1, 1),
+            ],
         },
         _ => new BuildingSpec
         {

@@ -60,6 +60,8 @@ public sealed class GameKitWindow : Window
     // The sheet
     readonly NumericUpDown _thick = Number(0.5m, 12, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0"), _scaleTex = Number(0.25m, 10, 0.25m, "0.##");
     readonly ComboBox _finish = Combo([.. Defaults.FinishNames]);
+    readonly ComboBox _theme = Combo([.. GameKitThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _font = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     List<string> _fonts = [];
     readonly ComboBox _cutWith = Combo(), _etchWith = Combo();
@@ -228,6 +230,8 @@ public sealed class GameKitWindow : Window
             Explained("Sheet", "Everything is cut from one sheet: its thickness sets every slot and tab. 3 mm plywood suits towers and trays.",
                 Field("Thickness", _thick, tip: "The sheet's thickness (mm)."),
                 Field("Slot fit", _fit, tip: "Added to the sheet's thickness for the slots (mm): more is looser. 0.1 is a snug fit to glue.")),
+            Explained("Theme", "A look to start from, the same as the wall maker's: it sets the finish, the dice towers' battlements and the initiative tiles' tops to match the scenery of that theme.",
+                Field("Theme", _theme), _themeAbout),
             Explained("Finish", "Etched on the faces that show: the tower's walls, the tray's sides, the stand's front rail and the top of the tracker's base.",
                 Field("Faces", _finish, tip: "Wood like the furniture maker's, or one of the wall maker's textures."),
                 Field("Texture size", _scaleTex, tip: "The texture's stones, bricks or planks are the wall maker's sizes times this."),
@@ -295,6 +299,7 @@ public sealed class GameKitWindow : Window
         _cardSize.SelectionChanged += (_, _) => CardSizeChosen();
         foreach (var n in new[] { _thick, _fit, _seed, _scaleTex }) n.ValueChanged += (_, _) => SheetChanged();
         _finish.SelectionChanged += (_, _) => SheetChanged();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
         _font.SelectionChanged += (_, _) => SheetChanged();
         _etchWith.SelectionChanged += (_, _) => SheetChanged();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
@@ -348,9 +353,23 @@ public sealed class GameKitWindow : Window
         ItemChanged();
     }
 
+    string ThemeName => GameKitThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, GameKitThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its finish and tops replace the ones set, on every accessory in the list.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = GameKitThemes.About(ThemeName);
+        if (_loading) return;
+        _set = GameKitThemes.Apply(_set, ThemeName);
+        LoadSheet();
+        LoadItem();
+        Changed();
+    }
+
     void LoadSheet()
     {
         _loading = true;
+        _theme.SelectedIndex = Math.Max(0, GameKitThemes.Names.ToList().IndexOf(_set.Theme)); _themeAbout.Text = GameKitThemes.About(_set.Theme);
         _thick.Value = D(_set.ThicknessMm); _fit.Value = D(_set.FitMm); _seed.Value = Math.Clamp(_set.Seed, 1, 9999);
         _finish.SelectedIndex = (int)_set.Finish;
         _scaleTex.Value = D(Math.Clamp(_set.TextureScale, 0.25, 10));

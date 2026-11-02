@@ -54,6 +54,22 @@ For plank and rope bridges, **Ends stand on** says what's under the ends:
 **Arch rise** lifts a plank bridge's middle above its ends (0 makes it level); a rope bridge's
 **Sag** is how far its middle hangs below its ends.
 
+## Themes
+
+**Theme**, under **Kind**, is a look to start from, the same as the wall maker's, so a bridge matches
+the walls, floors and scatter made in that theme. Change anything afterwards.
+
+| Theme | Stone bridge | Plank and rope bridges |
+|---|---|---|
+| Medieval | Stone blocks, round arches, a straight parapet, cobbles | As they were |
+| Dungeon | Dungeon blocks, round arches, battlements, flagstones | As they were |
+| Cave | Cave rock, flatter arches, no parapet, flagstones | Rough planks |
+| Sci-fi | Sci-fi panels, flatter arches, a plain road | A metal gantry: grating on the planks, rivets on the beams and rails, no grain |
+| Desert | Sandstone, round arches, flagstones | As they were |
+| Gothic | Fine stone blocks, pointed arches, battlements, cobbles | As they were |
+
+A pointed arch stands taller than a round one as wide, so picking *Gothic* raises the road to clear it.
+
 ## Planks
 
 Plank and rope bridges have loose planks. Each one drops into a notch in the top of both sides, as
@@ -67,6 +83,7 @@ right distance apart.
 | **Gap** | The gap between planks. The bit of side between two notches is the gap plus both necks: it has to be at least 1 mm or the planks are too close together. |
 | **Rough planks (crooked ends, different lengths)** | Each plank's ends are cut a little crooked and some reach further than others, in three shapes. Good for a rope bridge. |
 | **Missing planks** | Rope bridges: planks left out here and there, never the two at either end or two side by side. |
+| **Metal deck: grating on the planks, rivets on the beams (sci-fi gantry)** | Etches grating on every plank instead of grain, and scores rivets along the beams and the rail. |
 | **Beam depth** | Plank bridges: how deep the side beams are under the deck. It has to be at least the sheet plus 1.2 mm. |
 | **Middle legs**, **Leg width** | Plank bridges standing on the table: legs under the middle of a long bridge, besides the ones at the ends. Each leg has knee braces up to the beam, and where the legs are tall enough a **spreader** goes through both, low down, to keep them square. |
 

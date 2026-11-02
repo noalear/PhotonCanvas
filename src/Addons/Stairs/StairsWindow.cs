@@ -44,6 +44,8 @@ public sealed class StairsWindow : Window
     readonly CheckBox _floor = new() { Content = "Make a floor", IsChecked = true };
     readonly ComboBox _edge = Combo("Over the columns (a little past them)", "Flush with the walls", "Overhanging the walls");
     readonly NumericUpDown _overhang = Number(0, 100, 0.5m, "0.#"), _floors = Number(1, 20, 1, "0"), _piecesAlong = Number(1, 6, 1, "0"), _piecesAcross = Number(1, 6, 1, "0");
+    readonly ComboBox _theme = Combo([.. StairThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _texture = Combo();
     readonly List<string> _textureNames = [];
     readonly NumericUpDown _sizeA = Number(0.5m, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0");
@@ -244,7 +246,10 @@ public sealed class StairsWindow : Window
                 _sizeARow, _sizeBRow, _grooveRow, _seedRow,
                 Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each plank or stone (much quicker)."),
                 _across2));
-        return Stack(_floor, _floorRows);
+        return Stack(
+            Explained("Theme", "A look to start from, the same as the wall maker's: it sets the floor's texture and the way up (open stairs, solid stone steps, a spiral or a ladder) to match the walls of that theme.",
+                Field("Theme", _theme), _themeAbout),
+            _floor, _floorRows);
     }
 
     Control OpeningTab()
@@ -330,6 +335,7 @@ public sealed class StairsWindow : Window
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
     }
 
     void MatchWalls()
@@ -403,6 +409,17 @@ public sealed class StairsWindow : Window
 
     WayUp Way => (WayUp)Math.Max(0, _way.SelectedIndex);
 
+    string ThemeName => StairThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, StairThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its floor texture and way up replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = StairThemes.About(ThemeName);
+        if (_loading) return;
+        Load(StairThemes.Apply(Current(), ThemeName));
+        Changed();
+    }
+
     void ShowRows()
     {
         bool floor = _floor.IsChecked == true, way = Way != WayUp.None;
@@ -438,6 +455,7 @@ public sealed class StairsWindow : Window
         _piecesAlong.Value = s.PiecesAlong; _piecesAcross.Value = s.PiecesAcross;
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _etch.SelectedIndex = (int)s.Etch; _across2.IsChecked = s.TextureAcross;
+        _theme.SelectedIndex = Math.Max(0, StairThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = StairThemes.About(s.Theme);
         _hatch.IsChecked = s.Hatch; _hatchAuto.IsChecked = s.HatchAuto; _hatchX.Value = D(s.HatchXMm); _hatchY.Value = D(s.HatchYMm);
         _hatchL.Value = D(s.HatchLengthMm); _hatchW.Value = D(s.HatchWidthMm); _trapdoor.IsChecked = s.Trapdoor;
         _way.SelectedIndex = (int)s.Way; _climb.Value = D(s.ClimbMm); _ways.Value = s.WaysUp;
@@ -459,7 +477,7 @@ public sealed class StairsWindow : Window
         SheetMm = V(_sheet, 3), FitMm = V(_fit, 0.15),
         Floor = _floor.IsChecked == true, Edge = (FloorEdge)Math.Max(0, _edge.SelectedIndex), OverhangMm = V(_overhang, 6), Floors = (int)V(_floors, 1),
         PiecesAlong = (int)V(_piecesAlong, 1), PiecesAcross = (int)V(_piecesAcross, 1),
-        Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 5), SizeB = V(_sizeB, 35), GrooveMm = V(_groove, 0.5), Seed = (int)V(_seed, 1),
+        Theme = ThemeName, Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 5), SizeB = V(_sizeB, 35), GrooveMm = V(_groove, 0.5), Seed = (int)V(_seed, 1),
         Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), TextureAcross = _across2.IsChecked == true,
         Hatch = _hatch.IsChecked == true, HatchAuto = _hatchAuto.IsChecked == true, HatchXMm = V(_hatchX, 15), HatchYMm = V(_hatchY, 3),
         HatchLengthMm = V(_hatchL, 60), HatchWidthMm = V(_hatchW, 34), Trapdoor = _trapdoor.IsChecked == true,

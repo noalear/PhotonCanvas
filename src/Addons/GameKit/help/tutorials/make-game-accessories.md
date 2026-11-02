@@ -17,6 +17,11 @@ On the **Sheet** tab, type your sheet's **Thickness** (3 mm plywood suits a dice
 the **Faces** to etch on it. Picking your material in **Cut with** fills the thickness and slot fit
 in for you.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top of the **Sheet** tab matches the tower to your scenery: dungeon blocks, cave
+rock, sci-fi panels (no battlements), sandstone or brick.
+
 ## Size the tower for your dice
 <!-- target: field:Biggest die -->
 Back on the **Accessories** tab, the dice tower is on the list. Type the size of your biggest die in

@@ -112,7 +112,7 @@ public static class WallPieces
         };
         var face = Geo.Subtract(outline, notches);
         var leaf = Geo.Union(face, pins);
-        var (etched, lines) = DoorDetail(face, x0, w, o, p, yt, T);
+        var (etched, lines) = m.Detail is WoodDetail.Metal or WoodDetail.Stone ? Handle(face, w) : DoorDetail(face, x0, w, o, p, yt, T);
         var leafPose = Pose.Front(0, 0, p.AxisZ);
         var clip = Clip(p, Wt, T, f);
         // Push fit: the clips' forks get ribs too, gripping the wall.
@@ -147,6 +147,14 @@ public static class WallPieces
         };
         var holes = new PathsD { Geo.Rect(-d - 1, -zf, 0, zf), Geo.Circle(0, p.AxisZ, p.HoleR) };
         return Geo.Subtract(Geo.Union(body), Geo.Union(holes));
+    }
+
+    /// <summary>Just a handle on the latch side (a metal or stone door: the face's own detail does the rest).</summary>
+    static (PathsD Etched, List<PathD> Lines) Handle(PathsD face, double w)
+    {
+        var b = Geo.Bounds(face);
+        double hx = w - Math.Max(2, w * 0.15), hy = Math.Min(b.bottom * 0.45, 14), hw = Math.Clamp(w * 0.05, 0.4, 1);
+        return ([], [Geo.Loop(Geo.Rect(hx - hw / 2, hy - hw * 2, hx + hw / 2, hy + hw * 2))]);
     }
 
     /// <summary>Braces across the planks, strap hinges by the clips and a ring handle on the latch side.</summary>

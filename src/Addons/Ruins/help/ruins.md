@@ -54,12 +54,26 @@ by itself when there are walls in the design.
 ## The texture
 
 The wall maker's textures, at the same sizes: Brick, Stone blocks, Fieldstone, Tiles, Wood planks
-(upright or across), Timber frame, Corrugated metal, Metal plates, Hexagons and Plain, and your own
-texture if the walls you matched used one. See the wall maker's page for what each looks like.
+(upright or across), Timber frame, Corrugated metal, Metal plates, Hexagons, Dungeon blocks, Cave
+rock, Sci-fi panels, Sandstone, Adobe and Plain, and your own texture if the walls you matched used
+one. See the wall maker's page for what each looks like.
+
+**Theme**, at the top of the **Texture** tab, is a look to start from, the same as the wall maker's:
+it sets the texture and its sizes and the pillars' shape, so a ruin matches whole walls of that theme.
+
+| Theme | Texture | Pillars |
+|---|---|---|
+| Medieval | Brick | Round |
+| Dungeon | Dungeon blocks | Square |
+| Cave | Cave rock | Round |
+| Sci-fi | Sci-fi panels | Square |
+| Desert | Sandstone | Round |
+| Gothic | Fine stone blocks | Eight-sided |
 
 How the wall breaks depends on the texture:
 
-- **Bricks, stones, tiles, plates and hexagons** break along the mortar, a whole brick or stone at a
+- **Bricks, stones, tiles, plates, hexagons and the theme textures** (dungeon blocks, cave rock,
+  sci-fi panels, sandstone and adobe's bricks) break along the joints, a whole brick or stone at a
   time, so the broken edge steps up and down the courses like a real ruin.
 - **Upright planks** snap off board by board, each at its own height, to a splintered point.
 - **Planks across** and **corrugated metal** tear in a jagged line.

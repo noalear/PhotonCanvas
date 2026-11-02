@@ -15,6 +15,11 @@ Click **Bridges** on the **Home** tab.
 <!-- target: field:Kind -->
 Choose **Plank bridge** in **Kind**. It starts at a size to suit 28 mm figures.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** under **Kind** gives the bridge a look: *Sci-fi* turns a plank bridge into a metal gantry
+with grating and rivets, *Cave* roughens its planks. Leave it on *Medieval* for now.
+
 ## Make it arch
 <!-- target: field:Arch rise -->
 Type 10 in **Arch rise** to lift its middle 10 mm above its ends (0 makes it level). The preview

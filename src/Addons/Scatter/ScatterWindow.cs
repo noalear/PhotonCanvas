@@ -27,6 +27,11 @@ public sealed class ScatterWindow : Window
     ScatterSet _set;
     int _sel;
 
+    // The theme
+    readonly ComboBox _theme = Combo([.. ScatterThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
+    readonly Button _starter = UiKit.Button("Start the list from this theme", tip: "Replaces the list with scenery that suits the theme: braziers and barrels for a dungeon, stalagmites, mushrooms and boulders for a cave, consoles and drums for sci-fi, and so on.");
+
     // The list
     readonly ListBox _list = new() { MinHeight = 120, MaxHeight = 180 };
     readonly ComboBox _addKind = Combo([.. Defaults.Kinds.Select(k => k.Name)]);
@@ -40,8 +45,9 @@ public sealed class ScatterWindow : Window
     Control _dRow = null!;
     // Barrels
     readonly CheckBox _hoops = new() { Content = "Raised hoops" }, _open = new() { Content = "Open at the top, with water inside" };
+    readonly CheckBox _metal = new() { Content = "A metal drum (sci-fi): a filler cap on the lid" };
     // Fences
-    readonly ComboBox _style = Combo("Pickets", "Posts and rails", "Planks", "Wattle");
+    readonly ComboBox _style = Combo("Pickets", "Posts and rails", "Planks", "Wattle", "Iron railings", "Steel barrier (sci-fi)");
     readonly CheckBox _feet = new() { Content = "Feet, so it stands up on its own" };
     // Carts
     readonly NumericUpDown _wheel = Number(4, 200, 0.5m, "0.#");
@@ -57,6 +63,10 @@ public sealed class ScatterWindow : Window
     readonly ComboBox _shape = Combo("Rounded", "Square", "Pointed", "Cross", "Celtic cross");
     readonly NumericUpDown _slab = Number(0, 500, 1, "0.#");
     readonly CheckBox _inscription = new() { Content = "R.I.P. and lettering" }, _weathered = new() { Content = "Weathered: chips and cracks" };
+    // Braziers, stalagmites and mushrooms, urns
+    readonly CheckBox _flames = new() { Content = "Flames rising out of the bowl" }, _urnOpen = new() { Content = "Open at the neck" };
+    readonly NumericUpDown _cluster = Number(1, 5, 1, "0");
+    Control _brazierRows = null!, _clusterRows = null!, _urnRows = null!;
     Control _barrelRows = null!, _fenceRows = null!, _cartRows = null!, _stallRows = null!, _wellRows = null!, _graveRows = null!;
 
     // The sheet
@@ -178,7 +188,10 @@ public sealed class ScatterWindow : Window
     {
         var addRow = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _addKind, _add.With(b => { Grid.SetColumn(b, 1); b.MinWidth = 70; }) } };
         ToolTip.SetTip(_addKind, "Pick a piece of scenery and press Add to put it on the list.");
-        _barrelRows = Stack(_hoops, _open);
+        _barrelRows = Stack(_hoops, _open, _metal);
+        _brazierRows = Stack(_flames);
+        _clusterRows = Stack(Field("In the clump", _cluster, tip: "How many grow together on one base: up to five stalagmites, or three mushrooms. Each is a different size."));
+        _urnRows = Stack(_urnOpen);
         _fenceRows = Stack(Field("Fence", _style), _feet);
         _cartRows = Stack(Field("Wheels", _wheel, tip: "The wheels' diameter (mm)."), _shafts);
         _stallRows = Stack(Field("Counter", _counter, tip: "How high the counter top is (mm)."),
@@ -189,6 +202,8 @@ public sealed class ScatterWindow : Window
             _inscription, _weathered);
         _dRow = Line(_dLabel, _d);
         return Stack(
+            Explained("Theme", "A look to start from, the same as the wall maker's: it sets the wood detail and turns the pieces on the list to suit (drums aboard a ship, iron railings round a graveyard). Start the list from it for scenery of its own.",
+                Field("Theme", _theme), _themeAbout, _starter),
             Explained("Scenery to cut", "Everything on the list is cut from the same sheet and nested onto the bed together. Pick one to change it.",
                 _list,
                 addRow,
@@ -197,7 +212,7 @@ public sealed class ScatterWindow : Window
                 _title, _about,
                 Field("How many", _count),
                 Line(_wLabel, _w), _dRow, Line(_hLabel, _h),
-                _barrelRows, _fenceRows, _cartRows, _stallRows, _wellRows, _graveRows));
+                _barrelRows, _fenceRows, _cartRows, _stallRows, _wellRows, _graveRows, _brazierRows, _clusterRows, _urnRows));
     }
 
     Control SheetTab()
@@ -261,11 +276,13 @@ public sealed class ScatterWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _count, _w, _d, _h, _wheel, _counter, _rise, _top, _slab })
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
+        _starter.Click += (_, _) => StartFromTheme();
+        foreach (var n in new[] { _count, _w, _d, _h, _wheel, _counter, _rise, _top, _slab, _cluster })
             n.ValueChanged += (_, _) => ItemChanged();
         foreach (var c in new[] { _style, _texture, _shape })
             c.SelectionChanged += (_, _) => ItemChanged();
-        foreach (var c in new[] { _hoops, _open, _feet, _shafts, _stripes, _scallops, _roof, _shingles, _inscription, _weathered })
+        foreach (var c in new[] { _hoops, _open, _metal, _feet, _shafts, _stripes, _scallops, _roof, _shingles, _inscription, _weathered, _flames, _urnOpen })
             c.IsCheckedChanged += (_, _) => ItemChanged();
         foreach (var n in new[] { _thick, _fit, _seed, _grip }) n.ValueChanged += (_, _) => SheetChanged();
         _joints.SelectionChanged += (_, _) => { _gripRow.IsVisible = _joints.SelectedIndex == 1; SheetChanged(); };
@@ -282,6 +299,29 @@ public sealed class ScatterWindow : Window
     static decimal D(double v) => (decimal)v;
     static double V(NumericUpDown n, double fallback) => n.Value is { } v ? (double)v : fallback;
     ScatterItem Item => _set.Items[Math.Clamp(_sel, 0, _set.Items.Count - 1)];
+
+    string ThemeName => ScatterThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, ScatterThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its detail replaces the one set, and the pieces on the list turn to suit it.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = ScatterThemes.About(ThemeName);
+        if (_loading) return;
+        _set = ScatterThemes.Apply(_set, ThemeName);
+        LoadSheet();
+        FillList(_sel);
+        Changed();
+    }
+
+    /// <summary>The list replaced by the theme's starter scenery, sized for the figures chosen.</summary>
+    void StartFromTheme()
+    {
+        double k = _set.ScaleMm / 28;
+        _set = ScatterThemes.Apply(_set with { Items = [.. ScatterThemes.Starter(ThemeName).Select(it => Math.Abs(k - 1) < 1e-9 ? it : Defaults.Scaled(it, k))] }, ThemeName);
+        LoadSheet();
+        FillList(0);
+        Changed();
+    }
 
     void FillList(int select)
     {
@@ -330,6 +370,7 @@ public sealed class ScatterWindow : Window
         _loading = true;
         _thick.Value = D(_set.ThicknessMm); _fit.Value = D(_set.FitMm); _seed.Value = Math.Clamp(_set.Seed, 1, 9999);
         _detail.SelectedIndex = (int)_set.Detail;
+        _theme.SelectedIndex = Math.Max(0, ScatterThemes.Names.ToList().IndexOf(_set.Theme)); _themeAbout.Text = ScatterThemes.About(_set.Theme);
         _joints.SelectedIndex = _set.PushFit ? 1 : 0;
         _grip.Value = D(Math.Clamp(_set.GripMm, 0.02, 0.5));
         _gripRow.IsVisible = _set.PushFit;
@@ -346,11 +387,12 @@ public sealed class ScatterWindow : Window
         bool was = _loading;
         _loading = true;
         var info = Defaults.Info(kind);
-        _title.Text = info.Name;
+        _title.Text = Defaults.Name(it);
         _about.Text = info.About;
         _count.Value = Math.Max(1, it.Count);
         _w.Value = D(it.WidthMm); _d.Value = D(it.DepthMm); _h.Value = D(it.HeightMm);
-        _hoops.IsChecked = it.Hoops; _open.IsChecked = it.Open;
+        _hoops.IsChecked = it.Hoops; _open.IsChecked = it.Open; _metal.IsChecked = it.Metal;
+        _flames.IsChecked = it.Flames; _urnOpen.IsChecked = it.Open; _cluster.Value = Math.Clamp(it.Cluster, 1, 5);
         _style.SelectedIndex = (int)it.Style; _feet.IsChecked = it.Feet;
         _wheel.Value = D(it.WheelMm); _shafts.IsChecked = it.Shafts;
         _counter.Value = D(it.CounterMm); _rise.Value = D(it.RiseMm); _stripes.IsChecked = it.Stripes; _scallops.IsChecked = it.Scallops;
@@ -365,6 +407,13 @@ public sealed class ScatterWindow : Window
             ItemKind.Cart => ("Bed width", "Bed length", "Sides"),
             ItemKind.MarketStall => ("Width", "Depth", "Front height"),
             ItemKind.Well => ("Width", "Depth", "Wall height"),
+            ItemKind.Brazier => ("Across", null, "Height"),
+            ItemKind.Console => ("Width", "Depth", "Height"),
+            ItemKind.Stalagmite => ("Base across", null, "Height"),
+            ItemKind.Mushroom => ("Cap across", null, "Height"),
+            ItemKind.Boulder => ("Width", "Depth", "Height"),
+            ItemKind.Urn => ("Across", null, "Height"),
+            ItemKind.Palm => ("Fronds across", "Base across", "Height"),
             _ => ("Width", null, "Height"),
         };
         _wLabel.Text = labels.W;
@@ -377,6 +426,9 @@ public sealed class ScatterWindow : Window
         _stallRows.IsVisible = kind == ItemKind.MarketStall;
         _wellRows.IsVisible = kind == ItemKind.Well;
         _graveRows.IsVisible = kind == ItemKind.Gravestone;
+        _brazierRows.IsVisible = kind == ItemKind.Brazier;
+        _clusterRows.IsVisible = kind is ItemKind.Stalagmite or ItemKind.Mushroom;
+        _urnRows.IsVisible = kind == ItemKind.Urn;
         _loading = was;
     }
 
@@ -388,7 +440,8 @@ public sealed class ScatterWindow : Window
         {
             Count = (int)V(_count, 1),
             WidthMm = V(_w, it.WidthMm), DepthMm = V(_d, it.DepthMm), HeightMm = V(_h, it.HeightMm),
-            Hoops = _hoops.IsChecked == true, Open = _open.IsChecked == true,
+            Hoops = _hoops.IsChecked == true, Open = it.Kind == ItemKind.Urn ? _urnOpen.IsChecked == true : _open.IsChecked == true, Metal = _metal.IsChecked == true,
+            Flames = _flames.IsChecked == true, Cluster = (int)V(_cluster, it.Cluster),
             Style = (FenceStyle)Math.Max(0, _style.SelectedIndex), Feet = _feet.IsChecked == true,
             WheelMm = V(_wheel, it.WheelMm), Shafts = _shafts.IsChecked == true,
             CounterMm = V(_counter, it.CounterMm), RiseMm = V(_rise, it.RiseMm), Stripes = _stripes.IsChecked == true, Scallops = _scallops.IsChecked == true,
@@ -478,7 +531,7 @@ public sealed class ScatterWindow : Window
         int pieces = kit.PieceCount;
         _summary.Text = pieces == 0 ? "" :
             $"{pieces} piece{(pieces == 1 ? "" : "s")} to cut for " + ListWords(set.Items.Select((it, i) => (it.Count > 1 ? $"{it.Count} × " : "") + Lower(ScatterKit.Label(set, i)))) +
-            $" ({mine.Parts.Sum(p => p.Copies)} for each {Lower(Defaults.Info(mine.Item.Kind).Name)}).";
+            $" ({mine.Parts.Sum(p => p.Copies)} for each {Lower(Defaults.Name(mine.Item))}).";
         _make.IsEnabled = kit.Ok && pieces > 0 && !all.Any(f => f.Level == Severity.Bad);
     }
 

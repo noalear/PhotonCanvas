@@ -16,6 +16,11 @@ Click **Ruins** on the **Home** tab.
 If you've made walls with **Walls**, press **Match the walls in the design**: the ruin takes their
 sheet, height, texture and variation, so its bricks line up with theirs.
 
+## Or pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top of the **Texture** tab gives the ruin a look of its own: dungeon blocks, cave
+rock, sci-fi panels (the rubble comes out as twisted plates), sandstone or fine gothic stone.
+
 ## Size the wall and its ends
 <!-- target: field:Length -->
 Type the wall's **Length** and **Height**. Leave both ends **Whole** to slide the wall into columns,

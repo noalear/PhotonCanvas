@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.Bridges;
@@ -40,6 +41,8 @@ public static class Textures
         new("Corrugated metal", "Ridge pitch", 2.5, null, 0, false, 0, false, "Upright ridges, for sheds and industrial or sci-fi scenery."),
         new("Metal plates", "Plate width", 20, "Plate height", 14, true, 0.5, false, "Riveted plates, each row moved along half a plate."),
         new("Hexagons", "Hexagon size", 8, null, 0, true, 0.7, false, "Hexagonal tiles or armour, for sci-fi walls."),
+        // The themes' own (Shared/Terrain/ThemeTextures.cs), as the wall maker has them.
+        .. ThemeTextures.All.Select(t => new TexturePreset(t.Name, t.SizeALabel, t.SizeA, t.SizeBLabel, t.SizeB, true, t.Groove, true, t.About)),
         new(Plain, null, 0, null, 0, false, 0, false, "No texture: just the outline, openings and mounts."),
     ];
 
@@ -53,6 +56,11 @@ public static class Textures
         double g = Math.Clamp(groove, 0.05, (Preset(texture)?.SizeBLabel is null ? a : Math.Min(a, b)) / 2);
         var rnd = new Random(seed);
         if (custom is not null && texture == custom.Name) return Custom(custom, a, f);
+        if (ThemeTextures.Find(texture) is not null)
+        {
+            var (r, e, l) = ThemeTextures.Make(texture, f.Length, f.Height, a, b, g, rnd);
+            return new(r, e, l);
+        }
         return texture switch
         {
             "Brick" => Bricks(f, a, b, g, 0.5),

@@ -32,6 +32,8 @@ public sealed class BuildingWindow : Window
     // Building
     readonly ComboBox _kind = Combo([.. BuildingSpec.Kinds.Select(k => k.Name)]);
     readonly TextBlock _kindAbout = Hint();
+    readonly ComboBox _theme = Combo([.. BuildingThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _scale = Combo("15 mm", "28 mm", "32 mm", "54 mm");
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _width = Number(30, 2000, 5, "0.#"), _depth = Number(30, 2000, 5, "0.#"), _storeys = Number(1, 4, 1, "0"), _storeyH = Number(10, 500, 1, "0.#"), _parapet = Number(8, 200, 1, "0.#");
@@ -39,10 +41,12 @@ public sealed class BuildingWindow : Window
     readonly ComboBox _wayUp = Combo("Stairs", "Spiral stairs", "Ladder", "None (a plain floor)");
     Control _parapetRow = null!;
     readonly ComboBox _door = Combo("Hung on clips: it swings open", "Loose in the doorway", "Just a doorway");
-    readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch");
+    readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch", "Angled corners (sci-fi)", "Rough (cave mouth)");
+    static readonly OpeningShape[] DoorShapes = [OpeningShape.Rectangle, OpeningShape.Arched, OpeningShape.Pointed, OpeningShape.Chamfered, OpeningShape.Rough];
+    readonly ComboBox _doorLook = Combo("Planks", "Planks with iron studs", "Metal blast door", "Bars (a portcullis)", "Stone slab");
     readonly NumericUpDown _doorW = Number(4, 500, 0.5m, "0.#"), _doorH = Number(6, 500, 0.5m, "0.#");
     readonly NumericUpDown _winFront = Number(0, 20, 1, "0"), _winSide = Number(0, 20, 1, "0"), _winW = Number(1, 200, 0.5m, "0.#"), _winH = Number(1, 200, 0.5m, "0.#"), _sill = Number(1, 300, 0.5m, "0.#");
-    readonly ComboBox _winShape = Combo("Square", "Round arch", "Pointed arch", "Round", "Arrow slit"), _bars = Combo("None", "A cross", "Upright bars");
+    readonly ComboBox _winShape = Combo("Square", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)"), _bars = Combo("None", "A cross", "Upright bars");
 
     // Floor tiles
     readonly CheckBox _tiles = new() { Content = "Floor tiles under the building (the floor tile maker's)" };
@@ -71,7 +75,7 @@ public sealed class BuildingWindow : Window
     readonly NumericUpDown _furnT = Number(0.3m, 20, 0.5m, "0.##"), _furnFit = Number(-0.5m, 2, 0.05m, "0.##"), _grip = Number(0.02m, 0.5m, 0.05m, "0.##");
     readonly ComboBox _joints = Combo("Snug, to glue", "Push fit (grip ribs, no glue)");
     Control _gripRow = null!;
-    readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain"), _furnCut = Combo();
+    readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain", "Metal panels and rivets (sci-fi)", "Stone (cracks and pits)"), _furnCut = Combo();
     readonly TextBlock _furnCutNote = Hint();
 
     readonly TabControl _tabs = new(), _views = new();
@@ -181,6 +185,8 @@ public sealed class BuildingWindow : Window
             Explained("Building", "Picking a building starts again from it, sized for the figures chosen. Everything below can then be changed.",
                 Field("Building", _kind), _kindAbout,
                 Field("Figures", _scale, tip: "Changing it scales every size, the furniture's too, to suit figures that size.")),
+            Explained("Theme", "A look for the whole building, the same as the other terrain makers': it sets the walls' texture, the door and windows, the roof, the floor tiles, the furniture's detail and the way up. Sizes, storeys and furniture stay as they are.",
+                Field("Theme", _theme), _themeAbout),
             Explained("Size", "Measured between the corner columns' centres. Each storey is rounded to whole layers of the wall sheet, so the columns come out flush with the walls.",
                 Field("Width", _width, tip: "Left to right, between the corner columns' centres (mm)."),
                 Field("Depth", _depth, tip: "Front to back, between the corner columns' centres (mm)."),
@@ -197,7 +203,8 @@ public sealed class BuildingWindow : Window
                     Field("Yard", _yard, tip: "How far the tiles reach past the building's outside, all round (mm)."))),
             Explained("Door", "In the middle of the front of the ground floor.",
                 Field("Door", _door, tip: "Hung on clips (from the furniture maker) it swings open; loose, it just sits in the doorway."),
-                Field("Shape", _doorShape),
+                Field("Shape", _doorShape, tip: "A door that swings is made for square, arched and pointed doorways; the others get a loose door."),
+                Field("Look", _doorLook, tip: "What a loose door looks like, as the wall maker makes it."),
                 Field("Width", _doorW), Field("Height", _doorH)),
             Explained("Windows", "On every storey; the ground floor's front fits them round the door.",
                 Field("Front and back", _winFront, tip: "Windows in the front wall and in the back wall of each storey."),
@@ -242,7 +249,7 @@ public sealed class BuildingWindow : Window
                 Field("Slot fit", _furnFit, tip: "Added to the sheet's thickness for the furniture's slots (mm): more is looser."),
                 Field("Joints", _joints, tip: "Snug joints want a drop of glue; push fit puts small ribs in every slot that squeeze flat, so the furniture holds without glue."),
                 _gripRow = Field("Grip", _grip, tip: "How much tighter than the sheet the ribs make each joint (mm); 0.15 suits plywood and MDF."),
-                Field("Wood", _detail, tip: "Grain is scored lines; planks add etched grooves between boards. The floors get planks too."),
+                Field("Faces", _detail, tip: "Grain is scored lines; planks add etched grooves between boards; metal is a panel line and rivets; stone is cracks and pits. The floors between storeys match: planks, deck plates or stone."),
                 Field("Cut with", _furnCut), _furnCutNote));
     }
 
@@ -287,7 +294,8 @@ public sealed class BuildingWindow : Window
     {
         foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
             n.ValueChanged += (_, _) => FromControls();
-        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
+        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _doorLook, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
         _tiles.IsCheckedChanged += (_, _) => FromControls();
@@ -313,12 +321,13 @@ public sealed class BuildingWindow : Window
         _loading = true;
         _kind.SelectedIndex = (int)s.Kind;
         _kindAbout.Text = BuildingSpec.Info(s.Kind).About;
+        _theme.SelectedIndex = Math.Max(0, BuildingThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = BuildingThemes.About(s.Theme);
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - s.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
         _width.Value = D(s.WidthMm); _depth.Value = D(s.DepthMm); _storeys.Value = Math.Clamp(s.Storeys, 1, 4); _storeyH.Value = D(s.StoreyHeightMm);
         _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm); _wayUp.SelectedIndex = (int)s.WayUp;
         _door.SelectedIndex = (int)s.Door;
-        _doorShape.SelectedIndex = s.DoorShape switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
+        _doorShape.SelectedIndex = Math.Max(0, Array.IndexOf(DoorShapes, s.DoorShape)); _doorLook.SelectedIndex = (int)s.DoorLook;
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm);
         _winFront.Value = s.WindowsFront; _winSide.Value = s.WindowsSide;
         _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
@@ -349,7 +358,7 @@ public sealed class BuildingWindow : Window
             WidthMm = V(_width, 110), DepthMm = V(_depth, 80), Storeys = (int)V(_storeys, 1), StoreyHeightMm = V(_storeyH, 48),
             Top = top, ParapetHeightMm = V(_parapet, 21), WayUp = (WayUpStyle)Index(_wayUp),
             Door = (DoorStyle)Index(_door),
-            DoorShape = Index(_doorShape) switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched },
+            DoorShape = DoorShapes[Math.Clamp(Index(_doorShape), 0, DoorShapes.Length - 1)], DoorLook = (DoorLook)Math.Max(0, Index(_doorLook)),
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28),
             WindowsFront = (int)V(_winFront, 0), WindowsSide = (int)V(_winSide, 0),
             WindowShape = (OpeningShape)Index(_winShape), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 22),
@@ -369,6 +378,16 @@ public sealed class BuildingWindow : Window
         Changed();
     }
 
+    /// <summary>A theme picked: the building's looks change to it (see <see cref="BuildingThemes"/>).</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = BuildingThemes.About(BuildingThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, BuildingThemes.Names.Count - 1)]);
+        if (_loading) return;
+        _spec = BuildingThemes.Apply(_spec, BuildingThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, BuildingThemes.Names.Count - 1)]);
+        Load();
+        Changed();
+    }
+
     void KindChosen()
     {
         if (_loading) return;
@@ -379,7 +398,7 @@ public sealed class BuildingWindow : Window
         _spec = s with
         {
             WallSheetMm = _spec.WallSheetMm, TwoSided = _spec.TwoSided, FitMm = _spec.FitMm,
-            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Detail = _spec.Detail, Seed = _spec.Seed, Etch = _spec.Etch,
+            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Seed = _spec.Seed, Etch = _spec.Etch,
         };
         _sel = 0;
         Load();

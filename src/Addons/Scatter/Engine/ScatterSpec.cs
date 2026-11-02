@@ -4,9 +4,9 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace PhotonCanvas.Addon.Scatter;
 
-public enum ItemKind { Barrel, Fence, Cart, MarketStall, Well, Gravestone }
+public enum ItemKind { Barrel, Fence, Cart, MarketStall, Well, Gravestone, Brazier, Console, Stalagmite, Mushroom, Boulder, Urn, Palm }
 
-public enum FenceStyle { Picket, PostAndRail, Planks, Wattle }
+public enum FenceStyle { Picket, PostAndRail, Planks, Wattle, Railings, Barrier }
 public enum StoneShape { Rounded, Square, Pointed, Cross, Celtic }
 /// <summary>The wood detail etched and scored on the faces.</summary>
 public enum WoodDetail { None, Grain, Planks }
@@ -29,8 +29,15 @@ public sealed record ScatterItem
 
     /// <summary>Barrels: two raised hoops near the ends and one round the middle.</summary>
     public bool Hoops { get; init; } = true;
-    /// <summary>Barrels: open at the top, water inside.</summary>
+    /// <summary>Barrels: open at the top, water inside. Urns: open at the neck.</summary>
     public bool Open { get; init; }
+    /// <summary>Barrels: a metal drum (ribbed, a filler cap on the lid) instead of a wooden barrel.</summary>
+    public bool Metal { get; init; }
+
+    /// <summary>Stalagmites and mushrooms: how many grow together on one base (1 to 5; mushrooms up to 3).</summary>
+    public int Cluster { get; init; } = 1;
+    /// <summary>Braziers: flames standing up out of the bowl.</summary>
+    public bool Flames { get; init; } = true;
 
     public FenceStyle Style { get; init; } = FenceStyle.Picket;
     /// <summary>Fences: a foot crossing each end post, so the section stands up on its own.</summary>
@@ -86,6 +93,8 @@ public sealed record ScatterSet
     public double GripMm { get; init; } = 0.15;
     /// <summary>Grain, stones and chips are laid out at random: each number gives a different layout.</summary>
     public int Seed { get; init; } = 1;
+    /// <summary>The look last picked (one of the terrain themes: see <see cref="ScatterThemes"/>).</summary>
+    public string Theme { get; init; } = "Medieval";
     /// <summary>The figures it's for (mm): only used to scale the sizes when it's changed.</summary>
     public double ScaleMm { get; init; } = 28;
 
@@ -111,9 +120,19 @@ public static class Defaults
         new(ItemKind.MarketStall, "Market stall", "Two side frames, a counter and a sloping awning with stripes and a scalloped edge, all slotted together."),
         new(ItemKind.Well, "Well", "A square stone well with two posts, a winch bar and a shingled roof, its stonework etched like the wall maker's."),
         new(ItemKind.Gravestone, "Gravestone", "A headstone slotted into a base or a grave slab: rounded, square, pointed, a cross or a Celtic cross, with lettering."),
+        new(ItemKind.Brazier, "Brazier", "A fire bowl on splayed legs with flames rising out of it: two pieces crossed with a halving joint."),
+        new(ItemKind.Console, "Console", "A sci-fi control desk: a finger-jointed cabinet with a keypad on top and a screen slotted in at the back."),
+        new(ItemKind.Stalagmite, "Stalagmite", "Layers stacked on a hidden core into a tapering spire of rock, alone or in a clump of up to five."),
+        new(ItemKind.Mushroom, "Giant mushroom", "A stalk and a domed, spotted cap in stacked layers, alone or in a clump of up to three on one base."),
+        new(ItemKind.Boulder, "Boulder", "A rough rock in stacked layers, flat underneath, its shape different for every Variation number."),
+        new(ItemKind.Urn, "Urn", "A clay pot in stacked rings: a foot, a round belly, a neck and a lip, closed or open at the top."),
+        new(ItemKind.Palm, "Palm tree", "A curved, ringed trunk slotted into a base, with a crown of fronds slotted onto its top."),
     ];
 
     public static KindInfo Info(ItemKind k) => Kinds.First(x => x.Kind == k);
+
+    /// <summary>What the piece is called: its kind's name, or "Drum" for a metal barrel.</summary>
+    public static string Name(ScatterItem it) => it.Kind == ItemKind.Barrel && it.Metal ? "Drum" : Info(it.Kind).Name;
 
     public static ScatterItem For(ItemKind k) => k switch
     {
@@ -123,6 +142,13 @@ public static class Defaults
         ItemKind.MarketStall => new() { Kind = k, WidthMm = 30, DepthMm = 16, HeightMm = 28, CounterMm = 12, RiseMm = 5 },
         ItemKind.Well => new() { Kind = k, WidthMm = 20, DepthMm = 20, HeightMm = 10, TopMm = 34 },
         ItemKind.Gravestone => new() { Kind = k, WidthMm = 9, HeightMm = 13, Shape = StoneShape.Rounded },
+        ItemKind.Brazier => new() { Kind = k, WidthMm = 14, HeightMm = 22 },
+        ItemKind.Console => new() { Kind = k, WidthMm = 20, DepthMm = 12, HeightMm = 26 },
+        ItemKind.Stalagmite => new() { Kind = k, WidthMm = 10, HeightMm = 30, Cluster = 2 },
+        ItemKind.Mushroom => new() { Kind = k, WidthMm = 18, HeightMm = 24, Cluster = 2 },
+        ItemKind.Boulder => new() { Kind = k, WidthMm = 24, DepthMm = 18, HeightMm = 12 },
+        ItemKind.Urn => new() { Kind = k, WidthMm = 12, HeightMm = 18 },
+        ItemKind.Palm => new() { Kind = k, WidthMm = 30, DepthMm = 14, HeightMm = 45 },
         _ => new() { Kind = k },
     };
 

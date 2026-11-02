@@ -47,6 +47,8 @@ public sealed record RuinSpec
     public bool PlainEnds { get; init; } = true;
 
     // ---- the texture ----
+    /// <summary>The look picked to start from (<see cref="RuinThemes"/>): it set the texture and pillars, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
 
     public string Texture { get; init; } = "Brick";
     public CustomTexture? Custom { get; init; }

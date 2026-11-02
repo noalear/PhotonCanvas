@@ -42,17 +42,22 @@ public static class Fences
                 case FenceStyle.PostAndRail: Rails(m, xa, xb, H, rails); break;
                 case FenceStyle.Planks: Planks(m, xa, xb, H, boards, etched); break;
                 case FenceStyle.Wattle: Wattle(m, xa, xb, H, boards, etched); break;
+                case FenceStyle.Railings: Railings(xa, xb, H, sw, rails, boards); break;
+                case FenceStyle.Barrier: Barrier(xa, xb, H, boards, etched, lines); break;
             }
         }
         var outline = Geo.Union(Geo.Union(postArea, rails), boards);
         var holes = new PathsD();
         if (feet) foreach (var x in posts) holes.Add(Geo.Rect(x - sw / 2, -1, x + sw / 2, hf / 2 + f / 2));
 
-        // Grain up the posts and boards, along the rails.
-        var (pe, pl) = m.Wood(Geo.Union(postArea), alongU: false);
+        // Grain up the posts and boards, along the rails (iron and steel have none: bolts instead).
+        bool metal = it.Style is FenceStyle.Railings or FenceStyle.Barrier;
+        if (metal)
+            foreach (var x in posts) { lines.Add(WoodFace.Dot(x, H * 0.85, Math.Min(0.35, pw * 0.2))); lines.Add(WoodFace.Dot(x, H * 0.2, Math.Min(0.35, pw * 0.2))); }
+        var (pe, pl) = metal ? ([], []) : m.Wood(Geo.Union(postArea), alongU: false);
         etched.AddRange(pe); lines.AddRange(pl);
-        if (rails.Count > 0) { var (re, rl) = m.Wood(Geo.Subtract(Geo.Union(rails), Geo.Union(postArea)), alongU: true); etched.AddRange(re); lines.AddRange(rl); }
-        if (boards.Count > 0 && it.Style != FenceStyle.Wattle)
+        if (rails.Count > 0 && !metal) { var (re, rl) = m.Wood(Geo.Subtract(Geo.Union(rails), Geo.Union(postArea)), alongU: true); etched.AddRange(re); lines.AddRange(rl); }
+        if (boards.Count > 0 && it.Style is not (FenceStyle.Wattle or FenceStyle.Railings or FenceStyle.Barrier))
         {
             var (be, bl) = m.Wood(Geo.Subtract(Geo.Union(boards), Geo.Union(Geo.Union(postArea), Geo.Union(rails))), alongU: false);
             etched.AddRange(be); lines.AddRange(bl);
@@ -117,6 +122,50 @@ public static class Fences
         // Two battens across, scored.
         foreach (var y in new[] { H * 0.25, H * 0.7 })
             etched.AddRange(Geo.Subtract([Geo.Rect(xa, y - 0.7, xb, y + 0.7)], [Geo.Rect(xa + 0.3, y - 0.45, xb - 0.3, y + 0.45)]));
+    }
+
+    /// <summary>Iron railings: two rails and upright bars, each topped with a spearhead (blunted, so it doesn't burn away).</summary>
+    static void Railings(double xa, double xb, double H, double slot, PathsD rails, PathsD bars)
+    {
+        double rh = Math.Clamp(H * 0.07, 1.0, 1.6), bw = Maker.Bridge * 1.1, head = Math.Clamp(H * 0.14, 1.6, 2.6);
+        double y0 = Math.Max(0.8, H * 0.1), top = H - head;
+        foreach (var y in new[] { y0 + rh / 2, H * 0.72 }) rails.Add(Geo.Rect(xa, y - rh / 2, xb, y + rh / 2));
+        double bay = xb - xa;
+        int n = Math.Max(1, (int)Math.Floor(bay / 3.0));
+        // Never a gap as wide as a slot: the push fit's grip ribs would go in it.
+        bool SlotWide(int k) => Math.Abs(bay / (k + 1) - bw - slot) < 0.08 || Math.Abs(bay / (k + 1) - bw / 2 - slot) < 0.08;
+        if (SlotWide(n)) n = SlotWide(n + 1) ? n + 2 : n + 1;
+        double step = bay / (n + 1);
+        for (int i = 1; i <= n; i++)
+        {
+            double x = xa + i * step;
+            bars.Add(Geo.Rect(x - bw / 2, y0, x + bw / 2, top + 0.01));
+            double hw = Math.Min(0.95, step / 2 - 0.5);
+            bars.Add([new(x - bw / 2, top), new(x + bw / 2, top), new(x + Math.Max(bw / 2, hw), top + head * 0.35), new(x + bw / 2, H), new(x - bw / 2, H), new(x - Math.Max(bw / 2, hw), top + head * 0.35)]);
+        }
+    }
+
+    /// <summary>A steel barrier panel between the posts, with hazard stripes along it and a bolt in each corner.</summary>
+    static void Barrier(double xa, double xb, double H, PathsD boards, PathsD etched, List<PathD> lines)
+    {
+        double y0 = Math.Max(0.8, H * 0.12), y1 = H * 0.85;
+        boards.Add(Geo.Rect(xa, y0, xb, y1));
+        double i = 0.6;
+        if (xb - xa < 2 * i + 2 || y1 - y0 < 2 * i + 2) return;
+        lines.Add(Geo.Loop(Geo.Rect(xa + i, y0 + i, xb - i, y1 - i)));
+        // Stripes in a band across the top half.
+        double b0 = y0 + (y1 - y0) * 0.5, b1 = y1 - i - 0.5, sw = 1.0;
+        if (b1 - b0 > 1.2)
+        {
+            var band = new PathsD { Geo.Rect(xa + i + 0.5, b0, xb - i - 0.5, b1) };
+            var stripes = new PathsD();
+            for (double x = xa - (b1 - b0); x < xb; x += 2 * sw)
+                stripes.Add([new(x, b0), new(x + sw, b0), new(x + sw + (b1 - b0), b1), new(x + (b1 - b0), b1)]);
+            etched.AddRange(Geo.Intersect(Geo.Union(stripes), band));
+            lines.Add(Geo.Loop(Geo.Rect(xa + i + 0.5, b0, xb - i - 0.5, b1)));
+        }
+        foreach (var (x, y) in new[] { (xa + i + 0.6, y0 + i + 0.6), (xb - i - 0.6, y0 + i + 0.6), (xa + i + 0.6, y1 - i - 0.6), (xb - i - 0.6, y1 - i - 0.6) })
+            lines.Add(WoodFace.Dot(x, y, 0.25));
     }
 
     /// <summary>Woven hurdle: stakes poking out of the top, the weave etched between them.</summary>

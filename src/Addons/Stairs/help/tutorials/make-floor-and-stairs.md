@@ -16,6 +16,11 @@ Click **Stairs & floors** on the **Home** tab.
 Press **Match the walls in the design**: the walls' height, length, sheet and columns are filled in
 from the walls you made. Or type them in.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top of the **Floor** tab matches the floor and the way up to walls of the same theme:
+dungeon blocks and solid steps, sci-fi panels and a ladder, gothic tiles and a spiral stair.
+
 ## Choose the floor
 <!-- target: tabitem:Floor -->
 On the **Floor** tab, pick how far the **Edge** reaches and the **Texture**: planks for floorboards,

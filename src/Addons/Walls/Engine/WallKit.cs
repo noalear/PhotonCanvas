@@ -134,7 +134,7 @@ public static class WallKitMaker
                 if (s.Door == DoorKind.ClosedDoor)
                 {
                     keepClear.AddRange(door);
-                    var (de, dl) = DoorFace(door, s.Etch, groove);
+                    var (de, dl) = DoorFace(door, s.Etch, groove, s.DoorLook);
                     etched.AddRange(de);
                     lines.AddRange(dl);
                 }
@@ -142,8 +142,10 @@ public static class WallKitMaker
                 if (s.Door == DoorKind.DoorwayAndDoor)
                 {
                     var leaf = Geo.Offset(door, -DoorClearMm);
-                    var (le, ll) = DoorFace(leaf, s.Etch, groove);
-                    extras.Add(new Part("Door", Geo.Tidy(Geo.Move(leaf, -(cx - w / 2), 0)), Geo.Move(le, -(cx - w / 2), 0), Geo.Map(ll, p => new PointD(p.x - (cx - w / 2), p.y)), 1));
+                    var (le, ll) = DoorFace(leaf, s.Etch, groove, s.DoorLook);
+                    // A loose portcullis has its gaps cut right through.
+                    var leafCut = s.DoorLook == DoorLook.Bars ? Geo.Subtract(leaf, BarGaps(leaf)) : leaf;
+                    extras.Add(new Part(s.DoorLook == DoorLook.Bars ? "Portcullis" : "Door", Geo.Tidy(Geo.Move(leafCut, -(cx - w / 2), 0)), Geo.Move(le, -(cx - w / 2), 0), Geo.Map(ll, p => new PointD(p.x - (cx - w / 2), p.y)), 1));
                 }
             }
         }
@@ -298,9 +300,52 @@ public static class WallKitMaker
                     Geo.Circle(cx, y + w * 0.6, w * 0.6), Geo.Circle(cx, y + h - w * 0.6, w * 0.6),
                 });
             }
+            case OpeningShape.Chamfered:
+            {
+                // Square below, the top corners cut off at 45°: sci-fi doors and hatches.
+                double c = Math.Min(w * 0.3, h * 0.3);
+                return [[new(x, y), new(x + w, y), new(x + w, y + h - c), new(x + w - c, y + h), new(x + c, y + h), new(x, y + h - c)]];
+            }
+            case OpeningShape.Rough:
+                return [RoughArch(x, y, w, h)];
             default:
                 return [Geo.Rect(x, y, x + w, y + h)];
         }
+    }
+
+    /// <summary>
+    /// A ragged cave mouth: a round arch whose sides and top wander in and out by up to a tenth of its
+    /// width, the bottom straight. The same size and place always give the same outline.
+    /// </summary>
+    static PathD RoughArch(double x, double y, double w, double h)
+    {
+        var rnd = new Random((int)(Math.Round(x * 10) * 7919 + Math.Round(y * 10) * 104729 + Math.Round(w * 10) * 31 + Math.Round(h * 10)) & 0x7fffffff);
+        double spring = Math.Max(y, y + h - w / 2);
+        // The arch's outline from the bottom right, up and over to the bottom left, a point every 1 mm or so.
+        var smooth = new List<PointD>();
+        for (double t = y; t < spring; t += 1) smooth.Add(new(x + w, t));
+        smooth.AddRange(Geo.Arc(x + w / 2, spring, w / 2, 0, Math.PI, 0.05));
+        for (double t = spring - 1; t > y; t -= 1) smooth.Add(new(x, t));
+        // Each point pushed in or out along the outline's normal, the push smoothed along it.
+        int n = smooth.Count;
+        var push = new double[n];
+        double amp = w * 0.1;
+        for (int i = 0; i < n; i++) push[i] = (rnd.NextDouble() - 0.5) * 2 * amp;
+        for (int pass = 0; pass < 2; pass++)
+            for (int i = 1; i < n - 1; i++) push[i] = (push[i - 1] + push[i] * 2 + push[i + 1]) / 4;
+        // Anticlockwise: from the bottom right, round the top, to the bottom left.
+        var p = new PathD { new(x + w, y) };
+        double cx = x + w / 2;
+        for (int i = 0; i < n; i++)
+        {
+            var q = smooth[i];
+            // Out from the arch's middle (the sides straight out, the top round from the springing).
+            double dx = q.x - cx, dy = q.y > spring ? q.y - spring : 0, len = Math.Max(1e-9, Math.Sqrt(dx * dx + dy * dy));
+            double k = i == 0 || i == n - 1 ? 0.5 : 1;
+            p.Add(new(q.x + dx / len * push[i] * k, q.y + dy / len * push[i] * k));
+        }
+        p.Add(new(x, y));
+        return Geo.Tidy([p]).OrderByDescending(q => Math.Abs(Clipper.Area(q))).FirstOrDefault() ?? Geo.Rect(x, y, x + w, y + h);
     }
 
     /// <summary>A window with bars left across it: the panes that are cut out.</summary>
@@ -325,8 +370,148 @@ public static class WallKitMaker
         return Geo.Subtract(window, Geo.Union(strips));
     }
 
+    /// <summary>What's etched and scored on a door of the given look, inside its outline.</summary>
+    public static (PathsD Etched, List<PathD> Lines) DoorFace(PathsD door, EtchStyle style, double groove, DoorLook look) => look switch
+    {
+        DoorLook.Studded => StuddedDoor(door, style, groove),
+        DoorLook.Metal => MetalDoor(door, style, groove),
+        DoorLook.Bars => BarsDoor(door, style, groove),
+        DoorLook.Stone => StoneDoor(door, style, groove),
+        _ => PlankDoor(door, style, groove),
+    };
+
+    /// <summary>The edge of a door: a groove just inside it, or a line round it.</summary>
+    static void Edge(PathsD door, EtchStyle style, double g, PathsD etched, List<PathD> lines)
+    {
+        if (style == EtchStyle.Grooves) etched.AddRange(Geo.Subtract(door, Geo.Offset(door, -g)));
+        else lines.AddRange(Geo.Offset(door, -g / 2).Select(Geo.Loop));
+    }
+
+    /// <summary>A ring groove (or line) round a shape.</summary>
+    static void Ring(PathsD shape, EtchStyle style, double g, PathsD etched, List<PathD> lines)
+    {
+        if (style == EtchStyle.Grooves) etched.AddRange(Geo.Subtract(Geo.Offset(shape, g / 2), Geo.Offset(shape, -g / 2)));
+        else lines.AddRange(shape.Select(Geo.Loop));
+    }
+
+    /// <summary>Planks with iron straps across them, studded with nail heads, and a ring handle.</summary>
+    static (PathsD Etched, List<PathD> Lines) StuddedDoor(PathsD door, EtchStyle style, double groove)
+    {
+        var (etched, lines) = PlankDoor(door, style, groove);
+        var b = Geo.Bounds(door);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        if (w < 4 || h < 4) return (etched, lines);
+        double strap = Math.Max(1.2, h * 0.06), r = Math.Clamp(w * 0.03, 0.25, 0.45), inside = Math.Min(1, w / 8) + r * 2;
+        var within = Geo.Offset(door, -inside);
+        foreach (double at in new[] { 0.2, 0.62 })
+        {
+            double y = b.top + h * at + strap / 2;
+            int n = Math.Max(2, (int)Math.Round(w / 2.5));
+            for (int i = 0; i <= n; i++)
+            {
+                double x = b.left + inside + (w - 2 * inside) * i / n;
+                if (Geo.Intersect([Geo.Circle(x, y, r)], within).Count > 0) lines.Add(Geo.Loop(Geo.Circle(x, y, r)));
+            }
+        }
+        return (etched, lines);
+    }
+
+    /// <summary>
+    /// A sci-fi blast door: two leaves meeting up the middle, a band of hazard stripes across the foot
+    /// (making chevrons where the leaves meet) and a panel scored on each leaf above.
+    /// </summary>
+    static (PathsD Etched, List<PathD> Lines) MetalDoor(PathsD door, EtchStyle style, double groove)
+    {
+        var b = Geo.Bounds(door);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        if (w < 3 || h < 3) return ([], []);
+        double g = Math.Min(groove, w / 12), cx = (b.left + b.right) / 2;
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        Edge(door, style, g, etched, lines);
+        var inside = Geo.Offset(door, -g);
+        // The seam between the leaves.
+        if (style == EtchStyle.Grooves) etched.AddRange(Geo.Intersect([Geo.Rect(cx - g / 2, b.top - 1, cx + g / 2, b.bottom + 1)], inside));
+        else lines.AddRange(Geo.ClipLines([[new(cx, b.top - 1), new(cx, b.bottom + 1)]], inside));
+        // Hazard chevrons along the foot.
+        double band = Math.Min(h * 0.22, w * 0.35), sw = Math.Max(0.7, band * 0.35), y0 = b.top + g, y1 = y0 + band;
+        var stripes = new PathsD();
+        for (double sx = 0; sx < w / 2 + band; sx += sw * 2)
+        {
+            stripes.Add([new(cx + sx, y0), new(cx + sx + sw, y0), new(cx + sx + sw + band, y1), new(cx + sx + band, y1)]);
+            stripes.Add([new(cx - sx, y0), new(cx - sx - band, y1), new(cx - sx - sw - band, y1), new(cx - sx - sw, y0)]);
+        }
+        etched.AddRange(Geo.Intersect(Geo.Union(stripes), Geo.Intersect([Geo.Rect(b.left, y0, b.right, y1)], inside)));
+        lines.AddRange(Geo.ClipLines([[new(b.left - 1, y1 + 0.3), new(b.right + 1, y1 + 0.3)]], inside));
+        // A panel on each leaf, its corners cut.
+        double m = Math.Max(1, w * 0.1), py0 = y1 + m, py1 = b.top + h * 0.8;
+        foreach (var (x0, x1) in new[] { (b.left + m, cx - m * 0.7), (cx + m * 0.7, b.right - m) })
+        {
+            if (x1 - x0 < 1.5 || py1 - py0 < 2) continue;
+            double c = Math.Min(x1 - x0, py1 - py0) * 0.2;
+            PathD panel = [new(x0 + c, py0), new(x1 - c, py0), new(x1, py0 + c), new(x1, py1 - c), new(x1 - c, py1), new(x0 + c, py1), new(x0, py1 - c), new(x0, py0 + c)];
+            lines.AddRange(Geo.ClipLines([Geo.Loop(panel)], inside));
+        }
+        return (Geo.Intersect(Geo.Union(etched), door), lines);
+    }
+
+    /// <summary>The gaps of a portcullis's grid of bars over the door (the bars are what's left).</summary>
+    public static PathsD BarGaps(PathsD door)
+    {
+        var b = Geo.Bounds(door);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        double bar = Math.Clamp(w * 0.1, 1.2, 2.5);
+        var inner = Geo.Offset(door, -bar);
+        if (inner.Count == 0 || w < bar * 4 || h < bar * 4) return [];
+        var ib = Geo.Bounds(inner);
+        double iw = ib.right - ib.left, ih = ib.bottom - ib.top;
+        int cols = Math.Max(2, (int)Math.Round((iw + bar) / (bar * 3.2)));
+        double gw = (iw - (cols - 1) * bar) / cols;
+        int rows = Math.Max(2, (int)Math.Round((ih + bar) / (gw * 1.6 + bar)));
+        double gh = (ih - (rows - 1) * bar) / rows;
+        if (gw < 0.8 || gh < 0.8) return [];
+        var gaps = new PathsD();
+        for (int i = 0; i < cols; i++)
+            for (int j = 0; j < rows; j++)
+            {
+                double x = ib.left + i * (gw + bar), y = ib.top + j * (gh + bar);
+                gaps.Add(Geo.Rect(x, y, x + gw, y + gh));
+            }
+        // Clipped to the door's shape; slivers too thin to cut are left as bar.
+        var clipped = Geo.Intersect(gaps, inner);
+        return Geo.Offset(Geo.Offset(clipped, -0.35), 0.35);
+    }
+
+    /// <summary>A portcullis etched on: its gaps etched (or scored round), the bars standing.</summary>
+    static (PathsD Etched, List<PathD> Lines) BarsDoor(PathsD door, EtchStyle style, double groove)
+    {
+        var gaps = BarGaps(door);
+        return style == EtchStyle.Grooves ? (gaps, []) : ([], [.. gaps.Select(Geo.Loop)]);
+    }
+
+    /// <summary>A stone slab: a border groove inside the edge and a round seal in the middle.</summary>
+    static (PathsD Etched, List<PathD> Lines) StoneDoor(PathsD door, EtchStyle style, double groove)
+    {
+        var b = Geo.Bounds(door);
+        double w = b.right - b.left, h = b.bottom - b.top;
+        if (w < 3 || h < 3) return ([], []);
+        double g = Math.Min(groove, w / 10);
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        Edge(door, style, g, etched, lines);
+        var border = Geo.Offset(door, -Math.Max(1.2, w * 0.14));
+        if (border.Count > 0) Ring(border, style, g, etched, lines);
+        double r = Math.Min(w * 0.2, h * 0.15), cx = (b.left + b.right) / 2, cy = b.top + h * 0.5;
+        if (r > 1.2)
+        {
+            Ring([Geo.Circle(cx, cy, r)], style, g, etched, lines);
+            Ring([Geo.Circle(cx, cy, r * 0.45)], style, g, etched, lines);
+        }
+        return (Geo.Intersect(Geo.Union(etched), door), lines);
+    }
+
     /// <summary>Planks, two braces and a ring handle, inside a door's outline.</summary>
-    static (PathsD Etched, List<PathD> Lines) DoorFace(PathsD door, EtchStyle style, double groove)
+    static (PathsD Etched, List<PathD> Lines) PlankDoor(PathsD door, EtchStyle style, double groove)
     {
         var b = Geo.Bounds(door);
         double w = b.right - b.left, h = b.bottom - b.top;
@@ -406,6 +591,7 @@ public static class WallKitMaker
         if (a is Accessory.Pegs or Accessory.OneOfEach) list.Add(new Part("Wall peg", Peg(wallT, slotH), [], [], 1));
         if (a is Accessory.Sconces or Accessory.OneOfEach) list.Add(new Part("Torch sconce", Sconce(wallT, slotH), [], [], 1));
         if (a is Accessory.Brackets or Accessory.OneOfEach) list.Add(new Part("Shelf bracket", Bracket(wallT, slotH, 10, 1), [], [], 1));
+        if (a is Accessory.Lamps) list.Add(new Part("Wall lamp", Lamp(wallT, slotH), [], [], 1));
         return list;
     }
 
@@ -420,6 +606,19 @@ public static class WallKitMaker
     {
         double top = slotH + above;
         return Geo.Union([Tab(wallT, slotH, slotH), [new(0, top), new(0, top - size), new(size, top)]]);
+    }
+
+    /// <summary>A sci-fi wall lamp, side-on: a back plate, an arm out and up, and a lamp housing angled down at the floor.</summary>
+    static PathsD Lamp(double wallT, double slotH)
+    {
+        double half = slotH / 2;
+        return Geo.Union(new PathsD
+        {
+            Tab(wallT, slotH, half),
+            Geo.Rect(0, -half - 1, 1.2, half + 1),                                      // back plate
+            Textures.Strip(new(0.6, 0), new(3.5, 2.5), 1.4),                         // arm
+            new PathD { new(2.6, 1.2), new(7.5, 2.6), new(7.0, 4.6), new(2.4, 4.0) }, // housing, angled down
+        });
     }
 
     /// <summary>A torch in a bracket, side-on: an arm out from the wall, a cup, the torch leaning out and its flame.</summary>

@@ -228,6 +228,17 @@ public static class Planks
         return lines;
     }
 
+    /// <summary>Grating on a metal plank: slots scored across it (u) about 1.4 mm apart along it (v), inside a solid edge.</summary>
+    public static List<PathD> Grating(double width, double length)
+    {
+        var lines = new List<PathD>();
+        double u0 = -width / 2 + 0.6, u1 = width / 2 - 0.6;
+        if (u1 - u0 < 0.8) return lines;
+        for (double v = 1; v + 0.6 < length - 1; v += 1.4)
+            lines.Add([new(u0, v), new(u1, v), new(u1, v + 0.6), new(u0, v + 0.6), new(u0, v)]);
+        return lines;
+    }
+
     /// <summary>Upright grain lines in a strip from x = xa to xb, y = y0 to y1 (posts and legs).</summary>
     public static List<PathD> UprightGrain(double xa, double xb, double y0, double y1, Random rnd)
     {

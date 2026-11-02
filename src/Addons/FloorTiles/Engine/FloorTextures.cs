@@ -46,6 +46,18 @@ public static class FloorTextures
             "Riveted plates, for ships, bunkers and sci-fi decks.", "Metal plates"),
         new("Tread plate", "Pattern size", 4, null, 0, false, 0, false, false, true,
             "Non-slip metal plate: little bars etched in, leaning one way and the other."),
+        new("Chequered tiles", "Tile size", 12.7, null, 0, true, 0.5, false, false, true,
+            "Square tiles, every other one etched dark: halls, chapels and crypts. Four to a square."),
+        new("Cave floor", "Rock size", 18, "Layer height", 12, true, 1.0, true, true, true,
+            "Rough rock in uneven slabs, split by cracks and pitted, as the wall maker's cave rock.", "Cave rock"),
+        new("Sci-fi deck", "Panel width", 25.4, "Panel height", 12.7, true, 0.5, true, false, true,
+            "Metal deck panels with cut corners, vents, bolts and hazard stripes, as the wall maker's sci-fi panels.", "Sci-fi panels"),
+        new("Grating", "Slot pitch", 2.2, null, 0, false, 0, false, false, true,
+            "Open metal grating: rows of slots etched in each square inside a solid frame, turned square by square."),
+        new("Sandstone slabs", "Slab length", 16.9, "Row width", 8.47, true, 0.7, true, true, true,
+            "Long sandstone slabs with wind-worn lines and pits, as the wall maker's sandstone.", "Sandstone"),
+        new("Sand", "Ripple spacing", 3, null, 0, false, 0, true, false, true,
+            "Sand blown into ripples, with the odd pebble: deserts, beaches and arenas."),
         new(Plain, null, 0, null, 0, false, 0, false, false, false, "No texture: just the tiles (and the grid, if you mark it)."),
     ];
 
@@ -88,6 +100,9 @@ public static class FloorTextures
             "Cobblestones" => Crazy(region, a, Math.Min(groove, a / 3), rnd, jitter: 0.3, round: a * 0.22),
             "Herringbone brick" => Herringbone(region, a, Math.Min(groove, a / 2)),
             "Tread plate" => Tread(region, a),
+            "Chequered tiles" => Chequer(region, a, Math.Min(groove, a / 3)),
+            "Grating" => Grating(region, g0, a),
+            "Sand" => Sand(region, a, rnd),
             _ => TextureParts.None,
         };
         if (p is { Stone: true } && s.CracksPct > 0 && parts.Raised.Count > 0)
@@ -260,6 +275,71 @@ public static class FloorTextures
                 etched.AddRange(Geo.Offset([[new(cx - dx, cy - dy), new(cx + dx, cy + dy), new(cx + dx + 1e-3, cy + dy + 1e-3)]], wid / 2, round: true));
             }
         return new([], etched, []);
+    }
+
+    /// <summary>Square tiles in rows and columns from the tile's corner, every other one etched all over (dark).</summary>
+    static TextureParts Chequer(Area r, double size, double g)
+    {
+        var raised = new PathsD();
+        var etched = new PathsD();
+        for (int i = (int)Math.Floor(r.X0 / size); i * size < r.X1; i++)
+            for (int j = (int)Math.Floor(r.Y0 / size); j * size < r.Y1; j++)
+            {
+                var tile = Box(i * size, j * size, (i + 1) * size, (j + 1) * size, g);
+                raised.Add(tile);
+                if (((i + j) % 2 + 2) % 2 == 1) etched.Add(tile);
+            }
+        return new(raised, etched, []);
+    }
+
+    /// <summary>
+    /// Grating: in each grid square a solid frame round rows of slots <paramref name="pitch"/> apart,
+    /// the rows running across in one square and up and down in the next, all etched in.
+    /// </summary>
+    static TextureParts Grating(Area r, double sq, double pitch)
+    {
+        var etched = new PathsD();
+        double frame = Math.Max(1.2, sq * 0.06), slot = Math.Max(0.4, pitch * 0.5);
+        for (int i = (int)Math.Floor(r.X0 / sq); i * sq < r.X1; i++)
+            for (int j = (int)Math.Floor(r.Y0 / sq); j * sq < r.Y1; j++)
+            {
+                double x0 = i * sq + frame, y0 = j * sq + frame, x1 = (i + 1) * sq - frame, y1 = (j + 1) * sq - frame;
+                if (x1 - x0 < pitch * 2 || y1 - y0 < pitch * 2) continue;
+                bool across = ((i + j) % 2 + 2) % 2 == 0;
+                double from = across ? y0 : x0, to = across ? y1 : x1;
+                int n = Math.Max(1, (int)Math.Floor((to - from - slot) / pitch) + 1);
+                double start = from + (to - from - (n - 1) * pitch - slot) / 2;
+                for (int k = 0; k < n; k++)
+                {
+                    double t = start + k * pitch;
+                    etched.Add(across ? Geo.Rect(x0, t, x1, t + slot) : Geo.Rect(t, y0, t + slot, y1));
+                }
+            }
+        return new([], etched, []);
+    }
+
+    /// <summary>Sand: gently wavy ripples scored across, broken now and then, and a few small pebbles etched in.</summary>
+    static TextureParts Sand(Area r, double spacing, Random rnd)
+    {
+        var lines = new List<PathD>();
+        var etched = new PathsD();
+        double s = Math.Max(1, spacing), wave = s * (5 + 3 * rnd.NextDouble()), slant = (rnd.NextDouble() - 0.5) * 0.3;
+        for (double y = r.Y0; y < r.Y1 + s; y += s * (0.8 + 0.4 * rnd.NextDouble()))
+        {
+            double phase = rnd.NextDouble() * Math.PI * 2, amp = s * (0.25 + 0.2 * rnd.NextDouble());
+            var line = new PathD();
+            for (double x = r.X0; x <= r.X1; x += 0.6)
+            {
+                // A break in the ripple now and then.
+                if (rnd.NextDouble() < 0.012 && line.Count > 4) { lines.Add(line); line = []; x += s * (1 + 2 * rnd.NextDouble()); continue; }
+                line.Add(new PointD(x, y + slant * (x - r.X0) + amp * Math.Sin(x / wave * Math.PI * 2 + phase)));
+            }
+            if (line.Count >= 2) lines.Add(line);
+        }
+        int pebbles = (int)((r.X1 - r.X0) * (r.Y1 - r.Y0) / (s * s * 40));
+        for (int k = 0; k < pebbles; k++)
+            etched.Add(Geo.Circle(r.X0 + (r.X1 - r.X0) * rnd.NextDouble(), r.Y0 + (r.Y1 - r.Y0) * rnd.NextDouble(), s * (0.08 + 0.1 * rnd.NextDouble())));
+        return new([], etched, lines);
     }
 
     /// <summary>A wandering crack scored across some of the stones (<paramref name="share"/> of them, the bigger ones).</summary>
