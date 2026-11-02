@@ -54,7 +54,7 @@ public sealed record SavedJig
 /// <summary>The saved jigs: one JSON file each in the add-on's data folder.</summary>
 public sealed class JigStore(string folder)
 {
-    static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+    static readonly JsonSerializerOptions Json = new() { WriteIndented = true, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
 
     string Dir => Path.Combine(folder, "jigs");
 
