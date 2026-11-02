@@ -37,8 +37,10 @@ where the program finds it; `tools/publish.sh` puts them in the published progra
 </Project>
 ```
 
-Add the project to `PhotonCanvas.slnx` (under `/src/Addons/`) so a solution build builds it, and to
-`tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj` if you have tests. An add-on may use anything
+Don't add the project to `PhotonCanvas.slnx`, the test project or `tools/HelpShots`: the test
+project and HelpShots reference every `src/Addons/*/*.csproj` by folder, so a solution build builds
+each add-on (in the solution's configuration) and the tests and screenshots can use it. Keeping
+those files untouched is what stops add-on branches conflicting with each other. An add-on may use anything
 public in Core, Doc, Device and App (App's `UiKit` helpers included) and its own NuGet packages; it
 must not copy the program's assemblies (the targets file makes sure of that).
 
@@ -187,7 +189,16 @@ built add-ons.
 - Never put xTool-derived code or connection keys in an add-on.
 - Clean up in `Stop`: close your windows, cancel background work, unhook events you hooked on the
   program's objects directly (the host's events unhook themselves). Avoid static fields that point
-  at program objects, so the add-on can be unloaded from memory.
+  at program objects, so the add-on can be unloaded from memory. (The program itself forgets your
+  ribbon buttons and takes your window and control classes out of Avalonia's per-type caches.)
+- Don't register your own Avalonia properties (`AvaloniaProperty.Register…`): Avalonia keeps them,
+  and so the add-on, in memory until the program closes. Plain C# properties are fine.
+- With System.Text.Json, don't use `JsonSerializerOptions.Default` or a plain `new JsonSerializerOptions()`
+  (or options equal to them): equal options share one cache that the program keeps, and it would
+  hold your types. Give your options their own resolver,
+  `TypeInfoResolver = new DefaultJsonTypeInfoResolver()`, and keep them in a field of your own.
+- To check yours leaves memory: turn it off and look in the log. "still in memory after stopping"
+  means something still points into it.
 - Build windows in code like the rest of the program (no `.axaml` in add-ons).
 - Don't change program files beyond a slot or hook you need; ask the add-ons thread for those.
 
