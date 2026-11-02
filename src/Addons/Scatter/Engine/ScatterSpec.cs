@@ -77,6 +77,13 @@ public sealed record ScatterSet
     /// <summary>Gap added to slots so tabs go in (mm), on top of the kerf the cut layer allows for.</summary>
     public double FitMm { get; init; } = 0.1;
     public WoodDetail Detail { get; init; } = WoodDetail.Planks;
+    /// <summary>
+    /// Push fit (as the furniture maker's): small grip ribs on the walls of every slot, which the sheet
+    /// squeezes flat as it goes in, so the scenery holds together without glue and comes apart again.
+    /// </summary>
+    public bool PushFit { get; init; }
+    /// <summary>Push fit: how much tighter than the sheet the ribs make each joint (mm, both sides together).</summary>
+    public double GripMm { get; init; } = 0.15;
     /// <summary>Grain, stones and chips are laid out at random: each number gives a different layout.</summary>
     public int Seed { get; init; } = 1;
     /// <summary>The figures it's for (mm): only used to scale the sizes when it's changed.</summary>

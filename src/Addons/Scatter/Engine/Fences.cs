@@ -64,7 +64,7 @@ public static class Fences
             var foot = new PathsD { new PathD { new(0, 0), new(Lf, 0), new(Lf, hf * 0.45), new(Lf * 0.75, hf), new(Lf * 0.25, hf), new(0, hf * 0.45) } };
             var fh = new PathsD { Geo.Rect(Lf / 2 - sw / 2, hf / 2 - f / 2, Lf / 2 + sw / 2, hf + 1) };
             m.Add("Foot", foot, fh, posts.Select(x => Pose.Left(x, 0, 0)), grainAlongU: true);
-            m.Note("Slide a foot up into the slot under each post, across the fence; a drop of glue holds them square.");
+            m.Note("Slide a foot up into the slot under each post, across the fence; " + (m.PushFit ? "the ribs hold them square." : "a drop of glue holds them square."));
         }
         else m.Note("Without feet, glue the fence to a base or stand it in a groove in your terrain.");
     }

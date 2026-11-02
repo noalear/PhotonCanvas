@@ -62,6 +62,8 @@ until it's fixed.
 |---|---|---|
 | **Thickness** | 0.3 to 20 mm (2) | The sheet's thickness. Every slot and tab is sized from it, and a barrel has as many discs as fit its height. Thin sheet (1.5 to 2 mm) looks best at 28 mm; at 15 mm use 1 mm or less. |
 | **Slot fit** | −0.5 to 2 mm (0.1) | Added to the thickness for the slots: more is looser. 0.1 is a snug fit to glue. |
+| **Joints** | Snug, to glue | *Snug, to glue*, or *Push fit (grip ribs, no glue)* as in the furniture maker: small ribs on the walls of every slot squeeze flat as the pieces go together, so they hold without glue and come apart again. A barrel's bottom and lid still want glue. |
+| **Grip** | 0.02 to 0.5 mm (0.15) | Push fit only: how much tighter than the sheet the ribs make each joint. More holds harder but is harder to push together; 0.15 suits plywood and MDF. |
 | **Figures** | 15, 28, 32 or 54 mm (28) | The size of figures the scenery is for. Changing it scales every size on the list, and the stonework, shingles and lettering with them. |
 | **Wood** | Planks and grain | *None*, *Wood grain* (scored lines along each piece) or *Planks and grain* (etched grooves between boards as well). Stonework, stripes, shingles and lettering are etched whatever is chosen. |
 | **Variation** | 1 to 9999 (1) | Grain, stones, chips and cracks are laid out at random; each number gives a different layout, and **Shuffle** picks the next one. |

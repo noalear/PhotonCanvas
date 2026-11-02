@@ -92,7 +92,7 @@ public static class Barrels
             m.Add("Core", [Geo.Rect(0, 0, c, count * T)], [], [Pose.Front(R - c / 2, coreFrom * T, R)], grainAlongU: false, wood: false);
         }
         m.Note($"{n} layers, {n * T:0.#} mm high. " + (core
-            ? "Glue the core upright in the middle of the bottom disc, thread the layers on over it in order (smallest at the ends), then glue the " + (open ? "water and the rim" : "lid") + " on top."
+            ? "Glue the core upright in the middle of the bottom disc, thread the layers on over it in order (smallest at the ends)" + (m.PushFit ? " (their ribs grip it)" : "") + ", then glue the " + (open ? "water and the rim" : "lid") + " on top."
             : "Glue the layers in order, smallest at the ends."));
     }
 

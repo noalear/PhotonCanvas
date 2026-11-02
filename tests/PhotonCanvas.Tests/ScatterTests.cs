@@ -47,8 +47,13 @@ public class ScatterTests
         return inside % 2 == 1;
     }
 
+    /// <summary>Every piece where it sits; push-fit ribs are taken off first (they squash flat as the joint goes together).</summary>
     static List<Placed> Assemble(ItemKit k, double T) =>
-        [.. k.Parts.SelectMany(p => p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(p.Cut, -0.03), p.Cut, T)))];
+        [.. k.Parts.SelectMany(p =>
+        {
+            var cut = p.Ribs.Count > 0 ? Geo.Subtract(p.Cut, p.Ribs) : p.Cut;
+            return p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(cut, -0.03), cut, T));
+        })];
 
     /// <summary>Places where two pieces would be in the same space once put together (sampled every 0.1 mm where their boxes meet).</summary>
     static List<string> Clashes(List<Placed> all)
@@ -180,6 +185,21 @@ public class ScatterTests
         var set = Sheet with { ThicknessMm = t };
         // Weathering may leave a chip that narrows an edge: that's a warning, not a fault.
         FitsTogether(ScatterKit.Make(it, set), t, 0.1, warnings: it.Weathered || it.WidthMm < 6);
+    }
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void A_push_fit_puts_grip_ribs_in_the_slots_and_still_fits_together(ItemKind kind)
+    {
+        var set = Sheet with { PushFit = true, GripMm = 0.15 };
+        var k = ScatterKit.Make(Defaults.For(kind), set);
+        FitsTogether(k, 2, 0.1);
+        Assert.Contains(k.Parts, p => p.Ribs.Count > 0);
+        // Each rib stands (fit + grip) / 2 into its slot, so the slot is the sheet less the grip.
+        var ribbed = k.Parts.First(p => p.Ribs.Count > 0);
+        var tall = ribbed.Ribs.Max(r => { var b = Clipper.GetBounds(r); return Math.Min(b.right - b.left, b.bottom - b.top); });
+        Assert.Equal((0.1 + 0.15) / 2, tall, 1);
+        Assert.Empty(ScatterKit.Make(Defaults.For(kind), Sheet).Parts.SelectMany(p => p.Ribs));
     }
 
     [Fact]
