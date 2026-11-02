@@ -20,7 +20,7 @@ static class FurnitureShots
         // A scratch data folder holding the set to show, so the pictures don't depend on the last one used.
         var data = Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-furniture");
 
-        void Shot(string name, FurnitureSet set, int item, int view)
+        void Shot(string name, FurnitureSet set, int item, int view, int tab = 0)
         {
             Directory.CreateDirectory(data);
             File.WriteAllText(Path.Combine(data, "last.json"), set.ToJson());
@@ -29,6 +29,7 @@ static class FurnitureShots
             settle(300);
             F<ListBox>(win, "_list").SelectedIndex = item;
             F<TabControl>(win, "_views").SelectedIndex = view;
+            if (((Grid)win.Content!).Children[0] is Border { Child: TabControl left }) left.SelectedIndex = tab;
             settle(100);
             var t = (Task)typeof(FurnitureWindow).GetMethod("Rebuild", Any)!.Invoke(win, null)!;
             for (int i = 0; i < 400 && !t.IsCompleted; i++) settle(50);
@@ -52,6 +53,7 @@ static class FurnitureShots
         };
         Shot("window-furniture-chair", tavern, 1, 0);
         Shot("window-furniture-pieces", tavern, 4, 1);
+        Shot("window-furniture-push-fit", tavern with { PushFit = true }, 4, 1, 1);
         Shot("window-furniture-door", new FurnitureSet { Items = [Defaults.For(ItemKind.WallDoor), Defaults.For(ItemKind.WallShelf)] }, 0, 0);
     }
 }

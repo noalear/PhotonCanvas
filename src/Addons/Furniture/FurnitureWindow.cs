@@ -61,6 +61,9 @@ public sealed class FurnitureWindow : Window
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _thick = Number(0.3m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0");
     readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain");
+    readonly ComboBox _joints = Combo("Snug, to glue", "Push fit (grip ribs, no glue)");
+    readonly NumericUpDown _grip = Number(0.02m, 0.5m, 0.05m, "0.##");
+    Control _gripRow = null!;
     readonly ComboBox _cutWith = Combo(), _etchWith = Combo();
     readonly TextBlock _cutNote = Hint();
     List<(Material M, Recipe R)?> _cuts = [], _etches = [];
@@ -206,6 +209,9 @@ public sealed class FurnitureWindow : Window
                 Field("Thickness", _thick, tip: "The sheet's thickness (mm)."),
                 Field("Slot fit", _fit, tip: "Added to the sheet's thickness for the slots (mm): more is looser. 0.1 is a snug fit to glue."),
                 Field("Figures", _scale, tip: "Changing it scales every size on the list to suit figures that size.")),
+            Explained("Joints", "Snug joints want a drop of glue. Push fit puts small ribs in every slot and finger joint that squeeze flat as the pieces go together, so they hold without glue and come apart again.",
+                Field("Joints", _joints),
+                _gripRow = Field("Grip", _grip, tip: "How much tighter than the sheet the ribs make each joint (mm). More holds harder but is harder to push together; 0.15 suits plywood and MDF.")),
             Explained("Detail", "Etched and scored on the faces that show.",
                 Field("Wood", _detail, tip: "Grain is scored lines; planks add etched grooves between boards."),
                 Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
@@ -260,7 +266,8 @@ public sealed class FurnitureWindow : Window
             c.SelectionChanged += (_, _) => ItemChanged();
         foreach (var c in new[] { _rail, _backPanel, _books, _bands, _bedding })
             c.IsCheckedChanged += (_, _) => ItemChanged();
-        foreach (var n in new[] { _thick, _fit, _seed }) n.ValueChanged += (_, _) => SheetChanged();
+        foreach (var n in new[] { _thick, _fit, _seed, _grip }) n.ValueChanged += (_, _) => SheetChanged();
+        _joints.SelectionChanged += (_, _) => { _gripRow.IsVisible = _joints.SelectedIndex == 1; SheetChanged(); };
         _detail.SelectionChanged += (_, _) => SheetChanged();
         _etchWith.SelectionChanged += (_, _) => SheetChanged();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
@@ -330,6 +337,9 @@ public sealed class FurnitureWindow : Window
         _loading = true;
         _thick.Value = D(_set.ThicknessMm); _fit.Value = D(_set.FitMm); _seed.Value = Math.Clamp(_set.Seed, 1, 9999);
         _detail.SelectedIndex = (int)_set.Detail;
+        _joints.SelectedIndex = _set.PushFit ? 1 : 0;
+        _grip.Value = D(Math.Clamp(_set.GripMm, 0.02, 0.5));
+        _gripRow.IsVisible = _set.PushFit;
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - _set.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
         _loading = false;
@@ -425,7 +435,8 @@ public sealed class FurnitureWindow : Window
     void SheetChanged()
     {
         if (_loading) return;
-        _set = _set with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Detail = (WoodDetail)Math.Max(0, _detail.SelectedIndex) };
+        _set = _set with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Detail = (WoodDetail)Math.Max(0, _detail.SelectedIndex),
+                        PushFit = _joints.SelectedIndex == 1, GripMm = V(_grip, 0.15) };
         Changed();
     }
 
