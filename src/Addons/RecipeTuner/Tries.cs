@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
@@ -17,8 +18,10 @@ public sealed record TriedRecord(
 /// <summary>The tries the tuner keeps, in its own data folder (tries.json).</summary>
 public sealed class TriesStore
 {
+    // Their own resolver, so the program's shared cache never holds the add-on's types (docs/addons.md).
     static readonly JsonSerializerOptions Json = new()
     {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
         WriteIndented = true,
         Converters = { new JsonStringEnumConverter() },
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
@@ -86,7 +89,7 @@ public static class TuneTries
     public const string LabelKey = "recipe-tuner.label";
     public const string LayerPrefix = "Test tune ";
 
-    static readonly JsonSerializerOptions Json = new() { Converters = { new JsonStringEnumConverter() } };
+    static readonly JsonSerializerOptions Json = new() { TypeInfoResolver = new DefaultJsonTypeInfoResolver(), Converters = { new JsonStringEnumConverter() } };
 
     public static TuneRound? Round(DocState s)
     {

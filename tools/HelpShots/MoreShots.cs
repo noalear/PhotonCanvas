@@ -523,12 +523,12 @@ static class MoreShots
             var tunerBefore = w.OwnedWindows.ToList();
             tunerCommands.FirstOrDefault(c => c.Id == "recipe-tuner.open")?.Run();
             settle(1500);
-            if (w.OwnedWindows.Except(tunerBefore).FirstOrDefault() is { } tunerWin)
+            if (w.OwnedWindows.Except(tunerBefore).FirstOrDefault(x => x.GetType().Name == "RecipeTunerWindow") is { } tunerWin)
             {
                 tunerWin.GetVisualDescendants().OfType<TabControl>().First().SelectedIndex = 1;
                 settle(500);
-                var starRows = (System.Collections.IDictionary)tunerWin.GetType().GetField("_stars", Any)!.GetValue(tw)!;
-                var heatBoxes = (System.Collections.IDictionary)tunerWin.GetType().GetField("_heat", Any)!.GetValue(tw)!;
+                var starRows = (System.Collections.IDictionary)tunerWin.GetType().GetField("_stars", Any)!.GetValue(tunerWin)!;
+                var heatBoxes = (System.Collections.IDictionary)tunerWin.GetType().GetField("_heat", Any)!.GetValue(tunerWin)!;
                 int[] given = [4, 2, 3, 0, 5, 1];
                 int[] how = [2, 1, 2, 0, 2, 3];
                 for (int i = 0; i < given.Length; i++)

@@ -269,13 +269,16 @@ public static class Tuner
         double target = own.Count > 0 ? own.Max(e => e.Rating) : ev.Max(e => e.Rating * Math.Min(1, e.Trust + 0.3));
         target = Math.Min(target, 4.8);
         const double MinStep = 0.6;
+        // A try must differ from what you've already tried by a visible amount (a third of a step: 5% power, 15% speed).
+        var ownU = own.Select(e => StepsOf(e.Settings)).ToList();
+        var fresh = poolU.Select(u => ownU.Count == 0 || ownU.Min(o => Dist(o, u)) >= 0.33).ToList();
         for (int round = 0; round < count; round++)
         {
             int best = -1;
             double score = double.NegativeInfinity, mean = 0, sd = 0;
             for (int i = 0; i < pool.Count; i++)
             {
-                if (MinGap(poolU[i]) < MinStep) continue;
+                if (!fresh[i] || MinGap(poolU[i]) < MinStep) continue;
                 var (mu, v) = gp.Predict(poolF[i]);
                 double s = Math.Sqrt(Math.Max(v, 1e-9));
                 // First the safest good one; then the most expected gain over the best so far.

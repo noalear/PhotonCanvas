@@ -74,7 +74,7 @@ public sealed class RecipeTunerWindow : Window
 
         var suggest = new StackPanel
         {
-            Spacing = 10, Margin = new(0, 12, 0, 0),
+            Spacing = 10, Margin = new(0, 12, 16, 0),
             Children =
             {
                 Hint("The tuner learns from the stars on your recipes: this material's own, and (counting for less) those on similar materials of the same category. It suggests the next settings to try: its best guess first, then ones that could beat your best so far. Burn them, rate them, and ask again: each round gets closer."),
@@ -114,7 +114,7 @@ public sealed class RecipeTunerWindow : Window
         };
         var rateTab = new StackPanel
         {
-            Spacing = 10, Margin = new(0, 12, 0, 0),
+            Spacing = 10, Margin = new(0, 12, 16, 0),
             Children =
             {
                 Hint("After burning the tries, give each one stars: 5 = perfect, 3 = good, 1 = poor. Leave a try at no stars to skip it. Poor ratings matter too: they show the tuner where not to go. Say whether each had too little or too much heat as well: that tells it which way to go, so it gets there in fewer rounds."),
@@ -350,7 +350,7 @@ public sealed class RecipeTunerWindow : Window
             var kept = _store.Find(round.Id, t.Number);
             var stars = new Stars { Value = kept?.Rating ?? 0 };
             _stars[t.Number] = stars;
-            var heat = new ComboBox { ItemsSource = HeatWords(round.Purpose), SelectedIndex = (kept?.Heat ?? 0) switch { < 0 => 1, > 0 => 3, _ => kept is null ? 0 : 2 }, Width = 190, Margin = new(0, 4, 0, 0) };
+            var heat = new ComboBox { ItemsSource = HeatWords(round.Purpose), SelectedIndex = (kept?.Heat ?? 0) switch { < 0 => 1, > 0 => 3, _ => kept is null ? 0 : 2 }, Width = 215, Margin = new(0, 4, 0, 0) };
             ToolTip.SetTip(heat, "Not enough or too much: this tells the tuner which way to go, and makes it find the settings much sooner");
             _heat[t.Number] = heat;
             var settings = ProcessSettings.From(t.Layer);

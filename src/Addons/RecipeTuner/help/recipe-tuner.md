@@ -95,7 +95,7 @@ The tries are ordinary layers: **Laser → Record results** reads them too.
   With both answers it keeps between them.
 - **Limits**: suggestions stay inside the machine's limits (power 1–100%, its speed range, the
   fiber's pulse widths and the frequencies each allows, and out of the protected range on highly
-  reflective materials). Settings you have already tried on the material aren't suggested again.
+  reflective materials). Settings you have already tried on the material aren't suggested again, and each try differs from them by at least a third of a step (about 5% power or 15% speed), enough to see.
 - The same question gets the same answer, so you can close the window and come back.
 
 The tuner's own tries are kept in its data folder (`tries.json`), so they stay when the add-on is
