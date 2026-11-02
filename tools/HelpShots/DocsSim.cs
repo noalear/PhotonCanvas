@@ -262,6 +262,7 @@ static class DocsSim
         if (only is null or "more" or "buildings") { Reset(); BuildingsShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "gamekit") { Reset(); GameKitShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "puzzlebox") { Reset(); PuzzleBoxShots.Run(w, doc, canvas.Machine, lib, Settle); }
+        if (only is null or "more" or "automata") { Reset(); AutomataShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "floortiles") { Reset(); FloorTilesShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "roofs") { Reset(); RoofsShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "bases") { Reset(); BasesShots.Run(w, doc, canvas.Machine, lib, Settle); }

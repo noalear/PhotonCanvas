@@ -34,14 +34,15 @@ public static class Shapes
     public static Paths64 Link(Vec2 a, Vec2 b, double width) =>
         Poly.Union([Poly.Circle(a, width / 2, 0.003), Poly.Circle(b, width / 2, 0.003), Bar(a, b, width)]);
 
-    /// <summary>A straight bar <paramref name="width"/> wide from <paramref name="a"/> to <paramref name="b"/> (square ends).</summary>
+    /// <summary>A straight bar <paramref name="width"/> wide from <paramref name="a"/> to <paramref name="b"/> (square ends), anticlockwise.</summary>
     public static Path64 Bar(Vec2 a, Vec2 b, double width)
     {
         var d = b - a;
         double len = d.Length;
         if (len < 1e-9) return [];
         var n = new Vec2(-d.Y / len, d.X / len) * (width / 2);
-        return Poly.Path([a + n, b + n, b - n, a - n]);
+        // Anticlockwise (positive), like circles: joined with them (a link's round ends) it must wind the same way.
+        return Poly.Path([a - n, b - n, b + n, a + n]);
     }
 
     /// <summary>A rectangle centred on <paramref name="c"/>, <paramref name="w"/> by <paramref name="h"/>, turned by <paramref name="angle"/>.</summary>
