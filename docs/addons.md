@@ -37,8 +37,10 @@ where the program finds it; `tools/publish.sh` puts them in the published progra
 </Project>
 ```
 
-Add the project to `PhotonCanvas.slnx` (under `/src/Addons/`) so a solution build builds it, and to
-`tests/PhotonCanvas.Tests/PhotonCanvas.Tests.csproj` if you have tests. An add-on may use anything
+Don't add the project to `PhotonCanvas.slnx` or to the test project: the test project references
+every `src/Addons/*/*.csproj` by folder, so a solution build builds each add-on (in the solution's
+configuration) and the tests can use it. Keeping those two files untouched is what stops add-on
+branches conflicting with each other. An add-on may use anything
 public in Core, Doc, Device and App (App's `UiKit` helpers included) and its own NuGet packages; it
 must not copy the program's assemblies (the targets file makes sure of that).
 
