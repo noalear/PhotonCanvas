@@ -23,7 +23,7 @@ public sealed class GameKitAddon : IAddon
         {
             Tip = "Dice towers, card stands, deck trays, initiative trackers, movement gauges, range rulers and area templates for tabletop games",
             Large = true,
-            Order = 22,
+            Order = 30,
         });
         host.AddCommand(new AddonCommand("gamekit.open", "Shapes", "Game accessories…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit game accessories…", Open) { Visible = Selected });
