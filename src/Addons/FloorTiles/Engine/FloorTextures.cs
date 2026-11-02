@@ -257,7 +257,9 @@ public static class FloorTextures
                 int k = (int)Math.Round(x / size) + (int)Math.Round(y / size);
                 double ang = (k % 2 == 0 ? 45 : -45) * Math.PI / 180, cx = x + size / 2, cy = y + size / 2;
                 double dx = Math.Cos(ang) * (len - wid) / 2, dy = Math.Sin(ang) * (len - wid) / 2;
-                etched.AddRange(Geo.Offset([[new(cx - dx, cy - dy), new(cx + dx, cy + dy), new(cx + dx + 1e-3, cy + dy + 1e-3)]], wid / 2, round: true));
+                // A round-ended bar: the line between its ends, grown by half its width. (Grown as an open line: a thin
+                // triangle along it would vanish when it lies along the line, and the bars leaning one way went missing.)
+                etched.AddRange(Clipper.InflatePaths([[new(cx - dx, cy - dy), new(cx + dx, cy + dy)]], wid / 2, JoinType.Round, EndType.Round, 2, 4));
             }
         return new([], etched, []);
     }
