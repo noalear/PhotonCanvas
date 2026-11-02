@@ -13,6 +13,10 @@ An add-on (Settings → Add-ons → **Toys and automata**): on when PhotonCanvas
   that play a strip of card). Type the tune or open a MIDI file; each note becomes a hole in its
   lane. The check finds notes the box hasn't got, repeated notes too close to sound and holes so
   close the card would tear.
+- **Music box comb**: the steel comb that plays the notes, to cut from thin spring steel on a fiber
+  laser. Each tine is as long as its note needs, worked out from the metal and its thickness, and
+  the tines are as far apart as the strip's lanes, so the strips it punches line up with it. Two
+  thick clamp bars hold each tine at its root.
 
 Then it puts the parts in the design, named and marked, on a cut layer with your material's kerf.
 
@@ -28,13 +32,15 @@ opens over the program.
 
 ![The Toys and automata window: a bobbing fish, a pecking bird and a spinning dancer on a crank box, moving on the right](images/window-automata-figures.png)
 
-- **Top:** a tab for each kind, **Moving figures** and **Music box strip**. Each keeps its own
+- **Top:** a tab for each kind, **Moving figures**, **Music box strip** and **Music box comb**. Each keeps its own
   settings while you look at the other.
 - **Left:** its settings, and the **Material** it's cut from. Every change is checked again straight
   away.
 - **Right:** the toy moving: the box from the front with every figure, each cam from the handle's
   side, the turntables from above, and charts of how high each figure is and how far each lever
-  tips. For a strip, the strip going past the box's comb, its notes lighting up as they play.
+  tips. For a strip, the strip going past the box's comb, its notes lighting up as they play. For
+  a comb, the comb from above with each tine lit in turn, and that tine from the side, plucked and
+  ringing.
 - **Under that:** a one-line summary, each thing the check found (✓ fine, **i** good to know, **!**
   worth fixing, ✕ a problem to fix), the parts to cut and what else you need (dowels, rubber bands,
   a coin, the music box movement).
@@ -184,6 +190,153 @@ box. Cut strips from thin card the same thickness as the ones that came with the
 0.25 mm, 160–200 gsm), with your card's cut settings picked under **Cut with** so the holes come out
 their drawn size.
 
+## Music box comb
+
+The comb is the row of steel teeth (tines) in a music box: each one is a little springy beam, held
+at its root and free at its tip, that rings at one note when it's plucked. This tab makes one to cut
+from thin spring steel on a fiber laser, for the strips the **Music box strip** tab punches (or any
+other notes you give it).
+
+![The Music box comb tab: a 15-tine comb in 0.508 mm blue-tempered spring steel, its stepped clamp bar over the base, and the tine playing seen from the side](images/window-automata-comb.png)
+
+### How the tines are worked out
+
+Each tine is a cantilever ringing in its first bending mode:
+
+`f = 0.162 × t / L² × √(E / ρ)`
+
+where `t` is the metal's thickness, `L` the tine's length from its tip to the clamp, `E` how stiff
+the metal is (Young's modulus) and `ρ` how heavy (its density). So for one sheet of metal, each
+tine's length is `L = √(k × t / f)`: a note an octave up wants a tine about 71% as long (1/√2), and
+stock twice as thick makes every tine about 1.4 times as long. For blue-tempered spring steel
+(`E` = 205 GPa, `ρ` = 7850 kg/m³), `k` is about 825 500 with `t` and `L` in mm: middle C (261.6 Hz) in
+0.508 mm steel is 40.0 mm long, and C6 (1046.5 Hz) 20.0 mm.
+
+The **width** isn't in the formula (a wider tine is stiffer and heavier in step), so it only sets how
+loud the tine is and how hard it is to pluck. Here it's the strip's lane spacing less the **Gap**
+between tines: 2 mm lanes and a 0.4 mm gap make 1.6 mm tines.
+
+It's ballpark, which is plenty for a toy: the notes come out within about a semitone, most likely a
+little flat, because no clamp is perfectly stiff. Real combs are tuned by grinding, and so is this
+one (see [Tuning it](#tuning-it)). The check lists every tine's note, frequency and length.
+
+### Settings
+
+**The strips it plays**
+
+| Setting | What it does |
+|---|---|
+| **Box** | The movement whose strips it plays: **15-note** or **30-note**, or **Another box (set its sizes)** to give the **Strip width**, **Lane spacing**, **First lane** and **Its notes**, as on the strip tab. The tines are the lane spacing apart, the lowest one the first lane in from the strip's edge, so the comb and the strips line up. |
+| **Tines from the other edge** | The lowest note at the other end, as **Lanes from the other edge** on the strip. |
+| **Sounds** | The comb an octave or two up or down from the lanes' names. The strips play the same tune in any octave; up makes the tines shorter, down longer. |
+
+**The metal**
+
+| Setting | What it does |
+|---|---|
+| **Metal** | **Blue-tempered 1095 spring steel** (the default, already hardened), **Annealed 1075 or 1095** (to harden after cutting), **301 stainless, full hard**, **Phosphor bronze** or **Brass**. Each has its own stiffness and weight, so its own tine lengths. |
+| **Thickness** | The stock's thickness, 0.1–3 mm (default 0.508 mm, 0.020"). **Suggest** picks the thickest shim sold (0.010" to 0.040") that keeps the bass tine within 45 mm, the treble tine at least 10 mm and the tines at least twice as wide as they're thick. Picking cut settings under **Cut with** whose material is 1.2 mm or thinner brings its thickness. |
+| **Gap** | The slot between neighbouring tines, 0.1–2 mm (default 0.4). Narrower makes wider, louder tines, but below about 0.25 mm ringing tines may touch, and the slivers cut out of the slots may not drop free. |
+| **Tuning allowance** | Cuts every tine this much longer (0–5 mm, default 0), so they all come out flat and you only ever file the tips to bring them up. |
+
+**Holding it**
+
+| Setting | What it does |
+|---|---|
+| **Line the tips up, as on a real comb** | On (the default): the tips are in one line, where the strip plucks them, and the roots step back, longer for lower notes. The clamp bars have the same stepped edge. Off: the roots are in one line and the tips step instead, so a plain straight bar clamps it, but whatever plucks it must reach each tip. |
+| **Base** | Solid metal behind the longest tine's root, 6–40 mm (default 12), where the bolts go. |
+| **Clamp bars** | The clamp bars' thickness, 1–10 mm (default 3). |
+| **Bolts** | Their size, M1.5 to M8 (default M3). There's a bolt about every 25 mm, at least two. |
+
+The base also reaches 8 mm past the outside tines on each side. Two **Clamp bars** with the same
+outline sandwich the comb's base: each one's front edge steps to sit exactly on each tine's root,
+which is what sets the tine's length (and so its note). Cut both from steel plate, 3 mm or thicker,
+or thick aluminium: wood or acrylic gives a little, and the notes go flat and dull. Stack them all
+the same way up (don't turn a bar over: its steps would then be the wrong way round), the engraved
+bar on top, and bolt through. The top bar is engraved with each tine's note by its root, and two
+ticks where the strip's edges are.
+
+What the check looks for:
+
+- The tines on the strip's lanes (always, for a box from the list).
+- Tines short and stubby for their thickness (under 10 mm, or under 12 times the thickness): hard to
+  pluck and tune, and likely flat. Thinner stock, or the comb an octave down, lengthens them.
+- Tines over 60 mm: they ring quietly and can buzz. Thicker stock, or the comb an octave up,
+  shortens them (real combs weight their bass tines with lead instead).
+- Tines less than 1.5 times as wide as they're thick, which wobble sideways as well as up and down.
+- A gap under 0.25 mm.
+- Annealed steel, which must be hardened after it's cut.
+
+### The stock
+
+Real combs are hardened spring steel: hardness hardly changes a tine's note (steel's stiffness is the
+same soft or hard), but a soft tine bends and stays bent the first time it's plucked hard, and sounds
+dull. The easy way is metal that's already spring-hard:
+
+- **Blue-tempered 1095 spring steel shim** (sold in 0.010" to 0.040" sheets and rolls) is hardened
+  and tempered to about HRC 48–52. Cut it and use it: the laser only heats a hair's width along each
+  edge.
+- **301 stainless, full hard** is as good and doesn't rust; it can't be hardened by heat, so it must
+  be bought full hard.
+- **Phosphor bronze** (spring temper) and **brass** (half hard) ring more softly and die away
+  sooner, but cut and file easily.
+
+0.5 mm (0.020") is a good start for a 15-note comb (tines 20 to 40 mm); **Suggest** finds the size
+for other notes. Thicker is louder but makes every tine longer and stiffer to pluck.
+
+### Hardening annealed spring steel
+
+Annealed (soft) 1075 or 1095 cuts and flattens more easily, but must be hardened and tempered after
+cutting:
+
+1. **Harden:** heat the comb evenly to just past non-magnetic (a magnet stops sticking), about
+   800–830 °C, cherry red, in a forge, a heat-treat oven or with a big torch.
+2. **Quench** at once in warm oil (canola at about 50 °C, or quenching oil), outdoors, with a lid to
+   hand. A thin comb warps in a plain quench: clamp it between two thick steel or aluminium plates
+   instead (a plate quench). It's now glass-hard and will snap if bent.
+3. **Clean** the scale off with fine abrasive, so you can see the temper colour.
+4. **Temper** to spring hardness: an hour at about 370–400 °C (700–750 °F), for about HRC 45–50. A
+   kitchen oven can't get that hot; a heat-treat oven or a toaster-oven-sized kiln can. Tempered
+   too low (straw coloured), the tines are brittle and snap.
+
+Hardening and tempering change the notes very little, but check them again afterwards.
+
+### Cutting it on a fiber laser
+
+> **Safety:** Cutting steel throws sparks and molten metal. Keep the lid shut, nothing flammable on
+> or under the bed, and the fume extraction on.
+
+Fiber lasers cut thin metal by taking off a little with each pass. For the comb:
+
+- **Many quick passes, not a few slow ones**, so the thin tines don't heat up, warp, or lose their
+  temper (tempered steel softens past about 300 °C).
+- **Start from:** 100% power, about 100 mm/s, 30 to 40 kHz, and the longest pulse your laser has
+  (on a MOPA laser, 350 to 500 ns). Add passes until it drops through: about 20 to 40 for 0.5 mm.
+  Run a cut test on an offcut first (**Laser → Tests → Cut test**), and pick its settings under
+  **Cut with**, so the kerf is allowed for and the tines come out their drawn width.
+- **Raise the sheet** on spacers or a honeycomb so it's clear of the bed, and hold it flat at the
+  edges with magnets or tape: molten metal under a sheet lying on the bed can weld it down.
+- **Thicker plate for the clamp bars** (3 mm steel) takes many more passes; lower the focus as it
+  cuts deeper (a step down of about 0.1 mm every few passes), or follow your own settings for that
+  plate.
+- **Afterwards**, push out any sliver left in a slot, and smooth each tine's edges along its length
+  with a fine stone or 400-grit paper: a rough edge is where a tine starts to crack.
+
+### Tuning it
+
+Clamp the comb up first: the clamp sets the notes. Then pluck each tine and check it with a tuner app
+on your phone.
+
+- **Too flat (low): raise it** by filing a little off its tip. It takes very little: 1% shorter is
+  about a third of a semitone higher, so 0.2 mm off a 20 mm tine.
+- **Too sharp (high): lower it** by thinning the tine near its root (a fine grinding wheel or file
+  across its top, just in front of the clamp), or with a small dab of solder on the underside of its
+  tip.
+- **Keep it cool:** grind a little at a time and dip it in water. Steel that turns blue has been
+  softened.
+
+With **Tuning allowance** every tine starts flat, so you only ever file the tips.
+
 ## Material and kerf
 
 **Cut with** lists the cut settings in your material library. Picking one brings its thickness and,
@@ -200,6 +353,10 @@ something on it), on two layers:
 
 - **Toy · cut**: the parts' outlines, cut with your material's settings.
 - **Toy · marks**: names and marks, engraved lightly first, while the sheet is still whole.
+
+A comb's two clamp bars are cut from thicker plate, so they go on a page of their own, on a cut layer
+named for it (**Toy · cut (3 mm steel)**): cut the comb on its page with the shim's settings, then
+the clamp bars on theirs with the plate's.
 
 Each part's outline and marks are grouped, and the parts are nested onto the bed by their real
 shape; what doesn't fit goes on further pages, a bed each. To change a toy later, right-click one of

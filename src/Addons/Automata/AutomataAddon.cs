@@ -5,7 +5,7 @@ namespace PhotonCanvas.Addon.Automata;
 /// <summary>
 /// Home → Draw → Automata, its command and "Edit toy…" on the right-click menu, opening
 /// <see cref="AutomataWindow"/>: a crank box whose cut-out figures bob, nod, peck and spin, or a punched strip
-/// for a paper-strip music box. The geometry and the checks are in Engine/; the cams, motion view and
+/// for a paper-strip music box, or a spring steel comb to play it. The geometry and the checks are in Engine/; the cams, motion view and
 /// placement come from the mechanism maker (addon.json "requires" it).
 /// </summary>
 public sealed class AutomataAddon : IAddon
@@ -21,7 +21,7 @@ public sealed class AutomataAddon : IAddon
         _host = host;
         host.AddRibbonButton(new RibbonButton("Home", "Draw", "Automata", Icon, Open)
         {
-            Tip = "Crank boxes with cut-out figures that bob, nod, peck and spin, and punched strips for paper-strip music boxes",
+            Tip = "Crank boxes with cut-out figures that bob, nod, peck and spin, punched strips for paper-strip music boxes, and steel combs to play them",
             Large = true,
             Order = 33,
         });

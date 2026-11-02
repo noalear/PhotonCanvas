@@ -27,6 +27,13 @@ public sealed record Part
     /// <summary>Lines marked on it (not cut through), in the same axes as the outline.</summary>
     public IReadOnlyList<List<Vec2>> Marks { get; init; } = [];
     public PartLabel? Label { get; init; }
+    /// <summary>More labels engraved on it besides <see cref="Label"/> (a note name by each tine of a comb).</summary>
+    public IReadOnlyList<PartLabel> Labels { get; init; } = [];
+    /// <summary>
+    /// What it's cut from when that isn't the main sheet ("3 mm steel"): such parts go on pages of their own,
+    /// on a cut layer named after it, so they can be cut with their own settings. Null: the main sheet.
+    /// </summary>
+    public string? Stock { get; init; }
 }
 
 /// <summary>Something that moves (or not) in a view of the mechanism.</summary>
