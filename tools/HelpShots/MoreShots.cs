@@ -297,6 +297,34 @@ static class MoreShots
         }
         warp.Close();
 
+        // --- Leather and fabric (add-on, run by its command): a card wallet's outside and its pocket.
+        {
+            reset();
+            var ls = DocState.New();
+            var outside = new PathShape { Name = "Outside", LayerId = ls.Layers[0].Id, Geometry = PathGeometry.RoundRect(15, 30, 85, 62, 8, 8) };
+            var pocket = new PathShape { Name = "Pocket", LayerId = ls.Layers[0].Id, Geometry = PathGeometry.RoundRect(110, 30, 85, 40, 8, 8) };
+            doc.Reset(Ops.AddShapes(ls, [outside, pocket]), null);
+            canvas.FitRect(new Rect2(0, 10, 230, 200));
+            doc.Select([outside.Id, pocket.Id]);
+            settle(300);
+            var addonCommands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            addonCommands.FirstOrDefault(c => c.Id == "leatherfabric.open")?.Run();
+            settle(1500);
+            if (w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == "SewnPatternWindow") is { } sewn)
+            {
+                var mirror = sewn.GetVisualDescendants().OfType<CheckBox>().First(c => (c.Content as string)?.StartsWith("Also make the mirror") == true);
+                mirror.IsChecked = true;
+                settle(900);
+                AddonShot(sewn.CaptureRenderedFrame(), "LeatherFabric", "window-leather-fabric");
+                sewn.Position = new PixelPoint(w.Position.X + 2000, w.Position.Y);
+                canvas.FitRect(new Rect2(0, 10, 230, 200));
+                settle(900);
+                AddonShot(w.CaptureRenderedFrame(), "LeatherFabric", "workspace-leather-pieces");
+                sewn.Close();
+                settle(300);
+            }
+        }
+
         // --- Split onto pieces: a 400 × 150 mm design over four 200 × 75 mm boards laid two by two.
         {
             reset();
