@@ -7,6 +7,7 @@
     <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
     <ProjectReference Include="..\FloorTiles\PhotonCanvas.Addon.FloorTiles.csproj" Private="false" ExcludeAssets="runtime" />
     <ProjectReference Include="..\Stairs\PhotonCanvas.Addon.Stairs.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Roofs\PhotonCanvas.Addon.Roofs.csproj" Private="false" ExcludeAssets="runtime" />
     <ProjectReference Include="..\Furniture\PhotonCanvas.Addon.Furniture.csproj" Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>

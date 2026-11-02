@@ -2,6 +2,7 @@ using Clipper2Lib;
 using PhotonCanvas.Addon.FloorTiles;
 using PhotonCanvas.Addon.Furniture;
 using PhotonCanvas.Addon.Stairs;
+using Roofs = PhotonCanvas.Addon.Roofs;
 using Pose = PhotonCanvas.Addon.Furniture.Pose;
 using V3 = PhotonCanvas.Addon.Furniture.V3;
 using PhotonCanvas.Addon.Walls;
@@ -27,7 +28,7 @@ public sealed record Piece(string Name, Sheet Sheet, PathsD Cut, PathsD Etched, 
 /// </summary>
 public sealed record Solid(string Name, PathsD Outline, Pose Pose, double Thickness, PathsD? Etched, List<PathD>? Lines, int Storey, WallSide Side, bool IsFurniture);
 
-public enum WallSide { None, Front, Back, Left, Right, Floor, Ground }
+public enum WallSide { None, Front, Back, Left, Right, Floor, Ground, Roof }
 
 /// <summary>Everything a building is cut from, where it all goes, and what was found while making it.</summary>
 public sealed record BuildingKit(List<Piece> Pieces, List<Solid> Solids, List<Finding> Findings, double StoreyMm, double WallMm, SetKit? Furniture)
@@ -201,12 +202,23 @@ public static class BuildingKitMaker
 
         Tiles(s, pieces, solids, findings);
         Columns(s, storeys, wallStoreys, pieces, solids, findings);
+        if (!parapet) Roof(s, pieces, solids, findings);
         var blocked = new List<(int Storey, double X0, double Z0, double X1, double Z1)>();
         Floors(s, storeys, wallStoreys, pieces, solids, findings, blocked);
         var furniture = Furnish(s, frontGround, pieces, solids, findings, blocked);
 
         if (frontGround is not null)
-            findings.Add(new(Severity.Note, $"The building is {W + s.ColumnMm:0} × {D + s.ColumnMm:0} mm on the ground and {StoreyBase(s, wallStoreys - 1) + (wallStoreys > storeys ? ParapetHeight(s) : H):0} mm tall."));
+        {
+            double tall = StoreyBase(s, wallStoreys - 1) + (wallStoreys > storeys ? ParapetHeight(s) : H);
+            foreach (var r in solids.Where(x => x.Side == WallSide.Roof))
+            {
+                var b = Geo.Bounds(r.Outline);
+                foreach (var u in new[] { b.left, b.right })
+                    foreach (var v in new[] { b.top, b.bottom })
+                        tall = Math.Max(tall, r.Pose.At(u, v, r.Thickness / 2).Y);
+            }
+            findings.Add(new(Severity.Note, $"The building is {W + s.ColumnMm:0} × {D + s.ColumnMm:0} mm on the ground and {tall:0} mm tall{(solids.Any(x => x.Side == WallSide.Roof) ? " with its roof" : "")}."));
+        }
         return new(pieces, solids, findings, H, Wt, furniture);
     }
 
@@ -235,6 +247,61 @@ public static class BuildingKitMaker
             string where = wallStoreys == 1 ? "" : Storey == storeys ? ", battlements" : $", storey {Storey + 1}";
             return what + where;
         }
+    }
+
+    /// <summary>The roof maker's settings for a roof on the top storey's walls (null for none).</summary>
+    public static Roofs.RoofSpec? RoofSpecFor(BuildingSpec s)
+    {
+        if (s.Roof == RoofShape.None || s.Top != BuildingTop.Straight) return null;
+        int top = Math.Clamp(s.Storeys, 1, 6) - 1;
+        double k28 = K(s);
+        var along = StoreyWall(s, top, s.WidthMm) with { Cap = true };
+        var across = StoreyWall(s, top, s.DepthMm) with { Cap = true };
+        var shingle = Roofs.Shingles.Preset(s.RoofTexture) ?? Roofs.Shingles.Preset("Slate")!;
+        var roof = new Roofs.RoofSpec
+        {
+            Style = s.Roof switch { RoofShape.Hip => Roofs.RoofStyle.Hip, RoofShape.LeanTo => Roofs.RoofStyle.LeanTo, _ => Roofs.RoofStyle.Gable },
+            PitchDeg = s.RoofPitchDeg, EaveMm = s.RoofEaveMm, GableOverhangMm = Math.Round(3 * k28, 1),
+            Shingle = shingle.Name, ShingleA = Math.Round(shingle.SizeA * k28, 2), ShingleB = Math.Round(shingle.SizeB * k28, 2),
+            ShingleGrooveMm = shingle.UsesGroove ? Math.Round(Math.Max(0.4, shingle.Groove * Math.Sqrt(k28)), 2) : shingle.Groove,
+            Seed = s.Seed + 211, Etch = s.Etch, TrussSpacingMm = Math.Round(60 * k28, 1),
+            Window = Roofs.GableWindow.None, WindowMm = Math.Round(10 * k28, 1), PinMm = PinMm,
+        };
+        return Roofs.RoofMaker.FitToWalls(roof, along, across);
+    }
+
+    /// <summary>
+    /// The roof maker's roof, sitting on the top storey's column caps with its locator inside the walls:
+    /// it lifts off to show the rooms. Its ridge runs along the longer side.
+    /// </summary>
+    static void Roof(BuildingSpec s, List<Piece> pieces, List<Solid> solids, List<Finding> findings)
+    {
+        if (RoofSpecFor(s) is not { } spec) return;
+        var kit = Roofs.RoofMaker.Make(spec);
+        foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
+            findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Roof: {f.Text}"));
+        if (!kit.Ok) return;
+        int top = Math.Clamp(s.Storeys, 1, 6) - 1;
+        var wall = StoreyWall(s, top, s.WidthMm) with { Cap = true };
+        // The roof's Z = 0 is the top of the column caps it rests on.
+        double baseY = StoreyBase(s, top) + WallKitMaker.ColumnLayers(wall) * s.WallSheetMm + s.WallSheetMm;
+        double L = spec.LengthMm, T = kit.ThicknessMm;
+        bool alongX = s.WidthMm >= s.DepthMm;
+        // The roof's model (X along the ridge from 0, Y across from the middle, Z up) → the building (X right, Y up, Z toward you).
+        V3 Dir(Roofs.V3 d) => alongX ? new V3(d.X, d.Z, -d.Y) : new V3(d.Y, d.Z, d.X);
+        V3 Point(Roofs.V3 p) => alongX ? new V3(p.X - L / 2, baseY + p.Z, -p.Y) : new V3(p.Y, baseY + p.Z, p.X - L / 2);
+        foreach (var part in kit.Parts)
+        {
+            string name = part.Name.StartsWith("Roof", StringComparison.Ordinal) ? part.Name : "Roof " + char.ToLowerInvariant(part.Name[0]) + part.Name[1..];
+            pieces.Add(new Piece(name, Sheet.Walls, part.Cut, part.Etched, part.Lines, part.Copies));
+            foreach (var pose in part.Poses)
+            {
+                // The roof maker's pieces run from w = 0 to T; a solid here is centred on its pose.
+                var mid = pose.O + pose.N * (T / 2);
+                solids.Add(new Solid(name, part.Cut, new Pose(Point(mid), Dir(pose.U), Dir(pose.V)), T, Nil(part.Etched), Nil(part.Lines), top + 1, WallSide.Roof, false));
+            }
+        }
+        findings.Add(new(Severity.Note, "The roof is glued together on its base and lifts off: the frame under the base drops inside the top walls so it can't slide."));
     }
 
     /// <summary>Four corner columns a storey: a slot for each of the two walls, a pin hole up the middle; a cap on the top ones if nothing lies on them.</summary>

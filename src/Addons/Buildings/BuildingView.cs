@@ -15,12 +15,16 @@ public enum ViewMode { Whole, CutAway, Storey }
 /// <summary>
 /// The building put together, drawn in 3D from above and to one side: every piece at its thickness where
 /// it sits, the etched faces showing their texture. Drag to turn it round. It can cut the front and
-/// right-hand walls away to show the rooms, or show one storey on its own.
+/// right-hand walls (and the roof) away to show the rooms, or show one storey on its own.
 /// </summary>
 public sealed class BuildingView : Control
 {
     /// <summary>A flat face of one piece: its outlines (holes included), facing <see cref="Normal"/>.</summary>
-    sealed record Face(List<V3[]> Loops, V3 Normal, double Shade, PathsD? Etched, List<PathD>? Lines, Pose? Pose, double W, bool Wood);
+    sealed record Face(List<V3[]> Loops, V3 Normal, double Shade, PathsD? Etched, List<PathD>? Lines, Pose? Pose, double W, bool Wood)
+    {
+        /// <summary>The roof's outside: nothing of the roof is in front of it, so it's drawn as near as its nearest corner.</summary>
+        public bool Outside { get; init; }
+    }
 
     readonly List<Face> _faces = [];
     BuildingKit? _kit;
@@ -60,9 +64,10 @@ public sealed class BuildingView : Control
 
     bool Shown(Solid s) => Mode switch
     {
-        ViewMode.CutAway => s.Side is not (WallSide.Front or WallSide.Right),
-        ViewMode.Storey => s.Storey == Storey && s.Side is not (WallSide.Front or WallSide.Right),
-        _ => true,
+        ViewMode.CutAway => s.Side is not (WallSide.Front or WallSide.Right or WallSide.Roof),
+        ViewMode.Storey => s.Storey == Storey && s.Side is not (WallSide.Front or WallSide.Right or WallSide.Roof),
+        // Inside the roof, out of sight: left out, as they'd show through the slopes in a painter's drawing.
+        _ => !(s.Side == WallSide.Roof && (s.Name.StartsWith("Roof truss", StringComparison.Ordinal) || s.Name.StartsWith("Roof locator", StringComparison.Ordinal))),
     };
 
     void Build()
@@ -108,13 +113,13 @@ public sealed class BuildingView : Control
     {
         double T = s.Thickness;
         var pose = s.Pose;
-        bool wood = s.IsFurniture || s.Side == WallSide.Floor;
+        bool wood = s.IsFurniture || s.Side is WallSide.Floor or WallSide.Roof;
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         V3 At(PointD p, double w) => pose.At(p.x, p.y, w);
         var n = pose.N;
         if (faces)
         {
-            _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, T / 2)).ToArray())], n, 1, s.Etched, s.Lines, pose, T / 2, wood));
+            _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, T / 2)).ToArray())], n, 1, s.Etched, s.Lines, pose, T / 2, wood) { Outside = s.Side == WallSide.Roof && s.Etched is not null });
             _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, -T / 2)).ToArray())], -n, 1, null, null, null, 0, wood));
         }
         if (!sides) return;
@@ -169,7 +174,7 @@ public sealed class BuildingView : Control
         // While turning it round, the etching is left off so it keeps up.
         bool detail = _drag is null;
         var seen = _faces.Where(f => f.Normal.Dot(d) > 1e-6)
-                         .Select(f => (Face: f, Depth: f.Loops[0].Average(q => (q - _centre).Dot(d))))
+                         .Select(f => (Face: f, Depth: f.Outside ? f.Loops[0].Max(q => (q - _centre).Dot(d)) : f.Loops[0].Average(q => (q - _centre).Dot(d))))
                          .OrderBy(x => x.Depth);
         foreach (var (f, _) in seen)
         {

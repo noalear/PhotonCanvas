@@ -106,7 +106,7 @@ public class BuildingsTests
     public void Walls_go_into_the_columns_without_clashing(BuildingKind k)
     {
         var kit = Make(k);
-        var walls = kit.Solids.Where(s => !s.IsFurniture && s.Side is not (WallSide.None or WallSide.Floor or WallSide.Ground) && s.Name != "Front door").ToList();
+        var walls = kit.Solids.Where(s => !s.IsFurniture && s.Side is not (WallSide.None or WallSide.Floor or WallSide.Ground or WallSide.Roof) && s.Name != "Front door").ToList();
         var columns = kit.Solids.Where(s => s.Name is "Corner column" or "Column cap").ToList();
         var floors = kit.Solids.Where(s => s.Side is WallSide.Floor or WallSide.Ground).ToList();
         Assert.Equal(4, walls.Count(w => w.Storey == 0));
@@ -168,6 +168,51 @@ public class BuildingsTests
         }
         var structure = kit.Solids.Where(s => !s.IsFurniture).ToList();
         Assert.Empty(Clashes(furniture, structure, 0.4));
+    }
+
+    [Theory]
+    [InlineData(BuildingKind.Cottage, RoofShape.Gable)]
+    [InlineData(BuildingKind.Tavern, RoofShape.Gable)]
+    [InlineData(BuildingKind.Tavern, RoofShape.Hip)]
+    [InlineData(BuildingKind.Cottage, RoofShape.LeanTo)]
+    public void The_roof_sits_on_the_top_storey_without_clashing(BuildingKind k, RoofShape shape)
+    {
+        var spec = BuildingSpec.Preset(k) with { Roof = shape };
+        var kit = BuildingKitMaker.Make(spec);
+        Assert.DoesNotContain(kit.Findings, f => f.Level != Severity.Note);
+        var roof = kit.Solids.Where(s => s.Side == WallSide.Roof).ToList();
+        Assert.NotEmpty(roof);
+        Assert.Contains(kit.Pieces, p => p.Name == "Roof base" && p.Sheet == Sheet.Walls);
+        // As wide as the column caps' outside: half a column and the caps' lip past the columns' centres.
+        double W = spec.WidthMm, D = spec.DepthMm, half = spec.ColumnMm / 2 + PhotonCanvas.Addon.Walls.WallKitMaker.LipMm;
+        int top = spec.Storeys - 1;
+        double wallsTop = BuildingKitMaker.StoreyBase(spec, top) + BuildingKitMaker.StoreyHeight(spec);
+        var base_ = Box(roof.First(s => s.Name == "Roof base"));
+        // The base lies on the column caps.
+        Assert.Equal(wallsTop + spec.WallSheetMm, base_.Min.Y, 3);
+        Assert.Equal(-W / 2 - half, base_.Min.X, 1);
+        Assert.Equal(W / 2 + half, base_.Max.X, 1);
+        Assert.Equal(-D / 2 - half, base_.Min.Z, 1);
+        Assert.Equal(D / 2 + half, base_.Max.Z, 1);
+        // The locator reaches down inside the walls.
+        var locator = roof.Where(s => s.Name.StartsWith("Roof locator", StringComparison.Ordinal)).ToList();
+        Assert.NotEmpty(locator);
+        Assert.True(locator.Min(s => Box(s).Min.Y) < wallsTop, "the locator doesn't reach inside the walls");
+        var structure = kit.Solids.Where(s => !s.IsFurniture && s.Side != WallSide.Roof).ToList();
+        Assert.Empty(Clashes(roof, structure, 0.4));
+        Assert.Contains(kit.Findings, f => f.Text.Contains("with its roof", StringComparison.Ordinal));
+
+        var bare = BuildingKitMaker.Make(spec with { Roof = RoofShape.None });
+        Assert.DoesNotContain(bare.Solids, s => s.Side == WallSide.Roof);
+        Assert.DoesNotContain(bare.Pieces, p => p.Name.StartsWith("Roof", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_tower_with_battlements_has_no_roof()
+    {
+        var spec = BuildingSpec.Preset(BuildingKind.Watchtower) with { Roof = RoofShape.Gable };
+        var kit = BuildingKitMaker.Make(spec);
+        Assert.DoesNotContain(kit.Solids, s => s.Side == WallSide.Roof);
     }
 
     [Theory]
