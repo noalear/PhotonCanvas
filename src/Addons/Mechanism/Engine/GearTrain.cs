@@ -15,6 +15,10 @@ public sealed record GearRow
     public GearLink Link { get; init; } = GearLink.Meshes;
     /// <summary>Which way from the gear before it this one sits (degrees: 0 = right, 90 = up); for a meshing gear.</summary>
     public double AngleDeg { get; init; }
+    /// <summary>Its hole for the axle; null = a round one that turns freely on the axle.</summary>
+    public Hole? Hole { get; init; }
+    /// <summary>A handle hole in it; null = gear A has one if <see cref="GearTrainSpec.Handle"/> says so, other gears none.</summary>
+    public Crank? Handle { get; init; }
 }
 
 /// <summary>Generated teeth, kept so a change elsewhere doesn't cut them again.</summary>
@@ -52,8 +56,13 @@ public sealed record GearTrainSpec : MechSpec
     public bool Plate { get; init; } = true;
     /// <summary>Windows in the bigger gears, leaving spokes.</summary>
     public bool Spokes { get; init; } = true;
-    /// <summary>A hole near the first gear's rim for a peg to turn it by.</summary>
+    /// <summary>A hole near gear A's rim for a peg to turn it by, unless gear A's own row says otherwise (<see cref="GearRow.Handle"/>).</summary>
     public bool Handle { get; init; } = true;
+
+    /// <summary>Gear <paramref name="i"/>'s handle, if it has one.</summary>
+    public Crank? HandleOf(int i) => i < 0 || i >= Gears.Count ? null
+        : Gears[i].Handle is { } c ? (c.On ? c : null)
+        : i == 0 && Handle ? new Crank() : null;
 
     public static string Letter(int i) => i < 26 ? ((char)('A' + i)).ToString() : $"G{i + 1}";
 
@@ -105,45 +114,69 @@ public sealed record GearTrainSpec : MechSpec
         double m = f.Module, t = ThicknessMm;
         var placed = Place();
         var mech = new Mechanism { Title = "Gears" };
-        double holeR = Axle.Square ? Axle.SizeMm * Math.Sqrt(2) / 2 + 0.15 : Axle.SizeMm / 2 + 0.15;
-        double pegR = Math.Max(2, Axle.SizeMm / 2 - 0.03);
+        string mat = Material;
+        var bores = placed.Select(g => new Bore(Gears[g.Index].Hole, Axle, true, mat)).ToArray();
+        var holeR = bores.Select(b => b.R).ToArray();
 
-        // ---- the gears themselves ----
+        // ---- the gears themselves, each with its hole and any handle hole ----
         var shapes = new Paths64[placed.Count];
-        Vec2? handleAt = null;
+        var handleAt = new Vec2?[placed.Count];
+        var pegs = new Hole?[placed.Count];
         for (int i = 0; i < placed.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
             var g = placed[i];
             var teeth = GearCache.External(f, g.Teeth, g.Shift, g.TipShorten);
-            var holes = new Paths64 { Axle.TurningHole(default) };
+            var holes = new Paths64 { bores[i].Cut(default) };
             double rimR = g.Size.RootR - Math.Max(3, 1.25 * m);
-            Vec2? handle = i == 0 && Handle && rimR - pegR - 1 > holeR + 3 ? Shapes.Polar(rimR - pegR - 1, 0) : null;
-            if (Spokes && Shapes.SpokeWindows(holeR + Math.Max(4, 0.4 * Axle.SizeMm), rimR, rimR > 32 ? 5 : 4) is { } windows)
+            Vec2? handle = null;
+            double pegR = 0;
+            if (HandleOf(i) is { } crank)
+            {
+                var peg = crank.PegHole(Axle);
+                pegR = peg.OuterR(mat);
+                var (at, why) = crank.Place(holeR[i], rimR - 1, pegR, $"Gear {Letter(i)}");
+                if (why is not null) mech.Findings.Add(new Finding(crank.RadiusMm > 0 ? Severity.Warn : Severity.Note, why));
+                handle = at;
+                if (at is not null) pegs[i] = peg;
+            }
+            if (Spokes && Shapes.SpokeWindows(holeR[i] + Math.Max(4, 0.4 * bores[i].Shaft.SizeMm), rimR, rimR > 32 ? 5 : 4) is { } windows)
             {
                 // The handle's hole sits on a spoke (one points its way), in a round pad.
                 if (handle is { } pad) windows = Poly.Grow(Poly.Grow(Poly.Subtract(windows, [Poly.Circle(pad, pegR + 3, 0.003)]), -1), 1);
                 holes.AddRange(windows);
             }
-            if (handle is { } peg)
+            if (handle is { } at2)
             {
-                handleAt = peg;
-                holes.Add(Poly.Circle(peg, pegR, 0.003));
+                handleAt[i] = at2;
+                holes.Add(pegs[i]!.Cut(at2, mat));
             }
             shapes[i] = Poly.Subtract(teeth, holes);
             string name = $"Gear {Letter(i)} ({g.Teeth} teeth)";
-            var tick = new List<Vec2> { Shapes.Polar(holeR + 1, 0), Shapes.Polar(Math.Min(holeR + 4, g.Size.RootR - 1), 0) };
+            var tick = new List<Vec2> { Shapes.Polar(holeR[i] + 1, 0), Shapes.Polar(Math.Min(holeR[i] + 4, g.Size.RootR - 1), 0) };
             mech.Parts.Add(new Part
             {
                 Name = name,
                 Shape = shapes[i],
-                Label = LabelFor(Letter(i), g.Size.RootR, holeR, i == 0 && Handle && handleAt is not null),
+                Label = LabelFor(Letter(i), g.Size.RootR, holeR[i], handleAt[i] is not null),
                 Marks = g.Index == 0 ? [tick] : [],
             });
         }
 
         // ---- the plate, spacers and axles ----
+        // An axle turns in the plate when a gear on it grips it; otherwise it's glued in and the gears turn on it.
         var axles = placed.GroupBy(g => (Math.Round(g.Centre.X, 3), Math.Round(g.Centre.Y, 3))).Select(grp => grp.ToList()).ToList();
+        Bore BoreOf(List<Placed> a) => a.Select(g => bores[g.Index]).FirstOrDefault(b => b.Chosen) ?? bores[a[0].Index];
+        bool AxleTurns(List<Placed> a) => a.Any(g => !bores[g.Index].Turns);
+        foreach (var a in axles.Where(a => a.Count > 1))
+        {
+            var shafts = a.Select(g => bores[g.Index].Shaft).Distinct().ToList();
+            if (shafts.Count > 1)
+            {
+                mech.Findings.Add(new(Severity.Bad, $"{Say.And(a.Select(g => Letter(g.Index)))} share an axle but have different holes for it ({Say.And(shafts.Select(x => x.Words))}). Give them the same shape and size."));
+                mech.Mark(0, Mechanism.StripSamples, Severity.Bad);
+            }
+        }
         var extent = Rect2.Empty;
         foreach (var g in placed) extent = extent.Union(new Rect2(g.Centre.X - g.Size.TipR, g.Centre.Y - g.Size.TipR, g.Centre.X + g.Size.TipR, g.Centre.Y + g.Size.TipR));
         Paths64? plate = null;
@@ -152,34 +185,50 @@ public sealed record GearTrainSpec : MechSpec
             var box = extent.Inflate(6);
             var outline = new Paths64 { Shapes.RoundRect(box.MinX, box.MinY, box.MaxX, box.MaxY, 6) };
             var holes = new Paths64();
-            foreach (var a in axles) holes.Add(Axle.HeldHole(a[0].Centre));
+            foreach (var a in axles) holes.Add(BoreOf(a).Frame(a[0].Centre, AxleTurns(a)));
             foreach (var corner in new[] { new Vec2(box.MinX + 5, box.MinY + 5), new Vec2(box.MaxX - 5, box.MinY + 5), new Vec2(box.MaxX - 5, box.MaxY - 5), new Vec2(box.MinX + 5, box.MaxY - 5) })
                 if (placed.All(g => g.Centre.Dist(corner) > g.Size.TipR + 3)) holes.Add(Poly.Circle(corner, 1.75, 0.003));
             plate = Poly.Subtract(outline, holes);
             mech.Parts.Add(new Part { Name = "Plate", Shape = plate, Label = new PartLabel("Plate", new(box.MinX + 14, box.MinY + 4), 3) });
-            int spacers = axles.Sum(a => 1 + a.Min(g => g.Layer));
-            double spacerR = Math.Min(holeR + 4, placed.Min(g => g.Size.RootR) - 1);
-            mech.Parts.Add(new Part { Name = "Spacer", Shape = Poly.Subtract([Poly.Circle(default, spacerR, 0.003)], [Axle.TurningHole(default)]), Copies = spacers });
+            // Spacers: one under each gear nearest the plate, one kind for each kind of axle.
+            double smallest = placed.Min(g => g.Size.RootR) - 1;
+            var spacerKinds = axles.GroupBy(a => BoreOf(a).Shaft).ToList();
+            foreach (var kind in spacerKinds)
+            {
+                var b = BoreOf(kind.First());
+                double r = Math.Min(b.R + 4, smallest);
+                int copies = kind.Sum(a => 1 + a.Min(g => g.Layer));
+                string spacerName = spacerKinds.Count == 1 ? "Spacer" : $"Spacer ({b.Shaft.Short})";
+                mech.Parts.Add(new Part { Name = spacerName, Shape = Poly.Subtract([Poly.Circle(default, r, 0.003)], [b.Frame(default, true)]), Copies = copies });
+            }
             extent = box;
         }
         foreach (var a in axles)
         {
             int layers = a.Max(g => g.Layer) + 1;
             double len = (Plate ? t + (1 + a.Min(g => g.Layer)) * t : 0) + (layers - a.Min(g => g.Layer)) * t + 3;
-            mech.Shopping.Add($"An axle for {string.Join(" and ", a.Select(g => Letter(g.Index)))}: {Axle.Words} dowel or rod, about {Math.Ceiling(len + (Plate ? 0 : 10)):0} mm long");
+            string how = !Plate ? "" : AxleTurns(a) ? " (it turns in the plate)" : " (glued into the plate)";
+            mech.Shopping.Add($"An axle for {string.Join(" and ", a.Select(g => Letter(g.Index)))}: {BoreOf(a).ShaftWords} dowel or rod, about {Math.Ceiling(len + (Plate ? 0 : 10)):0} mm long{how}");
         }
-        // Gears sharing an axle turn as one: glued face to face (each turns on the axle).
-        var shared = axles.Where(a => a.Count > 1).Select(a => Say.And(a.Select(g => Letter(g.Index)))).ToList();
+        // Gears sharing an axle turn as one: glued face to face, unless every one of them grips the axle.
+        var shared = axles.Where(a => a.Count > 1 && a.Any(g => bores[g.Index].Turns)).Select(a => Say.And(a.Select(g => Letter(g.Index)))).ToList();
         if (shared.Count > 0) mech.Shopping.Add($"Wood glue: {string.Join("; ", shared)} glued face to face, so they turn as one");
-        if (Handle && handleAt is null) mech.Findings.Add(new Finding(Severity.Note, "Gear A is too small for a handle hole: turn it by its axle, or give it more teeth."));
-        if (handleAt is not null) mech.Shopping.Add($"A handle peg for gear A: {pegR * 2 + 0.06:0.#} mm dowel, about 25 mm long");
+        for (int i = 0; i < placed.Count; i++)
+            if (pegs[i] is { } peg) mech.Shopping.Add($"A handle peg for gear {Letter(i)}: {peg.Shaft.Words} dowel, about 25 mm long");
+        var drawn = new List<string>();
+        for (int i = 0; i < placed.Count; i++)
+        {
+            if (bores[i].Chosen) drawn.Add($"{Letter(i)}'s axle hole {bores[i].Words}");
+            if (pegs[i] is { } peg && (Gears[i].Handle?.Hole is not null)) drawn.Add($"{Letter(i)}'s handle hole {peg.Words(mat)}");
+        }
+        if (drawn.Count > 0) mech.Findings.Add(new(Severity.Note, $"Holes drawn for {MaterialWords.Of(mat)}: {string.Join("; ", drawn)}."));
 
         // ---- how it moves ----
         var bodies = new List<Body>();
         if (plate is not null) bodies.Add(new Body("Plate", plate, Tints.Frame, _ => Pose.Zero) { Faint = true });
         foreach (var g in placed.OrderBy(g => g.Layer))
         {
-            var mark = new List<Vec2> { Shapes.Polar(holeR + 1, 0), Shapes.Polar(g.Size.RootR - 1, 0) };
+            var mark = new List<Vec2> { Shapes.Polar(holeR[g.Index] + 1, 0), Shapes.Polar(g.Size.RootR - 1, 0) };
             var gg = g;
             bodies.Add(new Body(Letter(g.Index), shapes[g.Index], Tints.Of(g.Index), a => new Pose(gg.Centre, gg.Phase + gg.Speed * a))
             {
@@ -187,16 +236,22 @@ public sealed record GearTrainSpec : MechSpec
                 IsInput = g.Index == 0,
             });
         }
-        foreach (var a in axles) bodies.Add(new Body("Axle", [Axle.Square ? Axle.HeldHole(default) : Poly.Circle(default, Axle.SizeMm / 2, 0.01)], Tints.Steel, _ => new Pose(a[0].Centre, 0)));
-        if (handleAt is { } h)
+        foreach (var a in axles)
         {
-            var g0 = placed[0];
-            bodies.Add(new Body("Handle", [Poly.Circle(default, pegR, 0.01)], Tints.Steel, a => new Pose(new Pose(g0.Centre, g0.Phase + a).Apply(h), 0)));
+            var g0 = a[0];
+            bool turns = AxleTurns(a);
+            bodies.Add(new Body("Axle", [BoreOf(a).ShaftOutline()], Tints.Steel, x => new Pose(g0.Centre, turns ? g0.Phase + g0.Speed * x : 0)));
+        }
+        for (int i = 0; i < placed.Count; i++)
+        {
+            if (handleAt[i] is not { } h || pegs[i] is not { } peg) continue;
+            var g = placed[i];
+            bodies.Add(new Body("Handle", [peg.Shaft.Outline(default)], Tints.Steel, a => new Pose(new Pose(g.Centre, g.Phase + g.Speed * a).Apply(h), g.Phase + g.Speed * a)));
         }
 
         // ---- the motion check ----
         var clashes = CheckMeshes(mech, placed, shapes, ct);
-        CheckLayout(mech, placed, holeR, handleAt, pegR);
+        CheckLayout(mech, placed, handleAt, pegs);
         CheckSizes(mech, placed, holeR);
 
         var first = placed[0];
@@ -313,7 +368,7 @@ public sealed record GearTrainSpec : MechSpec
     }
 
     /// <summary>Gears that don't mesh but touch, and gears that rub on another gear's axle or the handle.</summary>
-    void CheckLayout(Mechanism mech, List<Placed> placed, double holeR, Vec2? handleAt, double pegR)
+    void CheckLayout(Mechanism mech, List<Placed> placed, Vec2?[] handleAt, Hole?[] pegs)
     {
         bool any = false;
         for (int i = 0; i < placed.Count; i++)
@@ -344,17 +399,19 @@ public sealed record GearTrainSpec : MechSpec
                     any = true;
                 }
             }
-        if (handleAt is { } h)
+        for (int i = 0; i < placed.Count; i++)
         {
-            // The peg sticks out of A towards you, sweeping a circle round A's axle.
-            var g0 = placed[0];
-            double r = h.Length;
+            if (handleAt[i] is not { } h || pegs[i] is not { } peg) continue;
+            // The peg sticks out of its gear towards you, sweeping a circle round the gear's axle.
+            var g0 = placed[i];
+            double r = h.Length, pegR = peg.OuterR(Material);
             foreach (var p in placed.Where(p => p.Layer > g0.Layer))
             {
                 double d = p.Centre.Dist(g0.Centre);
                 if (d - p.Size.TipR < r + pegR + 0.5 && d + p.Size.TipR > r - pegR - 0.5)
                 {
-                    mech.Findings.Add(new(Severity.Warn, $"The handle peg in A would hit {Letter(p.Index)}, which sits in front of A. Leave the handle out, or turn A with {Letter(p.Index)}'s axle."));
+                    string me = Letter(g0.Index), them = Letter(p.Index);
+                    mech.Findings.Add(new(Severity.Warn, $"The handle peg in {me} would hit {them}, which sits in front of {me}. Leave the handle out, move it, or turn {me} with {them}'s axle."));
                     any = true;
                 }
             }
@@ -363,7 +420,7 @@ public sealed record GearTrainSpec : MechSpec
     }
 
     /// <summary>Undercut, pointed tips, fragile small teeth, thin hubs.</summary>
-    void CheckSizes(Mechanism mech, List<Placed> placed, double holeR)
+    void CheckSizes(Mechanism mech, List<Placed> placed, double[] holeR)
     {
         var f = Form;
         double m = f.Module;
@@ -376,7 +433,7 @@ public sealed record GearTrainSpec : MechSpec
                 mech.Findings.Add(new(Severity.Note, $"{name}'s teeth are shifted out by {g.Shift * m:0.##} mm so they aren't undercut."));
             if (g.Size.TipThickness < Math.Max(0.3, 0.2 * m))
                 mech.Findings.Add(new(Severity.Warn, $"{name}'s tooth tips come to a point ({g.Size.TipThickness:0.##} mm across): the laser may burn them away. Use more teeth or a bigger module."));
-            if (g.Size.RootR - holeR < 3)
+            if (g.Size.RootR - holeR[g.Index] < 3)
                 mech.Findings.Add(new(Severity.Bad, $"{name} has almost nothing between its axle hole and its teeth. Use a thinner axle or more teeth."));
         }
         if (m < 1.5 && ThicknessMm >= 2)

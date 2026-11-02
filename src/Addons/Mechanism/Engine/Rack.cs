@@ -19,6 +19,10 @@ public sealed record RackSpec : MechSpec
     public bool Plate { get; init; } = true;
     /// <summary>A hole near the pinion's rim for a peg to turn it by.</summary>
     public bool Handle { get; init; } = true;
+    /// <summary>Where the handle hole goes and what peg it takes.</summary>
+    public Crank Crank { get; init; } = new();
+    /// <summary>The pinion's hole for its axle; null = a round one it turns freely on.</summary>
+    public Hole? PinionHole { get; init; }
 
     public override Mechanism Build(CancellationToken ct = default)
     {
@@ -33,16 +37,21 @@ public sealed record RackSpec : MechSpec
         var mech = new Mechanism { Title = "Rack and pinion", Cycle = 2 * TravelMm / rp };
 
         // ---- the parts ----
-        double holeR = Axle.Square ? Axle.SizeMm * Math.Sqrt(2) / 2 + 0.15 : Axle.SizeMm / 2 + 0.15;
-        double pegR = Math.Max(2, Axle.SizeMm / 2 - 0.03);
+        string mat = Material;
+        var bore = new Bore(PinionHole, Axle, true, mat);
+        double holeR = bore.R;
+        var peg = Crank.PegHole(Axle);
+        double pegR = peg.OuterR(mat);
         var pinionTeeth = GearCache.External(f, z, x, 0);
-        var holes = new Paths64 { Axle.TurningHole(default) };
+        var holes = new Paths64 { bore.Cut(default) };
         double rimR = size.RootR - Math.Max(3, 1.25 * m);
         Vec2? handle = null;
-        if (Handle && rimR - pegR - 1 > holeR + 3)
+        if (Handle)
         {
-            handle = Shapes.Polar(rimR - pegR - 1, 0);
-            holes.Add(Poly.Circle(handle.Value, pegR, 0.003));
+            var (at, why) = Crank.Place(holeR, rimR - 1, pegR, "The pinion");
+            if (why is not null) mech.Findings.Add(new(Crank.RadiusMm > 0 ? Severity.Warn : Severity.Note, why));
+            handle = at;
+            if (at is { } a) holes.Add(peg.Cut(a, mat));
         }
         var pinion = Poly.Subtract(pinionTeeth, holes);
         mech.Parts.Add(new Part
@@ -96,23 +105,32 @@ public sealed record RackSpec : MechSpec
             var box = extent.Inflate(5);
             box = box.Union(new Rect2(-size.TipR - 5, centreY - size.TipR - 5, size.TipR + 5, centreY + size.TipR + 5));
             plate = Poly.Subtract([Shapes.RoundRect(box.MinX, box.MinY, box.MaxX, box.MaxY, 5)],
-                [Axle.HeldHole(new Vec2(0, centreY)), Axle.HeldHole(pin1), Axle.HeldHole(pin2)]);
+                [bore.Frame(new Vec2(0, centreY), !bore.Turns), Axle.HeldHole(pin1), Axle.HeldHole(pin2)]);
             mech.Parts.Add(new Part { Name = "Plate", Shape = plate, Label = new PartLabel("Plate", new Vec2(box.MinX + 14, box.MaxY - 5), 3) });
             bodies.Add(new Body("Plate", plate, Tints.Frame, _ => Pose.Zero) { Faint = true });
             extent = box;
-            mech.Shopping.Add($"Three pins: {Axle.Words} dowel or rod, about {Math.Ceiling(2 * ThicknessMm + 4):0} mm long (the pinion's axle and two for the rack's slot)");
+            if (bore.Chosen)
+            {
+                mech.Shopping.Add($"An axle for the pinion: {bore.ShaftWords} dowel or rod, about {Math.Ceiling(2 * ThicknessMm + 4):0} mm long ({(bore.Turns ? "glued into the plate" : "it turns in the plate")})");
+                mech.Shopping.Add($"Two pins for the rack's slot: {Axle.Words} dowel or rod, about {Math.Ceiling(2 * ThicknessMm + 4):0} mm long");
+            }
+            else mech.Shopping.Add($"Three pins: {Axle.Words} dowel or rod, about {Math.Ceiling(2 * ThicknessMm + 4):0} mm long (the pinion's axle and two for the rack's slot)");
         }
-        else mech.Shopping.Add($"An axle for the pinion: {Axle.Words} dowel or rod");
-        if (handle is not null) mech.Shopping.Add($"A handle peg: {pegR * 2 + 0.06:0.#} mm dowel, about 25 mm long");
+        else mech.Shopping.Add($"An axle for the pinion: {bore.ShaftWords} dowel or rod");
+        if (handle is not null) mech.Shopping.Add($"A handle peg: {peg.Shaft.Words} dowel, about 25 mm long");
+        var drawn = new List<string>();
+        if (bore.Chosen) drawn.Add($"the pinion's axle hole {bore.Words}");
+        if (handle is not null && Crank.Hole is not null) drawn.Add($"its handle hole {peg.Words(mat)}");
+        if (drawn.Count > 0) mech.Findings.Add(new(Severity.Note, $"Holes drawn for {MaterialWords.Of(mat)}: {string.Join("; ", drawn)}."));
 
         bodies.Add(new Body("Rack", rack, Tints.Of(1), RackAt));
         bodies.Add(new Body("Pinion", pinion, Tints.Of(0), PinionAt) { IsInput = true, Lines = [[Shapes.Polar(holeR + 1, 0), Shapes.Polar(size.RootR - 1, 0)]] });
-        bodies.Add(new Body("Axle", [Axle.Square ? Axle.HeldHole(default) : Poly.Circle(default, Axle.SizeMm / 2, 0.01)], Tints.Steel, _ => new Pose(new Vec2(0, centreY), 0)));
+        bodies.Add(new Body("Axle", [bore.ShaftOutline()], Tints.Steel, a => bore.Turns ? new Pose(new Vec2(0, centreY), 0) : PinionAt(a)));
         if (Plate)
             foreach (var pin in new[] { pin1, pin2 })
                 bodies.Add(new Body("Pin", [Poly.Circle(default, pinR, 0.01)], Tints.Steel, _ => new Pose(pin, 0)));
         if (handle is { } h)
-            bodies.Add(new Body("Handle", [Poly.Circle(default, pegR, 0.01)], Tints.Steel, a => new Pose(PinionAt(a).Apply(h), 0)));
+            bodies.Add(new Body("Handle", [peg.Shaft.Outline(default)], Tints.Steel, a => new Pose(PinionAt(a).Apply(h), PinionAt(a).Angle)));
 
         // ---- the motion check ----
         double eps = GearMaker.ContactRatioRack(f, size);

@@ -25,6 +25,11 @@ make bigger gears.
 Type each gear's **Teeth**: with 36 on A and 12 on B, B turns 3 times for each turn of A. **Add a
 gear** puts another in the train.
 
+## Holes and handles
+<!-- target: text:Holes and handles -->
+Open **Gear A: hole and handle** to pick a round hole with a fit (press, snug, slip or free), a D
+hole for a motor shaft or a square one, and to put a handle hole in any gear at the radius you set.
+
 ## Watch it turn
 <!-- target: text:Drag a part round -->
 Drag a gear round to turn it by hand, or click along the strip under the picture. Green all the

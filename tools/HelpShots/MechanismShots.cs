@@ -1,6 +1,7 @@
 using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Headless;
+using Avalonia.VisualTree;
 using PhotonCanvas.Addon.Mechanism;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
@@ -21,7 +22,7 @@ static class MechanismShots
         var folder = Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", "Mechanism", "help", "images");
         Directory.CreateDirectory(folder);
 
-        void Shot(string name, int kind, MechSpec? spec, double turnedDeg, Action<MechanismWindow>? before = null)
+        void Shot(string name, int kind, MechSpec? spec, double turnedDeg, Action<MechanismWindow>? before = null, Action<MechanismWindow>? after = null)
         {
             // No data folder: the pictures show the settings given here, not the last ones used.
             var win = new MechanismWindow(doc, machine, lib);
@@ -33,6 +34,11 @@ static class MechanismShots
             before?.Invoke(win);
             win.Show(owner);
             settle(400);
+            if (after is not null)
+            {
+                after(win);
+                settle(400);
+            }
             var t = (Task)typeof(MechanismWindow).GetMethod("BuildNow", Any)!.Invoke(win, null)!;
             for (int i = 0; i < 400 && !t.IsCompleted; i++) settle(50);
             var view = F<MotionView>(win, "_view");
@@ -46,6 +52,22 @@ static class MechanismShots
         }
 
         Shot("window-mechanism-gears", 0, null, 50);
+        // Holes and handles: a D hole in A for a motor shaft, a handle in B 25 mm out, B's settings open.
+        Shot("window-mechanism-holes", 0, new GearTrainSpec
+        {
+            Handle = false,
+            Gears = [new() { Teeth = 36, Hole = new Hole { Shape = HoleShape.D, SizeMm = 5, FlatMm = 4.5, Fit = HoleFit.Snug } }, new() { Teeth = 30, Handle = new Crank { RadiusMm = 25 } }],
+        }, 30, before: w =>
+        {
+            F<HashSet<int>>(w, "_openGears").Add(1);
+            typeof(MechanismWindow).GetField("_shownKind", Any)!.SetValue(w, -1);
+            typeof(MechanismWindow).GetMethod("ShowKind", Any)!.Invoke(w, null);
+        }, after: w =>
+        {
+            // Down to gear B's hole and handle.
+            var scroll = w.GetVisualDescendants().OfType<ScrollViewer>().First();
+            scroll.Offset = new Avalonia.Vector(0, Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height - 200));
+        });
         Shot("window-mechanism-rack", 1, null, 140);
         Shot("window-mechanism-planetary", 2, null, 40);
         Shot("window-mechanism-cam", 3, new CamSpec { Steps = CamPresets.All[6].Steps }, 250);
