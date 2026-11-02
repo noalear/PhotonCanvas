@@ -215,6 +215,60 @@ public static partial class Updates
         }
     }
 
+    /// <summary>Reads byte ranges (first to last, inclusive) of a file.</summary>
+    public delegate Task<byte[]> RangeReader(long first, long last, CancellationToken ct);
+
+    /// <summary>
+    /// A way to read parts of a release file without downloading all of it, and its length; null
+    /// when the server won't send parts. GitHub sends downloads on to a storage server with a
+    /// short-lived link: that link is found once and used for every part (the key never goes there).
+    /// </summary>
+    public static async Task<(RangeReader Read, long Length)?> RangesAsync(Asset asset, string? token, CancellationToken ct = default)
+    {
+        var uri = new Uri(asset.ApiUrl.Length > 0 ? asset.ApiUrl : asset.Url);
+        long length = -1;
+        using (var cts = CancellationTokenSource.CreateLinkedTokenSource(ct))
+        {
+            cts.CancelAfter(TimeSpan.FromSeconds(30));
+            for (int hop = 0; ; hop++)
+            {
+                using var res = await RangeRequest(uri, 0, 0, token, cts.Token).ConfigureAwait(false);
+                if ((int)res.StatusCode is >= 300 and < 400 && res.Headers.Location is { } next && hop < 5)
+                {
+                    uri = next.IsAbsoluteUri ? next : new Uri(uri, next);
+                    continue;
+                }
+                if (res.StatusCode != HttpStatusCode.PartialContent || res.Content.Headers.ContentRange?.Length is not { } total) return null;
+                length = total;
+                break;
+            }
+        }
+        var final = uri;
+        async Task<byte[]> Read(long first, long last, CancellationToken c)
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(c);
+            cts.CancelAfter(TimeSpan.FromMinutes(5));
+            using var res = await RangeRequest(final, first, last, token, cts.Token).ConfigureAwait(false);
+            if (res.StatusCode != HttpStatusCode.PartialContent || res.Content.Headers.ContentRange?.From != first)
+                throw new IOException($"The download server didn't send the part asked for ({(int)res.StatusCode}).");
+            var bytes = await res.Content.ReadAsByteArrayAsync(cts.Token).ConfigureAwait(false);
+            if (bytes.Length != last - first + 1) throw new IOException("The download server sent a part of the wrong size.");
+            return bytes;
+        }
+        return (Read, length);
+    }
+
+    static Task<HttpResponseMessage> RangeRequest(Uri uri, long first, long last, string? token, CancellationToken ct)
+    {
+        if (uri.Scheme != Uri.UriSchemeHttps) throw new IOException("Only https downloads are allowed.");
+        var req = new HttpRequestMessage(HttpMethod.Get, uri);
+        req.Headers.UserAgent.ParseAdd($"{AppIdentity.ProductName}/{Current}");
+        req.Headers.Accept.ParseAdd("application/octet-stream");
+        req.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(first, last);
+        if (!string.IsNullOrWhiteSpace(token) && SendsKeyTo(uri)) req.Headers.Authorization = new("Bearer", token.Trim());
+        return Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+    }
+
     /// <summary>The access key only ever goes to GitHub's API.</summary>
     public static bool SendsKeyTo(Uri uri) => uri.Scheme == Uri.UriSchemeHttps && string.Equals(uri.Host, "api.github.com", StringComparison.OrdinalIgnoreCase);
 

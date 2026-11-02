@@ -199,6 +199,8 @@ public static class UpdateInstall
     /// Swap the version unpacked in <paramref name="newRoot"/> into <paramref name="installRoot"/>
     /// (its files are moved, so <paramref name="newRoot"/> is used up). All or nothing: on any failure
     /// what was done is undone and the exception is passed on. Returns how many files were put in.
+    /// <paramref name="newRoot"/> may hold only the files that changed (see <see cref="UpdateDelta"/>)
+    /// as long as it has the new version's update-files.txt: files that list names stay.
     /// </summary>
     public static int Apply(string newRoot, string installRoot)
     {
@@ -206,7 +208,9 @@ public static class UpdateInstall
         if (incoming.Count == 0) throw new InvalidDataException("The new version has no files.");
         if (!incoming.Contains(Path.GetRelativePath(newRoot, Path.Combine(ProgramDirIn(newRoot), MarkerFile)), PathComparer))
             throw new InvalidDataException("The new version has no update.json, so it isn't a published PhotonCanvas.");
-        var incomingSet = incoming.ToHashSet(PathComparer);
+        // What the new version is made of: the files brought, plus (when only the changed files were
+        // downloaded) the ones its list names that are already here and stay as they are.
+        var incomingSet = incoming.Concat(ListedIn(newRoot)).ToHashSet(PathComparer);
         var dropped = ListedIn(installRoot).Where(f => !incomingSet.Contains(f)).ToList();
 
         var done = new List<Step>();

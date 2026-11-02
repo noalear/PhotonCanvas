@@ -42,7 +42,7 @@ cat >> "$notes" <<EOF
 PhotonCanvas is free to use, for personal or commercial work; all rights reserved. It may not be sold, redistributed or published in a modified form without written permission. The full terms are in the LICENSE file that comes with it.
 EOF
 
-files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz)
+files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz dist/PhotonCanvas-*.files.txt)
 existing=()
 for f in "${files[@]}"; do [ -f "$f" ] && existing+=("$f"); done
 [ ${#existing[@]} -gt 0 ] || { echo "Nothing was built."; exit 1; }

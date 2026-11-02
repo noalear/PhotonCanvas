@@ -10,6 +10,8 @@
 #             from there (it's written into their update.json).
 #   Checked   the tests run first; a failing test means no release.
 #   Safe      every download is listed in SHA256SUMS, and the program refuses a file that doesn't match.
+#   Small     PhotonCanvas-<build>.files.txt lists every file's SHA-256, so the program downloads only
+#             the files that changed, read straight out of the zip.
 name: Release
 
 on:
@@ -75,6 +77,7 @@ jobs:
           shopt -s nullglob
           files=(PhotonCanvas-*.zip PhotonCanvas-*.tar.gz)
           [ ${#files[@]} -gt 0 ] || { echo "Nothing was built."; exit 1; }
+          files+=(PhotonCanvas-*.files.txt)
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
 
@@ -95,7 +98,7 @@ jobs:
             echo "PhotonCanvas is free to use, for personal or commercial work; all rights reserved. It may not be sold, redistributed or published in a modified form without written permission. The full terms are in the LICENSE file that comes with it."
           } > notes.md
           shopt -s nullglob
-          files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz dist/SHA256SUMS)
+          files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz dist/PhotonCanvas-*.files.txt dist/SHA256SUMS)
           if [ "$REPO" = "$GITHUB_REPOSITORY" ]; then
             gh release create "v$VERSION" "${files[@]}" --repo "$REPO" --target "$GITHUB_SHA" \
               --title "PhotonCanvas $VERSION" --notes-file notes.md --latest
