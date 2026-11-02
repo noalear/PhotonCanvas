@@ -1,0 +1,10 @@
+{
+  "id": "leatherfabric",
+  "name": "Leather and fabric",
+  "version": "1.0.0",
+  "description": "Pieces for sewn goods: seam allowance, stitch holes along the edges, notches and mirrored pairs.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

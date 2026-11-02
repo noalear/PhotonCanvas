@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>objectjig</AddonId>
+  </PropertyGroup>
+</Project>

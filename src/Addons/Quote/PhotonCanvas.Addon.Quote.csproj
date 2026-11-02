@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>quote</AddonId>
+  </PropertyGroup>
+</Project>

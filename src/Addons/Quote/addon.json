@@ -1,0 +1,10 @@
+{
+  "id": "quote",
+  "name": "Quote and cost",
+  "version": "1.0.0",
+  "description": "What a job costs you (material, laser time, electricity, labour) and the price to charge, with a quote to print or send.",
+  "category": "Laser",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

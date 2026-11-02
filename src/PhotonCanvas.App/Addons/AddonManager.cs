@@ -177,6 +177,7 @@ public sealed class AddonManager
         e.Running = null;
         var weak = new WeakReference(r.Context);
         r.Context.Unload();
+        AvaloniaTypeCaches.Forget(r.Context);
         AppLog.Write("addons", $"Stopped {e.Id}");
         // Unloading finishes once nothing points into it any more; say in the log if it never does.
         _ = Task.Run(async () =>
@@ -285,6 +286,9 @@ sealed class AddonLoadContext : AssemblyLoadContext
     {
         _manifest = manifest;
         _manager = manager;
+        // The runtime holds a context firmly while it unloads, so what it still points to would keep
+        // it in memory for good: let go of the assemblies once unloading starts.
+        Unloading += _ => _mine.Clear();
     }
 
     public Assembly LoadMain()
