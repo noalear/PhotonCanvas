@@ -1,0 +1,131 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
+
+namespace PhotonCanvas.Addon.Walls;
+
+public enum EtchStyle { Grooves, Lines }
+public enum TopStyle { Straight, Battlements, Ruined }
+public enum DoorKind { None, Doorway, ClosedDoor, DoorwayAndDoor }
+public enum OpeningShape { Rectangle, Arched, Pointed, Round, ArrowSlit }
+public enum WindowBars { None, Cross, Bars }
+public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach }
+public enum ColumnShape { Auto, Square, Octagon, Round }
+public enum LengthMeasure { Panel, Centres }
+
+/// <summary>A connector: a column that walls slide into, with a slot for each wall.</summary>
+public enum ConnectorKind { Straight, Corner, Angle135, Sharp45, Tee, Cross, EndCap, Custom }
+
+/// <summary>Everything a set of walls is made from. Saved on the shapes it makes, so it can be opened and changed.</summary>
+public sealed record WallSpec
+{
+    /// <summary>Length of the wall (mm): the panel as cut, or from column centre to column centre (<see cref="Measure"/>).</summary>
+    public double LengthMm { get; init; } = 100;
+    public LengthMeasure Measure { get; init; } = LengthMeasure.Panel;
+    /// <summary>Height of the wall (mm), to the top of the battlements.</summary>
+    public double HeightMm { get; init; } = 50;
+    /// <summary>The sheet's thickness (mm): drives the slots in the columns and the mount points.</summary>
+    public double ThicknessMm { get; init; } = 3;
+    /// <summary>Two panels glued back to back (mirror images), so both faces are textured and the wall is twice as thick.</summary>
+    public bool TwoSided { get; init; }
+    public int Walls { get; init; } = 1;
+
+    /// <summary>A preset (<see cref="Textures.Presets"/>) or the name of one of your own.</summary>
+    public string Texture { get; init; } = "Brick";
+    /// <summary>Your own texture, kept with the design so it can be made again on another computer.</summary>
+    public CustomTexture? Custom { get; init; }
+    public double SizeA { get; init; } = 8;
+    public double SizeB { get; init; } = 3.5;
+    public double GrooveMm { get; init; } = 0.6;
+    public int Seed { get; init; } = 1;
+    public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
+    /// <summary>Leave the ends (the part inside the columns' slots) smooth, so they slide in at full thickness.</summary>
+    public bool PlainEnds { get; init; } = true;
+
+    public TopStyle Top { get; init; } = TopStyle.Straight;
+    public double MerlonWidthMm { get; init; } = 7;
+    public double CrenelWidthMm { get; init; } = 5;
+    public double MerlonHeightMm { get; init; } = 6;
+    /// <summary>A walkway behind the battlements: a strip on brackets that plug into mount slots.</summary>
+    public bool Walkway { get; init; }
+    public double WalkwayDepthMm { get; init; } = 10;
+    /// <summary>How far down a ruined top is broken, as a share of the height.</summary>
+    public double RuinDepth { get; init; } = 0.4;
+
+    public DoorKind Door { get; init; } = DoorKind.None;
+    public OpeningShape DoorShape { get; init; } = OpeningShape.Arched;
+    public double DoorWidthMm { get; init; } = 16;
+    public double DoorHeightMm { get; init; } = 28;
+    /// <summary>The door's centre from the middle of the wall (mm; less than 0 = to the left).</summary>
+    public double DoorOffsetMm { get; init; }
+
+    public int Windows { get; init; }
+    public OpeningShape WindowShape { get; init; } = OpeningShape.Arched;
+    public double WindowWidthMm { get; init; } = 8;
+    public double WindowHeightMm { get; init; } = 12;
+    /// <summary>Bottom of the windows above the bottom of the wall (mm).</summary>
+    public double SillMm { get; init; } = 25;
+    public WindowBars Bars { get; init; } = WindowBars.None;
+    public double BarMm { get; init; } = 1.5;
+    /// <summary>A smooth band round doors and windows (mm), edged with a groove, where the texture stops.</summary>
+    public double FrameMm { get; init; } = 1.5;
+
+    /// <summary>Mount points: slots right through the wall that accessories plug into.</summary>
+    public int Mounts { get; init; }
+    public double MountHeightMm { get; init; } = 30;
+    /// <summary>How tall each mount slot is (mm); it's as wide as the sheet is thick.</summary>
+    public double MountSlotMm { get; init; } = 6;
+    public Accessory Accessories { get; init; } = Accessory.None;
+
+    /// <summary>Gap added to slots so parts slide together (mm), on top of the kerf the cut layer allows for.</summary>
+    public double FitMm { get; init; } = 0.15;
+
+    public Dictionary<ConnectorKind, int> Connectors { get; init; } = new() { [ConnectorKind.EndCap] = 2 };
+    /// <summary>Angle between the two walls for <see cref="ConnectorKind.Custom"/> (degrees).</summary>
+    public double CustomAngleDeg { get; init; } = 120;
+    public ColumnShape Column { get; init; } = ColumnShape.Auto;
+    /// <summary>Column size across its flats (mm).</summary>
+    public double ColumnMm { get; init; } = 16;
+    /// <summary>How deep the walls go into the columns (mm).</summary>
+    public double SlotDepthMm { get; init; } = 4;
+    /// <summary>A hole up the middle of every layer of a column for a pin (a cocktail stick) that lines the stack up. 0 = none.</summary>
+    public double PinMm { get; init; } = 2;
+    /// <summary>A wider layer on top of each column, over the walls.</summary>
+    public bool Cap { get; init; } = true;
+    /// <summary>A wider bottom layer on each column.</summary>
+    public bool Foot { get; init; }
+
+    public int ConnectorCount(ConnectorKind k) => Connectors.TryGetValue(k, out var n) ? Math.Max(0, n) : 0;
+
+    public string ToJson() => JsonSerializer.Serialize(this, WallJson.Options);
+
+    public static WallSpec? FromJson(string json)
+    {
+        try { return JsonSerializer.Deserialize<WallSpec>(json, WallJson.Options); }
+        catch (Exception e) when (e is JsonException or NotSupportedException or ArgumentException) { return null; }
+    }
+}
+
+/// <summary>Your own texture: shapes repeated across the face. Closed shapes are etched as areas, open ones as lines.</summary>
+public sealed record CustomTexture
+{
+    public string Name { get; init; } = "";
+    /// <summary>The shapes, as SVG path data in the program's millimetres (y down), with the tile's top-left corner at 0, 0.</summary>
+    public string Path { get; init; } = "";
+    public double TileWidthMm { get; init; } = 10;
+    public double TileHeightMm { get; init; } = 10;
+    /// <summary>Every other row shifted along by this share of a tile (0 to 1): 0.5 for a brick-like offset.</summary>
+    public double RowShift { get; init; }
+}
+
+static class WallJson
+{
+    public static readonly JsonSerializerOptions Options = new()
+    {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver(),
+        Converters = { new JsonStringEnumConverter() },
+    };
+}
+
+public enum Severity { Note, Warn, Bad }
+public sealed record Finding(Severity Level, string Text);

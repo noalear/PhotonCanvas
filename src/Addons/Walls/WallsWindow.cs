@@ -1,0 +1,624 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Layout;
+using Avalonia.Media;
+using Avalonia.Platform.Storage;
+using Avalonia.Threading;
+using PhotonCanvas.App;
+using PhotonCanvas.Core;
+using PhotonCanvas.Doc;
+using PhotonCanvas.Doc.Materials;
+using static PhotonCanvas.App.UiKit;
+
+namespace PhotonCanvas.Addon.Walls;
+
+/// <summary>
+/// The wall maker: the wall's size, its texture (a preset or your own), its top, doors, windows and
+/// mount points, and the columns that join walls, with a preview of every piece; then the pieces go
+/// into the design, nested onto the bed.
+/// </summary>
+public sealed class WallsWindow : Window
+{
+    readonly Document _doc;
+    readonly MachineProfile _machine;
+    readonly MaterialLibrary? _library;
+    readonly string? _dataFolder;
+    readonly CustomTextures _own;
+    (Guid Id, WallSpec Spec)? _editing;
+
+    // Wall
+    readonly NumericUpDown _length = Number(10, 2000, 5, "0.#"), _height = Number(5, 1000, 1, "0.#"), _thick = Number(0.5m, 20, 0.5m, "0.##"), _walls = Number(1, 100, 1, "0");
+    readonly ComboBox _measure = Combo("The panel as cut", "Column centre to centre");
+    readonly CheckBox _twoSided = new() { Content = "Two panels back to back (texture on both faces)" };
+    readonly ComboBox _cutWith = Combo(), _etchWith = Combo();
+    readonly TextBlock _cutNote = Hint();
+    List<(Material M, Recipe R)?> _cuts = [], _etches = [];
+
+    // Texture
+    readonly ComboBox _texture = Combo();
+    readonly List<string> _textureNames = [];
+    readonly NumericUpDown _sizeA = Number(0.5m, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0");
+    readonly TextBlock _sizeALabel = Label("Size"), _sizeBLabel = Label("Size"), _textureAbout = Hint();
+    Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!, _seedRow = null!;
+    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
+    readonly CheckBox _plainEnds = new() { Content = "Keep the ends smooth where they go into the columns", IsChecked = true };
+    readonly TextBox _ownName = new() { Watermark = "A name for your texture" };
+    readonly NumericUpDown _ownGap = Number(0, 100, 0.5m, "0.##"), _ownShift = Number(0, 100, 5, "0");
+    readonly Button _ownDelete = UiKit.Button("Delete this texture");
+    readonly TextBlock _ownNote = Hint();
+
+    // Top
+    readonly ComboBox _top = Combo("Straight", "Battlements (parapet)", "Ruined");
+    readonly NumericUpDown _merlonW = Number(1, 100, 0.5m, "0.#"), _crenelW = Number(1, 100, 0.5m, "0.#"), _merlonH = Number(1, 100, 0.5m, "0.#"), _walkDepth = Number(4, 60, 1, "0.#"), _ruin = Number(5, 80, 5, "0");
+    readonly CheckBox _walkway = new() { Content = "Walkway behind the battlements (a strip on brackets)" };
+    Control _battleRows = null!, _ruinRow = null!;
+
+    // Doors and windows
+    readonly ComboBox _door = Combo("No door", "Doorway (cut through)", "Closed door (etched)", "Doorway and a door to fit it");
+    readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch");
+    readonly NumericUpDown _doorW = Number(3, 500, 0.5m, "0.#"), _doorH = Number(3, 500, 0.5m, "0.#"), _doorAt = Number(-1000, 1000, 1, "0.#");
+    readonly NumericUpDown _windows = Number(0, 50, 1, "0"), _winW = Number(1, 300, 0.5m, "0.#"), _winH = Number(1, 300, 0.5m, "0.#"), _sill = Number(0, 1000, 0.5m, "0.#"), _barW = Number(0.6m, 10, 0.1m, "0.#"), _frame = Number(0, 10, 0.5m, "0.#");
+    readonly ComboBox _winShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit");
+    readonly ComboBox _bars = Combo("No bars", "A cross", "Upright bars");
+    Control _doorRows = null!, _winRows = null!;
+
+    // Mounts
+    readonly NumericUpDown _mounts = Number(0, 50, 1, "0"), _mountH = Number(1, 1000, 0.5m, "0.#"), _mountSlot = Number(2, 30, 0.5m, "0.#");
+    readonly ComboBox _acc = Combo("None", "Wall pegs (pictures, shields, banners)", "Torch sconces", "Shelf brackets", "One of each");
+
+    // Connectors
+    readonly Dictionary<ConnectorKind, NumericUpDown> _counts = [];
+    readonly NumericUpDown _customAngle = Number(20, 340, 5, "0.#"), _columnW = Number(3, 200, 0.5m, "0.#"), _slotDepth = Number(0.5m, 50, 0.5m, "0.#"), _fit = Number(-1, 2, 0.05m, "0.##"), _pin = Number(0, 10, 0.1m, "0.#");
+    readonly ComboBox _column = Combo("Auto (to suit the angles)", "Square", "Octagon", "Round");
+    readonly CheckBox _cap = new() { Content = "A wider cap on top", IsChecked = true }, _foot = new() { Content = "A wider foot at the bottom" };
+
+    readonly Border _tabsHost = new() { Width = 440, Padding = new Thickness(14, 10, 8, 0) };
+    readonly WallPreview _preview = new();
+    readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
+    readonly StackPanel _findings = new() { Spacing = 4 };
+    readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
+    readonly Button _make = new() { Content = "Put in the design", Classes = { "primary" }, MinWidth = 160 };
+    readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    bool _loading;
+    int _generation;
+    WallKit? _kit;
+    WallSpec? _kitFrom;
+
+    public WallsWindow(Document doc, MachineProfile machine, MaterialLibrary? library, string? dataFolder, (Guid Id, WallSpec Spec)? editing)
+    {
+        _doc = doc;
+        _machine = machine;
+        _library = library;
+        _dataFolder = dataFolder;
+        _own = new CustomTextures(dataFolder);
+        _editing = editing;
+        Title = "Textured walls";
+        Width = 1080;
+        Height = 760;
+        MinWidth = 820;
+        MinHeight = 560;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Background = Brush("Bg1");
+
+        foreach (var k in Connectors.Kinds) _counts[k.Id] = Number(0, 200, 1, "0");
+        Library();
+
+        var tabs = new TabControl
+        {
+            Items =
+            {
+                Tab("Wall", WallTab()),
+                Tab("Texture", TextureTab()),
+                Tab("Top", TopTab()),
+                Tab("Doors & windows", OpeningsTab()),
+                Tab("Mounts", MountsTab()),
+                Tab("Connectors", ConnectorsTab()),
+            },
+        };
+        var left = _tabsHost;
+        left.Child = tabs;
+
+        var results = new StackPanel { Spacing = 8, Children = { _summary, _findings } };
+        var right = new Grid { RowDefinitions = new("*,Auto"), Margin = new Thickness(0, 14, 14, 0), RowSpacing = 8 };
+        right.Children.Add(new Border { CornerRadius = new(8), ClipToBounds = true, BorderBrush = Brush("Line"), BorderThickness = new(1), Child = _preview });
+        var resultScroll = new ScrollViewer { Content = results, MaxHeight = 200, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+        Grid.SetRow(resultScroll, 1);
+        right.Children.Add(resultScroll);
+
+        var bottom = new Grid { ColumnDefinitions = new("*,Auto,Auto"), Margin = new Thickness(14, 8, 14, 14), ColumnSpacing = 12 };
+        bottom.Children.Add(_status);
+        Grid.SetColumn(_make, 1);
+        bottom.Children.Add(_make);
+        var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
+        close.Click += (_, _) => Close();
+        Grid.SetColumn(close, 2);
+        bottom.Children.Add(close);
+
+        var body = new Grid { ColumnDefinitions = new("Auto,*"), RowDefinitions = new("*,Auto") };
+        body.Children.Add(left);
+        Grid.SetColumn(right, 1);
+        body.Children.Add(right);
+        Grid.SetRow(bottom, 1);
+        Grid.SetColumnSpan(bottom, 2);
+        body.Children.Add(bottom);
+        Content = body;
+
+        _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
+        _make.Click += (_, _) => Make();
+        Hook();
+        Load(editing?.Spec ?? LoadLast() ?? new WallSpec());
+        if (editing is not null) _make.Content = "Update in the design";
+        Closed += (_, _) => { _debounce.Stop(); _generation++; SaveLast(); };
+        Rebuild().ContinueWith(_ => { }, TaskScheduler.Default);
+    }
+
+    // ---- building the tabs ----
+
+    static TabItem Tab(string header, Control content) => new()
+    {
+        Header = header,
+        Content = new ScrollViewer { HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = new StackPanel { Spacing = 10, Margin = new Thickness(0, 10, 10, 10), Children = { content } } },
+    };
+
+    static ComboBox Combo(params string[] items) => new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = items.ToList(), SelectedIndex = items.Length > 0 ? 0 : -1 };
+
+    static TextBlock Label(string text) => new() { Text = text, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
+
+    /// <summary>Like <see cref="UiKit.Field"/>, with a label that can change.</summary>
+    static Control Line(TextBlock label, Control editor, string? tip = null)
+    {
+        var grid = new Grid { ColumnDefinitions = new("110,*") };
+        grid.Children.Add(label);
+        Grid.SetColumn(editor, 1);
+        grid.Children.Add(editor);
+        if (tip is not null) { ToolTip.SetTip(label, tip); ToolTip.SetTip(editor, tip); }
+        return grid;
+    }
+
+    /// <summary>A setting with its name above it (for two side by side).</summary>
+    static Control Small(string label, Control editor, string? tip = null)
+    {
+        var l = Muted(label);
+        if (tip is not null) { ToolTip.SetTip(l, tip); ToolTip.SetTip(editor, tip); }
+        return Labelled(l, editor);
+    }
+
+    static StackPanel Stack(params Control[] c)
+    {
+        var s = new StackPanel { Spacing = 8 };
+        foreach (var x in c) s.Children.Add(x);
+        return s;
+    }
+
+    Control WallTab() => Stack(
+        Explained("Size", "The wall panel. Thickness is your sheet's: the columns' slots and the mount points follow it.",
+            Row(Small("Length", _length, tip: "How long the wall is (mm)."), Small("Height", _height, tip: "How high the wall is (mm), to the top of any battlements.")),
+            Field("Length is", _measure, tip: "The panel as cut, or the distance between the centres of the columns at its ends: handy for laying walls out on a grid."),
+            Field("Thickness", _thick, tip: "The sheet's thickness (mm)."),
+            _twoSided,
+            Field("How many walls", _walls, tip: "How many walls like this to cut.")),
+        Explained("Material", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
+            Field("Cut with", _cutWith),
+            Field("Etch with", _etchWith, tip: "Settings for the texture (an engrave/fill recipe from your library)."),
+            _cutNote));
+
+    Control TextureTab()
+    {
+        _sizeARow = Line(_sizeALabel, _sizeA);
+        _sizeBRow = Line(_sizeBLabel, _sizeB);
+        _grooveRow = Field("Groove", _groove, tip: "How wide the etched gaps between bricks, stones or planks are (mm).");
+        var shuffle = UiKit.Button("Shuffle");
+        shuffle.HorizontalAlignment = HorizontalAlignment.Left;
+        shuffle.Click += (_, _) => _seed.Value = (_seed.Value ?? 1) % 9999 + 1;
+        _seedRow = Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
+            tip: "Stones, blocks and planks are laid out at random: each number gives a different layout.");
+        var fromSelection = UiKit.Button("From the selected shapes", tip: "Select some shapes on the canvas first: they become one tile of the texture.");
+        var fromSvg = UiKit.Button("From an SVG file…", tip: "An SVG drawing becomes one tile of the texture, at the size the file gives.");
+        fromSelection.Click += (_, _) => AddOwn(null);
+        fromSvg.Click += async (_, _) => await AddOwnFromFile();
+        _ownDelete.Click += (_, _) => DeleteOwn();
+        return Stack(
+            Explained("Texture", "Etched on the face of each wall. Pick a preset, or one of your own (they're listed after the presets).",
+                Field("Texture", _texture),
+                _textureAbout,
+                _sizeARow, _sizeBRow, _grooveRow, _seedRow,
+                Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker)."),
+                _plainEnds),
+            Explained("Your own texture", "Shapes you drew (or an SVG) repeated over the face in rows. Closed shapes are etched as areas, open ones as lines. It's kept in the list for next time.",
+                Field("Name", _ownName),
+                Row(Small("Gap", _ownGap, tip: "Space between one tile and the next (mm)."), Small("Row shift %", _ownShift, tip: "Move every other row along by this much of a tile: 50 for a brick-like offset.")),
+                Row(fromSelection, fromSvg),
+                _ownDelete,
+                _ownNote));
+    }
+
+    Control TopTab()
+    {
+        _battleRows = Stack(
+            Row(Small("Merlon width", _merlonW, tip: "The raised blocks along the top (mm)."), Small("Gap width", _crenelW, tip: "The gaps between them (mm).")),
+            Field("Merlon height", _merlonH, tip: "How deep the gaps go (mm)."),
+            _walkway,
+            Field("Walkway depth", _walkDepth, tip: "How far the walkway sticks out behind the wall (mm). Its brackets plug into slots in the wall."));
+        _ruinRow = Field("Broken down %", _ruin, tip: "How far down the broken part goes, as a share of the height.");
+        return Stack(Explained("The top", "A straight top, battlements (a parapet with gaps, and a walkway behind if you like), or a ruined, broken top. The ends stay whole so they still go into the columns.",
+            Field("Top", _top), _battleRows, _ruinRow));
+    }
+
+    Control OpeningsTab()
+    {
+        _doorRows = Stack(
+            Field("Door shape", _doorShape),
+            Row(Small("Door width", _doorW), Small("Door height", _doorH)),
+            Field("Door position", _doorAt, tip: "Where the door's middle is, in mm from the middle of the wall (less than 0 = to the left)."));
+        _winRows = Stack(
+            Field("Window shape", _winShape),
+            Row(Small("Window width", _winW), Small("Window height", _winH)),
+            Field("Sill height", _sill, tip: "How high the bottom of the windows is above the bottom of the wall (mm)."),
+            Row(Small("Bars", _bars), Small("Bar width", _barW, tip: "How wide the bars left across the window are (mm). Very thin bars break: 1.5 mm or more in plywood.")));
+        return Stack(
+            Explained("Door", "Cut through, etched on as a closed door, or cut through with a loose door to fit it (planks, braces and a ring handle etched on).",
+                Field("Door", _door), _doorRows),
+            Explained("Windows", "Spread evenly along the wall, clear of the door and the ends.",
+                Field("Windows", _windows), _winRows),
+            Field("Frame", _frame, tip: "A smooth band round each door and window where the texture stops, edged with a groove (mm). 0 = none."));
+    }
+
+    Control MountsTab() => Stack(Explained("Mount points",
+        "Small slots right through the wall, as wide as the sheet is thick, that accessories plug into from either side: pegs for pictures, shields and banners, torch sconces, shelf brackets. Use the same slot for anything you make with a tab that size.",
+        Field("Mount points", _mounts, tip: "How many slots on each wall, spread evenly clear of the doors and windows."),
+        Row(Small("Mount height", _mountH, tip: "How high the middle of the slots is (mm)."), Small("Slot height", _mountSlot, tip: "How tall each slot is (mm).")),
+        Field("Accessories", _acc, tip: "Accessories to cut, one per mount point (one of each: three per mount point).")));
+
+    Control ConnectorsTab()
+    {
+        var counts = Stack([.. Connectors.Kinds.Select(k => Field(k.Name, _counts[k.Id]))]);
+        return Stack(
+            Explained("Connectors", "Columns the walls slide into, stacked from layers of the same sheet. Say how many of each to cut: for a square room, four corners.",
+                counts,
+                Field("Your angle (°)", _customAngle, tip: "The angle between the two walls for \"Your angle\" columns (degrees)."),
+                Field("Column shape", _column, tip: "Auto is square for straight runs, corners, T and crosses, an octagon for 45° steps and round otherwise."),
+                Row(Small("Column width", _columnW, tip: "Across the column's flats (mm)."), Small("Slot depth", _slotDepth, tip: "How far the walls go into the column (mm). The walls' ends are kept smooth that far."))),
+            Explained("Fit", "Slots are the wall's thickness plus the fit. With your material's cut settings picked (Wall tab), the kerf is allowed for too.",
+                Row(Small("Slot fit", _fit, tip: "Added to the wall's thickness for the slots (mm): more is looser."), Small("Pin hole Ø", _pin, tip: "A hole up the middle of each layer, for a cocktail stick or wire that lines the stack up (mm). 0 = none.")),
+                _cap, _foot));
+    }
+
+    // ---- the library ----
+
+    void Library()
+    {
+        var mats = _library?.Materials ?? [];
+        _cuts = [null, .. mats.SelectMany(m => m.Recipes.Where(r => r.Settings.Mode == LayerMode.Cut).Select(r => ((Material, Recipe)?)(m, r)))];
+        _etches = [null, .. mats.SelectMany(m => m.Recipes.Where(r => r.Settings.Mode == LayerMode.Fill).Select(r => ((Material, Recipe)?)(m, r)))];
+        _cutWith.ItemsSource = _cuts.Select(c => c is { } x ? $"{x.M.Label} · {x.R.Title}" + (x.R.Settings.KerfMm > 0 ? $" (kerf {x.R.Settings.KerfMm:0.###} mm)" : "") : "As set on the cut layer").ToList();
+        _etchWith.ItemsSource = _etches.Select(c => c is { } x ? $"{x.M.Label} · {x.R.Title}" : "As set on the etch layer").ToList();
+        _cutWith.SelectedIndex = 0;
+        _etchWith.SelectedIndex = 0;
+    }
+
+    (Material M, Recipe R)? CutRecipe => _cutWith.SelectedIndex > 0 && _cutWith.SelectedIndex < _cuts.Count ? _cuts[_cutWith.SelectedIndex] : null;
+    (Material M, Recipe R)? EtchRecipe => _etchWith.SelectedIndex > 0 && _etchWith.SelectedIndex < _etches.Count ? _etches[_etchWith.SelectedIndex] : null;
+
+    void CutChosen()
+    {
+        if (!_loading && CutRecipe is { } c)
+        {
+            _loading = true;
+            if (c.M.ThicknessMm is { } t) _thick.Value = (decimal)Math.Clamp(t, 0.5, 20);
+            if (c.R.SlotFitMm is { } fit) _fit.Value = (decimal)Math.Clamp(fit, -1, 2);
+            // An etch recipe for the same material, if there is one.
+            int same = _etches.FindIndex(e => e is { } x && x.M.Id == c.M.Id);
+            if (same > 0 && EtchRecipe is null) _etchWith.SelectedIndex = same;
+            _loading = false;
+        }
+        _cutNote.Text = CutRecipe is not { } r
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out a little loose. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for slots at their drawn size."
+            : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so slots come out their drawn width."
+            : $"{r.M.Label}: no kerf measured yet, so slots come out a little loose (run a cut test).";
+        Changed();
+    }
+
+    // ---- settings in and out ----
+
+    void Hook()
+    {
+        foreach (var n in new[] { _length, _height, _thick, _walls, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
+            n.ValueChanged += (_, _) => Changed();
+        foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
+        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _winShape, _bars, _acc, _column, _etchWith })
+            c.SelectionChanged += (_, _) => Changed();
+        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot })
+            c.IsCheckedChanged += (_, _) => Changed();
+        _cutWith.SelectionChanged += (_, _) => CutChosen();
+        _texture.SelectionChanged += (_, _) => TextureChosen();
+    }
+
+    void FillTextures(string select)
+    {
+        _textureNames.Clear();
+        _textureNames.AddRange(Textures.Presets.Select(p => p.Name));
+        _textureNames.AddRange(_own.All.Select(t => t.Name).Where(n => !_textureNames.Contains(n)));
+        if (!_textureNames.Contains(select) && _editing?.Spec.Custom is { } c && c.Name == select) _textureNames.Add(select);
+        bool was = _loading;
+        _loading = true;
+        _texture.ItemsSource = _textureNames.Select(n => Textures.Preset(n) is null ? $"{n} (yours)" : n).ToList();
+        _texture.SelectedIndex = Math.Max(0, _textureNames.IndexOf(select));
+        _loading = was;
+        ShowTextureRows();
+    }
+
+    string TextureName => _texture.SelectedIndex >= 0 && _texture.SelectedIndex < _textureNames.Count ? _textureNames[_texture.SelectedIndex] : "Brick";
+
+    CustomTexture? OwnTexture => Textures.Preset(TextureName) is null ? _own.Get(TextureName) ?? (_editing?.Spec.Custom is { } c && c.Name == TextureName ? c : null) : null;
+
+    void TextureChosen()
+    {
+        if (_loading) return;
+        _loading = true;
+        if (Textures.Preset(TextureName) is { } p)
+        {
+            if (p.SizeALabel is not null) _sizeA.Value = (decimal)p.SizeA;
+            if (p.SizeBLabel is not null) _sizeB.Value = (decimal)p.SizeB;
+            if (p.UsesGroove) _groove.Value = (decimal)p.Groove;
+        }
+        else if (OwnTexture is { } own) _sizeA.Value = (decimal)Math.Clamp(own.TileWidthMm, 0.5, 300);
+        _loading = false;
+        ShowTextureRows();
+        Changed();
+    }
+
+    void ShowTextureRows()
+    {
+        if (Textures.Preset(TextureName) is { } p)
+        {
+            _sizeALabel.Text = p.SizeALabel ?? "";
+            _sizeBLabel.Text = p.SizeBLabel ?? "";
+            _sizeARow.IsVisible = p.SizeALabel is not null;
+            _sizeBRow.IsVisible = p.SizeBLabel is not null;
+            _grooveRow.IsVisible = p.UsesGroove;
+            _seedRow.IsVisible = p.Random;
+            _textureAbout.Text = p.About;
+            _ownDelete.IsEnabled = false;
+        }
+        else
+        {
+            _sizeALabel.Text = "Tile width";
+            _sizeARow.IsVisible = true;
+            _sizeBRow.IsVisible = _grooveRow.IsVisible = _seedRow.IsVisible = false;
+            var own = OwnTexture;
+            _textureAbout.Text = own is null ? "" : $"Your texture: a {own.TileWidthMm:0.#} × {own.TileHeightMm:0.#} mm tile, scaled to the tile width, repeated in rows.";
+            _ownDelete.IsEnabled = _own.Get(TextureName) is not null;
+        }
+    }
+
+    void ShowRows()
+    {
+        _battleRows.IsVisible = _top.SelectedIndex == 1;
+        _ruinRow.IsVisible = _top.SelectedIndex == 2;
+        _doorRows.IsVisible = _door.SelectedIndex > 0;
+        _winRows.IsVisible = (_windows.Value ?? 0) > 0;
+    }
+
+    static decimal D(double v) => (decimal)v;
+    static double V(NumericUpDown n, double fallback) => n.Value is { } v ? (double)v : fallback;
+
+    void Load(WallSpec s)
+    {
+        _loading = true;
+        _length.Value = D(s.LengthMm); _height.Value = D(s.HeightMm); _thick.Value = D(s.ThicknessMm); _walls.Value = s.Walls;
+        _measure.SelectedIndex = (int)s.Measure; _twoSided.IsChecked = s.TwoSided;
+        _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
+        _etch.SelectedIndex = (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
+        _top.SelectedIndex = (int)s.Top; _merlonW.Value = D(s.MerlonWidthMm); _crenelW.Value = D(s.CrenelWidthMm); _merlonH.Value = D(s.MerlonHeightMm);
+        _walkway.IsChecked = s.Walkway; _walkDepth.Value = D(s.WalkwayDepthMm); _ruin.Value = D(Math.Round(s.RuinDepth * 100));
+        _door.SelectedIndex = (int)s.Door; _doorShape.SelectedIndex = s.DoorShape switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
+        _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm); _doorAt.Value = D(s.DoorOffsetMm);
+        _windows.Value = s.Windows; _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
+        _bars.SelectedIndex = (int)s.Bars; _barW.Value = D(s.BarMm); _frame.Value = D(s.FrameMm);
+        _mounts.Value = s.Mounts; _mountH.Value = D(s.MountHeightMm); _mountSlot.Value = D(s.MountSlotMm); _acc.SelectedIndex = (int)s.Accessories;
+        foreach (var (k, n) in _counts) n.Value = s.ConnectorCount(k);
+        _customAngle.Value = D(s.CustomAngleDeg); _column.SelectedIndex = (int)s.Column; _columnW.Value = D(s.ColumnMm); _slotDepth.Value = D(s.SlotDepthMm);
+        _fit.Value = D(s.FitMm); _pin.Value = D(s.PinMm); _cap.IsChecked = s.Cap; _foot.IsChecked = s.Foot;
+        _loading = false;
+        FillTextures(s.Texture);
+        ShowRows();
+        CutChosen();
+    }
+
+    WallSpec Current()
+    {
+        var own = OwnTexture;
+        return new WallSpec
+        {
+            LengthMm = V(_length, 100), Measure = (LengthMeasure)Math.Max(0, _measure.SelectedIndex), HeightMm = V(_height, 50), ThicknessMm = V(_thick, 3),
+            TwoSided = _twoSided.IsChecked == true, Walls = (int)V(_walls, 1),
+            Texture = TextureName, Custom = own, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
+            Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), PlainEnds = _plainEnds.IsChecked == true,
+            Top = (TopStyle)Math.Max(0, _top.SelectedIndex), MerlonWidthMm = V(_merlonW, 7), CrenelWidthMm = V(_crenelW, 5), MerlonHeightMm = V(_merlonH, 6),
+            Walkway = _walkway.IsChecked == true, WalkwayDepthMm = V(_walkDepth, 10), RuinDepth = V(_ruin, 40) / 100,
+            Door = (DoorKind)Math.Max(0, _door.SelectedIndex), DoorShape = _doorShape.SelectedIndex switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched },
+            DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28), DoorOffsetMm = V(_doorAt, 0),
+            Windows = (int)V(_windows, 0), WindowShape = (OpeningShape)Math.Max(0, _winShape.SelectedIndex), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 25),
+            Bars = (WindowBars)Math.Max(0, _bars.SelectedIndex), BarMm = V(_barW, 1.5), FrameMm = V(_frame, 1.5),
+            Mounts = (int)V(_mounts, 0), MountHeightMm = V(_mountH, 30), MountSlotMm = V(_mountSlot, 6), Accessories = (Accessory)Math.Max(0, _acc.SelectedIndex),
+            FitMm = V(_fit, 0.15),
+            Connectors = _counts.Where(kv => (kv.Value.Value ?? 0) > 0).ToDictionary(kv => kv.Key, kv => (int)kv.Value.Value!.Value),
+            CustomAngleDeg = V(_customAngle, 120), Column = (ColumnShape)Math.Max(0, _column.SelectedIndex), ColumnMm = V(_columnW, 16), SlotDepthMm = V(_slotDepth, 4),
+            PinMm = V(_pin, 2), Cap = _cap.IsChecked == true, Foot = _foot.IsChecked == true,
+        };
+    }
+
+    string? LastFile => _dataFolder is null ? null : Path.Combine(_dataFolder, "last.json");
+
+    WallSpec? LoadLast()
+    {
+        try { return LastFile is { } f && File.Exists(f) ? WallSpec.FromJson(File.ReadAllText(f)) : null; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    void SaveLast()
+    {
+        try
+        {
+            if (LastFile is not { } f) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(f)!);
+            File.WriteAllText(f, Current().ToJson());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    // ---- your own textures ----
+
+    void AddOwn(CustomTexture? made)
+    {
+        string name = (_ownName.Text ?? "").Trim();
+        if (name.Length == 0) { _ownNote.Text = "Type a name for it first."; return; }
+        if (Textures.Preset(name) is not null) { _ownNote.Text = "That's the name of a preset: pick another."; return; }
+        if (made is null)
+        {
+            var shapes = _doc.State.Shapes.Where(x => _doc.Selection.Contains(x.Id)).OfType<PathShape>().Select(x => x.World).ToList();
+            if (shapes.Count == 0) { _ownNote.Text = "Select some drawn shapes on the canvas first (close this window, select, and open it again)."; return; }
+            made = CustomTextures.FromGeometry(name, shapes, V(_ownGap, 0), V(_ownShift, 0) / 100);
+            if (made is null) { _ownNote.Text = "Those shapes have no size."; return; }
+        }
+        try { _own.Put(made); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _ownNote.Text = $"Couldn't save it: {e.Message}"; return; }
+        _ownNote.Text = $"\"{made.Name}\" is in the list: a {made.TileWidthMm:0.#} × {made.TileHeightMm:0.#} mm tile.";
+        FillTextures(made.Name);
+        TextureChosen();
+    }
+
+    async Task AddOwnFromFile()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "An SVG drawing for your texture",
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType("SVG drawings") { Patterns = ["*.svg"] }],
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        if ((_ownName.Text ?? "").Trim().Length == 0) _ownName.Text = Path.GetFileNameWithoutExtension(path);
+        try
+        {
+            var t = CustomTextures.FromSvg(_ownName.Text!, path, V(_ownGap, 0), V(_ownShift, 0) / 100);
+            if (t is null) { _ownNote.Text = "That file has no shapes in it."; return; }
+            AddOwn(t);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or FormatException or System.Xml.XmlException or InvalidOperationException)
+        {
+            _ownNote.Text = $"Couldn't read it: {e.Message}";
+        }
+    }
+
+    void DeleteOwn()
+    {
+        string name = TextureName;
+        if (_own.Get(name) is null) return;
+        try { _own.Remove(name); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _ownNote.Text = $"Couldn't delete it: {e.Message}"; return; }
+        _ownNote.Text = $"\"{name}\" deleted (walls already made with it keep it).";
+        FillTextures("Brick");
+        TextureChosen();
+    }
+
+    // ---- preview ----
+
+    void Changed()
+    {
+        if (_loading) return;
+        ShowRows();
+        _debounce.Stop();
+        _debounce.Start();
+    }
+
+    async Task Rebuild()
+    {
+        int gen = ++_generation;
+        var spec = Current();
+        WallKit kit;
+        try { kit = await Task.Run(() => WallKitMaker.Make(spec)); }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or ArithmeticException)
+        {
+            if (gen == _generation) _preview.Show(null, e.Message);
+            return;
+        }
+        if (gen != _generation) return;
+        _kit = kit;
+        _kitFrom = spec;
+        var findings = kit.Findings.Concat(Placement.TooBig(kit, _machine)).ToList();
+        _preview.Show(kit.Parts.Count > 0 ? kit : null, findings.FirstOrDefault(f => f.Level == Severity.Bad)?.Text ?? "Nothing to show.");
+        _findings.Children.Clear();
+        foreach (var f in findings.OrderByDescending(f => f.Level)) _findings.Children.Add(FindingRow(f));
+        int pieces = kit.PieceCount;
+        _summary.Text = kit.Parts.Count == 0 ? "" :
+            $"{pieces} piece{(pieces == 1 ? "" : "s")} to cut: " + ListWords(kit.Parts.Select(p => p.Copies > 1 ? $"{p.Copies} × {Lower(p.Name)}" : Lower(p.Name))) + ".";
+        _make.IsEnabled = kit.Ok && kit.Parts.Count > 0 && !findings.Any(f => f.Level == Severity.Bad);
+    }
+
+    /// <summary>"Corner column layer" → "corner column layer", but "T column layer" stays.</summary>
+    static string Lower(string name) => name.Length > 1 && char.IsLower(name[1]) ? char.ToLowerInvariant(name[0]) + name[1..] : name;
+
+    static Control FindingRow(Finding f)
+    {
+        var (mark, brush) = f.Level switch
+        {
+            Severity.Bad => ("✕", Brush("Danger")),
+            Severity.Warn => ("!", Brush("Warn")),
+            _ => ("•", Brush("TextMuted")),
+        };
+        var g = new Grid { ColumnDefinitions = new("20,*") };
+        g.Children.Add(new TextBlock { Text = mark, Foreground = brush, FontWeight = FontWeight.Bold, HorizontalAlignment = HorizontalAlignment.Center });
+        var t = new TextBlock { Text = f.Text, TextWrapping = TextWrapping.Wrap };
+        Grid.SetColumn(t, 1);
+        g.Children.Add(t);
+        return g;
+    }
+
+    // ---- putting it in ----
+
+    bool _making;
+
+    async void Make()
+    {
+        if (_making) return;
+        _making = true;
+        _make.IsEnabled = false;
+        _status.Text = "Putting the pieces in the design…";
+        try
+        {
+            var spec = Current();
+            var built = _kit is not null && _kitFrom?.ToJson() == spec.ToJson() ? _kit : null;
+            Func<Layer, Layer>? cut = CutRecipe is { } c ? l => c.R.Settings.ApplyTo(l) with { Material = new MaterialRef(c.M.Id, c.M.Label, c.R.Id, c.R.Title) } : null;
+            Func<Layer, Layer>? etch = EtchRecipe is { } e ? l => e.R.Settings.ApplyTo(l) with { Material = new MaterialRef(e.M.Id, e.M.Label, e.R.Id, e.R.Title) } : null;
+            Guid? replace = _editing is { } ed && Placement.ShapesOf(_doc.State, ed.Id).Count + _doc.State.OtherPages.Sum(p => p.Shapes.Count(x => x.AddonData.TryGetValue(Placement.IdKey, out var v) && v == ed.Id.ToString())) > 0 ? ed.Id : null;
+            var before = _doc.State;
+            var (kit, s, sheets, id) = await Task.Run(() =>
+            {
+                var kit = built ?? WallKitMaker.Make(spec);
+                if (!kit.Ok) throw new InvalidOperationException(kit.Findings.First(f => f.Level == Severity.Bad).Text);
+                var (s, sheets, id) = Placement.Place(before, kit, spec, _machine, new PlaceOptions { CutSettings = cut, EtchSettings = etch, Replace = replace });
+                return (kit, s, sheets, id);
+            });
+            if (!ReferenceEquals(_doc.State, before)) { _status.Text = "The design changed meanwhile: press again to put the pieces in."; return; }
+            _doc.Commit(replace is null ? "Walls" : "Update the walls", s, Placement.ShapesOf(s, id));
+            _editing = (id, spec);
+            _make.Content = "Update in the design";
+            int pieces = kit.PieceCount;
+            _status.Text = $"{(replace is null ? "Put" : "Updated")} {pieces} piece{(pieces == 1 ? "" : "s")} in the design" +
+                           (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
+                           $": outlines on \"{Placement.CutLayer}\", the texture on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).";
+        }
+        catch (InvalidOperationException ex) { _status.Text = ex.Message; }
+        catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)
+        {
+            AppLog.Error("walls", ex);
+            _status.Text = $"Couldn't put the walls in: {ex.Message}";
+        }
+        finally
+        {
+            _making = false;
+            _make.IsEnabled = _kit?.Ok ?? true;
+        }
+    }
+}
