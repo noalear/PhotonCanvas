@@ -77,7 +77,7 @@ public static class Storage
             }
             m.Add("Back", bk, [], [Pose.Front(T, y0, bi + T / 2)], grainAlongU: false, face: it.Books ? [] : [Geo.Rect(0, 0, Li, Hbk)], etched: etched, lines: lines);
         }
-        else m.Note("Without a back panel, glue the shelves in square.");
+        else m.Note(m.PushFit ? "Without a back panel the shelves hold the sides square only by their slots: add the back for a stiffer bookshelf." : "Without a back panel, glue the shelves in square.");
 
         // The top, overhanging at the front and sides.
         double Wt = W + 2 * oh, Dt = D + oh;
@@ -120,7 +120,11 @@ public static class Storage
     // ---- boxes ----
 
     /// <summary>One face of a box: its outline (flat), where it sits, and its size along u and v.</summary>
-    public sealed record Panel(string Name, PathsD Cut, Pose Pose, double Lu, double Lv);
+    public sealed record Panel(string Name, PathsD Cut, Pose Pose, double Lu, double Lv)
+    {
+        /// <summary>Grip ribs on the sides of its fingers (push fit), to add to the cut after it's checked.</summary>
+        public PathsD Ribs { get; init; } = [];
+    }
 
     /// <summary>
     /// The panels of a box <paramref name="size"/> (x, y, z) outside, with finger joints along every
@@ -128,7 +132,7 @@ public static class Storage
     /// the front and back, then the ends, then the bottom and top. <paramref name="has"/> = left, right,
     /// bottom, top, back, front.
     /// </summary>
-    public static List<Panel> Box(double[] size, double T, bool[] has)
+    public static List<Panel> Box(double[] size, double T, bool[] has, double rib = 0)
     {
         static int Rank(int axis) => axis == 2 ? 3 : axis == 0 ? 2 : 1;
         bool Has(int axis, int side) => has[axis * 2 + side];
@@ -167,6 +171,7 @@ public static class Storage
                         break;
                 }
                 var rects = new PathsD();
+                var ribs = new PathsD();
                 (double, double)[] Zones(double L) => [(0, T), (T, L - T), (L - T, L)];
                 var zb = Zones(size[b]);
                 var zc = Zones(size[c]);
@@ -197,6 +202,23 @@ public static class Storage
                             if ((k % 2 == 0) != even) continue;
                             double s0 = from + (to - from) * k / nseg, s1 = from + (to - from) * (k + 1) / nseg;
                             rects.Add(endB ? Geo.Rect(b0, s0, b1, s1) : Geo.Rect(s0, c0, s1, c1));
+                            if (rib > 0)
+                            {
+                                // A rib on each side of the finger, pressing on the fingers either side of it.
+                                double bw = Math.Min(0.8, T * 0.45);
+                                if (endB)
+                                {
+                                    double bm = (b0 + b1) / 2;
+                                    ribs.Add(Maker.Tooth(new(bm, s1), new(1, 0), new(0, 1), bw, rib));
+                                    ribs.Add(Maker.Tooth(new(bm, s0), new(1, 0), new(0, -1), bw, rib));
+                                }
+                                else
+                                {
+                                    double cm = (c0 + c1) / 2;
+                                    ribs.Add(Maker.Tooth(new(s1, cm), new(0, 1), new(1, 0), bw, rib));
+                                    ribs.Add(Maker.Tooth(new(s0, cm), new(0, 1), new(-1, 0), bw, rib));
+                                }
+                            }
                         }
                     }
                 // Room coordinates → the panel's flat ones.
@@ -207,8 +229,9 @@ public static class Storage
                     g[b] = gb; g[c] = gc; g[a] = Coord(pose.O, a);
                     return new V3(g[0], g[1], g[2]);
                 }
-                var flat = Geo.Map(Geo.Union(rects), p => { var l = pose.Local(Room(p.x, p.y)); return new PointD(l.U, l.V); });
-                panels.Add(new Panel(names[a * 2 + s], Geo.Tidy(flat), pose, size[b], size[c]));
+                PointD Flat(PointD p) { var l = pose.Local(Room(p.x, p.y)); return new PointD(l.U, l.V); }
+                var flat = Geo.Map(Geo.Union(rects), Flat);
+                panels.Add(new Panel(names[a * 2 + s], Geo.Tidy(flat), pose, size[b], size[c]) { Ribs = Geo.Map(ribs, Flat) });
             }
         return panels;
     }
@@ -245,7 +268,7 @@ public static class Storage
         double min = 3 * T + 2;
         if (W < min || D < min || H < min) { m.Bad($"The {what} is too small for a {T:0.##} mm sheet: make each side at least {min:0.#} mm."); return; }
         bool closed = it.Lid == LidStyle.Flat;
-        var panels = Box([W, H, D], T, [true, true, true, closed, true, true]);
+        var panels = Box([W, H, D], T, [true, true, true, closed, true, true], m.PushFit ? m.Grip / 2 : 0);
         double band = Math.Clamp(Math.Min(W, D) * 0.07, 0.6, 1.2);
         foreach (var p in panels)
         {
@@ -261,7 +284,7 @@ public static class Storage
             if (!chest && it.Bands && p.Name != "Bottom") Braced(p.Lu, p.Lv, T, etched);
             bool planks = side || p.Name == "Lid";
             m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
-                etched: etched, lines: lines);
+                etched: etched, lines: lines, ribs: p.Ribs);
         }
         if (chest && it.Lid == LidStyle.Loose)
         {
@@ -270,11 +293,29 @@ public static class Storage
             var etched = new PathsD();
             var lines = new List<PathD>();
             if (it.Bands && Wl > 2 * (T + band + lo) + 2) Bands([T + band + lo, Wl - T - band - lo], Dl, band, etched, lines);
-            m.Add("Lid", [Geo.Rect(0, 0, Wl, Dl)], [], [Pose.Up(-lo, H + T / 2, D + lo)], grainAlongU: true, planks: true, plankMm: 2.4, etched: etched, lines: lines);
             double Wr = W - 2 * T - 2 * cl, Dr = D - 2 * T - 2 * cl;
-            if (Wr > 2 && Dr > 2)
+            // Push fit: two upright strips just inside the front and back, their tabs up through the lid.
+            double hs = Math.Min(Math.Clamp(H * 0.25, 1.5, 3), H - 2 * T - 0.5), tw = Math.Clamp(Wr * 0.2, 1.5, 4);
+            bool strips = m.PushFit && Wr > 2 * tw + 3 && Dr > 2 * T + 1 && hs >= 1.2;
+            var slots = new PathsD();
+            double[] zs = [T + cl + T / 2, D - T - cl - T / 2], xs = [T + cl + Wr * 0.25, T + cl + Wr * 0.75];
+            if (strips)
+                foreach (var z in zs)
+                    foreach (var x in xs)
+                        slots.Add(Geo.Rect(x + lo - tw / 2 - m.Fit / 2, D + lo - z - m.SlotW / 2, x + lo + tw / 2 + m.Fit / 2, D + lo - z + m.SlotW / 2));
+            m.Add("Lid", [Geo.Rect(0, 0, Wl, Dl)], slots, [Pose.Up(-lo, H + T / 2, D + lo)], grainAlongU: true, planks: true, plankMm: 2.4, etched: etched, lines: lines);
+            if (strips)
+            {
+                var strip = new PathsD { Geo.Rect(0, H - hs, Wr, H) };
+                foreach (var x in xs) strip.Add(Geo.Rect(x - T - cl - tw / 2, H - 0.01, x - T - cl + tw / 2, H + T));
+                m.Add("Lid rail", strip, [], [.. zs.Select(z => Pose.Front(T + cl, 0, z))], grainAlongU: true);
+                m.Note("Push the two lid rails' tabs up into the slots under the lid: they keep the lid in place on the chest.");
+            }
+            else if (Wr > 2 && Dr > 2)
+            {
                 m.Add("Lid rim", [Geo.Rect(0, 0, Wr, Dr)], [], [Pose.Up(T + cl, H - T / 2, D - T - cl)], grainAlongU: true);
-            m.Note("Glue the rim under the middle of the lid: it keeps the lid in place on the chest.");
+                m.Note("Glue the rim under the middle of the lid: it keeps the lid in place on the chest.");
+            }
         }
         m.Note(closed ? $"Fit the sides together at the corners, the bottom in, and the lid on last: every piece goes in straight, its fingers between the others'." : $"Push the {what}'s sides together at the corners, then the bottom in.");
     }
