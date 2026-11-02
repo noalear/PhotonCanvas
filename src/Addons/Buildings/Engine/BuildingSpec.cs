@@ -11,6 +11,9 @@ public enum BuildingKind { Cottage, Tavern, Watchtower }
 /// <summary>The front door: hung on clips so it swings (the furniture maker's), loose in the doorway (the wall maker's), or just a doorway.</summary>
 public enum DoorStyle { Swinging, Loose, Open }
 
+/// <summary>How you get up to the floors above: the stairs maker's stairs, spiral stairs or a ladder, through an opening at the back.</summary>
+public enum WayUpStyle { Stairs, Spiral, Ladder, None }
+
 /// <summary>The top of the building: walls cut straight (for a roof), or a floor on top with a low wall of battlements round it.</summary>
 public enum BuildingTop { Straight, Battlements }
 
@@ -75,6 +78,9 @@ public sealed record BuildingSpec
     /// <summary>Bottom of the windows above the floor of their storey (mm).</summary>
     public double SillMm { get; init; } = 22;
     public WindowBars Bars { get; init; } = WindowBars.Cross;
+
+    /// <summary>The way up to each floor above.</summary>
+    public WayUpStyle WayUp { get; init; } = WayUpStyle.Stairs;
 
     /// <summary>Floor tiles (the floor tile maker's) under the whole building, cut from the wall sheet.</summary>
     public bool FloorTiles { get; init; } = true;
@@ -153,7 +159,7 @@ public sealed record BuildingSpec
         BuildingKind.Watchtower => new BuildingSpec
         {
             Kind = k, WidthMm = 72, DepthMm = 72, Storeys = 2, StoreyHeightMm = 45, Top = BuildingTop.Battlements, ParapetHeightMm = 21,
-            Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
+            Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Ladder, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
             WindowsFront = 1, WindowsSide = 1, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 15, SillMm = 18, Bars = WindowBars.None,
             Items = [I(ItemKind.Crate, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
         },

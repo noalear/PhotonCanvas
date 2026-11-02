@@ -36,6 +36,7 @@ public sealed class BuildingWindow : Window
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _width = Number(30, 2000, 5, "0.#"), _depth = Number(30, 2000, 5, "0.#"), _storeys = Number(1, 4, 1, "0"), _storeyH = Number(10, 500, 1, "0.#"), _parapet = Number(8, 200, 1, "0.#");
     readonly ComboBox _top = Combo("Straight (for a roof)", "A floor on top behind battlements");
+    readonly ComboBox _wayUp = Combo("Stairs", "Spiral stairs", "Ladder", "None (a plain floor)");
     Control _parapetRow = null!;
     readonly ComboBox _door = Combo("Hung on clips: it swings open", "Loose in the doorway", "Just a doorway");
     readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch");
@@ -186,7 +187,8 @@ public sealed class BuildingWindow : Window
                 Field("Storeys", _storeys, tip: "Storeys with rooms. A floor lies on the walls between each."),
                 Field("Storey height", _storeyH, tip: "How high each storey's walls are (mm)."),
                 Field("Top", _top, tip: "Straight walls take a roof; battlements put a floor on the top storey with a low wall round it."),
-                _parapetRow),
+                _parapetRow,
+                Field("Way up", _wayUp, tip: "What goes up through an opening in each floor, from the stair maker. It stands in the back right corner of the storey below.")),
             Explained("Floor tiles", "Jigsaw tiles the building stands on, cut from the wall sheet, as big as its outside and any yard round it.",
                 _tiles,
                 _tileRows = Stack(
@@ -285,7 +287,7 @@ public sealed class BuildingWindow : Window
     {
         foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
             n.ValueChanged += (_, _) => FromControls();
-        foreach (var c in new[] { _top, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
+        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
         _tiles.IsCheckedChanged += (_, _) => FromControls();
@@ -314,7 +316,7 @@ public sealed class BuildingWindow : Window
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - s.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
         _width.Value = D(s.WidthMm); _depth.Value = D(s.DepthMm); _storeys.Value = Math.Clamp(s.Storeys, 1, 4); _storeyH.Value = D(s.StoreyHeightMm);
-        _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm);
+        _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm); _wayUp.SelectedIndex = (int)s.WayUp;
         _door.SelectedIndex = (int)s.Door;
         _doorShape.SelectedIndex = s.DoorShape switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm);
@@ -345,7 +347,7 @@ public sealed class BuildingWindow : Window
         _spec = _spec with
         {
             WidthMm = V(_width, 110), DepthMm = V(_depth, 80), Storeys = (int)V(_storeys, 1), StoreyHeightMm = V(_storeyH, 48),
-            Top = top, ParapetHeightMm = V(_parapet, 21),
+            Top = top, ParapetHeightMm = V(_parapet, 21), WayUp = (WayUpStyle)Index(_wayUp),
             Door = (DoorStyle)Index(_door),
             DoorShape = Index(_doorShape) switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched },
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28),

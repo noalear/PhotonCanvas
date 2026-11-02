@@ -171,6 +171,41 @@ public class BuildingsTests
     }
 
     [Theory]
+    [InlineData(WayUpStyle.Stairs)]
+    [InlineData(WayUpStyle.Spiral)]
+    [InlineData(WayUpStyle.Ladder)]
+    [InlineData(WayUpStyle.None)]
+    public void Each_way_up_stands_inside_without_clashing(WayUpStyle way)
+    {
+        var spec = BuildingSpec.Preset(BuildingKind.Tavern) with { WayUp = way };
+        var kit = BuildingKitMaker.Make(spec);
+        Assert.DoesNotContain(kit.Findings, f => f.Level != Severity.Note);
+        var up = kit.Solids.Where(s => !s.IsFurniture && s.Side == WallSide.None && s.Name is not ("Corner column" or "Column cap")).ToList();
+        var plate = kit.Solids.First(s => s.Side == WallSide.Floor);
+        if (way == WayUpStyle.None)
+        {
+            Assert.Empty(up);
+            // A plain floor has no opening: its only holes are the four pin holes.
+            Assert.Equal(4, plate.Outline.Count(p => !Clipper.IsPositive(p)));
+            return;
+        }
+        Assert.NotEmpty(up);
+        Assert.Equal(5, plate.Outline.Count(p => !Clipper.IsPositive(p)));
+        double W = spec.WidthMm, D = spec.DepthMm, Wt = BuildingKitMaker.WallThickness(spec);
+        foreach (var u in up)
+        {
+            var (lo, hi) = Box(u);
+            Assert.True(lo.X >= -W / 2 + Wt / 2 - 0.05 && hi.X <= W / 2 - Wt / 2 + 0.05 && lo.Z >= -D / 2 + Wt / 2 - 0.05 && hi.Z <= D / 2 - Wt / 2 + 0.05, $"{u.Name} is outside the walls");
+            Assert.True(lo.Y >= BuildingKitMaker.StoreyBase(spec, 0) - 1e-6, $"{u.Name} is under the floor");
+            // At the back, away from the door.
+            Assert.True(hi.Z < D / 6, $"{u.Name} isn't at the back");
+        }
+        var structure = kit.Solids.Where(s => !s.IsFurniture && !up.Contains(s)).ToList();
+        Assert.Empty(Clashes(up, structure, 0.4));
+        Assert.Contains(kit.Findings, f => f.Text.Contains("back right", StringComparison.Ordinal));
+    }
+
+    [Theory]
     [MemberData(nameof(Kinds))]
     public void The_building_stands_on_floor_tiles_that_cover_it(BuildingKind k)
     {

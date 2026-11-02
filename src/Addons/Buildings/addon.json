@@ -2,9 +2,9 @@
   "id": "buildings",
   "name": "Whole-building kits",
   "version": "1.0.0",
-  "description": "Pick a cottage, tavern or watchtower and get every piece at once: textured walls with doors and windows, corner columns, floor tiles to stand it on, floors between storeys, a door that swings and the furniture for every room, sized for your figures.",
+  "description": "Pick a cottage, tavern or watchtower and get every piece at once: textured walls with doors and windows, corner columns, floor tiles to stand it on, floors between storeys with stairs or a ladder up, a door that swings and the furniture for every room, sized for your figures.",
   "category": "Make",
   "apiVersion": 1,
-  "requires": ["walls", "furniture", "floortiles"],
+  "requires": ["walls", "furniture", "floortiles", "stairs"],
   "onByDefault": true
 }

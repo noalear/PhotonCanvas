@@ -52,7 +52,7 @@ public static class Interior
     }
 
     /// <summary>Stands every piece of furniture in its room and adds it to <paramref name="solids"/>.</summary>
-    public static void Lay(BuildingSpec s, List<RoomItem> items, List<string> labels, SetKit kit, List<Solid> solids, List<Finding> findings)
+    public static void Lay(BuildingSpec s, List<RoomItem> items, List<string> labels, SetKit kit, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)>? blocked = null)
     {
         double W = s.WidthMm, D = s.DepthMm, Wt = BuildingKitMaker.WallThickness(s), c = BuildingKitMaker.Clearance, col = s.ColumnMm / 2;
         double T = kit.ThicknessMm;
@@ -72,6 +72,8 @@ public static class Interior
                 double dw = s.DoorWidthMm / 2 + c;
                 taken.Add(new(-dw, D / 2 - Wt / 2 - Math.Max(12, s.DoorWidthMm * 1.2), dw, D / 2));
             }
+            // The way up, and the opening above it.
+            foreach (var b in blocked ?? []) if (b.Storey == k) taken.Add(new(b.X0, b.Z0, b.X1, b.Z1));
             double floor = BuildingKitMaker.StoreyBase(s, k);
             var here = items.Select((r, i) => (r, i)).Where(x => Math.Clamp(x.r.Storey, 0, s.Storeys - 1) == k && x.i < kit.Items.Count && kit.Items[x.i].Ok)
                 .SelectMany(x => Enumerable.Repeat(x.i, Math.Max(1, x.r.Item.Count)))
