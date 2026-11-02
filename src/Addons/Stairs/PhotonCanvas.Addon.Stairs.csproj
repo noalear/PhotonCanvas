@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>stairs</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The wall maker's textures, column shapes and geometry (addon.json "requires" it): compile against it, never copy it. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
