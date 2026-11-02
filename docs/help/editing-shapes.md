@@ -23,6 +23,8 @@ Most of these commands replace a shape's outline with a new one, and that has si
 - **Pictures** are never changed by these commands; selected along with vector shapes, they're
   left as they are. To show only part of a picture, use **Image mask** on the Picture tab
   (the Image mask add-on).
+- **Stencil bridges** (the middles of O, A, R kept in a cut-out stencil) is the Stencil bridges
+  add-on: **Home → Outline → Stencil bridges**.
 - **Hand-placed tabs and start points** are dropped from a shape whose outline is rebuilt. Place
   them last. Moving, turning and resizing keep them.
 
@@ -32,7 +34,7 @@ Most of these commands replace a shape's outline with a new one, and that has si
 | **Break apart** | become outlines | one shape per outline, each on its shape's layer, in no group |
 | **Weld**, **Subtract**, **Intersect**, **Exclude** | become outlines | one new shape on the bottom shape's layer, in no group; the originals are removed |
 | **Offset** | used (the text itself stays if you keep the originals) | new shapes on each original's layer, in no group |
-| **Round corners**, **Stencil bridges…** | become outlines | the same shapes, layer and group |
+| **Round corners** | become outlines | the same shapes, layer and group |
 | **Simplify**, **Tidy lines**, **Extend lines to meet the next shape**, **Remove overlapping lines** | left out | the same shapes, layer and group |
 | **Cut shapes** | left out | new pieces on the bottom shape's layer, in no group |
 | **Mask with shape** | left out (they can be the mask) | the same shapes, layer and group, cut to the mask; a shape left with nothing is removed |
@@ -342,19 +344,6 @@ Useful for geometric patterns of touching circles.
 - The new circles are editable ellipses named "Tangent circle", on the first circle's layer, and
   are selected.
 
-### Stencil bridges
-
-Cut out of a sheet as a stencil, the middle of an O, A, R or B falls out with the letter.
-**Stencil bridges…** keeps a strip of the sheet across each letter that has a middle, so the
-middle stays joined to the stencil. Select the letters (a text, or any shapes with holes), then
-type how wide each bridge is: mm, default 1.
-
-- The strip runs straight up and down through each enclosed middle, across that letter.
-- Only shapes with an outline inside another are changed. If none has, the status bar says
-  "Nothing to bridge".
-- A text becomes plain outlines.
-- Wider bridges are stronger but show more.
-
 ### Drop shadow and 3D shadow
 
 Both add a shadow beside each selected closed shape, offset by a distance you type: **Offset X, Y
@@ -435,7 +424,6 @@ when a text is selected.
 - [Extend lines to meet](tutorial:edit-extend-lines)
 - [Remove doubled lines](tutorial:edit-remove-overlaps)
 - [Tangent circles](tutorial:edit-tangent-circles)
-- [Stencil bridges](tutorial:edit-stencil-bridges)
 - [Drop shadow and 3D shadow](tutorial:edit-shadows)
 - [Clear all guides](tutorial:edit-clear-guides)
 - [Tidy an imported drawing](tutorial:edit-tidy-lines)
