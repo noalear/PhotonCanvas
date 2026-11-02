@@ -277,6 +277,14 @@ public static class JobBuilder
 
             var images = onLayer.OfType<ImageShape>().ToList();
             var shapes = onLayer.OfType<PathShape>().ToList();
+            // Less power in places (set by an add-on's job hook): line fills and grey or dithered pictures only.
+            var power = s.LayerPower.GetValueOrDefault(layer.Id);
+            bool onOff = layer.Mode == LayerMode.Image && layer.ImageMode == ImageEngraveMode.Dither && layer.Dither is DitherMethod.Threshold or DitherMethod.Sketch;
+            if (power is not null && (onOff || (layer.Mode == LayerMode.Image && layer.ImageMode == ImageEngraveMode.Slices) || (layer.Mode == LayerMode.Fill && layer.FillStyle == FillStyle.Offset) || layer.Mode is LayerMode.Cut or LayerMode.Score))
+            {
+                warnings.Add($"Layer \"{layer.Name}\": power that changes from place to place only works on line fills and on pictures in shades of grey or dithered, so this layer runs at its own power everywhere.");
+                power = null;
+            }
             if (layer.Mode == LayerMode.Image)
             {
                 if (LeftOutOn(s, layer) is { } left) { warnings.Add(left); leftOut.Add(left); }
@@ -330,7 +338,7 @@ public static class JobBuilder
                         warnings.Add($"\"{img.Name}\" has {img.Source.Width} pixels across {img.Bounds.Width:0.#} mm ({OwnDpi(img):0} dpi), more than layer \"{layer.Name}\"'s {layer.Dpi:0} dpi. One dot per pixel would put {OwnDpi(img) / layer.Dpi:0.#}× the heat in, so it's engraved at {layer.Dpi:0} dpi instead (pass-through can't keep its own pixels).");
                     foreach (double angle in angles)
                     {
-                        var (dots, area) = Rasterize(img, layer, angle);
+                        var (dots, area) = Rasterize(img, layer, angle, power);
                         if (dots is null) continue;
                         var block = Finish(dots);
                         if (perPass)
@@ -339,7 +347,7 @@ public static class JobBuilder
                             var per = new List<DotBlock> { block };
                             for (int p = 2; p <= Math.Min(layer.Laser.Passes, MaxTurnedPasses); p++)
                             {
-                                var (more, moreArea) = Rasterize(img, layer, angle + (p - 1) * layer.AngleStepDeg);
+                                var (more, moreArea) = Rasterize(img, layer, angle + (p - 1) * layer.AngleStepDeg, power);
                                 per.Add(more is null ? block with { Bitmap = new Bitmap(1, 1), Levels = null } : Finish(more));
                                 area = area.Union(moreArea);
                             }
@@ -400,6 +408,7 @@ public static class JobBuilder
                         FocusOffsetMm = layer.FocusOffsetMm,
                         DotWidthMm = layer.DotWidthMm,
                         Unidirectional = !layer.Bidirectional,
+                        PowerScale = power,
                     };
                     block = block with
                     {
@@ -947,7 +956,8 @@ public static class JobBuilder
     /// apply its tone settings and dither it. Returns the dot block and the area it
     /// covers, or null when nothing would burn.
     /// </summary>
-    public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer, double angleDeg = 0)
+    /// <param name="power">Less power in places: each spot's darkness is scaled by the field there before it's dithered (or given its grey power).</param>
+    public static (DotBlock? Block, Rect2 Area) Rasterize(ImageShape img, Layer layer, double angleDeg = 0, PowerField? power = null)
     {
         angleDeg = ((angleDeg % 360) + 360) % 360;
         if (Math.Abs(angleDeg - Math.Round(angleDeg)) < 1e-9) angleDeg = Math.Round(angleDeg) % 360;
@@ -989,6 +999,7 @@ public static class JobBuilder
                 {
                     v = (float)tone.Apply(img.Source.SampleLuminance(px.X, px.Y));
                     if (material is not null) v = (float)material.Correct(v);
+                    if (power is not null) v = 1 - (1 - v) * (float)power.At(Pos(c, r));
                 }
                 grey[r * cols + c] = v;
             }

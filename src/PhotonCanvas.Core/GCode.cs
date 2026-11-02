@@ -279,6 +279,12 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// </summary>
     public double DotWidthMm { get; init; }
 
+    /// <summary>
+    /// Less power in some places (grain-aware engraving): each scan line is burned in pieces, each at
+    /// the layer's power times the field's factor there. Null = the layer's power everywhere.
+    /// </summary>
+    public PowerField? PowerScale { get; init; }
+
     /// <summary>The block as run on pass <paramref name="pass"/> (1-based): turned by <see cref="AngleStepDeg"/> per earlier pass.</summary>
     public FillBlock ForPass(int pass) => AngleStepDeg == 0 || pass <= 1 ? this : this with { AngleDeg = AngleDeg + (pass - 1) * AngleStepDeg, AngleStepDeg = 0 };
 
@@ -1051,7 +1057,7 @@ public sealed class Job
             {
                 body.Add(first ? $"G0{Pos(seg.Start, Fixed3)}" : $"G1{Pos(seg.Start, Fixed3)}S0");
                 first = false;
-                body.Add($"G1{Pos(seg.End, Fixed3)}S{s}");
+                BurnTo(body, seg.Start, seg.End, s, b.PowerScale, p => Pos(p, Fixed3));
             }
         }
         if (first) return [];
@@ -1453,6 +1459,17 @@ public sealed class Job
 
     static string[] BitmapTail(string tag) => ["", $"# {tag} BITMAP TAIL", "# motion_end", ""];
 
+    /// <summary>
+    /// One burned scan line to <paramref name="end"/> at S <paramref name="s"/>, or, with a power
+    /// field, in pieces each at its own lower S (the field never asks for more than <paramref name="s"/>).
+    /// </summary>
+    static void BurnTo(List<string> body, Vec2 start, Vec2 end, long s, PowerField? field, Func<Vec2, string> pos)
+    {
+        if (field is null || field.Lowest >= 1) { body.Add($"G1{pos(end)}S{s}"); return; }
+        foreach (var (at, f) in field.Along(start, end))
+            body.Add($"G1{pos(at)}S{Math.Clamp((long)Math.Round(s * f, MidpointRounding.AwayFromZero), 0, s)}");
+    }
+
     List<string> RenderFill(FillBlock b, string tag, int passes)
     {
         var segs = FillLines(b);
@@ -1475,7 +1492,7 @@ public sealed class Job
                 at0 = Pos(runUp, Fixed3);
                 body.Add(body.Count <= 4 ? $"G0{at0}" : $"G1{at0}S0");
                 if (over > 0) body.Add($"G1{Pos(seg.Start, Fixed3)}S0");
-                body.Add($"G1{Pos(seg.End, Fixed3)}S{s}");
+                BurnTo(body, seg.Start, seg.End, s, b.PowerScale, p => Pos(p, Fixed3));
                 if (over > 0) body.Add($"G1{Pos(runOut, Fixed3)}S0");
             }
         }
@@ -1492,7 +1509,7 @@ public sealed class Job
                 else body.Add($"G1X{xa}Y{ya}S0");
                 if (over > 0) body.Add($"G1X{Fixed3(seg.X0)}S0");
                 lastX = Fixed3(seg.X1);
-                body.Add($"G1X{lastX}S{s}");
+                BurnTo(body, seg.Start, seg.End, s, b.PowerScale, p => $"X{Fixed3(p.X)}");
                 if (over > 0)
                 {
                     lastX = Fixed3(seg.X1 + dir * over);
@@ -1511,7 +1528,7 @@ public sealed class Job
                 else if (last != at) body.Add($"G1{at}S0");
                 if (over > 0) body.Add($"G1{Pos(seg.Start, Fixed3)}S0");
                 last = Pos(seg.End, Fixed3);
-                body.Add($"G1{last}S{s}");
+                BurnTo(body, seg.Start, seg.End, s, b.PowerScale, p => Pos(p, Fixed3));
                 if (over > 0)
                 {
                     last = Pos(runOut, Fixed3);

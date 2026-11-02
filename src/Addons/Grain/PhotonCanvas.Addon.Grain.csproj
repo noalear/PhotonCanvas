@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>grain</AddonId>
+  </PropertyGroup>
+</Project>
