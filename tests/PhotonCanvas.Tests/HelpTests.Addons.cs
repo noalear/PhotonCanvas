@@ -23,9 +23,12 @@ public partial class HelpTests
         return d;
     }
 
-    static string AddonSources(string addon) => string.Join("\n", Directory.GetFiles(Path.Combine(AddonsDir, addon), "*.cs", SearchOption.AllDirectories)
+    static string AddonSources(string addon) => string.Join("\n", AddonFiles(addon));
+
+    /// <summary>Each of the add-on's source files, in a fixed order (the order files come off disk differs between computers).</summary>
+    static IEnumerable<string> AddonFiles(string addon) => Directory.GetFiles(Path.Combine(AddonsDir, addon), "*.cs", SearchOption.AllDirectories)
         .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"))
-        .Select(File.ReadAllText));
+        .Order(StringComparer.Ordinal).Select(File.ReadAllText);
 
     /// <summary>"Tab/Label" of each ribbon button the add-on adds (new RibbonButton("Tab", "Group", "Label", …)).</summary>
     static HashSet<string> AddonRibbon(string src) =>
@@ -93,7 +96,8 @@ public partial class HelpTests
 
         // Tutorial targets: the program's ribbon plus this add-on's buttons; labels from both sources.
         var commands = RibbonCommands().Concat(AddonRibbon(withRequired)).ToHashSet();
-        var literals = Sources.Value.Values.Append(withRequired).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
+        // String literals file by file: one file's odd quote (a verbatim @"…""…" string) mustn't throw the pairing off in the next.
+        var literals = Sources.Value.Values.Concat(needed.Append(addon).SelectMany(AddonFiles)).SelectMany(t => Regex.Matches(t, @"\$?""((?:[^""\\]|\\.)*)""").Select(m => m.Groups[1].Value)).ToHashSet();
         foreach (var t in own.Tutorials)
             foreach (var s in t.Steps)
                 if (s.Target is { } target)
