@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>mapterrain</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The wall, floor tile, furniture and building makers make the pieces and show them (addon.json "requires" them): compile against them, never copy them. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\FloorTiles\PhotonCanvas.Addon.FloorTiles.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Furniture\PhotonCanvas.Addon.Furniture.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Buildings\PhotonCanvas.Addon.Buildings.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
