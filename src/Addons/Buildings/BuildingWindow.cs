@@ -61,7 +61,9 @@ public sealed class BuildingWindow : Window
     readonly NumericUpDown _count = Number(0, 100, 1, "0"), _iw = Number(1, 1000, 0.5m, "0.#"), _id = Number(1, 1000, 0.5m, "0.#"), _ih = Number(1, 1000, 0.5m, "0.#");
     readonly TextBlock _itemAbout = Hint();
     Control _itemRows = null!;
-    readonly NumericUpDown _furnT = Number(0.3m, 20, 0.5m, "0.##"), _furnFit = Number(-0.5m, 2, 0.05m, "0.##");
+    readonly NumericUpDown _furnT = Number(0.3m, 20, 0.5m, "0.##"), _furnFit = Number(-0.5m, 2, 0.05m, "0.##"), _grip = Number(0.02m, 0.5m, 0.05m, "0.##");
+    readonly ComboBox _joints = Combo("Snug, to glue", "Push fit (grip ribs, no glue)");
+    Control _gripRow = null!;
     readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain"), _furnCut = Combo();
     readonly TextBlock _furnCutNote = Hint();
 
@@ -224,6 +226,8 @@ public sealed class BuildingWindow : Window
             Explained("Sheet", "The furniture and a door that swings are cut from this sheet. When it's not the walls' sheet, they go on pages of their own.",
                 Field("Thickness", _furnT, tip: "The furniture sheet's thickness (mm)."),
                 Field("Slot fit", _furnFit, tip: "Added to the sheet's thickness for the furniture's slots (mm): more is looser."),
+                Field("Joints", _joints, tip: "Snug joints want a drop of glue; push fit puts small ribs in every slot that squeeze flat, so the furniture holds without glue."),
+                _gripRow = Field("Grip", _grip, tip: "How much tighter than the sheet the ribs make each joint (mm); 0.15 suits plywood and MDF."),
                 Field("Wood", _detail, tip: "Grain is scored lines; planks add etched grooves between boards. The floors get planks too."),
                 Field("Cut with", _furnCut), _furnCutNote));
     }
@@ -267,9 +271,9 @@ public sealed class BuildingWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit })
+        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip })
             n.ValueChanged += (_, _) => FromControls();
-        foreach (var c in new[] { _top, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith })
+        foreach (var c in new[] { _top, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
         _wallCut.SelectionChanged += (_, _) => CutChosen(_wallCut, _wallT, _fit, _wallCutNote);
@@ -309,6 +313,7 @@ public sealed class BuildingWindow : Window
         _upper.SelectedIndex = s.UpperTexture is { Length: > 0 } up && _textures.IndexOf(up) is >= 0 and var ui ? ui + 1 : 0;
         _etch.SelectedIndex = (int)s.Etch;
         _furnT.Value = D(s.FurnitureSheetMm); _furnFit.Value = D(s.FurnitureFitMm); _detail.SelectedIndex = (int)s.Detail;
+        _joints.SelectedIndex = s.FurniturePushFit ? 1 : 0; _grip.Value = D(Math.Clamp(s.FurnitureGripMm, 0.02, 0.5)); _gripRow.IsVisible = s.FurniturePushFit;
         _parapetRow.IsVisible = s.Top == BuildingTop.Battlements;
         _loading = false;
         FillList(_sel);
@@ -334,7 +339,9 @@ public sealed class BuildingWindow : Window
             WallSheetMm = V(_wallT, 3), TwoSided = _twoSided.IsChecked == true, FitMm = V(_fit, 0.15), ColumnMm = V(_column, 16), Seed = (int)V(_seed, 1),
             Texture = _textures[Math.Clamp(Index(_texture), 0, _textures.Count - 1)], UpperTexture = upper, Etch = (EtchStyle)Index(_etch),
             FurnitureSheetMm = V(_furnT, 2), FurnitureFitMm = V(_furnFit, 0.1), Detail = (WoodDetail)Index(_detail),
+            FurniturePushFit = _joints.SelectedIndex == 1, FurnitureGripMm = V(_grip, 0.15),
         };
+        _gripRow.IsVisible = _spec.FurniturePushFit;
         _parapetRow.IsVisible = top == BuildingTop.Battlements;
         if (_spec.Storeys != storeysBefore) FillList(_sel);
         Shows();
@@ -351,7 +358,7 @@ public sealed class BuildingWindow : Window
         _spec = s with
         {
             WallSheetMm = _spec.WallSheetMm, TwoSided = _spec.TwoSided, FitMm = _spec.FitMm,
-            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, Detail = _spec.Detail, Seed = _spec.Seed, Etch = _spec.Etch,
+            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Detail = _spec.Detail, Seed = _spec.Seed, Etch = _spec.Etch,
         };
         _sel = 0;
         Load();

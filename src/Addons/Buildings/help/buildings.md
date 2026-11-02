@@ -92,7 +92,9 @@ Pick one to change **Storey**, **How many** (0 leaves it out) and its **Width**,
 comes in the furniture maker's standard style; for other legs, backs or lids, make that piece with
 **Home → Draw → Furniture** instead.
 
-**Thickness** is the furniture sheet (2 mm suits 28 mm figures; use 1 mm for 15 mm figures). If a
+**Thickness** is the furniture sheet (2 mm suits 28 mm figures; use 1 mm for 15 mm figures).
+**Joints** *Push fit (grip ribs, no glue)* adds the furniture maker's small ribs to every slot, so
+the furniture holds together without glue; **Grip** sets how tight. If a
 piece of furniture is too small for the sheet, it's left out with a yellow ! saying why, and the rest
 of the building still goes in.
 

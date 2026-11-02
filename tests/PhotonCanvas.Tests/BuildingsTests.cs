@@ -205,6 +205,18 @@ public class BuildingsTests
     }
 
     [Fact]
+    public void Push_fit_furniture_gets_the_furniture_makers_grip_ribs()
+    {
+        var spec = BuildingSpec.Preset(BuildingKind.Cottage);
+        var glued = BuildingKitMaker.Make(spec);
+        var pushed = BuildingKitMaker.Make(spec with { FurniturePushFit = true });
+        Assert.True(pushed.Ok);
+        Assert.True(pushed.Furniture!.Items.All(i => i.Item.Kind == ItemKind.WallDoor || i.Ok));
+        static double Points(BuildingKit k) => k.Pieces.Where(p => p.Sheet == Sheet.Furniture).Sum(p => p.Cut.Sum(c => c.Count));
+        Assert.True(Points(pushed) > Points(glued));
+    }
+
+    [Fact]
     public void Spec_survives_saving()
     {
         var spec = BuildingSpec.Preset(BuildingKind.Tavern);

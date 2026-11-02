@@ -306,7 +306,7 @@ public static class BuildingKitMaker
             });
         }
         if (all.Count == 0) return null;
-        var set = new FurnitureSet { Items = all, ThicknessMm = s.FurnitureSheetMm, FitMm = s.FurnitureFitMm, Detail = s.Detail, Seed = s.Seed, ScaleMm = s.ScaleMm };
+        var set = new FurnitureSet { Items = all, ThicknessMm = s.FurnitureSheetMm, FitMm = s.FurnitureFitMm, PushFit = s.FurniturePushFit, GripMm = s.FurnitureGripMm, Detail = s.Detail, Seed = s.Seed, ScaleMm = s.ScaleMm };
         var kit = FurnitureKit.Make(set);
         for (int i = 0; i < kit.Items.Count; i++)
         {

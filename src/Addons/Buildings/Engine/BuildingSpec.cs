@@ -81,6 +81,9 @@ public sealed record BuildingSpec
     /// <summary>The sheet the furniture (and a swinging door) is cut from (mm).</summary>
     public double FurnitureSheetMm { get; init; } = 2;
     public double FurnitureFitMm { get; init; } = 0.1;
+    /// <summary>The furniture's joints with the furniture maker's grip ribs, to hold without glue.</summary>
+    public bool FurniturePushFit { get; init; }
+    public double FurnitureGripMm { get; init; } = 0.15;
     public WoodDetail Detail { get; init; } = WoodDetail.Planks;
 
     /// <summary>Stones, planks and grain are laid out at random: each number gives a different layout.</summary>
