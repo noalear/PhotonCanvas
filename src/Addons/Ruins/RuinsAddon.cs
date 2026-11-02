@@ -22,7 +22,7 @@ public sealed class RuinsAddon : IAddon
         {
             Tip = "Broken wall sections, rubble piles, fallen stones and broken pillars, in the wall maker's textures, for tabletop games and models",
             Large = true,
-            Order = 22,
+            Order = 26,
         });
         host.AddCommand(new AddonCommand("ruins.open", "Shapes", "Ruins and rubble…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit ruins…", Open) { Visible = Selected });

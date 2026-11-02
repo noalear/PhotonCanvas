@@ -115,6 +115,8 @@ public static class WallPieces
         var (etched, lines) = DoorDetail(face, x0, w, o, p, yt, T);
         var leafPose = Pose.Front(0, 0, p.AxisZ);
         var clip = Clip(p, Wt, T, f);
+        // Push fit: the clips' forks get ribs too, gripping the wall.
+        m.RibGaps.Add(Wt + f);
         if (it.Hinge == HingeSide.Right)
         {
             PointD Mirror(PointD q) => new(w - q.x, q.y);
@@ -185,20 +187,36 @@ public static class WallPieces
         double slotW = it.WallSheetMm + 0.15;
         if (L < 4 || Dp < 2) { m.Bad("The shelf is too small: make it at least 4 mm long and 2 mm deep."); return; }
         if (T > slotW + 0.01) { m.Bad($"A {T:0.##} mm sheet is too thick for the wall's {slotW:0.##} mm mount slots: cut the brackets from {it.WallSheetMm:0.##} mm sheet or thinner."); return; }
-        if (T < slotW - 0.5) m.Warn($"The brackets ({T:0.##} mm) are thinner than the wall's mount slots ({slotW:0.##} mm): glue them in so they don't lean.");
+        if (T < slotW - 0.5) m.Warn($"The brackets ({T:0.##} mm) are thinner than the wall's mount slots ({slotW:0.##} mm): {(m.PushFit ? "they'll be held top and bottom, but may lean" : "glue them in so they don't lean")}.");
 
         // The bracket, side-on: its tab through the wall (u less than 0), the triangle standing out from it.
         double tabH = slotH - 0.2, tabL = Wt - 0.2;
+        double top = slotH + 1;
+        // Push fit: a tab up through the shelf, and ribs on the wall tab's top and bottom that press on the mount slot.
+        double tw = Math.Clamp(size * 0.4, 1, 4), tu = Math.Max(1.2, size * 0.25);
+        bool tab = m.PushFit && size >= 3 && tu + tw < size - 0.5 && Dp - (tu + tw) - m.Fit / 2 >= Maker.Bridge && tu - m.Fit / 2 >= Maker.Bridge;
         var bracket = Geo.Union(new PathsD
         {
             Geo.Rect(-tabL, 0.1, 0.01, 0.1 + tabH),
-            new PathD { new(0, slotH + 1), new(0, slotH + 1 - size), new(size, slotH + 1) },
-            Geo.Rect(0, Math.Min(0, slotH + 1 - size), 1.2, slotH + 1),
+            new PathD { new(0, top), new(0, top - size), new(size, top) },
+            Geo.Rect(0, Math.Min(0, top - size), 1.2, top),
         });
-        double top = slotH + 1;
+        if (tab) bracket = Geo.Union(bracket, [Geo.Rect(tu, top - 0.01, tu + tw, top + T)]);
+        var ribs = new PathsD();
+        if (m.PushFit)
+        {
+            double rh = 0.1 + m.Grip / 2, bw = Math.Min(0.8, tabL * 0.45);
+            ribs.Add(Maker.Tooth(new(-tabL / 2, 0.1 + tabH), new(1, 0), new(0, 1), bw, rh));
+            ribs.Add(Maker.Tooth(new(-tabL / 2, 0.1), new(1, 0), new(0, -1), bw, rh));
+        }
         double[] at = [L * 0.2, L * 0.8];
-        m.Add("Shelf bracket", bracket, [], at.Select(x => Pose.Left(x, 0, 0)), grainAlongU: true, face: []);
-        m.Add("Shelf", [Geo.Rect(0, 0, L, Dp)], [], [Pose.Up(0, top + T / 2, Dp)], grainAlongU: true);
-        m.Note($"Plug the brackets into two mount points about {at[1] - at[0]:0} mm apart and glue the shelf on top; the shelf sits {top:0.#} mm above the bottom of the slots.");
+        m.Add("Shelf bracket", bracket, [], at.Select(x => Pose.Left(x, 0, 0)), grainAlongU: true, face: [], ribs: ribs);
+        // The shelf: Up from z = Dp, so v = Dp - z; the bracket's tab runs along z from tu to tu + tw.
+        var slots = new PathsD();
+        if (tab)
+            foreach (var x in at)
+                slots.Add(Geo.Rect(x - m.SlotW / 2, Dp - tu - tw - m.Fit / 2, x + m.SlotW / 2, Dp - tu + m.Fit / 2));
+        m.Add("Shelf", [Geo.Rect(0, 0, L, Dp)], slots, [Pose.Up(0, top + T / 2, Dp)], grainAlongU: true);
+        m.Note($"Plug the brackets into two mount points about {at[1] - at[0]:0} mm apart and {(tab ? "push the shelf down onto their tabs" : "glue the shelf on top")}; the shelf sits {top:0.#} mm above the bottom of the slots.");
     }
 }
