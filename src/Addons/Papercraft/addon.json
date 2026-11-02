@@ -1,0 +1,10 @@
+{
+  "id": "papercraft",
+  "name": "Fold-up papercraft",
+  "version": "1.0.0",
+  "description": "Unfold a 3D model (STL, OBJ, STEP) into flat pieces of card with cut lines, fold lines, glue tabs and numbered edges, to fold back up into the model.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
