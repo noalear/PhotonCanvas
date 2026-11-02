@@ -428,6 +428,42 @@ static class MoreShots
         save(shot(canvas), "canvas-edit-points", "Edit points on a heart: its corner and curve points");
         canvas.Tool = Tool.Select;
         reset();
+
+        // --- Recipe tuner: a round of tries in the design, some rated.
+        if (lib.Materials.FirstOrDefault(x => x.Recipes.Any(r => r.Purpose == RecipePurpose.Cut && r.Rating > 0)) is { } tunedOn)
+        {
+            reset();
+            var tunerCommands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            var tunerAsk = new PhotonCanvas.Addon.RecipeTuner.TuneAsk(tunedOn, RecipePurpose.Cut, LightSource.Blue,
+                PhotonCanvas.Addon.RecipeTuner.Knobs.Default(RecipePurpose.Cut, LightSource.Blue), 6);
+            var tunerEv = PhotonCanvas.Addon.RecipeTuner.Tuner.Gather(lib, [], tunedOn, RecipePurpose.Cut, LightSource.Blue, canvas.Machine.DeviceCode);
+            var tunerRound = PhotonCanvas.Addon.RecipeTuner.Tuner.Suggest(tunerAsk, tunerEv, canvas.Machine).Suggestions.Select(x => x.Settings).ToList();
+            var (tuned, added, _) = PhotonCanvas.Addon.RecipeTuner.TuneTries.Add(doc.State, tunedOn, RecipePurpose.Cut, LightSource.Blue, tunerRound, 10, settings.TextFont, canvas.Machine);
+            doc.Commit("Recipe tuner tries", tuned, added);
+            settle(300);
+            var tunerBefore = w.OwnedWindows.ToList();
+            tunerCommands.FirstOrDefault(c => c.Id == "recipe-tuner.open")?.Run();
+            settle(1500);
+            if (w.OwnedWindows.Except(tunerBefore).FirstOrDefault() is { } tunerWin)
+            {
+                tunerWin.GetVisualDescendants().OfType<TabControl>().First().SelectedIndex = 1;
+                settle(500);
+                var starRows = (System.Collections.IDictionary)tunerWin.GetType().GetField("_stars", Any)!.GetValue(tw)!;
+                var heatBoxes = (System.Collections.IDictionary)tunerWin.GetType().GetField("_heat", Any)!.GetValue(tw)!;
+                int[] given = [4, 2, 3, 0, 5, 1];
+                int[] how = [2, 1, 2, 0, 2, 3];
+                for (int i = 0; i < given.Length; i++)
+                {
+                    if (starRows[i + 1] is Stars st) st.Value = given[i];
+                    if (heatBoxes[i + 1] is ComboBox hb) hb.SelectedIndex = how[i];
+                }
+                settle(600);
+                AddonShot(tunerWin.CaptureRenderedFrame(), "RecipeTuner", "window-laser-recipe-tuner--rate-the-tries");
+                tunerWin.Close();
+                settle(150);
+            }
+            reset();
+        }
     }
 
     // A box from corner to corner (for the booklet's animal).
