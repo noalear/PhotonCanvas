@@ -255,6 +255,7 @@ static class DocsSim
         if (only is null or "more" or "mechanism") { Reset(); MechanismShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "walls") { Reset(); WallsShots.Run(w, doc, canvas.Machine, lib, Settle); }
         if (only is null or "more" or "furniture") { Reset(); FurnitureShots.Run(w, doc, canvas.Machine, lib, Settle); }
+        if (only is null or "more" or "stairs") { Reset(); StairsShots.Run(w, doc, canvas.Machine, lib, Settle); }
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "images-index.txt"), Index.ToString());
         Console.WriteLine(Index.ToString());
     }
