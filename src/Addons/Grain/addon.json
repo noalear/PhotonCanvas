@@ -1,0 +1,10 @@
+{
+  "id": "grain",
+  "name": "Grain-aware engraving",
+  "version": "1.0.0",
+  "description": "Map the wood grain from the camera picture and lower the power where it would burn darker, so engravings come out even. Or bring the grain out, and place a picture so its darks fall on dark grain.",
+  "category": "Picture",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
