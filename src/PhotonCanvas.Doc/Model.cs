@@ -267,6 +267,30 @@ public abstract class Shape
 
     public abstract Rect2 Bounds { get; }
 
+    ImmutableSortedDictionary<string, string> _addonData = ImmutableSortedDictionary<string, string>.Empty;
+
+    /// <summary>
+    /// Add-ons' own notes on this shape, by key (start each key with the add-on's id: "grain.map").
+    /// Saved in the project file and kept, untouched, while the add-on that wrote them isn't installed.
+    /// </summary>
+    public ImmutableSortedDictionary<string, string> AddonData { get => _addonData; init => _addonData = value; }
+
+    /// <summary>A copy with an add-on's note set (null takes it away).</summary>
+    public Shape WithAddonData(string key, string? value)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._addonData = value is null ? _addonData.Remove(key) : _addonData.SetItem(key, value);
+        return c;
+    }
+
+    /// <summary>A copy with all the add-on notes replaced.</summary>
+    public Shape WithAddonData(ImmutableSortedDictionary<string, string> data)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._addonData = data;
+        return c;
+    }
+
     /// <summary>A copy with some common properties changed (everything else is kept).</summary>
     public Shape With(Guid? layerId = null, Affine? transform = null, string? name = null, Guid? id = null)
     {
@@ -296,6 +320,7 @@ public abstract class Shape
     {
         rebuilt._locked = _locked;
         rebuilt.VarOffset = VarOffset;
+        rebuilt._addonData = _addonData;
         if (this is PathShape from && rebuilt is PathShape to && (from.ManualTabs.Count > 0 || from.StartPoint is not null))
         {
             bool same = Transform == rebuilt.Transform;
@@ -447,6 +472,8 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public CurvedSurface Curve { get; init; } = new();
     /// <summary>Spread the heat across the job's layers and objects (off by default).</summary>
     public SpreadHeat Spread { get; init; } = new();
+    /// <summary>Add-ons' own notes on the project, by key (start each key with the add-on's id). Kept while the add-on isn't installed.</summary>
+    public ImmutableSortedDictionary<string, string> AddonData { get; init; } = ImmutableSortedDictionary<string, string>.Empty;
     /// <summary>The name of the page on screen.</summary>
     public string PageName { get; init; } = "Page 1";
     /// <summary>Where the page on screen sits among all the pages.</summary>

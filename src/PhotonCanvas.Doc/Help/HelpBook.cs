@@ -438,12 +438,59 @@ public sealed class HelpLibrary
     public IReadOnlyDictionary<string, HelpPage> Pages { get; }
     public IReadOnlyList<Tutorial> Tutorials { get; }
 
-    HelpLibrary(string folder, IReadOnlyList<ContentsEntry> contents, IReadOnlyDictionary<string, HelpPage> pages, IReadOnlyList<Tutorial> tutorials)
+    /// <summary>Pages and tutorials that live in another folder (an add-on's help), by page file or tutorial id.</summary>
+    readonly IReadOnlyDictionary<string, string> _folders;
+
+    HelpLibrary(string folder, IReadOnlyList<ContentsEntry> contents, IReadOnlyDictionary<string, HelpPage> pages, IReadOnlyList<Tutorial> tutorials,
+        IReadOnlyDictionary<string, string>? folders = null)
     {
         Folder = folder;
         Contents = contents;
         Pages = pages;
         Tutorials = tutorials;
+        _folders = folders ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The folder a page's pictures are in (the guide's, or the add-on's whose page it is).</summary>
+    public string FolderFor(string pageFile) => _folders.GetValueOrDefault(pageFile) ?? Folder;
+
+    /// <summary>The folder a tutorial's pictures are in.</summary>
+    public string FolderForTutorial(string tutorialId) => _folders.GetValueOrDefault("tutorial:" + tutorialId) ?? Folder;
+
+    /// <summary>
+    /// The guide with add-ons' help folders joined in: their pages (listed under "Add-ons" in the
+    /// contents, by their own contents.md if they have one) and tutorials. A page whose file name is
+    /// already taken is left out.
+    /// </summary>
+    public HelpLibrary WithAddons(IEnumerable<(string Name, string Folder)> addons)
+    {
+        var pages = new Dictionary<string, HelpPage>(Pages, StringComparer.OrdinalIgnoreCase);
+        var folders = new Dictionary<string, string>(_folders, StringComparer.OrdinalIgnoreCase);
+        var tutorials = Tutorials.ToList();
+        var entries = new List<ContentsEntry>();
+        foreach (var (name, folder) in addons.OrderBy(a => a.Name, StringComparer.CurrentCultureIgnoreCase))
+        {
+            var lib = Load(folder);
+            var added = new List<HelpPage>();
+            foreach (var page in lib.Pages.Values)
+                if (pages.TryAdd(page.File, page))
+                {
+                    folders[page.File] = folder;
+                    added.Add(page);
+                }
+            foreach (var tut in lib.Tutorials.Where(x => !tutorials.Any(have => have.Id == x.Id)))
+            {
+                tutorials.Add(tut);
+                folders["tutorial:" + tut.Id] = folder;
+            }
+            if (added.Count == 0) continue;
+            var children = lib.Contents.Count > 0 ? lib.Contents : [.. added.OrderBy(p => p.Title).Select(p => new ContentsEntry(p.Title, p.File, []))];
+            entries.Add(children.Count == 1 ? children[0] : new ContentsEntry(name, children[0].File, children));
+        }
+        var contents = Contents.ToList();
+        if (entries.Count > 0) contents.Add(new ContentsEntry("Add-ons", entries[0].File, entries));
+        return new HelpLibrary(Folder, contents, pages,
+            [.. tutorials.OrderBy(t => t.Category).ThenBy(t => t.Order).ThenBy(t => t.Title)], folders);
     }
 
     /// <summary>Read the guide from a folder holding contents.md, the pages, images/ and tutorials/.</summary>

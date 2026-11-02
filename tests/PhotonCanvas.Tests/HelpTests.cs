@@ -10,7 +10,7 @@ namespace PhotonCanvas.Tests;
 /// (so a new feature can't be added without its page and tutorial). tools/helpcheck.py does the same
 /// without building, with a report of what's missing.
 /// </summary>
-public class HelpTests
+public partial class HelpTests
 {
     static readonly string Root = FindRoot();
     static readonly string HelpDir = Path.Combine(Root, "docs", "help");

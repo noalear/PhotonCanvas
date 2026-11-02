@@ -34,8 +34,23 @@ public static class HelpFiles
         return shipped;
     }
 
-    /// <summary>The guide, read once.</summary>
-    public static HelpLibrary Library => _library ??= HelpLibrary.Load(Folder);
+    static readonly List<(string Name, string Folder)> AddonFolders = [];
+
+    /// <summary>The guide, read once (again after an add-on's help comes or goes).</summary>
+    public static HelpLibrary Library => _library ??= AddonFolders.Count == 0 ? HelpLibrary.Load(Folder) : HelpLibrary.Load(Folder).WithAddons(AddonFolders);
+
+    /// <summary>Join an add-on's help folder to the guide; dispose to take it out again.</summary>
+    public static IDisposable AddAddon(string name, string folder)
+    {
+        var entry = (name, folder);
+        AddonFolders.Add(entry);
+        _library = null;
+        return new Addons.AddonUndo(() =>
+        {
+            AddonFolders.Remove(entry);
+            _library = null;
+        });
+    }
 }
 
 /// <summary>Turns the guide's blocks into controls in the program's look.</summary>

@@ -33,5 +33,4 @@ For a picture already prepared at the right size, tick **Pass-through (the file'
 one dot per pixel, never denser than the **Resolution**.
 
 ## Compare on scrap
-<!-- target: ribbon:Laser/Line test -->
-Laser → **Line test** burns the same patch with one change each, side by side.
+Laser → **Line test** (from the Material tests add-on) burns the same patch with one change each, side by side.

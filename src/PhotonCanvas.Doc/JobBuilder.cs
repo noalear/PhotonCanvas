@@ -212,6 +212,12 @@ public static class JobBuilder
     {
         JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
+        // Add-ons' steps (Extensions.JobHooks): a changed copy of the design, and their own checks.
+        if (Extensions.JobHooks.All.Count > 0)
+        {
+            s = Extensions.JobHooks.Apply(s, opt, warnings);
+            warnings.AddRange(Extensions.JobHooks.Checks(s, opt));
+        }
         // The job bar's pause after each path: how many it was put after, and the time they add (heat-ordered layers have their own).
         int fixedPauses = 0;
         // Heat-ordered layers add a step per piece per pass: the extra ones beyond one per path.

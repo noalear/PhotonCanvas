@@ -153,7 +153,7 @@ public sealed class TraceWindow : Window
         Opened += async (_, _) => await Prepare();
     }
 
-    internal static Control Slide(string label, Slider s, TextBlock value)
+    public static Control Slide(string label, Slider s, TextBlock value)
     {
         var head = new DockPanel();
         value.HorizontalAlignment = HorizontalAlignment.Right;
@@ -348,7 +348,7 @@ public sealed class TraceWindow : Window
 }
 
 /// <summary>The picture with the traced outlines drawn over it; wheel zooms, drag pans.</summary>
-sealed class TracePreview : Control
+public sealed class TracePreview : Control
 {
     Bitmap? _picture;
     TraceResult? _result;

@@ -149,6 +149,7 @@ public static class DocFile
             if (sh.VarOffset > 0) o["varOffset"] = sh.VarOffset;
             if (sh is PathShape { ManualTabs.Count: > 0 } mt) o["tabs"] = new JsonArray([.. mt.ManualTabs.Select(t => (JsonNode)new JsonArray(t.X, t.Y))]);
             if (sh is PathShape { StartPoint: { } sp }) o["start"] = new JsonArray(sp.X, sp.Y);
+            if (sh.AddonData.Count > 0) o["addonData"] = AddonJson(sh.AddonData);
             switch (sh)
             {
                 case TextShape tx:
@@ -240,6 +241,7 @@ public static class DocFile
             },
         };
         if (SpreadJson(s.Spread) is { } spread) root["spreadHeat"] = spread;
+        if (s.AddonData.Count > 0) root["addonData"] = AddonJson(s.AddonData);
         return root;
     }
 
@@ -502,15 +504,25 @@ public static class DocFile
                 .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty,
                     x => new Vec2(x["start"]![0]!.GetValue<double>(), x["start"]![1]!.GetValue<double>()));
             if (starts.Count > 0) all = [.. all.Select(sh => sh is PathShape ps && starts.TryGetValue(sh.Id, out var p) ? ps.WithStart(p) : sh)];
+            // Add-ons' notes, per shape (kept even when the add-on isn't installed).
+            var notes = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["addonData"] is JsonObject)
+                .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty, x => AddonFrom(x["addonData"]));
+            if (notes.Count > 0) all = [.. all.Select(sh => notes.TryGetValue(sh.Id, out var d) ? sh.WithAddonData(d) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
-            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Spread = SpreadFrom(root["spreadHeat"]) };
+            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Spread = SpreadFrom(root["spreadHeat"]), AddonData = AddonFrom(root["addonData"]) };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {
             throw new FormatException($"The project file is damaged ({e.Message}).");
         }
     }
+
+    static JsonObject AddonJson(ImmutableSortedDictionary<string, string> d) => new([.. d.Select(kv => KeyValuePair.Create(kv.Key, (JsonNode?)kv.Value))]);
+
+    static ImmutableSortedDictionary<string, string> AddonFrom(JsonNode? n) => n is JsonObject o
+        ? o.Where(kv => kv.Value is JsonValue).ToImmutableSortedDictionary(kv => kv.Key, kv => kv.Value!.ToString())
+        : ImmutableSortedDictionary<string, string>.Empty;
 
     static JsonNode? CurveJson(CurvedSurface c)
     {

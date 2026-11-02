@@ -1,0 +1,8 @@
+{
+  "id": "slicer",
+  "name": "3D to slices",
+  "version": "1.0.0",
+  "description": "Slice a 3D model (STL, OBJ, STEP) into layers of your material to cut, number and glue up, with an assembly booklet and dowel pins.",
+  "category": "Make",
+  "apiVersion": 1
+}

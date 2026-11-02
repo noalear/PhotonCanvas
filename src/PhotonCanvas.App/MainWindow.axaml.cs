@@ -77,10 +77,9 @@ public partial class MainWindow : Window
         _layers.ShapeActions = ShapeActions;
         _layers.Moved += (n, layer) => StatusText.Text = $"{(n == 1 ? "1 shape" : $"{n} shapes")} moved to \"{layer}\". Ctrl+Z puts {(n == 1 ? "it" : "them")} back.";
         _props = new PropertiesPanel(_doc, _layers, _settings);
+        _props.SlotOwner = this;
         _props.TraceRequested += im => _ = Guard(() => Trace(im));
         _props.FitToCameraRequested += () => _ = Guard(FitToCamera);
-        _props.DepthmapRequested += im => _ = Guard(() => MakeDepthmap(im));
-        _props.RemoveBackgroundRequested += im => _ = Guard(() => RemoveBackground(im));
         _library = Doc.Materials.MaterialLibrary.Load(Path.Combine(AppIdentity.DataDir, "materials"));
         if (!_settings.PresetsAdopted)
         {
@@ -95,7 +94,7 @@ public partial class MainWindow : Window
         _machine = new MachinePanel(_settings) { OwnerWindow = this };
         if (_settings.ActiveSetup().Kind == MachineKind.XTool && !WorkModes.Usable(_settings)) _settings.WorkMode = "Flat";
         // The machine in use (and its work mode) sets the work area.
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         _job = new JobBar(_doc, _settings, Canvas, _machine);
         _job.JobBuilt += j => _layers.SetTimes(j?.LayerTimes.GroupBy(t => t.LayerId).ToDictionary(g => g.Key, g => g.Sum(t => t.TotalSeconds)) ?? new());
         _job.LayerClicked += id => _layers.Activate(id);
@@ -116,15 +115,13 @@ public partial class MainWindow : Window
         RibbonHost.Content = _ribbon;
 
         BuildRibbon();
+        StartAddons();
         WireTools();
         ApplyGrid();
         Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {Units.Num(v.X)}   Y {Units.Num(v.Y)} {Units.Name}" : "";
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
-        // While a test read from the close-up camera is in the design, show where that camera sees.
-        void ShowCloseUpArea() => Canvas.CloseUpArea =
-            ToneTestWindow.InDesign(_doc.State) || LineTestWindow.InDesign(_doc.State) ? _machine.CloseUpSees() : null;
         _doc.Changed += _ => ShowCloseUpArea();
         _machine.StateChanged += ShowCloseUpArea;
         _machine.PhotoChanged += p => Canvas.Photo = p;
@@ -270,17 +267,9 @@ public partial class MainWindow : Window
         _props.FontsRequested += () => _ = Guard(ShowFonts);
         _job.RunFinished += from =>
         {
-            // An etch test just finished: straight to its results.
-            if (_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowEtchTest(true)));
-            // A cut test (or its kerf test) likewise.
-            else if (CutTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCutTest(true)));
-            else if (ToneTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowToneTest(true)));
-            else if (LineTestWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowLineTest(true)));
-            else if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
-            else if (Bevel.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, true).ShowDialog(this)));
+            // A calibration just burned: straight to reading it (the material tests are an add-on and open their own results).
+            if (CloseUpCalibrationWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => ShowCloseUpCalibration(true)));
             else if (LaserAlignWindow.InDesign(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, true).ShowDialog(this)));
-            // A depth round burned: measure it next.
-            if (ExactDepthWindow.Waiting(_doc.State)) Avalonia.Threading.Dispatcher.UIThread.Post(() => _ = Guard(ShowExactDepth));
             // The next serial number and spreadsheet row, and the next turn for layers that turn between runs.
             if (from != _doc.FilePath) return;
             var next = VariableText.AfterRun(_doc.State, DateTime.Now);
@@ -568,7 +557,6 @@ public partial class MainWindow : Window
                 Item("Extend lines to meet the next shape", ExtendSel),
                 Item("Remove overlapping lines", RemoveOverlapsSel),
                 Item("Tangent circles (select three circles)", TangentCirclesSel),
-                AsyncItem("Stencil bridges…", StencilSel),
                 AsyncItem("Drop shadow…", () => ShadowSel(false)),
                 AsyncItem("3D shadow…", () => ShadowSel(true)),
                 Item("Clear all guides", () => { if (_doc.State.Guides.Count > 0) _doc.Commit("Clear guides", _doc.State with { Guides = [] }); }),
@@ -581,7 +569,6 @@ public partial class MainWindow : Window
         import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
         var importMore = import.Small("Import as…", "IcMore", () => { }, "Import a drawing grouped, in separate pieces, or as one picture");
-        import.Small("3D to slices", "IcDepth", () => _ = Guard(() => new StackSliceWindow(_doc, Canvas.Machine, _settings, _library).ShowDialog(this)), "Slice a 3D model (STL, OBJ, STEP) into layers of your material's thickness: cut them, numbered, and glue them up into the model");
         importMore.Flyout = new MenuFlyout
         {
             Items =
@@ -615,42 +602,26 @@ public partial class MainWindow : Window
         order.Small("To front", "IcFront", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), "Bring to front (drawn last on its layer)", HasSel);
         order.Small("To back", "IcBack", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), "Send to back", HasSel);
         var repeat = arrange.Group("Repeat");
-        repeat.Large("Nest", "IcNest", () => _ = Guard(NestSel), "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)", HasSel);
         repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
         repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
         repeat.Small("Along a path", "IcAlongPath", () => _ = Guard(CopyAlongSel), "Copies spaced along a path: select what to copy and the path (the longest selected line is the path)", Many);
         var shapeIt = arrange.Group("Transform");
-        shapeIt.Large("Warp", "IcWarp", () => _ = Guard(() => new WarpWindow(_doc).ShowDialog(this)), "Warp the selection: perspective taper, arch, bulge or wave", () => SelectedPaths().Count > 0);
         ToolSmall(shapeIt, "Align 2 points", "IcAlign2", Tool.Align2, "Move and turn the selection so two of its points land on two other points (Shift on the last click also resizes)");
         shapeIt.Small("Lock", "IcLock", () => LockSel(true), "Lock the selected shapes: they stay put and can't be picked until unlocked (still marked)", HasSel);
         shapeIt.Small("Unlock all", "IcUnlock", () => LockSel(false), "Unlock every locked shape", () => _doc.State.Shapes.Any(s => s.Locked));
 
         // ---- Picture: photos and artwork ----
-        var picture = _ribbon.Tab("Picture", "Trace, depthmaps and background removal (lights up when a picture is selected)");
+        var picture = _ribbon.Tab("Picture", "Trace, filters, crop and what add-ons bring (lights up when a picture is selected)");
         var pin = picture.Group("Add");
         pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
         var pwork = picture.Group("Turn it into");
         pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
-        pwork.Large("Engraving", "IcLine", () => { if (SelectedPicture() is { } im) _ = Guard(() => new EngravingWindow(_doc, im).ShowDialog(this)); }, "The picture as engraving lines, banknote style: lines that swell in the shadows (straight, following the forms, rings or a spiral)", HasPicture);
-        _ribbon.ShowWhen(pwork.Large("Colour on metal", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeColourPicture(im)); }, "The picture in the colours your plate really made (a measured palette): one layer per colour, MOPA on stainless or titanium", HasPicture), () => _settings.ShowColourOnMetal);
-        _ribbon.ShowWhen(pwork.Large("Diffraction", "IcPrism", () => { if (SelectedPicture() is { } im) _ = Guard(() => MakeDiffraction(im)); }, "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts", HasPicture), () => _settings.ShowDiffraction);
-        pwork.Large("Depthmap", "IcDepth", () => _ = Guard(() => MakeDepthmap(SelectedPicture())), "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)");
         var pclip = picture.Group("Shape");
-        pclip.Large("Image mask", "IcIntersect", ClipPicture, "Select a picture and a closed shape: the shape masks the picture, so only the part inside it is shown and engraved", () => SelectedPicture() is not null || _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is ImageShape));
-        pclip.Small("Remove mask", "IcExclude", () => { if (SelectedPicture() is { Clip: not null } im) _doc.Commit("Remove image mask", Ops.Replace(_doc.State, im.WithClip(null)), [im.Id]); }, "Take the image mask off: the whole picture is shown and engraved again", () => SelectedPicture() is { Clip: not null });
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
         ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
         pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
-        pedit.Small("CMYK split", "IcLayers", () => { if (SelectedPicture() is { } im) SplitCmyk(im); }, "Four pictures, one per ink (cyan, magenta, yellow, black), each on its own layer: for screen printing", HasPicture);
-        pedit.Small("Centre-line trace", "IcPen", () => { if (SelectedPicture() is { } im) _ = Guard(() => CentrelineTrace(im)); }, "One line down the middle of each stroke (handwriting, line art), on a Score layer", HasPicture);
-        var prelief = picture.Group("Relief");
-        prelief.Large("3D model", "IcDepth", () => _ = Guard(AddStl), "A 3D model (STL) as a depth map, on a depth-slices layer");
-        prelief.Small("Depth outlines", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }, "Find the edges in a depthmap and mark them as lines over the relief (one laser line, a set width, or swelling with the edge), so it looks less washed out", HasPicture);
-        prelief.Small("Relief preview", "IcEye", () => { if (SelectedPicture() is { } im) new ReliefPreviewWindow(im).Show(this); }, "See a depth map as the lit relief it will carve", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
-        var pclean = picture.Group("Clean up");
-        pclean.Large("Remove background", "IcRemoveBg", () => { if (SelectedPicture() is { } im) _ = Guard(() => RemoveBackground(im)); }, "Make the backdrop see-through so it isn't engraved", HasPicture);
 
         // ---- Camera: what the machine sees ----
         var camera = _ribbon.Tab("Camera", "Use the machine's camera: photo, live view, fit designs to pieces, calibration");
@@ -661,9 +632,6 @@ public partial class MainWindow : Window
         see.SmallToggle("Show picture", "IcEye", on => { if (_machine.HasCalibration) _machine.CameraOnWorkArea = on; else _ = Guard(async () => { await _machine.CalibrateAsync(); _ribbon.Refresh(); }); }, "Show the camera picture under the design", null, () => _machine.CameraOnWorkArea);
         var fit = camera.Group("Place");
         fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
-        fit.Large("Cut round prints", "IcCut", () => _ = Guard(CutRoundPrints), "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it");
-        fit.Large("Line up pieces", "IcFitPiece", ShowLineUp, "For a design split onto pieces: the camera keeps looking and moves the page's design onto its piece and the pieces laid beside it, so they line up. No clicking while you place them");
-        fit.Large("Every piece", "IcGrid", () => _ = Guard(PlaceOnEveryPiece), "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)", () => SelectedOutline().Count > 0);
         var cal = camera.Group("Set up");
         cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
         cal.Small("Focus on selection", "IcFocus", () => _ = Guard(FocusByPointer), "Aimed focus: the red pointer is aimed at the middle of the selection (or of the bed), the close-up camera reads the height there from where its dot lands, and the head moves to focus on it. Nothing touches the material; needs the pointer calibrated (Curved surface)");
@@ -677,18 +645,7 @@ public partial class MainWindow : Window
         mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
         mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
         mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
-        mat.Large("Etch rate", "IcDepth", () => _ = Guard(() => ShowEtchTest(_doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null))), "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material");
-        mat.Large("Cut test", "IcTestGrid", () => _ = Guard(() => ShowCutTest(CutTestWindow.InDesign(_doc.State))), "Find the cut: small squares at different speeds and passes, see which drop out; then the kerf and the slot fit at that setting; saved with the material");
-        mat.Large("Exact depth", "IcDepth", () => _ = Guard(ShowExactDepth), "Engrave the selected shapes to an exact depth: the red pointer measures the surface, then the depth after each round of passes, and works out the next round");
-        mat.Large("Tone test", "IcPalette", () => _ = Guard(() => ShowToneTest(ToneTestWindow.InDesign(_doc.State))), "Photos that come out as they look: grey patches burned with a picture layer's settings, read by the camera, and that layer's pictures corrected for the material");
-        mat.Large("Line test", "IcLine", () => _ = Guard(() => ShowLineTest(LineTestWindow.InDesign(_doc.State))), "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side");
-        mat.Small("Inlay", "IcLayers", () => _ = Guard(() => new InlayWindow(_doc, _library, SelectedPaths()).ShowDialog(this)), "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)", () => SelectedPaths().Count > 0);
-        mat.Small("Bevel test", "IcMeasure", () => _ = Guard(() => new BevelTestWindow(_doc, _library, _settings, Canvas.Machine, Bevel.InDesign(_doc.State)).ShowDialog(this)), "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges");
-        mat.Small("Graphene test", "IcBolt", () => _ = Guard(() => new GrapheneTestWindow(_doc, _library, Canvas.Machine, GrapheneTestWindow.InDesign(_doc.State)).ShowDialog(this)), "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter");
         mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
-        var colour = laser.Group("Colour on metal", () => _settings.ShowColourOnMetal);
-        colour.Large("Colour test", "IcPalette", () => _ = Guard(AddColourTest), "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives");
-        colour.Large("Measure colours", "IcEyedropper", () => _ = Guard(MeasureColours), "Read the colours of a burned colour test from a scan or photo, and save them as a palette");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
         job.Large("Ship It", "IcSend", () => _ = Guard(() => _job.Send()), "Upload the job; the machine waits for its start button", () => _job.CanSend);
@@ -696,17 +653,14 @@ public partial class MainWindow : Window
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.Small("Preview run", "IcPreview", () => { if (_job.CurrentJob is { } bj) new RunPreviewWindow(bj, Canvas).Show(this); }, "Play the job back on the work area, sped up: what's marked when", () => _job.CurrentJob is not null);
         job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
-        job.SmallToggle("Time-lapse", "IcCamera", on => { _settings.TimeLapse = on; _settings.Save(); }, $"Take a camera photo every {_settings.TimeLapseSeconds:0} s while a job runs and make a video of it (needs ffmpeg for the video; otherwise the photos are kept). Saved in Pictures.", null, () => _settings.TimeLapse);
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
         work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
-        work.Small("Split onto pieces", "IcBreak", () => _ = Guard(SplitOntoPieces), "Mark a design across several pieces that go together (four boards making one picture): select the design and the pieces' material outlines; each piece gets a page with its share, and Line up pieces fits it to the pieces on the bed", HasSel);
         var machine = laser.Group("Machine");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
-        machine.Large("Remote access", "IcPhone", () => new RemoteAccessWindow().Show(this), "Watch and run the laser from your phone: start the remote server, connect the phone with a QR code, choose the designs it can load");
 
         // ---- View ----
         var view = _ribbon.Tab("View", "Zoom, grid and snapping");
@@ -727,6 +681,7 @@ public partial class MainWindow : Window
         ToolLarge(tools, "Measure", "IcMeasure", Tool.Measure, "Measure: drag between two points (snaps to corners; Shift = 45° steps)");
         tools.Large("History", "IcHistory", ShowHistory, "Every step you can undo: click one to go back to it");
         var panels = view.Group("Show");
+        panels.Small("Add-ons", "IcPlug", () => _ = Guard(ShowAddons), "Extra features: turn each on or off, or install new ones, without restarting");
         panels.Small("Reset panels", "IcLayers", () => _docking.Reset(), "Put the layers, selection and layer settings panels back where they started (each panel's title bar moves, floats or folds it)");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Colour the paths by when they run: blue first, through green and yellow, to red last (a key shows at the top of the work area)", null, () => _job.ShowOrder);
         panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
@@ -774,6 +729,10 @@ public partial class MainWindow : Window
                 new("Connection keys…", "The one-time setup that lets this program talk to the machine.", async () => await _machine.SetUpKeys()),
                 new("Calibrate camera…", "Line the camera picture up with where the laser marks (once per material height).", _machine.CalibrateAsync),
             ]),
+            ("Add-ons",
+            [
+                new("Add-ons…", "Extra features: turn each on or off, install new ones or remove them, while the program runs.", ShowAddons),
+            ]),
             ("Tools",
             [
                 new("Home the Z axis", "Send the head up to find its zero again (if the focus height seems off).", HomeZ),
@@ -804,7 +763,9 @@ public partial class MainWindow : Window
     List<HotCommand>? _commands;
 
     /// <summary>Everything that has (or can be given) a keyboard shortcut. Changed ones are in the settings.</summary>
-    IReadOnlyList<HotCommand> Commands() => _commands ??=
+    IReadOnlyList<HotCommand> Commands() => _addonCommands.Count == 0 ? BuiltInCommands() : [.. BuiltInCommands(), .. _addonCommands];
+
+    IReadOnlyList<HotCommand> BuiltInCommands() => _commands ??=
     [
         new("file.new", "File", "New design", "Ctrl+N", () => _ = Guard(NewDoc), true),
         new("file.open", "File", "Open…", "Ctrl+O", () => _ = Guard(OpenDoc), true),
@@ -839,14 +800,11 @@ public partial class MainWindow : Window
         new("shape.textpath", "Shapes", "Text on path", "", TextOnPath),
         new("shape.tidy", "Shapes", "Tidy lines…", "", () => _ = Guard(TidyPaths)),
         new("shape.along", "Shapes", "Copy along a path…", "", () => _ = Guard(CopyAlongSel)),
-        new("shape.warp", "Shapes", "Warp…", "", () => { if (SelectedPaths().Count > 0) _ = Guard(() => new WarpWindow(_doc).ShowDialog(this)); }),
         new("shape.material", "Shapes", "Use as material outline", "", MaterialSel),
         new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
         new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
-        new("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", () => { if (_doc.Selection.Count > 0) _ = Guard(NestSel); }),
         new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
         new("picture.trace", "Shapes", "Trace picture…", "Ctrl+T", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }),
-        new("picture.depthoutlines", "Shapes", "Depth outlines…", "", () => { if (SelectedPicture() is { } im) _ = Guard(() => new DepthOutlinesWindow(_doc, im).ShowDialog(this)); }),
         new("layer.add", "Layers", "New layer", "Ctrl+L", _layers.AddLayer),
         new("layer.moveto", "Layers", "Move selection to the active layer", "Ctrl+M", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, _doc.Selection, _doc.ActiveLayer))),
         new("view.zoomin", "View", "Zoom in", "Ctrl+OemPlus|Ctrl+Add", () => Canvas.ZoomBy(1.25)),
@@ -874,6 +832,7 @@ public partial class MainWindow : Window
         new("job.frame", "Job", "Frame", "", () => { if (_job.CanFrame) _ = Guard(_job.ToggleFrame); }),
         new("job.send", "Job", "Ship It", "", () => { if (_job.CanSend) _ = Guard(() => _job.Send()); }),
         new("job.console", "Job", "G-code console", "", ShowConsole),
+        new("settings.addons", "Settings", "Add-ons…", "", () => _ = Guard(ShowAddons)),
     ];
 
     readonly Dictionary<string, KeyGesture[]> _gestures = [];
@@ -938,7 +897,7 @@ public partial class MainWindow : Window
             _settings.Save();
             StatusText.Text = "Work mode: flat bed (the attachment it used isn't in your equipment).";
         }
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         _job.Refresh();
         _ribbon.Refresh();
     }
@@ -1096,69 +1055,6 @@ public partial class MainWindow : Window
         _doc.Commit("Crop picture", Ops.Replace(_doc.State, Repicture(im, cropped, size, t)), [im.Id]);
     }
 
-    void SplitCmyk(ImageShape im)
-    {
-        // Separated as the picture looks with its tone settings; each plate keeps its clip and sharpening.
-        var plates = Core.Imaging.PictureTools.CmykSplit(im.Source.Pixels, im.Tone);
-        var plateTone = Core.Imaging.ToneAdjust.None with { Sharpen = im.Tone.Sharpen, SharpenRadiusMm = im.Tone.SharpenRadiusMm };
-        var state = _doc.State;
-        var made = new List<Shape>();
-        uint[] colours = [0x00A3E0, 0xE0007A, 0xF2C800, 0x222222];
-        for (int i = 0; i < plates.Length; i++)
-        {
-            var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with { Name = $"{plates[i].Ink} · {im.Name}", Color = colours[i], Dither = Core.Imaging.DitherMethod.Halftone, HalftoneAngleDeg = new[] { 15.0, 75, 0, 45 }[i] };
-            state = Ops.AddLayer(state, layer);
-            var plate = new ImageShape { Name = $"{plates[i].Ink} plate", LayerId = layer.Id, Source = ImageSource.FromEncoded(plates[i].Plate.EncodePng()), SizeMm = im.SizeMm, Transform = im.Transform, Clip = im.Clip, Tone = plateTone };
-            made.Add(plate);
-        }
-        _doc.Commit("CMYK split", Ops.AddShapes(state, made), made.Select(m => m.Id));
-        StatusText.Text = "Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Laser → Layer by layer can ship them one layer at a time.";
-    }
-
-    async Task CentrelineTrace(ImageShape im)
-    {
-        var src = im.Source.Pixels;
-        var tone = im.Tone;
-        var (geometry, n) = await Task.Run(() =>
-        {
-            var ink = new bool[src.Width * src.Height];
-            for (int i = 0; i < ink.Length; i++)
-            {
-                double lum = (0.2126 * src.Rgba[i * 4] + 0.7152 * src.Rgba[i * 4 + 1] + 0.0722 * src.Rgba[i * 4 + 2]) / 255;
-                ink[i] = src.Rgba[i * 4 + 3] > 127 && tone.Apply(lum) < 0.5;
-            }
-            var lines = Doc.Tracing.Centreline.Trace(ink, src.Width, src.Height);
-            return (Doc.Tracing.Centreline.ToGeometry(lines, im.PixelToWorld), lines.Count);
-        });
-        if (n == 0) { StatusText.Text = "No dark strokes found to trace."; return; }
-        var state = _doc.State;
-        var layer = state.Layers.FirstOrDefault(l => l.Mode == LayerMode.Score && l.Visible && !l.Locked);
-        if (layer is null)
-        {
-            layer = Layer.Default(state.Layers.Count, LayerMode.Score) with { Name = "Centre lines" };
-            state = Ops.AddLayer(state, layer);
-        }
-        var shape = new PathShape { Name = $"Centre lines · {im.Name}", LayerId = layer.Id, Geometry = geometry };
-        _doc.Commit("Centre-line trace", Ops.AddShapes(state, [shape]), [shape.Id]);
-        StatusText.Text = $"Traced {n} line{(n == 1 ? "" : "s")} down the middle of the strokes.";
-    }
-
-    async Task AddStl()
-    {
-        var w = new StlWindow();
-        await w.ShowDialog(this);
-        if (w.Result is not { } r) return;
-        var state = _doc.State;
-        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
-        {
-            Name = $"Relief · {r.Name}", ImageMode = ImageEngraveMode.Slices, Dpi = 254, LinesPerCm = 200, AngleStepDeg = 37,
-        };
-        state = Ops.AddLayer(state, layer);
-        var at = new Vec2(Canvas.Machine.FieldW / 2 - r.SizeMm.X / 2, Canvas.Machine.FieldH / 2 - r.SizeMm.Y / 2);
-        var pic = new ImageShape { Name = r.Name, LayerId = layer.Id, Source = ImageSource.FromEncoded(r.Depth.EncodePng()), SizeMm = r.SizeMm, Transform = Affine.Translate(at) };
-        _doc.Commit("3D model relief", Ops.AddShapes(state, [pic]), [pic.Id]);
-        _layers.Activate(layer.Id);
-    }
 
     async Task HomeZ()
     {
@@ -1234,7 +1130,7 @@ public partial class MainWindow : Window
     /// <summary>The canvas shows the mode's work area; the job is built for it.</summary>
     void ApplyWorkMode()
     {
-        Canvas.Machine = WorkModes.Area(_settings);
+        SetMachine(WorkModes.Area(_settings));
         Canvas.FitField();
         _job.Refresh();
         _ribbon.Refresh();
@@ -1349,13 +1245,11 @@ public partial class MainWindow : Window
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked), shapes.Select(s => s.Id).ToHashSet())),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
-            DoAsync("Split onto pieces…", SplitOntoPieces, n > 1),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
                 DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
                 Do(anyText && paths.Count == 1 && paths[0] is TextShape { Guide: not null } ? "Straighten text" : "Text on path", TextOnPath, anyText),
                 DoAsync("Copy along path…", CopyAlongSel, n > 1),
-                DoAsync("Warp…", () => new WarpWindow(_doc).ShowDialog(this), paths.Count > 0),
                 DoAsync("Tidy lines…", TidyPaths, paths.Count > 0),
                 new Separator(),
                 Do("Weld (union)", () => BooleanSel(BoolOp.Union), paths.Count > 1),
@@ -1364,7 +1258,6 @@ public partial class MainWindow : Window
                 DoAsync("Mask with shape…", MaskSel, paths.Count > 1),
                 Do("Exclude (remove the overlap)", () => BooleanSel(BoolOp.Exclude), paths.Count > 1)),
             Sub("Array",
-                DoAsync("Nest on material…", NestSel),
                 DoAsync("Grid array…", () => ArraySel(circular: false)),
                 DoAsync("Circular array…", () => ArraySel(circular: true))),
             Sub("Align and distribute",
@@ -1391,29 +1284,13 @@ public partial class MainWindow : Window
             new Separator(),
             DoAsync("Fit to piece in camera…", FitToCamera, paths.Count > 0, "Ctrl+Shift+F"),
             DoAsync("Trace picture…", () => picture is not null ? Trace(picture) : Task.CompletedTask, picture is not null, "Ctrl+T"),
-            DoAsync("Depthmap with DepthCharge…", () => MakeDepthmap(picture), picture is not null),
-            DoAsync("Remove picture background…", () => picture is not null ? RemoveBackground(picture) : Task.CompletedTask, picture is not null),
             Do("Zoom to " + what, Canvas.FitSelection, gesture: "F"),
             DoAsync("Rename…", RenameSel, n == 1),
             Do("Save to My shapes…", ShowShapes, paths.Count > 0),
         ];
     }
 
-    readonly DepthChargeService _depthCharge = new();
 
-    async Task RemoveBackground(ImageShape im)
-    {
-        var w = new BackgroundWindow(im.Source.Pixels, result =>
-        {
-            var replaced = new ImageShape
-            {
-                Id = im.Id, Name = im.Name, LayerId = im.LayerId, GroupId = im.GroupId, Transform = im.Transform,
-                SizeMm = im.SizeMm, Tone = im.Tone, Clip = im.Clip, Source = ImageSource.FromEncoded(result.ToPng()),
-            };
-            _doc.Commit("Remove background", Ops.Replace(_doc.State, replaced), [im.Id]);
-        });
-        await w.ShowDialog(this);
-    }
     readonly Doc.Materials.MaterialLibrary _library;
 
     async Task ShowLibrary()
@@ -1448,67 +1325,6 @@ public partial class MainWindow : Window
         _layerEditor.RefreshMaterials();
     }
 
-    /// <summary>
-    /// Depthmap of a picture (or a picture file) via DepthCharge. The result goes over the
-    /// original, same place and size, on its own greyscale Image layer.
-    /// </summary>
-    async Task MakeDepthmap(ImageShape? picture)
-    {
-        byte[] bytes;
-        string name;
-        if (picture is not null)
-        {
-            bytes = picture.Source.Encoded;
-            name = string.IsNullOrWhiteSpace(picture.Name) ? "Picture" : picture.Name;
-        }
-        else
-        {
-            var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = "Picture to turn into a depthmap",
-                FileTypeFilter = [new FilePickerFileType("Pictures") { Patterns = [.. PictureExtensions.Select(e => "*" + e)] }],
-            });
-            if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
-            bytes = await File.ReadAllBytesAsync(path);
-            name = Path.GetFileNameWithoutExtension(path);
-        }
-        var w = new DepthChargeWindow(_depthCharge, _settings, bytes, name, (png, label) => AddDepthmap(png, label, picture));
-        await w.ShowDialog(this);
-    }
-
-    void AddDepthmap(byte[] png, string label, ImageShape? over)
-    {
-        var src = ImageSource.FromEncoded(png);
-        var state = _doc.State;
-        var layer = Layer.Default(state.Layers.Count, LayerMode.Image) with
-        {
-            Name = $"Relief · {label}",
-            // Darker = deeper, carved in slices; each slice's lines turned to keep the floor smooth.
-            ImageMode = ImageEngraveMode.Slices,
-            Dpi = 254,
-            LinesPerCm = 200,
-            AngleStepDeg = 37,
-        };
-        state = Ops.AddLayer(state, layer, 0);
-        ImageShape shape;
-        if (over is not null)
-        {
-            // Same place and size as the original; a cropped depthmap fits inside it, centred.
-            double s = Math.Min(over.SizeMm.X / src.Width, over.SizeMm.Y / src.Height);
-            var size = new Vec2(src.Width * s, src.Height * s);
-            var inset = (over.SizeMm - size) / 2;
-            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(inset).Then(over.Transform) };
-        }
-        else
-        {
-            var size = ImageShape.DefaultSize(src, 100);
-            var at = new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH).Center - size / 2;
-            shape = new ImageShape { Name = label, LayerId = layer.Id, Source = src, SizeMm = size, Transform = Affine.Translate(at) };
-        }
-        _doc.Commit("Add depthmap", Ops.AddShapes(state, [shape]), [shape.Id]);
-        _layers.Activate(layer.Id);
-    }
-
     ShapeLibraryWindow? _shapesWindow;
     string ShapesFolder => Path.Combine(AppIdentity.DataDir, "shapes");
 
@@ -1540,12 +1356,6 @@ public partial class MainWindow : Window
     }
 
     int _insertCount;
-
-    async Task NestSel()
-    {
-        if (_doc.Selection.Count == 0) return;
-        await new NestWindow(_doc, _doc.Selection, Canvas.Machine).ShowDialog(this);
-    }
 
     void CenterSelInField()
     {
@@ -1584,6 +1394,7 @@ public partial class MainWindow : Window
             menu.Items.Add(fit);
             menu.Items.Add(grid);
         }
+        AddAddonMenuItems(menu);
         menu.Open(Canvas);
     }
 
@@ -2024,21 +1835,6 @@ public partial class MainWindow : Window
         await new MaskShapesWindow(_doc, paths).ShowDialog(this);
     }
 
-    void ClipPicture()
-    {
-        var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
-        var pic = sel.OfType<ImageShape>().FirstOrDefault();
-        var outline = sel.OfType<PathShape>().FirstOrDefault(p => p.World.Subpaths.Any(sp => sp.Closed));
-        if (pic is not null && outline is null && sel.OfType<PathShape>().Any())
-        {
-            StatusText.Text = "Image mask: the selected shape isn't a closed outline (its ends don't join), so it can't mask the picture. Close it with Tidy lines first, or draw a closed shape.";
-            return;
-        }
-        if (pic is null || outline is null) { StatusText.Text = "Select a picture and the closed shape to mask it with."; return; }
-        _doc.Commit("Image mask", Ops.Replace(_doc.State, pic.WithClip(new Doc.PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
-        StatusText.Text = "Image mask: only the part inside the shape is shown and engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).";
-    }
-
     async Task CopyAlongSel()
     {
         var sel = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).ToList();
@@ -2151,53 +1947,6 @@ public partial class MainWindow : Window
     /// The selected closed shapes are the board in the machine: they move to the Material layer
     /// (shown, never sent), and nesting and the model slicer fill them instead of the whole bed.
     /// </summary>
-    /// <summary>
-    /// The selected design split across the selected material outlines (the pieces it goes over; all
-    /// the ones it touches when none are selected): a page each, then Line up pieces to fit them.
-    /// </summary>
-    async Task SplitOntoPieces()
-    {
-        var s = _doc.State;
-        var sel = _doc.Selection;
-        var material = MaterialOutline.Layer(s)?.Id;
-        var outlines = MaterialOutline.On(s);
-        var pieces = outlines.Where(p => sel.Contains(p.Id)).ToList();
-        var art = s.Shapes.Where(x => sel.Contains(x.Id) && x.LayerId != material).Select(x => x.Id).ToHashSet();
-        if (pieces.Count == 0 && art.Count > 0)
-        {
-            var box = s.Bounds(art);
-            pieces = [.. outlines.Where(p => p.Bounds.Intersects(box))];
-        }
-        if (pieces.Count < 2 || art.Count == 0)
-        {
-            await Dialogs.Message(this, "Split onto pieces",
-                "Select the design and the pieces it goes across. Draw each piece the size it really is (a rectangle 200 × 75 mm for a 200 × 75 mm board), " +
-                "right-click it → Use as material outline, and lay them out as they'll go together. Then put the design over them, select it all, and split.\n\n" +
-                (pieces.Count < 2 ? $"Pieces found: {pieces.Count} (at least 2 are needed)." : "Nothing of the design is selected."));
-            return;
-        }
-        double w = Canvas.Machine.FieldW, h = Canvas.Machine.FieldH;
-        StatusText.Text = "Splitting…";
-        var result = await Task.Run(() => PieceSplit.Split(s, pieces, art, w, h));
-        _doc.Commit("Split onto pieces", result.State, []);
-        _layers.Activate(_doc.ActiveLayer);
-        Canvas.FitField();
-        StatusText.Text = $"Split onto {result.Pieces} pieces: a page each (\"Piece 1 of {result.Pieces}\"…), after the layout. Only each page's piece is sent; the rest shows grey.";
-        if (result.Notes.Count > 0) await Dialogs.Message(this, "Split onto pieces", string.Join("\n", result.Notes));
-        ShowLineUp();
-    }
-
-    LineUpWindow? _lineUp;
-
-    /// <summary>The Line up the pieces window (one at a time).</summary>
-    void ShowLineUp()
-    {
-        if (_lineUp is { IsVisible: true }) { _lineUp.Activate(); return; }
-        _lineUp = new LineUpWindow(_doc, _machine, Canvas.Machine);
-        _lineUp.Closed += (_, _) => _lineUp = null;
-        _lineUp.Show(this);
-    }
-
     void MaterialSel()
     {
         var ids = SelectedPaths().Where(p => p is not (TextShape or CodeShape) && p.Geometry.Subpaths.Any(sp => sp.Closed)).Select(p => p.Id).ToHashSet();
@@ -2248,6 +1997,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Selected vector shapes (text included), in drawing order.</summary>
+    /// <summary>While a test read from the close-up camera is in the design (an add-on says so), show where that camera sees.</summary>
+    void ShowCloseUpArea() => Canvas.CloseUpArea = AddonsWantCloseUpArea() ? _machine.CloseUpSees() : null;
+
     List<PathShape> SelectedPaths() => _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList();
 
     void BooleanSel(BoolOp op)
@@ -2370,53 +2122,6 @@ public partial class MainWindow : Window
             StatusText.Text = $"Quick processing stopped: {e.Message}";
         }
         finally { _quickRunning = false; }
-    }
-
-    /// <summary>Print-then-cut: cuts round printed art the camera finds (close-up when it covers the area, else the overview).</summary>
-    async Task CutRoundPrints()
-    {
-        if (!_machine.IsConnected) { await Dialogs.Message(this, "Cut round prints", "Connect the machine first: this needs a fresh camera photo."); return; }
-        // Where to look: inside the selected shape(s), else the whole bed.
-        var sel = _doc.State.Shapes.Where(x => _doc.Selection.Contains(x.Id)).Select(x => x.Bounds).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
-        var within = sel.IsEmpty ? new Rect2(0, 0, Canvas.Machine.FieldW, Canvas.Machine.FieldH) : sel;
-        var text = await Dialogs.Prompt(this, "Cut round prints", "How far outside the printed art the cut goes (mm): a white border round each sticker.", "1");
-        if (text is null || !double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double margin) || margin < 0) return;
-        StatusText.Text = "Photographing the prints…";
-        CameraPhoto? photo = null;
-        if (_machine.CloseUpSees() is { } sees && sees.Contains(within.TopLeft) && sees.Contains(within.BottomRight)) photo = await _machine.CloseUpBedPhotoAsync();
-        if (photo is null) { await _machine.UpdatePhotoAsync(); photo = Canvas.Photo; }
-        if (photo is null) { StatusText.Text = "No camera photo: calibrate the camera first (Camera → Calibrate)."; return; }
-        var cuts = await Task.Run(() => PrintCut.Find(photo.Image, photo.Area, photo.MmPerPx, within, new PrintCutOptions { MarginMm = margin }));
-        int n = cuts.Subpaths.Length;
-        if (n == 0) { StatusText.Text = "No print found there: is it on white paper, in the camera's view and well lit?"; return; }
-        var s = _doc.State;
-        var layer = s.Layers.FirstOrDefault(l => l.Name == "Print cut") ?? Layer.Default(s.Layers.Count, LayerMode.Cut) with { Name = "Print cut" };
-        if (s.FindLayer(layer.Id) is null) s = Ops.AddLayer(s, layer);
-        var shapes = cuts.Subpaths.Select((sp, i) => (Shape)new PathShape { Name = $"Print {i + 1}", LayerId = layer.Id, Geometry = new PathGeometry([sp]) }).ToList();
-        _doc.Commit("Cut round prints", Ops.AddShapes(s, shapes), shapes.Select(x => x.Id));
-        StatusText.Text = $"{n} print{(n == 1 ? "" : "s")} found: a cut round each, {margin:0.##} mm out, on the \"Print cut\" layer. Set its power for the paper (a kiss cut for stickers).";
-    }
-
-    /// <summary>Stencil bridges: the middles of O, A, R… kept joined to the stencil by a strip across the letter.</summary>
-    async Task StencilSel()
-    {
-        var shapes = SelectedPaths();
-        if (shapes.Count == 0) { await Dialogs.Message(this, "Stencil bridges", "Select the letters or shapes to cut as a stencil first."); return; }
-        var text = await Dialogs.Prompt(this, "Stencil bridges", "How wide each bridge is (mm). A strip of the sheet this wide is kept across each letter that has a middle (O, A, R, B…), so the middle stays in.", "1");
-        if (text is null || !double.TryParse(text.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out double w) || !(w > 0)) return;
-        var s = _doc.State;
-        int islands = 0, changed = 0;
-        foreach (var sh in shapes)
-        {
-            var (g, n) = PhotonCanvas.Doc.Geometry.Stencil.Bridge(sh.World, w);
-            if (n == 0) continue;
-            islands += n;
-            changed++;
-            s = Ops.Replace(s, new PathShape { Id = sh.Id, Name = sh.Name, LayerId = sh.LayerId, GroupId = sh.GroupId, Geometry = g });
-        }
-        if (changed == 0) { StatusText.Text = "Nothing to bridge: none of the selected shapes has a middle that would fall out."; return; }
-        _doc.Commit("Stencil bridges", s);
-        StatusText.Text = $"Bridged {islands} middle{(islands == 1 ? "" : "s")} in {changed} shape{(changed == 1 ? "" : "s")} with {w:0.##} mm strips.";
     }
 
     async Task OffsetSel()
@@ -2569,8 +2274,8 @@ public partial class MainWindow : Window
         {
             if (ConnectOnOpen) RememberOpen();
             ClearAutosave();
+            _addons?.StopAll();
             _machine.Shutdown();
-            _depthCharge.Dispose(); // stops DepthCharge only if this program started it
             return;
         }
         e.Cancel = true;
@@ -2664,96 +2369,8 @@ public partial class MainWindow : Window
             : $"{units.Count} copies, each marking the next serial number / spreadsheet row (back to front, left to right).";
     }
 
-    Task ShowExactDepth() => new ExactDepthWindow(_doc, _machine, _library, _doc.Selection).ShowDialog(this);
-
-    Task ShowToneTest(bool results) =>
-        new ToneTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
-
     Task ShowCloseUpCalibration(bool find) =>
         new CloseUpCalibrationWindow(_doc, _machine, Canvas.Machine, find).ShowDialog(this);
-
-    Task ShowLineTest(bool results) =>
-        new LineTestWindow(_doc, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results, _machine.CloseUpBedPhotoAsync, _machine.CloseUpSees, () => _machine.Lights, _machine.SetLights).ShowDialog(this);
-
-    Task ShowCutTest(bool results) =>
-        new CutTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results).ShowDialog(this);
-
-    Task ShowEtchTest(bool results) =>
-        new EtchTestWindow(_doc, _library, Canvas.Machine, () => Canvas.Photo, _machine.UpdatePhotoAsync, results,
-            d => _machine.CameraMapFor(d) is { } c ? new EtchTestWindow.ImageMapChoiceInfo(c.Exact, c.Description) : null).ShowDialog(this);
-
-    async Task PlaceOnEveryPiece()
-    {
-        var outline = SelectedOutline();
-        if (outline.Count == 0) { await Dialogs.Message(this, "Every piece", "Select the design to put on each piece first."); return; }
-        if (!_machine.IsConnected) { await Dialogs.Message(this, "Every piece", "Connect to the machine first: finding the pieces needs a fresh camera photo."); return; }
-        var ids = _doc.Selection;
-        var w = new BatchPlaceWindow(_machine, outline, placements =>
-        {
-            // One copy per piece (each its own group); the copies' fields count up in reading order.
-            var originals = _doc.State.Shapes.Where(s => ids.Contains(s.Id)).ToList();
-            var made = new List<Shape>();
-            var s = _doc.State;
-            for (int i = 0; i < placements.Count; i++)
-            {
-                var copy = Ops.CopyAsUnit(originals, placements[i].Move).Select(c => c.WithVarOffset(i)).ToList();
-                s = Ops.AddShapes(s, copy);
-                if (copy.Count > 1) s = Ops.Group(s, copy.Select(c => c.Id).ToHashSet()).Item1;
-                made.AddRange(copy);
-            }
-            s = Ops.Delete(s, ids);
-            _doc.Commit("Place on every piece", s, made.Select(m => m.Id));
-            StatusText.Text = $"A copy on each of {placements.Count} pieces." + (VariableText.Used(_doc.State).Count > 0 ? " Each one marks the next serial number / spreadsheet row." : "");
-        });
-        await w.ShowDialog(this);
-    }
-
-    /// <summary>Colour layers over a picture from a measured palette; the picture stops being sent when it's alone on its layer.</summary>
-    async Task MakeColourPicture(ImageShape picture)
-    {
-        var w = new ColourPictureWindow(picture, _library);
-        await w.ShowDialog(this);
-        if (w.Result is not { } r) return;
-        var (state, added) = Doc.Colour.ColourPicture.Add(_doc.State, picture, r.Palette, r.Options);
-        if (added.Count == 0) return;
-        bool alone = state.ShapesOn(picture.LayerId).Count() == 1;
-        if (alone) state = Ops.UpdateLayers(state, new HashSet<Guid> { picture.LayerId }, l => l with { Output = false });
-        _doc.Commit("Colour picture", state, added);
-        StatusText.Text = $"Added {added.Count} colour layers." + (alone ? " The picture's own layer is now a guide only (not sent)." : " The picture shares its layer, which is still sent: turn its output off if you only want the colours.");
-    }
-
-    /// <summary>Grating layers over a picture; the picture itself stops being sent when it's alone on its layer.</summary>
-    async Task MakeDiffraction(ImageShape picture)
-    {
-        var w = new DiffractionWindow(picture);
-        await w.ShowDialog(this);
-        if (w.Result is not { } o) return;
-        var (state, added) = Doc.Colour.Diffraction.Add(_doc.State, picture, o);
-        if (added.Count == 0) return;
-        bool alone = state.ShapesOn(picture.LayerId).Count() == 1;
-        if (alone) state = Ops.UpdateLayers(state, new HashSet<Guid> { picture.LayerId }, l => l with { Output = false });
-        _doc.Commit("Diffraction picture", state, added);
-        StatusText.Text = alone
-            ? $"Added {added.Count} grating layers. The picture's own layer is now a guide only (not sent)."
-            : $"Added {added.Count} grating layers. The picture shares its layer, which is still sent: turn its output off if you only want the gratings.";
-    }
-
-    async Task AddColourTest()
-    {
-        var w = new ColourTestWindow(_settings.TextFont);
-        await w.ShowDialog(this);
-        if (w.Result is not { } o) return;
-        var (state, added) = Doc.Colour.ColourTest.Add(_doc.State, o);
-        _doc.Commit("Colour test", state, added);
-        Canvas.FitField();
-    }
-
-    async Task MeasureColours()
-    {
-        var w = new MeasureColourWindow(_doc.State, _library, Canvas.Photo, _machine.Distance, _machine);
-        await w.ShowDialog(this);
-        _layerEditor.RefreshMaterials();
-    }
 
     /// <summary>Make a new code (<paramref name="id"/> null) or change one.</summary>
     async Task EditCode(Guid? id)

@@ -6,10 +6,18 @@ using Avalonia.Media;
 namespace PhotonCanvas.App;
 
 /// <summary>Small helpers so panels built in code stay consistent and readable.</summary>
-static class UiKit
+public static class UiKit
 {
     public static IBrush Brush(string key) => (IBrush)Application.Current!.FindResource(key)!;
     public static Geometry Icon(string key) => (Geometry)Application.Current!.FindResource(key)!;
+
+    /// <summary>One of the program's icons by key (Icons.axaml), or else SVG path data (an add-on's own icon).</summary>
+    public static Geometry IconOrPath(string keyOrPath)
+    {
+        if (Application.Current!.TryFindResource(keyOrPath, out var g) && g is Geometry geo) return geo;
+        try { return Geometry.Parse(keyOrPath); }
+        catch (Exception) { return Geometry.Parse("M4 4h16v16H4z M6 6v12h12V6z"); }
+    }
 
     public static Border Card(string title, params Control[] children)
     {

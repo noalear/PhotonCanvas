@@ -5,6 +5,7 @@ using Avalonia.Headless;
 using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using PhotonCanvas.App;
+using PhotonCanvas.Addon.Slicer;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Import;
@@ -20,6 +21,10 @@ static class MoreShots
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
 
     static T F<T>(object o, string name) => (T)o.GetType().GetField(name, Any)!.GetValue(o)!;
+
+    /// <summary>An add-on's pictures go in its own help folder (src/Addons/<folder>/help/images).</summary>
+    static void AddonShot(Bitmap? bmp, string addonFolder, string name) =>
+        bmp?.Save(Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", addonFolder, "help", "images", name + ".png"));
 
     public static void Run(MainWindow w, Document doc, CanvasView canvas, LayersPanel layers, Control editor, string data,
         Action<Bitmap?, string, string> save, Func<Control, Bitmap?> shot, Action<int> settle, Action reset, DocState sample, DocsSim.Ids ids)
@@ -135,14 +140,14 @@ static class MoreShots
         settle(200);
         if (ownFolder) try { Directory.Delete(models, true); } catch (Exception) { }
         // The pawn as a relief (Picture → 3D model), seen from the front.
-        var relief = new StlWindow();
+        var relief = new PhotonCanvas.Addon.Relief.StlWindow();
         relief.Show(w);
         settle(300);
-        typeof(StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
-        typeof(StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_tris", Any)!.SetValue(relief, pawn);
+        typeof(PhotonCanvas.Addon.Relief.StlWindow).GetField("_name", Any)!.SetValue(relief, "pawn");
         F<ComboBox>(relief, "_view").SelectedIndex = 1;
         settle(3000);
-        save(relief.CaptureRenderedFrame(), "window-picture-3d-model", "3D model to relief: a chess pawn seen from the front, as a depth map");
+        AddonShot(relief.CaptureRenderedFrame(), "Relief", "window-picture-3d-model");
         relief.Close();
 
         // Depth outlines, on a made-up depthmap: domed pebbles piled on each other.
@@ -168,11 +173,11 @@ static class MoreShots
                 rgba[i * 4 + 3] = 255;
             }
             var depth = new ImageShape { Name = "pebbles depthmap", LayerId = doc.State.Layers[0].Id, Source = ImageSource.FromEncoded(new PhotonCanvas.Core.Imaging.RasterImage(pw, ph, rgba).EncodePng()), SizeMm = new Vec2(120, 60) };
-            var outlines = new DepthOutlinesWindow(doc, depth);
+            var outlines = new PhotonCanvas.Addon.DepthOutlines.DepthOutlinesWindow(doc, depth);
             outlines.Show(w);
             F<Slider>(outlines, "_amount").Value = 45;
             settle(3000);
-            save(outlines.CaptureRenderedFrame(), "window-picture-depth-outlines", "Depth outlines: the edges of a depthmap of piled pebbles, as lines that swell on the tall steps (How many edges at 45%)");
+            AddonShot(outlines.CaptureRenderedFrame(), "DepthOutlines", "window-picture-depth-outlines");
             outlines.Close();
         }
 
@@ -281,16 +286,30 @@ static class MoreShots
         reset();
         doc.Select([ids.Outline]);
         settle(200);
-        var warp = new WarpWindow(doc);
+        var warp = new PhotonCanvas.Addon.Warp.WarpWindow(doc);
         warp.Show(w);
         settle(600);
         foreach (var (index, name) in new[] { (4, "round-object"), (6, "four-corners") })
         {
             F<ComboBox>(warp, "_mode").SelectedIndex = index;
             settle(900);
-            save(warp.CaptureRenderedFrame(), $"window-warp-{name}", $"Warp, {name.Replace('-', ' ')} mode");
+            AddonShot(warp.CaptureRenderedFrame(), "Warp", $"window-warp-{name}");
         }
         warp.Close();
+
+        // --- Stencil bridges on a bold text.
+        {
+            reset();
+            var word = TextShape.Create("ROBOT 80", new TextStyle(SizeMm: 28, Bold: true), ids.Cut, Affine.Translate(30, 60));
+            doc.Commit("Text", Ops.AddShapes(doc.State, [word]), [word.Id]);
+            settle(300);
+            var input = PhotonCanvas.Addon.Stencil.StencilEdit.Gather(doc.State, doc.Selection);
+            var stencil = new PhotonCanvas.Addon.Stencil.StencilWindow(doc, input, Path.Combine(data, "stencil-shot"), _ => { });
+            stencil.Show(w);
+            for (int i = 0; i < 40; i++) settle(100);
+            AddonShot(stencil.CaptureRenderedFrame(), "Stencil", "window-stencil-bridges");
+            stencil.Close();
+        }
 
         // --- Split onto pieces: a 400 × 150 mm design over four 200 × 75 mm boards laid two by two.
         {
@@ -315,9 +334,10 @@ static class MoreShots
             doc.Select(doc.State.Shapes.Select(x => x.Id));
             settle(800);
             save(w.CaptureRenderedFrame(), "workspace-pieces-layout", "Four boards as material outlines, the design over them, all selected");
-            var split = (Task)typeof(MainWindow).GetMethod("SplitOntoPieces", Any)!.Invoke(w, null)!;
-            for (int i = 0; i < 200 && !split.IsCompleted; i++) settle(50);
-            settle(800);
+            // Split onto pieces is an add-on: run its command.
+            var commands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            commands.FirstOrDefault(c => c.Id == "area.split")?.Run();
+            settle(3000);
             // The job bar rebuilds on a timer after a change (not run here): rebuilt straight away.
             var bar = F<JobBar>(w, "_job");
             void Rebuilt()
@@ -327,7 +347,7 @@ static class MoreShots
                 settle(300);
             }
             Rebuilt();
-            var lineUp = w.OwnedWindows.OfType<LineUpWindow>().FirstOrDefault();
+            var lineUp = w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == "LineUpWindow");
             if (lineUp is not null) { lineUp.Position = new PixelPoint(w.Position.X + 2000, w.Position.Y); settle(300); }
             canvas.FitRect(new Rect2(-200, -10, 240, 240));
             settle(800);
