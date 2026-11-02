@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Publish a new version for friends: build it, and put the builds up as a release on the public,
-# releases-only GitHub repository. Their PhotonCanvas sees it at start. PhotonCanvas is free to
-# use, all rights reserved (LICENSE); the source repository is private.
+# Publish a new version by hand: build it and put the builds up as a GitHub release, which
+# PhotonCanvas finds and installs by itself. (Normally .github/workflows/release.yml does this on
+# every change to master; this is for a numbered version such as 0.2.0, which also moves the
+# workflow's numbering on to 0.2.x.) PhotonCanvas is free to use, all rights reserved (LICENSE).
 #
 #   VERSION=0.2.0 tools/release.sh                  # every platform
 #   VERSION=0.2.0 tools/release.sh win-x64 osx-arm64 # just these
 #
 # What's new: docs/releases/<version>.md if it's there, else the commit subjects since the last release.
-# Needs the GitHub CLI (gh), signed in with access to both repositories.
+# Needs the GitHub CLI (gh), signed in with access to the repository releases go to (RELEASE_REPO).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 : "${VERSION:?Set VERSION, e.g. VERSION=0.2.0 tools/release.sh}"
-REPO=${RELEASE_REPO:-noalear/PhotonCanvas-releases}
+REPO=${RELEASE_REPO:-noalear/PhotonCanvas}
 GH=${GH:-gh}
 command -v "$GH" >/dev/null || GH="/c/Program Files/GitHub CLI/gh.exe"
 [ -n "$(git status --porcelain)" ] && { echo "Commit or put away your changes first: the release is built from what's committed."; exit 1; }
@@ -24,7 +25,7 @@ if ! git diff --quiet Directory.Build.props; then
 fi
 git tag -a "v$VERSION" -m "PhotonCanvas $VERSION"
 
-VERSION="$VERSION" tools/publish.sh "$@"
+VERSION="$VERSION" RELEASE_REPO="$REPO" tools/publish.sh "$@"
 
 notes="$(mktemp)"
 if [ -f "docs/releases/$VERSION.md" ]; then cp "docs/releases/$VERSION.md" "$notes"
@@ -34,7 +35,7 @@ else
 fi
 cat >> "$notes" <<'EOF'
 
-To update: unpack the file for your computer in place of the old one. Your designs, settings and material library are kept in your PhotonCanvas folder (in your home folder), not with the program.
+PhotonCanvas downloads this version by itself and puts it in when you close it (Settings → Updates). To install it by hand, unpack the file for your computer in place of the old one: your designs, settings and material library are kept in your PhotonCanvas folder, not with the program.
 EOF
 cat >> "$notes" <<EOF
 
@@ -45,6 +46,9 @@ files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz)
 existing=()
 for f in "${files[@]}"; do [ -f "$f" ] && existing+=("$f"); done
 [ ${#existing[@]} -gt 0 ] || { echo "Nothing was built."; exit 1; }
+# The checksums the program checks each download against (it won't install one without them).
+(cd dist && sha256sum "${existing[@]#dist/}" > SHA256SUMS)
+existing+=(dist/SHA256SUMS)
 "$GH" release create "v$VERSION" "${existing[@]}" --repo "$REPO" --title "PhotonCanvas $VERSION" --notes-file "$notes"
 git push -q origin HEAD "v$VERSION"
 echo "Released $VERSION to https://github.com/$REPO/releases/tag/v$VERSION"

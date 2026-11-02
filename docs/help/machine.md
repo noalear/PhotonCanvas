@@ -303,19 +303,47 @@ right on the first job.
 
 ### Updates
 
-Which version this is (e.g. *This is PhotonCanvas 1.0.0 (win-x64).*) and:
+PhotonCanvas keeps itself up to date: new versions are published on GitHub, and it downloads them
+in the background and puts them in when you close it. The page says which version this is (e.g.
+*This is PhotonCanvas 0.1.42 (win-x64).*) and has:
 
-- **Check for a new version at start** (on to begin with): at start, PhotonCanvas asks GitHub for
-  the latest version and tells you when there's a newer one. Nothing about you or your designs is
-  sent (like any web request, it shows GitHub your internet address). Quiet when offline.
+- **Check for a new version at start** (on to begin with): at start, and every few hours while
+  it's open, PhotonCanvas asks GitHub for the latest version. Nothing about you or your designs is
+  sent (like any web request, it shows GitHub your internet address). Quiet when offline. Off: it
+  never asks, except when you click **Check now**.
+- **Put new versions in by themselves** (on to begin with): a newer version is downloaded in the
+  background and checked against the release's checksums (a damaged or tampered download is thrown
+  away). While it downloads, the bottom left of the window says so; once it's ready, a button there
+  says **PhotonCanvas 0.1.43 is ready: restart**. Click it to close and start again with the new
+  version straight away (you're asked to save first, as usual), or carry on: it goes in the next
+  time you close PhotonCanvas. After it has gone in, the same place says **Updated to 0.1.43:
+  what's new** for a minute (click it for the release notes). Off: you're asked first, with
+  **A new version is out** (below).
 - **Check now** asks straight away and says what it found.
+- **GitHub access key**: only needed while new versions are published in a *private* GitHub
+  repository. On github.com go to **Settings → Developer settings → Personal access tokens →
+  Fine-grained tokens → Generate new token**, choose the repository, give it
+  **Contents: Read-only** and nothing else, then paste it here and click **Save key**. It's kept on
+  this computer only (`github-key.txt` in the [data folder](#the-data-folder), never in backups)
+  and only ever sent to GitHub. **Forget key** deletes it.
 
 ![Settings, Updates page](images/window-settings--updates.png)
 
-When there's a newer version, **A new version is out** shows what's new, with **Download** (the
-file for this computer, or **Open the download page**), **Skip this version** (not offered at
-start again) and **Later**. Unpack the new version in place of the old one: your designs,
-settings and library are in the [data folder](#the-data-folder), not with the program.
+When there's a newer version and it isn't put in by itself, **A new version is out** shows what's
+new, with **Update** (download it and put it in when you close, or straight away with
+**Restart now**), **Skip this version** (not offered at start again) and **Later**.
+
+Your designs, settings, material library and add-ons are in the
+[data folder](#the-data-folder), not with the program, so an update never touches them. Add-ons
+you installed yourself are kept up to date too when they say where their updates come from: see
+[Add-ons](addons.md).
+
+A copy that was **built from the source code** (rather than downloaded) never changes itself. When
+there's a new version, it offers **Install it** instead (Windows): that puts the published version
+in `AppData\Local\Programs\PhotonCanvas` with shortcuts on the desktop and in the Start menu, and
+offers to open it. From then on, open PhotonCanvas from those shortcuts: that copy keeps itself up
+to date. A copy in a folder it can't write to (for example *Program Files*) can't update itself
+either; move it to a folder of your own.
 
 ### Workspace, Materials and Connection
 
@@ -516,6 +544,6 @@ Data saved by older versions in other places is brought over when the program st
 - [Add a GRBL machine](tutorial:mach-grbl)
 - [Tell PhotonCanvas what you have](tutorial:mach-equipment)
 - [Colours and units](tutorial:mach-appearance)
-- [Check for updates](tutorial:mach-updates)
+- [Keep PhotonCanvas up to date](tutorial:mach-updates)
 - [Back up your settings](tutorial:mach-backup)
 - [Send G-code from the console](tutorial:mach-console)

@@ -86,8 +86,12 @@ public sealed class AppSettings
     public int FanGear { get; set; } = 3;
     public int PurifierSpeed { get; set; } = 50;
 
-    /// <summary>At start, ask GitHub whether a newer version has been published (nothing about you is sent).</summary>
+    /// <summary>At start (and every few hours while open), ask GitHub whether a newer version has been published (nothing about you is sent).</summary>
     public bool CheckForUpdates { get; set; } = true;
+    /// <summary>Download a newer version (and add-on updates) without asking, and put it in when the program closes.</summary>
+    public bool AutoUpdate { get; set; } = true;
+    /// <summary>The version that ran last time (to say "Updated to …" once after an update).</summary>
+    public string? LastVersion { get; set; }
     /// <summary>A version the user said not to be told about again.</summary>
     public string? SkippedVersion { get; set; }
     /// <summary>The design open when the program was last closed (reopened on start), if it had been saved.</summary>
