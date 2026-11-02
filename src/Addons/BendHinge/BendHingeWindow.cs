@@ -337,13 +337,15 @@ public sealed class BendHingeWindow : Window
         public bool Marks { get; set; } = true;
 
         const string FileName = "settings.json";
+        // Its own resolver: the default JSON options would keep this add-on in memory after it stops.
+        static readonly JsonSerializerOptions Json = new() { TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() };
 
         public static Saved Load(string folder)
         {
             try
             {
                 var path = Path.Combine(folder, FileName);
-                if (File.Exists(path) && JsonSerializer.Deserialize<Saved>(File.ReadAllText(path)) is { } s) return s;
+                if (File.Exists(path) && JsonSerializer.Deserialize<Saved>(File.ReadAllText(path), Json) is { } s) return s;
             }
             catch (Exception) { /* a damaged file just means the defaults */ }
             return new Saved();
@@ -354,7 +356,7 @@ public sealed class BendHingeWindow : Window
             try
             {
                 Directory.CreateDirectory(folder);
-                File.WriteAllText(Path.Combine(folder, FileName), JsonSerializer.Serialize(this));
+                File.WriteAllText(Path.Combine(folder, FileName), JsonSerializer.Serialize(this, Json));
             }
             catch (Exception) { /* not being able to remember the settings isn't worth an error */ }
         }
