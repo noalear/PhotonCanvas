@@ -1,0 +1,10 @@
+{
+  "id": "scatter",
+  "name": "Scatter terrain maker",
+  "version": "1.0.0",
+  "description": "Scenery for tabletop games that slots together: barrels, fences, carts, market stalls, wells and gravestones, sized for your figures, with wood grain, stonework and lettering etched on.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
