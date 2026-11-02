@@ -8,6 +8,7 @@ using Xunit;
 namespace PhotonCanvas.Tests;
 
 /// <summary>The phone's side: reading the QR code, the server's answers and events, errors, and the demo machine.</summary>
+[Collection(TimingCollection.Name)]
 public class RemoteClientTests
 {
     // ---- where the server is ----
@@ -200,7 +201,20 @@ public class RemoteClientTests
         using var demo = new DemoRemote(speed: 1);
         var events = new List<RemoteEvent>();
         using var cts = new CancellationTokenSource();
-        var listening = Task.Run(async () => { await foreach (var e in demo.EventsAsync(cts.Token)) lock (events) events.Add(e); });
+        // Wait for the listener to be in (its first event) before anything happens, and for the
+        // stop to reach it at the end, rather than guessing how long either takes.
+        var listeningNow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var sawStop = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var listening = Task.Run(async () =>
+        {
+            await foreach (var e in demo.EventsAsync(cts.Token))
+            {
+                lock (events) events.Add(e);
+                listeningNow.TrySetResult();
+                if (e is JobChanged { Job.Kind: "stopped" }) sawStop.TrySetResult();
+            }
+        });
+        await listeningNow.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var load = await demo.LoadAsync("demo-tag");
         await demo.StartAsync(load.Picture!.Id);
         Assert.Equal("P_PAUSE", (await demo.ControlAsync("pause")).Mode);
@@ -208,7 +222,7 @@ public class RemoteClientTests
         Assert.Equal("P_IDLE", (await demo.ControlAsync("stop")).Mode);
         Assert.Contains("Nothing is running", (await Assert.ThrowsAsync<RemoteError>(() => demo.ControlAsync("pause"))).Message);
         Assert.False((await demo.HistoryAsync(1))[0].Finished);
-        await Task.Delay(100);
+        await sawStop.Task.WaitAsync(TimeSpan.FromSeconds(10));
         cts.Cancel();
         try { await listening; } catch (OperationCanceledException) { }
         lock (events)
