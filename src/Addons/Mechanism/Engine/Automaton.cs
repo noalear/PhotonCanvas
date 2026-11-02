@@ -33,6 +33,8 @@ public sealed record AutomatonSpec : MechSpec
     public double CrankMm { get; init; } = 28;
     /// <summary>The handle turns clockwise (looking at the handle side) instead of anticlockwise.</summary>
     public bool Clockwise { get; init; }
+    /// <summary>The cams' hole for the shaft (and so the shaft's shape and size); null = the shaft's own shape, gripping it.</summary>
+    public Hole? CamHole { get; init; }
 
     public const int MaxStations = 6;
     /// <summary>Room for the followers to slide in their slots (mm).</summary>
@@ -57,7 +59,16 @@ public sealed record AutomatonSpec : MechSpec
         var mech = new Mechanism { Title = "Automaton" };
 
         // ---- sizes: everything follows from the cams ----
-        double heldR = Axle.Square ? Axle.SizeMm * Math.Sqrt(2) / 2 : Axle.SizeMm / 2;
+        var bore = new Bore(CamHole, Axle, false, Material);
+        double heldR = bore.Shaft.OuterR;
+        if (bore.Turns)
+            mech.Findings.Add(new(Severity.Bad, "The cams' holes let them turn on the shaft, so turning the handle won't turn them. Use a press or snug fit, or a D or square hole."));
+        else if (bore.Chosen)
+        {
+            mech.Findings.Add(new(Severity.Note, $"Holes drawn for {MaterialWords.Of(Material)}: the cams' shaft holes {bore.Words}."));
+            if (bore.Shaft.Shape == HoleShape.Round)
+                mech.Findings.Add(new(Severity.Note, "A round shaft doesn't set the cams' timing: line each cam's mark up with the crank before the glue sets."));
+        }
         double rMax = designs.Max(d => d.MaxRadius);
         double sp = Math.Max(P + 6, 24);                       // from one cam to the next along the shaft
         double W = n * sp;                                     // inside, between the sides
@@ -102,7 +113,7 @@ public sealed record AutomatonSpec : MechSpec
             sideOutline.Add(Poly.Rect(sy * D / 4 - tw / 2, -t, sy * D / 4 + tw / 2, 0.01));
             sideOutline.Add(Poly.Rect(sy * D / 4 - tw / 2, H - 0.01, sy * D / 4 + tw / 2, H + t));
         }
-        var side = Poly.Subtract(Poly.Union(sideOutline), [Axle.TurningHole(new Vec2(0, zs)), Shapes.Box(new Vec2(0, zShelf + t / 2), stw + fitLen, t + fit)]);
+        var side = Poly.Subtract(Poly.Union(sideOutline), [bore.Frame(new Vec2(0, zs), true), Shapes.Box(new Vec2(0, zShelf + t / 2), stw + fitLen, t + fit)]);
         mech.Parts.Add(new Part { Name = "Side", Shape = side, Copies = 2, Label = zs - heldR > 14 ? new PartLabel("Side", new Vec2(0, 6), 3.5) : null });
 
         // ---- the cams, followers and platforms ----
@@ -115,7 +126,7 @@ public sealed record AutomatonSpec : MechSpec
             var d = designs[i];
             // The shaft's square, seen from the cam: a square shaft sets each cam's timing by itself.
             double turn0 = -d.TurnAt(starts[i]);
-            cams[i] = Poly.Subtract(d.Outline, [Axle.HeldHole(default, turn0)]);
+            cams[i] = Poly.Subtract(d.Outline, [bore.Cut(default, turn0)]);
             double room = d.MinRadius - heldR;
             var lines = new List<List<Vec2>>();
             if (room > 4) lines.Add([Shapes.Polar(heldR + 1.5, turn0), Shapes.Polar(heldR + Math.Min(7, room - 1.5), turn0)]);
@@ -149,12 +160,12 @@ public sealed record AutomatonSpec : MechSpec
         // ---- the handle ----
         double cw = Math.Max(12, 2 * heldR + 8);
         double pegR = Axle.SizeMm / 2;
-        var crank = Poly.Subtract(Shapes.Link(default, new Vec2(CrankMm, 0), cw), [Axle.HeldHole(default), Poly.Circle(new Vec2(CrankMm, 0), pegR - 0.03, 0.003)]);
+        var crank = Poly.Subtract(Shapes.Link(default, new Vec2(CrankMm, 0), cw), [bore.Frame(default, false), Poly.Circle(new Vec2(CrankMm, 0), pegR - 0.03, 0.003)]);
         mech.Parts.Add(new Part { Name = "Crank", Shape = crank });
-        var collar = Poly.Subtract([Poly.Circle(default, heldR + 5, 0.003)], [Axle.HeldHole(default)]);
+        var collar = Poly.Subtract([Poly.Circle(default, heldR + 5, 0.003)], [bore.Frame(default, false)]);
         mech.Parts.Add(new Part { Name = "Collar", Shape = collar });
         double shaftLen = W + 2 * t + 2 * (t + 1) + 4;
-        mech.Shopping.Add($"A shaft: {Axle.Words} dowel, {Math.Ceiling(shaftLen):0} mm long");
+        mech.Shopping.Add($"A shaft: {bore.ShaftWords} dowel, {Math.Ceiling(shaftLen):0} mm long");
         mech.Shopping.Add($"A handle: {Axle.SizeMm:0.#} mm round dowel, about 30 mm long");
         mech.Shopping.Add("Wood glue, and figures to stand on the platforms");
 
@@ -167,7 +178,7 @@ public sealed record AutomatonSpec : MechSpec
             new("Side", [Poly.Rect(W / 2, 0, W / 2 + t, H)], Tints.Frame, _ => Pose.Zero) { Faint = true },
             new("Shelf", [Poly.Rect(-W / 2, zShelf, W / 2, zShelf + t)], Tints.Frame, _ => Pose.Zero) { Faint = true },
             new("Top", [Poly.Rect(-tx, H, tx, H + t)], Tints.Frame, _ => Pose.Zero) { Faint = true },
-            new("Shaft", [Poly.Rect(xL - 1, zs - Axle.SizeMm / 2, xC + t + 2, zs + Axle.SizeMm / 2)], Tints.Steel, _ => Pose.Zero),
+            new("Shaft", [Poly.Rect(xL - 1, zs - bore.Shaft.SizeMm / 2, xC + t + 2, zs + bore.Shaft.SizeMm / 2)], Tints.Steel, _ => Pose.Zero),
             new("Collar", [Poly.Rect(xL, zs - heldR - 5, xL + t, zs + heldR + 5)], Tints.Of(7), _ => Pose.Zero),
         };
         for (int i = 0; i < n; i++)
@@ -215,7 +226,7 @@ public sealed record AutomatonSpec : MechSpec
                 new($"Cam {i + 1}", cams[i], Tints.Of(i), a => new Pose(new Vec2(0, zs), d.TurnAt(a + phi0))) { IsInput = true, Lines = camLines[i] },
                 new($"Follower {i + 1}", followers[i], Tints.Of(i + 4), Up),
                 new($"Platform {i + 1}", [Poly.Rect(-P / 2, s, P / 2, s + t)], Tints.Of(i + 4), Up),
-                new("Shaft", [Axle.Square ? Axle.HeldHole(default) : Poly.Circle(default, Axle.SizeMm / 2, 0.01)], Tints.Steel, a => new Pose(new Vec2(0, zs), dir * a)),
+                new("Shaft", [bore.ShaftOutline()], Tints.Steel, a => new Pose(new Vec2(0, zs), dir * a)),
             };
             mech.Panels.Add(new PlanarPanel
             {

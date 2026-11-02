@@ -31,6 +31,8 @@ public sealed record PlanetarySpec : MechSpec
     public double PlanetPinMm { get; init; } = 4;
     /// <summary>How wide the ring's rim is outside its tooth roots (mm).</summary>
     public double RimMm { get; init; } = 10;
+    /// <summary>The sun's hole for its axle; null = one that grips it.</summary>
+    public Hole? SunHole { get; init; }
 
     public int RingTeeth => SunTeeth + 2 * PlanetTeeth;
 
@@ -72,9 +74,13 @@ public sealed record PlanetarySpec : MechSpec
 
         // ---- the parts ----
         ct.ThrowIfCancellationRequested();
-        double holeR = Axle.Square ? Axle.SizeMm * Math.Sqrt(2) / 2 + 0.15 : Axle.SizeMm / 2 + 0.15;
+        var bore = new Bore(SunHole, Axle, false, Material);
+        double holeR = bore.R;
         double pinHoleR = PlanetPinMm / 2 + 0.15;
-        var sunShape = Poly.Subtract(GearCache.External(f, zs, 0, 0), [Held == PlanetaryHeld.Sun ? Axle.HeldHole(default) : Axle.HeldHole(default)]);
+        var sunShape = Poly.Subtract(GearCache.External(f, zs, 0, 0), [bore.Cut(default)]);
+        if (bore.Turns)
+            mech.Findings.Add(new(Severity.Bad, $"The sun's hole lets it turn on its axle, but the sun is {(Held == PlanetaryHeld.Sun ? "held still" : "turned")} by its axle. Use a press or snug fit, or a D or square hole."));
+        else if (bore.Chosen) mech.Findings.Add(new(Severity.Note, $"Holes drawn for {MaterialWords.Of(Material)}: the sun's axle hole {bore.Words}."));
         var planetShape = Poly.Subtract(GearCache.External(f, zp, 0, 0), [Poly.Circle(default, pinHoleR, 0.003)]);
         ct.ThrowIfCancellationRequested();
         Paths64 ringTeeth;
@@ -87,7 +93,7 @@ public sealed record PlanetarySpec : MechSpec
             for (int i = 0; i < 4; i++) bolts.Add(Poly.Circle(Shapes.Polar((ringSize.RootR + outerR) / 2, Math.PI / 4 + i * Math.PI / 2), boltR, 0.003));
         var ringShape = bolts.Count > 0 ? Poly.Subtract(ringTeeth, bolts) : ringTeeth;
         double carrierR = a + pinHoleR + Math.Max(4, PlanetPinMm);
-        var carrierHoles = new Paths64 { Axle.TurningHole(default) };
+        var carrierHoles = new Paths64 { bore.Frame(default, true) };
         foreach (var g in angles) carrierHoles.Add(Poly.Circle(Shapes.Polar(a, g), PlanetPin(), 0.003));
         var carrierShape = Poly.Subtract([Poly.Circle(default, carrierR, 0.003)], carrierHoles);
         double PlanetPin() => PlanetPinMm / 2 - 0.03;
@@ -106,11 +112,11 @@ public sealed record PlanetarySpec : MechSpec
         if (Held == PlanetaryHeld.Ring)
         {
             // A base the ring is screwed to, with the sun's axle turning in its middle.
-            var holes = new Paths64(bolts) { Axle.TurningHole(default) };
+            var holes = new Paths64(bolts) { bore.Frame(default, true) };
             baseShape = Poly.Subtract([Poly.Circle(default, outerR, 0.003)], holes);
             mech.Parts.Add(new Part { Name = "Base", Shape = baseShape, Label = new PartLabel("Base", new Vec2(0, -(holeR + ringSize.RootR) / 2), 4) });
         }
-        mech.Shopping.Add($"An axle for the sun: {Axle.Words} dowel or rod, about {Math.Ceiling(4 * t + 15):0} mm long");
+        mech.Shopping.Add($"An axle for the sun: {bore.ShaftWords} dowel or rod, about {Math.Ceiling(4 * t + 15):0} mm long");
         mech.Shopping.Add($"{Planets} pins for the planets: {PlanetPinMm:0.#} mm dowel, {Math.Ceiling(2 * t + 1):0} mm long");
         if (bolts.Count > 0) mech.Shopping.Add($"4 small screws or bolts ({2 * boltR + 0.3:0.#} mm) for the ring");
 
@@ -128,7 +134,7 @@ public sealed record PlanetarySpec : MechSpec
         }
         // The carrier drawn see-through over the planets, turning with them.
         bodies.Add(new Body("Carrier", carrierShape, Tints.Of(2), x => new Pose(default, wc * x)) { Faint = true, Lines = Held == PlanetaryHeld.Carrier ? [] : carrierMarks });
-        bodies.Add(new Body("Axle", [Axle.Square ? Axle.HeldHole(default) : Poly.Circle(default, Axle.SizeMm / 2, 0.01)], Tints.Steel, x => new Pose(default, ws * x)));
+        bodies.Add(new Body("Axle", [bore.ShaftOutline()], Tints.Steel, x => new Pose(default, ws * x)));
 
         // ---- the motion check ----
         int total = zs + zr;

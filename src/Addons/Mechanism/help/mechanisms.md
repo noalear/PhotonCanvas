@@ -77,16 +77,62 @@ turns harder.
 | **Teeth** | Each gear's teeth, 6–200. Up to 8 gears (**Add a gear**, ✕ takes one away). The default is A with 36 teeth driving B with 12: B turns three times as fast, the other way. |
 | **Placed** | **meshes with** the gear before it (at **Angle** from it: 0° to the right, 90° up), or **on** its **axle**, in the layer in front, glued to it face to face so they turn as one: big then small makes a big change of speed in a small space. |
 | **Avoid undercut (stronger small gears)** | On by default. Gears with few teeth (under 17 at 20°) are cut thin at the root; this shifts their teeth outwards so they aren't, and moves their axles a little further apart. |
-| **A plate to hold the axles, with spacers** | A plate under the gears with snug holes for the axles (glue them in) and a hole in each free corner to screw it down, and spacers to keep the gears off the plate. |
+| **A plate to hold the axles, with spacers** | A plate under the gears with snug holes for the axles (glue them in) and a hole in each free corner to screw it down, and spacers to keep the gears off the plate. An axle whose gear grips it (see [Holes and handles](#holes-and-handles)) turns in a round hole in the plate instead. |
 | **Spokes in the bigger gears** | Windows in gears big enough for them, to save material and weight. |
-| **A handle hole in gear A** | A hole for a peg to turn A by, on a spoke in a round pad. A gear too small for one says so. |
 | **Axles** | The dowel or rod's width, 2–25 mm, default 6. Holes a part turns in get 0.3 mm of room; holes that hold the axle (the plate's) are snug, to glue. **Square** is for square dowel: parts that hold it get square holes, so it can't turn in them; parts that turn on it get round ones. |
+
+### Holes and handles
+
+Under **Holes and handles**, each gear has its own **Gear A: hole and handle** (B, C…). Click one to
+open it.
+
+![Gear A with a D hole for a motor shaft, gear B with a handle hole 25 mm out, B's settings open](images/window-mechanism-holes.png)
+
+**Axle hole** is the gear's hole for its axle:
+
+| Choice | What it is |
+|---|---|
+| **Turns freely (usual)** | Round: the axle is glued into the plate and the gear turns on it, with 0.3 mm of room. |
+| **Round** | A round hole with the **Fit** you pick. |
+| **D (round with a flat)** | For a motor shaft, or a dowel with a flat sanded on it. **Across the flat** is from the flat to the far side (0.5 mm under the size unless you set it). |
+| **Square** | For square dowel. |
+
+**Shaft size** is the shaft's diameter (a square one's side). **Fit** says how tight the hole is:
+
+| Fit | Wood and other soft sheets | Acrylic and other stiff ones | What it's for |
+|---|---|---|---|
+| **Press** | 0.2 mm under | 0.08 mm under | Tap it on: it holds without glue. |
+| **Snug** | 0.06 mm under | 0.02 mm under | Push it on and glue it to be sure. |
+| **Slip** | 0.1 mm over | 0.08 mm over | Slides on and turns on the shaft with little wobble. |
+| **Free** | 0.3 mm over | 0.25 mm over | Turns easily on the shaft. |
+
+The material is the one picked in **Cut with** (its kind in the material library); with none picked
+the holes are drawn for wood. The sizes are for holes cut at their drawn size, which they are with
+your material's kerf on the cut layer (see [Material and kerf](#material-and-kerf)). **Adjust**
+adds to the hole across, −1 to +1 mm (+ is looser), for dowels that aren't quite their size. The
+list under the picture gives every chosen hole's size as drawn, so you can check it with calipers.
+
+A D or square hole, and a round press or snug one, grips the shaft, so the gear turns with it: that
+axle then turns in a round hole in the plate rather than being glued in. Gears that share an axle
+need the same hole for it (the check says if they don't); when they all grip it they turn as one
+without glue.
+
+**A handle hole** puts a hole off the middle of the gear for a peg (a crank pin) to turn it by, in
+any gear. It's on for gear A to start with. **Handle radius** is from the middle of the gear to the
+middle of the hole, in mm; 0 puts it as far out as there's room for. A radius that would run into
+the axle hole or the teeth says so, with the radii that fit, and leaves the hole out. On a gear with
+spokes the hole sits on a spoke, in a round pad. **Peg hole** is the peg's hole, chosen the same way
+as the axle hole: **Snug (usual)**, for a dowel the size of the axles (4 mm at least), to start with, or a free
+fit for a peg that spins in your fingers as you turn it. A peg on a gear with another gear in front
+of it, close enough to hit it, is flagged.
 
 **Rack and pinion** turns turning into sliding: the pinion turns on its axle and slides the rack
 on two pins through the slot in it. **Pinion teeth** 6–80 (default 16), **Travel** 10–500 mm (how far
 the rack slides, end to end, default 60), and the same **Teeth** settings (default tooth size 3).
 With **A plate with the axle and the rack's pins**, the pinion's axle and the two pins are glued
-into a plate. In the picture the rack slides to one end and back.
+into a plate. In the picture the rack slides to one end and back. **Pinion's hole** and **A handle
+hole in the pinion** work as the gears' [holes and handles](#holes-and-handles) (the pinion turns
+freely on its axle to start with).
 
 ![A rack and pinion: the pinion's handle turns it, the rack slides along its two pins](images/window-mechanism-rack.png)
 
@@ -103,6 +149,7 @@ inside round them all. Hold one still and turn another: the third turns slower o
 | **Planet pins** | The dowels the planets turn on, 2–12 mm, default 4. |
 | **Ring's rim** | Wood round the ring's teeth, 4–40 mm, default 10. |
 | **Sun's axle** | As **Axles** above. |
+| **Sun's hole** | **Grips the axle (usual)** to start with, or a round (press or snug), D or square hole of its own, as under [Holes and handles](#holes-and-handles). The sun must grip its axle: a hole it turns in is flagged. |
 
 The default tooth size is 2 for planetary gears.
 
@@ -139,8 +186,9 @@ to jump up, which can't work (shown as a problem).
 | **Foot** | **Round: follows every dip** (the default) or **Flat: can't get into dips**: a flat foot pushes straight and wears well, but it rides over hollows and slides down drops. |
 | **Foot size** | A round foot's diameter or a flat foot's width, 4–80 mm, default 12. |
 | **Turns** | **Anticlockwise** (the default) or **Clockwise**, looking at the front of the cam. It matters for drops. |
-| **A handle hole in the cam** | A hole for a peg to turn it by. |
 | **Shaft and pins** | As **Axles** under [Gears](#gears). |
+| **Cam's hole** | **Grips the shaft (usual)** to start with (the shaft turns in the backboard), or a round, D or square hole of its own with a fit, as under [Holes and handles](#holes-and-handles); the shaft takes its shape and size. A cam that would turn on its shaft is flagged. |
+| **A handle hole in the cam** | A hole for a peg to turn it by, at **Handle radius** from the middle (0 = as far out as fits), with its own **Peg hole**. |
 
 The chart under the picture shows how high the follower is over one turn: **Planned** (the steps)
 and **On the cut cam** (where it really is, riding on the cut shape). Where the two part, the cam
@@ -170,6 +218,7 @@ and **Base radius**, **Foot** and **Foot size** as for a single cam (default bas
 | **Crank** | From the shaft to the handle, 10–120 mm, default 28. Too long and it hits the base at the bottom of its turn; the check says, and how short to make it. |
 | **Handle turns** | **Anticlockwise** (the default) or **Clockwise**, looking at the handle's side. |
 | **Shaft** | As **Axles** under [Gears](#gears); square by default, so the cams turn with it. Each cam's square hole is turned to set where it starts. |
+| **Cams' holes** | **Grips the shaft (usual)** to start with, or a round, D or square hole with a fit (as under [Holes and handles](#holes-and-handles)), which sets the shaft's shape and size. A D hole is turned to set each cam's start, like a square one; round cams have to be lined up by hand before the glue sets. |
 
 The box is held together by tabs in slots: the slots are the sheet's **Thickness** plus **Slot fit**
 (under **Material**). The followers slide in slots in the top and in a shelf under it.
@@ -215,7 +264,8 @@ leave empty go too) and the new ones are put on the page shown.
 ## Putting it together
 
 - Glue the axles and pins into the plate, backboard or base (their holes are snug), and turn the
-  gears, cams and followers on them (their holes have 0.3 mm of room). A drop of wax on the teeth
+  gears, cams and followers on them (their holes have 0.3 mm of room). A gear or cam with a press,
+  snug, D or square hole goes on its shaft instead, and the shaft turns in the frame. A drop of wax on the teeth
   and the follower's foot helps.
 - Gears go on in their layers: a spacer, then the gear. Glue gears that share an axle to each
   other first, face to face, with the axle through both to line them up.

@@ -185,7 +185,7 @@ public sealed class MechanismWindow : Window
     int Kind => Math.Clamp(_kind.SelectedIndex, 0, Kinds.Length - 1);
 
     /// <summary>The settings as they are now, made of the sheet chosen.</summary>
-    MechSpec Current() => _specs[Kind] with { ThicknessMm = (double)(_thick.Value ?? 3), SlotFitMm = (double)(_fit.Value ?? 0.1m) };
+    MechSpec Current() => _specs[Kind] with { ThicknessMm = (double)(_thick.Value ?? 3), SlotFitMm = (double)(_fit.Value ?? 0.1m), Material = Cut()?.M.Category ?? "" };
 
     void Speed()
     {
@@ -457,9 +457,81 @@ public sealed class MechanismWindow : Window
         return Stack(Field(what, size, Hint("The dowel or rod's width (mm). Holes it turns in get 0.3 mm of room; holes that hold it are snug, to glue."), "Round dowel, or square dowel for parts that must turn with it."), square);
     }
 
+    /// <summary>
+    /// A part's hole for its shaft: the mechanism's usual one (<paramref name="usual"/> says what that is), or a
+    /// round, D or square one of its own with a fit. <paramref name="fitWhenChosen"/> is the fit a new one starts with.
+    /// </summary>
+    Control HoleFields(string label, Func<Hole?> get, Action<Hole?> set, string usual, Func<double> size, HoleFit fitWhenChosen, string? tip = null)
+    {
+        var host = new StackPanel { Spacing = 8 };
+        void Fill()
+        {
+            host.Children.Clear();
+            var h = get();
+            var shape = Pick([usual, "Round", "D (round with a flat)", "Square"], h is null ? 0 : 1 + (int)h.Shape, v =>
+            {
+                if (v == 0) set(null);
+                else
+                {
+                    var was = get() ?? new Hole { SizeMm = size(), Fit = fitWhenChosen };
+                    var to = (HoleShape)(v - 1);
+                    // A D or square hole always turns with its shaft: no free fit for it.
+                    set(was with { Shape = to, Fit = to != HoleShape.Round && was.Fit == HoleFit.Free ? HoleFit.Snug : was.Fit });
+                }
+                Dispatcher.UIThread.Post(Fill);
+            });
+            host.Children.Add(Field(label, shape, tip: tip ?? "Round with a fit (press, snug, slip or free), D-shaped for a motor shaft or a dowel with a flat, or square."));
+            if (h is null) return;
+            host.Children.Add(Field("Shaft size", Num(1, 50, 0.1m, "0.##", h.SizeMm, v => { if (get() is { } c) set(c with { SizeMm = v }); }),
+                Hint(h.Shape == HoleShape.Square ? "The square shaft's side (mm)." : "The shaft's diameter (mm).")));
+            if (h.Shape == HoleShape.D)
+                host.Children.Add(Field("Across the flat", Num(0.5m, 50, 0.1m, "0.##", h.Shaft.Flat, v => { if (get() is { } c) set(c with { FlatMm = v }); }),
+                    Hint("From the flat to the far side of the shaft (mm).")));
+            HoleFit[] fits = h.Shape == HoleShape.Round ? Fits.All : [HoleFit.Press, HoleFit.Snug, HoleFit.Slip];
+            int fi = Array.IndexOf(fits, h.Fit);
+            host.Children.Add(Field("Fit", Pick([.. fits.Select(Fits.Words)], fi < 0 ? 1 : fi, v => { if (get() is { } c) set(c with { Fit = fits[v] }); }),
+                Hint("Drawn for the material picked below (wood squashes, acrylic cracks); the list under the picture gives each hole's size."),
+                "Press and snug grip the shaft, so the part turns with it; slip and free let it turn on the shaft."));
+            host.Children.Add(Field("Adjust", Num(-1, 1, 0.02m, "+0.##;-0.##;0", h.AdjustMm, v => { if (get() is { } c) set(c with { AdjustMm = v }); }),
+                Hint("Added across the hole (mm): + is looser. For dowels that aren't quite their size.")));
+        }
+        Fill();
+        return host;
+    }
+
+    /// <summary>A handle hole: on or off, how far out it sits, and the peg's hole.</summary>
+    Control HandleFields(string text, Func<Crank> get, Action<Crank> set, Func<double> axleSize)
+    {
+        var host = new StackPanel { Spacing = 8 };
+        void Fill()
+        {
+            host.Children.Clear();
+            var c = get();
+            var on = new CheckBox { Content = text, IsChecked = c.On };
+            ToolTip.SetTip(on, "A hole off the middle for a peg (a crank pin) to turn it by.");
+            on.IsCheckedChanged += (_, _) =>
+            {
+                set(get() with { On = on.IsChecked == true });
+                Changed();
+                Dispatcher.UIThread.Post(Fill);
+            };
+            host.Children.Add(on);
+            if (!c.On) return;
+            host.Children.Add(Field("Handle radius", Num(0, 500, 0.5m, "0.#", c.RadiusMm, v => set(get() with { RadiusMm = v })),
+                Hint("From the middle to the handle hole's centre (mm). 0 puts it as far out as there's room for.")));
+            host.Children.Add(HoleFields("Peg hole", () => get().Hole, h => set(get() with { Hole = h }), $"Snug, {Math.Max(4, axleSize()):0.#} mm (usual)", axleSize, HoleFit.Snug,
+                "The peg's hole: snug or press to glue a peg in, free for a peg that spins in your fingers, or D or square."));
+        }
+        Fill();
+        return host;
+    }
+
+    readonly HashSet<int> _openGears = [];
+
     Control GearsPanel()
     {
         var rows = new StackPanel { Spacing = 6 };
+        var extras = new StackPanel { Spacing = 6 };
         var add = Button("Add a gear", tip: "Another gear meshing with the last one (or set it to share the last one's axle).");
         void Fill()
         {
@@ -519,6 +591,28 @@ public sealed class MechanismWindow : Window
                 rows.Children.Add(row);
             }
             add.IsEnabled = gears.Count < 8;
+            extras.Children.Clear();
+            for (int i = 0; i < gears.Count; i++)
+            {
+                int idx = i;
+                GearRow Row() => Gears.Gears[idx];
+                void SetRow(GearRow r, bool legacyOff = false) => Gears = Gears with { Gears = Gears.Gears.SetItem(idx, r), Handle = legacyOff ? false : Gears.Handle };
+                var ex = new Expander
+                {
+                    Header = $"Gear {GearTrainSpec.Letter(i)}: hole and handle",
+                    IsExpanded = _openGears.Contains(i),
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    Content = Stack(
+                        HoleFields("Axle hole", () => Row().Hole, h => SetRow(Row() with { Hole = h }), "Turns freely (usual)", () => Gears.Axle.SizeMm, HoleFit.Press),
+                        HandleFields("A handle hole", () => Gears.HandleOf(idx) ?? Row().Handle ?? new Crank { On = false }, c => SetRow(Row() with { Handle = c }, legacyOff: idx == 0), () => Gears.Axle.SizeMm)),
+                };
+                ex.PropertyChanged += (_, e) =>
+                {
+                    if (e.Property != Expander.IsExpandedProperty) return;
+                    if (ex.IsExpanded) _openGears.Add(idx); else _openGears.Remove(idx);
+                };
+                extras.Children.Add(ex);
+            }
         }
         add.Click += (_, _) =>
         {
@@ -535,8 +629,8 @@ public sealed class MechanismWindow : Window
                 Check("Avoid undercut (stronger small gears)", s.AvoidUndercut, b => Gears = Gears with { AvoidUndercut = b }, "Small gears' teeth are shifted outwards so they aren't cut thin at the root; their axles move a little further apart."),
                 Check("A plate to hold the axles, with spacers", s.Plate, b => Gears = Gears with { Plate = b }),
                 Check("Spokes in the bigger gears", s.Spokes, b => Gears = Gears with { Spokes = b }),
-                Check("A handle hole in gear A", s.Handle, b => Gears = Gears with { Handle = b }),
-                AxleFields(() => Gears.Axle, a => Gears = Gears with { Axle = a }, "Axles")));
+                AxleFields(() => Gears.Axle, a => Gears = Gears with { Axle = a }, "Axles")),
+            Explained("Holes and handles", "Each gear's hole for its axle (round with a fit, D or square) and a handle hole in any gear, as far out as you set.", extras));
     }
 
     Control RackPanel()
@@ -549,8 +643,9 @@ public sealed class MechanismWindow : Window
                 Field("Travel", Num(10, 500, 5, "0", s.TravelMm, v => Rack = Rack with { TravelMm = v }), Hint("How far the rack slides, end to end (mm).")),
                 Check("Avoid undercut (stronger pinion)", s.AvoidUndercut, b => Rack = Rack with { AvoidUndercut = b }),
                 Check("A plate with the axle and the rack's pins", s.Plate, b => Rack = Rack with { Plate = b }),
-                Check("A handle hole in the pinion", s.Handle, b => Rack = Rack with { Handle = b }),
-                AxleFields(() => Rack.Axle, a => Rack = Rack with { Axle = a }, "Axle and pins")));
+                AxleFields(() => Rack.Axle, a => Rack = Rack with { Axle = a }, "Axle and pins"),
+                HoleFields("Pinion's hole", () => Rack.PinionHole, h => Rack = Rack with { PinionHole = h }, "Turns freely (usual)", () => Rack.Axle.SizeMm, HoleFit.Press),
+                HandleFields("A handle hole in the pinion", () => Rack.Crank with { On = Rack.Handle }, c => Rack = Rack with { Handle = c.On, Crank = c }, () => Rack.Axle.SizeMm)));
     }
 
     Control PlanetaryPanel()
@@ -570,7 +665,8 @@ public sealed class MechanismWindow : Window
                     Hint("Fixed to the base. In brackets: the part you turn by hand.")),
                 Field("Planet pins", Num(2, 12, 0.5m, "0.#", s.PlanetPinMm, v => Planetary = Planetary with { PlanetPinMm = v }), Hint("The dowels the planets turn on (mm).")),
                 Field("Ring's rim", Num(4, 40, 1, "0", s.RimMm, v => Planetary = Planetary with { RimMm = v }), Hint("Wood round the ring's teeth (mm).")),
-                AxleFields(() => Planetary.Axle, a => Planetary = Planetary with { Axle = a }, "Sun's axle")));
+                AxleFields(() => Planetary.Axle, a => Planetary = Planetary with { Axle = a }, "Sun's axle"),
+                HoleFields("Sun's hole", () => Planetary.SunHole, h => Planetary = Planetary with { SunHole = h }, "Grips the axle (usual)", () => Planetary.Axle.SizeMm, HoleFit.Press)));
     }
 
     Control CamPanel()
@@ -582,8 +678,9 @@ public sealed class MechanismWindow : Window
             Explained("Cam and follower", "The follower slides on two pins in a backboard; its foot rides on the cam.",
                 CamFields(() => (Cam.BaseRadiusMm, Cam.Foot, Cam.FootMm), (r, f, m) => Cam = Cam with { BaseRadiusMm = r, Foot = f, FootMm = m }),
                 Field("Turns", Pick(["Anticlockwise", "Clockwise"], s.Clockwise ? 1 : 0, v => Cam = Cam with { Clockwise = v == 1 }), tip: "Looking at the front of the cam. It matters for a sudden drop, which only works one way."),
-                Check("A handle hole in the cam", s.Handle, b => Cam = Cam with { Handle = b }),
-                AxleFields(() => Cam.Axle, a => Cam = Cam with { Axle = a }, "Shaft and pins")));
+                AxleFields(() => Cam.Axle, a => Cam = Cam with { Axle = a }, "Shaft and pins"),
+                HoleFields("Cam's hole", () => Cam.CamHole, h => Cam = Cam with { CamHole = h }, "Grips the shaft (usual)", () => Cam.Axle.SizeMm, HoleFit.Press, "The cam's hole for its shaft, which sets the shaft's shape: round with a press or snug fit, D-shaped or square."),
+                HandleFields("A handle hole in the cam", () => Cam.Crank with { On = Cam.Handle }, c => Cam = Cam with { Handle = c.On, Crank = c }, () => Cam.Axle.SizeMm)));
     }
 
     Control CamFields(Func<(double R, FollowerFoot Foot, double Mm)> get, Action<double, FollowerFoot, double> set)
@@ -716,7 +813,9 @@ public sealed class MechanismWindow : Window
                 Field("Platforms", Num(10, 120, 1, "0", s.PlatformMm, v => Automaton = Automaton with { PlatformMm = v }), Hint("How wide each round platform is (mm): your figures stand on these.")),
                 Field("Crank", Num(10, 120, 1, "0", s.CrankMm, v => Automaton = Automaton with { CrankMm = v }), Hint("From the shaft to the handle (mm).")),
                 Field("Handle turns", Pick(["Anticlockwise", "Clockwise"], s.Clockwise ? 1 : 0, v => Automaton = Automaton with { Clockwise = v == 1 }), tip: "Looking at the handle's side of the box."),
-                AxleFields(() => Automaton.Axle, a => Automaton = Automaton with { Axle = a }, "Shaft")));
+                AxleFields(() => Automaton.Axle, a => Automaton = Automaton with { Axle = a }, "Shaft"),
+                HoleFields("Cams' holes", () => Automaton.CamHole, h => Automaton = Automaton with { CamHole = h }, "Grips the shaft (usual)", () => Automaton.Axle.SizeMm, HoleFit.Press,
+                    "The cams' holes for the shaft, which set its shape and size: D-shaped or square set each cam's timing by themselves; round ones are lined up by hand and glued.")));
     }
 
     // ---- remembered between visits ----
