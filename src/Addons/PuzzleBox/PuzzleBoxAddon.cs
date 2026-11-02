@@ -22,7 +22,7 @@ public sealed class PuzzleBoxAddon : IAddon
         {
             Tip = "Boxes with secrets: sliding-panel tops that only come out in the right order, and drawers hidden in the layers",
             Large = true,
-            Order = 31,
+            Order = 32,
         });
         host.AddCommand(new AddonCommand("puzzlebox.open", "Shapes", "Puzzle box…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit puzzle box…", Open) { Visible = Selected });
