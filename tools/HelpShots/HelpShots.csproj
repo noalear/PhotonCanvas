@@ -15,5 +15,6 @@
     <ProjectReference Include="..\..\src\Addons\Warp\PhotonCanvas.Addon.Warp.csproj" />
     <ProjectReference Include="..\..\src\Addons\Slicer\PhotonCanvas.Addon.Slicer.csproj" />
     <ProjectReference Include="..\..\src\Addons\Relief\PhotonCanvas.Addon.Relief.csproj" />
+    <ProjectReference Include="..\..\src\Addons\Stencil\PhotonCanvas.Addon.Stencil.csproj" />
   </ItemGroup>
 </Project>

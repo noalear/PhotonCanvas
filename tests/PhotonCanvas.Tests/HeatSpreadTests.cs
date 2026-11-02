@@ -150,12 +150,16 @@ public class HeatSpreadTests
     public void OffIsTheSameJobAsBefore()
     {
         var s = Grid(3, 3);
-        string plain = JobBuilder.Build(s, new JobOptions()).Job.Render();
+        // One time for every build: the job's header has its date to the second, which would
+        // differ when two builds straddle a second.
+        var now = new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero);
+        string Render(DocState d, JobOptions o) => JobBuilder.Build(d, o, now).Job.Render();
+        string plain = Render(s, new JobOptions());
         // Settings changed but off: nothing changes.
-        Assert.Equal(plain, JobBuilder.Build(s with { Spread = On with { On = false, LimitC = 2, CooldownS = 9 } }, new JobOptions()).Job.Render());
-        Assert.Equal(plain, JobBuilder.Build(s with { Spread = On }, new JobOptions { Spread = new SpreadHeat() }).Job.Render());
+        Assert.Equal(plain, Render(s with { Spread = On with { On = false, LimitC = 2, CooldownS = 9 } }, new JobOptions()));
+        Assert.Equal(plain, Render(s with { Spread = On }, new JobOptions { Spread = new SpreadHeat() }));
         // On in the design does change it.
-        Assert.NotEqual(plain, JobBuilder.Build(s with { Spread = On }, new JobOptions()).Job.Render());
+        Assert.NotEqual(plain, Render(s with { Spread = On }, new JobOptions()));
     }
 
     [Fact]
