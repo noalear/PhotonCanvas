@@ -12,7 +12,8 @@ open, and a **wall shelf** whose brackets plug into the walls' mount points.
 > **Note:** The furniture has been checked on screen and in tests (every piece is put together in
 > 3D and checked for clashes, loose slots and pieces that don't join), but not yet cut on the
 > machine. Cut one small piece first, a stool or a chair, and check how the tabs go into the slots
-> before cutting a whole room; change **Slot fit** if they're too tight or too loose.
+> before cutting a whole room; change **Slot fit** (or, for a push fit, **Grip**) if they're too
+> tight or too loose.
 
 ## The Mini furniture window
 <!-- windows: FurnitureWindow -->
@@ -95,10 +96,32 @@ made.
 | **Thickness** | 0.3 to 20 mm (2) | The sheet's thickness. Every slot and tab is sized from it. Thin sheet (1.5 to 2 mm) looks best at 28 mm. |
 | **Slot fit** | −0.5 to 2 mm (0.1) | Added to the thickness for the slots: more is looser. 0.1 is a snug fit to glue. |
 | **Figures** | 15, 28, 32 or 54 mm (28) | The size of figures the furniture is for. Changing it scales every size on the list. |
+| **Joints** | Snug, to glue | *Snug, to glue*, or *Push fit (grip ribs, no glue)*: see [Push fit](#push-fit). |
+| **Grip** | 0.02 to 0.5 mm (0.15) | Push fit only: how much tighter than the sheet the ribs make each joint. |
 | **Wood** | Planks and grain | *None*, *Wood grain* (scored lines along each piece) or *Planks and grain* (etched grooves between boards as well). Bands, books, bedding and the door's braces are etched whatever is chosen. |
 | **Variation** | 1 to 9999 (1) | Grain and plank joints are laid out at random; each number gives a different layout, and **Shuffle** picks the next one. |
 | **Cut with** | As set on the cut layer | Cut settings from your material library. Their kerf goes on the cut layer, so the slots come out the width they're drawn, and the material's thickness and slot fit from your cut test are filled in. |
 | **Etch with** | As set on the etch layer | Engrave (fill) settings from your library for the planks, bands and books. |
+
+## Push fit
+
+With **Joints** set to *Push fit (grip ribs, no glue)* on the **Sheet** tab, every slot, notch and
+finger joint gets small teeth (ribs) on its walls, so the gap at each rib is **Grip** narrower than
+the sheet. The ribs squash as the pieces are pushed together and hold them there, so the furniture
+stays together without glue and comes apart again. The pieces that were glued change too:
+
+- A chest's lid has two **lid rails** under it, whose tabs push up into slots in the lid, in place of
+  the glued rim.
+- A wall shelf's brackets have a tab that pushes up through a slot in the shelf, and ribs top and
+  bottom that press on the wall's mount slot.
+- A door's clips get ribs in the fork that slides onto the wall.
+
+![The Sheet tab with Joints set to push fit, and the chest's pieces with its two lid rails](images/window-furniture-push-fit.png)
+
+Start with the default 0.15 mm on plywood or MDF. If the pieces won't go together, lower **Grip**;
+if they fall apart, raise it. The ribs are tiny, so they need the kerf allowed for: pick your
+material's settings in **Cut with** (with its kerf from a cut test). Without it, the laser burns most
+of each rib away.
 
 ## Layers and order
 
@@ -112,7 +135,8 @@ tell them apart on the bed.
 The notes under the preview say how each one goes together. In general: the tabs go through the
 slots from the side the slot faces, finger-jointed boxes go together side by side and then the
 bottom drops in, and a table's or chair's top goes on last. Etched faces point outwards. A tiny
-drop of wood glue (or superglue) in each joint keeps it square.
+drop of wood glue (or superglue) in each joint keeps it square, or choose a [push fit](#push-fit) and
+leave the glue out.
 
 ## Try it
 
