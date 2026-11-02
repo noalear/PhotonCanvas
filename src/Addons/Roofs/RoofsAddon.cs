@@ -30,7 +30,7 @@ public sealed class RoofsAddon : IAddon
         {
             Tip = "Round towers stacked from rings, with stonework, floors, a door, windows, battlements or a cone roof, and slots for walls",
             Large = true,
-            Order = 24,
+            Order = 23,
         });
         host.AddCommand(new AddonCommand("roofs.open", "Shapes", "Roofs…", "", () => Open(tower: false)));
         host.AddCommand(new AddonCommand("roofs.tower", "Shapes", "Round towers…", "", () => Open(tower: true)));
