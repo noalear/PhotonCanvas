@@ -1,0 +1,10 @@
+{
+  "id": "flip-picture",
+  "name": "Flip pictures on metal",
+  "version": "1.0.0",
+  "description": "Two to four pictures in one polished stainless plate as diffraction gratings, each showing only when the plate is tilted its way (MOPA).",
+  "category": "Picture",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

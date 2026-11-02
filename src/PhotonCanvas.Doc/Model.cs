@@ -474,6 +474,12 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public SpreadHeat Spread { get; init; } = new();
     /// <summary>Add-ons' own notes on the project, by key (start each key with the add-on's id). Kept while the add-on isn't installed.</summary>
     public ImmutableSortedDictionary<string, string> AddonData { get; init; } = ImmutableSortedDictionary<string, string>.Empty;
+    /// <summary>
+    /// Less power in places, by layer id: set by an add-on's job hook (grain-aware engraving) on the
+    /// copy a job is built from. Line fills burn each scan line in pieces at the field's power,
+    /// pictures have their greys scaled before dithering. Never saved; empty in the person's document.
+    /// </summary>
+    public ImmutableDictionary<Guid, PowerField> LayerPower { get; init; } = ImmutableDictionary<Guid, PowerField>.Empty;
     /// <summary>The name of the page on screen.</summary>
     public string PageName { get; init; } = "Page 1";
     /// <summary>Where the page on screen sits among all the pages.</summary>

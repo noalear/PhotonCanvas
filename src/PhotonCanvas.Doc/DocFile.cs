@@ -242,6 +242,7 @@ public static class DocFile
         };
         if (SpreadJson(s.Spread) is { } spread) root["spreadHeat"] = spread;
         if (s.AddonData.Count > 0) root["addonData"] = AddonJson(s.AddonData);
+        // DocState.LayerPower is never saved: job hooks set it only on the copy a job is built from.
         return root;
     }
 

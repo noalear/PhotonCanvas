@@ -1,0 +1,10 @@
+{
+  "id": "objectjig",
+  "name": "Object jig maker",
+  "version": "1.0.0",
+  "description": "Photograph an odd-shaped object and cut a jig that holds it (one or a batch), with the design lined up on every object; the camera finds the jig again later.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
