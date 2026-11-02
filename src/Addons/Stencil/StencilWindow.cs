@@ -319,7 +319,7 @@ public sealed class StencilWindow : Window
 
         public static Settings Load(string folder)
         {
-            try { return System.Text.Json.JsonSerializer.Deserialize<Settings>(File.ReadAllText(PathIn(folder))) ?? new(); }
+            try { return System.Text.Json.JsonSerializer.Deserialize<Settings>(File.ReadAllText(PathIn(folder)), StencilEdit.Json) ?? new(); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Text.Json.JsonException) { return new(); }
         }
 
@@ -328,7 +328,7 @@ public sealed class StencilWindow : Window
             try
             {
                 Directory.CreateDirectory(folder);
-                File.WriteAllText(PathIn(folder), System.Text.Json.JsonSerializer.Serialize(this));
+                File.WriteAllText(PathIn(folder), System.Text.Json.JsonSerializer.Serialize(this, StencilEdit.Json));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
         }
