@@ -181,6 +181,45 @@ static class MoreShots
             outlines.Close();
         }
 
+        // Topo map stacks: Mount Rainier from a Google Maps link, as a round map (the heights come from
+        // the internet: no pictures without it), then handed to 3D to slices.
+        {
+            using var http = new HttpClient();
+            var topo = new PhotonCanvas.Addon.Topo.TopoWindow(doc, canvas.Machine, settings, lib, http, Path.Combine(data, "tiles"));
+            topo.Show(w);
+            settle(300);
+            var make = F<Avalonia.Controls.Button>(topo, "_make");
+            F<TextBox>(topo, "_find").Text = "https://www.google.com/maps/place/Mount+Rainier/@46.8529,-121.7604,11z/";
+            Click(F<Avalonia.Controls.Button>(topo, "_findButton"));
+            for (int i = 0; i < 600 && !make.IsEnabled; i++) settle(50);
+            F<ComboBox>(topo, "_frame").SelectedIndex = 1;
+            F<NumericUpDown>(topo, "_areaKm").Value = 22;
+            F<NumericUpDown>(topo, "_layers").Value = 12;
+            // Timers don't run here: fetch round the new area now (it remakes the map when it's done).
+            var fetched = (Task)typeof(PhotonCanvas.Addon.Topo.TopoWindow).GetMethod("Fetch", Any)!.Invoke(topo, null)!;
+            for (int i = 0; i < 600 && !fetched.IsCompleted; i++) settle(50);
+            for (int i = 0; i < 200 && !(F<TextBlock>(topo, "_summary").Text ?? "").StartsWith("13 layers"); i++) settle(50);
+            settle(1500);
+            Console.WriteLine($"Topo map: {F<TextBlock>(topo, "_summary").Text} / {F<TextBlock>(topo, "_status").Text}");
+            if (!make.IsEnabled) Console.WriteLine("Topo map: no heights (no internet?), no pictures");
+            else
+            {
+                AddonShot(topo.CaptureRenderedFrame(), "Topo", "window-topo-map");
+                Click(make);
+                StackSliceWindow? sliced = null;
+                for (int i = 0; i < 200 && sliced is null; i++) { settle(50); sliced = topo.OwnedWindows.OfType<StackSliceWindow>().FirstOrDefault(); }
+                if (sliced is not null)
+                {
+                    Slice(sliced);
+                    Console.WriteLine($"Topo slices: {F<TextBlock>(sliced, "_summary").Text}");
+                    AddonShot(sliced.CaptureRenderedFrame(), "Topo", "window-topo-slices");
+                    sliced.Close();
+                }
+            }
+            topo.Close();
+            settle(300);
+        }
+
         // --- Spread the heat: a thin aluminium mask, a plate with rows of holes.
         reset();
         var hs = DocState.New();

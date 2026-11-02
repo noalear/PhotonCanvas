@@ -21,6 +21,7 @@
     <Project Path="src/Addons/Diffraction/PhotonCanvas.Addon.Diffraction.csproj" />
     <Project Path="src/Addons/DepthCharge/PhotonCanvas.Addon.DepthCharge.csproj" />
     <Project Path="src/Addons/Slicer/PhotonCanvas.Addon.Slicer.csproj" />
+    <Project Path="src/Addons/Topo/PhotonCanvas.Addon.Topo.csproj" />
     <Project Path="src/Addons/Centreline/PhotonCanvas.Addon.Centreline.csproj" />
     <Project Path="src/Addons/CmykSplit/PhotonCanvas.Addon.CmykSplit.csproj" />
     <Project Path="src/Addons/Engraving/PhotonCanvas.Addon.Engraving.csproj" />
