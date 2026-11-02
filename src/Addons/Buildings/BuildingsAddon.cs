@@ -22,7 +22,7 @@ public sealed class BuildingsAddon : IAddon
         {
             Tip = "A whole cottage, tavern or watchtower at once: every wall, column, floor, door and piece of furniture, sized for your figures",
             Large = true,
-            Order = 22,
+            Order = 25,
         });
         host.AddCommand(new AddonCommand("buildings.open", "Shapes", "Whole buildings…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit building…", Open) { Visible = Selected });
