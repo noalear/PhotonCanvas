@@ -1,0 +1,10 @@
+{
+  "id": "bases",
+  "name": "Miniature bases and movement trays",
+  "version": "1.0.0",
+  "description": "Round, oval, square and hexagonal bases for tabletop figures in the usual sizes, with cracked earth, rocks, grass, flagstones, deck plates or the floor tiles' textures etched on, magnet holes and slots, and movement trays that hold a unit of them.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls", "floortiles"],
+  "onByDefault": true
+}

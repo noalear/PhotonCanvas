@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>bases</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The wall and floor tile makers' textures and geometry (addon.json "requires" them): compile against them, never copy them. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\FloorTiles\PhotonCanvas.Addon.FloorTiles.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
