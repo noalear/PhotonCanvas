@@ -11,6 +11,9 @@ public enum BuildingKind { Cottage, Tavern, Watchtower }
 /// <summary>The front door: hung on clips so it swings (the furniture maker's), loose in the doorway (the wall maker's), or just a doorway.</summary>
 public enum DoorStyle { Swinging, Loose, Open }
 
+/// <summary>How you get up to the floors above: the stairs maker's stairs, spiral stairs or a ladder, through an opening at the back.</summary>
+public enum WayUpStyle { Stairs, Spiral, Ladder, None }
+
 /// <summary>The top of the building: walls cut straight (for a roof), or a floor on top with a low wall of battlements round it.</summary>
 public enum BuildingTop { Straight, Battlements }
 
@@ -76,6 +79,18 @@ public sealed record BuildingSpec
     public double SillMm { get; init; } = 22;
     public WindowBars Bars { get; init; } = WindowBars.Cross;
 
+    /// <summary>The way up to each floor above.</summary>
+    public WayUpStyle WayUp { get; init; } = WayUpStyle.Stairs;
+
+    /// <summary>Floor tiles (the floor tile maker's) under the whole building, cut from the wall sheet.</summary>
+    public bool FloorTiles { get; init; } = true;
+    /// <summary>The tiles' texture (a floor tile maker preset).</summary>
+    public string FloorTexture { get; init; } = "Flagstones";
+    /// <summary>The tiles' grid square (mm).</summary>
+    public double SquareMm { get; init; } = 25.4;
+    /// <summary>How far the tiles reach past the building's outside, all round (mm).</summary>
+    public double YardMm { get; init; }
+
     /// <summary>The furniture, room by room.</summary>
     public List<RoomItem> Items { get; init; } = [];
     /// <summary>The sheet the furniture (and a swinging door) is cut from (mm).</summary>
@@ -131,7 +146,7 @@ public sealed record BuildingSpec
         BuildingKind.Tavern => new BuildingSpec
         {
             Kind = k, WidthMm = 150, DepthMm = 100, Storeys = 2, StoreyHeightMm = 48,
-            Texture = "Stone blocks", UpperTexture = "Timber frame",
+            Texture = "Stone blocks", UpperTexture = "Timber frame", FloorTexture = "Floorboards",
             DoorShape = OpeningShape.Rectangle, DoorWidthMm = 18, DoorHeightMm = 30,
             WindowsFront = 3, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 10, WindowHeightMm = 12, SillMm = 20, Bars = WindowBars.Cross,
             Items =
@@ -144,7 +159,7 @@ public sealed record BuildingSpec
         BuildingKind.Watchtower => new BuildingSpec
         {
             Kind = k, WidthMm = 72, DepthMm = 72, Storeys = 2, StoreyHeightMm = 45, Top = BuildingTop.Battlements, ParapetHeightMm = 21,
-            Texture = "Stone blocks", DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
+            Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Ladder, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
             WindowsFront = 1, WindowsSide = 1, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 15, SillMm = 18, Bars = WindowBars.None,
             Items = [I(ItemKind.Crate, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
         },
@@ -163,7 +178,7 @@ public sealed record BuildingSpec
         return this with
         {
             ScaleMm = R(ScaleMm * k),
-            WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
+            WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), SquareMm = R(SquareMm * k), YardMm = R(YardMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
             ColumnMm = Math.Max(WallSheetMm * (TwoSided ? 2 : 1) + 6, R(ColumnMm * k)),
             DoorWidthMm = R(DoorWidthMm * k), DoorHeightMm = R(DoorHeightMm * k),
             WindowWidthMm = R(WindowWidthMm * k), WindowHeightMm = R(WindowHeightMm * k), SillMm = R(SillMm * k),

@@ -1,5 +1,9 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.FloorTiles;
 using PhotonCanvas.Addon.Furniture;
+using PhotonCanvas.Addon.Stairs;
+using Pose = PhotonCanvas.Addon.Furniture.Pose;
+using V3 = PhotonCanvas.Addon.Furniture.V3;
 using PhotonCanvas.Addon.Walls;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
 
@@ -23,7 +27,7 @@ public sealed record Piece(string Name, Sheet Sheet, PathsD Cut, PathsD Etched, 
 /// </summary>
 public sealed record Solid(string Name, PathsD Outline, Pose Pose, double Thickness, PathsD? Etched, List<PathD>? Lines, int Storey, WallSide Side, bool IsFurniture);
 
-public enum WallSide { None, Front, Back, Left, Right, Floor }
+public enum WallSide { None, Front, Back, Left, Right, Floor, Ground }
 
 /// <summary>Everything a building is cut from, where it all goes, and what was found while making it.</summary>
 public sealed record BuildingKit(List<Piece> Pieces, List<Solid> Solids, List<Finding> Findings, double StoreyMm, double WallMm, SetKit? Furniture)
@@ -61,8 +65,11 @@ public static class BuildingKitMaker
     /// <summary>The parapet's height, in whole layers, to the top of the battlements.</summary>
     public static double ParapetHeight(BuildingSpec s) => Layers(s.ParapetHeightMm, s.WallSheetMm);
 
-    /// <summary>Where storey <paramref name="k"/>'s walls stand (mm up from the ground): each storey's walls, then a floor.</summary>
-    public static double StoreyBase(BuildingSpec s, int k) => k * (StoreyHeight(s) + s.WallSheetMm);
+    /// <summary>Where storey <paramref name="k"/>'s walls stand (mm up from the table): on the floor tiles, then each storey's walls and a floor.</summary>
+    public static double StoreyBase(BuildingSpec s, int k) => Ground(s) + k * (StoreyHeight(s) + s.WallSheetMm);
+
+    /// <summary>How high the floor tiles under the building are (0 without them).</summary>
+    public static double Ground(BuildingSpec s) => s.FloorTiles ? s.WallSheetMm : 0;
 
     static double K(BuildingSpec s) => Math.Max(0.2, s.ScaleMm / 28);
 
@@ -192,9 +199,11 @@ public static class BuildingKitMaker
         foreach (var (i, g) in named) solids[i] = solids[i] with { Name = g.Name(wallStoreys, storeys) };
         pieces.AddRange(extras);
 
+        Tiles(s, pieces, solids, findings);
         Columns(s, storeys, wallStoreys, pieces, solids, findings);
-        Floors(s, storeys, wallStoreys, pieces, solids, findings);
-        var furniture = Furnish(s, frontGround, pieces, solids, findings);
+        var blocked = new List<(int Storey, double X0, double Z0, double X1, double Z1)>();
+        Floors(s, storeys, wallStoreys, pieces, solids, findings, blocked);
+        var furniture = Furnish(s, frontGround, pieces, solids, findings, blocked);
 
         if (frontGround is not null)
             findings.Add(new(Severity.Note, $"The building is {W + s.ColumnMm:0} × {D + s.ColumnMm:0} mm on the ground and {StoreyBase(s, wallStoreys - 1) + (wallStoreys > storeys ? ParapetHeight(s) : H):0} mm tall."));
@@ -254,6 +263,42 @@ public static class BuildingKitMaker
         findings.Add(new(Severity.Note, $"Stack each corner column's layers on a {PinMm:0.#} mm pin (a cocktail stick or wire) and glue them; the pin carries on up through the floors into the column above."));
     }
 
+    /// <summary>The floor tile maker's settings for the tiles under the building: a board as big as its outside (and the yard round it).</summary>
+    public static TileSpec TileSpecFor(BuildingSpec s)
+    {
+        double sq = Math.Max(5, s.SquareMm), yard = Math.Max(0, s.YardMm);
+        var preset = FloorTextures.Preset(s.FloorTexture) ?? FloorTextures.Preset("Flagstones")!;
+        var (a, b) = FloorTextures.SizesFor(preset, sq);
+        return new TileSpec
+        {
+            Mode = TileMode.Board, SquareMm = sq,
+            BoardAcross = Math.Round((s.WidthMm + s.ColumnMm + 2 * yard) / sq, 4),
+            BoardDown = Math.Round((s.DepthMm + s.ColumnMm + 2 * yard) / sq, 4),
+            TileAcross = 2, TileDown = 2, PlainBorder = true,
+            ThicknessMm = s.WallSheetMm,
+            Texture = preset.Name, SizeA = a, SizeB = b, GrooveMm = preset.Groove, Seed = s.Seed + 7, Etch = s.Etch,
+            Join = TileJoin.Jigsaw, FitMm = s.FitMm, TabMm = Math.Round(5 * Math.Clamp(sq / 25.4, 0.6, 2), 1),
+        };
+    }
+
+    /// <summary>The floor tiles the building stands on, from the floor tile maker, lying where they go.</summary>
+    static void Tiles(BuildingSpec s, List<Piece> pieces, List<Solid> solids, List<Finding> findings)
+    {
+        if (!s.FloorTiles) return;
+        var spec = TileSpecFor(s);
+        var kit = TileKitMaker.Make(spec);
+        foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
+            findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Floor tiles: {f.Text}"));
+        if (!kit.Ok) return;
+        foreach (var p in kit.Parts)
+            pieces.Add(new Piece(p.Name == TileKitMaker.ClipName ? "Floor tile clip" : $"Floor tile {p.Name}", Sheet.Walls, p.Cut, p.Etched, p.Lines, p.Copies));
+        // The board's corner at the building's front left (outside the columns and the yard), its rows running back.
+        double x0 = -s.WidthMm / 2 - s.ColumnMm / 2 - Math.Max(0, s.YardMm), z1 = s.DepthMm / 2 + s.ColumnMm / 2 + Math.Max(0, s.YardMm);
+        foreach (var spot in kit.Board)
+            solids.Add(new Solid("Floor tile", spot.Tile.Cut, Pose.Up(x0 + spot.X, s.WallSheetMm / 2, z1 - spot.Y), s.WallSheetMm, Nil(spot.Tile.Etched), Nil(spot.Tile.Lines), 0, WallSide.Ground, false));
+        findings.Add(new(Severity.Note, $"The building stands on {kit.Board.Count} floor tiles ({spec.BoardAcross:0.#} × {spec.BoardDown:0.#} squares of {spec.SquareMm:0.#} mm) that lock together with jigsaw edges."));
+    }
+
     /// <summary>Lying flat at <paramref name="y"/>, turned <paramref name="turn"/> degrees round the upright (u along +X when 0, v away from you).</summary>
     public static Pose Flat(double x, double y, double z, double turn)
     {
@@ -261,36 +306,96 @@ public static class BuildingKitMaker
         return new Pose(new V3(x, y, z), new V3(c, 0, -sn), new V3(-sn, 0, -c));
     }
 
+    /// <summary>The stairs maker's settings for the floors between storeys: a plate over the columns' outside, lying on the walls and columns, with an opening and a way up at the back.</summary>
+    public static FloorSpec FloorSpecFor(BuildingSpec s, int floors)
+    {
+        double k28 = K(s), Wt = WallThickness(s);
+        return new FloorSpec
+        {
+            WallHeightMm = StoreyHeight(s), WallSheetMm = s.WallSheetMm, TwoSidedWalls = s.TwoSided,
+            WallLengthMm = s.WidthMm, WallsAlong = 1, WallWidthMm = s.DepthMm, WallsAcross = 1,
+            // Told about the columns so the opening and the way up keep clear of them. The building's columns
+            // are only as tall as the walls, though, so the floor lies on them: Floors() fills their holes back in.
+            Columns = true, ColumnMm = s.ColumnMm, ColumnCaps = false,
+            SheetMm = s.WallSheetMm, FitMm = s.FitMm,
+            Floor = true, Edge = FloorEdge.Overhang, OverhangMm = Math.Max(0, s.ColumnMm / 2 - Wt / 2), Floors = floors,
+            Texture = s.Detail == WoodDetail.None ? Textures.Plain : "Wood planks (across)", SizeA = Math.Round(5 * k28, 2), SizeB = Math.Round(35 * k28, 1), GrooveMm = 0.5,
+            Seed = s.Seed + 101, Etch = s.Etch,
+            Hatch = s.WayUp != WayUpStyle.None, HatchAuto = true,
+            Way = s.WayUp switch { WayUpStyle.Stairs => WayUp.Stairs, WayUpStyle.Spiral => WayUp.Spiral, WayUpStyle.Ladder => WayUp.Ladder, _ => WayUp.None },
+            StairWidthMm = Math.Round(25 * k28, 1), RiseMm = Math.Round(6 * k28, 1), GoingMm = Math.Round(7 * k28, 1),
+            SpiralRadiusMm = Math.Round(26 * k28, 1), SpiralHubMm = Math.Round(9 * k28, 1),
+            LadderWidthMm = Math.Round(12 * k28, 1), RungStepMm = Math.Round(6 * k28, 1),
+            WaysUp = s.WayUp == WayUpStyle.None ? 1 : floors,
+        };
+    }
+
     /// <summary>
-    /// A floor between storeys (and under the parapet): a plate as big as the columns' outside, lying on
-    /// the walls and columns, with a pin hole over each column so the pins run on into the columns above.
+    /// The floors between storeys (and under the battlements) and the way up to each, from the stairs
+    /// maker: the plate lies on the walls and the columns, with a pin hole over each column so the
+    /// pins run on into the columns above. Its plan is turned round so the opening and the way up are
+    /// at the back right, away from the front door.
     /// </summary>
-    static void Floors(BuildingSpec s, int storeys, int wallStoreys, List<Piece> pieces, List<Solid> solids, List<Finding> findings)
+    static void Floors(BuildingSpec s, int storeys, int wallStoreys, List<Piece> pieces, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)> blocked)
     {
         int count = wallStoreys - 1;
         if (count <= 0) return;
-        double W = s.WidthMm, D = s.DepthMm, c = s.ColumnMm, T = s.WallSheetMm;
-        double x0 = -W / 2 - c / 2, x1 = W / 2 + c / 2, z0 = -D / 2 - c / 2, z1 = D / 2 + c / 2;
-        // Flat: u along x from the left, v from the front to the back (lying face up).
-        double w = x1 - x0, d = z1 - z0;
-        var holes = new PathsD();
-        foreach (var (cx, cz) in new[] { (-W / 2, D / 2), (W / 2, D / 2), (W / 2, -D / 2), (-W / 2, -D / 2) })
-            holes.Add(Geo.Circle(cx - x0, z1 - cz, PinMm / 2));
-        var cut = Geo.Subtract([Geo.Rect(0, 0, w, d)], holes);
-        // Floorboards on the face that shows, inside the walls.
-        double Wt = WallThickness(s);
-        var inside = Geo.Subtract([Geo.Rect(c / 2 + Wt / 2, c / 2 + Wt / 2, w - c / 2 - Wt / 2, d - c / 2 - Wt / 2)], Geo.Offset(holes, 1));
-        var (etched, lines) = WoodFace.Make(inside, true, s.Detail == WoodDetail.None ? WoodDetail.None : WoodDetail.Planks, true, Math.Round(5 * K(s), 1), new Random(s.Seed * 7919 + 101));
-        pieces.Add(new Piece("Floor", Sheet.Walls, cut, etched, lines, count));
-        for (int k = 1; k <= count; k++)
+        double W = s.WidthMm, D = s.DepthMm;
+        var spec = FloorSpecFor(s, count);
+        var kit = FloorKitMaker.Make(spec);
+        foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
+            findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Floors: {f.Text}"));
+        if (!kit.Ok) return;
+        // Plan (x along, y across, from the first corner column) → the building, turned half round: the first corner is the back right.
+        V3 Point(Stairs.V3 p, double up) => new(W / 2 - p.X, p.Y + up, -D / 2 - p.Z);
+        V3 Dir(Stairs.V3 p) => new(-p.X, p.Y, -p.Z);
+        var pins = new PathsD { Geo.Circle(0, 0, PinMm / 2), Geo.Circle(W, 0, PinMm / 2), Geo.Circle(0, D, PinMm / 2), Geo.Circle(W, D, PinMm / 2) };
+        var columnHoles = Plate.ColumnHoles(spec);
+        foreach (var part in kit.Parts)
         {
-            double y = StoreyBase(s, k) - T / 2;
-            solids.Add(new Solid(k == storeys ? "Top floor" : "Floor", cut, Pose.Up(x0, y, z1), T, etched.Count > 0 ? etched : null, lines.Count > 0 ? lines : null, k, WallSide.Floor, false));
+            bool plate = part.Name == "Floor";
+            // The plate lies with its plan coordinates as they are (Pose.Flat at the first corner), so the pin holes go at the column centres.
+            var cut = part.Cut;
+            if (plate)
+            {
+                // The plate lies on the columns rather than round them: fill their holes in (inside the plate's edge) and drill the pin holes instead.
+                var edge = Geo.Bounds(cut);
+                cut = Geo.Subtract(Geo.Intersect(Geo.Union(cut, columnHoles), [Geo.Rect(edge.left, edge.top, edge.right, edge.bottom)]), pins);
+            }
+            var etched = plate ? Geo.Subtract(part.Etched, Geo.Offset(pins, 0.8)) : part.Etched;
+            var lines = plate ? Geo.ClipLines(part.Lines, Geo.Subtract(cut, Geo.Offset(pins, 0.8))) : part.Lines;
+            string name = part.Name switch { "Floor" => "Floor", _ => part.Name };
+            pieces.Add(new Piece(name, Sheet.Walls, cut, etched, lines, part.Copies));
+            if (part.Poses.Count == 0) continue;
+            for (int k = 1; k <= count; k++)
+            {
+                double up = StoreyBase(s, k - 1);
+                foreach (var pose in part.Poses)
+                {
+                    var solid = new Solid(plate ? (k == storeys ? "Top floor" : "Floor") : part.Name, cut, new Pose(Point(pose.O, up), Dir(pose.U), Dir(pose.V)), s.WallSheetMm,
+                        Nil(etched), Nil(lines), plate ? k : k - 1, plate ? WallSide.Floor : WallSide.None, false);
+                    solids.Add(solid);
+                    if (plate) continue;
+                    // The way up takes room on the storey below.
+                    var b = Geo.Bounds(cut);
+                    var pts = new[] { solid.Pose.At(b.left, b.top), solid.Pose.At(b.right, b.top), solid.Pose.At(b.left, b.bottom), solid.Pose.At(b.right, b.bottom) };
+                    blocked.Add((k - 1, pts.Min(q => q.X), pts.Min(q => q.Z), pts.Max(q => q.X), pts.Max(q => q.Z)));
+                }
+                // Nothing stands under the opening on the storey above, either.
+                if (kit.Layout.Hatch.Count > 0)
+                {
+                    var hb = Geo.Bounds(kit.Layout.Hatch);
+                    double x0 = W / 2 - hb.right, x1 = W / 2 - hb.left, z0 = -D / 2 + hb.top, z1 = -D / 2 + hb.bottom;
+                    blocked.Add((k, x0, z0, x1, z1));
+                }
+            }
         }
+        if (s.WayUp != WayUpStyle.None)
+            findings.Add(new(Severity.Note, $"Each floor has an opening at the back right with {(s.WayUp == WayUpStyle.Ladder ? "a ladder" : s.WayUp == WayUpStyle.Spiral ? "spiral stairs" : "stairs")} up to it from the storey below."));
     }
 
     /// <summary>The furniture maker's pieces for every room (and a swinging door), laid out in the rooms for the 3D view.</summary>
-    static SetKit? Furnish(BuildingSpec s, WallSpec? front, List<Piece> pieces, List<Solid> solids, List<Finding> findings)
+    static SetKit? Furnish(BuildingSpec s, WallSpec? front, List<Piece> pieces, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)> blocked)
     {
         var chosen = s.Items.Select((r, i) => (Room: r, Label: s.Label(i))).Where(x => x.Room.Item.Count > 0 && x.Room.Item.Kind is not (ItemKind.WallDoor or ItemKind.WallShelf)).ToList();
         var items = chosen.Select(x => x.Room).ToList();
@@ -329,9 +434,9 @@ public static class BuildingKitMaker
             double x = -s.WidthMm / 2 + WallKitMaker.CentreToEnd(front) + WallKitMaker.PanelLength(front) / 2 - s.DoorWidthMm / 2;
             foreach (var p in dk.Parts)
                 foreach (var pose in p.Poses)
-                    solids.Add(new Solid("Front door", p.Cut, Interior.Move(pose, x, 0, s.DepthMm / 2, 0), s.FurnitureSheetMm, Nil(p.Etched), Nil(p.Lines), 0, WallSide.Front, true));
+                    solids.Add(new Solid("Front door", p.Cut, Interior.Move(pose, x, Ground(s), s.DepthMm / 2, 0), s.FurnitureSheetMm, Nil(p.Etched), Nil(p.Lines), 0, WallSide.Front, true));
         }
-        Interior.Lay(s, items, [.. chosen.Select(x => x.Label)], kit, solids, findings);
+        Interior.Lay(s, items, [.. chosen.Select(x => x.Label)], kit, solids, findings, blocked);
         if (s.FurnitureSheetMm > s.WallSheetMm + 1e-9 && door)
             findings.Add(new(Severity.Note, "The door is cut from the furniture's sheet, which is thicker than the walls' here."));
         return kit;

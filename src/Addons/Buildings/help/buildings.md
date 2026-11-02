@@ -1,13 +1,15 @@
 # Whole buildings
 
-An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker** and the **Mini furniture maker** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker** and **Stairs, ladders and floors** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
 
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
 **Cottage**, a **Tavern** or a **Watchtower** and you get every wall with its doorway and windows,
-the corner columns the walls slide into, a floor between the storeys, a door that swings open, and
-the furniture for every room. Each piece is made the way the wall maker
-([Textured walls](walls.md)) and the furniture maker ([Mini furniture](furniture.md)) make it, so
-the walls have your texture etched on and the furniture slots together.
+the corner columns the walls slide into, the floor tiles it stands on, a floor between the storeys
+with stairs or a ladder up to it, a door that swings open, and the furniture for every room. Each
+piece is made the way the wall maker ([Textured walls](walls.md)), the furniture maker
+([Mini furniture](furniture.md)), the floor tile maker ([Floor tiles](floortiles.md)) and the stair
+maker ([Stairs and floors](stairs.md)) make it, so the walls have your texture etched on, the tiles
+jigsaw together and the furniture slots together.
 
 > **Note:** The buildings have been checked on screen and in tests (every wall, column and floor is
 > put together in 3D and checked for clashes, and every piece of furniture stands inside its room),
@@ -40,11 +42,11 @@ changing **Figures** later scales every size, the furniture's too). Everything c
 
 | Building | What you get (at 28 mm) |
 |---|---|
-| **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
-| **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
-| **Watchtower** | A 72 mm square tower of two storeys with arrow slits, a floor on top with battlements round it. Crates and a chest below, two bunks, a table and stools above. |
+| **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls on flagstone tiles, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
+| **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows, stairs up and floorboard tiles. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
+| **Watchtower** | A 72 mm square tower of two storeys with arrow slits, a ladder up to each floor, a floor on top with battlements round it, on dungeon flagstones. Crates and a chest below, two bunks, a table and stools above. |
 
-## Size, storeys, door and windows
+## Size, storeys, floor tiles, door and windows
 
 On the **Building** tab:
 
@@ -54,6 +56,15 @@ On the **Building** tab:
   the columns, a stack of layers, come out exactly as tall as the walls and the floor lies flat on both.
 - **Top**: *Straight (for a roof)*, or *A floor on top behind battlements*: a floor on the top
   storey with a low wall of battlements round it, **Battlements** high.
+- **Way up**: *Stairs*, *Spiral stairs*, *Ladder* or *None (a plain floor)*. Each floor gets an
+  opening in its back right corner, away from the door, with the stair maker's stairs or ladder
+  standing under it on the storey below. The furniture is kept clear of them, and of the space
+  under the opening upstairs.
+- **Floor tiles under the building**: the floor tile maker's jigsaw tiles, cut from the wall sheet,
+  covering the building's outside and as much **Yard** round it as you like. The walls and columns
+  stand on them. Pick their **Texture** (flagstones, floorboards, cobbles and the rest) and the
+  **Grid square** they're laid out on (25.4 mm, an inch, for 28–32 mm figures). Untick it to stand
+  the building straight on the table.
 - **Door**: in the middle of the ground floor's front. *Hung on clips: it swings open* is the
   furniture maker's door for a wall, cut from the furniture sheet, on two clips slid onto the side of
   the doorway; *Loose in the doorway* is the wall maker's door that just sits in it; *Just a
@@ -66,7 +77,7 @@ On the **Building** tab:
 
 On the **Walls** tab:
 
-- **Thickness**: the wall sheet. The walls, the corner columns and the floors are all cut from it.
+- **Thickness**: the wall sheet. The walls, the corner columns, the floors, the stairs and the floor tiles are all cut from it.
   Tick **Two panels back to back** for walls textured inside and out (twice as thick).
 - **Slot fit**: added to the wall's thickness for the columns' slots. **Columns**: how wide the
   corner columns are. Pick your material in **Cut with** to bring in its thickness, slot fit and
@@ -78,7 +89,10 @@ On the **Walls** tab:
 Each corner column is a stack of layers with a slot for each wall and a hole up the middle: stack
 them on a 2 mm pin (a cocktail stick or a piece of wire) and glue them. The floor between storeys has
 a hole over each column too, so the pin carries on up into the column above and holds the storeys in
-line. The floor has floorboards etched on it where it shows inside the walls.
+line. The floor has floorboards etched on it, and the stairs or ladder up to it are the stair
+maker's, cut from the same sheet.
+
+![A tavern's ground floor on its own: the stairs along the back wall of the taproom, up to the opening in the floor above, and the floorboard tiles it stands on](images/window-buildings-tavern-inside.png)
 
 Walls that come out the same are cut together: a cottage's two side walls are one piece ×2, a
 tower's upper storey is **Walls, storey 2** ×4. Each wall also carries the wall maker's settings, so
@@ -105,12 +119,15 @@ or one storey on its own.
 
 ## Putting it together
 
-1. Stack and glue the corner columns of the ground floor on their pins.
-2. Slide the ground floor's walls into the columns' slots: the front wall (with the doorway) at the
+1. Jigsaw the floor tiles together, if you made them, and stand the building on them.
+2. Stack and glue the corner columns of the ground floor on their pins.
+3. Slide the ground floor's walls into the columns' slots: the front wall (with the doorway) at the
    front. A drop of glue in each slot.
-3. Lay the floor on top, its holes over the pins, and push the pins up through. Build the next
+4. Put the stairs or ladder together as the stair maker says and stand it in the back right
+   corner, under where the opening will be. Lay the floor on top, its holes over the pins, and push
+   the pins up through. Build the next
    storey's columns on the pins and slide its walls in; and so on to the top (the top columns get a
    wider cap).
-4. Slide the door's clips onto the side of the doorway, one at the floor and one high up, and drop
+5. Slide the door's clips onto the side of the doorway, one at the floor and one high up, and drop
    the door's pins into them.
-5. Put the furniture together as the furniture maker says and stand it in the rooms.
+6. Put the furniture together as the furniture maker says and stand it in the rooms.

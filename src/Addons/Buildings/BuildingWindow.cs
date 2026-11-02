@@ -36,12 +36,19 @@ public sealed class BuildingWindow : Window
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _width = Number(30, 2000, 5, "0.#"), _depth = Number(30, 2000, 5, "0.#"), _storeys = Number(1, 4, 1, "0"), _storeyH = Number(10, 500, 1, "0.#"), _parapet = Number(8, 200, 1, "0.#");
     readonly ComboBox _top = Combo("Straight (for a roof)", "A floor on top behind battlements");
+    readonly ComboBox _wayUp = Combo("Stairs", "Spiral stairs", "Ladder", "None (a plain floor)");
     Control _parapetRow = null!;
     readonly ComboBox _door = Combo("Hung on clips: it swings open", "Loose in the doorway", "Just a doorway");
     readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch");
     readonly NumericUpDown _doorW = Number(4, 500, 0.5m, "0.#"), _doorH = Number(6, 500, 0.5m, "0.#");
     readonly NumericUpDown _winFront = Number(0, 20, 1, "0"), _winSide = Number(0, 20, 1, "0"), _winW = Number(1, 200, 0.5m, "0.#"), _winH = Number(1, 200, 0.5m, "0.#"), _sill = Number(1, 300, 0.5m, "0.#");
     readonly ComboBox _winShape = Combo("Square", "Round arch", "Pointed arch", "Round", "Arrow slit"), _bars = Combo("None", "A cross", "Upright bars");
+
+    // Floor tiles
+    readonly CheckBox _tiles = new() { Content = "Floor tiles under the building (the floor tile maker's)" };
+    readonly ComboBox _tileTexture = Combo([.. PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name)]);
+    readonly NumericUpDown _square = Number(5, 300, 0.5m, "0.##"), _yard = Number(0, 500, 5, "0.#");
+    Control _tileRows = null!;
 
     // Walls
     readonly NumericUpDown _wallT = Number(0.5m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _column = Number(5, 200, 1, "0.#"), _seed = Number(1, 9999, 1, "0");
@@ -180,7 +187,14 @@ public sealed class BuildingWindow : Window
                 Field("Storeys", _storeys, tip: "Storeys with rooms. A floor lies on the walls between each."),
                 Field("Storey height", _storeyH, tip: "How high each storey's walls are (mm)."),
                 Field("Top", _top, tip: "Straight walls take a roof; battlements put a floor on the top storey with a low wall round it."),
-                _parapetRow),
+                _parapetRow,
+                Field("Way up", _wayUp, tip: "What goes up through an opening in each floor, from the stair maker. It stands in the back right corner of the storey below.")),
+            Explained("Floor tiles", "Jigsaw tiles the building stands on, cut from the wall sheet, as big as its outside and any yard round it.",
+                _tiles,
+                _tileRows = Stack(
+                    Field("Texture", _tileTexture),
+                    Field("Grid square", _square, tip: "One square of the grid the tiles are laid out on (mm): 25.4 (an inch) for 28–32 mm figures."),
+                    Field("Yard", _yard, tip: "How far the tiles reach past the building's outside, all round (mm)."))),
             Explained("Door", "In the middle of the front of the ground floor.",
                 Field("Door", _door, tip: "Hung on clips (from the furniture maker) it swings open; loose, it just sits in the doorway."),
                 Field("Shape", _doorShape),
@@ -271,11 +285,12 @@ public sealed class BuildingWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip })
+        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
             n.ValueChanged += (_, _) => FromControls();
-        foreach (var c in new[] { _top, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints })
+        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
+        _tiles.IsCheckedChanged += (_, _) => FromControls();
         _wallCut.SelectionChanged += (_, _) => CutChosen(_wallCut, _wallT, _fit, _wallCutNote);
         _furnCut.SelectionChanged += (_, _) => CutChosen(_furnCut, _furnT, _furnFit, _furnCutNote);
         _kind.SelectionChanged += (_, _) => KindChosen();
@@ -301,13 +316,16 @@ public sealed class BuildingWindow : Window
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - s.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
         _width.Value = D(s.WidthMm); _depth.Value = D(s.DepthMm); _storeys.Value = Math.Clamp(s.Storeys, 1, 4); _storeyH.Value = D(s.StoreyHeightMm);
-        _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm);
+        _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm); _wayUp.SelectedIndex = (int)s.WayUp;
         _door.SelectedIndex = (int)s.Door;
         _doorShape.SelectedIndex = s.DoorShape switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm);
         _winFront.Value = s.WindowsFront; _winSide.Value = s.WindowsSide;
         _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
         _bars.SelectedIndex = (int)s.Bars;
+        _tiles.IsChecked = s.FloorTiles; _tileRows.IsVisible = s.FloorTiles;
+        _tileTexture.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.ToList().FindIndex(p => p.Name == s.FloorTexture));
+        _square.Value = D(s.SquareMm); _yard.Value = D(s.YardMm);
         _wallT.Value = D(s.WallSheetMm); _twoSided.IsChecked = s.TwoSided; _fit.Value = D(s.FitMm); _column.Value = D(s.ColumnMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _texture.SelectedIndex = Math.Max(0, _textures.IndexOf(s.Texture));
         _upper.SelectedIndex = s.UpperTexture is { Length: > 0 } up && _textures.IndexOf(up) is >= 0 and var ui ? ui + 1 : 0;
@@ -329,13 +347,15 @@ public sealed class BuildingWindow : Window
         _spec = _spec with
         {
             WidthMm = V(_width, 110), DepthMm = V(_depth, 80), Storeys = (int)V(_storeys, 1), StoreyHeightMm = V(_storeyH, 48),
-            Top = top, ParapetHeightMm = V(_parapet, 21),
+            Top = top, ParapetHeightMm = V(_parapet, 21), WayUp = (WayUpStyle)Index(_wayUp),
             Door = (DoorStyle)Index(_door),
             DoorShape = Index(_doorShape) switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched },
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28),
             WindowsFront = (int)V(_winFront, 0), WindowsSide = (int)V(_winSide, 0),
             WindowShape = (OpeningShape)Index(_winShape), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 22),
             Bars = (WindowBars)Index(_bars),
+            FloorTiles = _tiles.IsChecked == true, FloorTexture = PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets[Math.Clamp(Index(_tileTexture), 0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Count - 1)].Name,
+            SquareMm = V(_square, 25.4), YardMm = V(_yard, 0),
             WallSheetMm = V(_wallT, 3), TwoSided = _twoSided.IsChecked == true, FitMm = V(_fit, 0.15), ColumnMm = V(_column, 16), Seed = (int)V(_seed, 1),
             Texture = _textures[Math.Clamp(Index(_texture), 0, _textures.Count - 1)], UpperTexture = upper, Etch = (EtchStyle)Index(_etch),
             FurnitureSheetMm = V(_furnT, 2), FurnitureFitMm = V(_furnFit, 0.1), Detail = (WoodDetail)Index(_detail),
@@ -343,6 +363,7 @@ public sealed class BuildingWindow : Window
         };
         _gripRow.IsVisible = _spec.FurniturePushFit;
         _parapetRow.IsVisible = top == BuildingTop.Battlements;
+        _tileRows.IsVisible = _spec.FloorTiles;
         if (_spec.Storeys != storeysBefore) FillList(_sel);
         Shows();
         Changed();

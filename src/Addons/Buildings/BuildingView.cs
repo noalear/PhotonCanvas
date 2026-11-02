@@ -85,12 +85,26 @@ public sealed class BuildingView : Control
                     }
             }
             _centre = (lo + hi) * 0.5;
-            foreach (var s in kit.Solids.Where(Shown)) Add(s);
+            var shown = kit.Solids.Where(Shown).ToList();
+            foreach (var s in shown) Add(s, sides: s.Side != WallSide.Ground);
+            // The floor tiles lie edge to edge: their sides are drawn only round the outside of them all,
+            // or the sides between them would show through the tiles' tops.
+            if (shown.FirstOrDefault(s => s.Side == WallSide.Ground) is { } first)
+            {
+                var all = new PathsD();
+                foreach (var t in shown.Where(s => s.Side == WallSide.Ground))
+                {
+                    var d = t.Pose.O - first.Pose.O;
+                    all.AddRange(Geo.Move(t.Outline, d.Dot(first.Pose.U), d.Dot(first.Pose.V)));
+                }
+                // Grown and shrunk back, to close the fit gaps between the jigsaw joins.
+                Add(first with { Outline = Geo.Offset(Geo.Offset(Geo.Union(all), 0.4), -0.4) }, faces: false);
+            }
         }
         InvalidateVisual();
     }
 
-    void Add(Solid s)
+    void Add(Solid s, bool faces = true, bool sides = true)
     {
         double T = s.Thickness;
         var pose = s.Pose;
@@ -98,8 +112,12 @@ public sealed class BuildingView : Control
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         V3 At(PointD p, double w) => pose.At(p.x, p.y, w);
         var n = pose.N;
-        _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, T / 2)).ToArray())], n, 1, s.Etched, s.Lines, pose, T / 2, wood));
-        _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, -T / 2)).ToArray())], -n, 1, null, null, null, 0, wood));
+        if (faces)
+        {
+            _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, T / 2)).ToArray())], n, 1, s.Etched, s.Lines, pose, T / 2, wood));
+            _faces.Add(new Face([.. outline.Select(c => c.Select(p => At(p, -T / 2)).ToArray())], -n, 1, null, null, null, 0, wood));
+        }
+        if (!sides) return;
         foreach (var c in outline)
             for (int i = 0; i < c.Count; i++)
             {
