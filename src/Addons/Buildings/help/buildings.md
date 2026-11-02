@@ -3,7 +3,8 @@
 An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors** and **Roofs and towers** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
 
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
-**Cottage**, a **Tavern** or a **Watchtower** and you get every wall with its doorway and windows,
+**Cottage**, a **Tavern** or a **Watchtower** (or a sci-fi outpost, a gothic chapel, a dungeon crypt
+or an adobe house) and you get every wall with its doorway and windows,
 the corner columns the walls slide into, the floor tiles it stands on, a floor between the storeys
 with stairs or a ladder up to it, a roof that lifts off, a door that swings open, and the furniture
 for every room. Each
@@ -46,7 +47,24 @@ changing **Figures** later scales every size, the furniture's too). Everything c
 | **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls on flagstone tiles under a thatched roof, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
 | **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows, stairs up, floorboard tiles and a clay-tiled roof. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
 | **Watchtower** | A 72 mm square tower of two storeys with arrow slits, a ladder up to each floor, a floor on top with battlements round it, on dungeon flagstones. Crates and a chest below, two bunks, a table and stools above. |
+| **Sci-fi outpost** | One storey, 110 × 85 mm of sci-fi panels under a corrugated lean-to roof, on a sci-fi deck, with a metal blast door with angled corners loose in the doorway and wide angled windows. Bunks, lockers, a mess table, chairs and crates with metal panels and rivets. |
+| **Gothic chapel** | One tall storey, 80 × 136 mm, of fine stone blocks under a steep slate roof, on chequered tiles, with a pointed door that swings and three tall pointed windows down each side. Six pews, an altar, two high-backed chairs and a bookshelf. |
+| **Dungeon crypt** | One squat storey, 100 mm square, of dungeon blocks under a low slate roof, on dungeon flagstones, with a studded door loose in its arched doorway and small barred windows high up. A tomb, chests, crates and a bench. |
+| **Adobe house** | Two storeys, 100 × 80 mm: sandstone below and adobe plaster above, a flat roof behind a low wall, a ladder up, on sandstone slabs, with small square windows. A low round table, stools, a chest and crates below, two beds and a chest above. |
 
+## Themes
+
+**Theme**, under **Building**, is a look for the whole building, the same as the other terrain
+makers', so a themed building matches walls, roofs, floor tiles, scatter and furniture made on their
+own in that theme. It sets the walls' texture (stone below and timber frame above on a medieval
+building of two storeys or more; sandstone below and adobe above in the desert), the door's shape
+and look, the windows' shape, size and bars (lowering their sill if they're taller), the roof's
+covering and pitch, the floor tiles, the furniture's faces and the way up (a ladder for sci-fi and
+desert, spiral stairs for gothic; *None* stays *None*). The size, storeys and furniture list stay as
+they are. A watchtower keeps its arrow slits in the medieval, dungeon and gothic looks.
+
+A door that swings is only made for square, arched and pointed doorways: a sci-fi or cave doorway
+gets a loose door instead (a note says so).
 ## Size, storeys, roof, floor tiles, door and windows
 
 On the **Building** tab:
@@ -76,10 +94,12 @@ On the **Building** tab:
 - **Door**: in the middle of the ground floor's front. *Hung on clips: it swings open* is the
   furniture maker's door for a wall, cut from the furniture sheet, on two clips slid onto the side of
   the doorway; *Loose in the doorway* is the wall maker's door that just sits in it; *Just a
-  doorway* leaves it open. Its **Shape**, **Width** and **Height**.
+  doorway* leaves it open. Its **Shape** (square top, round arch, pointed arch, angled corners or a rough cave mouth), **Look**
+(what a loose door looks like: planks, iron studs, a metal blast door, a portcullis or a stone slab, as
+in the wall maker), **Width** and **Height**.
 - **Windows**: how many in the **Front and back** walls and in **Each side** wall of every storey
   (the battlements have none, and the ground floor's front fits them round the door), their
-  **Shape** (*Arrow slit* for towers), size, **Sill** height above the floor and **Bars**.
+  **Shape** (*Arrow slit* for towers, angled corners for sci-fi, rough for a cave), size, **Sill** height above the floor and **Bars**.
 
 ## Walls and columns
 
@@ -116,7 +136,10 @@ comes in the furniture maker's standard style; for other legs, backs or lids, ma
 
 **Thickness** is the furniture sheet (2 mm suits 28 mm figures; use 1 mm for 15 mm figures).
 **Joints** *Push fit (grip ribs, no glue)* adds the furniture maker's small ribs to every slot, so
-the furniture holds together without glue; **Grip** sets how tight. If a
+the furniture holds together without glue; **Grip** sets how tight. **Faces** is the furniture
+maker's detail: *None*, *Wood grain*, *Planks and grain*, *Metal panels and rivets (sci-fi)* or
+*Stone (cracks and pits)*; the floors between storeys match it (floorboards, deck plates or stone,
+or plain with *None*). If a
 piece of furniture is too small for the sheet, it's left out with a yellow ! saying why, and the rest
 of the building still goes in.
 

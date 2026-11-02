@@ -11,6 +11,12 @@ inside. Make the walls first: the roof is made to fit them.
 <!-- wait: window:Roofs -->
 Click **Roofs** on the **Home** tab.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top sets the shingles, the slope and the gable ends for a look: slate for a dungeon,
+corrugated metal for sci-fi, clay tiles for the desert, a steep slate roof for gothic. Leave it on
+*Medieval* here; change anything it sets afterwards.
+
 ## Choose the shape
 <!-- target: field:Roof -->
 Pick **Gable** for two slopes, **Hipped** for four (a pyramid on a square room) or **Lean-to** for one.

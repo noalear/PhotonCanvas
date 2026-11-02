@@ -7,7 +7,7 @@ using PhotonCanvas.Addon.Walls;
 namespace PhotonCanvas.Addon.Roofs;
 
 public enum RoofStyle { Gable, Hip, LeanTo, Cone }
-public enum GableWindow { None, Round, Arched, Square, Pointed }
+public enum GableWindow { None, Round, Arched, Square, Pointed, Angled }
 /// <summary>How the edge of each ring of a stacked cone is shaped: the steps read as courses of shingles.</summary>
 public enum ConeEdge { Scallops, Slates, Smooth }
 public enum TowerTop { Battlements, Cone, Open }
@@ -20,6 +20,8 @@ public enum TowerTop { Battlements, Cone, Open }
 public sealed record RoofSpec
 {
     public RoofStyle Style { get; init; } = RoofStyle.Gable;
+    /// <summary>The look picked to start from (<see cref="RoofThemes"/>): it set the shingles, pitch and gables, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     /// <summary>Outer size along the ridge (mm).</summary>
     public double LengthMm { get; init; } = 128.5;
     /// <summary>Outer size across the ridge (mm); a cone's diameter.</summary>
@@ -80,6 +82,8 @@ public sealed record RoofSpec
 /// <summary>A round tower of rings stacked from sheet: stonework on the rings' edges, floors that lift apart, a door and windows, a top, and slots for walls.</summary>
 public sealed record TowerSpec
 {
+    /// <summary>The look picked to start from (<see cref="RoofThemes"/>): it set the stonework, door and windows, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     public double DiameterMm { get; init; } = 60;
     /// <summary>Height of the tower's body (mm): to the top of the battlements, or to where a cone roof sits.</summary>
     public double HeightMm { get; init; } = 100;

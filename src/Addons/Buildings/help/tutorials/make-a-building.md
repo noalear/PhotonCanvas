@@ -16,6 +16,12 @@ Click **Buildings** on the **Home** tab.
 Pick a **Cottage**, **Tavern** or **Watchtower** under **Building**, and the size of your figures
 under **Figures**. Change its size, storeys, roof, the way up, floor tiles, door and windows underneath.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** under **Building** changes the whole building's look at once: walls, door, windows, roof,
+floor tiles, the furniture's faces and the way up. Try *Dungeon* on the cottage, or pick the
+**Sci-fi outpost** or **Gothic chapel** as the building.
+
 ## Set the wall sheet and texture
 <!-- target: tabitem:Walls -->
 On the **Walls** tab, pick your material in **Cut with** (or type the sheet's **Thickness**), then

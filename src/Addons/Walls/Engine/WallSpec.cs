@@ -7,9 +7,11 @@ namespace PhotonCanvas.Addon.Walls;
 public enum EtchStyle { Grooves, Lines }
 public enum TopStyle { Straight, Battlements, Ruined }
 public enum DoorKind { None, Doorway, ClosedDoor, DoorwayAndDoor }
-public enum OpeningShape { Rectangle, Arched, Pointed, Round, ArrowSlit }
+public enum OpeningShape { Rectangle, Arched, Pointed, Round, ArrowSlit, Chamfered, Rough }
+/// <summary>What's etched on a closed door, or on a loose door (bars are cut right through a loose one).</summary>
+public enum DoorLook { Planks, Studded, Metal, Bars, Stone }
 public enum WindowBars { None, Cross, Bars }
-public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach }
+public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach, Lamps }
 public enum ColumnShape { Auto, Square, Octagon, Round }
 public enum LengthMeasure { Panel, Centres }
 
@@ -29,6 +31,9 @@ public sealed record WallSpec
     /// <summary>Two panels glued back to back (mirror images), so both faces are textured and the wall is twice as thick.</summary>
     public bool TwoSided { get; init; }
     public int Walls { get; init; } = 1;
+
+    /// <summary>The look picked to start from (<see cref="WallThemes"/>): it set the texture, openings and accessories, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
 
     /// <summary>A preset (<see cref="Textures.Presets"/>) or the name of one of your own.</summary>
     public string Texture { get; init; } = "Brick";
@@ -58,6 +63,8 @@ public sealed record WallSpec
     public double DoorHeightMm { get; init; } = 28;
     /// <summary>The door's centre from the middle of the wall (mm; less than 0 = to the left).</summary>
     public double DoorOffsetMm { get; init; }
+    /// <summary>What the door looks like: planks, studded planks, a metal blast door, bars (a portcullis) or a stone slab.</summary>
+    public DoorLook DoorLook { get; init; } = DoorLook.Planks;
 
     public int Windows { get; init; }
     public OpeningShape WindowShape { get; init; } = OpeningShape.Arched;

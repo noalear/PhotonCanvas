@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 
 namespace PhotonCanvas.Addon.GameKit;
 
@@ -24,6 +25,15 @@ public static class Surface
             var (e, l) = WoodFace.Make(small, alongU, finish == Finish.Planks, true, 3, rnd);
             return (Geo.Map(e, p => new PointD(p.x * k, p.y * k)), Geo.Map(l, p => new PointD(p.x * k, p.y * k)));
         }
+        if (ThemeTexture(finish) is { } theme)
+        {
+            var info = ThemeTextures.Find(theme)!;
+            var (tr, te, tl) = ThemeTextures.Make(theme, len, h, info.SizeA * k, info.SizeB * k, info.Groove * k, rnd);
+            var r2 = Geo.Move(tr, b.left, b.top);
+            var e2 = Geo.Move(te, b.left, b.top);
+            var l2 = Geo.Map(tl, p => new PointD(p.x + b.left, p.y + b.top));
+            return (Geo.Union(Geo.Subtract(region, Geo.Union(r2)), Geo.Intersect(e2, region)), Geo.ClipLines(l2, region));
+        }
         var t = finish switch
         {
             Finish.Brick => Bricks(len, h, 8 * k, 3.5 * k, 0.6 * k, 0.5),
@@ -39,6 +49,17 @@ public static class Surface
         var lines = Geo.Map(t.Lines, p => new PointD(p.x + b.left, p.y + b.top));
         return (Geo.Subtract(region, Geo.Union(raised)), Geo.ClipLines(lines, region));
     }
+
+    /// <summary>The themes' textures (Shared/Terrain/ThemeTextures.cs), drawn as the wall maker draws them.</summary>
+    static string? ThemeTexture(Finish f) => f switch
+    {
+        Finish.DungeonBlocks => ThemeTextures.DungeonBlocks,
+        Finish.CaveRock => ThemeTextures.CaveRock,
+        Finish.SciFiPanels => ThemeTextures.SciFiPanels,
+        Finish.Sandstone => ThemeTextures.Sandstone,
+        Finish.Adobe => ThemeTextures.Adobe,
+        _ => null,
+    };
 
     static PathD Box(double x0, double y0, double x1, double y1, double g) => Geo.Rect(x0 + g / 2, y0 + g / 2, x1 - g / 2, y1 - g / 2);
 

@@ -1,6 +1,6 @@
 # Make a brick wall with a door and columns
 <!-- category: Drawing -->
-<!-- summary: Make a brick wall for a tabletop game with battlements, a door and a window, and the corner columns that join walls into a room. -->
+<!-- summary: Make a brick wall for a tabletop game with battlements, a door and a window, and the corner columns that join walls into a room, and pick a theme (dungeon, cave, sci-fi, desert, gothic) for other looks. -->
 <!-- page: walls.md -->
 <!-- order: 75 -->
 Wall panels cut from sheet with a texture etched on make quick, sturdy scenery for tabletop games.
@@ -10,6 +10,12 @@ Columns join them, and the walls slide out again so the layout can change.
 <!-- target: ribbon:Home/Walls -->
 <!-- wait: window:Textured walls -->
 Click **Walls** on the **Home** tab.
+
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top sets the texture, door, windows and accessories for a look: *Dungeon*, *Cave*,
+*Sci-fi*, *Desert* or *Gothic*. Leave it on *Medieval* for this brick wall; the other terrain makers
+have the same themes, so a set made in one theme matches.
 
 ## Size the wall
 <!-- target: field:Length -->

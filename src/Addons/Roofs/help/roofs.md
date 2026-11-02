@@ -34,6 +34,23 @@ if they need more than one bed). To change it later, select any of its pieces, r
 When the design already has walls from **Walls**, a new roof or tower is made to fit them as the
 window opens; **Match the walls in the design** does it again after you've changed things.
 
+## Themes
+
+**Theme**, at the top of the first tab for both roofs and towers, is a look to start from, the same as
+the wall maker's, so a roof or tower matches the walls, floors and scatter made in that theme. Change
+anything afterwards.
+
+| Theme | Roof | Tower |
+|---|---|---|
+| Medieval | Slate at 45°, round attic windows, gables in brick | Stone blocks, arrow slits |
+| Dungeon | Slate at 50°, arched attic windows, gables in dungeon blocks | Big stone blocks, arrow slits |
+| Cave | Wooden shingles at 40°, no attic window, gables in cave rock | Fieldstone, a rough doorway and rough windows |
+| Sci-fi | Corrugated metal at 20°, angled attic windows, gables in sci-fi panels | Corrugated metal, an angled door and wide angled windows |
+| Desert | Clay tiles at 25°, square attic windows, gables in adobe plaster | Long sandstone blocks, small square windows |
+| Gothic | Slate at 60°, pointed attic windows, gables in fine stone | Fine stone blocks, tall pointed windows and a steep cone roof |
+
+A cone roof keeps its pitch; its edge becomes scallops, slates or smooth to suit.
+
 ## Roofs
 
 ### Shape
@@ -92,8 +109,8 @@ maker's textures etched on their outside, so they carry on from the walls under 
 walls in the design** picks the walls' own texture and sizes (your own textures too).
 
 - **Texture** and its sizes, **Groove** and **Variation**: as in [Textured walls](walls.md).
-- **Window**: an attic window in each gable: round, round arch, square or pointed arch, **Window
-  width** wide, with a smooth frame round it. If it doesn't fit, the notes say so.
+- **Window**: an attic window in each gable: round, round arch, square, pointed arch or angled
+  corners (sci-fi), **Window width** wide, with a smooth frame round it. If it doesn't fit, the notes say so.
 
 A hipped or cone roof has no gables.
 
@@ -172,12 +189,13 @@ edges make the courses.
 
 ### Doors and windows
 
-- **A doorway at the bottom**: **Door shape** (square top, round arch or pointed arch), **Door width**,
+- **A doorway at the bottom**: **Door shape** (square top, round arch, pointed arch, angled corners or
+  a rough cave mouth), **Door width**,
   **Door height**, and **Faces (°)**: which way it faces, in degrees round the tower seen from above
   (270 is towards you in the preview).
 - **Per storey**: how many windows each storey has, spread evenly round it, clear of the door and the
   walls, and turned a little from one storey to the next. **Window shape** (square top, round arch,
-  pointed arch, round or arrow slit), its width and height, and **Sill height** above the storey's floor.
+  pointed arch, round, arrow slit, angled corners or rough), its width and height, and **Sill height** above the storey's floor.
 
 Doors, windows and battlements are cut right through the rings, so those rings come as a C or in
 pieces. Short marks scored on the layer below show where each gap goes.

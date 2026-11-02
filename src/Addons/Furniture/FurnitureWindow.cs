@@ -60,7 +60,10 @@ public sealed class FurnitureWindow : Window
     readonly ComboBox _scale = Combo("15 mm", "28 mm", "32 mm", "54 mm");
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _thick = Number(0.3m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0");
-    readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain");
+    readonly ComboBox _detail = Combo("None", "Wood grain", "Planks and grain", "Metal panels and rivets (sci-fi)", "Stone (cracks and pits)");
+    readonly ComboBox _theme = Combo([.. FurnitureThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
+    readonly Button _starter = UiKit.Button("Start the list from this theme", tip: "Replaces the list with furniture that suits the theme: bunks, lockers and crates for sci-fi, a trestle table, benches and chests for a dungeon, and so on.");
     readonly ComboBox _joints = Combo("Snug, to glue", "Push fit (grip ribs, no glue)");
     readonly NumericUpDown _grip = Number(0.02m, 0.5m, 0.05m, "0.##");
     Control _gripRow = null!;
@@ -188,6 +191,8 @@ public sealed class FurnitureWindow : Window
         _wallRows = Stack(Field("Wall thickness", _wallT, tip: "How thick the wall is (mm): both panels if it's two-sided."), _shelfWallRows, _match, _matchNote);
         _dRow = Line(_dLabel, _d);
         return Stack(
+            Explained("Theme", "A look to start from, the same as the wall maker's: it sets the detail on the faces (planks, rough grain, metal panels or stone) and the doors' shape. Start the list from it for furniture that suits it.",
+                Field("Theme", _theme), _themeAbout, _starter),
             Explained("Furniture to cut", "Everything on the list is cut from the same sheet and nested onto the bed together. Pick one to change it.",
                 _list,
                 addRow,
@@ -213,7 +218,7 @@ public sealed class FurnitureWindow : Window
                 Field("Joints", _joints),
                 _gripRow = Field("Grip", _grip, tip: "How much tighter than the sheet the ribs make each joint (mm). More holds harder but is harder to push together; 0.15 suits plywood and MDF.")),
             Explained("Detail", "Etched and scored on the faces that show.",
-                Field("Wood", _detail, tip: "Grain is scored lines; planks add etched grooves between boards."),
+                Field("Faces", _detail, tip: "Grain is scored lines; planks add etched grooves between boards; metal is a panel line and rivets; stone is cracks and pits."),
                 Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
                     tip: "Grain and plank joints are laid out at random: each number gives a different layout.")),
             Explained("Material", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
@@ -269,6 +274,8 @@ public sealed class FurnitureWindow : Window
         foreach (var n in new[] { _thick, _fit, _seed, _grip }) n.ValueChanged += (_, _) => SheetChanged();
         _joints.SelectionChanged += (_, _) => { _gripRow.IsVisible = _joints.SelectedIndex == 1; SheetChanged(); };
         _detail.SelectionChanged += (_, _) => SheetChanged();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
+        _starter.Click += (_, _) => StartFromTheme();
         _etchWith.SelectionChanged += (_, _) => SheetChanged();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _scale.SelectionChanged += (_, _) => ScaleChosen();
@@ -282,6 +289,29 @@ public sealed class FurnitureWindow : Window
     static decimal D(double v) => (decimal)v;
     static double V(NumericUpDown n, double fallback) => n.Value is { } v ? (double)v : fallback;
     FurnitureItem Item => _set.Items[Math.Clamp(_sel, 0, _set.Items.Count - 1)];
+
+    string ThemeName => FurnitureThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, FurnitureThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its detail and door shape replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = FurnitureThemes.About(ThemeName);
+        if (_loading) return;
+        _set = FurnitureThemes.Apply(_set, ThemeName);
+        LoadSheet();
+        FillList(_sel);
+        Changed();
+    }
+
+    /// <summary>The list replaced by the theme's starter furniture, sized for the figures chosen.</summary>
+    void StartFromTheme()
+    {
+        double k = _set.ScaleMm / 28;
+        _set = FurnitureThemes.Apply(_set with { Items = [.. FurnitureThemes.Starter(ThemeName).Select(it => Math.Abs(k - 1) < 1e-9 ? it : Scaled(it, k))] }, ThemeName);
+        LoadSheet();
+        FillList(0);
+        Changed();
+    }
 
     void FillList(int select)
     {
@@ -337,6 +367,7 @@ public sealed class FurnitureWindow : Window
         _loading = true;
         _thick.Value = D(_set.ThicknessMm); _fit.Value = D(_set.FitMm); _seed.Value = Math.Clamp(_set.Seed, 1, 9999);
         _detail.SelectedIndex = (int)_set.Detail;
+        _theme.SelectedIndex = Math.Max(0, FurnitureThemes.Names.ToList().IndexOf(_set.Theme)); _themeAbout.Text = FurnitureThemes.About(_set.Theme);
         _joints.SelectedIndex = _set.PushFit ? 1 : 0;
         _grip.Value = D(Math.Clamp(_set.GripMm, 0.02, 0.5));
         _gripRow.IsVisible = _set.PushFit;

@@ -96,13 +96,28 @@ long. To put it together, lay the segments out in order (odd ones under, even on
 pin down through each joint and glue a cap onto the end of its stem underneath. Glue only the cap,
 so the joint still turns.
 
+## Themes
+
+**Theme**, at the top of the **Sheet** tab, is a look to start from, the same as the wall maker's, so
+a dice tower and trackers match the scenery on the table. It sets the faces, their size, the dice
+towers' battlements and the initiative tiles' tops. Change anything afterwards.
+
+| Theme | Faces | Dice tower | Initiative tiles |
+|---|---|---|---|
+| Medieval | Stone blocks | Battlements | Rounded tops |
+| Dungeon | Dungeon blocks | Battlements | Rounded tops |
+| Cave | Cave rock | No battlements | Rounded tops |
+| Sci-fi | Sci-fi panels | No battlements | Square tops |
+| Desert | Sandstone | Battlements | Arched tops |
+| Gothic | Brick | Battlements | Arched tops |
+
 ## The sheet
 
 | Setting | Range (default) | What it does |
 |---|---|---|
 | **Thickness** | 0.5 to 12 mm (3) | The sheet's thickness. Every slot and tab is sized from it. |
 | **Slot fit** | −0.5 to 2 mm (0.1) | Added to the thickness for the slots: more is looser. 0.1 is a snug fit to glue. |
-| **Faces** | Stone blocks | What's etched on the faces that show (the tower's walls, the tray's sides, the stand's front rail and the top of the tracker's base): *None*, *Wood grain* or *Planks* like the furniture maker's, or *Brick*, *Stone blocks*, *Fieldstone*, *Tiles*, *Metal plates* or *Hexagons* like the wall maker's. |
+| **Faces** | Stone blocks | What's etched on the faces that show (the tower's walls, the tray's sides, the stand's front rail and the top of the tracker's base): *None*, *Wood grain* or *Planks* like the furniture maker's, or *Brick*, *Stone blocks*, *Fieldstone*, *Tiles*, *Metal plates*, *Hexagons*, *Dungeon blocks*, *Cave rock*, *Sci-fi panels*, *Sandstone* or *Adobe* like the wall maker's. |
 | **Texture size** | 0.25 to 10 (2) | The texture's stones, bricks or planks are the wall maker's sizes (for 28 mm walls) times this. |
 | **Variation** | 1 to 9999 (1) | Stones, planks and grain are laid out at random; each number gives a different layout, and **Shuffle** picks the next one. |
 | **Font** | Arial | The font for the numbers and names. |

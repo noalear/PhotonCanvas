@@ -16,6 +16,12 @@ Click **Furniture** on the **Home** tab.
 On the **Sheet** tab, type your sheet's **Thickness** (2 mm suits 28 mm figures) and pick the
 **Figures** size. Picking your material in **Cut with** fills the thickness and slot fit in for you.
 
+## Or start from a theme
+<!-- target: button:Start the list from this theme -->
+Pick a **Theme** at the top and press **Start the list from this theme** for a room's worth that suits
+it: bunks and lockers for a sci-fi ship, a trestle table and chests for a dungeon. The faces change to
+match (metal panels for sci-fi).
+
 ## Add furniture to the list
 <!-- target: button:Add -->
 Back on the **Furniture** tab, pick a **Chair** under the list and press **Add**. Add a **Bench** and

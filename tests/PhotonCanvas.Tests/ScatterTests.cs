@@ -134,7 +134,7 @@ public class ScatterTests
         var all = Assemble(k, T);
         Assert.Empty(Clashes(all));
         Assert.Empty(EmptySlots(all, T, fit));
-        Assert.True(AllJoined(all, T, k.Item.Kind == ItemKind.Barrel), "a piece isn't joined to the others");
+        Assert.True(AllJoined(all, T, k.Item.Kind is ItemKind.Barrel or ItemKind.Stalagmite or ItemKind.Mushroom or ItemKind.Boulder or ItemKind.Urn), "a piece isn't joined to the others");
         if (!warnings) Assert.DoesNotContain(k.Findings, f => f.Level == Severity.Warn);
         // It stands on the table: nothing below it, something on it.
         double low = all.SelectMany(p => p.Corners()).Min(q => q.Y);
@@ -172,6 +172,20 @@ public class ScatterTests
         foreach (var shape in Enum.GetValues<StoneShape>())
             foreach (var slab in new[] { 0.0, 18.0 })
                 yield return [Defaults.For(ItemKind.Gravestone) with { Shape = shape, SlabMm = slab, Weathered = slab > 0 }, 2.0];
+        // The theme pieces' own settings.
+        yield return [Defaults.For(ItemKind.Barrel) with { Metal = true }, 2.0];
+        yield return [Defaults.For(ItemKind.Barrel) with { Metal = true, Open = true }, 2.0];
+        foreach (var n in new[] { 1, 3, 5 })
+            yield return [Defaults.For(ItemKind.Stalagmite) with { Cluster = n }, 2.0];
+        foreach (var n in new[] { 1, 3 })
+            yield return [Defaults.For(ItemKind.Mushroom) with { Cluster = n }, 2.0];
+        yield return [Defaults.For(ItemKind.Brazier) with { Flames = false }, 2.0];
+        yield return [Defaults.For(ItemKind.Brazier) with { WidthMm = 24, HeightMm = 30 }, 3.0];
+        yield return [Defaults.For(ItemKind.Urn) with { Open = true }, 2.0];
+        yield return [Defaults.For(ItemKind.Urn) with { Open = true, WidthMm = 20, HeightMm = 30 }, 1.5];
+        yield return [Defaults.For(ItemKind.Boulder) with { WidthMm = 40, DepthMm = 30, HeightMm = 20 }, 3.0];
+        yield return [Defaults.For(ItemKind.Palm) with { WidthMm = 20, DepthMm = 10, HeightMm = 30 }, 2.0];
+        yield return [Defaults.For(ItemKind.Console) with { WidthMm = 40, DepthMm = 16, HeightMm = 30 }, 3.0];
         // Sized for other figures.
         foreach (var (k, t) in new[] { (15 / 28.0, 0.8), (54 / 28.0, 2.0), (54 / 28.0, 3.0) })
             foreach (var kind in Defaults.Kinds.Select(x => x.Kind))
@@ -185,6 +199,61 @@ public class ScatterTests
         var set = Sheet with { ThicknessMm = t };
         // Weathering may leave a chip that narrows an edge: that's a warning, not a fault.
         FitsTogether(ScatterKit.Make(it, set), t, 0.1, warnings: it.Weathered || it.WidthMm < 6);
+    }
+
+    [Theory]
+    [InlineData(ItemKind.Stalagmite)]
+    [InlineData(ItemKind.Mushroom)]
+    [InlineData(ItemKind.Boulder)]
+    [InlineData(ItemKind.Palm)]
+    [InlineData(ItemKind.Brazier)]
+    public void Rock_and_plant_shapes_differ_with_the_variation_and_still_fit_together(ItemKind kind)
+    {
+        var shapes = new HashSet<double>();
+        foreach (var seed in new[] { 2, 3, 4, 5, 6 })
+        {
+            var k = ScatterKit.Make(Defaults.For(kind) with { Cluster = 3 }, Sheet with { Seed = seed });
+            FitsTogether(k, 2, 0.1);
+            shapes.Add(Math.Round(k.Parts.Sum(p => Geo.Area(p.Cut) * p.Copies), 2));
+        }
+        if (kind != ItemKind.Brazier) Assert.True(shapes.Count > 1, "every variation came out the same");
+    }
+
+    [Fact]
+    public void A_drum_is_a_metal_barrel_with_a_filler_cap_and_named_so()
+    {
+        var set = Sheet with { Items = [Defaults.For(ItemKind.Barrel) with { Metal = true }, Defaults.For(ItemKind.Barrel)] };
+        Assert.Equal("Drum", ScatterKit.Label(set, 0));
+        Assert.Equal("Barrel", ScatterKit.Label(set, 1));
+        var drum = Part(Make(set.Items[0]), "Lid");
+        var barrel = Part(Make(set.Items[1]), "Lid");
+        Assert.Empty(drum.Etched);
+        Assert.NotEmpty(barrel.Etched);
+    }
+
+    [Fact]
+    public void A_brazier_is_two_halves_slotted_from_opposite_ends()
+    {
+        var it = Defaults.For(ItemKind.Brazier);
+        var k = Make(it);
+        Assert.Equal(2, k.Parts.Count);
+        // The bowl is 0.35 of the width deep (14 mm across: 4.9 mm), under flames 0.3 of the height (6.6 mm): its middle is 12.95 mm up.
+        double cx = it.WidthMm / 2, yj = 12.95;
+        var fromTop = k.Parts.Single(p => p.Name.Contains("top")).Cut;
+        var fromBottom = k.Parts.Single(p => p.Name.Contains("bottom")).Cut;
+        Assert.True(In(fromTop, cx, yj - 0.6) && !In(fromTop, cx, yj + 0.6));
+        Assert.True(!In(fromBottom, cx, yj - 0.6) && In(fromBottom, cx, yj + 0.6));
+    }
+
+    [Fact]
+    public void A_console_screen_stands_in_slots_in_its_top()
+    {
+        var k = Make(Defaults.For(ItemKind.Console));
+        var top = Part(k, "Top");
+        Assert.Equal(2, Geo.Tidy(top.Cut).Count(p => Clipper.Area(p) < 0));
+        Assert.NotEmpty(top.Etched);
+        Assert.NotEmpty(Part(k, "Screen").Lines);
+        Assert.DoesNotContain(k.Parts, p => p.Name == "Bottom");
     }
 
     [Theory]

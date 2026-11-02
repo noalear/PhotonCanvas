@@ -58,6 +58,9 @@ public sealed record TileSpec
     /// <summary>The sheet's thickness (mm).</summary>
     public double ThicknessMm { get; init; } = 3;
 
+    /// <summary>The look picked to start from (<see cref="FloorThemes"/>): it set the texture, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Dungeon";
+
     /// <summary>A preset (<see cref="FloorTextures.Presets"/>) or the name of one of your own (shared with the wall maker).</summary>
     public string Texture { get; init; } = "Dungeon flagstones";
     public CustomTexture? Custom { get; init; }

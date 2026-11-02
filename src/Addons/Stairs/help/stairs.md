@@ -63,6 +63,21 @@ With caps on the columns and walls a whole number of sheets high (51 mm walls of
 the caps finish level with the floor: the next storey's columns stand on them, with a pin through
 both.
 
+## Themes
+
+**Theme**, at the top of the **Floor** tab, is a look to start from, the same as the wall maker's: it
+sets the floor's texture and the way up to match walls made in that theme. A way up of *None* is left
+as it is. Change anything afterwards.
+
+| Theme | Floor | Way up |
+|---|---|---|
+| Medieval | Wood planks | Open stairs |
+| Dungeon | Dungeon blocks | Solid stairs |
+| Cave | Cave rock | Solid stairs |
+| Sci-fi | Sci-fi panels | A ladder |
+| Desert | Sandstone | Solid stairs |
+| Gothic | Tiles | Spiral stairs |
+
 ## The floor
 
 | Setting | What it does |

@@ -35,6 +35,10 @@ public sealed class RoofsWindow : Window
     readonly Button _match = UiKit.Button("Match the walls in the design", tip: "Reads the size, sheet, fit and texture of walls made with Walls (the ones selected first, or any in the design).");
     readonly TextBlock _matchNote = Hint().With(h => h.IsVisible = false);
 
+    // Theme (both)
+    readonly ComboBox _theme = Combo([.. RoofThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
+
     // Roof
     readonly ComboBox _style = Combo("Gable (two slopes)", "Hipped (four slopes, or a pyramid)", "Lean-to (one slope)", "Cone (for a round tower)");
     readonly NumericUpDown _length = Number(20, 2000, 1, "0.##"), _width = Number(16, 2000, 1, "0.##"), _pitch = Number(10, 80, 5, "0.#"), _eave = Number(0, 50, 0.5m, "0.#"),
@@ -56,7 +60,7 @@ public sealed class RoofsWindow : Window
     Control _gARow = null!, _gBRow = null!, _gGrooveRow = null!, _gSeedRow = null!, _gableBody = null!;
     readonly TextBlock _gableNone = Hint("A hipped or cone roof has no gable ends: its slopes come down on every side.");
     CustomTexture? _gCustom;
-    readonly ComboBox _gWindow = Combo("No window", "Round", "Round arch", "Square", "Pointed arch");
+    readonly ComboBox _gWindow = Combo("No window", "Round", "Round arch", "Square", "Pointed arch", "Angled corners (sci-fi)");
     readonly NumericUpDown _gWindowW = Number(2, 100, 0.5m, "0.#");
     readonly NumericUpDown _truss = Number(0, 500, 5, "0"), _inset = Number(0, 100, 0.5m, "0.##"), _corner = Number(0, 200, 0.5m, "0.##"), _rest = Number(0, 50, 0.5m, "0.##"),
         _wallT = Number(0.5m, 40, 0.5m, "0.##"), _fit = Number(-1, 2, 0.05m, "0.##");
@@ -74,7 +78,8 @@ public sealed class RoofsWindow : Window
     readonly ComboBox _tConeEdge = Combo("Scalloped (round-ended shingles)", "Notched (slates)", "Smooth");
     Control _battleRows = null!, _towerConeRows = null!;
     readonly CheckBox _tDoor = new() { Content = "A doorway at the bottom", IsChecked = true };
-    readonly ComboBox _tDoorShape = Combo("Square top", "Round arch", "Pointed arch"), _tWinShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit");
+    readonly ComboBox _tDoorShape = Combo("Square top", "Round arch", "Pointed arch", "Angled corners (sci-fi)", "Rough (cave mouth)"),
+        _tWinShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)");
     readonly NumericUpDown _tDoorW = Number(3, 200, 0.5m, "0.#"), _tDoorH = Number(3, 500, 0.5m, "0.#"), _tDoorAt = Number(0, 359, 5, "0"),
         _tWin = Number(0, 12, 1, "0"), _tWinW = Number(1, 100, 0.5m, "0.#"), _tWinH = Number(1, 200, 0.5m, "0.#"), _tSill = Number(0, 200, 0.5m, "0.#");
     Control _doorRows = null!, _winRows = null!;
@@ -222,6 +227,10 @@ public sealed class RoofsWindow : Window
         return new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { seed, b.With(x => Grid.SetColumn(x, 1)) } };
     }
 
+    Control ThemeBox() => Explained("Theme", "A look to start from, the same as the wall maker's, so the " + (_tower ? "tower" : "roof") + " matches the walls, floors and scatter of that theme. It sets the " +
+        (_tower ? "stonework, door and windows" : "shingles, pitch and gable ends") + "; change anything afterwards.",
+        Field("Theme", _theme), _themeAbout);
+
     Control MaterialBox() => Explained("Material", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
         Field("Cut with", _cutWith),
         Field("Etch with", _etchWith, tip: "Settings for the etched texture (an engrave/fill recipe from your library)."),
@@ -232,6 +241,7 @@ public sealed class RoofsWindow : Window
         _lengthCell = SmallL(_lengthLabel, _length);
         _overhangRow = Field("Past the ends", _overhang, tip: "How far the slopes reach past the gable ends (mm).");
         return Stack(
+            ThemeBox(),
             Explained("Shape", "The roof lifts off the building as one piece. Its size is the outside of what it sits on: for walls from Walls, the outside of the corner columns' caps.",
                 Field("Roof", _style),
                 Row(_lengthCell, SmallL(_widthLabel, _width)),
@@ -292,6 +302,7 @@ public sealed class RoofsWindow : Window
     }
 
     Control TowerTab() => Stack(
+        ThemeBox(),
         Explained("Size", "The tower is stacked from rings of the sheet, glued in order. Each storey lifts off the one below, so figures can go inside.",
             Row(Small("Diameter", _tDia, tip: "Across the tower (mm)."), Small("Height", _tHeight, tip: "From the ground to the top of the battlements, or to where a cone roof sits (mm).")),
             Field("Thickness", _thick, tip: "The sheet's thickness (mm): each ring is one layer."),
@@ -432,6 +443,7 @@ public sealed class RoofsWindow : Window
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _style.SelectionChanged += (_, _) => StyleChosen();
         _shingle.SelectionChanged += (_, _) => ShingleChosen();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
         _gTex.SelectionChanged += (_, _) => GableTextureChosen();
         _tTex.SelectionChanged += (_, _) => { if (!_loading && Textures.Preset(TowerTexture) is { } p && p.SizeALabel is not null) { _loading = true; _tA.Value = (decimal)Math.Max(1, p.SizeA); _tGroove.Value = (decimal)Math.Max(0.1, p.Groove); _loading = false; } ShowRows(); };
     }
@@ -553,8 +565,21 @@ public sealed class RoofsWindow : Window
     static decimal D(double v) => (decimal)v;
     static double V(NumericUpDown n, double fallback) => n.Value is { } v ? (double)v : fallback;
 
-    static int DoorIndex(OpeningShape s) => s switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
-    static OpeningShape DoorShape(int i) => i switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched };
+    static readonly OpeningShape[] DoorShapes = [OpeningShape.Rectangle, OpeningShape.Arched, OpeningShape.Pointed, OpeningShape.Chamfered, OpeningShape.Rough];
+    static int DoorIndex(OpeningShape s) => Math.Max(0, Array.IndexOf(DoorShapes, s is OpeningShape.Round or OpeningShape.ArrowSlit ? OpeningShape.Arched : s));
+    static OpeningShape DoorShape(int i) => DoorShapes[Math.Clamp(i, 0, DoorShapes.Length - 1)];
+
+    string ThemeName => RoofThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, RoofThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its shingles and gables (or stonework and openings) replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = RoofThemes.About(ThemeName);
+        if (_loading) return;
+        var cur = Current();
+        Load(cur with { Roof = cur.Roof is { } r ? RoofThemes.Apply(r, ThemeName) : null, Tower = cur.Tower is { } t ? RoofThemes.Apply(t, ThemeName) : null });
+        Changed();
+    }
 
     void Load(RoofsDesign d)
     {
@@ -562,6 +587,7 @@ public sealed class RoofsWindow : Window
         if (d.Roof is { } r)
         {
             _style.SelectedIndex = (int)r.Style;
+            _theme.SelectedIndex = Math.Max(0, RoofThemes.Names.ToList().IndexOf(r.Theme)); _themeAbout.Text = RoofThemes.About(r.Theme);
             _length.Value = D(r.LengthMm); _width.Value = D(r.WidthMm); _pitch.Value = D(r.PitchDeg); _eave.Value = D(r.EaveMm); _overhang.Value = D(r.GableOverhangMm);
             _thick.Value = D(r.ThicknessMm); _count.Value = Math.Max(1, r.Roofs); _fit.Value = D(r.FitMm);
             _shingle.SelectedIndex = Math.Max(0, Shingles.Presets.ToList().FindIndex(p => p.Name == r.Shingle));
@@ -576,6 +602,7 @@ public sealed class RoofsWindow : Window
         }
         if (d.Tower is { } t)
         {
+            _theme.SelectedIndex = Math.Max(0, RoofThemes.Names.ToList().IndexOf(t.Theme)); _themeAbout.Text = RoofThemes.About(t.Theme);
             _tDia.Value = D(t.DiameterMm); _tHeight.Value = D(t.HeightMm); _thick.Value = D(t.ThicknessMm); _tRing.Value = D(t.RingMm); _tStoreys.Value = Math.Max(1, t.Storeys); _tCount.Value = Math.Max(1, t.Towers);
             _tTex.SelectedIndex = Math.Max(0, Rings.Textures.ToList().IndexOf(t.Texture));
             _tA.Value = D(t.SizeA); _tB.Value = D(t.SizeB); _tGroove.Value = D(t.GrooveMm); _tSeed.Value = Math.Clamp(t.Seed, 1, 9999); _tPlanks.IsChecked = t.FloorPlanks;
@@ -599,7 +626,7 @@ public sealed class RoofsWindow : Window
             {
                 Tower = new TowerSpec
                 {
-                    DiameterMm = V(_tDia, 60), HeightMm = V(_tHeight, 100), ThicknessMm = V(_thick, 3), RingMm = V(_tRing, 8), Storeys = (int)V(_tStoreys, 2), Towers = (int)V(_tCount, 1),
+                    Theme = ThemeName, DiameterMm = V(_tDia, 60), HeightMm = V(_tHeight, 100), ThicknessMm = V(_thick, 3), RingMm = V(_tRing, 8), Storeys = (int)V(_tStoreys, 2), Towers = (int)V(_tCount, 1),
                     Texture = TowerTexture, SizeA = V(_tA, 12), SizeB = V(_tB, 6), GrooveMm = V(_tGroove, 0.8), Seed = (int)V(_tSeed, 1), FloorPlanks = _tPlanks.IsChecked == true,
                     Top = (TowerTop)Math.Max(0, _tTop.SelectedIndex), MerlonWidthMm = V(_merW, 8), CrenelWidthMm = V(_creW, 6), MerlonHeightMm = V(_merH, 6), ParapetMm = V(_parapet, 15),
                     ConePitchDeg = V(_cPitch, 60), ConeEaveMm = V(_cEave, 4), ConeEdge = (ConeEdge)Math.Max(0, _tConeEdge.SelectedIndex), PinMm = V(_pin, 2),
@@ -614,7 +641,7 @@ public sealed class RoofsWindow : Window
         {
             Roof = new RoofSpec
             {
-                Style = style, LengthMm = V(_length, 128.5), WidthMm = V(_width, 128.5), PitchDeg = V(_pitch, 45), EaveMm = V(_eave, 4), GableOverhangMm = V(_overhang, 3),
+                Style = style, Theme = ThemeName, LengthMm = V(_length, 128.5), WidthMm = V(_width, 128.5), PitchDeg = V(_pitch, 45), EaveMm = V(_eave, 4), GableOverhangMm = V(_overhang, 3),
                 ThicknessMm = V(_thick, 3), Roofs = (int)V(_count, 1), FitMm = V(_fit, 0.15),
                 Shingle = ShingleName, ShingleA = style == RoofStyle.Cone ? V(_coneShingle, 6) : V(_shA, 6), ShingleB = V(_shB, 4.5), ShingleGrooveMm = V(_shGroove, 0.5), Seed = (int)V(_seed, 1),
                 Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), Caps = _caps.IsChecked == true,

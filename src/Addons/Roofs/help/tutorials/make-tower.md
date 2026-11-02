@@ -11,6 +11,11 @@ its storeys lift apart so figures can go inside. Walls from Walls slide into slo
 <!-- wait: window:Round towers -->
 Click **Towers** on the **Home** tab.
 
+## Pick a theme
+<!-- target: field:Theme -->
+**Theme** at the top sets the stonework, the door and the windows for a look: arrow slits for a
+dungeon, rough openings for a cave, angled windows for sci-fi, tall pointed windows for gothic.
+
 ## Size the tower
 <!-- target: field:Diameter -->
 Type its **Diameter** and **Height**, your sheet's **Thickness** and how many **Storeys** lift apart.

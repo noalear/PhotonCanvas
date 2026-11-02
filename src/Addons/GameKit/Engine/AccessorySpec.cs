@@ -18,7 +18,7 @@ public enum TileTop { Rounded, Arched, Square }
 /// front rail, the top of the initiative tracker's base): wood like the furniture maker's, or one of
 /// the wall maker's textures.
 /// </summary>
-public enum Finish { None, WoodGrain, Planks, Brick, StoneBlocks, Fieldstone, Tiles, MetalPlates, Hexagons }
+public enum Finish { None, WoodGrain, Planks, Brick, StoneBlocks, Fieldstone, Tiles, MetalPlates, Hexagons, DungeonBlocks, CaveRock, SciFiPanels, Sandstone, Adobe }
 
 /// <summary>
 /// One accessory and how many to cut. Sizes are in millimetres; which settings count depends on
@@ -83,6 +83,8 @@ public sealed record AccessoryItem
 /// <summary>Everything cut from one sheet in one go: the accessories, the sheet and the finish.</summary>
 public sealed record AccessorySet
 {
+    /// <summary>The look picked to start from (<see cref="GameKitThemes"/>): it set the finish and the towers' tops, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     public List<AccessoryItem> Items { get; init; } = [Defaults.For(AccessoryKind.DiceTower)];
     /// <summary>The sheet's thickness (mm): drives every slot and tab.</summary>
     public double ThicknessMm { get; init; } = 3;
@@ -134,7 +136,8 @@ public static class Defaults
         _ => new() { Kind = k },
     };
 
-    public static readonly IReadOnlyList<string> FinishNames = ["None", "Wood grain", "Planks", "Brick", "Stone blocks", "Fieldstone", "Tiles", "Metal plates", "Hexagons"];
+    public static readonly IReadOnlyList<string> FinishNames = ["None", "Wood grain", "Planks", "Brick", "Stone blocks", "Fieldstone", "Tiles", "Metal plates", "Hexagons",
+        "Dungeon blocks", "Cave rock", "Sci-fi panels", "Sandstone", "Adobe"];
     public static readonly IReadOnlyList<string> UnitNames = ["Inches", "Centimetres", "Grid squares (1 inch = 5 ft)"];
 
     /// <summary>One unit in mm.</summary>

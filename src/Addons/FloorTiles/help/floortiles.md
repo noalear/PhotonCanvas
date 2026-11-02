@@ -4,7 +4,8 @@ An add-on (Settings → Add-ons → **Floor tile maker**): on when PhotonCanvas 
 
 **Floor tiles** makes floor tiles for tabletop games, dioramas and model buildings on a square
 grid, cut from sheet material with a texture etched on: dungeon flagstones, crazy paving, cobbles,
-floorboards, brick, tiles, metal deck plates or a texture of your own. The tiles lock together with
+floorboards, brick, tiles, metal deck plates, cave rock, sci-fi decks, grating, sand or a texture of
+your own, in the same themes as the other terrain makers. The tiles lock together with
 jigsaw edges, bowtie clips or magnets, and every square of every edge has the same joint, so any
 tile fits against any other on the grid, turned any way round. They go with the walls from
 [Textured walls](walls.md).
@@ -66,6 +67,21 @@ whichever way the room needs. **Add a tile size** adds a line; ✕ takes one off
 
 ![Loose flagstone tiles: two 2 × 2 tiles, two edge tiles and two corner tiles, with the grid scored on](images/window-floortiles-flagstones.png)
 
+## Themes
+
+**Theme**, at the top of the **Texture** tab, is a look to start from, the same as the wall maker's:
+picking one sets the texture, its sizes and how many stones are cracked, so a floor matches the
+walls, roofs, scatter and furniture made in that theme. Change anything afterwards.
+
+| Theme | Floor |
+|---|---|
+| Medieval | Flagstones |
+| Dungeon | Dungeon flagstones (cracks on 20% of the stones) |
+| Cave | Cave floor (cracks on 30%) |
+| Sci-fi | Sci-fi deck |
+| Desert | Sandstone slabs |
+| Gothic | Chequered tiles |
+
 ## Textures
 
 Pick one in **Texture**. The sizes it asks for change with it, and their defaults suit the grid
@@ -85,6 +101,12 @@ tile to the next.
 | Hexagons | 8 mm | Hexagonal tiles. |
 | Metal deck plates | 25.4 × 12.7 mm | Riveted plates, for ships and sci-fi decks. |
 | Tread plate | 4 mm | Non-slip metal plate: little bars etched in. |
+| Chequered tiles | 12.7 mm | Square tiles, every other one etched dark: halls, chapels and crypts. |
+| Cave floor | rock 18, layer 12 mm | Rough rock in uneven slabs, split by cracks and pitted, like the wall maker's cave rock. |
+| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels with cut corners, vents, bolts and hazard stripes, like the wall maker's sci-fi panels. |
+| Grating | slots 2.2 mm apart | Open grating: rows of slots etched in each square inside a solid frame, turned square by square. |
+| Sandstone slabs | length 16.9, row 8.47 mm | Long sandstone slabs with wind-worn lines and pits. |
+| Sand | ripples 3 mm apart | Sand blown into ripples, with the odd pebble: deserts, beaches and arenas. |
 | Plain | | No texture. |
 
 - **Groove**: how wide the etched gaps between stones, boards or bricks are.

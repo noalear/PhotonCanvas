@@ -2,6 +2,7 @@ using Clipper2Lib;
 using PhotonCanvas.Addon.FloorTiles;
 using PhotonCanvas.Addon.Furniture;
 using PhotonCanvas.Addon.Stairs;
+using PhotonCanvas.Addon.Terrain;
 using Roofs = PhotonCanvas.Addon.Roofs;
 using Pose = PhotonCanvas.Addon.Furniture.Pose;
 using V3 = PhotonCanvas.Addon.Furniture.V3;
@@ -126,6 +127,11 @@ public static class BuildingKitMaker
         double T = s.WallSheetMm, Wt = WallThickness(s), W = s.WidthMm, D = s.DepthMm, H = StoreyHeight(s);
         int storeys = Math.Clamp(s.Storeys, 1, 6);
         s = s with { Storeys = storeys };
+        if (s.Door == DoorStyle.Swinging && s.DoorShape is OpeningShape.Chamfered or OpeningShape.Rough)
+        {
+            findings.Add(new(Severity.Note, "A door that swings is only made for square, arched and pointed doorways: this one has a loose door instead."));
+            s = s with { Door = DoorStyle.Loose };
+        }
         if (T < 0.5) { findings.Add(new(Severity.Bad, "The wall sheet is too thin: use at least 0.5 mm.")); return new([], [], findings, H, Wt, null); }
         if (W < 30 || D < 30) { findings.Add(new(Severity.Bad, "The building is too small: make it at least 30 × 30 mm.")); return new([], [], findings, H, Wt, null); }
         if (s.ColumnMm < Wt + 3) { findings.Add(new(Severity.Bad, $"The corner columns are too thin for a {Wt:0.#} mm wall: make them at least {Wt + 3:0.#} mm across.")); return new([], [], findings, H, Wt, null); }
@@ -154,7 +160,7 @@ public static class BuildingKitMaker
                     spec = spec with
                     {
                         Door = s.Door == DoorStyle.Loose ? DoorKind.DoorwayAndDoor : DoorKind.Doorway,
-                        DoorShape = s.DoorShape, DoorWidthMm = s.DoorWidthMm, DoorHeightMm = s.DoorHeightMm,
+                        DoorShape = s.DoorShape, DoorLook = s.DoorLook, DoorWidthMm = s.DoorWidthMm, DoorHeightMm = s.DoorHeightMm,
                     };
                     frontGround = spec;
                 }
@@ -386,7 +392,7 @@ public static class BuildingKitMaker
             Columns = true, ColumnMm = s.ColumnMm, ColumnCaps = false,
             SheetMm = s.WallSheetMm, FitMm = s.FitMm,
             Floor = true, Edge = FloorEdge.Overhang, OverhangMm = Math.Max(0, s.ColumnMm / 2 - Wt / 2), Floors = floors,
-            Texture = s.Detail == WoodDetail.None ? Textures.Plain : "Wood planks (across)", SizeA = Math.Round(5 * k28, 2), SizeB = Math.Round(35 * k28, 1), GrooveMm = 0.5,
+            Texture = FloorTexture(s.Detail), SizeA = Math.Round(FloorSizes(s.Detail).A * k28, 2), SizeB = Math.Round(FloorSizes(s.Detail).B * k28, 1), GrooveMm = 0.5,
             Seed = s.Seed + 101, Etch = s.Etch,
             Hatch = s.WayUp != WayUpStyle.None, HatchAuto = true,
             Way = s.WayUp switch { WayUpStyle.Stairs => WayUp.Stairs, WayUpStyle.Spiral => WayUp.Spiral, WayUpStyle.Ladder => WayUp.Ladder, _ => WayUp.None },
@@ -508,6 +514,22 @@ public static class BuildingKitMaker
             findings.Add(new(Severity.Note, "The door is cut from the furniture's sheet, which is thicker than the walls' here."));
         return kit;
     }
+
+    /// <summary>The floors between storeys: planks, or deck plates for metal furniture, or stone for stone.</summary>
+    static string FloorTexture(WoodDetail d) => d switch
+    {
+        WoodDetail.None => Textures.Plain,
+        WoodDetail.Metal => ThemeTextures.SciFiPanels,
+        WoodDetail.Stone => "Stone blocks",
+        _ => "Wood planks (across)",
+    };
+
+    static (double A, double B) FloorSizes(WoodDetail d) => d switch
+    {
+        WoodDetail.Metal => (16, 12),
+        WoodDetail.Stone => (12, 6),
+        _ => (5, 35),
+    };
 
     static PathsD? Nil(PathsD p) => p.Count > 0 ? p : null;
     static List<PathD>? Nil(List<PathD> p) => p.Count > 0 ? p : null;

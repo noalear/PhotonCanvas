@@ -42,6 +42,26 @@ replaced wherever they are.
 | **Cut with** | As set on the cut layer | Cut settings from your material library. Their kerf goes on the cut layer, so the slots come out the width they're drawn, and the material's thickness and slot fit from your cut test are filled in. |
 | **Etch with** | As set on the etch layer | Engrave (fill) settings from your library for the texture. |
 
+## Themes
+
+**Theme**, at the top of the **Wall** tab, is a look to start from. Picking one sets the texture and
+its sizes, the door's shape and look, the windows' shape, size and bars, the frame round them, the
+accessories and the columns' shape. The size, the top, how many walls and the fit stay as they are,
+and anything can be changed afterwards. Every terrain maker has the same themes (floor tiles, roofs
+and towers, floors and stairs, ruins, bridges, scatter, furniture, the game accessories and whole
+buildings), so pieces made in one theme go together on the table.
+
+| Theme | Texture | Door | Windows | Accessories, columns |
+|---|---|---|---|---|
+| Medieval | Brick | Round arch, planks | Round arch | As set |
+| Dungeon | Dungeon blocks | Round arch, iron studs | Small and square, upright bars | Torch sconces, square columns |
+| Cave | Cave rock | A rough cave mouth | Rough holes, no frame | Torch sconces, round columns |
+| Sci-fi | Sci-fi panels | Angled corners, a metal blast door | Wide, angled corners | Wall lamps |
+| Desert | Sandstone | Square top, planks | Small and square, a wide frame | Shelf brackets, square columns |
+| Gothic | Fine stone blocks | Pointed arch, iron studs | Tall pointed arches with a cross | Torch sconces, octagonal columns |
+
+Accessories only change when some are being cut: *None* stays *None*.
+
 ## Textures
 
 Pick one in **Texture**. The sizes it asks for change with it; the defaults suit 28 mm figures.
@@ -57,6 +77,11 @@ Pick one in **Texture**. The sizes it asks for change with it; the defaults suit
 | Corrugated metal | pitch 2.5 mm | Upright ridges. |
 | Metal plates | 20 × 14 mm | Riveted plates. |
 | Hexagons | 8 mm | Hexagonal tiles or armour. |
+| Dungeon blocks | length 14, course 8 mm | Big, worn blocks with chipped corners and the odd crack. |
+| Cave rock | rock 16, layer 10 mm | Rough rock in uneven layers, split by cracks and pitted. |
+| Sci-fi panels | 16 × 12 mm | Metal panels of different widths with cut corners; some have vents, bolts, an inset edge or hazard stripes. |
+| Sandstone | length 16, course 7 mm | Long, soft-cornered blocks with wind-worn lines and pits. |
+| Adobe | patch 14, brick 3 mm | Smooth mud plaster with patches fallen away to show the bricks, and a few cracks. |
 | Plain | | No texture: just the outline, doors, windows and mounts. |
 
 - **Groove**: how wide the etched gaps between bricks, stones or planks are.
@@ -100,11 +125,12 @@ your texture is saved in the design too, so it can be opened and changed on anot
 | Setting | What it does |
 |---|---|
 | **Door** | *Doorway* cuts it through. *Closed door* etches a door on (planks, braces and a ring handle) instead. *Doorway and a door to fit it* cuts the doorway and a loose door 0.3 mm smaller all round with the door etched on: glue it open or shut, or hinge it with a strip of tape or cloth. |
-| **Door shape** | Square top, round arch or pointed (Gothic) arch. |
+| **Door shape** | Square top, round arch, pointed (Gothic) arch, angled corners (sci-fi), or rough: a ragged cave mouth, different for every **Variation**. |
+| **Door look** | What's on the door: *Planks* (braces and a ring handle), *Planks with iron studs* (iron bands and studs), *Metal blast door* (a seam down the middle, hazard chevrons and panels), *Bars (a portcullis)* or *Stone slab*. A loose door with bars has the gaps between them cut through, and is called a portcullis. |
 | **Door width**, **Door height** | Its size (mm). |
 | **Door position** | Where its middle is, in mm from the middle of the wall: less than 0 moves it left. |
 | **Windows** | How many. They're spread evenly along the wall, clear of the door and the ends. If they don't all fit, the list under the preview says how many did. |
-| **Window shape** | Square top, round arch, pointed arch, round, or an arrow slit (a narrow slit with a cross slit; type a small width, such as 2 mm). |
+| **Window shape** | Square top, round arch, pointed arch, round, an arrow slit (a narrow slit with a cross slit; type a small width, such as 2 mm), angled corners (sci-fi) or rough (cave). |
 | **Sill height** | How high the bottom of the windows is. |
 | **Bars**, **Bar width** | Material left across the window: a cross, or upright bars. Keep bars 1.5 mm or wider in plywood. |
 | **Frame** | A smooth band round each door and window, edged with a groove, where the texture stops. 0 = none. |
@@ -127,6 +153,7 @@ either side of the wall, so one slot takes whatever you want to hang there.
   banner to its end.
 - **Torch sconces**: a torch in a bracket, standing out from the wall.
 - **Shelf brackets**: a triangle that holds a little shelf.
+- **Wall lamps (sci-fi)**: a lamp housing that stands out from the wall, its lens scored on.
 
 The accessories stand out from the wall at right angles, so they're drawn side-on.
 

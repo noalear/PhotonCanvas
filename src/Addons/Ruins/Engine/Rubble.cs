@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 
 namespace PhotonCanvas.Addon.Ruins;
 
@@ -136,7 +137,7 @@ public static class Rubble
         if (stones.Count == 0) { findings.Add(new(Severity.Warn, "The bricks or stones are too small to cut loose.")); return; }
         // The same size and area: the same piece.
         var groups = stones.GroupBy(x => { var bb = Geo.Bounds(x); return (Math.Round(bb.right - bb.left, 1), Math.Round(bb.bottom - bb.top, 1), Math.Round(Geo.Area(x), 0)); }).ToList();
-        string word = Rough.Cellular(s.Texture) ? (s.Texture is "Brick" ? "brick" : s.Texture is "Tiles" ? "tile" : s.Texture is "Metal plates" ? "plate" : "stone") : "chip";
+        string word = Rough.Cellular(s.Texture) ? (s.Texture is "Brick" ? "brick" : s.Texture is "Tiles" ? "tile" : s.Texture is "Metal plates" or ThemeTextures.SciFiPanels ? "plate" : s.Texture == ThemeTextures.CaveRock ? "rock" : "stone") : "chip";
         int k = 0;
         foreach (var g in groups)
         {

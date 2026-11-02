@@ -20,6 +20,8 @@ public enum RoadSurface { Cobbles, Flagstones, Plain }
 public sealed record BridgeSpec
 {
     public BridgeKind Kind { get; init; } = BridgeKind.Plank;
+    /// <summary>The look picked to start from (<see cref="BridgeThemes"/>): it set the stone, arches, road and deck, which can be changed afterwards.</summary>
+    public string Theme { get; init; } = "Medieval";
     public int Count { get; init; } = 1;
 
     /// <summary>End to end (mm).</summary>
@@ -90,6 +92,8 @@ public sealed record BridgeSpec
     public double FitMm { get; init; } = 0.1;
     /// <summary>Wood grain scored on planks, beams and posts.</summary>
     public bool Grain { get; init; } = true;
+    /// <summary>A plank bridge as a metal gantry: grating scored on the planks and rivets along the beams and rails, instead of grain.</summary>
+    public bool Metal { get; init; }
     /// <summary>Stones, grain and rough planks are laid out at random: each number gives a different layout.</summary>
     public int Seed { get; init; } = 1;
     /// <summary>The figures it's for (mm): only used to scale the sizes when it's changed.</summary>

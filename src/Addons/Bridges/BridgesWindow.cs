@@ -63,6 +63,9 @@ public sealed class BridgesWindow : Window
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _thick = Number(0.3m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0");
     readonly CheckBox _grain = new() { Content = "Wood grain and rope twist scored on" };
+    readonly CheckBox _metal = new() { Content = "Metal deck: grating on the planks, rivets on the beams (sci-fi gantry)" };
+    readonly ComboBox _theme = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = BridgeThemes.Names.ToList(), SelectedIndex = 0 };
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _cutWith = Combo(), _etchWith = Combo();
     readonly TextBlock _cutNote = Hint();
     List<(Material M, Recipe R)?> _cuts = [], _etches = [];
@@ -210,6 +213,8 @@ public sealed class BridgesWindow : Window
         return Stack(
             Explained("Bridge", "",
                 Field("Kind", _kind), _about,
+                Field("Theme", _theme, tip: "A look to start from, the same as the wall maker's: it sets the stone, arches, parapet and road, and makes a sci-fi plank bridge a metal gantry. Change anything afterwards."),
+                _themeAbout,
                 Field("How many", _count)),
             Explained("Size", "All in mm: the length end to end, the width of the walkway or road between the sides.",
                 Field("Length", _len), Field("Width", _wid, tip: "The walkway or road between the sides (mm)."),
@@ -229,6 +234,7 @@ public sealed class BridgesWindow : Window
                 Field("Figures", _scale, tip: "Changing it scales every size to suit figures that size.")),
             Explained("Detail", "Scored and etched on the faces that show.",
                 _grain,
+                _metal,
                 Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
                     tip: "Stones, grain and rough planks are laid out at random: each number gives a different layout.")),
             Explained("Material", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
@@ -286,6 +292,8 @@ public sealed class BridgesWindow : Window
         _kind.SelectionChanged += (_, _) => KindChosen();
         foreach (var n in new[] { _thick, _fit, _seed }) n.ValueChanged += (_, _) => SheetChanged();
         _grain.IsCheckedChanged += (_, _) => SheetChanged();
+        _metal.IsCheckedChanged += (_, _) => SheetChanged();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
         _etchWith.SelectionChanged += (_, _) => SheetChanged();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _scale.SelectionChanged += (_, _) => ScaleChosen();
@@ -303,9 +311,24 @@ public sealed class BridgesWindow : Window
         // A new kind starts from its own sizes (for the figures chosen); the sheet stays if it came from the library.
         var next = Defaults.For(kind);
         if (Math.Abs(_spec.ScaleMm - 28) > 1e-9) next = Defaults.Scaled(next, _spec.ScaleMm / 28);
-        next = next with { Count = _spec.Count, Seed = _spec.Seed, Grain = _spec.Grain, ScaleMm = _spec.ScaleMm };
+        next = next with { Count = _spec.Count, Seed = _spec.Seed, ScaleMm = _spec.ScaleMm };
+        // The new kind wears the same theme.
+        next = BridgeThemes.Apply(next, _spec.Theme) with { Grain = _spec.Grain, Metal = _spec.Metal };
         if (CutRecipe is not null) next = next with { ThicknessMm = _spec.ThicknessMm, FitMm = _spec.FitMm };
         _spec = next;
+        LoadSheet();
+        LoadBridge();
+        Changed();
+    }
+
+    string ThemeName => BridgeThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, BridgeThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its stone, arches, road and deck replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = BridgeThemes.About(ThemeName);
+        if (_loading) return;
+        _spec = BridgeThemes.Apply(FromControls(), ThemeName);
         LoadSheet();
         LoadBridge();
         Changed();
@@ -327,6 +350,7 @@ public sealed class BridgesWindow : Window
         _loading = true;
         _thick.Value = D(_spec.ThicknessMm); _fit.Value = D(_spec.FitMm); _seed.Value = Math.Clamp(_spec.Seed, 1, 9999);
         _grain.IsChecked = _spec.Grain;
+        _metal.IsChecked = _spec.Metal;
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - _spec.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
         _loading = was;
@@ -341,6 +365,7 @@ public sealed class BridgesWindow : Window
         _loading = true;
         _kind.SelectedIndex = (int)kind;
         _about.Text = Defaults.Info(kind).About;
+        _theme.SelectedIndex = Math.Max(0, BridgeThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = BridgeThemes.About(s.Theme);
         _count.Value = Math.Max(1, s.Count);
         _len.Value = D(s.LengthMm); _wid.Value = D(s.WidthMm); _h.Value = D(s.HeightMm); _rise.Value = D(s.RiseMm);
         _ends.SelectedIndex = (int)s.Ends;
@@ -440,7 +465,7 @@ public sealed class BridgesWindow : Window
     void SheetChanged()
     {
         if (_loading) return;
-        _spec = _spec with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Grain = _grain.IsChecked == true };
+        _spec = _spec with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Grain = _grain.IsChecked == true, Metal = _metal.IsChecked == true };
         Changed();
     }
 

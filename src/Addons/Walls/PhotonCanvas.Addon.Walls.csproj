@@ -2,4 +2,8 @@
   <PropertyGroup>
     <AddonId>walls</AddonId>
   </PropertyGroup>
+  <ItemGroup>
+    <!-- The terrain themes and their textures, shared by every terrain maker: compiled into each, so none needs another to run. -->
+    <Compile Include="..\Shared\Terrain\*.cs" Link="Terrain\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

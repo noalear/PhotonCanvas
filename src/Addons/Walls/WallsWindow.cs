@@ -27,6 +27,10 @@ public sealed class WallsWindow : Window
     readonly CustomTextures _own;
     (Guid Id, WallSpec Spec)? _editing;
 
+    // Theme
+    readonly ComboBox _theme = Combo([.. WallThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
+
     // Wall
     readonly NumericUpDown _length = Number(10, 2000, 5, "0.#"), _height = Number(5, 1000, 1, "0.#"), _thick = Number(0.5m, 20, 0.5m, "0.##"), _walls = Number(1, 100, 1, "0");
     readonly ComboBox _measure = Combo("The panel as cut", "Column centre to centre");
@@ -56,16 +60,17 @@ public sealed class WallsWindow : Window
 
     // Doors and windows
     readonly ComboBox _door = Combo("No door", "Doorway (cut through)", "Closed door (etched)", "Doorway and a door to fit it");
-    readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch");
+    readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch", "Angled corners (sci-fi)", "Rough (cave mouth)");
+    readonly ComboBox _doorLook = Combo("Planks", "Planks with iron studs", "Metal blast door", "Bars (a portcullis)", "Stone slab");
     readonly NumericUpDown _doorW = Number(3, 500, 0.5m, "0.#"), _doorH = Number(3, 500, 0.5m, "0.#"), _doorAt = Number(-1000, 1000, 1, "0.#");
     readonly NumericUpDown _windows = Number(0, 50, 1, "0"), _winW = Number(1, 300, 0.5m, "0.#"), _winH = Number(1, 300, 0.5m, "0.#"), _sill = Number(0, 1000, 0.5m, "0.#"), _barW = Number(0.6m, 10, 0.1m, "0.#"), _frame = Number(0, 10, 0.5m, "0.#");
-    readonly ComboBox _winShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit");
+    readonly ComboBox _winShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)");
     readonly ComboBox _bars = Combo("No bars", "A cross", "Upright bars");
     Control _doorRows = null!, _winRows = null!;
 
     // Mounts
     readonly NumericUpDown _mounts = Number(0, 50, 1, "0"), _mountH = Number(1, 1000, 0.5m, "0.#"), _mountSlot = Number(2, 30, 0.5m, "0.#");
-    readonly ComboBox _acc = Combo("None", "Wall pegs (pictures, shields, banners)", "Torch sconces", "Shelf brackets", "One of each");
+    readonly ComboBox _acc = Combo("None", "Wall pegs (pictures, shields, banners)", "Torch sconces", "Shelf brackets", "One of each", "Wall lamps (sci-fi)");
 
     // Connectors
     readonly Dictionary<ConnectorKind, NumericUpDown> _counts = [];
@@ -192,6 +197,9 @@ public sealed class WallsWindow : Window
     }
 
     Control WallTab() => Stack(
+        Explained("Theme", "A look to start from: it sets the texture, the doors and windows, the accessories and the columns to match the floor tiles, roofs, scatter and furniture of the same theme. Change anything afterwards.",
+            Field("Theme", _theme),
+            _themeAbout),
         Explained("Size", "The wall panel. Thickness is your sheet's: the columns' slots and the mount points follow it.",
             Row(Small("Length", _length, tip: "How long the wall is (mm)."), Small("Height", _height, tip: "How high the wall is (mm), to the top of any battlements.")),
             Field("Length is", _measure, tip: "The panel as cut, or the distance between the centres of the columns at its ends: handy for laying walls out on a grid."),
@@ -249,6 +257,7 @@ public sealed class WallsWindow : Window
     {
         _doorRows = Stack(
             Field("Door shape", _doorShape),
+            Field("Door look", _doorLook, tip: "What's etched on the door: planks, planks with iron studs, a metal blast door, a portcullis (a loose one has its gaps cut through) or a stone slab."),
             Row(Small("Door width", _doorW), Small("Door height", _doorH)),
             Field("Door position", _doorAt, tip: "Where the door's middle is, in mm from the middle of the wall (less than 0 = to the left)."));
         _winRows = Stack(
@@ -257,7 +266,7 @@ public sealed class WallsWindow : Window
             Field("Sill height", _sill, tip: "How high the bottom of the windows is above the bottom of the wall (mm)."),
             Row(Small("Bars", _bars), Small("Bar width", _barW, tip: "How wide the bars left across the window are (mm). Very thin bars break: 1.5 mm or more in plywood.")));
         return Stack(
-            Explained("Door", "Cut through, etched on as a closed door, or cut through with a loose door to fit it (planks, braces and a ring handle etched on).",
+            Explained("Door", "Cut through, etched on as a closed door, or cut through with a loose door to fit it, with planks, iron studs, a blast door, a portcullis or a stone slab etched on.",
                 Field("Door", _door), _doorRows),
             Explained("Windows", "Spread evenly along the wall, clear of the door and the ends.",
                 Field("Windows", _windows), _winRows),
@@ -326,12 +335,26 @@ public sealed class WallsWindow : Window
         foreach (var n in new[] { _length, _height, _thick, _walls, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
             n.ValueChanged += (_, _) => Changed();
         foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
-        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _winShape, _bars, _acc, _column, _etchWith })
+        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith })
             c.SelectionChanged += (_, _) => Changed();
         foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot })
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
+    }
+
+    static readonly OpeningShape[] DoorShapes = [OpeningShape.Rectangle, OpeningShape.Arched, OpeningShape.Pointed, OpeningShape.Chamfered, OpeningShape.Rough];
+
+    string ThemeName => WallThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, WallThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its texture, openings and accessories replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = WallThemes.About(ThemeName);
+        if (_loading) return;
+        Load(WallThemes.Apply(Current(), ThemeName));
+        Changed();
     }
 
     void FillTextures(string select)
@@ -412,7 +435,9 @@ public sealed class WallsWindow : Window
         _etch.SelectedIndex = (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
         _top.SelectedIndex = (int)s.Top; _merlonW.Value = D(s.MerlonWidthMm); _crenelW.Value = D(s.CrenelWidthMm); _merlonH.Value = D(s.MerlonHeightMm);
         _walkway.IsChecked = s.Walkway; _walkDepth.Value = D(s.WalkwayDepthMm); _ruin.Value = D(Math.Round(s.RuinDepth * 100));
-        _door.SelectedIndex = (int)s.Door; _doorShape.SelectedIndex = s.DoorShape switch { OpeningShape.Rectangle => 0, OpeningShape.Pointed => 2, _ => 1 };
+        _theme.SelectedIndex = Math.Max(0, WallThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = WallThemes.About(s.Theme);
+        _door.SelectedIndex = (int)s.Door; _doorShape.SelectedIndex = Math.Max(0, Array.IndexOf(DoorShapes, s.DoorShape is OpeningShape.Round or OpeningShape.ArrowSlit ? OpeningShape.Arched : s.DoorShape));
+        _doorLook.SelectedIndex = (int)s.DoorLook;
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm); _doorAt.Value = D(s.DoorOffsetMm);
         _windows.Value = s.Windows; _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
         _bars.SelectedIndex = (int)s.Bars; _barW.Value = D(s.BarMm); _frame.Value = D(s.FrameMm);
@@ -432,12 +457,12 @@ public sealed class WallsWindow : Window
         return new WallSpec
         {
             LengthMm = V(_length, 100), Measure = (LengthMeasure)Math.Max(0, _measure.SelectedIndex), HeightMm = V(_height, 50), ThicknessMm = V(_thick, 3),
-            TwoSided = _twoSided.IsChecked == true, Walls = (int)V(_walls, 1),
+            TwoSided = _twoSided.IsChecked == true, Walls = (int)V(_walls, 1), Theme = ThemeName,
             Texture = TextureName, Custom = own, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
             Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), PlainEnds = _plainEnds.IsChecked == true,
             Top = (TopStyle)Math.Max(0, _top.SelectedIndex), MerlonWidthMm = V(_merlonW, 7), CrenelWidthMm = V(_crenelW, 5), MerlonHeightMm = V(_merlonH, 6),
             Walkway = _walkway.IsChecked == true, WalkwayDepthMm = V(_walkDepth, 10), RuinDepth = V(_ruin, 40) / 100,
-            Door = (DoorKind)Math.Max(0, _door.SelectedIndex), DoorShape = _doorShape.SelectedIndex switch { 0 => OpeningShape.Rectangle, 2 => OpeningShape.Pointed, _ => OpeningShape.Arched },
+            Door = (DoorKind)Math.Max(0, _door.SelectedIndex), DoorShape = DoorShapes[Math.Clamp(_doorShape.SelectedIndex, 0, DoorShapes.Length - 1)], DoorLook = (DoorLook)Math.Max(0, _doorLook.SelectedIndex),
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28), DoorOffsetMm = V(_doorAt, 0),
             Windows = (int)V(_windows, 0), WindowShape = (OpeningShape)Math.Max(0, _winShape.SelectedIndex), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 25),
             Bars = (WindowBars)Math.Max(0, _bars.SelectedIndex), BarMm = V(_barW, 1.5), FrameMm = V(_frame, 1.5),

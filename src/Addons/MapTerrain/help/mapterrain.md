@@ -61,8 +61,11 @@ one square round it, and **Sample dungeon** starts again from the sample.
 
 **Look** picks the textures and the doors' shape that go together: *Dungeon* (stone blocks on
 square flagstones), *Castle* (brick with battlements on stone paving), *Ruins* (rough stone broken
-away at the top, on cobbles), *Inn or house* (planks on floorboards), *Temple* (tiles on hexagons)
-or *Sci-fi* (metal plates on deck plates). Each can be changed after on the other tabs.
+away at the top, on cobbles), *Inn or house* (planks on floorboards), *Temple* (tiles on hexagons),
+*Sci-fi* (metal panels with vents and hazard stripes on deck panels), *Cave* (rough cave rock on
+uneven rock slabs), *Desert* (sandstone with battlements on sandstone slabs) or *Gothic* (stone
+blocks on a chequered floor, pointed doors). These are the same textures the wall and floor tile
+makers use in their themes. Each can be changed after on the other tabs.
 
 ## Reading a battle map
 

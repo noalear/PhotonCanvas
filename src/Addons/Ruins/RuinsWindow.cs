@@ -41,6 +41,8 @@ public sealed class RuinsWindow : Window
     Control _wallRows = null!;
 
     // Texture
+    readonly ComboBox _theme = Combo([.. RuinThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _texture = Combo();
     readonly List<string> _textureNames = [];
     readonly NumericUpDown _sizeA = Number(0.5m, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0");
@@ -231,7 +233,10 @@ public sealed class RuinsWindow : Window
         shuffle.Click += (_, _) => _seed.Value = (_seed.Value ?? 1) % 9999 + 1;
         var seedRow = Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
             tip: "Where the wall breaks, how the stones lie and how the rubble falls: each number gives a different ruin, the same number the same one. Use the walls' own number to keep their stones.");
-        return Stack(Explained("Texture", "The wall maker's textures. A wall breaks along the mortar, brick by brick, where the texture has bricks or stones; wood splinters, metal tears and plain sheet breaks in steps.",
+        return Stack(
+            Explained("Theme", "A look to start from, the same as the wall maker's: it sets the texture and the pillars' shape to match the walls of that theme. Change them afterwards if you like.",
+                Field("Theme", _theme), _themeAbout),
+            Explained("Texture", "The wall maker's textures. A wall breaks along the mortar, brick by brick, where the texture has bricks or stones; wood splinters, metal tears and plain sheet breaks in steps.",
             Field("Texture", _texture),
             _textureAbout,
             _sizeARow, _sizeBRow, _grooveRow, seedRow,
@@ -330,6 +335,7 @@ public sealed class RuinsWindow : Window
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
     }
 
     void FillTextures(string select)
@@ -401,6 +407,17 @@ public sealed class RuinsWindow : Window
     static decimal D(double v) => (decimal)v;
     static double V(NumericUpDown n, double fallback) => n.Value is { } v ? (double)v : fallback;
 
+    string ThemeName => RuinThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, RuinThemes.Names.Count - 1)];
+
+    /// <summary>A theme picked: its texture and pillars replace the ones set.</summary>
+    void ThemeChosen()
+    {
+        _themeAbout.Text = RuinThemes.About(ThemeName);
+        if (_loading) return;
+        Load(RuinThemes.Apply(Current(), ThemeName));
+        Changed();
+    }
+
     void Load(RuinSpec s)
     {
         _loading = true;
@@ -411,6 +428,7 @@ public sealed class RuinsWindow : Window
         _slotDepth.Value = D(s.SlotDepthMm); _plainEnds.IsChecked = s.PlainEnds;
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(Math.Clamp(s.GrooveMm, 0.1, 3)); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _etch.SelectedIndex = (int)s.Etch;
+        _theme.SelectedIndex = Math.Max(0, RuinThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = RuinThemes.About(s.Theme);
         _break.SelectedIndex = (int)s.Break; _breakDepth.Value = D(Math.Round(Math.Clamp(s.BreakDepth, 0.05, 0.9) * 100));
         _breaches.Value = Math.Clamp(s.Breaches, 0, 6); _breachSize.Value = D(s.BreachMm); _knocked.Value = Math.Clamp(s.KnockedOut, 0, 40); _cracks.Value = Math.Clamp(s.Cracks, 0, 10);
         _base.IsChecked = s.Base; _baseMm.Value = D(s.BaseMm); _footRubble.IsChecked = s.FootRubble; _fit.Value = D(s.FitMm);
@@ -427,7 +445,7 @@ public sealed class RuinsWindow : Window
 
     RuinSpec Current() => new()
     {
-        Wall = _makeWall.IsChecked == true,
+        Wall = _makeWall.IsChecked == true, Theme = ThemeName,
         LengthMm = V(_length, 100), HeightMm = V(_height, 50), ThicknessMm = V(_thick, 3), TwoSided = _twoSided.IsChecked == true, Walls = (int)V(_walls, 1),
         LeftEnd = (EndKind)Math.Max(0, _leftEnd.SelectedIndex), RightEnd = (EndKind)Math.Max(0, _rightEnd.SelectedIndex),
         SlotDepthMm = V(_slotDepth, 4), PlainEnds = _plainEnds.IsChecked == true,

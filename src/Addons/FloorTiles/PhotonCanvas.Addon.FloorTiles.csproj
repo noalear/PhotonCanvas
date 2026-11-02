@@ -6,4 +6,8 @@
     <!-- The wall maker's textures and geometry (addon.json "requires" it): compile against it, never copy it. -->
     <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- The terrain themes and their textures, shared by every terrain maker: compiled into each, so none needs another to run. -->
+    <Compile Include="..\Shared\Terrain\*.cs" Link="Terrain\%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

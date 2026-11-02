@@ -42,7 +42,7 @@ public static class PlankBridges
         var outline = new PathsD { line.Band(-beam, 0, 0, L) };
         var holes = new PathsD();
         var lines = new List<PathD>();
-        var grain = s.Grain;
+        var grain = s.Grain && !s.Metal;
 
         // Legs: one at each end (when the deck is above the table) and any under the middle, each braced to the beam.
         var legs = new List<(double X, double Free, bool End)>();
@@ -122,6 +122,11 @@ public static class PlankBridges
             }
         }
         if (grain) for (double o = -beam + 0.45; o < -0.2; o += 0.9) lines.Add(line.Parallel(o, 0, L, m.Rnd));
+        if (s.Metal)
+        {
+            lines.AddRange(Rivets(line, -beam / 2, 0, L));
+            if (rail) lines.AddRange(Rivets(line, railH - railT / 2, 0, L));
+        }
         foreach (var p in st) holes.Add(Planks.Notch(p, nw + f, T));
 
         double zs = W / 2 + T / 2;
@@ -164,7 +169,7 @@ public static class PlankBridges
         var outline = new PathsD();
         var holes = new PathsD();
         var lines = new List<PathD>();
-        bool grain = s.Grain;
+        bool grain = s.Grain && !s.Metal;
         // The posts, with a point on top.
         double top = Hd + (rail ? railH : 3) + 2.5;
         foreach (var (x0, x1) in new[] { (0.0, P), (L - P, L) })
@@ -232,7 +237,7 @@ public static class PlankBridges
             var (e0, e1, s0, s1) = ends[v];
             double len = W + 2 * T + e0 + e1, front = W / 2 + T + e0;
             var (outline, holes) = Planks.Shape(pw, len, k, [front - zs, front + zs], T + f, s0, s1);
-            m.Add(variants > 1 ? $"Plank {(char)('A' + v)}" : "Plank", outline, holes, poses[v], lines: m.Spec.Grain ? Planks.Grain(pw, len, m.Rnd) : null);
+            m.Add(variants > 1 ? $"Plank {(char)('A' + v)}" : "Plank", outline, holes, poses[v], lines: m.Spec.Metal ? Planks.Grating(pw, len) : m.Spec.Grain ? Planks.Grain(pw, len, m.Rnd) : null);
         }
     }
 
@@ -243,6 +248,19 @@ public static class PlankBridges
         double lean = (hi - lo) * 0.45;
         for (double x = xa; x <= xb; x += 0.9)
             lines.Add([new(x, line.Y(x) + lo - 0.2), new(x + lean, line.Y(x + lean) + hi + 0.2)]);
+        return lines;
+    }
+
+    /// <summary>Rivets along a band <paramref name="o"/> above the deck line, about 3 mm apart.</summary>
+    static List<PathD> Rivets(DeckLine line, double o, double xa, double xb)
+    {
+        var lines = new List<PathD>();
+        int n = Math.Max(1, (int)Math.Round((xb - xa - 2) / 3));
+        for (int i = 0; i <= n; i++)
+        {
+            double x = xa + 1 + (xb - xa - 2) * i / n;
+            lines.Add(Geo.Loop(Geo.Circle(x, line.Y(x) + o, 0.3)));
+        }
         return lines;
     }
 

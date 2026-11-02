@@ -45,6 +45,7 @@ public static class WallsLink
                 TwoSided = Flag("TwoSided", s.TwoSided),
                 HeightMm = Num("HeightMm", s.HeightMm),
                 Texture = texture,
+                Theme = RuinThemes.Names.Contains(Str("Theme", "")) ? Str("Theme", s.Theme) : s.Theme,
                 Custom = custom is not null && custom.Name == texture ? custom : null,
                 SizeA = Num("SizeA", s.SizeA),
                 SizeB = Num("SizeB", s.SizeB),

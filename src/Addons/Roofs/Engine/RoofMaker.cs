@@ -145,13 +145,14 @@ public static class RoofMaker
     {
         if (s.Window == GableWindow.None) return null;
         double ww = Math.Max(2, s.WindowMm);
-        double wh = s.Window switch { GableWindow.Round => ww, GableWindow.Arched => ww * 1.4, GableWindow.Square => ww * 1.2, _ => ww * 1.5 };
+        double wh = s.Window switch { GableWindow.Round => ww, GableWindow.Arched => ww * 1.4, GableWindow.Square => ww * 1.2, GableWindow.Angled => ww * 0.8, _ => ww * 1.5 };
         double bottom = Math.Max(3, h * 0.38 - wh / 2);
         var shape = s.Window switch
         {
             GableWindow.Round => OpeningShape.Round,
             GableWindow.Arched => OpeningShape.Arched,
             GableWindow.Pointed => OpeningShape.Pointed,
+            GableWindow.Angled => OpeningShape.Chamfered,
             _ => OpeningShape.Rectangle,
         };
         var win = WallKitMaker.Opening(shape, cx - ww / 2, bottom, ww, wh);

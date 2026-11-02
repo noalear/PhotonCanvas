@@ -40,6 +40,8 @@ public sealed class FloorTilesWindow : Window
     List<(Material M, Recipe R)?> _cuts = [], _etches = [];
 
     // Texture
+    readonly ComboBox _theme = Combo([.. FloorThemes.Names]);
+    readonly TextBlock _themeAbout = Hint();
     readonly ComboBox _texture = Combo();
     readonly List<string> _textureNames = [];
     readonly NumericUpDown _sizeA = Number(0, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0"), _cracks = Number(0, 100, 5, "0");
@@ -207,6 +209,9 @@ public sealed class FloorTilesWindow : Window
             tip: "Stones and boards are laid out at random, differently on every tile: each number gives a different set.");
         _cracksRow = Field("Cracks %", _cracks, tip: "How many of the stones have a crack scored across them.");
         return Stack(
+            Explained("Theme", "A look to start from, the same as the wall maker's, so floors match the walls, roofs and scatter of that theme. It picks the texture below; change it afterwards if you like.",
+                Field("Theme", _theme),
+                _themeAbout),
             Explained("Texture", "Etched on the face of every tile. Your own textures, made in the wall maker (Walls → Texture), are listed after the presets.",
                 Field("Texture", _texture),
                 _textureAbout,
@@ -327,6 +332,17 @@ public sealed class FloorTilesWindow : Window
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
+        _theme.SelectionChanged += (_, _) => ThemeChosen();
+    }
+
+    string ThemeName => FloorThemes.Names[Math.Clamp(_theme.SelectedIndex, 0, FloorThemes.Names.Count - 1)];
+
+    void ThemeChosen()
+    {
+        _themeAbout.Text = FloorThemes.About(ThemeName);
+        if (_loading) return;
+        Load(FloorThemes.Apply(Current(), ThemeName));
+        Changed();
     }
 
     void FillTextures(string select)
@@ -420,6 +436,7 @@ public sealed class FloorTilesWindow : Window
         foreach (var t in s.Tiles) AddSizeRow(t);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(Math.Max(0.5, s.SizeB)); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999); _cracks.Value = D(s.CracksPct);
         _etch.SelectedIndex = (int)s.Etch; _grid.SelectedIndex = (int)s.Grid;
+        _theme.SelectedIndex = Math.Max(0, FloorThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = FloorThemes.About(s.Theme);
         _join.SelectedIndex = (int)s.Join; _tab.Value = D(s.TabMm); _fit.Value = D(s.FitMm); _magnet.Value = D(s.MagnetMm); _base.IsChecked = s.BaseLayer;
         _loading = false;
         FillTextures(s.Texture);
@@ -432,7 +449,7 @@ public sealed class FloorTilesWindow : Window
         SquareMm = V(_square, 25.4), ThicknessMm = V(_thick, 3), Mode = (TileMode)Math.Max(0, _mode.SelectedIndex),
         BoardAcross = V(_boardA, 6), BoardDown = V(_boardD, 6), TileAcross = (int)V(_tileA, 2), TileDown = (int)V(_tileD, 2), PlainBorder = _border.IsChecked == true,
         Tiles = [.. _sizeRows.Select(r => r.Value)],
-        Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 50), SizeB = V(_sizeB, 0), GrooveMm = V(_groove, 0.8), Seed = (int)V(_seed, 1), CracksPct = V(_cracks, 15),
+        Theme = ThemeName, Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 50), SizeB = V(_sizeB, 0), GrooveMm = V(_groove, 0.8), Seed = (int)V(_seed, 1), CracksPct = V(_cracks, 15),
         Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), Grid = (GridMarks)Math.Max(0, _grid.SelectedIndex),
         Join = (TileJoin)Math.Max(0, _join.SelectedIndex), TabMm = V(_tab, 5), FitMm = V(_fit, 0.15), MagnetMm = V(_magnet, 5), BaseLayer = _base.IsChecked == true,
     };
