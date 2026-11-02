@@ -1,7 +1,7 @@
 # Make several sizes
 <!-- category: Drawing -->
 <!-- summary: Copy a design in several widths at once, side by side, each in proportion. -->
-<!-- page: drawing.md#sizes -->
+<!-- page: generators.md#sizes -->
 <!-- order: 68 -->
 Make copies of a design in several sizes at once, each in proportion: for example a sign or
 ornament in small, medium and large.

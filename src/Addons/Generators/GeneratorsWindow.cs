@@ -5,9 +5,11 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
 using PhotonCanvas.Doc.Materials;
+using PhotonCanvas.App;
 using static PhotonCanvas.App.UiKit;
 
-namespace PhotonCanvas.App;
+// Not ...Addon.Generators: inside that namespace "Generators" would mean it, not the Doc class that draws the projects.
+namespace PhotonCanvas.Addon.ReadyMade;
 
 /// <summary>Make a finger-jointed box, a keychain or tag, a living hinge, earrings, or the selection in several sizes.</summary>
 public sealed class GeneratorsWindow : Window

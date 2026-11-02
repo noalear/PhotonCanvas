@@ -1,0 +1,10 @@
+{
+  "id": "generators",
+  "name": "Generators",
+  "version": "1.0.0",
+  "description": "Ready-to-cut projects: finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
