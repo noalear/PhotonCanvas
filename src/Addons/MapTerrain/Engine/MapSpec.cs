@@ -95,7 +95,10 @@ public sealed record MapSpec
         new("Ruins", "Fieldstone", "Cobblestones", TopStyle.Ruined, OpeningShape.Arched, "Rough stone walls broken away at the top, on cobbles."),
         new("Inn or house", "Wood planks (upright)", "Floorboards", TopStyle.Straight, OpeningShape.Rectangle, "Plank walls on floorboards, square-topped doors."),
         new("Temple", "Tiles", "Hexagons", TopStyle.Straight, OpeningShape.Pointed, "Tiled walls on hexagon tiles, pointed doors."),
-        new("Sci-fi", "Metal plates", "Metal deck plates", TopStyle.Straight, OpeningShape.Rectangle, "Riveted metal walls on deck plates, square doors."),
+        new("Sci-fi", "Sci-fi panels", "Sci-fi deck", TopStyle.Straight, OpeningShape.Rectangle, "Metal wall panels with vents and hazard stripes on deck panels, square doors."),
+        new("Cave", "Cave rock", "Cave floor", TopStyle.Straight, OpeningShape.Arched, "Rough cave rock on uneven rock slabs, arched openings."),
+        new("Desert", "Sandstone", "Sandstone slabs", TopStyle.Battlements, OpeningShape.Rectangle, "Sandstone walls with battlements on long sandstone slabs, square doors."),
+        new("Gothic", "Stone blocks", "Chequered tiles", TopStyle.Straight, OpeningShape.Pointed, "Cut stone walls on a chequered floor, pointed doors."),
     ];
 
     /// <summary>The same settings with a theme's textures, top and doors.</summary>
