@@ -1,0 +1,38 @@
+# Make a whole cottage
+<!-- category: Drawing -->
+<!-- summary: Pick a cottage, tavern or watchtower and get every wall, column, floor, door and piece of furniture at once, ready to cut and slot together. -->
+<!-- page: buildings.md -->
+<!-- order: 77 -->
+One window makes every piece of a building: textured walls, the columns they slide into, the
+floors, the door and the furniture for every room.
+
+## Open the building maker
+<!-- target: ribbon:Home/Buildings -->
+<!-- wait: window:Whole buildings -->
+Click **Buildings** on the **Home** tab.
+
+## Pick a building
+<!-- target: field:Building -->
+Pick a **Cottage**, **Tavern** or **Watchtower** under **Building**, and the size of your figures
+under **Figures**. Change its size, storeys, door and windows underneath.
+
+## Set the wall sheet and texture
+<!-- target: tabitem:Walls -->
+On the **Walls** tab, pick your material in **Cut with** (or type the sheet's **Thickness**), then
+the texture for the ground floor and the storeys above.
+
+## Furnish the rooms
+<!-- target: tabitem:Furniture -->
+The **Furniture** tab lists what's in each room. Pick one to change how many and its size, or add
+more under the list.
+
+## Look inside
+<!-- target: field:Show -->
+Pick **With the front cut away** under **Show** to see the rooms and the furniture standing in
+them. Drag the building to turn it round.
+
+## Put it in the design
+<!-- target: button:Put in the design -->
+Press **Put in the design**. The walls' pieces go on their own pages, nested onto the bed, and the
+furniture's on pages of their own. Cut a column and the end of a wall first and change **Slot fit**
+if the wall is too tight or too loose in the slot.
