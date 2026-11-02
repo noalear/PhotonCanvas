@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     readonly Docking _docking;
     readonly MachineHud _hud;
     readonly Ribbon _ribbon = new();
+    readonly Updater _updater;
     CloseUpView? _closeUp;
 
     /// <summary>The close-up camera on the work area: open or close it.</summary>
@@ -72,6 +73,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Canvas.Doc = _doc;
+        _updater = new Updater(_settings, this, () => _addons);
+        _updater.ShowIn(UpdateChip);
         _layers = new LayersPanel(_doc);
         _layers.ShapeHovered += id => Canvas.HighlightShape = id;
         _layers.ShapeActions = ShapeActions;
@@ -175,8 +178,8 @@ public partial class MainWindow : Window
             else if (ConnectOnOpen && !recovered) await ReopenLast();
             _autosave.Tick += (_, _) => Autosave();
             if (ConnectOnOpen) _autosave.Start();
-            // A newer version published? (Quiet when offline; off in Settings → Updates.)
-            if (ConnectOnOpen) _ = Guard(() => UpdateNotice.CheckAtStart(this, _settings));
+            // A newer version published? (Quiet when offline; Settings → Updates.)
+            if (ConnectOnOpen) _updater.Begin();
         };
         Closing += OnClosing;
         UpdateChrome();
@@ -744,7 +747,7 @@ public partial class MainWindow : Window
                 new("Safety and disclaimer", "Please read before running jobs.", ShowSafety),
                 new($"About {AppIdentity.ProductName}", "Version, licence, credits.", ShowAbout),
             ]),
-        ], [("Machines", machines), ("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); })), ("Updates", UpdateNotice.Panel(_settings, () => this))]);
+        ], [("Machines", machines), ("Equipment", equipment), ("Appearance", new AppearancePanel(_settings, () => { _props.Refresh(); Canvas.InvalidateVisual(); })), ("Updates", _updater.Panel())]);
         await w.ShowDialog(this);
         _ribbon.Refresh();
     }
@@ -2268,6 +2271,7 @@ public partial class MainWindow : Window
         {
             if (ConnectOnOpen) RememberOpen();
             ClearAutosave();
+            _updater.End();
             _addons?.StopAll();
             _machine.Shutdown();
             return;
@@ -2278,6 +2282,7 @@ public partial class MainWindow : Window
             _closeConfirmed = true;
             Dispatcher.UIThread.Post(Close);
         }
+        else Updater.StartAfterClose = null; // Restart now was called off
     }
 
     async Task ShowShortcuts()

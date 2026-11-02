@@ -93,7 +93,8 @@ warranty. Help → **Safety and disclaimer** shows both again.
 2. It looks for the machine and connects by itself.
 3. Unless you brought back unsaved work, it reopens the design that was open when you last
    closed it, at the same view.
-4. If **Check for a new version at start** is on, it asks whether a newer version is out.
+4. If **Check for a new version at start** is on, it asks whether a newer version is out, and
+   downloads it in the background (see [Updates](machine.md#updates)).
 
 ## Connecting to the machine
 

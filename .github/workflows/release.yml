@@ -1,0 +1,108 @@
+# Publishes a new version of PhotonCanvas every time master changes, as a GitHub release that the
+# program finds, downloads and puts in by itself (Settings → Updates; src/PhotonCanvas.App/Updater.cs).
+#
+#   Version   <major.minor from Directory.Build.props>.<this workflow's run number>, e.g. 0.1.42.
+#   Builds    win-x64 on every push. Run it by hand (Actions → Release → Run workflow) for others,
+#             e.g. "win-x64 osx-arm64 linux-x64".
+#   Where     this repository's releases. To publish somewhere else (say a public, releases-only
+#             repository), set the RELEASES_REPO variable to "owner/name" and the RELEASES_TOKEN
+#             secret to a token that can write releases there. Copies built from then on update
+#             from there (it's written into their update.json).
+#   Checked   the tests run first; a failing test means no release.
+#   Safe      every download is listed in SHA256SUMS, and the program refuses a file that doesn't match.
+name: Release
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'README.md'
+      - 'docs/*.md'
+      - 'requirements.txt'
+      - 'tools/RemoteProbe/**'
+      - 'src/PhotonCanvas.Remote.Android/**'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: 'Builds to make (win-x64 win-arm64 osx-arm64 osx-x64 linux-x64 linux-arm64)'
+        default: 'win-x64'
+        required: false
+      skip_tests:
+        description: 'Skip the tests'
+        type: boolean
+        default: false
+
+# A newer push replaces a build that hasn't finished: only the latest master is worth publishing.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test
+        if: ${{ !inputs.skip_tests }}
+        run: dotnet test tests/PhotonCanvas.Tests -c Release -nologo
+
+      - name: Version
+        id: v
+        run: |
+          base=$(sed -n 's|.*<Version>\([0-9]*\.[0-9]*\)\.[0-9]*</Version>.*|\1|p' Directory.Build.props)
+          echo "version=${base:-0.1}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+          RELEASE_REPO: ${{ vars.RELEASES_REPO || github.repository }}
+        run: tools/publish.sh ${{ inputs.platforms || 'win-x64' }}
+
+      - name: Checksums
+        working-directory: dist
+        run: |
+          shopt -s nullglob
+          files=(PhotonCanvas-*.zip PhotonCanvas-*.tar.gz)
+          [ ${#files[@]} -gt 0 ] || { echo "Nothing was built."; exit 1; }
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
+          VERSION: ${{ steps.v.outputs.version }}
+          REPO: ${{ vars.RELEASES_REPO || github.repository }}
+        run: |
+          last=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
+          {
+            echo "What's new in $VERSION:"
+            echo
+            git log --no-merges --format='- %s' ${last:+"$last..HEAD"} | head -60
+            echo
+            echo "PhotonCanvas downloads this version by itself and puts it in when you close it (Settings → Updates). To install it by hand, unpack the file for your computer in place of the old one: your designs, settings and material library are kept in your PhotonCanvas folder, not with the program."
+            echo
+            echo "PhotonCanvas is free to use, for personal or commercial work; all rights reserved. It may not be sold, redistributed or published in a modified form without written permission. The full terms are in the LICENSE file that comes with it."
+          } > notes.md
+          shopt -s nullglob
+          files=(dist/PhotonCanvas-*.zip dist/PhotonCanvas-*.tar.gz dist/SHA256SUMS)
+          if [ "$REPO" = "$GITHUB_REPOSITORY" ]; then
+            gh release create "v$VERSION" "${files[@]}" --repo "$REPO" --target "$GITHUB_SHA" \
+              --title "PhotonCanvas $VERSION" --notes-file notes.md --latest
+          else
+            git tag "v$VERSION" "$GITHUB_SHA"
+            git push origin "v$VERSION"
+            gh release create "v$VERSION" "${files[@]}" --repo "$REPO" \
+              --title "PhotonCanvas $VERSION" --notes-file notes.md --latest
+          fi
+          echo "Released $VERSION: https://github.com/$REPO/releases/tag/v$VERSION" >> "$GITHUB_STEP_SUMMARY"

@@ -201,9 +201,10 @@ public sealed class AddonManager
 
     /// <summary>
     /// Install (or update) from a .pcaddon file or a folder holding addon.json, and turn it on.
+    /// With <paramref name="keepOnOff"/> (an update), one that was off stays off and the person's choice is kept.
     /// Returns the add-on, or throws with a message for the person.
     /// </summary>
-    public AddonEntry Install(string path)
+    public AddonEntry Install(string path, bool keepOnOff = false)
     {
         string temp = Path.Combine(Path.GetTempPath(), "pcaddon-" + Guid.NewGuid().ToString("N"));
         try
@@ -219,13 +220,15 @@ public sealed class AddonManager
                       ?? throw new InvalidOperationException("That file has no addon.json in it, so it isn't a PhotonCanvas add-on.");
             }
             var m = AddonManifest.Read(source, builtIn: false);
+            bool wasOn = Find(m.Id) is not { } before || before.IsOn;
             if (Find(m.Id) is { IsOn: true } running) Stop(running, remember: false);
             var dest = Path.Combine(UserFolder, m.Id);
             if (Directory.Exists(dest)) Directory.Delete(dest, recursive: true);
             CopyFolder(source, dest);
             Scan();
             var e = Find(m.Id)!;
-            Start(e, remember: true);
+            if (!keepOnOff) Start(e, remember: true);
+            else if (wasOn) Start(e, remember: false);
             Changed?.Invoke();
             return e;
         }

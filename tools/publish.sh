@@ -8,12 +8,16 @@
 # Output: dist/<platform>/ (a PhotonCanvas.app bundle on macOS), plus dist/PhotonCanvas-<platform>.zip on
 # Windows and .tar.gz on macOS and Linux (which keeps the program's run permission).
 # VERSION=1.2.0 tools/publish.sh sets the version shown in the Mac bundle.
+# RELEASE_REPO=owner/name (default noalear/PhotonCanvas): the GitHub repository whose releases the
+# published copy updates itself from (written to update.json beside the program, with
+# update-files.txt listing the files it's made of; see src/PhotonCanvas.Core/UpdateInstall.cs).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ALL=(win-x64 win-arm64 osx-arm64 osx-x64 linux-x64 linux-arm64)
 TARGETS=("${@:-${ALL[@]}}")
 VERSION=${VERSION:-0.1.0}
+RELEASE_REPO=${RELEASE_REPO:-noalear/PhotonCanvas}
 # Built on Windows, files don't carry Unix run permission: the archives set it instead.
 case "${OSTYPE:-}" in msys*|cygwin*) ON_WINDOWS=1 ;; *) ON_WINDOWS=0 ;; esac
 pack_tar() { # folder to pack, archive
@@ -23,6 +27,9 @@ pack_tar() { # folder to pack, archive
 pack_zip() { # folder to pack, archive
   if command -v zip >/dev/null; then local dest; dest="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; (cd "$(dirname "$1")" && zip -qry "$dest" "$(basename "$1")")
   else powershell -NoProfile -Command "Compress-Archive -Force -Path '$(cygpath -w "$1")' -DestinationPath '$(cygpath -w "$2")'"; fi
+}
+write_list() { # the version's folder, where the program is in it (. or Contents/MacOS): every file, so the next update knows what to replace or drop
+  (cd "$1" && { find . -type f ! -name update-files.txt | LC_ALL=C sort; echo "./$2/update-files.txt"; } | sed 's|^\./\./|./|') > "$1/$2/update-files.txt"
 }
 
 for rid in "${TARGETS[@]}"; do
@@ -39,6 +46,8 @@ for rid in "${TARGETS[@]}"; do
     [ -f "$proj" ] || continue
     dotnet build "$proj" -c Release -p:Version="$VERSION" -p:AppOutDir="$PWD/$out/bin/" -nologo -v q
   done
+  # Where this copy gets new versions from, and which build it is.
+  printf '{\n  "repo": "%s",\n  "platform": "%s",\n  "version": "%s"\n}\n' "$RELEASE_REPO" "$rid" "$VERSION" > "$out/bin/update.json"
 
   case "$rid" in
     osx-*)
@@ -74,6 +83,7 @@ for rid in "${TARGETS[@]}"; do
 </plist>
 PLIST
       chmod +x "$app/Contents/MacOS/PhotonCanvas" "$app/Contents/MacOS/server/PhotonCanvas.Server"
+      write_list "$app" Contents/MacOS
       # Not signed: on first open, right-click → Open (or System Settings → Privacy & Security → Open anyway).
       pack_tar "$app" "dist/PhotonCanvas-$rid.tar.gz"
       ;;
@@ -90,10 +100,12 @@ Terminal=false
 Categories=Graphics;Engineering;
 MimeType=application/x-photoncanvas;
 DESKTOP
+      write_list "$out/PhotonCanvas" .
       pack_tar "$out/PhotonCanvas" "dist/PhotonCanvas-$rid.tar.gz"
       ;;
     win-*)
       mv "$out/bin" "$out/PhotonCanvas"
+      write_list "$out/PhotonCanvas" .
       pack_zip "$out/PhotonCanvas" "dist/PhotonCanvas-$rid.zip"
       ;;
   esac

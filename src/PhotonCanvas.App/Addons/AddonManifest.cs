@@ -26,6 +26,8 @@ public sealed record AddonManifest
     public string[] Requires { get; init; } = [];
     /// <summary>On when first installed (true), or waits for the person to turn it on.</summary>
     public bool OnByDefault { get; init; } = true;
+    /// <summary>The GitHub repository ("owner/name") whose latest release holds this add-on's newest .pcaddon (optional): installed add-ons that name one are kept up to date.</summary>
+    public string? Updates { get; init; }
 
     /// <summary>Set by the program: the folder it was found in.</summary>
     [JsonIgnore] public string Folder { get; init; } = "";
