@@ -1,0 +1,10 @@
+{
+  "id": "stairs",
+  "name": "Stairs, ladders and floors",
+  "version": "1.0.0",
+  "description": "Upper-floor plates that sit on the wall maker's walls, with a stairwell or hatch, and stairs (open, solid or spiral) or a ladder that reach them.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls"],
+  "onByDefault": true
+}
