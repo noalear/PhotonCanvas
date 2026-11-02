@@ -1,0 +1,10 @@
+{
+  "id": "walls",
+  "name": "Textured wall maker",
+  "version": "1.0.0",
+  "description": "Wall panels for tabletop games and models with brick, stone, wood or your own texture etched on the face, doors, windows, battlements and mount points, and slotted columns to join them.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
