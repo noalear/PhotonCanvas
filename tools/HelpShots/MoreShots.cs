@@ -211,6 +211,9 @@ static class MoreShots
                 if (sliced is not null)
                 {
                     Slice(sliced);
+                    // A slicing started by the window itself may still be going: wait for the summary.
+                    for (int i = 0; i < 1200 && F<TextBlock>(sliced, "_summary").Text is null or "Slicing…"; i++) settle(50);
+                    settle(1500);
                     Console.WriteLine($"Topo slices: {F<TextBlock>(sliced, "_summary").Text}");
                     AddonShot(sliced.CaptureRenderedFrame(), "Topo", "window-topo-slices");
                     sliced.Close();
