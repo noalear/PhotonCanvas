@@ -1,0 +1,10 @@
+{
+  "id": "puzzlebox",
+  "name": "Puzzle box maker",
+  "version": "1.0.0",
+  "description": "Boxes glued up from layers of sheet with secrets: sliding-panel tops hooked together underneath that only come out in the right order, and drawers hidden in the bottom layers that only open once a button inside is slid. Each box is played through to check it opens, and not before it should.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

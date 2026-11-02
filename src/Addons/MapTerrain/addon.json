@@ -1,0 +1,10 @@
+{
+  "id": "mapterrain",
+  "name": "Map to terrain",
+  "version": "1.0.0",
+  "description": "Draw a floor plan on a grid or read a battle map picture, and get every textured wall, column, door and floor tile for it, ready to cut and stand up on the table.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls", "floortiles", "furniture", "buildings"],
+  "onByDefault": true
+}
