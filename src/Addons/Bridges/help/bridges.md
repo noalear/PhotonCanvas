@@ -22,7 +22,7 @@ so it stands up square on its own; a drop of glue keeps it that way.
 Click **Bridges** on the **Home** tab (in the **Draw** group). The **Miniature bridges** window
 opens. On the left, the **Bridge** tab has the kind of bridge, its size and its style; the **Sheet**
 tab has the sheet it's cut from. On the right, **Put together** shows the bridge in 3D (drag it to
-turn it round) and **Pieces** shows its pieces flat, one of each, with how many of each there are.
+turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its pieces flat, one of each, with how many of each there are.
 Under them are the number of pieces and notes: how it goes together, a red ✕ that has to be fixed
 before the bridge can go in, a yellow ! worth a look.
 

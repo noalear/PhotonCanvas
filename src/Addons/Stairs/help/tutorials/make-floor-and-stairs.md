@@ -33,7 +33,7 @@ the floor's top; the opening is sized to fit them.
 
 ## Look at it put together
 <!-- target: tabitem:Put together -->
-The picture shows the floor and stairs in the room. Drag to turn it, and tick **Lift the floor off**
+The picture shows the floor and stairs in the room. Drag to turn it, scroll to zoom in (press **F** to see it all again), and tick **Lift the floor off**
 to see the stairs under it.
 
 ## Put it in the design

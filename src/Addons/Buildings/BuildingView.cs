@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using Clipper2Lib;
 using PhotonCanvas.Addon.Furniture;
@@ -15,17 +14,13 @@ public enum ViewMode { Whole, CutAway, Storey }
 
 /// <summary>
 /// The building put together, drawn in 3D from above and to one side: every piece at its thickness where
-/// it sits, the etched faces showing their texture. Drag to turn it round. It can cut the front and
+/// it sits, the etched faces showing their texture. Drag to turn it round, scroll to zoom, middle-drag or the
+/// arrow keys to move it. It can cut the front and
 /// right-hand walls (and the roof) away to show the rooms, or show one storey on its own.
 /// </summary>
-public sealed class BuildingView : Control
+public sealed class BuildingView : Model3DView
 {
-    readonly Scene3D _scene = new();
-    readonly Model3DPainter _painter = new();
     BuildingKit? _kit;
-    double _yaw = 32, _pitch = 26;
-    Point? _drag;
-    string? _message;
 
     public ViewMode Mode { get; private set; } = ViewMode.Whole;
     public int Storey { get; private set; }
@@ -40,17 +35,13 @@ public sealed class BuildingView : Control
 
     static readonly SlabStyle Wood = LookOf(Color.FromRgb(0xDD, 0xBE, 0x92)), Stone = LookOf(Color.FromRgb(0xD2, 0xC6, 0xB4));
 
-    public BuildingView()
-    {
-        ClipToBounds = true;
-        Cursor = new Cursor(StandardCursorType.SizeAll);
-    }
+    public BuildingView() : base(32, 26) { }
 
     /// <summary>Shows a building (or, with none, a message saying why there's nothing to show).</summary>
     public void Show(BuildingKit? kit, string? message = null)
     {
         _kit = kit;
-        _message = message;
+        Message = message;
         Build();
     }
 
@@ -71,7 +62,7 @@ public sealed class BuildingView : Control
 
     void Build()
     {
-        _scene.Clear();
+        Scene.Clear();
         if (_kit is { } kit)
         {
             var shown = kit.Solids.Where(Shown).ToList();
@@ -100,53 +91,6 @@ public sealed class BuildingView : Control
         bool wood = s.IsFurniture || s.Side is WallSide.Floor or WallSide.Roof;
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         var frame = new Frame3(new(p.O.X, p.O.Y, p.O.Z), new(p.U.X, p.U.Y, p.U.Z), new(p.V.X, p.V.Y, p.V.Z));
-        _scene.AddSlab(outline, frame, -T / 2, T / 2, wood ? Wood : Stone, s.Etched, s.Lines, faces: faces, sides: sides);
-    }
-
-    public override void Render(DrawingContext ctx)
-    {
-        if (!_painter.Draw(ctx, this, _scene, Camera3D.YUp(_yaw, _pitch), UiKit.Brush("Bg2"), draft: _drag is not null))
-        {
-            if (_message is { } m) Message(ctx, Bounds, m);
-            return;
-        }
-        var hint = new FormattedText("Drag to turn it round", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
-        ctx.DrawText(hint, new Point(10, Bounds.Height - hint.Height - 6));
-    }
-
-    internal static void Message(DrawingContext ctx, Rect bounds, string text)
-    {
-        var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 13, UiKit.Brush("TextMuted"))
-        {
-            MaxTextWidth = Math.Max(50, bounds.Width - 40),
-            TextAlignment = TextAlignment.Center,
-        };
-        ctx.DrawText(ft, new Point((bounds.Width - ft.Width) / 2, (bounds.Height - ft.Height) / 2));
-    }
-
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
-    {
-        base.OnPointerPressed(e);
-        _drag = e.GetPosition(this);
-        e.Pointer.Capture(this);
-    }
-
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        base.OnPointerMoved(e);
-        if (_drag is not { } from) return;
-        var at = e.GetPosition(this);
-        _yaw = (_yaw - (at.X - from.X) * 0.5) % 360;
-        _pitch = Math.Clamp(_pitch + (at.Y - from.Y) * 0.4, -15, 85);
-        _drag = at;
-        InvalidateVisual();
-    }
-
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
-    {
-        base.OnPointerReleased(e);
-        _drag = null;
-        e.Pointer.Capture(null);
-        InvalidateVisual();
+        Scene.AddSlab(outline, frame, -T / 2, T / 2, wood ? Wood : Stone, s.Etched, s.Lines, faces: faces, sides: sides);
     }
 }

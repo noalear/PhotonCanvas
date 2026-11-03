@@ -18,8 +18,14 @@ namespace PhotonCanvas.App.View3D;
 /// </summary>
 public sealed class Model3DPainter
 {
-    /// <summary>Room left round the model when it's fitted into the view (left + right, top + bottom).</summary>
-    const double MarginX = 30, MarginY = 40;
+    /// <summary>
+    /// Room left round the model when it's fitted into the view (each side, top, bottom): more at the bottom,
+    /// where the view writes how to use it and has its buttons.
+    /// </summary>
+    const double MarginSide = 15, MarginTop = 14, MarginBottom = 40;
+
+    /// <summary>Where the middle of the model goes in a view this big: the middle of the room the margins leave.</summary>
+    public static Point Middle(Size size) => new(size.Width / 2, (MarginTop + size.Height - MarginBottom) / 2);
 
     // The screen at several samples per pixel: depth (bigger = nearer) and which face is nearest, for the solid
     // faces and, separately, for the ghosts in front of them; the colours; the ghosts' edges.
@@ -46,6 +52,12 @@ public sealed class Model3DPainter
     /// <summary>How big the model was last drawn: screen units per mm.</summary>
     public double PxPerMm { get; private set; }
 
+    /// <summary>How the model was last drawn: how big and what was in the middle of the view.</summary>
+    public Framing Shown { get; private set; }
+
+    /// <summary>How the whole model just fits the view, seen the way it was last drawn.</summary>
+    public Framing Fitted { get; private set; }
+
     /// <summary>Where a point of the model was in the view, the last time it was drawn (screen units).</summary>
     public Point ToView(Vec3 p) => new((_ox + p.Dot(_r) * _ks) / _sampleScale, (_oy - p.Dot(_u) * _ks) / _sampleScale);
 
@@ -53,9 +65,10 @@ public sealed class Model3DPainter
     /// Draws <paramref name="scene"/> into <paramref name="view"/>'s bounds, filling them with
     /// <paramref name="background"/> first. Groups whose bit is set in <paramref name="hiddenGroups"/> are left out
     /// (but the model is still fitted as a whole). <paramref name="draft"/> draws quicker and rougher (while turning
-    /// it). Returns false (having drawn only the background) when there's nothing to draw.
+    /// it). <paramref name="framing"/> says how big to draw it and what to put in the middle of the view; without it,
+    /// the whole model is fitted into the view. Returns false (having drawn only the background) when there's nothing to draw.
     /// </summary>
-    public bool Draw(DrawingContext ctx, Visual view, Scene3D scene, Camera3D camera, IBrush background, ulong hiddenGroups = 0, bool draft = false)
+    public bool Draw(DrawingContext ctx, Visual view, Scene3D scene, Camera3D camera, IBrush background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null)
     {
         var size = view.Bounds.Size;
         ctx.FillRectangle(background, new Rect(size));
@@ -64,20 +77,23 @@ public sealed class Model3DPainter
         double scaling = TopLevel.GetTopLevel(view)?.RenderScaling ?? 1;
         if (!(scaling > 0)) scaling = 1;
         int w = Math.Max(1, (int)Math.Ceiling(size.Width * scaling)), h = Math.Max(1, (int)Math.Ceiling(size.Height * scaling));
-        var key = (scene, scene.Version, camera, w, h, scaling, hiddenGroups, draft, bgColour);
+        var key = (scene, scene.Version, camera, w, h, scaling, hiddenGroups, draft, bgColour, framing);
         if (!key.Equals(_last) || _bitmap is null)
         {
-            if (!Paint(scene, camera, size, scaling, w, h, bgColour, hiddenGroups, draft)) { _last = null; return false; }
-            if (_bitmap is null || _bitmap.PixelSize.Width != w || _bitmap.PixelSize.Height != h || Math.Abs(_bitmap.Dpi.X - 96 * scaling) > 1e-6)
+            if (!Paint(scene, camera, size, scaling, w, h, bgColour, hiddenGroups, draft, framing)) { _last = null; return false; }
+            // At 96 dpi, so its size is the same in pixels and in screen units: drawing a bitmap takes the part of it
+            // to draw in pixels, so at any other dpi (a screen scaled to 175 %, say) only its top-left corner was drawn,
+            // stretched over the view.
+            if (_bitmap is null || _bitmap.PixelSize.Width != w || _bitmap.PixelSize.Height != h)
             {
                 _bitmap?.Dispose();
-                _bitmap = new WriteableBitmap(new PixelSize(w, h), new Vector(96 * scaling, 96 * scaling), PixelFormat.Bgra8888, AlphaFormat.Premul);
+                _bitmap = new WriteableBitmap(new PixelSize(w, h), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Premul);
             }
             using (var fb = _bitmap.Lock())
                 for (int y = 0; y < h; y++) System.Runtime.InteropServices.Marshal.Copy(_px, y * w, fb.Address + y * fb.RowBytes, w);
             _last = key;
         }
-        ctx.DrawImage(_bitmap!, new Rect(size));
+        ctx.DrawImage(_bitmap!, new Rect(0, 0, w, h), new Rect(size));
         return true;
     }
 
@@ -85,30 +101,34 @@ public sealed class Model3DPainter
     /// The picture <see cref="Draw"/> would draw in a view <paramref name="width"/> × <paramref name="height"/> pixels
     /// (at 1:1), as 0xAARRGGBB, row by row; null when there's nothing to draw.
     /// </summary>
-    public uint[]? Picture(Scene3D scene, Camera3D camera, int width, int height, Color background, ulong hiddenGroups = 0, bool draft = false)
+    public uint[]? Picture(Scene3D scene, Camera3D camera, int width, int height, Color background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null)
     {
         _last = null;
-        if (scene.IsEmpty || !Paint(scene, camera, new Size(width, height), 1, width, height, background, hiddenGroups, draft)) return null;
+        if (scene.IsEmpty || !Paint(scene, camera, new Size(width, height), 1, width, height, background, hiddenGroups, draft, framing)) return null;
         var picture = new uint[width * height];
         for (int i = 0; i < picture.Length; i++) picture[i] = unchecked((uint)_px[i]);
         return picture;
     }
 
     /// <summary>Fills <see cref="_px"/> with the picture, w × h pixels.</summary>
-    bool Paint(Scene3D scene, Camera3D cam, Size size, double scaling, int w, int h, Color background, ulong hidden, bool draft)
+    bool Paint(Scene3D scene, Camera3D cam, Size size, double scaling, int w, int h, Color background, ulong hidden, bool draft, Framing? framing)
     {
         _r = cam.Right; _u = cam.Up; _d = cam.Toward;
         // Fit the whole model (hidden groups too, so the picture doesn't jump when they're hidden).
-        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue;
+        double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue, z0 = double.MaxValue, z1 = double.MinValue;
         foreach (var f in scene.Faces)
             foreach (var l in f.Loops)
                 foreach (var p in l)
                 {
-                    double x = p.Dot(_r), y = -p.Dot(_u);
-                    x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y);
+                    double x = p.Dot(_r), y = p.Dot(_u), z = p.Dot(_d);
+                    x0 = Math.Min(x0, x); x1 = Math.Max(x1, x); y0 = Math.Min(y0, y); y1 = Math.Max(y1, y); z0 = Math.Min(z0, z); z1 = Math.Max(z1, z);
                 }
-        double k = Math.Min((size.Width - MarginX) / Math.Max(1e-6, x1 - x0), (size.Height - MarginY) / Math.Max(1e-6, y1 - y0));
-        if (!(k > 0) || double.IsInfinity(k)) return false;
+        double fit = Math.Min((size.Width - 2 * MarginSide) / Math.Max(1e-6, x1 - x0), (size.Height - MarginTop - MarginBottom) / Math.Max(1e-6, y1 - y0));
+        if (!(fit > 0) || double.IsInfinity(fit)) return false;
+        Fitted = new Framing(fit, _r * ((x0 + x1) / 2) + _u * ((y0 + y1) / 2) + _d * ((z0 + z1) / 2));
+        var shown = framing is { PxPerMm: > 0 and < double.PositiveInfinity } f2 ? f2 : Fitted;
+        Shown = shown;
+        double k = shown.PxPerMm;
         PxPerMm = k;
         // Samples per pixel each way: enough to smooth the edges; fewer on a big or sharp screen (to keep the
         // buffers a sensible size) and while turning (to keep up).
@@ -117,8 +137,10 @@ public sealed class Model3DPainter
         _sw = w * s; _sh = h * s;
         _sampleScale = scaling * s;
         _ks = k * scaling * s;
-        _ox = _sw / 2.0 - (x0 + x1) / 2 * _ks;
-        _oy = _sh / 2.0 - (y0 + y1) / 2 * _ks;
+        // The target in the middle of the room the margins leave.
+        var mid = Middle(size);
+        _ox = mid.X * scaling * s - shown.Target.Dot(_r) * _ks;
+        _oy = mid.Y * scaling * s + shown.Target.Dot(_u) * _ks;
 
         int n = _sw * _sh;
         Ensure(ref _depth, n);
@@ -469,5 +491,27 @@ public sealed class Model3DPainter
         uint g = ((top >> 8 & 0xFF) * a + (under >> 8 & 0xFF) * na + 127) / 255;
         uint b = ((top & 0xFF) * a + (under & 0xFF) * na + 127) / 255;
         return 0xFF000000u | r << 16 | g << 8 | b;
+    }
+}
+
+/// <summary>
+/// How a model is drawn in a view: <see cref="PxPerMm"/> screen units to the mm, with the point <see cref="Target"/>
+/// of the model in the middle of the view (<see cref="Model3DPainter.Middle"/>). Turning the model turns it about that point.
+/// </summary>
+public readonly record struct Framing(double PxPerMm, Vec3 Target)
+{
+    /// <summary>The same, with what's in the view moved by <paramref name="by"/> screen units (right, down) seen by <paramref name="camera"/>.</summary>
+    public Framing Moved(Camera3D camera, Vector by) =>
+        this with { Target = Target - camera.Right * (by.X / PxPerMm) + camera.Up * (by.Y / PxPerMm) };
+
+    /// <summary>
+    /// The same drawn <paramref name="pxPerMm"/> to the mm, the point of the model <paramref name="offset"/> from the middle of the
+    /// view (screen units, right and down) staying where it is.
+    /// </summary>
+    public Framing Zoomed(Camera3D camera, double pxPerMm, Vector offset)
+    {
+        // The point under the offset now, then the target that puts it back there at the new size.
+        var under = Target + camera.Right * (offset.X / PxPerMm) - camera.Up * (offset.Y / PxPerMm);
+        return new Framing(pxPerMm, under - camera.Right * (offset.X / pxPerMm) + camera.Up * (offset.Y / pxPerMm));
     }
 }

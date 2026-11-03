@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Media;
 using Clipper2Lib;
 using PhotonCanvas.App;
+using PhotonCanvas.App.View3D;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
 
 namespace PhotonCanvas.Addon.Buildings;
@@ -75,7 +76,7 @@ public sealed class PiecesView : Control
         ctx.FillRectangle(UiKit.Brush("Bg2"), new Rect(Bounds.Size));
         if (_placed.Count == 0 || _w <= 0)
         {
-            if (_message is { } m) BuildingView.Message(ctx, Bounds, m);
+            if (_message is { } m) Model3DView.DrawMessage(ctx, Bounds, m);
             return;
         }
         double k = Math.Min((Bounds.Width - 24) / _w, (Bounds.Height - 40) / _h);

@@ -215,20 +215,35 @@ as the model turns. Use the program's painter (`PhotonCanvas.App.View3D`), which
 buffer so the nearest face always shows:
 
 ```csharp
-readonly Scene3D _scene = new();
-readonly Model3DPainter _painter = new();
+// The view: a Model3DView, first seen turned 32° round and 24° down. It brings the camera controls.
+public sealed class AssembledView() : Model3DView(32, 24)
+{
+    public void Show(MyKit kit)
+    {
+        // Each flat piece, from its outline (u, v), where it sits and how thick it is.
+        Scene.Clear();
+        Scene.AddSlab(outline, new Frame3(origin, u, v), -t / 2, t / 2, style, etched, scoredLines, group: 0);
+        InvalidateVisual();
+    }
 
-// When the model changes: each flat piece, from its outline (u, v), where it sits and how thick it is.
-_scene.Clear();
-_scene.AddSlab(outline, new Frame3(origin, u, v), -t / 2, t / 2, style, etched, scoredLines, group: 0);
-
-// In Render: draft while dragging (quicker); groups can be hidden (e.g. a floor lifted off).
-_painter.Draw(ctx, this, _scene, Camera3D.YUp(yaw, pitch), UiKit.Brush("Bg2"), hiddenGroups, draft: dragging);
+    // Optional: groups to leave out (e.g. a floor lifted off), a Z-up camera, the corner hint, the wheel with Ctrl.
+    protected override ulong HiddenGroups => _liftFloor ? 1UL << 1 : 0;
+}
 ```
+
+`Model3DView` draws the scene with the painter and gives every 3D view the same camera controls
+(`ViewNavigator`): drag to turn it; middle-, right- or Shift-drag to move it; the wheel zooms in on
+what's under the pointer; the arrow keys move it (Ctrl + arrows turn it), + and − zoom, F or a
+double-click fits the whole model in again, Home goes back to the starting view; and four buttons in
+the bottom-right corner do the same. Until it's zoomed or moved, the model is fitted to the view
+however it's turned; after that it keeps its size, turns about the middle of the view, and keeps that
+view while the model changes. Don't give a 3D view its own mouse handling. A view that draws itself
+another way (the puzzle box, the stacked slices, the curved surface) implements `INavigable` and hooks up a
+`ViewNavigator` (adding its `Buttons` to its children) to get the same controls.
 
 A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
 what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs
-maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building and roof makers all use it.
+maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building, map-to-terrain and roof makers all use it.
 
 ## Checks
 
