@@ -22,7 +22,7 @@ static class GameKitShots
         // A scratch data folder holding the set to show, so the pictures don't depend on the last one used.
         var data = Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-gamekit");
 
-        void Shot(string into, string name, AccessorySet set, int item, int view)
+        void Shot(string into, string name, AccessorySet set, int item, int view, int left = 0)
         {
             Directory.CreateDirectory(data);
             File.WriteAllText(Path.Combine(data, "last.json"), set.ToJson());
@@ -31,6 +31,7 @@ static class GameKitShots
             settle(300);
             F<ListBox>(win, "_list").SelectedIndex = item;
             F<TabControl>(win, "_views").SelectedIndex = view;
+            if (left > 0) Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(win).OfType<TabControl>().First(t => t != F<TabControl>(win, "_views")).SelectedIndex = left;
             settle(100);
             var t = (Task)typeof(GameKitWindow).GetMethod("Rebuild", Any)!.Invoke(win, null)!;
             for (int i = 0; i < 400 && !t.IsCompleted; i++) settle(50);
@@ -54,5 +55,18 @@ static class GameKitShots
         }
         Shot(folder, "window-gamekit-tower", table, 0, 0);
         Shot(folder, "window-gamekit-tower-pieces", table, 0, 1);
+        // The markings: a gauge in the Medieval design with a title, and templates in the Gothic one.
+        var marked = marked0();
+        Shot(folder, "window-gamekit-markings", marked, 0, 1, left: 1);
+        Shot(folder, "window-gamekit-template-marked", marked, 2, 1, left: 1);
+        static AccessorySet marked0() => new AccessorySet
+        {
+            Items =
+            [
+                Defaults.For(AccessoryKind.MoveGauge) with { Segments = 6, Marks = MarkDesigns.Apply(new Markings(), "Medieval") with { Title = "MOVE" } },
+                Defaults.For(AccessoryKind.Ruler) with { Marks = MarkDesigns.Apply(new Markings(), "Sci-fi") with { Title = "RANGE" } },
+                Defaults.For(AccessoryKind.Template) with { LengthUnits = 2, Marks = MarkDesigns.Apply(new Markings(), "Gothic") with { Title = "FIREBALL", Numbers = Numbering.Numbers } },
+            ],
+        };
     }
 }

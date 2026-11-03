@@ -70,6 +70,8 @@ public static class BoxWall
         double bottom = s.ColumnBuild == ColumnBuild.Boxed ? (ColumnBasePlates(s) + 1) * T + 1 : T + 1;
         double faceTop = Walkway(s) ? BoxTop(s) - T : H;
         double top = Math.Min(s.ColumnBuild == ColumnBuild.Boxed ? H - T : H, faceTop) - 1;
+        // A wall with a fallen end keeps its tabs low, so the end can fall away above them.
+        if (s.Breaks == RuinStyle.FallenEnd && !Walkway(s)) top = Math.Min(top, bottom + Math.Max(10, (top - bottom) * 0.4));
         double span = top - bottom;
         if (span < 3) return [];
         if (span < 20)
@@ -112,53 +114,67 @@ public static class BoxWall
         Profile front, back;
         List<(double Z, Profile P)> core = [];
         double hb = BoxTop(s);
-        bool walkway = Walkway(s);
-        if (s.Walkway && s.Top == TopStyle.Battlements && !walkway)
+        bool walkway = Walkway(s), battlements = s.Top == TopStyle.Battlements;
+        var breaks = s.Breaks;
+        if (s.Walkway && battlements && !walkway)
             findings.Add(new(Severity.Warn, "The wall is too low for a walkway behind its battlements: the battlements are filled solid instead."));
-        switch (s.Top)
+        var plain = Profile.Level(0, L, H);
+        if (battlements)
         {
-            case TopStyle.Battlements:
+            double mh = Math.Clamp(s.MerlonHeightMm, 1, H * 0.6);
+            var crenels = Crenels(L, s.MerlonWidthMm, s.CrenelWidthMm);
+            if (crenels.Count == 0)
             {
-                double mh = Math.Clamp(s.MerlonHeightMm, 1, H * 0.6);
-                var crenels = Crenels(L, s.MerlonWidthMm, s.CrenelWidthMm);
-                if (crenels.Count == 0)
-                {
-                    findings.Add(new(Severity.Warn, "The wall is too short for battlements: it has a straight top."));
-                    front = back = Profile.Level(0, L, H);
-                    hb = H;
-                    walkway = false;
-                    break;
-                }
-                front = Battlemented(L, H, H - mh, crenels);
-                if (walkway)
-                {
-                    back = Profile.Level(0, L, hb - T);
-                    core.Add((W / 2 - 1.5 * T, front));
-                }
-                else
-                {
-                    back = front;
-                    core.AddRange(zs.Select(z => (z, front)));
-                }
-                break;
+                findings.Add(new(Severity.Warn, "The wall is too short for battlements: it has a straight top."));
+                battlements = walkway = false;
+                hb = H;
             }
-            case TopStyle.Ruined:
+            else
             {
-                double keep = intoColumns ? 3 : 0;
-                front = Ruin(s, L, H, keep, 0, 1);
-                back = Ruin(s, L, H, keep, 1, 0.85);
-                hb = Math.Min(front.Min, back.Min) - Math.Max(stepY, 2);
-                double lowest = 2 * T + 6;
-                if (hb < lowest)
-                {
-                    // Too far down to leave room for the box under the break: the break is made shallower.
-                    double up = lowest - hb;
-                    front = new Profile(front.Steps.Select(st => (st.X0, st.X1, Math.Min(H, st.Y + up))));
-                    back = new Profile(back.Steps.Select(st => (st.X0, st.X1, Math.Min(H, st.Y + up))));
-                    hb = lowest;
-                    findings.Add(new(Severity.Note, "The top is broken down as far as a box wall this high allows."));
-                }
+                plain = Tops.Battlements(s, L, H, H - mh, crenels);
+                if (s.Merlons != MerlonPattern.Even && s.MerlonStepMm > mh - 1)
+                    findings.Add(new(Severity.Warn, $"The shorter merlons can only be {Math.Max(0, mh - 1):0.#} mm lower than the tall ones: make the merlons taller."));
+            }
+        }
+        if (breaks == RuinStyle.None)
+        {
+            front = plain;
+            if (walkway)
+            {
+                back = Profile.Level(0, L, hb - T);
+                core.Add((W / 2 - 1.5 * T, front));
+            }
+            else
+            {
+                back = front;
+                if (battlements) core.AddRange(zs.Select(z => (z, front)));
+            }
+        }
+        else
+        {
+            // The ends stay up to the top of their tabs into the columns; below the break there has to be room
+            // for the box (or, behind a parapet, the walkway stays whole).
+            double keep = intoColumns ? 3 : 0;
+            var tabsUp = intoColumns ? EndTabs(s) : [];
+            double endFloor = tabsUp.Count > 0 ? tabsUp.Max(t => t.Y1) + 1.5 : H;
+            double under = Math.Max(stepY, 2), lowest = 2 * T + 6;
+            double floor = walkway ? hb + 1.5 : lowest + under;
+            bool byStones = breaks is not (RuinStyle.Stepped or RuinStyle.Shattered);
+            front = Tops.Break(s, plain, L, keep, endFloor, floor, 0, 1, byStones ? Stones(s, 0, L, H) : null, out bool shallow0);
+            if (walkway)
+            {
+                back = Profile.Level(0, L, hb - T);
+                core.Add((W / 2 - 1.5 * T, front));
+                if (shallow0) findings.Add(new(Severity.Note, "The parapet is broken down as far as the walkway behind it."));
+            }
+            else
+            {
+                back = Tops.Break(s, plain, L, keep, endFloor, floor, 1, 0.85, byStones ? Stones(s, 1, L, H) : null, out bool shallow1);
+                double broken = Math.Min(front.Min, back.Min);
+                if (broken < hb - 1e-6) hb = broken - under;
+                if (shallow0 || shallow1) findings.Add(new(Severity.Note, "The top is broken down as far as a box wall this high allows."));
                 var rnd = new Random(s.Seed * 104729 + 71);
+                double boxTop = hb;
                 foreach (var z in zs)
                 {
                     // Each layer between the faces breaks a little lower than the faces here and there, never below the box.
@@ -167,15 +183,12 @@ public static class BoxWall
                     {
                         double k = Math.Round(x / stepX);
                         if (!jitter.TryGetValue(k, out var j)) jitter[k] = j = rnd.NextDouble() < 0.4 ? stepY : 0;
-                        return Math.Max(hb + 1.5, Math.Min(a, b) - j);
+                        double m = Math.Min(a, b);
+                        return Math.Min(m, Math.Max(boxTop + 1.5, m - j));
                     }).Merged();
                     core.Add((z, p));
                 }
-                break;
             }
-            default:
-                front = back = Profile.Level(0, L, H);
-                break;
         }
         double bodyTop = hb - T;   // the underside of the top plate: ribs, ends and linings stop here
         if (bodyTop - T < 4) { Bad("There's no room for the box under the top: make the wall taller or the battlements shallower."); return Done(); }
@@ -416,7 +429,7 @@ public static class BoxWall
             var region = Geo.Subtract(p.Under(hb), allHoles);
             foreach (var piece in Separate(region))
             {
-                string name = walkway ? "Parapet backing" : s.Top == TopStyle.Battlements ? "Merlon filling" : "Broken top layer";
+                string name = walkway ? "Parapet backing" : breaks == RuinStyle.None ? "Merlon filling" : "Broken top layer";
                 if (walkway && s.TextureSides)
                 {
                     // The parapet's back faces the walkway: drawn and textured as seen from behind, like the back face.
@@ -475,7 +488,7 @@ public static class BoxWall
 
         // ---- notes ----
         int each = parts.Where(p => !p.Name.Contains("column", StringComparison.OrdinalIgnoreCase)).Sum(p => p.Copies) / walls;
-        findings.Add(new(Severity.Note, $"Each wall is a box {W:0.#} mm thick: {each} pieces (front, back, base, top, two ends{(ribXs.Count > 0 ? $", {ribXs.Count} rib{(ribXs.Count == 1 ? "" : "s")}" : "")}{(holes.Count > 0 ? ", linings" : "")}{(core.Count > 0 ? (walkway ? ", the parapet's backing" : s.Top == TopStyle.Battlements ? ", merlon filling" : ", the broken top's layers") : "")})."));
+        findings.Add(new(Severity.Note, $"Each wall is a box {W:0.#} mm thick: {each} pieces (front, back, base, top, two ends{(ribXs.Count > 0 ? $", {ribXs.Count} rib{(ribXs.Count == 1 ? "" : "s")}" : "")}{(holes.Count > 0 ? ", linings" : "")}{(core.Count > 0 ? (walkway ? ", the parapet's backing" : breaks == RuinStyle.None ? ", merlon filling" : ", the broken top's layers") : "")})."));
         findings.Add(new(Severity.Note, "Put it together on the base: the faces' tabs and the ribs into its slots, the ends, linings and ribs glued to the inside of the front, the top plate on, then the back. Glue as you go."));
         if (walkway) findings.Add(new(Severity.Note, $"The walkway is {hb:0.#} mm up, {WallKitMaker.WalkwayDropMm:0} mm under the gaps in the battlements, and {Math.Clamp(s.WalkwayDepthMm, 4, 80):0.#} mm deep behind the parapet."));
         if (s.Measure == LengthMeasure.Centres) findings.Add(new(Severity.Note, $"Each wall is {L:0.#} mm long, so the columns' centres are {s.LengthMm:0.#} mm apart."));
@@ -507,42 +520,11 @@ public static class BoxWall
         return [.. Enumerable.Range(0, gaps).Select(i => ((i + 1) * m + i * cw, (i + 1) * (m + cw)))];
     }
 
-    static Profile Battlemented(double L, double top, double floor, List<(double X0, double X1)> crenels)
+    /// <summary>The texture's stones on a face, in the front's x (the back's are drawn as seen from behind).</summary>
+    static PathsD Stones(WallSpec s, int face, double L, double H)
     {
-        var steps = new List<(double, double, double)>();
-        double x = 0;
-        foreach (var (c0, c1) in crenels)
-        {
-            steps.Add((x, c0, top));
-            steps.Add((c0, c1, floor));
-            x = c1;
-        }
-        steps.Add((x, L, top));
-        return new Profile(steps);
-    }
-
-    /// <summary>
-    /// A broken top: a dip in stone-sized steps, deepest somewhere near the middle (the same place on both
-    /// faces, each broken its own way), the ends whole for <paramref name="keep"/> mm.
-    /// </summary>
-    static Profile Ruin(WallSpec s, double L, double H, double keep, int face, double depthScale)
-    {
-        var shared = new Random(s.Seed * 7919 + 13);
-        var rnd = new Random(s.Seed * 7919 + 13 + face * 6007);
-        double depth = Math.Clamp(s.RuinDepth, 0.05, 0.8) * H * depthScale, u = L - 2 * keep;
-        double centre = keep + u * (0.35 + 0.3 * shared.NextDouble()), half = u * (0.3 + 0.15 * shared.NextDouble());
-        double stepX = Math.Clamp(s.SizeA / 2, 1.5, 8), stepY = Math.Clamp(s.SizeB, 1, 8);
-        var steps = new List<(double, double, double)>();
-        if (keep > 0) steps.Add((0, keep, H));
-        for (double x = keep; x < L - keep - 1e-6; x += stepX)
-        {
-            double x1 = Math.Min(L - keep, x + stepX);
-            double t = Math.Clamp(Math.Abs((x + x1) / 2 - centre) / half, 0, 1);
-            double dip = depth * Math.Pow(Math.Cos(t * Math.PI / 2), 2) + (rnd.NextDouble() - 0.3) * stepY;
-            steps.Add((x, x1, H - Math.Max(0, Math.Round(dip / stepY) * stepY)));
-        }
-        if (keep > 0) steps.Add((L - keep, L, H));
-        return new Profile(steps).Merged();
+        var raised = Textures.Make(face == 0 ? s : s with { Seed = s.Seed + face * 101 }, new Face(L, H, 0, L, H)).Raised;
+        return face == 1 ? Geo.Map(raised, p => new PointD(L - p.x, p.y)) : raised;
     }
 
     /// <summary>A texture over a face (its own flat coordinates, from 0, 0), kept inside <paramref name="region"/>.</summary>

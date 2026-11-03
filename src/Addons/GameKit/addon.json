@@ -1,8 +1,8 @@
 {
   "id": "gamekit",
   "name": "Game accessories maker",
-  "version": "1.0.0",
-  "description": "Accessories for tabletop games that slot together: dice towers with baffles and a tray, card stands and deck trays, initiative trackers with named tiles, and movement gauges, range rulers and area templates marked in inches, centimetres or grid squares.",
+  "version": "1.1.0",
+  "description": "Accessories for tabletop games that slot together: dice towers with baffles and a tray, card stands and deck trays, initiative trackers with named tiles, and movement gauges, range rulers and area templates marked in inches, centimetres, grid squares or a unit of your own, with the font, numbers, title, border and ornaments you pick or designs you upload.",
   "category": "Make",
   "apiVersion": 1,
   "requires": [],

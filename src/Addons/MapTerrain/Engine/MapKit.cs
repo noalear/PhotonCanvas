@@ -177,10 +177,10 @@ public static class MapKitMaker
             {
                 var kit = WallKitMaker.Make(spec);
                 // A broken top that cuts a doorway's wall apart: that one keeps a straight top.
-                if (!kit.Ok && spec.Top == TopStyle.Ruined)
+                if (!kit.Ok && spec.Breaks != RuinStyle.None)
                 {
-                    var straight = WallKitMaker.Make(spec with { Top = TopStyle.Straight });
-                    if (straight.Ok) { kit = straight; spec = spec with { Top = TopStyle.Straight }; unbroken++; }
+                    var straight = WallKitMaker.Make(spec with { Top = TopStyle.Straight, Broken = RuinStyle.None });
+                    if (straight.Ok) { kit = straight; spec = spec with { Top = TopStyle.Straight, Broken = RuinStyle.None }; unbroken++; }
                 }
                 gr = (spec, kit, 0, p.Squares, p.Door >= 0);
                 order.Add(key);

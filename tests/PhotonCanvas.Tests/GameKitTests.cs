@@ -355,12 +355,21 @@ public class GameKitTests
         Assert.Equal(150, nb.right - nb.left, 3);
         Assert.Equal(150, nb.bottom - nb.top, 3);
         var square = Part(Make(Defaults.For(AccessoryKind.Template) with { LengthUnits = 2, Units = Units.GridFeet, Shape = TemplateShape.Square }), "Square template");
-        Assert.Equal(2, square.Lines.Count);
+        // One line each way, stopped short of the size written where they cross.
+        Assert.True(square.Lines.Count >= 2);
+        Assert.InRange(square.Lines.Sum(Length), 2 * 50.8 * 0.6, 2 * 52.8 - 2);
         Assert.Equal("10", Defaults.Mark(Units.GridFeet, 2));
         Assert.Equal("2.5", Defaults.Mark(Units.Centimetres, 2.5));
         // A 5 inch radius circle is too big for the F2 Ultra's bed.
         var big = Make(Defaults.For(AccessoryKind.Template) with { LengthUnits = 5 });
         Assert.NotEmpty(Placement.TooBig(big, MachineProfile.F2Ultra));
+    }
+
+    static double Length(PathD l)
+    {
+        double d = 0;
+        for (int i = 1; i < l.Count; i++) d += Math.Sqrt((l[i].x - l[i - 1].x) * (l[i].x - l[i - 1].x) + (l[i].y - l[i - 1].y) * (l[i].y - l[i - 1].y));
+        return d;
     }
 
     [Fact]
