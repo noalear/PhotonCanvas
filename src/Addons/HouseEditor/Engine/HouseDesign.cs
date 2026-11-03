@@ -203,10 +203,18 @@ public sealed record WallLook
     public string Texture { get; init; } = "Fieldstone";
     public double Wear { get; init; } = 0.5;
     public double DetailMm { get; init; }
+    /// <summary>
+    /// The texture on the wall's other side (the inside of an outside wall), or null for the same as the front. A
+    /// single-panel wall's back is engraved after the cut pieces are turned over; a box wall's back face just takes it.
+    /// </summary>
+    public string? BackTexture { get; init; }
+    /// <summary>How worn the other side is (0 to 1).</summary>
+    public double BackWear { get; init; } = 0.5;
 
     /// <summary>Whether two squares of wall look the same (null: like the rest of the building).</summary>
     public static bool Same(WallLook? a, WallLook? b) =>
-        a is null ? b is null : b is not null && a.Texture == b.Texture && Math.Abs(a.Wear - b.Wear) < 1e-9 && Math.Abs(a.DetailMm - b.DetailMm) < 1e-9;
+        a is null ? b is null : b is not null && a.Texture == b.Texture && Math.Abs(a.Wear - b.Wear) < 1e-9 && Math.Abs(a.DetailMm - b.DetailMm) < 1e-9
+            && a.BackTexture == b.BackTexture && (a.BackTexture is null || Math.Abs(a.BackWear - b.BackWear) < 1e-9);
 }
 
 /// <summary>A roof's shape: pitched with a gable at each end, hipped (sloping on all four sides), a lean-to sloping one way, or flat.</summary>

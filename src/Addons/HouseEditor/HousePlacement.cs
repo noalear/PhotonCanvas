@@ -3,6 +3,8 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
+using WallPlacement = PhotonCanvas.Addon.Walls.Placement;
+using BackLayers = PhotonCanvas.Addon.Walls.BackLayers;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
@@ -21,6 +23,8 @@ public static class HousePlacement
     public const string LineLayer = "Building · lines";
     /// <summary>The pieces' numbers, scored lightly (turn the layer off to cut without them).</summary>
     public const string NumberLayer = "Building · numbers";
+    /// <summary>Single-panel walls' backs: a page after the sheet, engraved once the cut pieces are turned over.</summary>
+    public static readonly BackLayers Backs = new("Building · back etch", "Building · back lines", "Building · back relief", "Building · back outline (guide)");
     /// <summary>Which building a shape belongs to (an id shared by all its pieces).</summary>
     public const string IdKey = "houseeditor.id";
     /// <summary>The settings it was made from (JSON), on each piece's outline.</summary>
@@ -130,15 +134,22 @@ public static class HousePlacement
             if (cutSettings is { } cut)
                 s = Pages.UpdateLayers(s, from, sheets, l => l.Name == CutLayer, l => cut(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
             if (o.EtchSettings is { } etch)
-                s = Pages.UpdateLayers(s, from, sheets, l => l.Name == EtchLayer, l => etch(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Fill, ParentId = l.ParentId });
+                s = Pages.UpdateLayers(s, from, sheets, l => l.Name == EtchLayer || l.Name == Backs.Etch, l => etch(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Fill, ParentId = l.ParentId });
         }
         if (firstPage < 0) throw new InvalidOperationException("Nothing to cut.");
         return (Pages.SwitchTo(s, firstPage), pages, id);
     }
 
-    /// <summary>One sheet's pieces nested onto as many pages (beds) as they need, from the page shown on; returns how many pages.</summary>
+    /// <summary>
+    /// One sheet's pieces nested onto as many pages (beds) as they need, from the page shown on, then a page of
+    /// backs to engrave after turning pieces over (for each bed that has any); returns how many pages, the last shown.
+    /// </summary>
     static int PlaceSheet(ref DocState s, List<Piece> pieces, string title, Guid id, string json, MachineProfile machine, PlaceOptions o, CancellationToken ct)
     {
+        int firstPage = s.PageIndex;
+        // A piece's back, by its outline's id, and where each placed one went.
+        var backs = new Dictionary<Guid, List<(Shape Shape, int Kind)>>();
+        var backSheets = new List<(int Sheet, Affine Nested, List<(Shape Shape, int Kind)> Shapes)>();
         bool anyEtch = pieces.Any(p => p.Etched.Count > 0), anyLines = pieces.Any(p => p.Lines.Count > 0), anyMarks = pieces.Any(p => p.Marks.Count > 0);
         (Layer Cut, Layer? Etch, Layer? Lines, Layer? Marks) Layers(ref DocState st)
         {
@@ -179,6 +190,7 @@ public static class HousePlacement
             var etched = part.Etched.Count > 0 ? Geo.ToGeometry(part.Etched).Transform(move) : null;
             var lines = part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
             var marks = part.Marks.Count > 0 ? Geo.ToGeometry([], part.Marks).Transform(move) : null;
+            bool hasBack = part.BackEtched is { Count: > 0 } || part.BackLines is { Count: > 0 };
             for (int c = 0; c < part.Copies; c++)
             {
                 string label = part.Number > 0 ? $"#{part.Number} {part.Name}" : part.Name;
@@ -191,6 +203,12 @@ public static class HousePlacement
                 if (marks is not null) shapes.Add((new PathShape { Name = $"{name} · number", LayerId = markLayer!.Id, Geometry = marks }, 3));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
                 units.Add([.. shapes.Select(x => (x.Item1.WithGroup(g).WithAddonData(IdKey, id.ToString()), x.Item2))]);
+                if (hasBack)
+                {
+                    var bg = Guid.NewGuid();
+                    backs[units[^1][0].Shape.Id] = [.. WallPlacement.BackShapes(part.Cut, part.BackEtched, part.BackLines, outline, move)
+                        .Select(b => (b.Shape.With(name: $"{name} · back{b.Suffix}", id: Guid.NewGuid()).WithGroup(bg).WithAddonData(IdKey, id.ToString()), b.Kind))];
+                }
             }
         }
         if (units.Count == 0) return 0;
@@ -213,11 +231,16 @@ public static class HousePlacement
                 throw new InvalidOperationException("A piece doesn't fit on the bed with the spacing round it. Make the building smaller.");
             var unplaced = report.Unplaced.ToHashSet();
             s = Ops.Delete(nested, unplaced);
+            foreach (var u in onPage)
+                if (!unplaced.Contains(u[0].Id) && backs.TryGetValue(u[0].Id, out var b) && s.Shapes.FirstOrDefault(x => x.Id == u[0].Id) is { } placed)
+                    backSheets.Add((sheets, placed.Transform, b));
             units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
             if (units.Count == 0) break;
             s = Pages.Add(s, $"{title} {++sheets}");
             (cutLayer, etchLayer, lineLayer, markLayer) = Layers(ref s);
         }
-        return sheets;
+        if (backSheets.Count == 0) return sheets;
+        (s, int backPages) = WallPlacement.AddBackPages(s, backSheets, firstPage, sheets, machine, title, Backs);
+        return sheets + backPages;
     }
 }

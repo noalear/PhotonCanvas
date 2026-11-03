@@ -75,6 +75,20 @@ battered wall at the back). A wall with a look of its own is drawn lighter on th
 straight wall's look changes it's cut there with a column between. **Make every wall on this floor
 like it** copies its look along the floor; **Like the rest of the building** puts it back.
 
+**Other side** gives the wall a different texture on its other side (stone outside, wood panelling
+inside), with its own **Other side's wear %**. The line above it says which way the wall's texture
+faces: out of the building for an outside wall, so the other side is the inside. A wall between two
+rooms says which way on the plan each side faces.
+
+- **Single-panel walls**: the other side is engraved on the panel's back after it's cut. **Put in
+  the design** adds a page after the walls' sheet, "… · backs (turn the pieces over)", with each
+  piece's back on **Building · back etch** and its outline on **Building · back outline (guide)**,
+  which isn't burned. The outline is named with the piece's number. Cut the sheet, turn those pieces
+  over left to right, select each piece's group on the backs page and use **Camera** → **Fit to
+  piece**: only the outline is matched, and the engraving moves with it. Then run the page. See
+  [The back of a single panel](walls.md#the-back-of-a-single-panel).
+- **Box walls**: the back face is a piece of its own, so it simply gets the other side's texture.
+
 Click a column to give it a **Shape** of its own: square, octagonal, round, hexagonal, chamfered or
 fluted. A shape a wall can't meet at that corner (a square column where walls meet at 45°, say) is
 made to suit instead, with a note. **Built as** makes it *a box* or *stacked layers on a pin*, and
