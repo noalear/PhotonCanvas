@@ -115,7 +115,70 @@ public sealed record HouseDesign
                 Opening.NewWindow(style, 7, 4),
             ],
         };
-        return new HouseDesign { Style = style, SquareMm = style.SquareMm, Levels = [level] };
+        return new HouseDesign { Style = style, SquareMm = style.SquareMm, Levels = [level] }.Moved(10, 10);
+    }
+
+    /// <summary>
+    /// A two-storey house to show what the editor does: a ground floor of two rooms with a corner cut off
+    /// corner to corner, and a smaller room upstairs with a door out onto the roof of the room below.
+    /// </summary>
+    public static HouseDesign Sample()
+    {
+        var style = DefaultStyle() with { UpperTexture = "Timber frame" };
+        List<WallEdge> Lines(params (int X, int Y)[] pts)
+        {
+            var list = new List<WallEdge>();
+            for (int i = 0; i + 1 < pts.Length; i++)
+            {
+                var a = new GridPt(pts[i].X, pts[i].Y);
+                var b = new GridPt(pts[i + 1].X, pts[i + 1].Y);
+                int dx = Math.Sign(b.X - a.X), dy = Math.Sign(b.Y - a.Y);
+                for (var p = a; p != b; p += new GridPt(dx, dy)) list.Add(WallEdge.Of(p, p + new GridPt(dx, dy)));
+            }
+            return list;
+        }
+        var ground = new Level
+        {
+            Walls = [.. Lines((2, 2), (9, 2), (9, 5), (7, 7), (2, 7), (2, 2)), .. Lines((5, 2), (5, 7))],
+            Openings =
+            [
+                Opening.NewDoor(style, 3.5, 7),
+                Opening.NewDoorway(style, 5, 5.5),
+                Opening.NewWindow(style, 2, 4.5),
+                Opening.NewWindow(style, 3.5, 2),
+                Opening.NewWindow(style, 7, 2),
+                Opening.NewWindow(style, 8, 6),
+                Opening.NewWindow(style, 9, 3.5),
+                Opening.NewWindow(style, 6, 7),
+            ],
+        };
+        var upstairs = new Level
+        {
+            Walls = Lines((2, 2), (6, 2), (6, 7), (2, 7), (2, 2)),
+            Openings =
+            [
+                Opening.NewDoor(style, 6, 4.5),
+                Opening.NewWindow(style, 4, 2),
+                Opening.NewWindow(style, 2, 4.5),
+                Opening.NewWindow(style, 4, 7),
+            ],
+        };
+        return new HouseDesign { Style = style, SquareMm = style.SquareMm, Levels = [ground, upstairs] }.Moved(10, 10);
+    }
+
+    /// <summary>The whole building moved across the grid by whole squares.</summary>
+    public HouseDesign Moved(int dx, int dy)
+    {
+        var d = new GridPt(dx, dy);
+        return this with
+        {
+            Levels = [.. Levels.Select(l => l with
+            {
+                Walls = [.. l.Walls.Select(w => new WallEdge(w.A + d, w.B + d))],
+                Openings = [.. l.Openings.Select(o => o with { X = o.X + dx, Y = o.Y + dy })],
+                Floor = [.. l.Floor.Select(f => f + d)],
+            })],
+        };
     }
 
     public string ToJson() => JsonSerializer.Serialize(this, HouseJson.Options);

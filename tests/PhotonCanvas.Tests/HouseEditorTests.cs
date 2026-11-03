@@ -184,6 +184,27 @@ public class HouseEditorTests
         }
     }
 
+    [Fact]
+    public void The_pieces_go_into_the_design_and_can_be_found_and_replaced()
+    {
+        var design = HouseDesign.Sample();
+        var kit = HouseKitMaker.Make(design);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.Empty(HousePlacement.TooBig(kit, PhotonCanvas.Core.MachineProfile.F2Ultra));
+        var (s, pages, id) = HousePlacement.Place(PhotonCanvas.Doc.DocState.New(), kit, design, PhotonCanvas.Core.MachineProfile.F2Ultra, new PhotonCanvas.Addon.Buildings.PlaceOptions());
+        Assert.True(pages >= 1);
+        // Every piece's outline (its etching and lines are named "… · etching", "… · lines").
+        Assert.Equal(kit.PieceCount, s.Shapes.Concat(s.OtherPages.SelectMany(p => p.Shapes)).Count(x => x.AddonData.ContainsKey(HousePlacement.IdKey) && !x.Name.Contains(" · ")));
+        var found = HousePlacement.Find(s, s.Shapes.Select(x => x.Id));
+        Assert.NotNull(found);
+        Assert.Equal(design.ToJson(), found!.Value.Design.ToJson());
+        // Changed and put in again: the old pieces go.
+        var smaller = HouseDesign.Starter();
+        var (s2, _, id2) = HousePlacement.Place(s, HouseKitMaker.Make(smaller), smaller, PhotonCanvas.Core.MachineProfile.F2Ultra, new PhotonCanvas.Addon.Buildings.PlaceOptions { Replace = id });
+        Assert.Equal(id, id2);
+        Assert.Equal(HouseDesign.Starter().ToJson(), HousePlacement.Find(s2, s2.Shapes.Select(x => x.Id))!.Value.Design.ToJson());
+    }
+
     static bool Fits(Piece p, double bed = 220, double gap = 2)
     {
         var b = Geo.Bounds(p.Cut);
