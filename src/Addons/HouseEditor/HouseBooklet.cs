@@ -172,8 +172,9 @@ public static class HouseBooklet
             float boxTop;
             using (var measure = Font(10.5f)) boxTop = Margin + 34 + LineCount(step.Tip, W, measure) * 10.5f * 1.3f + 4;
             var picRect = new SKRect(Margin, boxTop + box.Height + 12, o.PageWidth - Margin, o.PageHeight - 40);
-            var picture = Render(painter, kit, done, step.Solids, step.Inside ? step.Level : null, picRect, ct);
-            done.AddRange(step.Solids);
+            // Pieces put together on their own are shown on their own; the step after stands them in the building.
+            var picture = Render(painter, kit, step.Alone ? [] : done, step.Solids, step.Inside ? step.Level : null, picRect, ct, labels: !step.PutsIn);
+            if (!step.Alone) done.AddRange(step.Solids);
             Add(c =>
             {
                 using var num = Font(30, bold: true);
@@ -280,7 +281,7 @@ public static class HouseBooklet
     }
 
     /// <summary>A rendered picture of the building so far, and where to label the new pieces' numbers on it.</summary>
-    sealed record Picture(SKImage Image, List<(float X, float Y, int Number)> Labels)
+    sealed record Picture(SKImage Image, List<(float X, float Y, int Number)> Labels, List<(float X, float Y, string Letter)> Letters)
     {
         public void Draw(SKCanvas c, SKRect r)
         {
@@ -291,6 +292,16 @@ public static class HouseBooklet
             using var font = Font(9, bold: true);
             using var fill = Fill(Tag);
             using var ring = Stroke(SKColors.White, 1.2f);
+            using var dark = Fill(Ink);
+            using var bigFont = Font(12, bold: true);
+            foreach (var (lx, ly, t) in Letters)
+            {
+                float px = x + lx * k, py = y + ly * k, tw = Math.Max(20, bigFont.MeasureText(t) + 10);
+                var tag = new SKRect(px - tw / 2, py - 10, px + tw / 2, py + 10);
+                c.DrawRoundRect(tag, 4, 4, dark);
+                c.DrawRoundRect(tag, 4, 4, ring);
+                Text(c, t, px, py + 4.3f, bigFont, SKColors.White, SKTextAlign.Center);
+            }
             foreach (var (lx, ly, n) in Labels)
             {
                 float px = x + lx * k, py = y + ly * k;
@@ -308,7 +319,7 @@ public static class HouseBooklet
     /// The pieces in <paramref name="built"/> and, picked out, <paramref name="adding"/>, rendered for a space
     /// <paramref name="r"/> big (points). With <paramref name="inside"/> set, that floor's walls in front are left out to see in.
     /// </summary>
-    static Picture? Render(Model3DPainter painter, HouseKit kit, List<int> built, List<int> adding, int? inside, SKRect r, CancellationToken ct)
+    static Picture? Render(Model3DPainter painter, HouseKit kit, List<int> built, List<int> adding, int? inside, SKRect r, CancellationToken ct, bool labels = true)
     {
         ct.ThrowIfCancellationRequested();
         var camera = Camera3D.YUp(35, 32);
@@ -344,8 +355,8 @@ public static class HouseBooklet
         var image = SKImage.FromEncodedData(jpeg);
 
         // A number on each new piece (once for each place, the biggest pieces first, not crowding each other).
-        var labels = new List<(float X, float Y, int Number)>();
-        foreach (int i in adding.OrderByDescending(i => Geo.Area(kit.Solids[i].Outline)))
+        var tags = new List<(float X, float Y, int Number)>();
+        foreach (int i in labels ? adding.OrderByDescending(i => Geo.Area(kit.Solids[i].Outline)).ToList() : [])
         {
             var s = kit.Solids[i];
             if (s.Number <= 0) continue;
@@ -356,11 +367,21 @@ public static class HouseBooklet
             if (lx < 0 || ly < 0 || lx > w || ly > h) continue;
             // Not on top of another, nor near another of the same number, and no more than three of each.
             double Far(float d) => d * d * pxPerPt * pxPerPt;
-            if (labels.Any(l => (l.X - lx) * (l.X - lx) + (l.Y - ly) * (l.Y - ly) < Far(l.Number == s.Number ? 70 : 17))) continue;
-            if (labels.Count(l => l.Number == s.Number) >= 3) continue;
-            labels.Add((lx, ly, s.Number));
+            if (tags.Any(l => (l.X - lx) * (l.X - lx) + (l.Y - ly) * (l.Y - ly) < Far(l.Number == s.Number ? 70 : 17))) continue;
+            if (tags.Count(l => l.Number == s.Number) >= 3) continue;
+            tags.Add((lx, ly, s.Number));
         }
-        return new Picture(image, labels);
+        // Without numbers (putting in what's been made), each wall's letter, as on the plan.
+        var letters = new List<(float X, float Y, string Letter)>();
+        if (!labels)
+            foreach (var g in adding.Where(i => kit.Solids[i].Kind == SolidKind.Wall).GroupBy(i => (HouseSteps.WallOf(kit.Solids[i].Name), kit.Solids[i].Level)))
+            {
+                if (g.Key.Item1 is not { Length: > 0 } letter) continue;
+                var m = kit.Solids[g.First()].Middle;
+                var at = painter.ToView(new Vec3(m.X, m.Y, m.Z));
+                if (at.X >= 0 && at.Y >= 0 && at.X <= w && at.Y <= h) letters.Add(((float)at.X, (float)at.Y, letter));
+            }
+        return new Picture(image, tags, letters);
     }
 
     static void Add(Scene3D scene, HouseSolid s, SlabStyle style)

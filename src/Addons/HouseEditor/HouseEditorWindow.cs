@@ -99,6 +99,10 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _wayKind = Combo("Stairs (open, with a handrail)", "Solid stairs (stacked layers)", "Spiral stairs", "Ladder");
     readonly Button _wLeft = UiKit.Button("⟲ Turn left"), _wRight = UiKit.Button("⟳ Turn right"), _wRemove = UiKit.Button("Take them away");
     List<FurnitureItem> _placeItems = [];
+    List<string> _placeAbout = [];
+    readonly ComboBox _placeTheme = Combo([.. FurnitureCatalog.Themes]);
+    readonly ComboBox _placeRoom = Combo(["Every room", .. FurnitureCatalog.Rooms, "Plain pieces (every kind)"]);
+    readonly TextBlock _placeInfo = new() { TextWrapping = TextWrapping.Wrap, Classes = { "muted" } };
     // A column picked.
     static readonly ColumnShape[] ColumnShapes = [ColumnShape.Auto, ColumnShape.Square, ColumnShape.Octagon, ColumnShape.Round, ColumnShape.Hexagon, ColumnShape.Chamfered, ColumnShape.Fluted];
     static readonly string[] ColumnNames = ["Matching the walls' angles", "Square", "Octagonal", "Round", "Hexagonal", "Chamfered (corners cut off)", "Fluted (grooved, round)"];
@@ -331,8 +335,10 @@ public sealed class HouseEditorWindow : Window
             _railInfo, _railHere, _railAll));
         _roomPanel.Children.Add(Explained("Room", "A room's floor can have a pattern of its own. Upstairs it's etched on the floor; on the ground floor it's a loose floor that drops in between the walls.",
             _roomInfo, Field("Floor", _roomFloor)));
+        _placeTheme.SelectedIndex = Math.Max(0, FurnitureCatalog.Themes.ToList().IndexOf(_design.Style.Theme));
         _placeList.ItemsSource = PlaceNames();
-        _placePanel.Children.Add(Explained("Furniture to put down", "Click one, then click on the plan to stand it there. Its dark edge is its front. It's made by the furniture maker, from the furniture's own sheet.", _placeList));
+        _placePanel.Children.Add(Explained("Furniture to put down", "Pick a theme and a room, click a piece, then click on the plan to stand it there. Its dark edge is its front. It's made by the furniture maker, from the furniture's own sheet, and keeps its theme's look in any building.",
+            Field("Theme", _placeTheme), Field("Room", _placeRoom), _placeList, _placeInfo));
         _wayPlacePanel.Children.Add(Explained("Ways up", "Click on the plan to put a way up to the floor above there: an opening is cut in that floor over it. The arrow shows which way it climbs.", Field("Put in", _wayPlace)));
         _itemPanel.Children.Add(Explained("Furniture", "Drag it to move it (hold Shift to place it to the millimetre); turn it while dragging with the mouse wheel.",
             _iInfo, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _iLeft, _iRight } },
@@ -446,10 +452,13 @@ public sealed class HouseEditorWindow : Window
         _cShape.SelectionChanged += (_, _) => ColumnChanged();
         _cBuild.SelectionChanged += (_, _) => ColumnChanged();
         _cTexture.SelectionChanged += (_, _) => ColumnChanged();
+        _placeTheme.SelectionChanged += (_, _) => _placeList.ItemsSource = PlaceNames();
+        _placeRoom.SelectionChanged += (_, _) => _placeList.ItemsSource = PlaceNames();
         _placeList.SelectionChanged += (_, _) =>
         {
             int i = _placeList.SelectedIndex;
             _plan.ToPlace = i >= 0 && i < _placeItems.Count ? _placeItems[i] : null;
+            _placeInfo.Text = i >= 0 && i < _placeAbout.Count ? _placeAbout[i] : "";
             if (_plan.ToPlace is not null && _plan.Tool != PlanTool.Furnish) PickTool(PlanTool.Furnish);
         };
         _wayPlace.SelectionChanged += (_, _) => _plan.WayToPlace = (WayKind)Math.Max(0, _wayPlace.SelectedIndex);
@@ -931,11 +940,26 @@ public sealed class HouseEditorWindow : Window
 
     // ---- furniture and ways up ----
 
-    /// <summary>The furniture that can be put down: every kind the furniture maker makes, sized for the building's figures.</summary>
+    /// <summary>
+    /// The furniture that can be put down, sized for the building's figures: the furniture maker's ready-made pieces for the
+    /// theme and room picked, or a plain piece of every kind it makes.
+    /// </summary>
     List<string> PlaceNames()
     {
-        _placeItems = [.. Defaults.Kinds.Where(k => k.Kind is not (ItemKind.WallDoor)).Select(k => HouseKitMaker.NewItem(_design.Style, k.Kind))];
-        return [.. _placeItems.Select(HouseKitMaker.ItemName)];
+        var themes = FurnitureCatalog.Themes;
+        string theme = themes[Math.Clamp(_placeTheme.SelectedIndex, 0, themes.Count - 1)];
+        int room = Math.Max(0, _placeRoom.SelectedIndex);
+        _placeInfo.Text = "";
+        if (room > FurnitureCatalog.Rooms.Count)
+        {
+            _placeItems = [.. Defaults.Kinds.Where(k => k.Kind is not (ItemKind.WallDoor)).Select(k => HouseKitMaker.NewItem(_design.Style, k.Kind))];
+            _placeAbout = [.. Defaults.Kinds.Where(k => k.Kind is not (ItemKind.WallDoor)).Select(_ => "A plain one, to change on the Picked tab once it's down.")];
+            return [.. _placeItems.Select(HouseKitMaker.ItemName)];
+        }
+        var entries = FurnitureCatalog.For(theme, room == 0 ? null : FurnitureCatalog.Rooms[room - 1]).ToList();
+        _placeItems = [.. entries.Select(e => HouseKitMaker.FromCatalog(_design.Style, e))];
+        _placeAbout = [.. entries.Select(e => room == 0 ? $"{e.Room}: {e.About}" : e.About)];
+        return [.. entries.Select(e => e.Name)];
     }
 
     PlacedItem? PickedItem => _plan.SelectedItem >= 0 && _plan.SelectedItem < _design.Levels[_plan.Level].Furniture.Count ? _design.Levels[_plan.Level].Furniture[_plan.SelectedItem] : null;
@@ -1132,6 +1156,8 @@ public sealed class HouseEditorWindow : Window
         var style = BuildingThemes.Apply(_design.Style, theme) with { Items = [] };
         Apply(_design with { Style = style }, "Change the theme");
         LoadLook();
+        // The furniture to put down follows the building's theme (it can still be picked from another).
+        if (FurnitureCatalog.Themes.ToList().IndexOf(theme) is >= 0 and var ti) _placeTheme.SelectedIndex = ti;
     }
 
     void ScaleChosen()
@@ -1146,6 +1172,7 @@ public sealed class HouseEditorWindow : Window
             Levels = [.. _design.Levels.Select(l => l with { Openings = [.. l.Openings.Select(o => o with { WidthMm = Math.Round(o.WidthMm * k, 1), HeightMm = Math.Round(o.HeightMm * k, 1), SillMm = Math.Round(o.SillMm * k, 1) })] })],
         }, "Change the figures");
         LoadLook();
+        _placeList.ItemsSource = PlaceNames();
     }
 
     // ---- saved between times ----

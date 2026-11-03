@@ -30,7 +30,10 @@ public static partial class HouseKitMaker
     public static FurnitureItem NewItem(BuildingSpec s, ItemKind kind) => BuildingSpec.ScaledItem(Defaults.For(kind), Math.Max(0.2, s.ScaleMm / 28)) with { Count = 1 };
 
     /// <summary>What a piece of furniture is called.</summary>
-    public static string ItemName(FurnitureItem item) => Defaults.Info(item.Kind).Name;
+    public static string ItemName(FurnitureItem item) => item.Name is { Length: > 0 } name ? name : Defaults.Info(item.Kind).Name;
+
+    /// <summary>A ready-made piece from the furniture maker's catalog, sized for the building's figures.</summary>
+    public static FurnitureItem FromCatalog(BuildingSpec s, CatalogEntry e) => FurnitureCatalog.Sized(e.Item, s.ScaleMm) with { Count = 1 };
 
     static readonly Dictionary<string, (double W, double D)> Sizes = [];
 
@@ -124,7 +127,9 @@ public static partial class HouseKitMaker
             double turn = (((placed.Turn % 4) + 4) % 4) * 90;
             var (lo, hi) = Interior.Box(ik, T, turn);
             var mid = world(placed.X, placed.Y, FloorTop(d, s, plans[0], k, placed.X, placed.Y));
-            double dx = mid.X - (lo.X + hi.X) / 2, dy = mid.Y - lo.Y, dz = mid.Z - (lo.Z + hi.Z) / 2;
+            // A hanging keeps its height up the wall; everything else stands on the floor.
+            var spot = FurnitureCatalog.SpotFor(placed.Item);
+            double dx = mid.X - (lo.X + hi.X) / 2, dy = mid.Y - (spot == FurnitureSpot.OnWall ? 0 : lo.Y), dz = mid.Z - (lo.Z + hi.Z) / 2;
             string where = plans.Count == 1 ? "" : $" on floor {k + 1}";
             string name = Lower(names[i]);
             foreach (var part in ik.Parts)
@@ -140,6 +145,8 @@ public static partial class HouseKitMaker
             if (Geo.Area(Geo.Subtract(foot, floor)) > Geo.Area(foot) * 0.05) Trouble($"The {name}{where} stands off the edge of the floor.");
             foreach (var w in ways.Where(w => w.Level == k && Geo.Area(Geo.Intersect(foot, w.Footprint)) > 0.5)) Trouble($"The {name}{where} is in the way of the stairs.");
             foreach (var w in ways.Where(w => w.Level + 1 == k && Geo.Area(Geo.Intersect(foot, w.Hatch)) > 0.5)) Trouble($"The {name}{where} stands over the opening for the stairs.");
+            // Rugs lie under other furniture, and hangings are up on the wall over it.
+            if (spot is FurnitureSpot.Floor or FurnitureSpot.OnWall) continue;
             if (!taken.TryGetValue(k, out var here)) taken[k] = here = [];
             foreach (var (other, area) in here)
                 if (Geo.Area(Geo.Intersect(foot, area)) > 0.5) Trouble($"The {name}{where} runs into the {Lower(other)}.");

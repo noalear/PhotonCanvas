@@ -347,6 +347,7 @@ public sealed record HouseDesign
             RoomFloors = [new RoomFloor { X = 3.5, Y = 4.5, Texture = "Flagstones" }],
             Furniture =
             [
+                new PlacedItem { X = 3.5, Y = 4, Item = HouseKitMaker.FromCatalog(style, FurnitureCatalog.Find("med-hall-rug")!) },
                 new PlacedItem { X = 3.5, Y = 4, Item = HouseKitMaker.NewItem(style, ItemKind.Table) },
                 new PlacedItem { X = 3.5, Y = 2.75, Item = HouseKitMaker.NewItem(style, ItemKind.Bench) },
                 new PlacedItem { X = 5.9, Y = 2.6, Item = HouseKitMaker.NewItem(style, ItemKind.Chest) },

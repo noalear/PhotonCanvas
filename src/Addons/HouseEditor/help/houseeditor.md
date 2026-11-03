@@ -254,8 +254,11 @@ On the **Look** tab:
 
 ## Furniture
 
-Pick **Furniture** (U): the list on the right has the furniture maker's pieces (tables, benches,
-stools, chairs, bookshelves, chests, crates, beds, shelves). Click one, then click in a room to stand
+Pick **Furniture** (U): on the right, pick a **Theme** and a **Room** and the list shows the furniture
+maker's ready-made pieces for them (a four-poster and a wardrobe for a medieval bedroom, bunks and
+lockers for a ship's quarters, a sarcophagus for a gothic crypt…), with a line about the one you
+click. *Plain pieces* lists one of every kind the furniture maker makes. The theme starts as the
+building's own, but any theme's pieces can go in any building and keep their look. Click one, then click in a room to stand
 it there; the next click puts down another the same way round. Its dark edge on the plan is its front.
 Drag it about (it snaps to an eighth of a square; hold **Shift** to place it to the millimetre), and
 turn it a quarter at a time with the mouse wheel while dragging, or **[** and **]**.
@@ -265,7 +268,8 @@ Click a piece (with **Furniture** or **Select**) to change it on the **Picked** 
 by the furniture maker ([Mini furniture](furniture.md)) from the furniture's own sheet, so it slots and
 glues together the same way; pieces that come out the same are cut together ("Table: top", ×3). A piece
 standing in a wall or column, off the edge of its floor, in the way of the stairs or over their opening,
-or running into another piece gets a yellow !.
+or running into another piece gets a yellow !. Rugs lie flat under the rest, and hangings (banners,
+tapestries, shields, screens) are glued up the wall at their own height: put them against a wall.
 
 ## Stairs and ladders
 
