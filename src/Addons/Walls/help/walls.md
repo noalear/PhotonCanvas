@@ -185,9 +185,9 @@ ends stay up to the top of their tabs into the columns; with a fallen end those 
 
 | Setting | What it does |
 |---|---|
-| **Door** | *Doorway* cuts it through. *Closed door* etches a door on (planks, braces and a ring handle) instead. *Doorway and a door to fit it* cuts the doorway and a loose door 0.3 mm smaller all round with the door etched on: glue it open or shut, or hinge it with a strip of tape or cloth. |
+| **Door** | *Doorway* cuts it through. *Closed door* etches a door on (planks, braces and a ring handle) instead. *Doorway and a door to fit it* cuts the doorway and the door too, with the door etched on. In a box wall the door hangs on pins and opens (see [What fills the openings](#what-fills-the-openings)); in a flat wall it's a loose door 0.3 mm smaller all round: glue it open or shut, or hinge it with a strip of tape or cloth. |
 | **Door shape** | Square top, round arch, pointed (Gothic) arch, angled corners (sci-fi), or rough: a ragged cave mouth, different for every **Variation**. |
-| **Door look** | What's on the door: *Planks* (braces and a ring handle), *Planks with iron studs* (iron bands and studs), *Metal blast door* (a seam down the middle, hazard chevrons and panels), *Bars (a portcullis)* or *Stone slab*. A loose door with bars has the gaps between them cut through, and is called a portcullis. |
+| **Door look** | What's on the door: *Planks* (braces and a ring handle), *Planks with iron studs* (iron bands and studs), *Metal blast door* (a seam down the middle, hazard chevrons and panels), *Bars (a portcullis)* or *Stone slab*. A door cut out with bars has the gaps between them cut through, and is called a portcullis. |
 | **Door width**, **Door height** | Its size (mm). |
 | **Door position** | Where its middle is, in mm from the middle of the wall: less than 0 moves it left. |
 | **Windows** | How many. They're spread evenly along the wall, clear of the door and the ends. If they don't all fit, the list under the preview says how many did. |
@@ -198,8 +198,34 @@ ends stay up to the top of their tabs into the columns; with a fallen end those 
 
 A door or window that would cut the wall into pieces, or that doesn't fit its height, is refused
 with a red ✕. In a box wall a door stands on the base (the base runs under it as a threshold), and
-every opening is lined between the faces (see [Boxed walls](#boxed-walls)). Bars are left in the
-front face; the back face's window is open.
+every opening is lined between the faces (see [Boxed walls](#boxed-walls)). In a flat wall, or a box
+wall whose windows are left open, the bars are left in the front face and the back face's window is
+open.
+
+### What fills the openings
+
+![A stone box wall put together with its studded door swung open on its pins, and a pair of shutters open in each arched window](images/window-walls-doors.png)
+
+In a box wall the door and the windows' insides are cut out too and sit between the faces, in the
+middle of the wall. These settings, under **Inside the openings** on **Doors & windows**, are only
+shown for box walls:
+
+| Setting | What it does |
+|---|---|
+| **The door opens** | Ticked (the usual), the door hangs on two square pins cut on its hinge side: the bottom pin turns in a round hole in the base, the top one in a **Door head** plate across the doorway inside the wall. It swings out to the front, all the way round to square, and shuts against a strip behind its latch side. An arched or pointed doorway gets an **Arch panel** over the head plate, glued into a groove. Not ticked, the door is glued into a groove round the doorway instead. A portcullis (door look *Bars*) slides up a channel inside the wall instead of swinging, and drops back down on its own. |
+| **Hinges** | Which side the door turns on (and a window's shutter, when there's only room for one). |
+| **In the windows** | *Nothing*: open windows, with the bars left in the front face. *A frame with its bars* (the usual): a frame glued into a groove round the window with the bars in it, set back from the face. *A shutter, glued in*: a solid planked shutter. *Shutters that open*: a pair that swing open (one when the window is narrow), hanging on pins between a **Window sill** plate and a **Window head** plate, with an **Arch panel** over an arched window. Round windows and arrow slits get a glued shutter. |
+| **Open the doors** | Over the **Put together** view: swings the door and shutters open and lifts a portcullis, to see how they work. |
+| **Groove depth** | How far the glued-in pieces reach past the opening's edge into the groove cut in the lining (0.8 to 2 mm, 1.2 to start). |
+
+A door or shutters need a wall at least about 2 panels plus 5 mm thick (12 mm for 3 mm sheet) for
+their pins to turn, a sill plate's room under the windows, and room inside the wall over the opening
+for the head plate. Where there isn't, they're glued in, and the list under the preview says why.
+
+**Hanging them**: before the back goes on, stand the door's bottom pin in its hole in the base (or
+a shutter's in its sill plate), slip the head plate over the top pin and glue the head plate to the
+linings either side. Don't get glue on the pins. Glued-in pieces go into the grooves in the middle
+layer of the linings as you build the linings up.
 
 ![A timber-framed house wall with an etched door, barred windows and two mount points with torch sconces](images/window-walls-house.png)
 
@@ -248,14 +274,16 @@ A box wall is cut as these pieces (the **Pieces** view shows each one):
 | **Top** | A plate between the faces at the top. Where a window runs through it, it's cut in two. With a walkway, it's the **Walkway**. |
 | **End** | Across the gap at each end, from the base to the top plate. |
 | **Rib** | The same, inside, every **Ribs every** or less. |
-| **Lining** | Layers of sheet between the faces round each door and window, 3 mm wide: from any side the opening looks cut through solid wall. One per layer that fits between the faces. |
+| **Lining** | Layers of sheet between the faces round each door and window, 3 mm wide: from any side the opening looks cut through solid wall. One per layer that fits between the faces; the middle layer is cut back to make a groove where something is glued into the opening. |
+| **Door**, **Door head**, **Shutter**, **Window frame**, **Window sill**, **Window head**, **Arch panel**, **Portcullis** | What fills the doors and windows (see [What fills the openings](#what-fills-the-openings)). |
 | **Merlon filling** | Battlements: the gap between the faces' merlons filled with layers, sitting on the top plate at the bottom of the gaps. |
 | **Parapet backing**, **Walkway** | Battlements with a walkway: the front face goes up as the parapet with a second layer behind it, the back face stops under the walkway, and the top plate is the walkway. A walkway deeper than the wall reaches back over the back face on **Walkway brackets** plugged into slots in the back face. |
 | **Broken top layer** | A broken top: the front and back break in the same place but each its own way, and the layers between them break a little lower here and there, so the top looks broken right through. |
 
 **Putting it together**: stand the faces' bottom tabs in the base. Glue the ends, the ribs and the
-linings to the inside of the front, with the ribs' and ends' tabs in the base too; put the top plate
-on, then glue the back on. With battlements, glue the merlon filling or the parapet's backing onto
+linings to the inside of the front, with the ribs' and ends' tabs in the base too; set the glued-in
+frames and shutters in their grooves and hang the door and shutters as you go; put the top plate on,
+then glue the back on. With battlements, glue the merlon filling or the parapet's backing onto
 the top plate.
 
 ## Connectors

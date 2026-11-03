@@ -50,6 +50,12 @@ Leave it on *Not broken* for a whole wall.
 On **Doors & windows**, choose a **Door** and its shape, and type how many **Windows**. They keep
 clear of each other and of the wall's ends.
 
+## Make the door open
+<!-- target: field:In the windows -->
+Choose *Doorway and a door to fit it* and the door is cut out too: it hangs on pins inside the wall
+and swings open. Under **Inside the openings**, pick which side it's hinged on, and what goes in the
+windows: a frame with its bars, a shutter, or *Shutters that open*.
+
 ## Hang a torch or a shelf
 <!-- target: button:Add a mount point -->
 On **Mounts**, press **Add a mount point** and pick its **Accessory**: a torch sconce, a peg for a

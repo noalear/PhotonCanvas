@@ -11,6 +11,9 @@ public enum OpeningShape { Rectangle, Arched, Pointed, Round, ArrowSlit, Chamfer
 /// <summary>What's etched on a closed door, or on a loose door (bars are cut right through a loose one).</summary>
 public enum DoorLook { Planks, Studded, Metal, Bars, Stone }
 public enum WindowBars { None, Cross, Bars }
+/// <summary>What fills a box wall's windows: nothing (bars left in the front face), a frame with its bars, a shutter glued in, or a pair of shutters that open.</summary>
+public enum WindowFill { Open, Frame, Shutter, Shutters }
+public enum HingeSide { Left, Right }
 public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach, Lamps }
 public enum ColumnShape { Auto, Square, Octagon, Round }
 public enum LengthMeasure { Panel, Centres }
@@ -112,6 +115,14 @@ public sealed record WallSpec
     public double SillMm { get; init; } = 25;
     public WindowBars Bars { get; init; } = WindowBars.None;
     public double BarMm { get; init; } = 1.5;
+    /// <summary>A box wall's door swings on pins at its top and bottom (else it's glued into a groove round the doorway).</summary>
+    public bool DoorOpens { get; init; } = true;
+    /// <summary>Which side of the doorway (seen from the front) the door swings from.</summary>
+    public HingeSide DoorHinge { get; init; } = HingeSide.Left;
+    /// <summary>What fills a box wall's windows.</summary>
+    public WindowFill WindowFill { get; init; } = WindowFill.Frame;
+    /// <summary>How deep the groove round a door or window is that its glued-in piece sits in (mm).</summary>
+    public double InsertGrooveMm { get; init; } = 1.2;
     /// <summary>A smooth band round doors and windows (mm), edged with a groove, where the texture stops.</summary>
     public double FrameMm { get; init; } = 1.5;
 

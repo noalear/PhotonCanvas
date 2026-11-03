@@ -10,6 +10,12 @@ public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Li
     /// not shown there have none. The face towards the pose's normal is the etched one.
     /// </summary>
     public List<Model.Pose> Poses { get; init; } = [];
+
+    /// <summary>A door or shutter that swings: it turns on pins up the line u = this (its own coordinates), its far edge out to the front.</summary>
+    public double? HingeU { get; init; }
+
+    /// <summary>A portcullis: how far it slides up (mm).</summary>
+    public double SlideMm { get; init; }
 }
 
 /// <summary>Everything a set of walls is cut from, with what was found while making it.</summary>

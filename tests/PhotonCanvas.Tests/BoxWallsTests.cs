@@ -124,7 +124,8 @@ public class BoxWallsTests
         });
         var k = WallKitMaker.Make(s);
         Assert.True(k.Ok, Why(k));
-        var all = Assemble(k, 3).Where(p => p.Name != "Door").ToList();   // the loose door stands in its doorway
+        var all = Assemble(k, 3);   // the door hangs in its doorway
+        Assert.Contains(all, p => p.Name == "Door");
         Assert.Empty(Clashes(all));
         Assert.Empty(EmptySlots(all, 3, s.FitMm));
     }
@@ -335,7 +336,7 @@ public class BoxWallsTests
         Assert.Single(Part(k, "Wall").Poses);
         Assert.Equal(2, Part(k, "Torch sconce").Poses.Count);
         Assert.Contains(k.Parts, p => p.Name.StartsWith("Corner column") && p.Poses.Count > 0);
-        Assert.Empty(Clashes(Assemble(k, 3).Where(p => p.Name != "Door").ToList()));
+        Assert.Empty(Clashes(Assemble(k, 3)));
     }
 
     [Fact]
@@ -544,7 +545,7 @@ public class BoxWallsTests
         Assert.True(k.Ok, Why(k));
         Assert.Equal(5, k.MountsUsed.Count);
         foreach (var name in new[] { "Torch sconce", "Shelf bracket", "Shelf", "Wall peg", "Wall lamp" }) Assert.Contains(k.Parts, p => p.Name == name);
-        Assert.Empty(Clashes(Assemble(k, 3).Where(p => p.Name != "Door").ToList()));
+        Assert.Empty(Clashes(Assemble(k, 3)));
     }
 
     [Fact]
@@ -599,5 +600,169 @@ public class BoxWallsTests
         Assert.Equal(s.MountPoints, back.MountPoints);
         Assert.Equal(("Wood planks (across)", 14.0), (back.AccessoryTexture, back.ShelfDepthMm));
         Assert.Equal(WallSpec.FromJson("""{"Mounts":2}""")!.MountPoints, []);
+    }
+
+    // ---- what fills the doors and windows ----
+
+    /// <summary>A hinged leaf turned about its pins by <paramref name="deg"/> (its latch side towards the front when more than 0).</summary>
+    static Placed Swung(Placed leaf, double deg)
+    {
+        // The pins are the lowest part of the leaf: the hinge is up their middle.
+        var b = Geo.Bounds(leaf.Cut);
+        var pin = Geo.Bounds(Geo.Intersect(leaf.Cut, [Geo.Rect(b.left - 1, b.top - 1, b.right + 1, b.top + 0.3)]));
+        double pu = (pin.left + pin.right) / 2, mid = (b.left + b.right) / 2;
+        var p = leaf.Pose.At(pu, 0);
+        double a = deg * Math.PI / 180 * (pu < mid ? 1 : -1), c = Math.Cos(a), sn = Math.Sin(a);
+        V3 R(V3 v) => new(v.X * c - v.Z * sn, v.Y, v.X * sn + v.Z * c);
+        var o = p + R(leaf.Pose.O - p);
+        return leaf with { Pose = new Pose(o, R(leaf.Pose.U), leaf.Pose.V) };
+    }
+
+    static List<string> Clashes(Placed one, List<Placed> all, double step = 0.25) =>
+        Clashes([one, .. all.Where(o => !ReferenceEquals(o, one) && o.Name != one.Name)], step).Where(t => t.StartsWith(one.Name + " and")).ToList();
+
+    [Theory]
+    [InlineData(OpeningShape.Rectangle, HingeSide.Left, 12)]
+    [InlineData(OpeningShape.Arched, HingeSide.Right, 12)]
+    [InlineData(OpeningShape.Pointed, HingeSide.Left, 15)]
+    [InlineData(OpeningShape.Rough, HingeSide.Left, 12)]
+    public void A_door_hangs_on_pins_and_swings_open_without_hitting_anything(OpeningShape shape, HingeSide hinge, double wall)
+    {
+        var s = Box(x => x with { WallMm = wall, ColumnMm = wall + 12, LengthMm = 110, HeightMm = 64, Door = DoorKind.DoorwayAndDoor, DoorShape = shape, DoorHinge = hinge, DoorWidthMm = 18, DoorHeightMm = 32 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Parts, p => p.Name == "Door head");
+        if (shape != OpeningShape.Rectangle) Assert.Contains(k.Parts, p => p.Name == "Arch panel");
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, 3, s.FitMm));
+        var door = all.Single(p => p.Name == "Door");
+        // Both pins are in round holes: the bottom one in the base, the top one in the head plate.
+        var b = Geo.Bounds(door.Cut);
+        foreach (var v in new[] { b.top + 1, b.bottom - 1 })
+        {
+            var pin = Geo.Bounds(Geo.Intersect(door.Cut, [Geo.Rect(b.left - 1, v - 0.1, b.right + 1, v + 0.1)]));
+            var c = door.Pose.At((pin.left + pin.right) / 2, v);
+            Assert.Contains(all, o => o.Name is "Base" or "Door head" && Holds(o, c));
+        }
+        // It opens to the front, all the way round to square, and shuts against a stop behind it.
+        foreach (var deg in new[] { 10, 30, 60, 90 }) Assert.Empty(Clashes(Swung(door, deg), all, 0.3));
+        Assert.NotEmpty(Clashes(Swung(door, -12), all, 0.3));
+        // The 3D view's open door is the same.
+        var part = Part(k, "Door");
+        Assert.NotNull(part.HingeU);
+        var shown = BoxWall.Opened(part, door.Pose, 60);
+        var swung = Swung(door, 60).Pose;
+        Assert.True((shown.O - swung.O).Length < 1e-6 && (shown.U - swung.U).Length < 1e-6, $"{shown} vs {swung}");
+    }
+
+    [Fact]
+    public void A_door_can_be_glued_into_a_groove_instead()
+    {
+        var s = Box(x => x with { LengthMm = 110, HeightMm = 64, Door = DoorKind.DoorwayAndDoor, DoorShape = OpeningShape.Arched, DoorOpens = false, DoorWidthMm = 18, DoorHeightMm = 32 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.DoesNotContain(k.Parts, p => p.Name == "Door head");
+        var door = Part(k, "Door");
+        // Wider than the doorway by the groove each side, less the fit, and in the middle layer between the faces.
+        var b = Geo.Bounds(door.Cut);
+        Assert.Equal(18 + 2 * (s.InsertGrooveMm - s.FitMm / 2), b.right - b.left, 1);
+        Assert.Equal(BoxWall.CoreZ(s)[BoxWall.CoreLayers(s) / 2], door.Poses[0].O.Z, 3);
+        Assert.NotEmpty(door.Etched.Count > 0 ? door.Etched : [.. door.Lines]);
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        // The groove: next to the doorway's edge in the door's layer there's door, not lining.
+        var at = new V3(55 - 9 - s.InsertGrooveMm / 2, 15, door.Poses[0].O.Z);
+        Assert.Equal(["Door"], all.Where(o => o.Inside(at)).Select(o => o.Name));
+    }
+
+    [Fact]
+    public void A_wall_too_thin_for_hinge_pins_glues_its_door_in()
+    {
+        var k = WallKitMaker.Make(Box(x => x with { WallMm = 9, LengthMm = 110, HeightMm = 64, Door = DoorKind.DoorwayAndDoor, DoorWidthMm = 18, DoorHeightMm = 32 }));
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Findings, f => f.Text.Contains("glued in place") && f.Text.Contains("thick"));
+        Assert.DoesNotContain(k.Parts, p => p.Name == "Door head");
+        Assert.Empty(Clashes(Assemble(k, 3)));
+    }
+
+    [Fact]
+    public void A_portcullis_slides_up_inside_the_wall()
+    {
+        var s = Box(x => x with { LengthMm = 110, HeightMm = 64, Door = DoorKind.DoorwayAndDoor, DoorLook = DoorLook.Bars, DoorShape = OpeningShape.Rectangle, DoorWidthMm = 18, DoorHeightMm = 28 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Findings, f => f.Text.Contains("slides up"));
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        // Lifted as far as the note says, it still hits nothing.
+        var p = all.Single(o => o.Name == "Portcullis");
+        double up = double.Parse(System.Text.RegularExpressions.Regex.Match(k.Findings.First(f => f.Text.Contains("slides up")).Text, @"([\d.]+) mm").Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        Assert.True(up > 10, $"{up}");
+        Assert.Equal(up, Part(k, "Portcullis").SlideMm, 3);
+        var lifted = p with { Pose = BoxWall.Opened(Part(k, "Portcullis"), p.Pose) };
+        Assert.Empty(Clashes(lifted, all));
+    }
+
+    [Theory]
+    [InlineData(WindowFill.Frame, WindowBars.Cross, 8)]
+    [InlineData(WindowFill.Frame, WindowBars.None, 8)]
+    [InlineData(WindowFill.Shutter, WindowBars.Bars, 8)]
+    [InlineData(WindowFill.Shutters, WindowBars.None, 8)]
+    [InlineData(WindowFill.Shutters, WindowBars.None, 16)]
+    [InlineData(WindowFill.Open, WindowBars.Cross, 8)]
+    public void Windows_are_filled_and_nothing_clashes(WindowFill fill, WindowBars bars, double width)
+    {
+        var s = Box(x => x with { LengthMm = 110, HeightMm = 64, Windows = 2, WindowShape = OpeningShape.Arched, WindowWidthMm = width, WindowHeightMm = 16, SillMm = 24, Bars = bars, WindowFill = fill });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, 3, s.FitMm));
+        string[] expect = fill switch
+        {
+            WindowFill.Frame => ["Window frame"],
+            WindowFill.Shutter => ["Shutter"],
+            WindowFill.Shutters when width >= 16 => ["Left shutter", "Right shutter", "Window sill", "Window head", "Arch panel"],
+            WindowFill.Shutters => ["Shutter", "Window sill", "Window head"],   // the arch over it is hardly taller than the head plate
+            _ => [],
+        };
+        foreach (var name in expect) Assert.Equal(2, Part(k, name).Copies);
+        if (fill == WindowFill.Open) Assert.DoesNotContain(k.Parts, p => p.Name is "Window frame" or "Shutter");
+        // Filled, the front face's window is clear (the bars are in the frame); left open, they're in the face.
+        var front = Part(k, "Front");
+        int holesInFront = Geo.Tidy(front.Cut).Count(p => Clipper.Area(p) < 0);
+        Assert.Equal(fill == WindowFill.Open ? 8 : 2, holesInFront);
+        if (fill == WindowFill.Shutters)
+            foreach (var leaf in all.Where(p => p.Name.EndsWith("hutter")))
+                foreach (var deg in new[] { 20, 60, 90 }) Assert.Empty(Clashes(Swung(leaf, deg), all, 0.3));
+    }
+
+    [Fact]
+    public void Round_windows_get_a_glued_shutter_when_asked_for_ones_that_open()
+    {
+        var k = WallKitMaker.Make(Box(x => x with { LengthMm = 110, HeightMm = 64, Windows = 1, WindowShape = OpeningShape.Round, WindowWidthMm = 10, SillMm = 24, WindowFill = WindowFill.Shutters }));
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Findings, f => f.Text.Contains("Round windows"));
+        Assert.Equal(1, Part(k, "Shutter").Copies);
+        Assert.Empty(Clashes(Assemble(k, 3)));
+    }
+
+    [Fact]
+    public void Old_designs_get_a_door_that_opens_and_framed_windows()
+    {
+        var s = WallSpec.FromJson("""{"Build":"Box","WallMm":12,"Door":"DoorwayAndDoor","Windows":2}""")!;
+        Assert.True(s.DoorOpens);
+        Assert.Equal(WindowFill.Frame, s.WindowFill);
+        var back = WallSpec.FromJson((s with { DoorOpens = false, DoorHinge = HingeSide.Right, WindowFill = WindowFill.Shutters, InsertGrooveMm = 1.6 }).ToJson())!;
+        Assert.Equal((false, HingeSide.Right, WindowFill.Shutters, 1.6), (back.DoorOpens, back.DoorHinge, back.WindowFill, back.InsertGrooveMm));
+    }
+
+    [Fact]
+    public void Arrow_slits_are_left_open_rather_than_filled_with_a_frame()
+    {
+        var k = WallKitMaker.Make(Box(x => x with { Windows = 2, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 12, SillMm = 20 }));
+        Assert.True(k.Ok, Why(k));
+        Assert.DoesNotContain(k.Parts, p => p.Name == "Window frame");
     }
 }
