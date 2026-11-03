@@ -1,0 +1,398 @@
+using Clipper2Lib;
+
+namespace PhotonCanvas.Addon.Furniture;
+
+/// <summary>
+/// Flat pieces: rugs (lying on the floor, the pattern etched and scored on top) and things hung on a
+/// wall (standing against it, the back on the wall, glued): tapestries, banners, paintings, shields,
+/// maps and screens.
+/// </summary>
+public static class Rugs
+{
+    // ---- rugs ----
+
+    public static void Rug(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = it.DepthMm;
+        if (W < 6 || D < 4) { m.Bad("The rug is too small: make it at least 6 by 4 mm."); return; }
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        PathsD outline;
+        var rnd = m.Rnd;
+        switch (it.Rug)
+        {
+            case RugPattern.Round:
+                outline = [Ellipse(W / 2, D / 2, W / 2, D / 2)];
+                for (int k = 1; k <= 3; k++)
+                {
+                    double f = 1 - k * 0.12;
+                    etched.AddRange(Fronts.Outline([Ellipse(W / 2, D / 2, W / 2 * f, D / 2 * f)], 0.4));
+                }
+                for (int i = 0; i < 12; i++)
+                {
+                    double a = i * Math.PI / 6;
+                    lines.Add(Geo.Loop(Petal(W / 2, D / 2, a, W / 2 * 0.5, D / 2 * 0.5)));
+                }
+                etched.Add(Ellipse(W / 2, D / 2, W * 0.06, D * 0.06));
+                break;
+            case RugPattern.Hide:
+                outline = [Hide(W / 2, D / 2, W / 2, D / 2, rnd)];
+                // Fur: short strokes all over, and the spine.
+                lines.Add([new(W * 0.12, D / 2), new(W * 0.88, D / 2)]);
+                for (int i = 0; i < (int)(W * D / 6); i++)
+                {
+                    double x = W * (0.1 + 0.8 * rnd.NextDouble()), y = D * (0.15 + 0.7 * rnd.NextDouble()), a = (y < D / 2 ? -1 : 1) * (0.4 + rnd.NextDouble() * 0.5);
+                    lines.Add([new(x, y), new(x + Math.Cos(a) * 0.7, y + Math.Sin(a) * 0.7)]);
+                }
+                lines = Geo.ClipLines(lines, Geo.Offset(outline, -0.3));
+                break;
+            case RugPattern.Mat:
+            {
+                outline = [Fronts.Chamfered(0, 0, W, D, Math.Min(1.5, Math.Min(W, D) * 0.15))];
+                // Hazard stripes along the ends, a grating in the middle.
+                double band = Math.Min(2.5, W * 0.15);
+                foreach (var (x0, x1) in new[] { (0.0, band), (W - band, W) })
+                {
+                    var stripes = new PathsD();
+                    for (double s = -D; s < W + D; s += 1.6) stripes.Add(Geo.Strip(new PointD(s, 0), new PointD(s + D, D), 0.8));
+                    etched.AddRange(Geo.Intersect(Geo.Union(stripes), [Geo.Rect(x0, 0, x1, D)]));
+                }
+                double gx0 = band + 0.8, gx1 = W - band - 0.8;
+                for (double x = gx0; x <= gx1 + 1e-6; x += 1.2) lines.Add([new(x, 0.8), new(x, D - 0.8)]);
+                lines.Add(Geo.Loop(Geo.Rect(gx0, 0.8, gx1, D - 0.8)));
+                break;
+            }
+            case RugPattern.Kilim:
+            {
+                outline = [Geo.Rect(0, 0, W, D)];
+                etched.AddRange(Fronts.Outline(0.8, 0.8, W - 0.8, D - 0.8, 0.5));
+                Fringe(W, D, lines);
+                // Bands across of stepped diamonds and zigzags.
+                int bands = Math.Max(1, (int)Math.Round((W - 2) / 5));
+                double bw = (W - 2) / bands;
+                for (int b = 0; b < bands; b++)
+                {
+                    double cx = 1 + bw * (b + 0.5);
+                    if (b % 2 == 0)
+                        for (double y = 1.8; y < D - 1.8; y += bw * 0.9)
+                            etched.Add(Stepped(cx, Math.Min(y + bw * 0.45, D - 1.8 - bw * 0.0), Math.Min(bw * 0.38, (D - 3) / 2)));
+                    else
+                    {
+                        var zig = new PathD();
+                        for (double y = 1.5; y <= D - 1.5; y += 1.2) zig.Add(new PointD(cx + ((int)((y - 1.5) / 1.2) % 2 == 0 ? -bw * 0.25 : bw * 0.25), y));
+                        if (zig.Count > 1) etched.AddRange(Thick(zig, 0.45));
+                    }
+                }
+                break;
+            }
+            case RugPattern.Damask:
+            {
+                outline = [Geo.Rect(0, 0, W, D)];
+                etched.AddRange(Fronts.Outline(0.9, 0.9, W - 0.9, D - 0.9, 0.6));
+                lines.Add(Geo.Loop(Geo.Rect(1.8, 1.8, W - 1.8, D - 1.8)));
+                Fringe(W, D, lines);
+                double step = Geo.Clamp(Math.Min(W, D) / 3, 3, 5);
+                int row = 0;
+                for (double y = 2.5 + step / 2; y < D - 2.5; y += step, row++)
+                    for (double x = 2.5 + step / 2 + (row % 2) * step / 2; x < W - 2.5; x += step)
+                        lines.Add(Geo.Loop(Cabinets.Trefoil(x, y, step * 0.3)));
+                break;
+            }
+            default:
+            {
+                // A bordered rug with a medallion.
+                outline = [Geo.Rect(0, 0, W, D)];
+                double b = Geo.Clamp(Math.Min(W, D) * 0.12, 0.8, 2.2);
+                etched.AddRange(Fronts.Outline(b * 0.5, b * 0.5, W - b * 0.5, D - b * 0.5, 0.45));
+                etched.AddRange(Fronts.Outline(b * 1.4, b * 1.4, W - b * 1.4, D - b * 1.4, 0.45));
+                // Little diamonds round the border.
+                for (double x = b * 1.5; x < W - b; x += b * 1.2) foreach (var y in new[] { b * 0.95, D - b * 0.95 }) lines.Add(Geo.Loop(Diamond(x, y, b * 0.3, b * 0.3)));
+                Fringe(W, D, lines);
+                double mw = (W - 3 * b) * 0.32, md = (D - 3 * b) * 0.42;
+                if (mw > 1 && md > 1)
+                {
+                    etched.Add(Diamond(W / 2, D / 2, mw, md));
+                    etched = Geo.Subtract(Geo.Union(etched), [Diamond(W / 2, D / 2, mw * 0.65, md * 0.65)]);
+                    lines.Add(Geo.Loop(Diamond(W / 2, D / 2, mw * 0.35, md * 0.35)));
+                    foreach (var (x, y) in new[] { (b * 2.6, b * 2.6), (W - b * 2.6, b * 2.6), (b * 2.6, D - b * 2.6), (W - b * 2.6, D - b * 2.6) })
+                        if (W > 12 && D > 8) lines.Add(Geo.Loop(Diamond(x, y, b * 0.7, b * 0.7)));
+                }
+                break;
+            }
+        }
+        m.Add("Rug", outline, [], [Pose.Up(0, m.T / 2, D)], grainAlongU: true, face: [], etched: etched, lines: lines);
+        m.Note(m.T > 1.6 ? "A rug looks best cut from thin card or veneer (set the sheet to 0.5 to 1 mm)." : "Glue the rug to the floor, or leave it loose.");
+    }
+
+    static void Fringe(double W, double D, List<PathD> lines)
+    {
+        foreach (var x in new[] { 0.0, W - 0.6 })
+            for (double y = 0.5; y < D - 0.3; y += 0.45) lines.Add([new(x, y), new(x + 0.6, y)]);
+    }
+
+    public static PathD Ellipse(double cx, double cy, double rx, double ry)
+    {
+        var c = Geo.Circle(0, 0, 1, 0.002);
+        return [.. c.Select(p => new PointD(cx + p.x * rx, cy + p.y * ry))];
+    }
+
+    static PathD Diamond(double cx, double cy, double rx, double ry) => [new(cx, cy - ry), new(cx + rx, cy), new(cx, cy + ry), new(cx - rx, cy)];
+
+    static PathD Petal(double cx, double cy, double a, double rx, double ry)
+    {
+        var p = new PathD();
+        for (int i = 0; i <= 16; i++)
+        {
+            double t = i / 16.0 * Math.PI, r = Math.Sin(t) * 0.18, along = 0.35 + 0.65 * i / 16.0;
+            double lx = Math.Cos(a) * along - Math.Sin(a) * r, ly = Math.Sin(a) * along + Math.Cos(a) * r;
+            p.Add(new PointD(cx + lx * rx, cy + ly * ry));
+        }
+        for (int i = 15; i > 0; i--)
+        {
+            double t = i / 16.0 * Math.PI, r = -Math.Sin(t) * 0.18, along = 0.35 + 0.65 * i / 16.0;
+            double lx = Math.Cos(a) * along - Math.Sin(a) * r, ly = Math.Sin(a) * along + Math.Cos(a) * r;
+            p.Add(new PointD(cx + lx * rx, cy + ly * ry));
+        }
+        return p;
+    }
+
+    /// <summary>A stepped (kilim) diamond.</summary>
+    static PathD Stepped(double cx, double cy, double r)
+    {
+        var p = new PathD();
+        int n = 3;
+        double s = r / n;
+        // Up the right side in steps, then round.
+        for (int q = 0; q < 4; q++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                double ax = (n - i) * s, ay = i * s, bx = (n - i) * s, by = (i + 1) * s;
+                (double x, double y) Rot(double x, double y) => q switch { 0 => (x, y), 1 => (-y, x), 2 => (-x, -y), _ => (y, -x) };
+                var (x1, y1) = Rot(ax, ay);
+                var (x2, y2) = Rot(bx, by);
+                var (x3, y3) = Rot(bx - s, by);
+                p.Add(new PointD(cx + x1, cy + y1));
+                p.Add(new PointD(cx + x2, cy + y2));
+                if (i < n - 1) p.Add(new PointD(cx + x3, cy + y3));
+            }
+        }
+        return Geo.Tidy([p]).OrderByDescending(q => Math.Abs(Clipper.Area(q))).FirstOrDefault() ?? Diamond(cx, cy, r, r);
+    }
+
+    static PathsD Thick(PathD line, double w)
+    {
+        var all = new PathsD();
+        for (int i = 0; i + 1 < line.Count; i++) all.Add(Geo.Strip(line[i], line[i + 1], w));
+        return Geo.Union(all);
+    }
+
+    /// <summary>An animal hide: an oval body with four legs and a neck, the edges wobbly.</summary>
+    public static PathD Hide(double cx, double cy, double rx, double ry, Random rnd)
+    {
+        var p = new PathD();
+        const int n = 64;
+        double ph = rnd.NextDouble() * 6;
+        for (int i = 0; i < n; i++)
+        {
+            double a = 2 * Math.PI * i / n;
+            // Legs at the four diagonals, the neck and tail along the long axis.
+            double r = 0.72;
+            foreach (var la in new[] { Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4 })
+                r += 0.3 * Math.Exp(-Math.Pow(Angle(a - la) / 0.13, 2));
+            r += 0.2 * Math.Exp(-Math.Pow(Angle(a) / 0.18, 2)) + 0.12 * Math.Exp(-Math.Pow(Angle(a - Math.PI) / 0.12, 2));
+            r -= 0.12 * Math.Exp(-Math.Pow(Angle(a - Math.PI / 2) / 0.4, 2)) + 0.12 * Math.Exp(-Math.Pow(Angle(a + Math.PI / 2) / 0.4, 2));
+            r *= 1 + 0.04 * Math.Sin(a * 7 + ph);
+            p.Add(new PointD(cx + Math.Cos(a) * rx * r, cy + Math.Sin(a) * ry * r));
+        }
+        return p;
+    }
+
+    static double Angle(double a)
+    {
+        while (a > Math.PI) a -= 2 * Math.PI;
+        while (a < -Math.PI) a += 2 * Math.PI;
+        return a;
+    }
+
+    // ---- wall hangings ----
+
+    public static void Hanging(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, H = it.HeightMm, y0 = Math.Max(0, it.HangMm);
+        if (W < 4 || H < 4) { m.Bad("Make it at least 4 by 4 mm."); return; }
+        var look = Fronts.Look(m);
+        var rnd = m.Rnd;
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        PathsD outline;
+        bool grain = false;
+        switch (it.Hanging)
+        {
+            case HangingStyle.Banner:
+            {
+                // A pole across the top, the cloth hanging from it, a swallowtail (or a point) at the bottom.
+                double pole = Math.Min(1.2, H * 0.08), cw = W * 0.8, x0 = (W - cw) / 2, tail = Math.Min(cw * 0.5, H * 0.2);
+                var cloth = new PathD { new(x0, tail), new(x0, H - pole), new(x0 + cw, H - pole), new(x0 + cw, tail) };
+                if (look == FrontLook.Gothic || look == FrontLook.Metal) cloth.Add(new PointD(x0 + cw / 2, 0));
+                else { cloth.Add(new PointD(x0 + cw, 0)); cloth.Add(new PointD(x0 + cw / 2, tail)); cloth.Add(new PointD(x0, 0)); }
+                outline = Geo.Union([cloth, Geo.Rect(0, H - pole, W, H), Geo.Circle(0.6, H - pole / 2, 0.75), Geo.Circle(W - 0.6, H - pole / 2, 0.75)]);
+                etched.AddRange(Fronts.Outline([Geo.Rect(x0 + 0.7, tail + 0.4, x0 + cw - 0.7, H - pole - 0.7)], 0.35));
+                double r = Math.Min(cw * 0.3, (H - tail - pole) * 0.22);
+                Cabinets.Symbol(look, W / 2, tail + (H - tail - pole) * 0.55, r, etched, lines);
+                break;
+            }
+            case HangingStyle.Painting:
+            {
+                outline = [Geo.Rect(0, 0, W, H)];
+                double fr = Geo.Clamp(Math.Min(W, H) * 0.1, 0.8, 2);
+                etched.AddRange(Fronts.Outline(fr * 0.5, fr * 0.5, W - fr * 0.5, H - fr * 0.5, 0.3));
+                lines.Add(Geo.Loop(Geo.Rect(fr, fr, W - fr, H - fr)));
+                Landscape(fr, fr, W - fr, H - fr, rnd, etched, lines);
+                grain = false;
+                break;
+            }
+            case HangingStyle.Shield:
+            {
+                // A shield with two swords crossed behind it.
+                double sw = Math.Min(W * 0.62, H * 0.75), sh = sw * 1.2, cx = W / 2, cy = H * 0.55;
+                var shield = look == FrontLook.Plank && m.Theme is "Dungeon" or "Cave" ? Geo.Circle(cx, cy, sw / 2) : Heater(cx - sw / 2, cy - sh / 2, sw, sh);
+                var swords = new PathsD();
+                foreach (var s in new[] { -1, 1 })
+                {
+                    var blade = Sword(H * 0.95, 1.1);
+                    swords.AddRange(Geo.Turn(blade, s * 35, cx, cy - H * 0.42));
+                }
+                outline = Geo.Union(Geo.Union(swords), [shield]);
+                etched.AddRange(Fronts.Outline([shield], 0.5));
+                double r = sw * 0.24;
+                if (look == FrontLook.Plank) { lines.Add(WoodFace.Dot(cx, cy, r * 0.8)); etched.Add(Geo.Circle(cx, cy, r * 0.45, 0.01)); }
+                else Cabinets.Symbol(look, cx, cy, r, etched, lines);
+                break;
+            }
+            case HangingStyle.Map:
+            {
+                // A parchment, rolled at both ends, with a coast, a road and a compass rose.
+                double roll = Math.Min(1.4, H * 0.1);
+                outline = Geo.Union([Geo.Rect(roll * 0.5, 0, W - roll * 0.5, H), WoodFace.RoundRect(0, 0, roll * 1.6, H, roll * 0.7), WoodFace.RoundRect(W - roll * 1.6, 0, W, H, roll * 0.7)]);
+                lines.Add([new(roll * 1.6, 0.3), new(roll * 1.6, H - 0.3)]);
+                lines.Add([new(W - roll * 1.6, 0.3), new(W - roll * 1.6, H - 0.3)]);
+                var land = Hide(W * 0.45, H * 0.5, W * 0.32, H * 0.36, rnd);
+                lines.Add(Geo.Loop(land));
+                var road = new PathD();
+                for (int i = 0; i <= 8; i++) road.Add(new PointD(W * 0.2 + W * 0.5 * i / 8, H * (0.35 + 0.25 * Math.Sin(i * 0.9 + rnd.NextDouble()))));
+                lines.AddRange(Geo.ClipLines([road], [land]));
+                double cr = Math.Min(W, H) * 0.12;
+                if (cr > 0.8) lines.Add(Geo.Loop(Fronts.Star(W * 0.8, H * 0.25, cr, cr * 0.3, 4)));
+                grain = false;
+                break;
+            }
+            case HangingStyle.Monitor:
+            {
+                outline = [Fronts.Chamfered(0, 0, W, H, Math.Min(1.2, Math.Min(W, H) * 0.12))];
+                double b = Math.Min(1.0, Math.Min(W, H) * 0.1);
+                var screen = Fronts.Chamfered(b, b * 1.6, W - b, H - b, Math.Min(0.8, Math.Min(W, H) * 0.08));
+                etched.Add(screen);
+                // What's on it, left unetched: a graph and lines of text.
+                var shown = new PathsD();
+                var graph = new PathD();
+                for (int i = 0; i <= 10; i++) graph.Add(new PointD(b + 1 + (W * 0.55 - b - 1) * i / 10, b * 1.6 + 1 + (H - b * 2.6 - 2) * (0.3 + 0.5 * rnd.NextDouble())));
+                shown.AddRange(Thick(graph, 0.3));
+                for (double y = H - b - 1.2; y > b * 1.6 + 1; y -= 1.0) shown.Add(Geo.Rect(W * 0.62, y - 0.18, W * (0.7 + 0.22 * rnd.NextDouble()) - b, y + 0.18));
+                etched = Geo.Subtract(etched, shown);
+                for (double x = W * 0.4; x < W * 0.6; x += 0.7) lines.Add(WoodFace.Dot(x, b * 0.8, 0.15));
+                break;
+            }
+            default:
+            {
+                // A tapestry on a rod: a border, a field of diamonds and a figure in the middle; a fringe at the bottom.
+                double rod = Math.Min(1.0, H * 0.07), x0 = Math.Min(1.0, W * 0.08);
+                outline = Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(0, H - rod, W, H)]);
+                double b = Geo.Clamp(Math.Min(W, H) * 0.1, 0.8, 2);
+                etched.AddRange(Fronts.Outline(x0 + b * 0.6, b * 1.2, W - x0 - b * 0.6, H - rod - b * 0.6, 0.45));
+                for (double x = x0 + 0.4; x < W - x0 - 0.3; x += 0.45) lines.Add([new(x, 0), new(x, b * 0.7)]);
+                double fx0 = x0 + b * 1.3, fx1 = W - x0 - b * 1.3, fy0 = b * 1.9, fy1 = H - rod - b * 1.3;
+                for (double s = -(fy1 - fy0); s < fx1 - fx0; s += 2.4)
+                {
+                    lines.AddRange(Geo.ClipLines([[new(fx0 + s, fy0), new(fx0 + s + (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
+                    lines.AddRange(Geo.ClipLines([[new(fx1 - s, fy0), new(fx1 - s - (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
+                }
+                double r = Math.Min(fx1 - fx0, fy1 - fy0) * 0.3;
+                if (r > 1)
+                {
+                    var plate = Heater(W / 2 - r, (fy0 + fy1) / 2 - r * 1.1, r * 2, r * 2.3);
+                    etched.Add(plate);
+                    var inner = new PathsD();
+                    var il = new List<PathD>();
+                    Cabinets.Symbol(look, W / 2, (fy0 + fy1) / 2 + r * 0.1, r * 0.55, inner, il);
+                    etched = Geo.Subtract(etched, Geo.Offset([plate], -0.5));
+                    lines.AddRange(il);
+                    etched.AddRange(inner);
+                }
+                break;
+            }
+        }
+        m.Add(it.Hanging switch { HangingStyle.Banner => "Banner", HangingStyle.Painting => "Painting", HangingStyle.Shield => "Shield", HangingStyle.Map => "Map", HangingStyle.Monitor => "Screen", _ => "Tapestry" },
+            outline, [], [Pose.Front(0, y0, m.T / 2)], grainAlongU: true, face: grain ? null : [], etched: etched, lines: lines);
+        m.Note($"Glue it to the wall with its bottom {y0:0.#} mm up.");
+    }
+
+    /// <summary>A heater shield: straight top, sides curving to a point.</summary>
+    public static PathD Heater(double x0, double y0, double w, double h)
+    {
+        var p = new PathD { new(x0, y0 + h), new(x0 + w, y0 + h) };
+        for (int i = 0; i <= 16; i++)
+        {
+            double t = i / 16.0;
+            p.Add(new PointD(x0 + w - w / 2 * Math.Pow(t, 1.6), y0 + h * 0.62 * (1 - t) + 0));
+        }
+        for (int i = 15; i >= 1; i--)
+        {
+            double t = i / 16.0;
+            p.Add(new PointD(x0 + w / 2 * Math.Pow(t, 1.6), y0 + h * 0.62 * (1 - t)));
+        }
+        p.Add(new PointD(x0, y0 + h * 0.62));
+        return Geo.Tidy([p]).OrderByDescending(q => Math.Abs(Clipper.Area(q))).First();
+    }
+
+    /// <summary>A sword standing on its point at the origin, <paramref name="len"/> long: blade, crossguard, grip and pommel.</summary>
+    public static PathsD Sword(double len, double blade)
+    {
+        double grip = len * 0.2, bl = len - grip;
+        var p = new PathsD
+        {
+            new PathD { new(0, 0), new(blade / 2, blade * 0.9), new(blade / 2, bl), new(-blade / 2, bl), new(-blade / 2, blade * 0.9) },
+            Geo.Rect(-blade * 1.9, bl - 0.01, blade * 1.9, bl + 1.0),
+            Geo.Rect(-0.55, bl + 0.99, 0.55, len - 0.7),
+            Geo.Circle(0, len - 0.6, 0.75),
+        };
+        return Geo.Union(p);
+    }
+
+    /// <summary>A little landscape: hills, a sun, a tree, inside the frame.</summary>
+    static void Landscape(double x0, double y0, double x1, double y1, Random rnd, PathsD etched, List<PathD> lines)
+    {
+        double w = x1 - x0, h = y1 - y0;
+        if (w < 3 || h < 3) return;
+        var hill = new PathD();
+        for (int i = 0; i <= 20; i++)
+        {
+            double t = i / 20.0;
+            hill.Add(new PointD(x0 + w * t, y0 + h * (0.35 + 0.12 * Math.Sin(t * 5 + rnd.NextDouble() * 0.3))));
+        }
+        lines.Add(hill);
+        var far = new PathD();
+        for (int i = 0; i <= 20; i++)
+        {
+            double t = i / 20.0;
+            far.Add(new PointD(x0 + w * t, y0 + h * (0.55 + 0.1 * Math.Sin(t * 3 + 2))));
+        }
+        lines.Add(far);
+        etched.Add(Geo.Circle(x0 + w * 0.75, y0 + h * 0.78, Math.Min(w, h) * 0.08, 0.01));
+        double tx = x0 + w * 0.28, ty = y0 + h * 0.4;
+        lines.Add([new(tx, ty), new(tx, ty + h * 0.25)]);
+        etched.Add(Geo.Circle(tx, ty + h * 0.3, Math.Min(w, h) * 0.1, 0.01));
+    }
+}

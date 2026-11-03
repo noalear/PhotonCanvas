@@ -55,5 +55,25 @@ static class FurnitureShots
         Shot("window-furniture-pieces", tavern, 4, 1);
         Shot("window-furniture-push-fit", tavern with { PushFit = true }, 4, 1, 1);
         Shot("window-furniture-door", new FurnitureSet { Items = [Defaults.For(ItemKind.WallDoor), Defaults.For(ItemKind.WallShelf)] }, 0, 0);
+
+        // Ready-made pieces: a gothic hall, a medieval bedroom, a starship's bridge and a crypt.
+        FurnitureItem C(string id) => FurnitureCatalog.Find(id)!.Item;
+        var gothic = FurnitureThemes.Apply(new FurnitureSet { Items = [C("got-grand-fireplace"), C("got-wing-chair"), C("got-grandfather-clock"), C("got-glass-bookcase"), C("got-candelabra")] }, "Gothic");
+        Shot("window-furniture-ready-made", gothic, 0, 0);
+        Shot("window-furniture-clock", gothic, 2, 0);
+        var bedroom = FurnitureThemes.Apply(new FurnitureSet { Items = [C("med-four-poster-bed"), C("med-wardrobe"), C("med-chest-of-drawers"), C("med-bedroom-rug")] }, "Medieval");
+        Shot("window-furniture-four-poster", bedroom, 0, 0);
+        Shot("window-furniture-wardrobe", bedroom, 1, 0);
+        var bridge = FurnitureThemes.Apply(new FurnitureSet { Items = [C("sci-captains-chair"), C("sci-helm-console"), C("sci-lockers"), C("sci-rifle-rack"), C("sci-sleeper-pod")] }, "Sci-fi");
+        Shot("window-furniture-console", bridge, 1, 0);
+        Shot("window-furniture-lockers", bridge, 2, 0);
+        var med = FurnitureThemes.Apply(new FurnitureSet { Items = [C("med-throne"), C("med-weapon-rack"), C("med-armour-stand"), C("med-smithy-forge"), C("med-dresser-with-plates")] }, "Medieval");
+        Shot("window-furniture-throne", med, 0, 0);
+        Shot("window-furniture-weapon-rack", med, 1, 0);
+        Shot("window-furniture-forge", med, 3, 0);
+        Shot("window-furniture-dresser", med, 4, 0);
+        var crypt = FurnitureThemes.Apply(new FurnitureSet { Items = [C("got-sarcophagus"), C("got-coffin"), C("got-tracery-screen")] }, "Gothic");
+        Shot("window-furniture-sarcophagus", crypt, 0, 0);
+        Shot("window-furniture-screen", crypt, 2, 0);
     }
 }

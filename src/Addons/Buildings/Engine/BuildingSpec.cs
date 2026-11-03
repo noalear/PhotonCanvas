@@ -195,6 +195,13 @@ public sealed record BuildingSpec
 
     public static KindInfo Info(BuildingKind k) => Kinds.First(x => x.Kind == k);
 
+    /// <summary>A ready-made piece from the furniture catalog (its theme's look and its name).</summary>
+    static RoomItem R(string id, int storey = 0, int count = 1)
+    {
+        var e = FurnitureCatalog.Find(id) ?? throw new ArgumentException($"No ready-made furniture called {id}.");
+        return new RoomItem { Item = e.Item with { Count = count }, Storey = storey, Name = e.Name };
+    }
+
     static RoomItem I(ItemKind kind, int storey = 0, int count = 1, Func<FurnitureItem, FurnitureItem>? edit = null, string? name = null)
     {
         var it = Defaults.For(kind) with { Count = count };
@@ -243,7 +250,7 @@ public sealed record BuildingSpec
             Items =
             [
                 I(ItemKind.Table, 0, 2), I(ItemKind.Bench, 0, 4), I(ItemKind.Stool, 0, 3), I(ItemKind.Crate, 0, 2),
-                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 40, DepthMm = 10, HeightMm = 14, Legs = LegStyle.Slab }, "Bar counter"),
+                R("med-bar-counter"), R("med-great-fireplace"),
                 I(ItemKind.Bed, 1, 3), I(ItemKind.Chest, 1, 2), I(ItemKind.Chair, 1, 1),
             ],
         },
@@ -252,7 +259,7 @@ public sealed record BuildingSpec
             Kind = k, WidthMm = 72, DepthMm = 72, Storeys = 2, StoreyHeightMm = 45, Top = BuildingTop.Battlements, ParapetHeightMm = 21, Roof = RoofShape.None,
             Texture = "Stone blocks", FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Ladder, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
             WindowsFront = 1, WindowsSide = 1, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 15, SillMm = 18, Bars = WindowBars.None,
-            Items = [I(ItemKind.Crate, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
+            Items = [I(ItemKind.Crate, 0, 2), R("med-weapon-rack"), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 2), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 2)],
         },
         BuildingKind.Outpost => new BuildingSpec
         {
@@ -264,7 +271,7 @@ public sealed record BuildingSpec
             Items =
             [
                 I(ItemKind.Table, 0, 1, t => t with { Legs = LegStyle.Slab, Top = TopShape.Square }), I(ItemKind.Chair, 0, 2, c => c with { Back = BackStyle.Panel }),
-                I(ItemKind.Bed, 0, 2, b => b with { FootMm = 13 }), I(ItemKind.Bookshelf, 0, 1, b => b with { Books = false }, "Lockers"), I(ItemKind.Crate, 0, 3),
+                R("sci-crew-bunks"), R("sci-lockers"), R("sci-helm-console"), I(ItemKind.Crate, 0, 2),
             ],
         },
         BuildingKind.Chapel => new BuildingSpec
@@ -276,9 +283,8 @@ public sealed record BuildingSpec
             FloorTexture = "Chequered tiles", Detail = WoodDetail.Grain,
             Items =
             [
-                I(ItemKind.Bench, 0, 6, b => b with { WidthMm = 26 }, "Pews"),
-                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 30, DepthMm = 12, HeightMm = 16, Legs = LegStyle.Slab }, "Altar"),
-                I(ItemKind.Chair, 0, 2, c => c with { Back = BackStyle.Ladder, HeightMm = 22 }), I(ItemKind.Bookshelf, 0, 1),
+                R("got-pew", 0, 6), R("got-altar"), R("got-lectern"), R("got-candelabra", 0, 2),
+                I(ItemKind.Chair, 0, 2, c => c with { Back = BackStyle.Ladder, HeightMm = 22 }),
             ],
         },
         BuildingKind.Crypt => new BuildingSpec
@@ -290,8 +296,7 @@ public sealed record BuildingSpec
             FloorTexture = "Dungeon flagstones", Detail = WoodDetail.Planks,
             Items =
             [
-                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 30, DepthMm = 14, HeightMm = 10, Legs = LegStyle.Slab }, "Tomb"),
-                I(ItemKind.Chest, 0, 2), I(ItemKind.Crate, 0, 2), I(ItemKind.Bench, 0, 1),
+                R("dun-stone-sarcophagus"), R("dun-coffin", 0, 2), R("dun-torch", 0, 2), I(ItemKind.Chest, 0, 1),
             ],
         },
         BuildingKind.OctagonTower => new BuildingSpec
@@ -310,8 +315,8 @@ public sealed record BuildingSpec
             WindowsFront = 2, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 9, WindowHeightMm = 12, SillMm = 20, Bars = WindowBars.Cross,
             Items =
             [
-                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 40 }), I(ItemKind.Bench, 0, 2), I(ItemKind.Bookshelf, 0, 1), I(ItemKind.Chair, 0, 2),
-                I(ItemKind.Bed, 1, 2), I(ItemKind.Chest, 1, 2),
+                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 40 }), I(ItemKind.Bench, 0, 2), R("med-great-fireplace"), R("med-bookcase"), R("med-armchair", 0, 2),
+                R("med-four-poster-bed", 1), R("med-wardrobe", 1), R("med-chest-of-drawers", 1), I(ItemKind.Chest, 1, 1),
             ],
         },
         BuildingKind.AdobeHouse => new BuildingSpec
@@ -322,15 +327,15 @@ public sealed record BuildingSpec
             FloorTexture = "Sandstone slabs", Detail = WoodDetail.Grain, WayUp = WayUpStyle.Ladder,
             Items =
             [
-                I(ItemKind.Table, 0, 1, t => t with { Legs = LegStyle.Round, HeightMm = 9 }), I(ItemKind.Stool, 0, 3), I(ItemKind.Chest, 0, 1), I(ItemKind.Crate, 0, 2),
-                I(ItemKind.Bed, 1, 2), I(ItemKind.Chest, 1, 1),
+                I(ItemKind.Table, 0, 1, t => t with { Legs = LegStyle.Round, HeightMm = 9 }), I(ItemKind.Stool, 0, 3), R("des-clay-oven"), R("des-jar-shelves"), I(ItemKind.Crate, 0, 1),
+                R("des-low-bed", 1, 2), R("des-lattice-cupboard", 1), I(ItemKind.Chest, 1, 1),
             ],
         },
         _ => new BuildingSpec
         {
             Kind = BuildingKind.Cottage, WidthMm = 110, DepthMm = 80, Storeys = 1, StoreyHeightMm = 48,
             Texture = "Fieldstone", RoofTexture = "Thatch", RoofPitchDeg = 50, RoofEaveMm = 6,
-            Items = [I(ItemKind.Table), I(ItemKind.Chair, 0, 2), I(ItemKind.Bed), I(ItemKind.Chest), I(ItemKind.Bookshelf)],
+            Items = [I(ItemKind.Table), I(ItemKind.Chair, 0, 2), I(ItemKind.Bed), I(ItemKind.Chest), R("med-dresser-with-plates")],
         },
     };
 
