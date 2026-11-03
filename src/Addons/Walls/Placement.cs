@@ -1,3 +1,4 @@
+using Clipper2Lib;
 using PhotonCanvas.Addon.Terrain;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
@@ -31,6 +32,14 @@ public static class Placement
     public const string LineLayer = "Walls · lines";
     /// <summary>The texture as a greyscale depth map, carved in slices (<see cref="WallSpec.Relief"/>).</summary>
     public const string ReliefLayer = "Walls · relief";
+    /// <summary>A single panel's back (<see cref="WallSpec.EngraveBack"/>): engraved after the cut pieces are turned over.</summary>
+    public const string BackEtchLayer = "Walls · back etch";
+    public const string BackLineLayer = "Walls · back lines";
+    public const string BackReliefLayer = "Walls · back relief";
+    /// <summary>Each turned-over piece's outline, not burned: what Fit to piece lines the back's engraving up by.</summary>
+    public const string BackGuideLayer = "Walls · back outline (guide)";
+    /// <summary>The name ending the page each sheet's backs are on.</summary>
+    public const string BackPage = "backs (turn the pieces over)";
     /// <summary>Which set a shape belongs to (an id shared by all its pieces).</summary>
     public const string IdKey = "walls.id";
     /// <summary>The settings it was made from (JSON), on each piece's outline.</summary>
@@ -143,6 +152,8 @@ public static class Placement
         if (TooBig(kit, machine, o.GapMm).FirstOrDefault() is { } tooBig) throw new InvalidOperationException(tooBig.Text);
         // Each piece (each copy of it) made at the bed's corner; the nesting moves it into place. Kind of each shape: 0 cut, 1 etch, 2 lines, 3 relief.
         var units = new List<List<(Shape Shape, int Kind)>>();
+        // A piece's back, by its outline's id: put on a page of its own once the front is nested (kind 4 etch, 5 lines, 6 relief, 7 guide outline).
+        var backs = new Dictionary<Guid, List<(Shape Shape, int Kind)>>();
         foreach (var part in kit.Parts)
         {
             ct.ThrowIfCancellationRequested();
@@ -155,6 +166,7 @@ public static class Placement
             var lines = !relief && part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
             var map = relief ? Terrain.Relief.Render(part.Cut, part.Etched, part.Lines, look with { Seed = look.Seed + units.Count }) : null;
             var source = map is null ? null : ImageSource.FromEncoded(map.Png);
+            var back = part.HasBack ? Back(part, outline, move, relief, look with { Seed = look.Seed + 500 + units.Count }) : null;
             for (int c = 0; c < part.Copies; c++)
             {
                 string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
@@ -169,9 +181,15 @@ public static class Placement
                     }, 3));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
                 units.Add([.. shapes.Select(x => (x.Item1.WithGroup(g).WithAddonData(IdKey, id.ToString()), x.Item2))]);
+                if (back is not null)
+                {
+                    var bg = Guid.NewGuid();
+                    backs[units[^1][0].Shape.Id] = [.. back.Select(b => (b.Shape.With(name: $"{name} · back{b.Suffix}", id: Guid.NewGuid()).WithGroup(bg).WithAddonData(IdKey, id.ToString()), b.Kind))];
+                }
             }
         }
         if (units.Count == 0) throw new InvalidOperationException("Nothing to cut.");
+        var backSheets = new List<(int Sheet, Affine Nested, List<(Shape Shape, int Kind)> Shapes)>();
 
         // Biggest first, so the panels get the room and the small pieces fill round them.
         units = [.. units.OrderByDescending(u => { var b = u[0].Shape.Bounds; return b.Width * b.Height; })];
@@ -187,15 +205,98 @@ public static class Placement
                 throw new InvalidOperationException("A piece doesn't fit on the bed with the spacing round it. Make it smaller.");
             var unplaced = report.Unplaced.ToHashSet();
             s = Ops.Delete(nested, unplaced);
+            foreach (var u in onPage)
+                if (!unplaced.Contains(u[0].Id) && backs.TryGetValue(u[0].Id, out var b) && s.Shapes.FirstOrDefault(x => x.Id == u[0].Id) is { } placed)
+                    backSheets.Add((sheets, placed.Transform, b));
             units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
             if (units.Count == 0) break;
             s = Pages.Add(s, $"{title} {++sheets}");
             (cutLayer, etchLayer, lineLayer, reliefLayer) = Layers(ref s);
         }
+        int backPages = 0;
+        if (backSheets.Count > 0) (s, backPages) = AddBacks(s, backSheets, firstPage, sheets, machine, title);
         if (o.CutSettings is { } cutSettings)
             s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == CutLayer, l => cutSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
         if (o.EtchSettings is { } etchSettings)
-            s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == EtchLayer, l => etchSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Fill, ParentId = l.ParentId });
+            s = Pages.UpdateLayers(s, firstPage, sheets + backPages, l => l.Name is EtchLayer or BackEtchLayer, l => etchSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Fill, ParentId = l.ParentId });
         return (Pages.SwitchTo(s, firstPage), sheets, id);
+    }
+
+    /// <summary>
+    /// A piece's back, made like its front at the bed's corner (<paramref name="move"/>): its outline as a guide, and
+    /// what's engraved, both as they lie seen through the piece from the front. Mirrored across the bed afterwards, it's
+    /// where the piece's back is once it's turned over left to right.
+    /// </summary>
+    static List<(Shape Shape, int Kind, string Suffix)> Back(Part part, PathGeometry outline, Affine move, bool relief, Terrain.Relief.Look look)
+    {
+        var list = new List<(Shape, int, string)> { (new PathShape { Name = "", Geometry = outline }, 7, " outline") };
+        var etched = part.BackEtched ?? [];
+        var lines = part.BackLines ?? [];
+        if (!relief)
+        {
+            if (etched.Count > 0) list.Add((new PathShape { Name = "", Geometry = Geo.ToGeometry(etched).Transform(move) }, 4, " texture"));
+            if (lines.Count > 0) list.Add((new PathShape { Name = "", Geometry = Geo.ToGeometry([], lines).Transform(move) }, 5, " lines"));
+            return list;
+        }
+        // A relief is a picture: drawn as seen from behind (so it's never shown mirrored), then turned to lie through the front.
+        var b = Geo.Bounds(part.Cut);
+        double c = b.left + b.right;
+        PointD M(PointD p) => new(c - p.x, p.y);
+        var map = Terrain.Relief.Render(Geo.Tidy(Geo.Map(part.Cut, M)), Geo.Tidy(Geo.Map(etched, M)), Geo.Map(lines, M), look);
+        if (map is null) return list;
+        var box = outline.Bounds();
+        var through = Affine.ScaleAbout(new Vec2(box.Center.X, 0), -1, 1);
+        list.Add((new ImageShape
+        {
+            Name = "", Source = ImageSource.FromEncoded(map.Png), SizeMm = new Vec2(map.WidthMm, map.HeightMm),
+            Transform = Affine.Translate(map.Left, -map.Top).Then(move).Then(through),
+        }, 6, " relief"));
+        return list;
+    }
+
+    /// <summary>
+    /// The backs of each sheet's pieces on a page after all the sheets: mirrored across the bed's middle, so they lie
+    /// where the pieces are once the sheet is turned over left to right. Only engraved; each piece's outline is a guide
+    /// for Fit to piece. Returns how many pages were added.
+    /// </summary>
+    static (DocState, int) AddBacks(DocState s, List<(int Sheet, Affine Nested, List<(Shape Shape, int Kind)> Shapes)> backs, int first, int sheets, MachineProfile machine, string title)
+    {
+        var flip = Affine.ScaleAbout(new Vec2(machine.FieldW / 2, 0), -1, 1);
+        int added = 0;
+        foreach (var sheet in backs.GroupBy(b => b.Sheet).OrderBy(g => g.Key))
+        {
+            // After the last page of this set (the front sheets, then the backs added so far).
+            s = Pages.SwitchTo(s, first + sheets - 1 + added);
+            s = Pages.Add(s, sheets == 1 ? $"{title} · {BackPage}" : $"{title} {sheet.Key} · {BackPage}");
+            added++;
+            // Only the back's own layers on this page.
+            var empty = s.Layers.Where(l => !s.Shapes.Any(x => x.LayerId == l.Id)).Select(l => l.Id).ToHashSet();
+            var kinds = sheet.SelectMany(b => b.Shapes.Select(x => x.Kind)).ToHashSet();
+            var layers = new Dictionary<int, Guid>();
+            void Want(int kind, string name, LayerMode mode, Func<Layer, Layer> setup)
+            {
+                if (!kinds.Contains(kind)) return;
+                var l = setup(Layer.Default(s.Layers.Count, mode) with { Name = name });
+                s = Ops.AddLayer(s, l);
+                layers[kind] = l.Id;
+            }
+            Want(4, BackEtchLayer, LayerMode.Fill, l => l);
+            Want(5, BackLineLayer, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 15) } });
+            Want(6, BackReliefLayer, LayerMode.Image, Terrain.Relief.Setup);
+            Want(7, BackGuideLayer, LayerMode.Score, l => l with { Output = false, Color = 0x9CA3AF });
+            if (empty.Count > 0) s = Ops.DeleteLayers(s, empty, null);
+            var shapes = new List<Shape>();
+            foreach (var (_, nested, parts) in sheet)
+                foreach (var (shape, kind) in parts)
+                {
+                    var world = shape.Transform.Then(nested).Then(flip);
+                    // Outlines and etching kept as plain geometry (no mirrored transform left on them).
+                    shapes.Add(shape is PathShape p
+                        ? new PathShape { Name = p.Name, Id = p.Id, LayerId = layers[kind], Geometry = p.Geometry.Transform(world), GroupId = p.GroupId, AddonData = p.AddonData }
+                        : shape.With(layerId: layers[kind], transform: world));
+                }
+            s = Ops.AddShapes(s, shapes);
+        }
+        return (Pages.SwitchTo(s, first), added);
     }
 }
