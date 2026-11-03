@@ -122,7 +122,7 @@ public static class Rubble
         if (Rough.Cellular(s.Texture))
         {
             var grid = TextureGrid.Wall(s.TextureOf(s.Seed + 17), a * 12, b * 12, 0, a * 12, b * 12);
-            foreach (var r in grid.Tex.Raised.Where(r => { var m = Rough.Middle(r); return m.x > a && m.x < a * 11 && m.y > b && m.y < b * 11; }).OrderBy(_ => rnd.Next()).Take(n))
+            foreach (var r in grid.Whole.Raised.Where(r => { var m = Rough.Middle(r); return m.x > a && m.x < a * 11 && m.y > b && m.y < b * 11; }).OrderBy(_ => rnd.Next()).Take(n))
                 stones.Add(Geo.Tidy([r]));
         }
         else

@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 using PhotonCanvas.Addon.Walls;
 
 namespace PhotonCanvas.Addon.FloorTiles;
@@ -9,7 +10,11 @@ namespace PhotonCanvas.Addon.FloorTiles;
 /// a random layout and stones that can crack. <paramref name="Walls"/> names the wall maker's texture
 /// it is made with, when it is one of those.
 /// </summary>
-public sealed record FloorPreset(string Name, string? SizeALabel, double SizeA, string? SizeBLabel, double SizeB, bool UsesGroove, double Groove, bool Random, bool Stone, bool Scales, string About, string? Walls = null);
+public sealed record FloorPreset(string Name, string? SizeALabel, double SizeA, string? SizeBLabel, double SizeB, bool UsesGroove, double Groove, bool Random, bool Stone, bool Scales, string About, string? Walls = null)
+{
+    /// <summary>The usual size of the texture's smallest marks (mm): the wall maker's for its textures.</summary>
+    public double Detail => Walls is not null && Textures.Preset(Walls) is { } w ? w.Detail : Name is "Cobblestones" or "Herringbone brick" ? 0.4 : 0.6;
+}
 
 /// <summary>
 /// The floor textures: some of the wall maker's (laid flat) and some made for floors, laid out from
@@ -51,7 +56,7 @@ public static class FloorTextures
         new("Cave floor", "Rock size", 18, "Layer height", 12, true, 1.0, true, true, true,
             "Rough rock in uneven slabs, split by cracks and pitted, as the wall maker's cave rock.", "Cave rock"),
         new("Sci-fi deck", "Panel width", 25.4, "Panel height", 12.7, true, 0.5, true, false, true,
-            "Metal deck panels with cut corners, vents, bolts and hazard stripes, as the wall maker's sci-fi panels.", "Sci-fi panels"),
+            "Metal deck panels laid as the wall maker's sci-fi panels: inset plates, vent grilles, hatches, pipe runs, greebles and hazard stripes between bolted ribs.", "Sci-fi panels"),
         new("Grating", "Slot pitch", 2.2, null, 0, false, 0, false, false, true,
             "Open metal grating: rows of slots etched in each square inside a solid frame, turned square by square."),
         new("Sandstone slabs", "Slab length", 16.9, "Row width", 8.47, true, 0.7, true, true, true,
@@ -87,7 +92,7 @@ public static class FloorTextures
             // One of the wall maker's: made over a face a square bigger all round, then moved back a square.
             var wallSpec = p is null
                 ? new WallSpec { Texture = s.Custom?.Name ?? s.Texture, Custom = s.Custom, SizeA = a, SizeB = b, GrooveMm = groove, Seed = seed }
-                : new WallSpec { Texture = p.Walls!, SizeA = a, SizeB = p.SizeBLabel is null ? a : b, GrooveMm = groove, Seed = seed };
+                : new WallSpec { Texture = p.Walls!, SizeA = a, SizeB = p.SizeBLabel is null ? a : b, GrooveMm = groove, Seed = seed, Wear = s.Wear, DetailMm = s.DetailMm, Etch = s.Etch };
             if (p is null && s.Custom is null) return TextureParts.None;
             double fw = w + 2 * g0, fh = h + 2 * g0;
             var t = Textures.Make(wallSpec, new Face(fw, fh, 0, fw, fh));
@@ -105,9 +110,27 @@ public static class FloorTextures
             "Sand" => Sand(region, a, rnd),
             _ => TextureParts.None,
         };
+        if (p is { Walls: null } && parts.Raised.Count > 0) parts = Worn(parts, p, s, seed);
         if (p is { Stone: true } && s.CracksPct > 0 && parts.Raised.Count > 0)
             parts = parts with { Lines = [.. parts.Lines, .. Cracks(parts.Raised, s.CracksPct / 100, rnd)] };
         return parts;
+    }
+
+    /// <summary>
+    /// The floor's own stones, bricks and tiles aged as the wall maker's are (Shared/Terrain/Weathering.cs):
+    /// worn edges, knocked corners, pits and cracks, as much as the spec's wear says.
+    /// </summary>
+    static TextureParts Worn(TextureParts parts, FloorPreset p, TileSpec s, int seed)
+    {
+        if (s.Wear <= 0) return parts;
+        var stuff = p.Name switch { "Herringbone brick" => Stuff.Brick, "Chequered tiles" => Stuff.Tile, _ => Stuff.Stone };
+        var w = new Weathering(seed + 101, new Wear(s.Wear, s.DetailMm > 0 ? s.DetailMm : p.Detail, s.Etch == EtchStyle.Lines));
+        var etched = new PathsD(parts.Etched);
+        var lines = new List<PathD>(parts.Lines);
+        var raised = new PathsD();
+        foreach (var piece in parts.Raised)
+            raised.AddRange(Clipper.Area(piece) > 0 ? w.Piece(piece, stuff, etched, lines) : [piece]);
+        return new(raised, etched, lines);
     }
 
     /// <summary>The rectangle a texture is made over.</summary>

@@ -66,6 +66,10 @@ public sealed record WallSpec
     public double SizeB { get; init; } = 3.5;
     public double GrooveMm { get; init; } = 0.6;
     public int Seed { get; init; } = 1;
+    /// <summary>How worn the texture is, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
+    public double DetailMm { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
     /// <summary>Leave the ends (the part inside the columns' slots) smooth, so they slide in at full thickness.</summary>
     public bool PlainEnds { get; init; } = true;

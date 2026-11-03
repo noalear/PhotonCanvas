@@ -62,7 +62,8 @@ public class WallsTests
     public void Bricks_follow_the_brick_size()
     {
         // 8 × 3.5 bricks with 0.6 mm mortar: the mortar is about (8·3.5 − 7.4·2.9)/(8·3.5) ≈ 23 % of the textured face.
-        var wall = Part(Make(new WallSpec { LengthMm = 100, HeightMm = 49, Texture = "Brick", SizeA = 8, SizeB = 3.5, GrooveMm = 0.6, PlainEnds = false, Connectors = [] }), "Wall");
+        // No wear: worn bricks lose a little more to nicks, chips and pits.
+        var wall = Part(Make(new WallSpec { LengthMm = 100, HeightMm = 49, Texture = "Brick", SizeA = 8, SizeB = 3.5, GrooveMm = 0.6, PlainEnds = false, Wear = 0, Connectors = [] }), "Wall");
         Assert.Equal(0.233, Geo.Area(wall.Etched) / (100 * 49), 2);
     }
 

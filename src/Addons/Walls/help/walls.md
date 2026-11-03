@@ -89,25 +89,35 @@ Pick one in **Texture**. The sizes it asks for change with it; the defaults suit
 
 | Texture | Sizes (defaults) | What it looks like |
 |---|---|---|
-| Brick | length 8, height 3.5 mm | Bricks in running bond, each row moved along half a brick. |
-| Stone blocks | length 12, course 6 mm | Cut stone in rows of different heights. |
-| Fieldstone | size 9, course 6 mm | Rough, rounded stones of uneven shapes. |
-| Tiles | 6 × 6 mm | Square tiles or blocks in straight rows. |
-| Wood planks (upright) / (across) | width 5, length 35 mm | Boards with butt joints, grain and nail holes. |
-| Timber frame | beam 3, bay 20 mm | Tudor style: posts, rails and braces stand out and the plaster between them is etched. |
-| Corrugated metal | pitch 2.5 mm | Upright ridges. |
-| Metal plates | 20 × 14 mm | Riveted plates. |
-| Hexagons | 8 mm | Hexagonal tiles or armour. |
-| Dungeon blocks | length 14, course 8 mm | Big, worn blocks with chipped corners and the odd crack. |
-| Cave rock | rock 16, layer 10 mm | Rough rock in uneven layers, split by cracks and pitted. |
-| Sci-fi panels | 16 × 12 mm | Metal panels of different widths with cut corners; some have vents, bolts, an inset edge or hazard stripes. |
-| Sandstone | length 16, course 7 mm | Long, soft-cornered blocks with wind-worn lines and pits. |
-| Adobe | patch 14, brick 3 mm | Smooth mud plaster with patches fallen away to show the bricks, and a few cracks. |
+| Brick | length 8, height 3.5 mm | Bricks in running bond, each row moved along half a brick: worn edges, knocked corners, the odd spalled or cracked brick. |
+| Stone blocks | length 12, course 6 mm | Cut stone in rows of different heights, weathered and chipped. |
+| Fieldstone | size 9, course 6 mm | Rough, rounded stones of uneven shapes and sizes. |
+| Tiles | 6 × 6 mm | Square tiles or blocks in straight rows, the odd one chipped or cracked. |
+| Wood planks (upright) / (across) | width 5, length 35 mm | Boards with butt joints, flowing grain that bends round knots, splits and nail holes. |
+| Timber frame | beam 3, bay 20 mm | Tudor style: posts, rails and braces stand out with their grain; the plaster between them is etched. |
+| Corrugated metal | pitch 2.5 mm | Upright ridges, dented and scratched, with riveted sheet overlaps. |
+| Metal plates | 20 × 14 mm | Riveted plates with the odd patch plate or weld seam, scratches and rust pits. |
+| Hexagons | 8 mm | Hexagonal tiles or armour, some with an inset face. |
+| Dungeon blocks | length 14, course 8 mm | Big, worn blocks: chipped, spalled, pitted and cracked. |
+| Cave rock | rock 16, layer 10 mm | Rough rock in uneven, tilted layers with bedding lines, split by cracks and pitted. |
+| Sci-fi panels | 16 × 12 mm | A bulkhead: a kick plate of vents along the foot, bays of panels with bolted ribs between them, and modules of different heights in each bay (inset plates, recessed panels, vent grilles, hatches with hinges and a grip, pipe runs with clamps, clusters of ports and knurled blocks, light strips, display panels and the odd band of hazard stripes). |
+| Sandstone | length 16, course 7 mm | Long, soft-cornered blocks eaten by the wind: rounded edges, wind lines and clusters of pits. |
+| Adobe | patch 14, brick 3 mm | Smooth mud plaster with ragged patches fallen away to show worn bricks, and spreading cracks. |
 | Plain | | No texture: just the outline, doors, windows and mounts. |
 
 - **Groove**: how wide the etched gaps between bricks, stones or planks are.
 - **Variation**: stones, blocks and planks are laid out at random; each number gives a different
   layout, and **Shuffle** picks the next one. The same number always gives the same wall.
+- **Wear %**: how weathered the texture looks. 0 is new and crisp (straight edges, nothing broken),
+  50 is the usual look, 100 is ancient and battered. More wear means more nicked edges (so the gaps
+  between stones vary in width), knocked-off corners, bites out of the edges, clusters of pits,
+  weathered patches, cracks (the worst etched open, the rest scored), and on metal scratches, dings
+  and rust pits. Some stones stay almost smooth and others are badly worn, and how worn the wall is
+  drifts slowly along it, as on a real wall. Changing the wear doesn't move any stones: the layout
+  comes from **Variation** only.
+- **Detail size**: the size of the smallest marks, in mm: pits, nicks, wood grain, bolts, vent slats,
+  pipes and greebles. Each texture picks a sensible size when you choose it. Make it bigger for a big
+  wall or a coarse material (the marks stay clear), smaller for fine work.
 - **Etch as**: *Grooves* etches the gaps as filled areas (deeper and the most real). *Lines* scores
   round each brick or stone instead, which is much quicker. Grain, rivets and door handles are always
   scored lines, on a light **Walls · lines** layer.

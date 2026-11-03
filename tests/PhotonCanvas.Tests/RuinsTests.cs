@@ -138,7 +138,8 @@ public class RuinsTests
         Assert.Equal(a.Lines.Count, b.Lines.Count);
         Assert.NotEqual(Geo.Area(a.Cut), Geo.Area(c.Cut), 3);
         Assert.True(a.Lines.Count >= 3);
-        Assert.Empty(Part(Make(Wall(new RuinSpec { Seed = 7, Cracks = 0 })), "Broken wall").Lines);
+        // No cracks of the ruin's own (and no wear, which scores the odd hairline crack in the bricks themselves).
+        Assert.Empty(Part(Make(Wall(new RuinSpec { Seed = 7, Cracks = 0, Wear = 0 })), "Broken wall").Lines);
     }
 
     [Fact]
