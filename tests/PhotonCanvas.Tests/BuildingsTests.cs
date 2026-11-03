@@ -34,7 +34,7 @@ public class BuildingsTests
         }
     }
 
-    static (V3 Min, V3 Max) Box(Solid s)
+    internal static (V3 Min, V3 Max) Box(Solid s)
     {
         var b = Geo.Bounds(s.Outline);
         var pts = new List<V3>();
@@ -46,7 +46,7 @@ public class BuildingsTests
     }
 
     /// <summary>Places where two solids would be in the same space (sampled where their boxes meet).</summary>
-    static List<string> Clashes(IReadOnlyList<Solid> a, IReadOnlyList<Solid> b, double step = 0.25)
+    internal static List<string> Clashes(IReadOnlyList<Solid> a, IReadOnlyList<Solid> b, double step = 0.25)
     {
         var found = new List<string>();
         var pa = a.Select(s => new Placed(s, Geo.Offset(s.Outline, -0.03))).ToList();
@@ -104,7 +104,7 @@ public class BuildingsTests
         var walls = kit.Solids.Where(s => !s.IsFurniture && s.Side is not (WallSide.None or WallSide.Floor or WallSide.Ground or WallSide.Roof) && s.Name != "Front door").ToList();
         var columns = kit.Solids.Where(s => s.Name is "Corner column" or "Column cap").ToList();
         var floors = kit.Solids.Where(s => s.Side is WallSide.Floor or WallSide.Ground).ToList();
-        Assert.Equal(4, walls.Count(w => w.Storey == 0));
+        Assert.Equal(Footprint.Of(BuildingSpec.FlatPreset(k)).Walls.Count, walls.Count(w => w.Storey == 0));
         Assert.Empty(Clashes(walls, columns));
         Assert.Empty(Clashes(walls, floors));
         Assert.Empty(Clashes(columns, floors));
@@ -420,7 +420,10 @@ public class BuildingsTests
         foreach (var p in kit.Pieces) Assert.True(Geo.Pieces(p.Cut) == 1, $"{p.Name} comes out in {Geo.Pieces(p.Cut)} pieces");
         // Each wall is a box: faces, a base, a top, ends; the corner columns are boxes too.
         foreach (var part in new[] { ": back", ": base", ": top", ": end" }) Assert.Contains(kit.Pieces, p => p.Name.EndsWith(part, StringComparison.Ordinal));
-        Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Corner column side", StringComparison.Ordinal));
+        // Square corners' columns are boxes; an octagon's are stacks of layers.
+        if (Footprint.Of(spec).Corners.Any(c => Math.Abs(c.SlotDeg - 90) < 1e-6))
+            Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Corner column side", StringComparison.Ordinal));
+        else Assert.Contains(kit.Pieces, p => p.Name.Contains("column layer", StringComparison.Ordinal));
         Assert.Equal(12, kit.WallMm);
     }
 
@@ -439,6 +442,8 @@ public class BuildingsTests
             foreach (var hole in Geo.Tidy(c.S.Outline).Where(h => Clipper.Area(h) < 0))
             {
                 var b = Clipper.GetBounds(hole);
+                // A stacked column's pin hole is round and empty.
+                if (Math.Abs(b.right - b.left - BuildingKitMaker.PinMm) < 0.1 && Math.Abs(b.bottom - b.top - BuildingKitMaker.PinMm) < 0.1) continue;
                 var centre = c.S.Pose.At((b.left + b.right) / 2, (b.top + b.bottom) / 2);
                 Assert.True(placed.Any(o => !ReferenceEquals(o, c) && o.Inside(centre, 0.01)), $"An empty slot in a corner column at {centre.X:0.#}, {centre.Y:0.#}, {centre.Z:0.#}");
             }

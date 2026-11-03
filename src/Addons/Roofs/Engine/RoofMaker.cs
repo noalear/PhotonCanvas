@@ -359,7 +359,7 @@ public static class RoofMaker
     static RoofPart Slope(RoofSpec s, string name, double w, double h, Pose pose) => Slope(s, name, [Geo.Rect(0, 0, w, h)], pose);
 
     /// <summary>A slope: its outline with the shingles etched on, courses running along its bottom edge (the eave).</summary>
-    static RoofPart Slope(RoofSpec s, string name, PathsD outline, Pose pose)
+    internal static RoofPart Slope(RoofSpec s, string name, PathsD outline, Pose pose)
     {
         var (_, _, x1, y1) = Shapes.Box(outline);
         var tex = Shingles.Make(s.Shingle, s.ShingleA, s.ShingleB, s.ShingleGrooveMm, s.Seed, x1, y1);
@@ -368,7 +368,7 @@ public static class RoofMaker
     }
 
     /// <summary>A strip over a ridge or hip, with the joints between ridge tiles etched across it.</summary>
-    static RoofPart Cap(RoofSpec s, string name, double length, double width, Pose pose)
+    internal static RoofPart Cap(RoofSpec s, string name, double length, double width, Pose pose)
     {
         var cut = new PathsD { Geo.Rect(0, 0, length, width) };
         var marks = new PathsD();

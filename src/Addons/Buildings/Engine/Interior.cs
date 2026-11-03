@@ -1,3 +1,4 @@
+using Clipper2Lib;
 using PhotonCanvas.Addon.Furniture;
 using PhotonCanvas.Addon.Walls;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
@@ -52,25 +53,48 @@ public static class Interior
     }
 
     /// <summary>Stands every piece of furniture in its room and adds it to <paramref name="solids"/>.</summary>
-    public static void Lay(BuildingSpec s, List<RoomItem> items, List<string> labels, SetKit kit, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)>? blocked = null)
+    public static void Lay(BuildingSpec s, List<RoomItem> items, List<string> labels, SetKit kit, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)>? blocked = null) =>
+        Lay(s, Footprint.Of(s), items, labels, kit, solids, findings, blocked);
+
+    /// <summary>Stands every piece of furniture in its room, inside the footprint's walls, and adds it to <paramref name="solids"/>.</summary>
+    public static void Lay(BuildingSpec s, Footprint fp, List<RoomItem> items, List<string> labels, SetKit kit, List<Solid> solids, List<Finding> findings, List<(int Storey, double X0, double Z0, double X1, double Z1)>? blocked = null)
     {
         double W = s.WidthMm, D = s.DepthMm, Wt = BuildingKitMaker.WallThickness(s), c = BuildingKitMaker.Clearance, col = s.ColumnMm / 2;
         double T = kit.ThicknessMm;
-        // Inside the walls.
+        // Inside the walls: a rectangle's sides, or (for any other shape) inside its walls and clear of its columns, in the 3D's x and z.
         double rx0 = -W / 2 + Wt / 2 + c, rx1 = W / 2 - Wt / 2 - c, rz0 = -D / 2 + Wt / 2 + c, rz1 = D / 2 - Wt / 2 - c;
+        PathsD? room = null;
+        if (!fp.IsRectangle)
+        {
+            room = Geo.Map(BuildingKitMaker.RoomInside(s, fp, c), p => new PointD(p.x, -p.y));
+            var rb = Geo.Bounds(room);
+            (rx0, rx1, rz0, rz1) = (rb.left, rb.right, rb.top, rb.bottom);
+        }
         var crowded = new List<string>();
         for (int k = 0; k < s.Storeys; k++)
         {
-            var taken = new List<Spot>
-            {
-                new(-W / 2 - col, -D / 2 - col, -W / 2 + col, -D / 2 + col), new(W / 2 - col, -D / 2 - col, W / 2 + col, -D / 2 + col),
-                new(-W / 2 - col, D / 2 - col, -W / 2 + col, D / 2 + col), new(W / 2 - col, D / 2 - col, W / 2 + col, D / 2 + col),
-            };
-            if (k == 0)
+            var taken = fp.IsRectangle
+                ? new List<Spot>
+                {
+                    new(-W / 2 - col, -D / 2 - col, -W / 2 + col, -D / 2 + col), new(W / 2 - col, -D / 2 - col, W / 2 + col, -D / 2 + col),
+                    new(-W / 2 - col, D / 2 - col, -W / 2 + col, D / 2 + col), new(W / 2 - col, D / 2 - col, W / 2 + col, D / 2 + col),
+                }
+                : [];
+            if (k == 0 && fp.IsRectangle)
             {
                 // Room to come in by the door.
                 double dw = s.DoorWidthMm / 2 + c;
                 taken.Add(new(-dw, D / 2 - Wt / 2 - Math.Max(12, s.DoorWidthMm * 1.2), dw, D / 2));
+            }
+            else if (k == 0)
+            {
+                // Room to come in by the door, wherever it is: a square inside the doorway.
+                var wall = fp.Walls[fp.DoorWall];
+                double reach = Math.Max(12, s.DoorWidthMm * 1.2), dw = s.DoorWidthMm / 2 + c;
+                var mid = wall.Middle;
+                var corners = new[] { (-dw, 0.0), (dw, 0.0), (-dw, Wt / 2 + reach), (dw, Wt / 2 + reach) }
+                    .Select(q => new PointD(mid.x + wall.Dir.x * q.Item1 - wall.Normal.x * q.Item2, mid.y + wall.Dir.y * q.Item1 - wall.Normal.y * q.Item2)).ToList();
+                taken.Add(new(corners.Min(q => q.x), corners.Min(q => -q.y), corners.Max(q => q.x), corners.Max(q => -q.y)));
             }
             // The way up, and the opening above it.
             foreach (var b in blocked ?? []) if (b.Storey == k) taken.Add(new(b.X0, b.Z0, b.X1, b.Z1));
@@ -89,7 +113,7 @@ public static class Interior
                 {
                     var b = Box(kit.Items[i], T, turn);
                     double w = b.Max.X - b.Min.X, d = b.Max.Z - b.Min.Z;
-                    var spot = Find(rx0, rz0, rx1, rz1, w, d, taken, c);
+                    var spot = Find(rx0, rz0, rx1, rz1, w, d, taken, c, room);
                     // Upright as made unless a quarter turn sits it further back.
                     if (spot is { } sp && (best is null || sp.Z0 < best.Value.Z0 - 0.5)) { best = sp; bestTurn = turn; bestBox = b; }
                 }
@@ -115,14 +139,15 @@ public static class Interior
             findings.Add(new(Severity.Warn, $"The rooms are too small for all the furniture ({string.Join(", ", crowded)} doesn't fit beside the rest). It's all still cut; make the building bigger or take some out."));
     }
 
-    /// <summary>The first free place for a w × d box, from the back left, in 0.5 mm steps; null if there's none.</summary>
-    static Spot? Find(double x0, double z0, double x1, double z1, double w, double d, List<Spot> taken, double gap)
+    /// <summary>The first free place for a w × d box, from the back left, in 0.5 mm steps, inside <paramref name="room"/> if there's one; null if there's none.</summary>
+    static Spot? Find(double x0, double z0, double x1, double z1, double w, double d, List<Spot> taken, double gap, PathsD? room = null)
     {
         const double step = 0.5;
         for (double z = z0; z + d <= z1 + 1e-9; z += step)
             for (double x = x0; x + w <= x1 + 1e-9; x += step)
             {
                 var s = new Spot(x, z, x + w, z + d);
+                if (room is not null && !Fits(room, s)) continue;
                 Spot? hit = null;
                 foreach (var t in taken) if (s.Hits(t, gap)) { hit = t; break; }
                 if (hit is null) return s;
@@ -130,6 +155,26 @@ public static class Interior
                 x = Math.Max(x, hit.Value.X1 + gap - step);
             }
         return null;
+    }
+
+    /// <summary>Whether a box lies wholly inside the room: its corners inside, and none of the room's corners inside it.</summary>
+    static bool Fits(PathsD room, Spot s)
+    {
+        foreach (var (x, z) in new[] { (s.X0, s.Z0), (s.X1, s.Z0), (s.X0, s.Z1), (s.X1, s.Z1) })
+            if (!In(room, x, z)) return false;
+        foreach (var path in room)
+            foreach (var p in path)
+                if (p.x > s.X0 + 1e-6 && p.x < s.X1 - 1e-6 && p.y > s.Z0 + 1e-6 && p.y < s.Z1 - 1e-6) return false;
+        return true;
+    }
+
+    static bool In(PathsD room, double x, double z)
+    {
+        // Even-odd: the room's outlines and any holes in it, whichever way round they run.
+        int count = 0;
+        foreach (var path in room)
+            if (Clipper.PointInPolygon(new PointD(x, z), path) == PointInPolygonResult.IsInside) count++;
+        return count % 2 == 1;
     }
 
     static string Lower(string name) => name.Length > 1 && char.IsLower(name[1]) ? char.ToLowerInvariant(name[0]) + name[1..] : name;

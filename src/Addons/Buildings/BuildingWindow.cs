@@ -40,6 +40,16 @@ public sealed class BuildingWindow : Window
     readonly ComboBox _top = Combo("Straight (for a roof)", "A floor on top behind battlements");
     readonly ComboBox _wayUp = Combo("Stairs", "Spiral stairs", "Ladder", "None (a plain floor)");
     Control _parapetRow = null!;
+    readonly ComboBox _shape = Combo("Rectangle", "L-shaped", "T-shaped", "U-shaped", "Hexagon (6 sides)", "Octagon (8 sides)", "Round (many flat sides)");
+    readonly ComboBox _columnShape = Combo("Match the corners", "Square", "Octagonal", "Round", "Hexagonal", "Chamfered square", "Fluted");
+    readonly NumericUpDown _wing = Number(30, 2000, 5, "0.#"), _sides = Number(6, 24, 2, "0");
+    readonly TextBlock _shapeAbout = Hint();
+    Control _depthRow = null!, _wingRow = null!, _sidesRow = null!;
+    TextBlock _widthLabel = null!;
+    readonly ComboBox _roof = Combo(), _covering = Combo([.. PhotonCanvas.Addon.Roofs.Shingles.Presets.Select(p => p.Name)]);
+    readonly NumericUpDown _pitch = Number(15, 75, 1, "0"), _eave = Number(0, 40, 0.5m, "0.#");
+    List<RoofShape> _roofs = [];
+    Control _roofRows = null!, _roofSection = null!;
     readonly ComboBox _door = Combo("Hung on clips: it swings open", "Loose in the doorway", "Just a doorway");
     readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch", "Angled corners (sci-fi)", "Rough (cave mouth)");
     static readonly OpeningShape[] DoorShapes = [OpeningShape.Rectangle, OpeningShape.Arched, OpeningShape.Pointed, OpeningShape.Chamfered, OpeningShape.Rough];
@@ -185,34 +195,49 @@ public sealed class BuildingWindow : Window
     Control BuildingTab()
     {
         _parapetRow = Field("Battlements", _parapet, tip: "How high the low wall round the top floor is, to the top of its battlements (mm).");
+        var widthField = Field("Width", _width, tip: "Left to right, between the corner columns' centres (mm). For a hexagon, an octagon or a round tower: across, from the middle of one flat side to the middle of the one opposite.");
+        _widthLabel = widthField is Grid { Children: [TextBlock label, ..] } ? label : new TextBlock();
+        _roofRows = Stack(
+            Field("Covering", _covering, tip: "The shingles etched on the slopes, from the roof maker."),
+            Field("Pitch", _pitch, tip: "How steep the slopes are (degrees from flat): 45 for a cottage, 55–65 for a tower's pointed roof."),
+            Field("Eaves", _eave, tip: "How far the roof reaches past the walls (mm)."));
+        _roofSection = Explained("Roof", "The roof maker's roof, made to fit the walls' tops: gable, hipped or lean-to on a rectangle, gables meeting over an L, T or U, and a pointed roof over a hexagon, an octagon or a round tower. It lifts off.",
+            Field("Roof", _roof, tip: "Only the roofs that suit the building's shape are listed. Battlements take no roof."), _roofRows);
         return Stack(
             Explained("Building", "Picking a building starts again from it, sized for the figures chosen. Everything below can then be changed.",
                 Field("Building", _kind), _kindAbout,
                 Field("Figures", _scale, tip: "Changing it scales every size, the furniture's too, to suit figures that size.")),
             Explained("Theme", "A look for the whole building, the same as the other terrain makers': it sets the walls' texture, the door and windows, the roof, the floor tiles, the furniture's detail and the way up. Sizes, storeys and furniture stay as they are.",
                 Field("Theme", _theme), _themeAbout),
+            Explained("Shape", "The building's plan, seen from above, and the shape of the columns at its corners. The walls, floors, floor tiles, furniture and roof all follow it.",
+                Field("Building shape", _shape, tip: "L, T and U buildings are a back wing with wings coming forward; a hexagon, an octagon or a round tower has equal flat walls all round."),
+                _shapeAbout,
+                Field("Column shape", _columnShape, tip: "Match the corners picks for each corner: square at right angles, octagonal at an octagon's corners, a hexagonal or round one at others. A square column only fits right-angled corners; where a shape doesn't suit a corner the nearest one that does is used, and the notes say so. Their width is on the Walls tab.")),
             Explained("Size", "Measured between the corner columns' centres. Each storey is rounded to whole layers of the wall sheet, so the columns come out flush with the walls.",
-                Field("Width", _width, tip: "Left to right, between the corner columns' centres (mm)."),
-                Field("Depth", _depth, tip: "Front to back, between the corner columns' centres (mm)."),
+                widthField,
+                _depthRow = Field("Depth", _depth, tip: "Front to back, between the corner columns' centres (mm)."),
+                _wingRow = Field("Wing width", _wing, tip: "How wide the wings of an L, T or U are, and how deep the back wing is (mm), between the columns' centres."),
+                _sidesRow = Field("Sides", _sides, tip: "How many flat walls a round tower has (an even number, 6 to 24): more is rounder, but each wall is narrower."),
                 Field("Storeys", _storeys, tip: "Storeys with rooms. A floor lies on the walls between each."),
                 Field("Storey height", _storeyH, tip: "How high each storey's walls are (mm)."),
                 Field("Top", _top, tip: "Straight walls take a roof; battlements put a floor on the top storey with a low wall round it."),
                 _parapetRow,
-                Field("Way up", _wayUp, tip: "What goes up through an opening in each floor, from the stair maker. It stands in the back right corner of the storey below.")),
+                Field("Way up", _wayUp, tip: "What goes up through an opening in each floor, from the stair maker. It stands in the back right corner of the storey below (in the biggest square corner of a building of another shape).")),
+            _roofSection,
             Explained("Floor tiles", "Jigsaw tiles the building stands on, cut from the wall sheet, as big as its outside and any yard round it.",
                 _tiles,
                 _tileRows = Stack(
                     Field("Texture", _tileTexture),
                     Field("Grid square", _square, tip: "One square of the grid the tiles are laid out on (mm): 25.4 (an inch) for 28–32 mm figures."),
                     Field("Yard", _yard, tip: "How far the tiles reach past the building's outside, all round (mm)."))),
-            Explained("Door", "In the middle of the front of the ground floor.",
+            Explained("Door", "In the middle of the front of the ground floor (an L's door is in the step between its wings, a U's in its courtyard).",
                 Field("Door", _door, tip: "Box walls hang the door on pins so it swings open, or glue it into the doorway if it's loose. Flat walls hang it on clips (from the furniture maker), or it just sits loose in the doorway."),
                 Field("Shape", _doorShape, tip: "In flat walls a door that swings is made for square, arched and pointed doorways; the others get a loose door."),
                 Field("Look", _doorLook, tip: "What the wall maker's door looks like (box walls, or a loose door)."),
                 Field("Width", _doorW), Field("Height", _doorH)),
             Explained("Windows", "On every storey; the ground floor's front fits them round the door.",
                 Field("Front and back", _winFront, tip: "Windows in the front wall and in the back wall of each storey."),
-                Field("Each side", _winSide, tip: "Windows in each side wall of each storey."),
+                Field("Each side", _winSide, tip: "Windows in each side wall of each storey. A building of another shape puts this many in each of its other walls, fewer where a wall is too narrow."),
                 Field("Shape", _winShape), Field("Width", _winW), Field("Height", _winH),
                 Field("Sill", _sill, tip: "How high the bottom of the windows is above the floor (mm)."),
                 Field("Bars", _bars),
@@ -299,10 +324,10 @@ public sealed class BuildingWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _wallMm, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
+        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _wallMm, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard, _wing, _sides, _pitch, _eave })
             n.ValueChanged += (_, _) => FromControls();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
-        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _doorLook, _winShape, _bars, _winFill, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
+        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _doorLook, _winShape, _bars, _winFill, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture, _columnShape, _roof, _covering })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
         _build.SelectionChanged += (_, _) => BuildChosen();
@@ -310,6 +335,7 @@ public sealed class BuildingWindow : Window
         _wallCut.SelectionChanged += (_, _) => CutChosen(_wallCut, _wallT, _fit, _wallCutNote);
         _furnCut.SelectionChanged += (_, _) => CutChosen(_furnCut, _furnT, _furnFit, _furnCutNote);
         _kind.SelectionChanged += (_, _) => KindChosen();
+        _shape.SelectionChanged += (_, _) => ShapeChosen();
         _scale.SelectionChanged += (_, _) => ScaleChosen();
         _show.SelectionChanged += (_, _) => ShowChosen();
         _list.SelectionChanged += (_, _) => { if (!_loading && _list.SelectedIndex >= 0) { _sel = _list.SelectedIndex; LoadItem(); } };
@@ -332,6 +358,12 @@ public sealed class BuildingWindow : Window
         _theme.SelectedIndex = Math.Max(0, BuildingThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = BuildingThemes.About(s.Theme);
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - s.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
+        _shape.SelectedIndex = s.Shape == BuildingShape.Custom ? 0 : (int)s.Shape;
+        _columnShape.SelectedIndex = Math.Clamp((int)s.Column, 0, 6);
+        _wing.Value = D(s.WingMm); _sides.Value = Math.Clamp(Footprint.RoundSides(s.Sides), 6, 24);
+        _pitch.Value = D(Math.Clamp(s.RoofPitchDeg, 15, 75)); _eave.Value = D(Math.Clamp(s.RoofEaveMm, 0, 40));
+        _covering.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.Roofs.Shingles.Presets.ToList().FindIndex(p => p.Name == s.RoofTexture));
+        Roofs(s);
         _width.Value = D(s.WidthMm); _depth.Value = D(s.DepthMm); _storeys.Value = Math.Clamp(s.Storeys, 1, 4); _storeyH.Value = D(s.StoreyHeightMm);
         _top.SelectedIndex = (int)s.Top; _parapet.Value = D(s.ParapetHeightMm); _wayUp.SelectedIndex = (int)s.WayUp;
         _door.SelectedIndex = (int)s.Door;
@@ -352,6 +384,7 @@ public sealed class BuildingWindow : Window
         _joints.SelectedIndex = s.FurniturePushFit ? 1 : 0; _grip.Value = D(Math.Clamp(s.FurnitureGripMm, 0.02, 0.5)); _gripRow.IsVisible = s.FurniturePushFit;
         _wallMmRow.IsVisible = _winFillRow.IsVisible = s.BoxWalls; _twoSided.IsVisible = !s.BoxWalls;
         _parapetRow.IsVisible = s.Top == BuildingTop.Battlements;
+        ShapeRows(s);
         _loading = false;
         FillList(_sel);
         Shows();
@@ -365,6 +398,11 @@ public sealed class BuildingWindow : Window
         var top = (BuildingTop)Index(_top);
         _spec = _spec with
         {
+            Shape = _spec.Shape == BuildingShape.Custom && _shape.SelectedIndex == 0 ? BuildingShape.Custom : (BuildingShape)Index(_shape),
+            WingMm = V(_wing, 70), Sides = (int)V(_sides, 12), Column = (ColumnShape)Index(_columnShape),
+            Roof = _roofs.Count > 0 ? _roofs[Math.Clamp(Index(_roof), 0, _roofs.Count - 1)] : _spec.Roof,
+            RoofTexture = PhotonCanvas.Addon.Roofs.Shingles.Presets[Math.Clamp(Index(_covering), 0, PhotonCanvas.Addon.Roofs.Shingles.Presets.Count - 1)].Name,
+            RoofPitchDeg = V(_pitch, 45), RoofEaveMm = V(_eave, 4),
             WidthMm = V(_width, 110), DepthMm = V(_depth, 80), Storeys = (int)V(_storeys, 1), StoreyHeightMm = V(_storeyH, 48),
             Top = top, ParapetHeightMm = V(_parapet, 21), WayUp = (WayUpStyle)Index(_wayUp),
             Door = (DoorStyle)Index(_door),
@@ -386,9 +424,60 @@ public sealed class BuildingWindow : Window
         _twoSided.IsVisible = !_spec.BoxWalls;
         _parapetRow.IsVisible = top == BuildingTop.Battlements;
         _tileRows.IsVisible = _spec.FloorTiles;
+        ShapeRows(_spec);
         if (_spec.Storeys != storeysBefore) FillList(_sel);
         Shows();
         Changed();
+    }
+
+    static readonly string[] RoofNames = ["None (a flat top)", "Gable", "Hipped", "Lean-to", "Pointed"];
+
+    /// <summary>The roof choices for the building's shape (<see cref="BuildingSpec.RoofsFor"/>), with the one it gets picked.</summary>
+    void Roofs(BuildingSpec s)
+    {
+        bool was = _loading;
+        _loading = true;
+        var can = BuildingSpec.RoofsFor(s.Shape).ToList();
+        var names = can.Select(r => s.Shape != BuildingShape.Rectangle && r == RoofShape.Gable ? "Gables (meeting over the corners)" : RoofNames[(int)r]).ToList();
+        if (!_roofs.SequenceEqual(can) || _roof.ItemsSource is not List<string> old || !old.SequenceEqual(names)) { _roofs = can; _roof.ItemsSource = names; }
+        _roof.SelectedIndex = Math.Max(0, can.IndexOf(s.RoofFor()));
+        _loading = was;
+    }
+
+    /// <summary>Shows the size rows the building's shape uses, and the roof rows when it has a roof.</summary>
+    void ShapeRows(BuildingSpec s)
+    {
+        bool regular = s.Shape is BuildingShape.Hexagon or BuildingShape.Octagon or BuildingShape.Round;
+        _depthRow.IsVisible = !regular;
+        _wingRow.IsVisible = s.Shape is BuildingShape.LShape or BuildingShape.TShape or BuildingShape.UShape;
+        _sidesRow.IsVisible = s.Shape == BuildingShape.Round;
+        _widthLabel.Text = regular ? "Across" : "Width";
+        _shapeAbout.Text = s.Shape switch
+        {
+            BuildingShape.LShape => "A back wing across the whole width, and a wing coming forward on the left: the door is in the step between them.",
+            BuildingShape.TShape => "A back wing across the whole width, and a wing coming forward from its middle with the door in its front.",
+            BuildingShape.UShape => "A back wing and two wings coming forward round a courtyard, the door in the courtyard.",
+            BuildingShape.Hexagon => "Six equal walls; the door is in the front one.",
+            BuildingShape.Octagon => "Eight equal walls, like a tower; the door is in the front one.",
+            BuildingShape.Round => "A round tower of equal flat walls; the door is in the front one.",
+            BuildingShape.Custom => "A shape drawn in the building editor.",
+            _ => "Four walls at right angles.",
+        };
+        _roofSection.IsVisible = s.Top != BuildingTop.Battlements;
+        _roofRows.IsVisible = s.RoofFor() != RoofShape.None;
+    }
+
+    /// <summary>A shape picked: the roof list changes to what suits it, and a regular shape gets a pointed roof if it had one.</summary>
+    void ShapeChosen()
+    {
+        if (_loading) return;
+        var shape = (BuildingShape)Index(_shape);
+        var roof = _spec.Roof;
+        if (roof != RoofShape.None && !BuildingSpec.RoofsFor(shape).Contains(roof))
+            roof = shape is BuildingShape.Hexagon or BuildingShape.Octagon or BuildingShape.Round ? RoofShape.Pointed : RoofShape.Gable;
+        _spec = _spec with { Shape = shape, Roof = roof };
+        Roofs(_spec);
+        FromControls();
     }
 
     /// <summary>A theme picked: the building's looks change to it (see <see cref="BuildingThemes"/>).</summary>

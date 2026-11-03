@@ -6,7 +6,7 @@ using PhotonCanvas.Addon.Walls;
 
 namespace PhotonCanvas.Addon.Buildings;
 
-public enum BuildingKind { Cottage, Tavern, Watchtower, Outpost, Chapel, Crypt, AdobeHouse }
+public enum BuildingKind { Cottage, Tavern, Watchtower, Outpost, Chapel, Crypt, AdobeHouse, OctagonTower, Manor }
 
 /// <summary>The front door: hung on clips so it swings (the furniture maker's), loose in the doorway (the wall maker's), or just a doorway.</summary>
 public enum DoorStyle { Swinging, Loose, Open }
@@ -17,8 +17,12 @@ public enum WayUpStyle { Stairs, Spiral, Ladder, None }
 /// <summary>The top of the building: walls cut straight (for a roof), or a floor on top with a low wall of battlements round it.</summary>
 public enum BuildingTop { Straight, Battlements }
 
-/// <summary>The roof on straight walls (the roof maker's): none, pitched with gable ends, hipped, or a lean-to.</summary>
-public enum RoofShape { None, Gable, Hip, LeanTo }
+/// <summary>
+/// The roof on straight walls (the roof maker's): none, pitched with gable ends, hipped, a lean-to, or pointed
+/// (a pyramid with a slope over every wall). A hexagonal, octagonal or round building has a pointed roof; an
+/// L, T or U has gables (a wing's ridge running into the back wing's slope); see <see cref="BuildingSpec.RoofFor"/>.
+/// </summary>
+public enum RoofShape { None, Gable, Hip, LeanTo, Pointed }
 
 /// <summary>One piece of furniture in the building, the storey it stands on (0 = the ground) and how many.</summary>
 public sealed record RoomItem
@@ -42,10 +46,16 @@ public sealed record BuildingSpec
     /// <summary>The figures it's for (mm): only used to rescale the sizes when it's changed.</summary>
     public double ScaleMm { get; init; } = 28;
 
-    /// <summary>Front to back corner columns' centres, left to right (mm).</summary>
+    /// <summary>The shape on the ground (see <see cref="Footprint"/>).</summary>
+    public BuildingShape Shape { get; init; } = BuildingShape.Rectangle;
+    /// <summary>Left to right, between the corner columns' centres (mm); across the flats for a hexagon, octagon or round building.</summary>
     public double WidthMm { get; init; } = 110;
-    /// <summary>Front to back, between the corner columns' centres (mm).</summary>
+    /// <summary>Front to back, between the corner columns' centres (mm). Not used by a hexagon, octagon or round building.</summary>
     public double DepthMm { get; init; } = 80;
+    /// <summary>How wide each wing of an L, T or U is, between its walls' centre lines (mm).</summary>
+    public double WingMm { get; init; } = 70;
+    /// <summary>How many walls round a round building (an even number, 6 to 24).</summary>
+    public int Sides { get; init; } = 10;
     /// <summary>Storeys with rooms (the ground floor is the first).</summary>
     public int Storeys { get; init; } = 1;
     /// <summary>Height of each storey's walls (mm), rounded to whole layers of the wall sheet so the columns come out flush.</summary>
@@ -74,6 +84,13 @@ public sealed record BuildingSpec
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
     /// <summary>Corner columns' size across (mm).</summary>
     public double ColumnMm { get; init; } = 16;
+    /// <summary>
+    /// The corner columns' shape: <see cref="ColumnShape.Auto"/> suits each corner (square at right angles, an
+    /// octagon round an octagon, a hexagon round a hexagon, round otherwise). A shape that doesn't suit a corner's
+    /// angle (a square column where walls meet at 135°) is changed there to one that does, and a note says so.
+    /// Square columns of box walls are boxes; the other shapes are stacks of layers.
+    /// </summary>
+    public ColumnShape Column { get; init; } = ColumnShape.Auto;
 
     public DoorStyle Door { get; init; } = DoorStyle.Swinging;
     public OpeningShape DoorShape { get; init; } = OpeningShape.Arched;
@@ -95,8 +112,30 @@ public sealed record BuildingSpec
     /// <summary>What fills box walls' windows: a frame with the bars, a shutter glued in, shutters that open, or nothing.</summary>
     public WindowFill WindowFill { get; init; } = WindowFill.Frame;
 
-    /// <summary>The roof on top of straight walls (none with battlements).</summary>
+    /// <summary>The roof on top of straight walls (none with battlements). See <see cref="RoofFor"/> for the shapes each building can have.</summary>
     public RoofShape Roof { get; init; } = RoofShape.Gable;
+
+    /// <summary>
+    /// The roofs a building of this shape can have: a rectangle any of them (pointed is hipped on a rectangle);
+    /// a hexagon, octagon or round building a pointed one; an L, T or U gables.
+    /// </summary>
+    public static IReadOnlyList<RoofShape> RoofsFor(BuildingShape shape) => shape switch
+    {
+        BuildingShape.Rectangle => [RoofShape.None, RoofShape.Gable, RoofShape.Hip, RoofShape.LeanTo],
+        BuildingShape.Hexagon or BuildingShape.Octagon or BuildingShape.Round => [RoofShape.None, RoofShape.Pointed],
+        BuildingShape.LShape or BuildingShape.TShape or BuildingShape.UShape => [RoofShape.None, RoofShape.Gable],
+        _ => [RoofShape.None],
+    };
+
+    /// <summary>The roof this building gets: <see cref="Roof"/> if its shape can have it, otherwise the one it can (a pointed roof asked of a rectangle is hipped).</summary>
+    public RoofShape RoofFor()
+    {
+        if (Roof == RoofShape.None) return RoofShape.None;
+        var can = RoofsFor(Shape);
+        if (can.Contains(Roof)) return Roof;
+        if (Shape == BuildingShape.Rectangle) return RoofShape.Hip;
+        return can.Count > 1 ? can[1] : RoofShape.None;
+    }
     /// <summary>What's etched on the roof (a roof maker shingle preset).</summary>
     public string RoofTexture { get; init; } = "Slate";
     /// <summary>The roof's slope (degrees from flat).</summary>
@@ -148,6 +187,8 @@ public sealed record BuildingSpec
         new(BuildingKind.Chapel, "Gothic chapel", "A tall, narrow chapel of fine-cut stone under a steep slate roof, with a pointed door, tall pointed windows down the sides, pews and an altar on a chequered floor."),
         new(BuildingKind.Crypt, "Dungeon crypt", "A squat crypt of big worn blocks with a studded door and barred windows high up: a tomb, chests and crates on dungeon flagstones."),
         new(BuildingKind.AdobeHouse, "Adobe house", "Two storeys of sandstone and mud plaster with a flat roof behind a low wall and a ladder up: stools, a low table and chests below, beds above."),
+        new(BuildingKind.OctagonTower, "Octagonal tower", "An eight-sided stone tower of two storeys on octagonal columns, with arched windows, spiral stairs up and a pointed slate roof: crates and a chest below, a bed and a table above."),
+        new(BuildingKind.Manor, "L-shaped manor", "Two storeys in an L of stone below and timber frame above, its wings under crossing gabled roofs, the door in the corner of the L: a long table, benches and a bookshelf below, beds and chests above."),
     ];
 
     public static KindInfo Info(BuildingKind k) => Kinds.First(x => x.Kind == k);
@@ -177,7 +218,9 @@ public sealed record BuildingSpec
     {
         var flat = FlatPreset(k);
         double grow = BoxColumnMm - flat.ColumnMm;
-        return flat with { BoxWalls = true, WallMm = 12, ColumnMm = BoxColumnMm, WidthMm = flat.WidthMm + grow, DepthMm = flat.DepthMm + grow };
+        var boxed = flat with { BoxWalls = true, WallMm = 12, ColumnMm = BoxColumnMm, WidthMm = flat.WidthMm + grow, DepthMm = flat.DepthMm + grow, WingMm = flat.WingMm + grow };
+        // Many-sided buildings' columns are stacks of layers, which can be a little thinner than boxes.
+        return flat.Shape is BuildingShape.Hexagon or BuildingShape.Octagon or BuildingShape.Round ? boxed with { ColumnMm = 20, WidthMm = flat.WidthMm + 20 } : boxed;
     }
 
     /// <summary>Corner columns for 12 mm box walls of 3 mm sheet, at 28 mm (mm across).</summary>
@@ -249,6 +292,26 @@ public sealed record BuildingSpec
                 I(ItemKind.Chest, 0, 2), I(ItemKind.Crate, 0, 2), I(ItemKind.Bench, 0, 1),
             ],
         },
+        BuildingKind.OctagonTower => new BuildingSpec
+        {
+            Kind = k, Shape = BuildingShape.Octagon, WidthMm = 120, DepthMm = 120, Storeys = 2, StoreyHeightMm = 48,
+            Texture = "Stone blocks", RoofTexture = "Slate", Roof = RoofShape.Pointed, RoofPitchDeg = 55, RoofEaveMm = 4,
+            FloorTexture = "Dungeon flagstones", WayUp = WayUpStyle.Spiral, Door = DoorStyle.Swinging, DoorShape = OpeningShape.Arched, DoorWidthMm = 15, DoorHeightMm = 27,
+            WindowsFront = 0, WindowsSide = 1, WindowShape = OpeningShape.Arched, WindowWidthMm = 6, WindowHeightMm = 12, SillMm = 22, Bars = WindowBars.Cross,
+            Items = [I(ItemKind.Crate, 0, 2), I(ItemKind.Chest, 0, 1), I(ItemKind.Bed, 1, 1), I(ItemKind.Table, 1, 1, t => t with { WidthMm = 20, DepthMm = 12 }), I(ItemKind.Stool, 1, 1)],
+        },
+        BuildingKind.Manor => new BuildingSpec
+        {
+            Kind = k, Shape = BuildingShape.LShape, WidthMm = 160, DepthMm = 140, WingMm = 70, Storeys = 2, StoreyHeightMm = 48,
+            Texture = "Stone blocks", UpperTexture = "Timber frame", FloorTexture = "Floorboards", RoofTexture = "Clay tiles", Roof = RoofShape.Gable, RoofPitchDeg = 45,
+            DoorShape = OpeningShape.Arched, DoorWidthMm = 16, DoorHeightMm = 28,
+            WindowsFront = 2, WindowsSide = 1, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 9, WindowHeightMm = 12, SillMm = 20, Bars = WindowBars.Cross,
+            Items =
+            [
+                I(ItemKind.Table, 0, 1, t => t with { WidthMm = 40 }), I(ItemKind.Bench, 0, 2), I(ItemKind.Bookshelf, 0, 1), I(ItemKind.Chair, 0, 2),
+                I(ItemKind.Bed, 1, 2), I(ItemKind.Chest, 1, 2),
+            ],
+        },
         BuildingKind.AdobeHouse => new BuildingSpec
         {
             Kind = k, Theme = "Desert", WidthMm = 100, DepthMm = 80, Storeys = 2, StoreyHeightMm = 44, Top = BuildingTop.Battlements, ParapetHeightMm = 18, Roof = RoofShape.None,
@@ -276,7 +339,7 @@ public sealed record BuildingSpec
         return this with
         {
             ScaleMm = R(ScaleMm * k),
-            WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), SquareMm = R(SquareMm * k), YardMm = R(YardMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
+            WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), WingMm = R(WingMm * k), SquareMm = R(SquareMm * k), YardMm = R(YardMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
             WallMm = Math.Max(3, Math.Round(WallMm * k / Math.Max(0.1, WallSheetMm))) * WallSheetMm,
             ColumnMm = Math.Max(BoxWalls ? Math.Ceiling(NarrowestBoxColumn + 1) : WallSheetMm * (TwoSided ? 2 : 1) + 6, R(ColumnMm * k)),
             DoorWidthMm = R(DoorWidthMm * k), DoorHeightMm = R(DoorHeightMm * k), RoofEaveMm = R(RoofEaveMm * k),

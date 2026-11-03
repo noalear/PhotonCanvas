@@ -6,7 +6,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The building maker's pictures (in its own help/images): a tavern put together and cut away, a cottage cut away, the watchtower's wall pieces.</summary>
+/// <summary>The building maker's pictures (in its own help/images): a tavern put together and cut away, a cottage cut away, the watchtower's wall pieces, the octagonal tower and the L-shaped manor.</summary>
 static class BuildingsShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -43,5 +43,7 @@ static class BuildingsShots
         Shot("window-buildings-tavern-inside", BuildingSpec.Preset(BuildingKind.Tavern), 0, 0, 2);
         Shot("window-buildings-cottage", BuildingSpec.Preset(BuildingKind.Cottage), 2, 0, 1);
         Shot("window-buildings-tower-pieces", BuildingSpec.Preset(BuildingKind.Watchtower), 1, 1, 0);
+        Shot("window-buildings-octagon", BuildingSpec.Preset(BuildingKind.OctagonTower), 0, 0, 0);
+        Shot("window-buildings-manor", BuildingSpec.Preset(BuildingKind.Manor), 0, 0, 0);
     }
 }
