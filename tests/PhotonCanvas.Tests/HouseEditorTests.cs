@@ -597,6 +597,52 @@ public class HouseEditorTests
         Assert.Null(HouseDesign.FromJson(d.ToJson())!.Levels[1].Yard);
     }
 
+    public static TheoryData<string> CatalogThemes() => [.. FurnitureCatalog.Themes];
+
+    [Theory]
+    [MemberData(nameof(CatalogThemes))]
+    public void Every_ready_made_piece_of_furniture_can_be_put_in_a_building(string theme)
+    {
+        var style = HouseDesign.DefaultStyle();
+        var entries = FurnitureCatalog.For(theme, null).ToList();
+        Assert.NotEmpty(entries);
+        // A big room with every piece of the theme in a row (they may crowd each other: only that they're made counts here).
+        var placed = entries.Select((e, i) => new PlacedItem { X = 1.5 + i % 10 * 1.5, Y = 1.5 + i / 10 * 2.0, Item = HouseKitMaker.FromCatalog(style, e) }).ToList();
+        int rows = (entries.Count + 9) / 10;
+        var d = new HouseDesign { Levels = [new Level { Walls = Box(0, 0, 16, 2 * rows + 1), Furniture = placed }] };
+        var kit = HouseKitMaker.Make(d, longestMm: 2000);
+        Assert.DoesNotContain(kit.Findings, f => f.Text.Contains("left out", StringComparison.Ordinal));
+        foreach (var e in entries)
+            Assert.True(kit.Solids.Any(x => x.Name == e.Name || x.Name.StartsWith(e.Name + " ", StringComparison.Ordinal)), $"{e.Name} isn't in the building");
+    }
+
+    [Fact]
+    public void A_hanging_stays_up_its_wall_and_a_rug_lies_under_the_furniture()
+    {
+        var style = HouseDesign.DefaultStyle();
+        var banner = FurnitureCatalog.For(TerrainThemesName, null).First(e => e.Spot == FurnitureSpot.OnWall);
+        var rug = FurnitureCatalog.For(TerrainThemesName, null).First(e => e.Spot == FurnitureSpot.Floor);
+        var table = HouseKitMaker.NewItem(style, ItemKind.Table);
+        var d = new HouseDesign
+        {
+            Levels = [new Level { Walls = Box(0, 0, 6, 4), Furniture = [
+                new PlacedItem { X = 3, Y = 2, Item = HouseKitMaker.FromCatalog(style, rug) },
+                new PlacedItem { X = 3, Y = 2, Item = table },
+                new PlacedItem { X = 1.5, Y = 0.2, Item = HouseKitMaker.FromCatalog(style, banner) }] }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Findings, f => f.Text.Contains("runs into", StringComparison.Ordinal));
+        // Named as the catalog names them.
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith(rug.Name + ":", StringComparison.Ordinal));
+        // The hanging's bottom is its hanging height up off the floor.
+        double floor = kit.Solids.Where(x => x.Name == "Table").SelectMany(x => x.Outline.SelectMany(path => path.Select(q => x.Pose.At(q.x, q.y)))).Min(p => p.Y);
+        double bottom = kit.Solids.Where(x => x.Name == banner.Name).SelectMany(x => x.Outline.SelectMany(path => path.Select(q => x.Pose.At(q.x, q.y)))).Min(p => p.Y);
+        Assert.Equal(banner.Item.HangMm, bottom - floor, 1.0);
+    }
+
+    const string TerrainThemesName = "Medieval";
+
     [Fact]
     public void Furniture_stands_where_it_is_put_turned_and_crowding_is_warned_of()
     {

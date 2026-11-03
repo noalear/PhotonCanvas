@@ -98,7 +98,11 @@ public class HouseBookletTests
         var steps = HouseSteps.Steps(kit);
         Assert.True(steps.Count >= 8, $"{steps.Count} steps");
         // Each piece in the model is put on in exactly one step.
-        var used = steps.SelectMany(s => s.Solids).ToList();
+        var used = steps.Where(s => !s.Alone).SelectMany(s => s.Solids).ToList();
+        // A box wall is put together on its own, then stood up in the next step (which takes no new pieces).
+        Assert.Contains(steps, s => s.Alone);
+        for (int i = 0; i < steps.Count; i++)
+            if (steps[i].Alone) Assert.Contains(steps.Skip(i + 1), s => s.PutsIn && s.Parts.Count == 0 && steps[i].Solids.All(s.Solids.Contains));
         Assert.Equal(kit.Solids.Count, used.Count);
         Assert.Equal(kit.Solids.Count, used.Distinct().Count());
         // The counts add up to the copies cut.
