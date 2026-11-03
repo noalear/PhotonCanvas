@@ -53,6 +53,8 @@ public sealed class BridgesWindow : Window
     readonly NumericUpDown _sizeA = Number(0.5m, 200, 0.5m, "0.#"), _sizeB = Number(0.5m, 200, 0.5m, "0.#"), _groove = Number(0.1m, 3, 0.05m, "0.##");
     readonly TextBlock _sizeALabel = Label("Size"), _sizeBLabel = Label("Size"), _textureAbout = Hint();
     Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!, _endHRow = null!, _parapetHRow = null!, _pierRow = null!;
+    readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
+    Control _wearRow = null!, _detailRow = null!;
     readonly Button _match = UiKit.Button("Match the walls in the design", tip: "Takes the stone texture, its sizes and the sheet from walls made with Walls (the ones selected, or the first in the design).");
     readonly TextBlock _matchNote = Hint();
     Control _stoneGroup = null!;
@@ -193,6 +195,8 @@ public sealed class BridgesWindow : Window
         _sizeARow = Line(_sizeALabel, _sizeA);
         _sizeBRow = Line(_sizeBLabel, _sizeB);
         _grooveRow = Field("Groove", _groove, tip: "How wide the etched gaps between the stones are (mm).");
+        _wearRow = Field("Wear %", _wear, tip: "How weathered the stone looks: 0 is new and crisp, 50 the usual look, 100 ancient and battered (more nicks, chipped corners, pits and cracks).");
+        _detailRow = Field("Detail size", _detail, tip: "Size of the smallest marks in mm: pits, nicks and cracks.");
         _endHRow = Field("End height", _endH, tip: "How high the road is at the ends (mm).");
         _parapetHRow = Field("Parapet height", _parapetH, tip: "How high the parapet walls stand over the road (mm).");
         _pierRow = Field("Pier width", _pier, tip: "How wide the piers between the arches are (mm). 0 = to suit the arches.");
@@ -209,7 +213,7 @@ public sealed class BridgesWindow : Window
                 Field("Parapet", _parapet), _parapetHRow,
                 Field("Road surface", _surface)),
             Explained("Stone", "The wall maker's textures, etched on the outer faces.",
-                Field("Texture", _texture), _textureAbout, _sizeARow, _sizeBRow, _grooveRow, _match, _matchNote));
+                Field("Texture", _texture), _textureAbout, _sizeARow, _sizeBRow, _grooveRow, _wearRow, _detailRow, _match, _matchNote));
         return Stack(
             Explained("Bridge", "",
                 Field("Kind", _kind), _about,
@@ -282,7 +286,7 @@ public sealed class BridgesWindow : Window
     void Hook()
     {
         foreach (var n in new[] { _count, _len, _wid, _h, _rise, _plank, _gap, _missing, _beam, _legs, _legW, _post, _railH, _every,
-                                  _arches, _span, _spring, _ring, _pier, _endH, _parapetH, _sizeA, _sizeB, _groove })
+                                  _arches, _span, _spring, _ring, _pier, _endH, _parapetH, _sizeA, _sizeB, _groove, _wear, _detail })
             n.ValueChanged += (_, _) => BridgeChanged();
         foreach (var c in new[] { _ends, _archShape, _road, _parapet, _surface })
             c.SelectionChanged += (_, _) => BridgeChanged();
@@ -381,6 +385,7 @@ public sealed class BridgesWindow : Window
         _texture.ItemsSource = _textures;
         _texture.SelectedIndex = Math.Max(0, _textures.IndexOf(s.Texture));
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(Math.Clamp(s.GrooveMm, 0.1, 3));
+        _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
         _matchNote.Text = "";
 
         bool stone = kind == BridgeKind.Stone, rope = kind == BridgeKind.Rope, table = s.Ends == EndsOn.Table;
@@ -415,6 +420,7 @@ public sealed class BridgesWindow : Window
         _sizeARow.IsVisible = custom || p?.SizeALabel is not null;
         _sizeBRow.IsVisible = p?.SizeBLabel is not null;
         _grooveRow.IsVisible = p?.UsesGroove ?? false;
+        _wearRow.IsVisible = _detailRow.IsVisible = p is not null && p.Name != Textures.Plain;
         _textureAbout.Text = custom ? "Your own texture, from the wall maker." : p?.About ?? "";
     }
 
@@ -425,7 +431,7 @@ public sealed class BridgesWindow : Window
         if (name == _spec.Texture) return;
         // A preset brings its own sizes.
         _spec = Textures.Preset(name) is { } p
-            ? _spec with { Texture = name, SizeA = p.SizeA > 0 ? p.SizeA : _spec.SizeA, SizeB = p.SizeB > 0 ? p.SizeB : _spec.SizeB, GrooveMm = p.UsesGroove ? p.Groove : _spec.GrooveMm }
+            ? _spec with { Texture = name, SizeA = p.SizeA > 0 ? p.SizeA : _spec.SizeA, SizeB = p.SizeB > 0 ? p.SizeB : _spec.SizeB, GrooveMm = p.UsesGroove ? p.Groove : _spec.GrooveMm, DetailMm = 0 }
             : _spec with { Texture = name };
         LoadBridge();
         Changed();
@@ -449,6 +455,7 @@ public sealed class BridgesWindow : Window
             Parapet = (ParapetTop)Math.Max(0, _parapet.SelectedIndex), ParapetMm = V(_parapetH, s.ParapetMm),
             Surface = (RoadSurface)Math.Max(0, _surface.SelectedIndex),
             SizeA = V(_sizeA, s.SizeA), SizeB = V(_sizeB, s.SizeB), GrooveMm = V(_groove, s.GrooveMm),
+            Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.5),
         };
     }
 

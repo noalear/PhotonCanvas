@@ -51,6 +51,8 @@ public static class WallsLink
                 SizeB = Num("SizeB", s.SizeB),
                 GrooveMm = Num("GrooveMm", s.GrooveMm),
                 Seed = (int)Num("Seed", s.Seed),
+                Wear = Num("Wear", 0.5),
+                DetailMm = Num("DetailMm", 0),
                 Etch = Str("Etch", "Grooves") == "Lines" ? EtchStyle.Lines : EtchStyle.Grooves,
                 PlainEnds = Flag("PlainEnds", s.PlainEnds),
                 SlotDepthMm = Num("SlotDepthMm", s.SlotDepthMm),
