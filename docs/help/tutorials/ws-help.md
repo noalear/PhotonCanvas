@@ -1,6 +1,6 @@
 # Find help in the program
 <!-- category: Getting started -->
-<!-- summary: The help guide and F1, the tutorials, the getting started tour and the tips. -->
+<!-- summary: The help guide and F1, right-click help, the tutorials, the getting started tour and the tips. -->
 <!-- page: workspace.md#the-help-menu -->
 <!-- order: 20 -->
 Help is always a click away: the guide explains every button and setting, and the tutorials walk
@@ -24,6 +24,11 @@ Press `F1` in any other window of the program: the guide opens at the page about
 <!-- wait: window:Getting started -->
 Choose **Getting started** in the Help menu to see the first-start tour again, with the
 connection setup.
+
+## Right-click anything
+<!-- target: ribbon:Home/Text -->
+Right-click any button, setting or shape, here **Text**: **See help** opens the guide on it,
+**See tutorial** starts its tutorial, and **Disable add-on** turns off the add-on that made it.
 
 ## Tips
 <!-- target: tab:Home -->

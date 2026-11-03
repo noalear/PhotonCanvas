@@ -330,6 +330,7 @@ public sealed class LayersPanel : UserControl
         // Buttons and the colour bar handle their own presses, so this only fires on the card itself.
         row.PointerPressed += (_, e) => OnRowPressed(l, e);
         row.ContextRequested += (_, e) => { e.Handled = true; RowMenu(l).Open(row); };
+        ContextHelp.Describe(row, () => new HelpSubject { Page = "layers.md#the-layers-right-click-menu" });
         return row;
     }
 
@@ -482,6 +483,7 @@ public sealed class LayersPanel : UserControl
         row.PointerPressed += (_, e) => OnShapePressed(s, l, e);
         // Built when opened, so it reflects the selection at that moment.
         row.ContextRequested += (_, e) => { e.Handled = true; ShapeMenu(s).Open(row); };
+        ContextHelp.Describe(row, () => ContextHelp.Shapes([s], "layers.md#right-click-on-a-shape"));
         return row;
     }
 

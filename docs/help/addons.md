@@ -38,10 +38,18 @@ as normal.
 > **Safety:** Add-ons can't start the laser by themselves: every job still goes through **Ship It**
 > and waits on the machine until you press its button. Only install add-ons from people you trust.
 
+### Turning one off from where it is
+
+Right-click anything an add-on made: its ribbon button, a setting in its window, or a shape it put in
+the design. **Disable add-on: …** at the end of the menu turns that add-on off straight away (add-ons
+that need it go off too, after asking). The rest of the program carries on; turn it back on here.
+See [Right-click for help](workspace.md#right-click-for-help).
+
 ## Help for add-ons
 
 Each add-on brings its own pages, listed under **Add-ons** at the end of the guide's contents, and
-its own tutorials. They're only there while the add-on is on.
+its own tutorials. They're only there while the add-on is on. Right-clicking anything an add-on made
+offers **See tutorial** and **See help** for it.
 
 ## Tutorial
 

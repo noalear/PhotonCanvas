@@ -179,7 +179,9 @@ paths**, **Lock** / **Unlock**, **Use as material outline**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
 camera…**, **Trace picture…**,
 **Zoom to …**, **Rename…** and **Save to My shapes…**, then the items add-ons add. They're
-explained in [Editing shapes](editing-shapes.md) and [Arranging](arrange.md).
+explained in [Editing shapes](editing-shapes.md) and [Arranging](arrange.md). Last come
+**Disable add-on**, **See tutorial** and **See help** for that shape (see
+[Right-click for help](workspace.md#right-click-for-help)).
 
 ## The layer's right-click menu
 
@@ -200,6 +202,7 @@ Right-click a card. If the layer isn't among the selected ones, it becomes the a
 | **Show only this layer** | Hides every other layer. |
 | **Show all layers** | Shows every layer. |
 | **Delete layer and its shapes** | Deletes this layer, its sub-layers and every shape on it. `Ctrl+Z` undoes it. |
+| **See tutorial**, **See help** | The tutorial and the help about what you clicked on the card (see [Right-click for help](workspace.md#right-click-for-help)). |
 
 **Copy settings** and **Paste settings** carry everything that says how a layer is processed: the
 mode, the laser, power, speed and passes, the MOPA's pulse width and frequency, and every setting
