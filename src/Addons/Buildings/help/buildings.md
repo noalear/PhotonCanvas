@@ -125,7 +125,9 @@ On the **Walls** tab:
   *Boxes* widens them if they're too thin). Pick your material in **Cut with** to bring in its thickness, slot fit and
   kerf.
 - **Ground floor** and **Upper storeys**: the wall maker's textures (brick, stones, planks, timber
-  frame and the rest), sized for the figures. **Etched as** grooves or scored lines, and
+  frame and the rest), sized for the figures. **Etched as** grooves, scored lines or a **Relief**
+  (carved in depth from a greyscale depth map on a **Building · relief** picture layer, every stone
+  or plank at its own height, as in the wall maker: the most real, and much the slowest), and
   **Variation** for a different layout of stones and planks.
 
 With flat walls, each corner column is a stack of layers with a slot for each wall and a hole up the

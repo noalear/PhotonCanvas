@@ -84,8 +84,10 @@ gives a different ruin and the same number always the same one. **Shuffle** pick
 **Wear %** and **Detail size** age the texture as the wall maker's do: 0 is new and crisp, 50 the
 usual look, 100 ancient and battered (nicked edges, knocked corners, pits, cracks and scratches), and
 the detail size is how big the smallest of those marks are, in mm.
-**Etch as** etches the gaps as grooves (deeper, the most real) or scores lines round each brick or
-stone (much quicker).
+**Etch as** etches the gaps as grooves (deeper) or scores lines round each brick or stone (much
+quicker), or carves them as a **Relief**: a greyscale depth map on a **Ruins · relief** picture layer,
+carved in depth slices, with every brick or stone at its own height and its edges rounded into the
+mortar, as in the wall maker (the most real, and much the slowest).
 
 ## Damage
 

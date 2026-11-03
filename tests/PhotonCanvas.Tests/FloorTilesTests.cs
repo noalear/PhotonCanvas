@@ -376,4 +376,20 @@ public class FloorTilesTests
         var kit = Make(spec);
         Assert.Single(TilePlacement.TooBig(kit, MachineProfile.F2Ultra with { FieldW = 200, FieldH = 200 }));
     }
+
+    [Fact]
+    public void Relief_carves_each_tile_as_a_depth_map()
+    {
+        var spec = new TileSpec { BoardAcross = 2, BoardDown = 2, Texture = "Dungeon flagstones", Relief = true };
+        var kit = Make(spec);
+        Assert.True(kit.Ok, Why(kit));
+        var (s, _, _) = TilePlacement.Place(DocState.New(), kit, spec, MachineProfile.F2Ultra, new TilePlaceOptions());
+        Assert.Contains(s.Layers, l => l.Name == TilePlacement.ReliefLayer && l.Mode == LayerMode.Image && l.ImageMode == ImageEngraveMode.Slices);
+        Assert.DoesNotContain(s.Layers, l => l.Name == TilePlacement.EtchLayer);
+        var pics = s.Shapes.OfType<ImageShape>().ToList();
+        Assert.NotEmpty(pics);
+        Assert.All(pics, p => Assert.NotNull(p.GroupId));
+        var (dark, light, greys, _) = WallsTests.Tones(pics[0]);
+        Assert.True(dark > 0.03 && light > 0.3 && greys > 10, $"{dark:P0} deep, {light:P0} near the surface, {greys} heights");
+    }
 }
