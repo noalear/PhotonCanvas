@@ -5,8 +5,10 @@ An add-on (Settings → Add-ons → **Building editor**): on when PhotonCanvas i
 **Build** lets you draw a building yourself, floor by floor, the way you build a house in a
 life-sim game: drag out rooms, draw walls along the grid or corner to corner, drop doors and windows
 anywhere along a wall and slide them about, give every floor its own shape, and watch it go up in
-3D with the walls in front cut away so you can see into the rooms. Every wall, column, floor and
-floor tile then comes out as pieces to cut, made the way the wall maker ([Textured walls](walls.md))
+3D with the walls in front cut away so you can see into the rooms. Put roofs over it (gable, hipped,
+lean-to or flat, at any pitch), railings go round balconies and terraces by themselves, and each room
+can have a floor pattern of its own. Every wall, column, floor, roof and floor tile then comes out as
+pieces to cut, made the way the wall maker ([Textured walls](walls.md))
 and the building maker ([Whole buildings](buildings.md)) make them: textured box walls whose tabs
 go into slotted columns, floors that lie on the walls, and jigsaw floor tiles to stand it on.
 
@@ -24,8 +26,8 @@ Click **Build** on the **Home** tab (in the **Draw** group). The **Building edit
 last building you drew (a small two-room house the first time). Along the top are the tools and the
 floors; on the left is the **Plan**, the floor you're on seen from above on a grid of squares; in the
 middle, **Put together** shows the whole building in 3D and **Pieces** shows every piece flat; down
-the right, **Picked** shows the door or window picked on the plan and **Look** the walls' look and
-sizes. Under them are the number of pieces and notes: how it goes together, a red ✕ that has to be
+the right, **Picked** shows the door, window, room or roof picked on the plan and **Look** the walls'
+look and sizes. Under them are the number of pieces and notes: how it goes together, a red ✕ that has to be
 fixed before it can go in, a yellow ! worth a look.
 
 Press **Put in the design** and every piece goes into the design, nested onto the bed, a page per
@@ -38,7 +40,7 @@ Pick a tool along the top (or press its letter), then use it on the plan:
 
 | Tool | Key | What it does |
 |---|---|---|
-| **Select** | S | Click a door or window to change it on the **Picked** tab, or drag it along its wall. **Delete** takes it away. |
+| **Select** | S | Click a door or window to change it on the **Picked** tab, or drag it along its wall. **Delete** takes it away. Click inside a room to give it a floor of its own. |
 | **Room** | R | Drag from one grid point to another: four walls round the rectangle at once. Drag a room against another and they share the wall between them. |
 | **Wall** | W | Drag from one grid point to another: a wall straight along, straight across or corner to corner (diagonal). It snaps to the nearest of those as you drag, and shows how long it is. |
 | **Erase** | E | Drag along walls to take them away, click one square of wall, or click a door or window. |
@@ -46,6 +48,7 @@ Pick a tool along the top (or press its letter), then use it on the plan:
 | **Doorway** | O | An open doorway with nothing in it, between two rooms, say. |
 | **Window** | N | Click a wall to put a window in it, and drag it along. |
 | **Floor** | L | Drag over squares to lay floor outside the rooms: a balcony, a landing, the floor of a walkway. Start a drag on a laid square to take floor up. |
+| **Roof** | T | Drag a rectangle over rooms for a roof on top of this floor's walls; click a roof to change it on the **Picked** tab. **Delete** takes the picked roof away. |
 
 Walls that close a space in make a **room**: it's shaded on the plan and gets a floor above it. Scroll
 on the plan to zoom (toward the pointer), drag with the right or middle button to move about, and
@@ -80,23 +83,67 @@ same shape. **Remove this floor** takes it away.
 
 Every floor can be a different shape. The floor between two storeys covers every room under it and
 on it, and any floor you lay by hand, so an upstairs smaller than the ground floor stands on a floor as
-big as the ground floor, and the rest of it is a terrace you can step out onto through a door (railings
-round it come in a later version). The columns under it are flush with its underside; the walls
+big as the ground floor, and the rest of it is a terrace you can step out onto through a door. The columns under it are flush with its underside; the walls
 above stand on it, and lines are scored on it where each wall and column goes. A floor bigger than the
 bed is cut in pieces along walls under it, so each join rests on a wall top (a note says if a join has
 no wall under it: glue a strip of sheet under it).
 
 Walls drawn upstairs with nothing under them get a red ✕: close in a room under them, or lay floor.
 
-![The upstairs of the same house: a smaller room with a door out onto the floor over the ground floor, picked on the Picked tab](images/window-houseeditor-upstairs.png)
+### Railings
+
+Every edge of a floor with no wall standing on it gets a railing, about a metre high for the figures
+(a top rail and a bottom rail with balusters between): round a terrace on the roof of the rooms below,
+round a balcony of floor you laid. They show on the plan as a rail with dots. Each straight stretch is
+one piece with two tabs under it that go into slots cut in the floor; it stops against a column, and
+at a corner the one running left to right carries on past the corner and the other butts up against
+it (glue them there). Turn **Railings round its open edges** off on the **Look** tab (under **This
+floor**) for a floor with none.
+
+### A room's own floor
+
+Pick **Select** and click inside a room: the **Picked** tab shows the room, and **Floor** gives it a
+pattern of its own, any of the floor tile maker's (floorboards, flagstones, cobbles, herringbone brick,
+chequered tiles, a sci-fi deck…). Its name shows on the plan. Upstairs it's etched on that room's part
+of the floor; on the ground floor it's a loose floor that drops in between the room's walls and columns
+("Floor 1, room 2 (chequered tiles)"). *The building's floor* puts it back to the rest.
+
+![The upstairs of the same house: a smaller room with a door out onto a terrace with railings round it, and a roof over it](images/window-houseeditor-upstairs.png)
+
+## Roofs
+
+Pick **Roof** and drag a rectangle over the rooms on the plan: a roof goes on top of that floor's
+walls, resting on the column caps round it, and lifts off to show the rooms (the 3D view puts it on
+with **Show** at *Everything, roofs on*). A roof over exactly one room has a frame under it that drops
+inside the walls so it can't slide; over more than one room (or part of one) it has none, and a note
+says so: glue it on, or let it rest on the caps. **Roof it** at the top puts one roof over the top
+floor's rooms (one over them all if they make a rectangle together, otherwise one over each
+rectangular room).
+
+Click a roof with **Roof** to change it on the **Picked** tab:
+
+- **Shape**: *Gable* (two slopes with an end wall at each end), *Hipped* (sloping on all four sides,
+  the ridge along the longer side), *Lean-to* (one slope, with a back wall and sides) or *Flat* (one
+  plate, with a floor pattern etched on it).
+- **Runs**: which way a gable's ridge runs, or which way a lean-to slopes down.
+- **Pitch** (degrees from flat), **Covering** (slate, wooden shingles, fish scale, clay tiles, thatch,
+  planks, corrugated metal; a flat roof takes a floor pattern), **Eaves** (how far it reaches past the
+  walls) and a **Gable window** in each end wall.
+- **Take the roof away**.
+
+A new roof is like the one picked before it. Roofs are numbered on the plan ("Roof 2"), and their
+pieces are named after them ("Roof 2: gable", "Roofs 1, 3: base" when two come out the same). A
+roof's own pieces and how they go together are the roof maker's ([Roofs and towers](roofs.md)).
+A roof under the floor above, or two roofs that overlap, get a yellow !. The floor below's roofs show
+as a dashed outline on the plan above them.
 
 ## The 3D view
 
 **Show** picks how much of the walls the 3D view draws:
 
-- **Walls up**: all of them.
+- **Everything, roofs on**: all the walls, and the roofs.
 - **Walls cut away**: the walls on your side of the building that face you (or face away from you) are
-  left out, wherever you turn it, so you can see into the rooms, like a doll's house.
+  left out, wherever you turn it, so you can see into the rooms, like a doll's house. The roofs are off.
 - **Walls down**: no walls, just the columns, the floors and the tiles: the plan in 3D.
 
 **up to** shows the floors only up to one of them, to look into the rooms of a lower floor. Drag to
@@ -140,5 +187,4 @@ On the **Look** tab:
 
 ## Coming next
 
-Roofs you place over any part of the building (their shape, pitch and covering), railings round
-balconies and terraces, floor patterns room by room, and furniture and stairs to drag into the rooms.
+Furniture and stairs to drag into the rooms.

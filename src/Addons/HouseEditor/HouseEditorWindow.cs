@@ -46,11 +46,11 @@ public sealed class HouseEditorWindow : Window
         _copyUp = UiKit.Button("Copy walls up", tip: "Draws the floor below's walls on this floor too (doors and windows aren't copied)."),
         _removeLevel = UiKit.Button("Remove this floor"),
         _undoButton = UiKit.Button("Undo"), _redoButton = UiKit.Button("Redo");
-    readonly ComboBox _walls = Combo("Walls up", "Walls cut away", "Walls down"), _upTo = Combo("Every floor");
+    readonly ComboBox _walls = Combo("Everything, roofs on", "Walls cut away", "Walls down"), _upTo = Combo("Every floor");
 
     // What's picked on the plan.
     readonly StackPanel _picked = new() { Spacing = 8 };
-    readonly TextBlock _pickedNone = Hint("Pick Select and click a door or window on the plan to change it, or drop one in a wall with Door, Doorway or Window.");
+    readonly TextBlock _pickedNone = Hint("Pick Select and click a door or window on the plan to change it (or drop one in a wall with Door, Doorway or Window), or click inside a room. Pick Roof and click a roof to change it.");
     readonly ComboBox _oKind = Combo("Door that opens", "Doorway (left open)", "Window");
     readonly ComboBox _oShape = Combo("Square", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)");
     readonly NumericUpDown _oW = Number(2, 300, 0.5m, "0.#"), _oH = Number(2, 300, 0.5m, "0.#"), _oSill = Number(1, 300, 0.5m, "0.#");
@@ -58,6 +58,21 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _oBars = Combo("None", "A cross", "Upright bars"), _oFill = Combo("Nothing (bars left in the wall)", "A frame with its bars", "A shutter, glued in", "Shutters that open");
     readonly Button _oAll = UiKit.Button("Make every one on this floor like it"), _oRemove = UiKit.Button("Take it away");
     Control _oSillRow = null!, _oLookRow = null!, _oHingeRow = null!, _oBarsRow = null!, _oFillRow = null!;
+    // A roof picked.
+    readonly StackPanel _roofPanel = new() { Spacing = 8 };
+    readonly TextBlock _rInfo = Hint();
+    readonly ComboBox _rKind = Combo("Gable (two slopes)", "Hipped (four slopes)", "Lean-to (one slope)", "Flat");
+    readonly ComboBox _rTurn = Combo(), _rCover = Combo(), _rWindow = Combo("None", "Round", "Arched", "Square", "Pointed", "Angled (sci-fi)");
+    readonly NumericUpDown _rPitch = Number(10, 75, 1, "0"), _rEave = Number(0, 40, 0.5m, "0.#");
+    readonly Button _rRemove = UiKit.Button("Take the roof away");
+    Control _rTurnRow = null!, _rPitchRow = null!, _rEaveRow = null!, _rWindowRow = null!;
+    // A room picked.
+    readonly StackPanel _roomPanel = new() { Spacing = 8 };
+    readonly TextBlock _roomInfo = Hint();
+    readonly ComboBox _roomFloor = Combo(["The building's floor", .. PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name)]);
+    // This floor.
+    readonly CheckBox _railings = new() { Content = "Railings round its open edges" };
+    readonly Button _roofIt = UiKit.Button("Roof it", tip: "Puts a roof over the top floor's rooms, in place of any roofs there (gable, the ridge along the longer side). Pick one on the plan with Roof to change it.");
 
     // The look.
     readonly ComboBox _theme = Combo([.. BuildingThemes.Names]);
@@ -117,7 +132,7 @@ public sealed class HouseEditorWindow : Window
             _tools[t] = b;
             bar.Children.Add(b);
         }
-        Tool(PlanTool.Select, "Select", "Click a door or window to change it (on the right) or drag it along its wall; Delete takes it away.");
+        Tool(PlanTool.Select, "Select", "Click a door or window to change it (on the right) or drag it along its wall; Delete takes it away. Click inside a room to give it a floor of its own.");
         Tool(PlanTool.Room, "Room", "Drag out a rectangle: four walls round it at once.");
         Tool(PlanTool.Wall, "Wall", "Drag from one grid point to another: straight along, across or corner to corner.");
         Tool(PlanTool.Erase, "Erase", "Drag along walls to take them away, or click one square of wall, or a door or window.");
@@ -127,6 +142,9 @@ public sealed class HouseEditorWindow : Window
         Tool(PlanTool.Window, "Window", "Click a wall to put a window in it. Drag it along the wall.");
         bar.Children.Add(Gap());
         Tool(PlanTool.Floor, "Floor", "Drag over squares to lay floor outside the rooms (a balcony or a landing); drag from a laid square to take it up. Rooms get a floor anyway.");
+        Tool(PlanTool.Roof, "Roof", "Drag out a rectangle over rooms for a roof that rests on their walls; click a roof to change its shape, pitch and covering (on the right).");
+        _roofIt.Margin = new Thickness(0, 0, 4, 4);
+        bar.Children.Add(_roofIt);
         bar.Children.Add(Gap());
         bar.Children.Add(new TextBlock { Text = "Floor", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 4), Classes = { "muted" } });
         _level.MinWidth = 110;
@@ -221,7 +239,15 @@ public sealed class HouseEditorWindow : Window
             Field("Kind", _oKind), Field("Shape", _oShape),
             Field("Width", _oW, tip: "Across the opening (mm)."), Field("Height", _oH, tip: "From its bottom to the top of its arch (mm)."),
             _oSillRow, _oLookRow, _oHingeRow, _oBarsRow, _oFillRow, buttons));
-        return Stack(_pickedNone, _picked);
+        _rTurnRow = Field("Runs", _rTurn);
+        _rPitchRow = Field("Pitch", _rPitch, tip: "How steep the slopes are (degrees from flat).");
+        _rEaveRow = Field("Eaves", _rEave, tip: "How far the roof reaches past the walls at the bottom of its slopes (mm).");
+        _rWindowRow = Field("Gable window", _rWindow, tip: "A window in each end wall of the roof.");
+        _roofPanel.Children.Add(Explained("Roof", "It rests on the column caps round its rectangle and lifts off to show the rooms. Drag out another with Roof: it's like this one.",
+            _rInfo, Field("Shape", _rKind), _rTurnRow, _rPitchRow, Field("Covering", _rCover), _rEaveRow, _rWindowRow, _rRemove));
+        _roomPanel.Children.Add(Explained("Room", "A room's floor can have a pattern of its own. Upstairs it's etched on the floor; on the ground floor it's a loose floor that drops in between the walls.",
+            _roomInfo, Field("Floor", _roomFloor)));
+        return Stack(_pickedNone, _picked, _roofPanel, _roomPanel);
     }
 
     Control LookTab()
@@ -241,6 +267,8 @@ public sealed class HouseEditorWindow : Window
                 Field("Floors", _detail, tip: "What's etched on the floors between storeys."),
                 Field("Slot fit", _fit, tip: "Gap added to slots so the pieces slide together (mm), on top of the kerf."),
                 Field("Layout", _seed, tip: "Stones, planks and grain are laid out at random: each number gives a different layout.")),
+            Explained("This floor", "Railings go round the edges of a floor with no wall on them: a balcony, or a terrace on the roof of the rooms below.",
+                _railings),
             Explained("Grid and ground", "The plan's squares: walls run along their lines. 25.4 mm (an inch) suits most tabletop games.",
                 Field("Square", _square, tip: "One square of the plan (mm)."),
                 _tiles, _tileRow),
@@ -285,6 +313,23 @@ public sealed class HouseEditorWindow : Window
     {
         _plan.Changed += (d, what) => Apply(d, what, fromPlan: true);
         _plan.SelectionChanged += ShowPicked;
+        _roofIt.Click += (_, _) => RoofIt();
+        _railings.IsCheckedChanged += (_, _) =>
+        {
+            if (_loading) return;
+            SetLevel(_design.Levels[_plan.Level] with { Railings = _railings.IsChecked == true }, "Railings");
+        };
+        _rKind.SelectionChanged += (_, _) => RoofChanged(kindChanged: true);
+        foreach (var c in new[] { _rTurn, _rCover, _rWindow }) c.SelectionChanged += (_, _) => RoofChanged();
+        foreach (var n in new[] { _rPitch, _rEave }) n.ValueChanged += (_, _) => RoofChanged();
+        _rRemove.Click += (_, _) =>
+        {
+            int i = _plan.SelectedRoof;
+            if (i < 0 || i >= _design.Roofs.Count) return;
+            _plan.SelectRoof(-1);
+            Apply(_design with { Roofs = [.. _design.Roofs.Where((_, j) => j != i)] }, "Take away a roof");
+        };
+        _roomFloor.SelectionChanged += (_, _) => RoomFloorChanged();
         _level.SelectionChanged += (_, _) => { if (!_loading && _level.SelectedIndex >= 0) ShowLevel(_level.SelectedIndex); };
         _addLevel.Click += (_, _) => AddLevel();
         _copyUp.Click += (_, _) => CopyUp();
@@ -322,7 +367,7 @@ public sealed class HouseEditorWindow : Window
         else if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Y) { Redo(); e.Handled = true; }
         else if (e.KeyModifiers == KeyModifiers.None && FocusManager?.GetFocusedElement() is not (TextBox or NumericUpDown))
         {
-            PlanTool? t = e.Key switch { Key.S => PlanTool.Select, Key.R => PlanTool.Room, Key.W => PlanTool.Wall, Key.E => PlanTool.Erase, Key.D => PlanTool.Door, Key.O => PlanTool.Doorway, Key.N => PlanTool.Window, Key.L => PlanTool.Floor, _ => null };
+            PlanTool? t = e.Key switch { Key.S => PlanTool.Select, Key.R => PlanTool.Room, Key.W => PlanTool.Wall, Key.E => PlanTool.Erase, Key.D => PlanTool.Door, Key.O => PlanTool.Doorway, Key.N => PlanTool.Window, Key.L => PlanTool.Floor, Key.T => PlanTool.Roof, _ => null };
             if (t is { } tool) { PickTool(tool); e.Handled = true; }
         }
     }
@@ -399,6 +444,10 @@ public sealed class HouseEditorWindow : Window
         _loading = false;
         _view.SetUpTo(int.MaxValue);
         _plan.Show(_design, k);
+        _loading = true;
+        _railings.IsChecked = _design.Levels[k].Railings;
+        _railings.IsEnabled = k > 0;
+        _loading = false;
         Buttons();
         ShowPicked();
     }
@@ -435,8 +484,14 @@ public sealed class HouseEditorWindow : Window
     void ShowPicked()
     {
         var o = Picked;
+        var roof = PickedRoof;
+        var room = PickedRoom;
         _picked.IsVisible = o is not null;
-        _pickedNone.IsVisible = o is null;
+        _roofPanel.IsVisible = roof is not null;
+        _roomPanel.IsVisible = room is not null;
+        _pickedNone.IsVisible = o is null && roof is null && room is null;
+        if (roof is not null) ShowRoof(roof);
+        if (room is { } rm) ShowRoom(rm.Room, rm.Plan);
         if (o is null) return;
         _loading = true;
         _oKind.SelectedIndex = (int)o.Kind;
@@ -489,6 +544,121 @@ public sealed class HouseEditorWindow : Window
         {
             Openings = [.. level.Openings.Select(x => x.Kind == o.Kind ? o with { X = x.X, Y = x.Y, Hinge = x.Hinge } : x)],
         }, "Make the doors or windows alike");
+    }
+
+    // ---- a roof or a room picked ----
+
+    RoofArea? PickedRoof => _plan.SelectedRoof >= 0 && _plan.SelectedRoof < _design.Roofs.Count ? _design.Roofs[_plan.SelectedRoof] : null;
+
+    (Room Room, PlanShape Plan)? PickedRoom
+    {
+        get
+        {
+            if (_plan.SelectedRoom is not { } at) return null;
+            var plan = PlanShape.Of(_design.Levels[_plan.Level].Walls);
+            int i = plan.RoomAt(at.X, at.Y);
+            return i >= 0 ? (plan.Rooms[i], plan) : null;
+        }
+    }
+
+    static readonly string[] Ridges = ["Ridge left to right", "Ridge top to bottom"];
+    static readonly string[] Slopes = ["Down towards the bottom of the plan", "Down towards the right", "Down towards the top", "Down towards the left"];
+    static List<string> Coverings(RoofKind kind) => kind == RoofKind.Flat
+        ? [.. PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name)]
+        : [.. PhotonCanvas.Addon.Roofs.Shingles.Presets.Select(p => p.Name)];
+
+    void ShowRoof(RoofArea r)
+    {
+        _loading = true;
+        _rInfo.Text = $"{r.X1 - r.X0} × {r.Y1 - r.Y0} squares on top of floor {r.Level + 1}{(r.Level == 0 ? " (the ground floor)" : "")}.";
+        _rKind.SelectedIndex = (int)r.Kind;
+        _rTurn.ItemsSource = r.Kind == RoofKind.LeanTo ? Slopes.ToList() : Ridges.ToList();
+        _rTurn.SelectedIndex = r.Kind == RoofKind.LeanTo ? ((r.Turn % 4) + 4) % 4 : ((r.Turn % 2) + 2) % 2;
+        var covers = Coverings(r.Kind);
+        _rCover.ItemsSource = covers;
+        _rCover.SelectedIndex = Math.Max(0, covers.IndexOf(r.Covering));
+        _rPitch.Value = (decimal)Math.Clamp(r.PitchDeg, 10, 75);
+        _rEave.Value = (decimal)Math.Clamp(r.EaveMm, 0, 40);
+        _rWindow.SelectedIndex = (int)r.Window;
+        _rTurnRow.IsVisible = r.Kind is RoofKind.Gable or RoofKind.LeanTo;
+        _rPitchRow.IsVisible = _rEaveRow.IsVisible = r.Kind != RoofKind.Flat;
+        _rWindowRow.IsVisible = r.Kind is RoofKind.Gable or RoofKind.LeanTo;
+        _loading = false;
+    }
+
+    void RoofChanged(bool kindChanged = false)
+    {
+        if (_loading || PickedRoof is not { } r) return;
+        var kind = (RoofKind)Math.Max(0, _rKind.SelectedIndex);
+        int turn = Math.Max(0, _rTurn.SelectedIndex);
+        string cover = _rCover.SelectedItem as string ?? r.Covering;
+        if (kindChanged)
+        {
+            // A lean-to keeps the way the ridge ran; a flat roof takes a floor's covering, a pitched one a roof's.
+            turn = ((r.Turn % 2) + 2) % 2;
+            if ((kind == RoofKind.Flat) != (r.Kind == RoofKind.Flat))
+                cover = kind == RoofKind.Flat ? "Stone blocks" : PhotonCanvas.Addon.Roofs.Shingles.Preset(_design.Style.RoofTexture) is not null ? _design.Style.RoofTexture : "Slate";
+        }
+        var next = r with
+        {
+            Kind = kind, Turn = turn, Covering = cover,
+            PitchDeg = V(_rPitch, r.PitchDeg), EaveMm = V(_rEave, r.EaveMm), Window = (PhotonCanvas.Addon.Roofs.GableWindow)Math.Max(0, _rWindow.SelectedIndex),
+        };
+        if (next == r) return;
+        var roofs = _design.Roofs.ToList();
+        roofs[_plan.SelectedRoof] = next;
+        Apply(_design with { Roofs = roofs }, "Change a roof");
+    }
+
+    /// <summary>A roof over the top floor's rooms: one over them all if together they make a rectangle, otherwise one over each rectangular room.</summary>
+    void RoofIt()
+    {
+        int top = _design.Levels.Count - 1;
+        while (top > 0 && _design.Levels[top].Walls.Count == 0) top--;
+        var plan = PlanShape.Of(_design.Levels[top].Walls);
+        if (plan.Rooms.Count == 0) { _status.Text = "There are no rooms on the top floor to roof: close some in first."; return; }
+        var like = PickedRoof ?? _design.Roofs.LastOrDefault();
+        RoofArea Over(Clipper2Lib.RectD b)
+        {
+            var r = RoofArea.Over(top, new GridPt((int)Math.Round(b.left), (int)Math.Round(b.top)), new GridPt((int)Math.Round(b.right), (int)Math.Round(b.bottom)), _design.Style);
+            return like is null ? r : r with { Kind = like.Kind == RoofKind.LeanTo ? RoofKind.Gable : like.Kind, PitchDeg = like.PitchDeg, Covering = like.Covering, EaveMm = like.EaveMm, Window = like.Window };
+        }
+        var all = Walls.Geo.Bounds(new Clipper2Lib.PathsD(plan.Rooms.SelectMany(r => r.Area)));
+        var roofs = new List<RoofArea>();
+        double total = plan.Rooms.Sum(r => r.AreaSquares);
+        if (Math.Abs(total - (all.right - all.left) * (all.bottom - all.top)) < 1e-6) roofs.Add(Over(all));
+        else
+        {
+            foreach (var room in plan.Rooms)
+            {
+                var b = Walls.Geo.Bounds(room.Area);
+                if (Math.Abs(room.AreaSquares - (b.right - b.left) * (b.bottom - b.top)) < 1e-6) roofs.Add(Over(b));
+            }
+            if (roofs.Count < plan.Rooms.Count) _status.Text = "Rooms that aren't rectangles have no roof yet: drag one over them with Roof, or give them a flat one.";
+        }
+        Apply(_design with { Roofs = [.. _design.Roofs.Where(r => r.Level != top), .. roofs] }, "Roof it");
+    }
+
+    void ShowRoom(Room room, PlanShape plan)
+    {
+        _loading = true;
+        _roomInfo.Text = $"Room {room.Index + 1} on floor {_plan.Level + 1}: {room.AreaSquares:0.#} squares.";
+        var tex = HouseKitMaker.RoomTexture(_design.Levels[_plan.Level], plan, room);
+        var names = PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name).ToList();
+        _roomFloor.SelectedIndex = tex is null ? 0 : names.IndexOf(tex) + 1;
+        _loading = false;
+    }
+
+    void RoomFloorChanged()
+    {
+        if (_loading || PickedRoom is not { } rm || _plan.SelectedRoom is not { } at) return;
+        var level = _design.Levels[_plan.Level];
+        // Any other mark in the same room goes: one pattern a room.
+        var rest = level.RoomFloors.Where(f => rm.Plan.RoomAt(f.X, f.Y) != rm.Room.Index).ToList();
+        var names = PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name).ToList();
+        if (_roomFloor.SelectedIndex > 0 && _roomFloor.SelectedIndex - 1 < names.Count)
+            rest.Add(new RoomFloor { X = Math.Round(at.X, 2), Y = Math.Round(at.Y, 2), Texture = names[_roomFloor.SelectedIndex - 1] });
+        SetLevel(level with { RoomFloors = rest }, "Change a room's floor");
     }
 
     // ---- the look ----

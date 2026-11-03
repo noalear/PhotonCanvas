@@ -12,7 +12,7 @@ using Severity = PhotonCanvas.Addon.Buildings.Severity;
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>What a piece in the 3D view is, so the view can hide walls or show one floor.</summary>
-public enum SolidKind { Wall, Column, Floor, Ground, Roof, Furniture }
+public enum SolidKind { Wall, Column, Floor, Ground, Roof, Furniture, Railing }
 
 /// <summary>
 /// One piece where it sits once the building is put together: its outline at <see cref="Pose"/>,
@@ -46,7 +46,7 @@ public sealed record HouseKit(List<Piece> Pieces, List<HouseSolid> Solids, List<
 /// each storey shaped to the rooms below and above it (and any floor laid outside them), and the floor
 /// tiles under it all.
 /// </summary>
-public static class HouseKitMaker
+public static partial class HouseKitMaker
 {
     /// <summary>The most levels a building can have.</summary>
     public const int MaxLevels = 6;
@@ -216,7 +216,13 @@ public static class HouseKitMaker
         if (s.BoxWalls) findings.Add(new(Severity.Note, $"Every column is {C:0.#} mm across: a box (or, where walls meet at an angle, a stack of layers on a pin) with a slot for each wall's tabs."));
         else findings.Add(new(Severity.Note, $"Stack each column's layers on a {BuildingKitMaker.PinMm:0.#} mm pin (a cocktail stick) and glue them."));
 
-        for (int k = 1; k < levels; k++) Floor(d, s, plans, plates[k], k, sq, longestMm, World, pieces, solids, findings);
+        for (int k = 1; k < levels; k++)
+        {
+            var slots = Railings(d, s, plans, k, sq, World, pieces, solids, findings);
+            Floor(d, s, plans, plates[k], k, sq, longestMm, World, slots, pieces, solids, findings);
+        }
+        RoomFloors(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
+        Roofs(d, s, plans, plates, sq, World, pieces, solids, findings);
         Tiles(d, s, sq, ox, oy, pieces, solids, findings);
 
         double tallest = solids.Count == 0 ? 0 : solids.Max(x => x.Pose.O.Y + x.Thickness);
@@ -415,7 +421,7 @@ public static class HouseKitMaker
     /// walls above stand, so they go back in the right place.
     /// </summary>
     static void Floor(HouseDesign d, BuildingSpec s, List<PlanShape> plans, PathsD area, int k, double sq, double longestMm, Func<double, double, double, V3> world,
-        List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
+        PathsD slots, List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
     {
         if (area.Count == 0)
         {
@@ -434,7 +440,23 @@ public static class HouseKitMaker
         foreach (var (g, _) in plans[k].Joints) foot.Add(Geo.Rect(g.X * sq - C / 2, g.Y * sq - C / 2, g.X * sq + C / 2, g.Y * sq + C / 2));
         foot = Geo.Union(foot);
         var shows = Geo.Subtract(area, foot);
-        var (etched, lines) = Texture(s, shows, k);
+        // Rooms with a floor of their own, then the building's floor everywhere else.
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        var own = new PathsD();
+        foreach (var room in plans[k].Rooms)
+        {
+            if (RoomTexture(d.Levels[k], plans[k], room) is not { } tex) continue;
+            var roomMm = Geo.Map(room.Area, p => new PointD(p.x * sq, p.y * sq));
+            var region = Geo.Intersect(roomMm, shows);
+            var (e1, l1) = FloorTexture(s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 31 * k + room.Index);
+            etched.AddRange(e1);
+            lines.AddRange(l1);
+            own.AddRange(region);
+        }
+        var (e0, l0) = Texture(s, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, k);
+        etched.AddRange(e0);
+        lines.AddRange(l0);
         lines.AddRange(Geo.ClipLines(foot.Select(Geo.Loop), area));
         if (Geo.Area(Geo.Subtract(foot, area)) > 1)
             findings.Add(new(Severity.Warn, $"Some of floor {k + 1}'s walls stand past the edge of its floor: lay floor under them."));
@@ -444,8 +466,10 @@ public static class HouseKitMaker
         if (cuts.Count > 1)
             findings.Add(new(Severity.Note, $"Floor {k + 1} is bigger than the bed: it's cut in {cuts.Count} pieces whose edges meet on top of the walls{(unsupported ? " (one join has no wall under it: glue a strip of sheet under that join)" : "")}."));
         int n = 0;
-        foreach (var cut in cuts)
+        foreach (var whole in cuts)
         {
+            // Slots for the railings' tabs.
+            var cut = slots.Count > 0 ? Geo.Subtract(whole, slots) : whole;
             string name = cuts.Count == 1 ? $"Floor {k + 1}" : $"Floor {k + 1}, piece {++n}";
             var e2 = Geo.Intersect(etched, cut);
             var l2 = Geo.ClipLines(lines, cut);

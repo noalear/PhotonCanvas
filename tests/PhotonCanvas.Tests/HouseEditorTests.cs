@@ -205,6 +205,172 @@ public class HouseEditorTests
         Assert.Equal(HouseDesign.Starter().ToJson(), HousePlacement.Find(s2, s2.Shapes.Select(x => x.Id))!.Value.Design.ToJson());
     }
 
+    // ---- roofs, railings and rooms' floors ----
+
+    /// <summary>A house of one room (4 × 3 squares) on the ground floor, and nothing else.</summary>
+    static HouseDesign OneRoom(params RoofArea[] roofs) => new() { Levels = [new Level { Walls = Box(0, 0, 4, 3) }], Roofs = [.. roofs] };
+
+    static RoofArea RoofOver(int x0, int y0, int x1, int y1, RoofKind kind, int turn = 0, int level = 0) =>
+        new() { Level = level, X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, Kind = kind, Turn = turn, PitchDeg = 40, Covering = kind == RoofKind.Flat ? "Square tiles" : "Slate" };
+
+    [Fact]
+    public void The_sample_house_comes_out_whole_with_its_roof_railings_and_room_floor()
+    {
+        var kit = HouseKitMaker.Make(HouseDesign.Sample());
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Findings, f => f.Level == Severity.Warn);
+        Assert.Contains(kit.Pieces, p => p.Name == "Roof: base");
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Roof: gable", StringComparison.Ordinal));
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Floor 2 railing", StringComparison.Ordinal));
+        Assert.Contains(kit.Pieces, p => p.Name == "Floor 1, room 1 (flagstones)");
+        Assert.True(kit.Pieces.All(p => Fits(p)), "A piece is too big for the bed.");
+        // The railings stand on the floor without running into the walls or columns.
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column or SolidKind.Railing).ToList(), step: 0.7));
+    }
+
+    [Theory]
+    [InlineData(RoofKind.Gable, 0)]
+    [InlineData(RoofKind.Gable, 1)]
+    [InlineData(RoofKind.Hip, 0)]
+    [InlineData(RoofKind.LeanTo, 0)]
+    [InlineData(RoofKind.LeanTo, 1)]
+    [InlineData(RoofKind.LeanTo, 2)]
+    [InlineData(RoofKind.LeanTo, 3)]
+    [InlineData(RoofKind.Flat, 0)]
+    public void A_roof_rests_on_the_column_caps_over_its_rectangle(RoofKind kind, int turn)
+    {
+        var d = OneRoom(RoofOver(0, 0, 4, 3, kind, turn));
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        var roof = kit.Solids.Where(s => s.Kind == SolidKind.Roof).ToList();
+        Assert.NotEmpty(roof);
+        var s = HouseKitMaker.StyleFor(d);
+        var wall = BuildingKitMaker.StoreyWall(s, 0, 100) with { Cap = true, ColumnTop = ColumnTop.Cap };
+        double rest = BuildingKitMaker.StoreyBase(s, 0) + WallKitMaker.ColumnTopMm(wall);
+        // Its base lies on the caps (the frame under it drops inside the walls).
+        var bottoms = roof.Select(r => Corners(r).Min(c => c.Y)).ToList();
+        Assert.Contains(bottoms, y => Math.Abs(y - rest) < 0.05);
+        Assert.All(roof.Where(r => r.Name == "Roof" && Corners(r).Min(c => c.Y) >= rest - 0.05), r => Assert.True(Corners(r).Min(c => c.Y) >= rest - 0.05));
+        // Centred over the room, as wide as the caps' outside (and its eaves beyond).
+        double lip = WallKitMaker.ColumnLip(wall);
+        double outX = 4 * 25.4 + s.ColumnMm + 2 * lip, outZ = 3 * 25.4 + s.ColumnMm + 2 * lip;
+        var basePlate = roof.Where(r => Math.Abs(Corners(r).Min(c => c.Y) - rest) < 0.05).OrderByDescending(r => Geo.Area(r.Outline)).First();
+        var cs = Corners(basePlate);
+        Assert.Equal(outX, cs.Max(c => c.X) - cs.Min(c => c.X), 1);
+        Assert.Equal(outZ, cs.Max(c => c.Z) - cs.Min(c => c.Z), 1);
+        Assert.Equal(0, (cs.Max(c => c.X) + cs.Min(c => c.X)) / 2, 1);
+        Assert.Equal(0, (cs.Max(c => c.Z) + cs.Min(c => c.Z)) / 2, 1);
+        if (kind == RoofKind.LeanTo)
+        {
+            // Its high side is away from where it slopes down to.
+            var (_, front) = HouseKitMaker.Directions(turn);
+            var all = roof.SelectMany(Corners).ToList();
+            var high = all.OrderByDescending(c => c.Y).Take(4).ToList();
+            double along = high.Average(c => c.X * front.X + c.Z * front.Y);
+            Assert.True(along < 0, $"The lean-to's high side should be at the back (got {along:0.#}).");
+        }
+        if (kind == RoofKind.Gable)
+        {
+            // The ridge runs the way it was asked to: across the narrower way it's lower (by half the difference up the slope).
+            static double Ridge(HouseKit k) => k.Solids.Where(s => s.Kind == SolidKind.Roof).SelectMany(Corners).Max(c => c.Y);
+            double other = Ridge(HouseKitMaker.Make(OneRoom(RoofOver(0, 0, 4, 3, kind, 1 - turn))));
+            double diff = (Ridge(kit) - other) * (turn == 0 ? 1 : -1);
+            Assert.Equal(-(outX - outZ) / 2 * Math.Tan(40 * Math.PI / 180), diff, 0.5);
+        }
+    }
+
+    [Fact]
+    public void A_roof_over_two_rooms_has_no_frame_under_it_and_one_under_a_floor_is_warned_of()
+    {
+        var walls = Box(0, 0, 6, 3).Concat(Line(3, 0, 3, 3)).ToList();
+        var d = new HouseDesign { Levels = [new Level { Walls = walls }], Roofs = [RoofOver(0, 0, 6, 3, RoofKind.Gable)] };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Pieces, p => p.Name.Contains("locator", StringComparison.Ordinal));
+        Assert.Contains(kit.Findings, f => f.Text.Contains("more than one room", StringComparison.Ordinal));
+        var one = HouseKitMaker.Make(OneRoom(RoofOver(0, 0, 4, 3, RoofKind.Gable)));
+        Assert.Contains(one.Pieces, p => p.Name.Contains("locator", StringComparison.Ordinal));
+
+        // Under the floor above: warned.
+        var two = new HouseDesign { Levels = [new Level { Walls = Box(0, 0, 4, 3) }, new Level { Walls = Box(0, 0, 4, 3) }], Roofs = [RoofOver(0, 0, 4, 3, RoofKind.Gable)] };
+        Assert.Contains(HouseKitMaker.Make(two).Findings, f => f.Level == Severity.Warn && f.Text.Contains("under floor 2", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Railings_go_round_open_floor_and_into_slots_in_it()
+    {
+        var style = HouseDesign.DefaultStyle();
+        // Upstairs is half the house: the rest of the floor is a terrace.
+        var d = new HouseDesign { Style = style, Levels = [new Level { Walls = Box(0, 0, 6, 3) }, new Level { Walls = Box(0, 0, 3, 3) }] };
+        var below = PlanShape.Of(d.Levels[0].Walls);
+        var plan = PlanShape.Of(d.Levels[1].Walls);
+        var runs = HouseKitMaker.RailingRuns(d.Levels[1], below, plan, style.WallSheetMm, style.ColumnMm);
+        // Along the top, the right-hand end and the bottom of the terrace.
+        Assert.Equal(3, runs.Count);
+        Assert.All(runs, r => Assert.DoesNotContain(d.Levels[1].Walls, w => w == WallEdge.Of(r.A, r.A + r.Step)));
+        // Stopped at the columns at (3, 0) and (3, 3); at the far corners, the ones across carry on past.
+        Assert.All(runs.Where(r => r.A.Y == r.B.Y), r => Assert.Contains(new[] { r.TrimA, r.TrimB }, t => t < 0));
+        Assert.All(runs.Where(r => r.A.X == r.B.X), r => Assert.True(r.TrimA > 0 && r.TrimB > 0));
+
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.Equal(3, kit.Solids.Count(s => s.Kind == SolidKind.Railing));
+        var floor = Assert.Single(kit.Solids, s => s.Kind == SolidKind.Floor);
+        // Two tabs a railing, a slot each.
+        Assert.Equal(1 + 6, floor.Outline.Count);
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column or SolidKind.Railing or SolidKind.Floor).ToList(), step: 0.7));
+
+        // Railings turned off: none, and no slots.
+        var off = HouseKitMaker.Make(d with { Levels = [d.Levels[0], d.Levels[1] with { Railings = false }] });
+        Assert.DoesNotContain(off.Solids, s => s.Kind == SolidKind.Railing);
+        Assert.Single(Assert.Single(off.Solids, s => s.Kind == SolidKind.Floor).Outline);
+    }
+
+    [Fact]
+    public void A_room_gets_its_own_floor_pattern()
+    {
+        var walls = Box(0, 0, 6, 3).Concat(Line(3, 0, 3, 3)).ToList();
+        var plain = new HouseDesign { Levels = [new Level { Walls = walls }, new Level { Walls = walls }] };
+        var mixed = plain with { Levels = [plain.Levels[0] with { RoomFloors = [new RoomFloor { X = 1.5, Y = 1.5, Texture = "Chequered tiles" }] }, plain.Levels[1] with { RoomFloors = [new RoomFloor { X = 4.5, Y = 1.5, Texture = "Herringbone brick" }] }] };
+        var a = HouseKitMaker.Make(plain);
+        var b = HouseKitMaker.Make(mixed);
+        Assert.True(b.Ok, string.Join("\n", b.Findings.Select(f => f.Text)));
+        // Downstairs, a loose floor for the left room, inside its walls.
+        var loose = Assert.Single(b.Pieces, p => p.Name.StartsWith("Floor 1, room", StringComparison.Ordinal));
+        var lb = Geo.Bounds(loose.Cut);
+        Assert.True(lb.right - lb.left < 3 * 25.4 && lb.bottom - lb.top < 3 * 25.4);
+        Assert.NotEmpty(loose.Etched);
+        Assert.Empty(Clashes(b.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column || s.Name.StartsWith("Floor 1, room", StringComparison.Ordinal)).ToList(), step: 0.7));
+        // Upstairs, the right room's part of the floor is etched differently.
+        var fa = a.Pieces.Single(p => p.Name == "Floor 2");
+        var fb = b.Pieces.Single(p => p.Name == "Floor 2");
+        Assert.NotEqual(Geo.Area(fa.Etched), Geo.Area(fb.Etched), 0);
+    }
+
+    [Fact]
+    public void Roofs_and_room_floors_save_and_move_with_the_design()
+    {
+        var d = HouseDesign.Sample();
+        var back = HouseDesign.FromJson(d.ToJson())!;
+        Assert.Equal(d.ToJson(), back.ToJson());
+        Assert.Single(back.Roofs);
+        var moved = d.Moved(2, -1);
+        Assert.Equal(d.Roofs[0].X0 + 2, moved.Roofs[0].X0);
+        Assert.Equal(d.Roofs[0].Y1 - 1, moved.Roofs[0].Y1);
+        Assert.Equal(d.Levels[0].RoomFloors[0].X + 2, moved.Levels[0].RoomFloors[0].X);
+    }
+
+    static List<V3> Corners(HouseSolid s)
+    {
+        var b = Geo.Bounds(s.Outline);
+        var list = new List<V3>();
+        foreach (var u in new[] { b.left, b.right })
+            foreach (var v in new[] { b.top, b.bottom })
+                foreach (var w in new[] { -s.Thickness / 2, s.Thickness / 2 })
+                    list.Add(s.Pose.At(u, v, w));
+        return list;
+    }
+
     static bool Fits(Piece p, double bed = 220, double gap = 2)
     {
         var b = Geo.Bounds(p.Cut);
