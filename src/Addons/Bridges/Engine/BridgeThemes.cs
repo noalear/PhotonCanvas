@@ -37,7 +37,7 @@ public static class BridgeThemes
             HeightMm = Math.Round(s.HeightMm + higher, 1),
             Arch = arch,
             Theme = name,
-            Texture = texture, Custom = null, SizeA = R(a), SizeB = R(b), GrooveMm = groove,
+            Texture = texture, Custom = null, SizeA = R(a), SizeB = R(b), GrooveMm = groove, DetailMm = 0,
             Parapet = name switch { TerrainThemes.Dungeon or TerrainThemes.Gothic => ParapetTop.Battlements, TerrainThemes.Cave => ParapetTop.None, _ => ParapetTop.Straight },
             Surface = name switch { TerrainThemes.Medieval or TerrainThemes.Gothic => RoadSurface.Cobbles, TerrainThemes.SciFi => RoadSurface.Plain, _ => RoadSurface.Flagstones },
             Metal = metal,

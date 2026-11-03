@@ -27,7 +27,7 @@ public static class RuinThemes
         };
         return s with
         {
-            Theme = name, Texture = texture, Custom = null, SizeA = a, SizeB = b, GrooveMm = groove,
+            Theme = name, Texture = texture, Custom = null, SizeA = a, SizeB = b, GrooveMm = groove, DetailMm = 0,
             PillarShape = name switch { TerrainThemes.Dungeon or TerrainThemes.SciFi => PillarShape.Square, TerrainThemes.Gothic => PillarShape.Octagon, _ => PillarShape.Round },
         };
     }

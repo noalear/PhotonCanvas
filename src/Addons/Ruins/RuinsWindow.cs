@@ -48,6 +48,8 @@ public sealed class RuinsWindow : Window
     readonly NumericUpDown _sizeA = Number(0.5m, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0");
     readonly TextBlock _sizeALabel = Label("Size"), _sizeBLabel = Label("Size"), _textureAbout = Hint();
     Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!;
+    readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
+    Control _wearRow = null!, _detailRow = null!;
     readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
 
     // Damage
@@ -233,6 +235,8 @@ public sealed class RuinsWindow : Window
         shuffle.Click += (_, _) => _seed.Value = (_seed.Value ?? 1) % 9999 + 1;
         var seedRow = Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
             tip: "Where the wall breaks, how the stones lie and how the rubble falls: each number gives a different ruin, the same number the same one. Use the walls' own number to keep their stones.");
+        _wearRow = Field("Wear %", _wear, tip: "How weathered the texture looks: 0 is new and crisp, 50 the usual look, 100 ancient and battered (more nicks, chipped corners, pits, cracks and scratches). Use the walls' own value to match them.");
+        _detailRow = Field("Detail size", _detail, tip: "Size of the smallest marks in mm: pits, nicks, wood grain, bolts, vent slats and greebles.");
         return Stack(
             Explained("Theme", "A look to start from, the same as the wall maker's: it sets the texture and the pillars' shape to match the walls of that theme. Change them afterwards if you like.",
                 Field("Theme", _theme), _themeAbout),
@@ -240,6 +244,7 @@ public sealed class RuinsWindow : Window
             Field("Texture", _texture),
             _textureAbout,
             _sizeARow, _sizeBRow, _grooveRow, seedRow,
+            _wearRow, _detailRow,
             Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker).")));
     }
 
@@ -329,6 +334,7 @@ public sealed class RuinsWindow : Window
         foreach (var n in new[] { _length, _height, _thick, _walls, _slotDepth, _sizeA, _sizeB, _groove, _seed, _breakDepth, _breaches, _breachSize, _knocked, _cracks,
                                   _baseMm, _fit, _piles, _pileW, _pileD, _pileH, _loose, _chunks, _pillars, _pillarW, _pillarH, _pin })
             n.ValueChanged += (_, _) => Changed();
+        foreach (var n in new[] { _wear, _detail }) n.ValueChanged += (_, _) => Changed();
         foreach (var c in new[] { _leftEnd, _rightEnd, _etch, _break, _pileShape, _pillarShape, _etchWith })
             c.SelectionChanged += (_, _) => Changed();
         foreach (var c in new[] { _makeWall, _twoSided, _plainEnds, _base, _footRubble, _markLayers, _plinth })
@@ -364,6 +370,7 @@ public sealed class RuinsWindow : Window
             if (p.SizeALabel is not null) _sizeA.Value = (decimal)p.SizeA;
             if (p.SizeBLabel is not null) _sizeB.Value = (decimal)p.SizeB;
             if (p.UsesGroove) _groove.Value = (decimal)p.Groove;
+            _detail.Value = (decimal)p.Detail;
         }
         else if (OwnTexture is { } own) _sizeA.Value = (decimal)Math.Clamp(own.TileWidthMm, 0.5, 300);
         _loading = false;
@@ -380,6 +387,7 @@ public sealed class RuinsWindow : Window
             _sizeARow.IsVisible = p.SizeALabel is not null;
             _sizeBRow.IsVisible = p.SizeBLabel is not null;
             _grooveRow.IsVisible = p.UsesGroove;
+            _wearRow.IsVisible = _detailRow.IsVisible = p.Name != Textures.Plain;
             _textureAbout.Text = p.About + (Rough.Cellular(p.Name) ? " Breaks along the mortar." : Rough.Wooden(p.Name) ? " Splinters where it breaks." : "");
         }
         else
@@ -387,6 +395,7 @@ public sealed class RuinsWindow : Window
             _sizeALabel.Text = "Tile width";
             _sizeARow.IsVisible = true;
             _sizeBRow.IsVisible = _grooveRow.IsVisible = false;
+            _wearRow.IsVisible = _detailRow.IsVisible = false;
             _textureAbout.Text = OwnTexture is { } own ? $"Your texture from the wall maker: a {own.TileWidthMm:0.#} × {own.TileHeightMm:0.#} mm tile, scaled to the tile width. It breaks in steps." : "";
         }
     }
@@ -427,6 +436,7 @@ public sealed class RuinsWindow : Window
         _twoSided.IsChecked = s.TwoSided; _leftEnd.SelectedIndex = (int)s.LeftEnd; _rightEnd.SelectedIndex = (int)s.RightEnd;
         _slotDepth.Value = D(s.SlotDepthMm); _plainEnds.IsChecked = s.PlainEnds;
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(Math.Clamp(s.GrooveMm, 0.1, 3)); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
+        _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
         _etch.SelectedIndex = (int)s.Etch;
         _theme.SelectedIndex = Math.Max(0, RuinThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = RuinThemes.About(s.Theme);
         _break.SelectedIndex = (int)s.Break; _breakDepth.Value = D(Math.Round(Math.Clamp(s.BreakDepth, 0.05, 0.9) * 100));
@@ -450,6 +460,7 @@ public sealed class RuinsWindow : Window
         LeftEnd = (EndKind)Math.Max(0, _leftEnd.SelectedIndex), RightEnd = (EndKind)Math.Max(0, _rightEnd.SelectedIndex),
         SlotDepthMm = V(_slotDepth, 4), PlainEnds = _plainEnds.IsChecked == true,
         Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
+        Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.5),
         Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex),
         Break = (BreakShape)Math.Max(0, _break.SelectedIndex), BreakDepth = V(_breakDepth, 55) / 100,
         Breaches = (int)V(_breaches, 0), BreachMm = V(_breachSize, 14), KnockedOut = (int)V(_knocked, 3), Cracks = (int)V(_cracks, 2),

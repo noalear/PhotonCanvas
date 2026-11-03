@@ -96,6 +96,10 @@ public sealed record BridgeSpec
     public bool Metal { get; init; }
     /// <summary>Stones, grain and rough planks are laid out at random: each number gives a different layout.</summary>
     public int Seed { get; init; } = 1;
+    /// <summary>How worn the texture is, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
+    public double DetailMm { get; init; }
     /// <summary>The figures it's for (mm): only used to scale the sizes when it's changed.</summary>
     public double ScaleMm { get; init; } = 28;
 

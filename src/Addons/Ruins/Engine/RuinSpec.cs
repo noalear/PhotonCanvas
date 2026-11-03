@@ -22,6 +22,12 @@ public sealed record TextureSpec
     public double SizeB { get; init; } = 3.5;
     public double GrooveMm { get; init; } = 0.6;
     public int Seed { get; init; } = 1;
+    /// <summary>How worn the texture is, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
+    public double DetailMm { get; init; }
+    /// <summary>The texture is scored as outlines, not etched: nothing is added that only makes sense filled.</summary>
+    public bool LinesOnly { get; init; }
 }
 
 /// <summary>Everything a set of ruins is made from. Saved on the shapes it makes, so it can be opened and changed.</summary>
@@ -57,6 +63,10 @@ public sealed record RuinSpec
     public double GrooveMm { get; init; } = 0.6;
     /// <summary>The variation: where the wall breaks, and how stones and planks are laid.</summary>
     public int Seed { get; init; } = 1;
+    /// <summary>How worn the texture is, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
+    public double DetailMm { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
 
     // ---- the damage ----
@@ -112,7 +122,7 @@ public sealed record RuinSpec
     /// <summary>Gap added to slots so parts slide together (mm), on top of the kerf the cut layer allows for.</summary>
     public double FitMm { get; init; } = 0.15;
 
-    public TextureSpec TextureOf(int seed) => new() { Texture = Texture, Custom = Custom, SizeA = SizeA, SizeB = SizeB, GrooveMm = GrooveMm, Seed = seed };
+    public TextureSpec TextureOf(int seed) => new() { Texture = Texture, Custom = Custom, SizeA = SizeA, SizeB = SizeB, GrooveMm = GrooveMm, Seed = seed, Wear = Wear, DetailMm = DetailMm, LinesOnly = Etch == EtchStyle.Lines };
     public TextureSpec TextureSpec => TextureOf(Seed);
 
     public string ToJson() => JsonSerializer.Serialize(this, RuinJson.Options);
