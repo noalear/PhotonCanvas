@@ -18,7 +18,7 @@ static class WallsShots
         var folder = Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", "Walls", "help", "images");
         Directory.CreateDirectory(folder);
 
-        void Shot(string name, WallSpec spec, int tab, int view = 0, bool open = false)
+        void Shot(string name, WallSpec spec, int tab, int view = 0, bool open = false, string? show = null)
         {
             // No data folder: the pictures show the settings given here, not the last ones used.
             var win = new WallsWindow(doc, machine, lib, null, null);
@@ -31,6 +31,8 @@ static class WallsShots
             var t = (Task)typeof(WallsWindow).GetMethod("Rebuild", Any)!.Invoke(win, null)!;
             for (int i = 0; i < 400 && !t.IsCompleted; i++) settle(50);
             if (open) F<CheckBox>(win, "_openDoors").IsChecked = true;
+            settle(300);
+            if (show is not null) F<Control>(win, show).BringIntoView();
             settle(600);
             win.CaptureRenderedFrame()?.Save(Path.Combine(folder, name + ".png"));
             Console.WriteLine($"walls: {name}.png");
@@ -85,5 +87,11 @@ static class WallsShots
             LengthMm = 100, HeightMm = 45, Texture = "Brick", Top = TopStyle.Battlements,
             Connectors = new() { [ConnectorKind.Corner] = 2, [ConnectorKind.Angle135] = 1 },
         }, 0, 1);
+        Shot("window-walls-backs", new WallSpec
+        {
+            LengthMm = 120, HeightMm = 50, Texture = "Stone blocks", SizeA = 12, SizeB = 6, GrooveMm = 0.8, Door = DoorKind.Doorway, DoorOffsetMm = -30,
+            Windows = 1, WindowAtMm = [30], EngraveBack = true, Back = FaceLook.Of("Wood planks (upright)", 0.3),
+            Connectors = new() { [ConnectorKind.Corner] = 2 },
+        }, 1, 0, show: "_backSection");
     }
 }

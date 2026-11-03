@@ -2323,13 +2323,23 @@ public partial class MainWindow : Window
         "Free to use; all rights reserved (see LICENSE). Third-party components keep their own licences (see THIRD-PARTY-NOTICES). No warranty.\n\n" +
         "Not affiliated with, endorsed by or supported by xTool or Makeblock. \"xTool\" is their trademark, used only to say which machines this works with.");
 
-    /// <summary>Outlines (world mm) of the selected vector shapes; pictures don't count.</summary>
-    List<IReadOnlyList<Vec2>> SelectedOutline() =>
-        _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id) && s is not ImageShape).OfType<PathShape>()
+    /// <summary>
+    /// Outlines (world mm) of the selected vector shapes; pictures don't count. When the selection has shapes on a
+    /// guide layer (output off), only those are matched: an outline drawn to line the rest up by, such as a turned-over
+    /// piece's outline round the engraving for its back.
+    /// </summary>
+    List<IReadOnlyList<Vec2>> SelectedOutline()
+    {
+        var picked = _doc.State.Shapes.Where(s => _doc.Selection.Contains(s.Id) && s is not ImageShape).OfType<PathShape>().ToList();
+        var guides = _doc.State.Layers.Where(l => !l.Output).Select(l => l.Id).ToHashSet();
+        if (picked.Any(s => guides.Contains(s.LayerId)) && picked.Any(s => !guides.Contains(s.LayerId)))
+            picked = [.. picked.Where(s => guides.Contains(s.LayerId))];
+        return picked
             .SelectMany(s => s.World.Flatten(0.05))
             .Where(f => f.Points.Count > 1)
             .Select(f => (IReadOnlyList<Vec2>)(f.Closed ? [.. f.Points, f.Points[0]] : f.Points))
             .ToList();
+    }
 
     async Task FitToCamera()
     {

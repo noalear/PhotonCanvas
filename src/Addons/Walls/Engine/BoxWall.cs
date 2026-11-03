@@ -557,7 +557,7 @@ public static class BoxWall
             var clear = new PathsD(keepClear);
             clear.AddRange(Geo.Offset(backSlots, 0.5));
             var region = Geo.Subtract(Geo.Intersect(backCut, bodyRect), Geo.Map(Geo.Union(clear), M));
-            (be, bl) = FaceTexture(s, 1, L, H, Geo.Tidy(region));
+            (be, bl) = FaceTexture(s.BackSpec, 1, L, H, Geo.Tidy(region));
             be.AddRange(Geo.Map(Geo.Intersect(Geo.Union(frameRings), backCutW), M));
             bl.AddRange(Geo.Map(Geo.ClipLines(frameLines, backCutW), M));
         }

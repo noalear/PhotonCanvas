@@ -153,6 +153,46 @@ scored as lines.
 **Delete this texture** takes one of yours off the list. Walls you already made with it keep it:
 your texture is saved in the design too, so it can be opened and changed on another computer.
 
+### The back of a single panel
+
+A flat wall cut as a single panel (not two back to back, not a box) can have another look on its
+back: brick on the outside of a house and wood panelling inside, say. The back is engraved in a
+second job after the pieces are cut and turned over.
+
+On the **Texture** tab, under **Back of the wall**:
+
+![The Texture tab's Back of the wall section, a wood back for a stone single panel](images/window-walls-backs.png)
+
+| Setting | Choices | Default | What it does |
+|---|---|---|---|
+| **Engrave the back too** | on, off | off | Engraves each panel's back as well, in a second job. |
+| **Back texture** | the presets | the front's | The texture on the back. It's laid out on its own, so it never matches the front stone for stone. |
+| **Back wear %** | 0 to 100 | the front's | How weathered the back looks. |
+
+The section only shows for a flat panel with **Two panels back to back** off: two panels back to
+back and box walls already have a separate back piece, so it takes the back's look without turning
+anything over.
+
+**Put in the design** adds a page after the sheets, named "… · backs (turn the pieces over)" (one
+for each sheet that has backs). On it:
+
+- **Walls · back etch** (and **Walls · back lines** or **Walls · back relief**, as the front has):
+  each panel's back. Only engraving, nothing is cut.
+- **Walls · back outline (guide)**: each panel's outline, with its door and window holes. Its
+  **Output** is off, so it's never burned. It's what **Fit to piece** lines the engraving up by.
+
+Everything on the page is mirrored across the bed's middle, so it lies where the pieces are when
+you turn the sheet over left to right in the same place. Each piece's outline and engraving are
+grouped.
+
+1. Run the sheet's page as usual: the front texture, then the cut.
+2. Turn the pieces over left to right (the top edge stays at the top) and lay them on the bed.
+3. Show the backs page. With the camera picture on, drag each piece's group roughly onto its piece.
+4. Select the group and click **Camera** → **Fit to piece**. Because the group has its outline on a
+   guide layer, only that outline is matched to the piece's edges, and the whole engraving moves
+   with it. **Apply**, then do the next piece.
+5. Run the backs page.
+
 ## The top
 
 - **Straight**: a flat top.
@@ -355,10 +395,14 @@ at the bottom** makes the bottom layer 2 mm bigger all round.
 ## Layers and order
 
 The pieces go on three layers, run in this order: **Walls · lines** (light scoring) and **Walls ·
-etch** (the texture, a Fill layer) first, while the sheet is whole, then **Walls · cut**. Set the
+etch** (the texture, a Fill layer) first, while the sheet is whole, then **Walls · cut**. Single
+panels engraved on the back too get a page of their own for the backs (see
+[The back of a single panel](#the-back-of-a-single-panel)); its etch layer takes the same **Etch
+with** settings. Set the
 etch layer's power and speed for the depth you want (Laser → Tests → Material test helps); a deeper
 etch shows more but takes longer.
 
 ## Try it
 
 - [Make a brick wall with a door and columns](tutorial:draw-walls)
+- [Engrave both sides of a single-panel wall](tutorial:draw-walls-backs)
