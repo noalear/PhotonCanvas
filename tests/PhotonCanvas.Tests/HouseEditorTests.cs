@@ -360,6 +360,52 @@ public class HouseEditorTests
         Assert.Equal(d.Levels[0].RoomFloors[0].X + 2, moved.Levels[0].RoomFloors[0].X);
     }
 
+    [Fact]
+    public void A_door_fills_its_arch_unless_it_opens_on_hinges()
+    {
+        var d = HouseDesign.Starter();
+        var door = d.Levels[0].Openings.First(o => o.Kind == OpeningKind.Door);
+        Assert.False(door.Opens);
+        var kit = HouseKitMaker.Make(d);
+        var wall = kit.Walls.Single(w => w.Spec.Door == DoorKind.DoorwayAndDoor);
+        Assert.False(wall.Spec.DoorOpens);
+        // Glued in, it's the opening's own shape: no square leaf with a panel over it.
+        Assert.DoesNotContain(kit.Pieces, p => p.Name.Contains("arch panel", StringComparison.Ordinal) || p.Name.Contains("door head", StringComparison.Ordinal));
+
+        var opens = d with { Levels = [d.Levels[0] with { Openings = [.. d.Levels[0].Openings.Select(o => o.Kind == OpeningKind.Door ? o with { Opens = true } : o)] }] };
+        var hinged = HouseKitMaker.Make(opens);
+        Assert.True(hinged.Walls.Single(w => w.Spec.Door == DoorKind.DoorwayAndDoor).Spec.DoorOpens);
+        Assert.Contains(hinged.Pieces, p => p.Name.Contains("door head", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_building_can_stand_on_one_plate_with_the_floors_patterns_picked()
+    {
+        var walls = Box(0, 0, 6, 3).Concat(Line(3, 0, 3, 3)).ToList();
+        var d = new HouseDesign
+        {
+            Base = BaseKind.Plate,
+            Levels = [new Level { Walls = walls, RoomFloors = [new RoomFloor { X = 1.5, Y = 1.5, Texture = "Chequered tiles" }] }, new Level { Walls = walls }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Pieces, p => p.Name.StartsWith("Floor tile", StringComparison.Ordinal));
+        // The room's pattern is on the plate, not a loose floor.
+        Assert.DoesNotContain(kit.Pieces, p => p.Name.StartsWith("Floor 1, room", StringComparison.Ordinal));
+        var plate = Assert.Single(kit.Pieces, p => p.Name == "Base");
+        var b = Geo.Bounds(plate.Cut);
+        var style = HouseDesign.DefaultStyle();
+        Assert.InRange(b.right - b.left, 6 * 25.4 + style.ColumnMm + 4 - 0.3, 6 * 25.4 + style.ColumnMm + 4 + 0.3);
+        Assert.NotEmpty(plate.Etched);
+        Assert.NotEmpty(plate.Lines);
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column or SolidKind.Ground).ToList(), step: 0.7));
+
+        // The upper floors' pattern is the one picked.
+        var a = HouseKitMaker.Make(d with { UpperFloor = "Floorboards" }).Pieces.Single(p => p.Name == "Floor 2");
+        var c = HouseKitMaker.Make(d with { UpperFloor = "Square tiles" }).Pieces.Single(p => p.Name == "Floor 2");
+        Assert.NotEqual(Geo.Area(a.Etched), Geo.Area(c.Etched), 0);
+    }
+
     static List<V3> Corners(HouseSolid s)
     {
         var b = Geo.Bounds(s.Outline);

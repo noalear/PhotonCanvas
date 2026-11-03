@@ -57,6 +57,7 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _oLook = Combo("Planks", "Planks with iron studs", "Metal blast door", "Bars (a portcullis)", "Stone slab"), _oHinge = Combo("Left (seen from outside)", "Right (seen from outside)");
     readonly ComboBox _oBars = Combo("None", "A cross", "Upright bars"), _oFill = Combo("Nothing (bars left in the wall)", "A frame with its bars", "A shutter, glued in", "Shutters that open");
     readonly Button _oAll = UiKit.Button("Make every one on this floor like it"), _oRemove = UiKit.Button("Take it away");
+    readonly CheckBox _oOpens = new() { Content = "Opens on hinges" };
     Control _oSillRow = null!, _oLookRow = null!, _oHingeRow = null!, _oBarsRow = null!, _oFillRow = null!;
     // A roof picked.
     readonly StackPanel _roofPanel = new() { Spacing = 8 };
@@ -78,13 +79,13 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _theme = Combo([.. BuildingThemes.Names]);
     readonly ComboBox _scale = Combo("15 mm", "28 mm", "32 mm", "54 mm");
     static readonly double[] Scales = [15, 28, 32, 54];
-    readonly ComboBox _build = Combo("Boxes: a front, back, top and bottom", "Flat: one sheet thick");
+    readonly ComboBox _build = Combo("Thick: boxes with a front, back, top and bottom", "Single panel: one sheet thick");
     readonly NumericUpDown _wallMm = Number(6, 60, 1, "0.#"), _sheet = Number(0.5m, 20, 0.5m, "0.##"), _column = Number(5, 200, 1, "0.#"), _storeyH = Number(10, 500, 1, "0.#"),
         _square = Number(10, 100, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0");
     readonly ComboBox _texture = Combo(), _upper = Combo(), _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
-    readonly ComboBox _detail = Combo("Plain", "Wood grain", "Planks and grain", "Metal deck plates (sci-fi)", "Stone");
-    readonly CheckBox _tiles = new() { Content = "Floor tiles under the building" };
+    readonly ComboBox _base = Combo("Jigsaw floor tiles", "One plate, shaped to the building", "Nothing: it stands on the table");
     readonly ComboBox _tileTexture = Combo([.. PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name)]);
+    readonly ComboBox _upperFloor = Combo([.. PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Select(p => p.Name)]);
     readonly List<string> _textures = [.. Textures.Presets.Select(p => p.Name)];
     readonly ComboBox _cut = Combo(), _etchWith = Combo();
     readonly TextBlock _cutNote = Hint();
@@ -232,13 +233,14 @@ public sealed class HouseEditorWindow : Window
         _oSillRow = Field("Sill", _oSill, tip: "How high the window's bottom is above its floor (mm).");
         _oLookRow = Field("Looks like", _oLook);
         _oHingeRow = Field("Hinged on the", _oHinge);
+        ToolTip.SetTip(_oOpens, "The door hangs on pins inside the wall and swings open. An arched or pointed door then has a fixed panel over it, because only a square-topped leaf can swing in a thick wall. Off, it's glued in and fills the whole opening.");
         _oBarsRow = Field("Bars", _oBars);
         _oFillRow = Field("In the window", _oFill, tip: "What fills a box wall's window: a frame with its bars, shutters, or nothing.");
         var buttons = new StackPanel { Spacing = 6, Children = { _oAll, _oRemove } };
         _picked.Children.Add(Explained("Door or window", "What's picked on the plan. A new one dropped in a wall is like the one picked last.",
             Field("Kind", _oKind), Field("Shape", _oShape),
             Field("Width", _oW, tip: "Across the opening (mm)."), Field("Height", _oH, tip: "From its bottom to the top of its arch (mm)."),
-            _oSillRow, _oLookRow, _oHingeRow, _oBarsRow, _oFillRow, buttons));
+            _oSillRow, _oLookRow, _oOpens, _oHingeRow, _oBarsRow, _oFillRow, buttons));
         _rTurnRow = Field("Runs", _rTurn);
         _rPitchRow = Field("Pitch", _rPitch, tip: "How steep the slopes are (degrees from flat).");
         _rEaveRow = Field("Eaves", _rEave, tip: "How far the roof reaches past the walls at the bottom of its slopes (mm).");
@@ -253,7 +255,7 @@ public sealed class HouseEditorWindow : Window
     Control LookTab()
     {
         _wallMmRow = Field("Wall thickness", _wallMm, tip: "A box wall's thickness, outside face to inside face (mm).");
-        _tileRow = Field("Tiles", _tileTexture);
+        _tileRow = Field("Ground floor", _tileTexture, tip: "The pattern on what the building stands on. A room can have its own: click inside it with Select.");
         return Stack(
             Explained("Look", "A look for the whole building, the same as the other terrain makers': the walls' texture, the doors and windows dropped from now on, the floor tiles.",
                 Field("Theme", _theme),
@@ -264,14 +266,16 @@ public sealed class HouseEditorWindow : Window
                 Field("Columns", _column, tip: "How wide each column is (mm)."),
                 Field("Storey height", _storeyH, tip: "Each floor's walls, rounded to whole layers of the sheet (mm)."),
                 Field("Texture", _texture), Field("Upstairs", _upper), Field("Etch as", _etch),
-                Field("Floors", _detail, tip: "What's etched on the floors between storeys."),
                 Field("Slot fit", _fit, tip: "Gap added to slots so the pieces slide together (mm), on top of the kerf."),
                 Field("Layout", _seed, tip: "Stones, planks and grain are laid out at random: each number gives a different layout.")),
             Explained("This floor", "Railings go round the edges of a floor with no wall on them: a balcony, or a terrace on the roof of the rooms below.",
                 _railings),
-            Explained("Grid and ground", "The plan's squares: walls run along their lines. 25.4 mm (an inch) suits most tabletop games.",
-                Field("Square", _square, tip: "One square of the plan (mm)."),
-                _tiles, _tileRow),
+            Explained("Floors", "What the building stands on, and the patterns etched on its floors. A room can have a pattern of its own: click inside it with Select.",
+                Field("Base", _base, tip: "Jigsaw tiles that lock together, one plate (cut along walls only if it's bigger than the bed), or nothing."),
+                _tileRow,
+                Field("Upper floors", _upperFloor, tip: "The pattern on the floors between storeys.")),
+            Explained("Grid", "The plan's squares: walls run along their lines. 25.4 mm (an inch) suits most tabletop games.",
+                Field("Square", _square, tip: "One square of the plan (mm).")),
             Explained("Cutting", "Your material's cut settings make slots come out their drawn width (the kerf is allowed for).",
                 Field("Cut with", _cut), _cutNote, Field("Etch with", _etchWith)));
     }
@@ -342,6 +346,7 @@ public sealed class HouseEditorWindow : Window
 
         foreach (var c in new[] { _oKind, _oShape, _oLook, _oHinge, _oBars, _oFill }) c.SelectionChanged += (_, _) => PickedChanged();
         foreach (var n in new[] { _oW, _oH, _oSill }) n.ValueChanged += (_, _) => PickedChanged();
+        _oOpens.IsCheckedChanged += (_, _) => PickedChanged();
         _oAll.Click += (_, _) => AllLikePicked();
         _oRemove.Click += (_, _) =>
         {
@@ -353,8 +358,7 @@ public sealed class HouseEditorWindow : Window
         };
 
         foreach (var n in new[] { _wallMm, _sheet, _column, _storeyH, _square, _fit, _seed }) n.ValueChanged += (_, _) => LookChanged();
-        foreach (var c in new[] { _texture, _upper, _etch, _detail, _tileTexture, _etchWith }) c.SelectionChanged += (_, _) => LookChanged();
-        _tiles.IsCheckedChanged += (_, _) => LookChanged();
+        foreach (var c in new[] { _texture, _upper, _etch, _tileTexture, _upperFloor, _base, _etchWith }) c.SelectionChanged += (_, _) => LookChanged();
         _build.SelectionChanged += (_, _) => BuildChosen();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
         _scale.SelectionChanged += (_, _) => ScaleChosen();
@@ -497,6 +501,7 @@ public sealed class HouseEditorWindow : Window
         _oKind.SelectedIndex = (int)o.Kind;
         _oShape.SelectedIndex = Math.Max(0, Array.IndexOf(DoorShapes, o.Shape));
         _oW.Value = (decimal)o.WidthMm; _oH.Value = (decimal)o.HeightMm; _oSill.Value = (decimal)o.SillMm;
+        _oOpens.IsChecked = o.Opens;
         _oLook.SelectedIndex = (int)o.Look; _oHinge.SelectedIndex = (int)o.Hinge; _oBars.SelectedIndex = (int)o.Bars; _oFill.SelectedIndex = (int)o.Fill;
         _loading = false;
         PickedRows(o);
@@ -507,7 +512,9 @@ public sealed class HouseEditorWindow : Window
         bool window = o.Kind == OpeningKind.Window;
         _oSillRow.IsVisible = _oBarsRow.IsVisible = window;
         _oFillRow.IsVisible = window && _design.Style.BoxWalls;
-        _oLookRow.IsVisible = _oHingeRow.IsVisible = o.Kind == OpeningKind.Door;
+        _oLookRow.IsVisible = o.Kind == OpeningKind.Door;
+        _oOpens.IsVisible = o.Kind == OpeningKind.Door && _design.Style.BoxWalls;
+        _oHingeRow.IsVisible = o.Kind == OpeningKind.Door && o.Opens && _design.Style.BoxWalls;
     }
 
     void PickedChanged()
@@ -518,7 +525,7 @@ public sealed class HouseEditorWindow : Window
         {
             Kind = kind, Shape = DoorShapes[Math.Clamp(_oShape.SelectedIndex, 0, DoorShapes.Length - 1)],
             WidthMm = V(_oW, o.WidthMm), HeightMm = V(_oH, o.HeightMm), SillMm = V(_oSill, o.SillMm),
-            Look = (DoorLook)Math.Max(0, _oLook.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _oHinge.SelectedIndex),
+            Look = (DoorLook)Math.Max(0, _oLook.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _oHinge.SelectedIndex), Opens = _oOpens.IsChecked == true,
             Bars = (WindowBars)Math.Max(0, _oBars.SelectedIndex), Fill = (WindowFill)Math.Max(0, _oFill.SelectedIndex),
         };
         // A window made into a door (or back) takes the usual size for one.
@@ -679,9 +686,9 @@ public sealed class HouseEditorWindow : Window
         _texture.SelectedIndex = Math.Max(0, _textures.IndexOf(s.Texture));
         _upper.SelectedIndex = s.UpperTexture is { Length: > 0 } up && _textures.IndexOf(up) is >= 0 and var ui ? ui + 1 : 0;
         _etch.SelectedIndex = (int)s.Etch;
-        _detail.SelectedIndex = (int)s.Detail;
-        _tiles.IsChecked = s.FloorTiles;
+        _base.SelectedIndex = !s.FloorTiles ? 2 : _design.Base == BaseKind.Plate ? 1 : 0;
         _tileTexture.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.ToList().FindIndex(p => p.Name == s.FloorTexture));
+        _upperFloor.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.ToList().FindIndex(p => p.Name == _design.UpperFloor));
         _wallMmRow.IsVisible = s.BoxWalls;
         _tileRow.IsVisible = s.FloorTiles;
         _loading = false;
@@ -697,13 +704,17 @@ public sealed class HouseEditorWindow : Window
             BoxWalls = _build.SelectedIndex == 0, WallMm = V(_wallMm, 12), WallSheetMm = V(_sheet, 3), ColumnMm = V(_column, 24), StoreyHeightMm = V(_storeyH, 48),
             FitMm = V(_fit, 0.15), Seed = (int)V(_seed, 1),
             Texture = _textures[Math.Clamp(_texture.SelectedIndex, 0, _textures.Count - 1)], UpperTexture = upper, Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex),
-            Detail = (WoodDetail)Math.Max(0, _detail.SelectedIndex),
-            FloorTiles = _tiles.IsChecked == true, FloorTexture = presets[Math.Clamp(_tileTexture.SelectedIndex, 0, presets.Count - 1)].Name,
+            FloorTiles = _base.SelectedIndex != 2, FloorTexture = presets[Math.Clamp(_tileTexture.SelectedIndex, 0, presets.Count - 1)].Name,
         };
         double square = V(_square, 25.4);
         _wallMmRow.IsVisible = style.BoxWalls;
         _tileRow.IsVisible = style.FloorTiles;
-        Apply(_design with { Style = style with { SquareMm = square }, SquareMm = square }, "Change the look");
+        Apply(_design with
+        {
+            Style = style with { SquareMm = square }, SquareMm = square,
+            Base = _base.SelectedIndex == 1 ? BaseKind.Plate : BaseKind.Tiles,
+            UpperFloor = presets[Math.Clamp(_upperFloor.SelectedIndex, 0, presets.Count - 1)].Name,
+        }, "Change the look");
     }
 
     void BuildChosen()
@@ -713,6 +724,12 @@ public sealed class HouseEditorWindow : Window
         {
             double need = Math.Ceiling(_design.Style.NarrowestBoxColumn + 1);
             if (V(_column, 24) < need) { _loading = true; _column.Value = Dm(need); _loading = false; }
+        }
+        else
+        {
+            // Single-panel walls need far slimmer columns than boxes: the flat building's own.
+            double slim = Math.Round(BuildingSpec.FlatPreset(_design.Style.Kind).ColumnMm * _design.Style.ScaleMm / 28);
+            if (V(_column, 24) > slim) { _loading = true; _column.Value = Dm(slim); _loading = false; }
         }
         LookChanged();
     }

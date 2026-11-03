@@ -224,6 +224,7 @@ public static partial class HouseKitMaker
         RoomFloors(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
         Roofs(d, s, plans, plates, sq, World, pieces, solids, findings);
         Tiles(d, s, sq, ox, oy, pieces, solids, findings);
+        BasePlate(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
 
         double tallest = solids.Count == 0 ? 0 : solids.Max(x => x.Pose.O.Y + x.Thickness);
         var outline = new PathsD(solids.Where(x => x.Kind is SolidKind.Wall or SolidKind.Column).Select(x => Geo.Rect(x.Pose.O.X - 1, x.Pose.O.Z - 1, x.Pose.O.X + 1, x.Pose.O.Z + 1)));
@@ -258,7 +259,7 @@ public static partial class HouseKitMaker
             spec = spec with
             {
                 Door = door.Kind == OpeningKind.Doorway ? DoorKind.Doorway : DoorKind.DoorwayAndDoor,
-                DoorOpens = door.Kind == OpeningKind.Door && s.BoxWalls,
+                DoorOpens = door.Kind == OpeningKind.Door && s.BoxWalls && door.Opens,
                 DoorShape = door.Shape, DoorLook = door.Look, DoorHinge = door.Hinge,
                 DoorWidthMm = door.WidthMm, DoorHeightMm = door.HeightMm,
                 DoorOffsetMm = Math.Round(dw.Along - length / 2, 2),
@@ -454,7 +455,7 @@ public static partial class HouseKitMaker
             lines.AddRange(l1);
             own.AddRange(region);
         }
-        var (e0, l0) = Texture(s, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, k);
+        var (e0, l0) = FloorTexture(s, d.UpperFloor, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(area), sq), sq, s.Seed + 101 + k);
         etched.AddRange(e0);
         lines.AddRange(l0);
         lines.AddRange(Geo.ClipLines(foot.Select(Geo.Loop), area));
@@ -561,45 +562,10 @@ public static partial class HouseKitMaker
         return list;
     }
 
-    /// <summary>The floor's texture over an area: planks, deck plates for metal furniture, or stone.</summary>
-    static (PathsD Etched, List<PathD> Lines) Texture(BuildingSpec s, PathsD region, int k)
-    {
-        if (region.Count == 0) return ([], []);
-        double k28 = K(s);
-        var (name, a, b) = s.Detail switch
-        {
-            WoodDetail.None => (Textures.Plain, 0.0, 0.0),
-            WoodDetail.Metal => (Terrain.ThemeTextures.SciFiPanels, 16.0, 12.0),
-            WoodDetail.Stone => ("Stone blocks", 12.0, 6.0),
-            _ => ("Wood planks (across)", 5.0, 35.0),
-        };
-        if (name == Textures.Plain || Textures.Preset(name) is null) return ([], []);
-        var bounds = Geo.Bounds(region);
-        double w = bounds.right - bounds.left, h = bounds.bottom - bounds.top;
-        if (w <= 0 || h <= 0) return ([], []);
-        var ws = new WallSpec { Texture = name, SizeA = Math.Round(a * k28, 2), SizeB = Math.Round(b * k28, 1), GrooveMm = 0.5, Seed = s.Seed + 101 + k, Etch = s.Etch, Connectors = [] };
-        var tex = Textures.Make(ws, new Face(w, h, 0, w, h));
-        PointD Map(PointD p) => new(bounds.left + p.x, bounds.top + p.y);
-        var etched = new PathsD();
-        var lines = new List<PathD>();
-        if (s.Etch == EtchStyle.Grooves)
-        {
-            var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-1, -1, w + 1, h + 1)], Geo.Union(tex.Raised)) : [];
-            etched.AddRange(Geo.Intersect(Geo.Tidy(Geo.Map(Geo.Union(mortar, tex.Etched), Map)), region));
-        }
-        else
-        {
-            lines.AddRange(Geo.ClipLines(Geo.Map(tex.Raised.Select(Geo.Loop), Map), region));
-            lines.AddRange(Geo.ClipLines(Geo.Map(tex.Etched.Select(Geo.Loop), Map), region));
-        }
-        lines.AddRange(Geo.ClipLines(Geo.Map(tex.Lines, Map), region));
-        return (etched, lines);
-    }
-
     /// <summary>The floor tile maker's tiles under the ground floor, as big as its walls' outside.</summary>
     static void Tiles(HouseDesign d, BuildingSpec s, double sq, double ox, double oy, List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
     {
-        if (!s.FloorTiles || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0) return;
+        if (!s.FloorTiles || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0 || d.Base != BaseKind.Tiles) return;
         var pts = d.Levels[0].Walls.SelectMany(e => new[] { e.A, e.B }).ToList();
         double x0 = pts.Min(p => p.X), x1 = pts.Max(p => p.X), y0 = pts.Min(p => p.Y), y1 = pts.Max(p => p.Y);
         var spec = BuildingKitMaker.TileSpecFor(s with { WidthMm = (x1 - x0) * sq, DepthMm = (y1 - y0) * sq });

@@ -47,6 +47,11 @@ public sealed record Opening
     public DoorLook Look { get; init; } = DoorLook.Planks;
     /// <summary>Which side a door swings from, seen from the outside.</summary>
     public HingeSide Hinge { get; init; } = HingeSide.Left;
+    /// <summary>
+    /// A door in box walls hangs on pins inside the wall and swings open; an arched or pointed one then has a
+    /// fixed panel over it (the leaf is square-topped). Otherwise it's glued in, filling the whole opening.
+    /// </summary>
+    public bool Opens { get; init; }
     public WindowBars Bars { get; init; } = WindowBars.Cross;
     public WindowFill Fill { get; init; } = WindowFill.Frame;
 
@@ -132,6 +137,9 @@ public sealed record RoofArea
     }
 }
 
+/// <summary>What the building stands on: the floor tile maker's jigsaw tiles, or one plate shaped to the building (cut in pieces only if it's bigger than the bed).</summary>
+public enum BaseKind { Tiles, Plate }
+
 /// <summary>
 /// A building drawn by hand, floor by floor, on a grid of squares: walls along the grid lines and
 /// corner to corner, the doors and windows dropped in them, and the floor. <see cref="Style"/> holds
@@ -147,6 +155,10 @@ public sealed record HouseDesign
     public List<Level> Levels { get; init; } = [new()];
     /// <summary>The roofs, each over a rectangle of one floor.</summary>
     public List<RoofArea> Roofs { get; init; } = [];
+    /// <summary>What the building stands on (with <see cref="BuildingSpec.FloorTiles"/> on): jigsaw floor tiles, or one plate shaped to it.</summary>
+    public BaseKind Base { get; init; } = BaseKind.Tiles;
+    /// <summary>The pattern on the floors between storeys: one of the floor tile maker's.</summary>
+    public string UpperFloor { get; init; } = "Floorboards";
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
     public static BuildingSpec DefaultStyle() => BuildingSpec.Preset(BuildingKind.Cottage) with { Items = [] };
