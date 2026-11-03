@@ -105,8 +105,9 @@ floor**) for a floor with none.
 Pick **Select** and click inside a room: the **Picked** tab shows the room, and **Floor** gives it a
 pattern of its own, any of the floor tile maker's (floorboards, flagstones, cobbles, herringbone brick,
 chequered tiles, a sci-fi deck…). Its name shows on the plan. Upstairs it's etched on that room's part
-of the floor; on the ground floor it's a loose floor that drops in between the room's walls and columns
-("Floor 1, room 2 (chequered tiles)"). *The building's floor* puts it back to the rest.
+of the floor; on the ground floor it's etched on the base plate, or, on floor tiles, it's a loose floor
+that drops in between the room's walls and columns ("Floor 1, room 2 (chequered tiles)"). *The
+building's floor* puts it back to the rest.
 
 ![The upstairs of the same house: a smaller room with a door out onto a terrace with railings round it, and a roof over it](images/window-houseeditor-upstairs.png)
 
@@ -158,7 +159,10 @@ On the **Picked** tab, with a door or window picked on the plan:
 - **Shape**: square, a round or pointed arch, round, an arrow slit, angled corners (sci-fi) or rough (a cave).
 - **Width** and **Height** (mm); a window's **Sill** is how high its bottom is above its floor.
 - A door's **Looks like** (planks, studded, a metal blast door, a portcullis that slides up, a stone
-  slab) and which side it's **Hinged on the** (seen from outside).
+  slab). As it comes, a door is glued into its wall and fills the whole opening, arch and all. In box
+  walls, tick **Opens on hinges** for one that swings open on pins inside the wall, and pick which side
+  it's **Hinged on the** (seen from outside). Only a square-topped leaf can swing inside a thick wall,
+  so an arched or pointed door that opens has a fixed panel over it.
 - A window's **Bars** and, in box walls, what's **In the window**: a frame with its bars, a shutter
   glued in, shutters that open, or nothing.
 
@@ -171,16 +175,18 @@ On the **Look** tab:
 
 - **Theme** and **Figures**: the same themes as the other terrain makers (medieval, dungeon, sci-fi,
   gothic, desert…) and the figures it's for, which scales the walls, doors and windows.
-- **Walls**: *Boxes* (thick walls that stand on their own; **Wall thickness**) or *Flat* (a sheet
-  thick, in columns of stacked layers). **Panel thickness** is the sheet everything is cut from,
+- **Walls**: *Thick* (boxes that stand on their own; **Wall thickness**) or *Single panel* (one
+  sheet thick, in slimmer columns of stacked layers; picking it makes the columns slimmer too). **Panel thickness** is the sheet everything is cut from,
   **Columns** how wide each column is, **Storey height** how high each floor's walls are (rounded to
   whole layers of the sheet).
-- **Texture** for the ground floor and **Upstairs**, etched as grooves or scored lines; **Floors**:
-  what's etched on the floors between storeys (planks, stone, metal deck plates or nothing).
+- **Texture** for the ground floor's walls and **Upstairs**, etched as grooves or scored lines.
 - **Slot fit** and **Layout** (a different random layout of stones and planks).
+- **Floors**: the **Base** the building stands on (the floor tile maker's *jigsaw floor tiles* over
+  the walls' outside, *one plate* shaped to the building with lines scored where the walls and columns
+  go, cut along walls only if it's bigger than the bed, or *nothing*), the **Ground floor** pattern on
+  it, and the **Upper floors** pattern on the floors between storeys: any of the floor tile maker's
+  (floorboards, flagstones, cobbles, tiles, sci-fi deck…). A room's own pattern goes over these.
 - **Square**: the plan's grid square (25.4 mm, an inch, for most tabletop games).
-- **Floor tiles under the building**: the floor tile maker's jigsaw tiles under the ground floor
-  (its walls' outside), in the **Tiles** texture picked.
 - **Cut with** and **Etch with**: your material's settings, so slots come out their drawn width.
 
 ![The same house's pieces, laid out flat](images/window-houseeditor-pieces.png)

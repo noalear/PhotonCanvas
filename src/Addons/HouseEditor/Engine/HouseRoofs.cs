@@ -194,11 +194,74 @@ public static partial class HouseKitMaker
         return (etched, lines);
     }
 
-    /// <summary>A loose floor for each ground-floor room with a pattern of its own: it drops in between the walls and columns.</summary>
+    /// <summary>A rectangle's top-left corner moved back onto the grid, so a pattern laid from it follows the squares.</summary>
+    static RectD OnGrid(RectD b, double sq) => new(Math.Floor(b.left / sq) * sq, Math.Floor(b.top / sq) * sq, b.right, b.bottom);
+
+    /// <summary>Whether the ground floor stands on one plate (rather than jigsaw tiles or nothing).</summary>
+    static bool OnPlate(HouseDesign d, BuildingSpec s) => s.FloorTiles && d.Base == BaseKind.Plate;
+
+    /// <summary>
+    /// One plate the building stands on, shaped to the ground floor's rooms (and floor laid by hand) out
+    /// to the columns' outside: the ground floor's pattern etched on it (each room's own where it has
+    /// one), and lines scored where the walls and columns stand. Cut along walls if it's bigger than the bed.
+    /// </summary>
+    static void BasePlate(HouseDesign d, BuildingSpec s, PlanShape plan, double sq, double longestMm, Func<double, double, double, V3> world,
+        List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
+    {
+        if (!OnPlate(d, s) || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0) return;
+        double T = s.WallSheetMm, Wt = BuildingKitMaker.WallThickness(s), C = s.ColumnMm;
+        var level = d.Levels[0];
+        var area = new PathsD();
+        foreach (var r in plan.Rooms) area.AddRange(r.Area);
+        foreach (var f in level.Floor) area.Add(Geo.Rect(f.X, f.Y, f.X + 1, f.Y + 1));
+        foreach (var e in level.Walls) area.Add(Textures.Strip(new PointD(e.A.X, e.A.Y), new PointD(e.B.X, e.B.Y), 0.002));
+        var mm = Geo.Map(Geo.Union(area), p => new PointD(p.x * sq, p.y * sq));
+        var plate = Geo.Tidy(Geo.Union(Clipper.InflatePaths(mm, C / 2 + 2, JoinType.Miter, EndType.Polygon, 4, 3)));
+        var foot = new PathsD();
+        foreach (var e in level.Walls) foot.Add(Textures.Strip(new PointD(e.A.X * sq, e.A.Y * sq), new PointD(e.B.X * sq, e.B.Y * sq), Wt));
+        foreach (var (g, _) in plan.Joints) foot.Add(Geo.Rect(g.X * sq - C / 2, g.Y * sq - C / 2, g.X * sq + C / 2, g.Y * sq + C / 2));
+        foot = Geo.Union(foot);
+        var shows = Geo.Subtract(plate, foot);
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        var own = new PathsD();
+        foreach (var room in plan.Rooms)
+        {
+            if (RoomTexture(level, plan, room) is not { } tex) continue;
+            var roomMm = Geo.Map(room.Area, p => new PointD(p.x * sq, p.y * sq));
+            var region = Geo.Intersect(roomMm, shows);
+            var (e1, l1) = FloorTexture(s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 17 + room.Index);
+            etched.AddRange(e1);
+            lines.AddRange(l1);
+            own.AddRange(region);
+        }
+        var (e0, l0) = FloorTexture(s, s.FloorTexture, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(plate), sq), sq, s.Seed + 7);
+        etched.AddRange(e0);
+        lines.AddRange(l0);
+        lines.AddRange(Geo.ClipLines(foot.Select(Geo.Loop), plate));
+        var cuts = SplitPlate(plate, plan, sq, longestMm, out bool unsupported);
+        findings.Add(new(Severity.Note, cuts.Count == 1
+            ? "The building stands on one base plate, with lines scored where the walls and columns go."
+            : $"The base is bigger than the bed: it's cut in {cuts.Count} pieces whose edges meet under walls{(unsupported ? " (one join has no wall over it: glue a strip of sheet under that join)" : "")}."));
+        int n = 0;
+        foreach (var cut in cuts)
+        {
+            string name = cuts.Count == 1 ? "Base" : $"Base, piece {++n}";
+            PointD Flip(PointD p) => new(p.x, -p.y);
+            var cutF = Geo.Tidy(Geo.Map(cut, Flip));
+            var etchF = Geo.Map(Geo.Intersect(etched, cut), Flip);
+            var linesF = Geo.Map(Geo.ClipLines(lines, cut), Flip);
+            pieces.Add(new Piece(name, Sheet.Walls, cutF, etchF, linesF, 1));
+            var o = world(0, 0, T / 2);
+            solids.Add(new HouseSolid(name, cutF, Pose.Up(o.X, o.Y, o.Z), T, Nil(etchF), Nil(linesF), 0, SolidKind.Ground));
+        }
+    }
+
+    /// <summary>A loose floor for each ground-floor room with a pattern of its own: it drops in between the walls and columns (on a base plate, it's etched on that instead).</summary>
     static void RoomFloors(HouseDesign d, BuildingSpec s, PlanShape plan, double sq, double longestMm, Func<double, double, double, V3> world,
         List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
     {
-        if (d.Levels.Count == 0) return;
+        if (d.Levels.Count == 0 || OnPlate(d, s)) return;
         double T = s.WallSheetMm, Wt = BuildingKitMaker.WallThickness(s), C = s.ColumnMm, clear = 0.3;
         var columns = new PathsD(plan.Joints.Keys.Select(g => Geo.Rect(g.X * sq - C / 2 - clear, g.Y * sq - C / 2 - clear, g.X * sq + C / 2 + clear, g.Y * sq + C / 2 + clear)));
         foreach (var room in plan.Rooms)
