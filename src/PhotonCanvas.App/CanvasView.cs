@@ -299,7 +299,18 @@ public sealed partial class CanvasView : Control
     public void FitSelection()
     {
         if (_doc is null) return;
-        var b = _doc.Selection.Count > 0 ? _doc.State.Bounds(_doc.Selection) : _doc.State.Bounds(_doc.State.Shapes.Select(s => s.Id));
+        if (_doc.Selection.Count > 0) FitShapes(_doc.State.Bounds(_doc.Selection)); else FitDesign();
+    }
+
+    /// <summary>Zoom to everything in the design, whatever is selected; the whole bed when it's empty.</summary>
+    public void FitDesign()
+    {
+        if (_doc is null) return;
+        FitShapes(_doc.State.Bounds(_doc.State.Shapes.Select(s => s.Id)));
+    }
+
+    void FitShapes(Rect2 b)
+    {
         if (b.IsEmpty) FitField(); else FitRect(b.Inflate(Math.Max(b.Width, b.Height) * 0.05 + 1));
     }
 

@@ -63,7 +63,11 @@
         <ContentControl x:Name="JobHost" DockPanel.Dock="Bottom" />
         <Panel>
           <app:CanvasView x:Name="Canvas" />
-          <ContentControl x:Name="CanvasOverlay" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+          <!-- Bottom-right corner: the close-up camera (when open) above the zoom buttons. -->
+          <StackPanel HorizontalAlignment="Right" VerticalAlignment="Bottom">
+            <ContentControl x:Name="CanvasOverlay" HorizontalAlignment="Right" />
+            <ContentControl x:Name="ZoomHost" HorizontalAlignment="Right" />
+          </StackPanel>
         </Panel>
       </DockPanel>
 

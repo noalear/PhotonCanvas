@@ -28,6 +28,7 @@ public partial class MainWindow : Window
     readonly Ribbon _ribbon = new();
     readonly Updater _updater;
     CloseUpView? _closeUp;
+    ZoomButtons? _zoomButtons;
 
     /// <summary>The close-up camera on the work area: open or close it.</summary>
     void ToggleCloseUp(bool open)
@@ -123,6 +124,7 @@ public partial class MainWindow : Window
         ApplyGrid();
         Canvas.CursorMoved += p => CursorText.Text = p is { } v ? $"X {Units.Num(v.X)}   Y {Units.Num(v.Y)} {Units.Name}" : "";
         Canvas.ZoomChanged += z => ZoomText.Text = $"{z / 3.7795 * 100:0}%";
+        ZoomHost.Content = _zoomButtons = new ZoomButtons(id => Commands().FirstOrDefault(c => c.Id == id), _settings);
         _doc.Changed += _ => UpdateChrome();
         _doc.Changed += _ => FollowSelectionLayer();
         _doc.Changed += _ => ShowCloseUpArea();
@@ -662,8 +664,9 @@ public partial class MainWindow : Window
         // ---- View ----
         var view = _ribbon.Tab("View", "Zoom, grid and snapping");
         var zoom = view.Group("Zoom");
-        zoom.Large("Fit bed", "IcFit", Canvas.FitField, "Show the whole work area (Home)");
+        zoom.Large("Fit bed", "IcFitBed", Canvas.FitField, "Show the whole work area (Home)");
         zoom.Small("Fit selection", "IcFit", Canvas.FitSelection, "Zoom to the selection, or the design (F)");
+        zoom.Small("Fit design", "IcFitDesign", Canvas.FitDesign, "Zoom to the whole design, whatever is selected (Shift+F)");
         zoom.Small("Zoom in", "IcZoomIn", () => Canvas.ZoomBy(1.25), "Zoom in (Ctrl +)");
         zoom.Small("Zoom out", "IcZoomOut", () => Canvas.ZoomBy(0.8), "Zoom out (Ctrl −)");
         var grid = view.Group("Grid & snapping");
@@ -808,6 +811,7 @@ public partial class MainWindow : Window
         new("view.zoomout", "View", "Zoom out", "Ctrl+OemMinus|Ctrl+Subtract", () => Canvas.ZoomBy(0.8)),
         new("view.fit", "View", "Fit work area", "Home|Ctrl+D0|Ctrl+NumPad0", Canvas.FitField),
         new("view.fitsel", "View", "Fit selection", "F", Canvas.FitSelection),
+        new("view.fitdesign", "View", "Fit design", "Shift+F", Canvas.FitDesign),
         new("view.grid", "View", "Grid settings…", "Ctrl+OemQuotes", () => _ = Guard(ShowGridSettings)),
         new("view.osnap", "View", "Object snaps on or off", "F3", ToggleObjectSnaps),
         new("tool.select", "Tools", "Select", "V", () => Canvas.Tool = Tool.Select),

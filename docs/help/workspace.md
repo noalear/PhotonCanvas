@@ -14,6 +14,8 @@ zoom and snap on the work area itself is on [Working on the canvas](canvas.md).
 3. **The Layers panel** on the left: every layer, what it does and how long it takes.
 4. **The tool options bar** and **the pages bar** above the work area.
 5. **The work area** (the canvas) in the middle: the machine's 220 × 220 mm field, with rulers.
+   Four small zoom buttons sit in its bottom-right corner: the whole bed, the whole design, zoom
+   in and zoom out.
 6. **The job bar** under the work area: **Ship It**, **Frame**, the run order and the time.
 7. **The Selection** and **Layer settings** panels on the right.
 8. **The status bar** along the bottom: the cursor position, the zoom and messages.
@@ -92,6 +94,7 @@ one does. If it still doesn't fit, the ribbon scrolls sideways.
 |---|---|---|
 | **Fit bed** | Shows the whole work area (`Home`). | [Zooming and panning](canvas.md#zooming-and-panning) |
 | **Fit selection** | Zooms to the selection, or to the whole design when nothing is selected (`F`). | [Zooming and panning](canvas.md#zooming-and-panning) |
+| **Fit design** | Zooms to the whole design, whatever is selected (`Shift+F`). | [Zooming and panning](canvas.md#zooming-and-panning) |
 | **Zoom in**, **Zoom out** | Zoom about the middle of the view (`Ctrl+=` and `Ctrl+-`). | [Zooming and panning](canvas.md#zooming-and-panning) |
 | **Snap to shapes** | On: dragged shapes line up with other shapes, guides and the work area's edges and centre lines. | [Snapping](canvas.md#snapping-the-grid-and-guides) |
 | **Show grid** | Shows or hides the grid on the work area. | [The grid](canvas.md#the-grid) |
