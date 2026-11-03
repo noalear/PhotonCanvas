@@ -83,6 +83,17 @@ public static class Connectors
         double wallT = WallKitMaker.WallThickness(s), slotW = wallT + Math.Max(0, s.FitMm), depth = Math.Max(0.5, s.SlotDepthMm);
         int layers = WallKitMaker.ColumnLayers(s);
         bool any = false;
+        // The 3D view shows one wall in the first kind's slot at its left end and the second kind's (or the first's) at its right.
+        var kinds = Kinds.Where(k => s.ConnectorCount(k.Id) > 0).ToList();
+        double T = s.ThicknessMm, c2e = WallKitMaker.CentreToEnd(s), L = WallKitMaker.PanelLength(s);
+        var shown = new List<(ConnectorKind Kind, double X, double Yaw)>();
+        if (kinds.Count > 0)
+        {
+            var left = kinds[0].Id;
+            var right = kinds[kinds.Count > 1 ? 1 : 0].Id;
+            shown.Add((left, -c2e, ShowYaw(Directions(left, s.CustomAngleDeg), 0)));
+            shown.Add((right, L + c2e, ShowYaw(Directions(right, s.CustomAngleDeg), 180)));
+        }
         foreach (var kind in Kinds)
         {
             int count = s.ConnectorCount(kind.Id);
@@ -93,9 +104,11 @@ public static class Connectors
             if (problem is not null) { findings.Add(new(Severity.Bad, $"{kind.Name}: {problem}")); continue; }
             string name = $"{Cap(kind.Short)} column";
             int body = s.Foot ? layers - 1 : layers;
-            if (body > 0) parts.Add(new Part($"{name} layer", c.Body, [], [], body * count));
-            if (s.Foot) parts.Add(new Part($"{name} foot", c.Foot, [], [], count));
-            if (s.Cap) parts.Add(new Part($"{name} cap", c.Top, [], [], count));
+            var at = shown.Where(x => x.Kind == kind.Id).ToList();
+            List<Model.Pose> Layers(IEnumerable<int> ks) => [.. at.SelectMany(p => ks.Select(k => Plate(p.X, k * T + T / 2, p.Yaw)))];
+            if (body > 0) parts.Add(new Part($"{name} layer", c.Body, [], [], body * count) { Poses = Layers(Enumerable.Range(s.Foot ? 1 : 0, body)) });
+            if (s.Foot) parts.Add(new Part($"{name} foot", c.Foot, [], [], count) { Poses = Layers([0]) });
+            if (s.Cap) parts.Add(new Part($"{name} cap", c.Top, [], [], count) { Poses = Layers([layers]) });
         }
         if (any)
         {
@@ -104,6 +117,30 @@ public static class Connectors
             if (s.PinMm > 0) findings.Add(new(Severity.Note, $"Line each column's layers up on a {s.PinMm:0.#} mm pin (a cocktail stick or wire) through the middle, and glue them."));
         }
         return parts;
+    }
+
+    /// <summary>
+    /// How to turn a column in the 3D view so one of its slots points at the wall (<paramref name="toward"/>, degrees)
+    /// and its other slots point away from you as much as they can.
+    /// </summary>
+    public static double ShowYaw(double[] dirs, double toward)
+    {
+        double best = toward - dirs[0], score = double.MinValue;
+        foreach (var d in dirs)
+        {
+            double yaw = toward - d;
+            // Away from you is −z, which is 90° (anticlockwise from x, seen from above).
+            double sc = dirs.Where(o => o != d).Sum(o => Math.Sin((o + yaw) * Math.PI / 180));
+            if (sc > score + 1e-9) { score = sc; best = yaw; }
+        }
+        return best;
+    }
+
+    /// <summary>A layer lying flat, its middle at (x, y, 0), its first slot pointing along <paramref name="yaw"/> (degrees, anticlockwise seen from above).</summary>
+    static Model.Pose Plate(double x, double y, double yaw)
+    {
+        double a = yaw * Math.PI / 180, b = a + Math.PI / 2;
+        return new Model.Pose(new Model.V3(x, y, 0), new Model.V3(Math.Cos(a), 0, -Math.Sin(a)), new Model.V3(Math.Cos(b), 0, -Math.Sin(b)));
     }
 
     static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];

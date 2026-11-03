@@ -2,27 +2,34 @@
 
 An add-on (Settings → Add-ons → **Textured wall maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Walls**, and **Edit walls…** is on the right-click menu of the pieces it made.
 
-**Walls** makes wall panels for tabletop games, dioramas and model buildings, cut from sheet
-material with a texture etched on the face: brick, stone, wood, metal, or a pattern of your own. A
-wall can have battlements (with a walkway behind) or a ruined top, a door, windows and mount points
-for accessories. Columns cut from the same sheet join the walls: straight on, at corners, at 45° and
-135°, as T junctions and crosses, or closing off an end. The walls slide into the columns' slots,
-so you can take a layout apart and build a different one.
+**Walls** makes walls for tabletop games, dioramas and model buildings, cut from sheet material with
+a texture etched on: brick, stone, wood, metal, or a pattern of your own. A wall is built as a
+**box** (a textured front and back, a base it stands on, a top, two ends and ribs inside) so it
+stands up on its own and looks solid from every side, or as a **flat panel**. A wall can have
+battlements (with a walkway behind) or a ruined top, a door, windows and mount points for
+accessories. Columns cut from the same sheet join the walls: straight on, at corners, at 45° and
+135°, as T junctions and crosses, or closing off an end.
 
 > **Note:** The walls have been checked on screen and in tests, but not yet cut on the machine. Cut
-> one short wall and a column first and check how the wall slides into the slot before cutting a
-> whole set; change **Slot fit** if it's too tight or too loose.
+> one short wall and a column first and check how the tabs go into the slots before cutting a whole
+> set; change **Slot fit** if they're too tight or too loose.
 
 ## The Textured walls window
 <!-- windows: WallsWindow -->
 
-![The wall maker making a castle wall: settings on the left, every piece on the right with the brick texture, battlements, arrow slits, a door and its walkway](images/window-walls-castle.png)
+![The wall maker making a boxed stone castle wall: settings on the left, and on the right the wall put together with battlements, a walkway, arrow slits, a door and corner columns](images/window-walls-castle.png)
 
 Click **Walls** on the **Home** tab (in the **Draw** group). The **Textured walls** window opens. The
-settings are on the left in tabs; the preview on the right shows every piece at the same scale (the
-wall's face on top, then one of each other piece) and updates as you change things. Under it are the
-number of pieces and any problems: a red ✕ has to be fixed before the walls can go in, a yellow !
-is worth a look, and a grey • is just for your information.
+settings are on the left in tabs; the preview on the right updates as you change things:
+
+- **Put together** shows one wall built, in 3D, with a column at each end (the first kind of column
+  you're cutting at its left, the second at its right), its door, accessories and walkway in place.
+  Drag it to turn it round.
+- **Pieces** shows every piece at the same scale, as it will be cut: the wall's front on top, then
+  one of each other piece.
+
+Under the preview are the number of pieces and any problems: a red ✕ has to be fixed before the
+walls can go in, a yellow ! is worth a look, and a grey • is just for your information.
 
 Press **Put in the design** and the pieces go on a page of their own, nested onto the bed (more pages
 if they need more than one bed). To change a set later, select any of its pieces, right-click and
@@ -31,13 +38,27 @@ replaced wherever they are.
 
 ## The wall
 
+**Build it as** picks how each wall is made:
+
+- **A box: front, back, top, bottom and ends** (new walls start like this). The wall is as thick as
+  **Wall thickness**, made from panels **Panel thickness** thick: a textured front and back, a base
+  plate they stand on, a top plate between them, an end at each end, and ribs inside that hold the
+  faces apart. It stands up on its own, its ends can be finished and textured, and doors and
+  windows are lined right through (see [Boxed walls](#boxed-walls)).
+- **A flat panel**: one sheet thick (or two glued back to back), its ends sliding into the columns'
+  slots. This is how the first walls were made, and walls made that way open as they were.
+
 | Setting | Range (default) | What it does |
 |---|---|---|
-| **Length** | 10 to 2000 mm (100) | How long the wall is. |
-| **Length is** | The panel as cut | *The panel as cut*, or *Column centre to centre*: the distance between the middles of the columns at each end. Use centre to centre to lay walls out on a grid (50.8 mm for two 1-inch squares). |
-| **Height** | 5 to 1000 mm (50) | How high the wall is, to the top of any battlements. |
-| **Thickness** | 0.5 to 20 mm (3) | Your sheet's thickness. The columns' slots and the mount points are sized from it. |
-| **Two panels back to back** | off | Cuts a mirror-image second panel to glue to the back of each wall, so both faces are textured. The wall is then twice as thick and the slots are made to fit. |
+| **Length** | 10 to 2000 mm (100) | How long the wall is: a box wall's faces, from column to column. |
+| **Length is** | The panel as cut | *The face as cut*, or *Column centre to centre*: the distance between the middles of the columns at each end. Use centre to centre to lay walls out on a grid (50.8 mm for two 1-inch squares). |
+| **Height** | 5 to 1000 mm (50) | How high the wall is from the table, to the top of any battlements. |
+| **Wall thickness** (box) | 1 to 200 mm (12) | The whole wall, front face to back face. It must be at least three panels. Two faces plus a whole number of panels between them fits exactly (12 mm, 15 mm or 18 mm for 3 mm sheet); other thicknesses work, and the list says how much room the layers inside leave. |
+| **Plinth** (box) | 0 to 20 mm (1.5) | How far the base sticks out past the faces, like a footing course. At 0 the faces' tabs show as notches in the base's edge. |
+| **Ribs every** (box) | 15 to 500 mm (45) | The most room between the ribs inside. Ribs keep clear of doors, windows and mount points. |
+| **Ends go into columns** (box) | on | The faces have tabs at their ends that go into slots in the columns, and the wall stops at the column's side. Off, the ends are closed: the base goes round them as a plinth, and they can be textured. |
+| **Panel thickness** (box), **Thickness** (flat) | 0.5 to 20 mm (3) | Your sheet's thickness. Slots, tabs and mount points are sized from it. |
+| **Two panels back to back** (flat) | off | Cuts a mirror-image second panel to glue to the back of each wall, so both faces are textured. The wall is then twice as thick and the slots are made to fit. |
 | **How many walls** | 1 to 100 (1) | How many walls like this one to cut. |
 | **Cut with** | As set on the cut layer | Cut settings from your material library. Their kerf goes on the cut layer, so the slots come out the width they're drawn, and the material's thickness and slot fit from your cut test are filled in. |
 | **Etch with** | As set on the etch layer | Engrave (fill) settings from your library for the texture. |
@@ -90,8 +111,12 @@ Pick one in **Texture**. The sizes it asks for change with it; the defaults suit
 - **Etch as**: *Grooves* etches the gaps as filled areas (deeper and the most real). *Lines* scores
   round each brick or stone instead, which is much quicker. Grain, rivets and door handles are always
   scored lines, on a light **Walls · lines** layer.
-- **Keep the ends smooth**: leaves the ends of the wall (as far as the slots are deep) without
-  texture, so they slide into the columns at full thickness. On by default.
+- **Keep the ends smooth** (flat walls): leaves the ends of the wall (as far as the slots are deep)
+  without texture, so they slide into the columns at full thickness. On by default.
+- **Texture the back face too** (box walls): on by default. The back is laid out differently from
+  the front, so the two faces don't match stone for stone.
+- **Texture the ends and the top too** (box walls): the texture on the top plate (or the walkway),
+  on closed ends and on the back of a parapet. The courses on the ends line up with the faces'.
 
 ### Your own texture
 
@@ -136,16 +161,19 @@ your texture is saved in the design too, so it can be opened and changed on anot
 | **Frame** | A smooth band round each door and window, edged with a groove, where the texture stops. 0 = none. |
 
 A door or window that would cut the wall into pieces, or that doesn't fit its height, is refused
-with a red ✕.
+with a red ✕. In a box wall a door stands on the base (the base runs under it as a threshold), and
+every opening is lined between the faces (see [Boxed walls](#boxed-walls)). Bars are left in the
+front face; the back face's window is open.
 
 ![A timber-framed house wall with an etched door, barred windows and two mount points with torch sconces](images/window-walls-house.png)
 
 ## Mount points
 
-**Mount points** are small slots right through the wall, as wide as the sheet is thick (plus the
-fit) and **Slot height** tall, at **Mount height**. They're spread evenly along the wall clear of
-the doors and windows. Anything cut from the same sheet with a tab that size plugs into them from
-either side of the wall, so one slot takes whatever you want to hang there.
+**Mount points** are small slots through the wall (through a box wall's front face), as wide as the
+sheet is thick (plus the fit) and **Slot height** tall, at **Mount height**. They're spread evenly
+along the wall clear of the doors and windows. Anything cut from the same sheet with a tab that size
+plugs into them, so one slot takes whatever you want to hang there. A box wall's ribs keep clear of
+the mount points, so an accessory's tab has room inside.
 
 **Accessories** cuts one of these for each mount point (or one of each):
 
@@ -157,9 +185,32 @@ either side of the wall, so one slot takes whatever you want to hang there.
 
 The accessories stand out from the wall at right angles, so they're drawn side-on.
 
+## Boxed walls
+
+![A boxed stone castle wall put together: battlements over a walkway, a door, arrow slits, and battlemented corner columns on stepped plinths](images/window-walls-castle.png)
+
+A box wall is cut as these pieces (the **Pieces** view shows each one):
+
+| Piece | What it is |
+|---|---|
+| **Front**, **Back** | The faces, textured. Tabs along the bottom go into the base; tabs at the ends go into the columns. The back is cut as seen from behind. |
+| **Base** | What the wall stands on: the faces' footprint plus the plinth, with slots for the faces', ends' and ribs' tabs. It runs under a doorway as a threshold. |
+| **Top** | A plate between the faces at the top. Where a window runs through it, it's cut in two. With a walkway, it's the **Walkway**. |
+| **End** | Across the gap at each end, from the base to the top plate. |
+| **Rib** | The same, inside, every **Ribs every** or less. |
+| **Lining** | Layers of sheet between the faces round each door and window, 3 mm wide: from any side the opening looks cut through solid wall. One per layer that fits between the faces. |
+| **Merlon filling** | Battlements: the gap between the faces' merlons filled with layers, sitting on the top plate at the bottom of the gaps. |
+| **Parapet backing**, **Walkway** | Battlements with a walkway: the front face goes up as the parapet with a second layer behind it, the back face stops under the walkway, and the top plate is the walkway. A walkway deeper than the wall reaches back over the back face on **Walkway brackets** plugged into slots in the back face. |
+| **Broken top layer** | A ruined top: the front and back break in the same place but each its own way, and the layers between them break a little lower here and there, so the top looks broken right through. |
+
+**Putting it together**: stand the faces' bottom tabs in the base. Glue the ends, the ribs and the
+linings to the inside of the front, with the ribs' and ends' tabs in the base too; put the top plate
+on, then glue the back on. With battlements, glue the merlon filling or the parapet's backing onto
+the top plate.
+
 ## Connectors
 
-The columns the walls slide into. Type how many of each kind to cut: for a square room, four
+The columns the walls go into. Type how many of each kind to cut: for a square room, four
 **Corner (90°)**; for a long straight run, **Straight (180°)** between the walls and an **End cap** at
 each end.
 
@@ -174,7 +225,30 @@ each end.
 | **End cap** | One: finishes the end of a wall. |
 | **Your angle** | Two, **Your angle (°)** apart. |
 
-![A ruined fieldstone wall and one layer and the cap of each kind of column: straight, corner, 135°, T and end](images/window-walls-connectors.png)
+![A ruined fieldstone box wall between a boxed straight column and a corner column, both with stepped caps](images/window-walls-connectors.png)
+
+### Columns for box walls
+
+A box wall's faces butt against the column's side, their end tabs in its slots (**Slot fit** wider
+than the sheet). **Columns are** picks how they're made:
+
+- **Boxes: four sides, a top and a bottom**, for straight runs, corners, T junctions, crosses and
+  end caps. Two sides are the column's full width and two fit between them. They go round a plug on
+  the base (a square that fits inside them) and another under the top, which line them up. The sides
+  are textured like the walls, except where a wall covers them. A boxed column must be at least the
+  wall's thickness, two sheets and 2 mm wide (the list says if it's narrower); 22 mm suits a 12 mm wall.
+- **Stacks of layers**: each layer has the two slots for each wall. Columns at angles other than a
+  right angle (135°, 45° and your angle) are always stacks.
+
+| Setting | Choices (default) | What it does |
+|---|---|---|
+| **Top** | A wider cap | *Flush with the sides*: a plate inside the top. *A wider cap*: a plate **Lip** wider all round, on top. *A stepped cap*: two plates, the upper one wider, like a cornice. *A stepped point*: plates getting smaller, a stepped pyramid. *Battlements*: the sides go up past the top with a gap in the middle of each, like a turret. |
+| **Bottom** | A wider foot | *Flat*: a plate the column's size. *A wider foot*: a plate **Lip** wider all round. *A stepped plinth*: two plates, the lower one wider. Where a wall comes in, the plates are notched so the wall (and its base) reaches the column's side. |
+| **Lip** | 2 mm | How far each step of a cap, foot or plinth sticks out. |
+
+### Columns for flat walls
+
+![A flat brick wall with battlements, and one layer and the cap of the corner and 135° columns](images/window-walls-flat.png)
 
 Each column is a stack of layers cut from the same sheet: as many as it takes to reach the top of
 the wall (the list under the preview says how many). Each layer has a slot for every wall, as wide
