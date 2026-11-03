@@ -123,7 +123,7 @@ passes, pulse width or frequency. Change that layer's setting (see
 - *Image "…" at … dpi needs … million dots. Lower the resolution or make it smaller.*: a picture
   is too big for its resolution.
 - *The focus can move at most 10 mm either way…* or *Stepping down … lowers the head … in total;
-  the limit is 10 mm.*: lower the focus offset or step-down.
+  the limit is 10 mm.*: lower the focus offset or step-down. On the rotary the limit is 60 mm.
 
 ### Serial numbers and spreadsheets
 

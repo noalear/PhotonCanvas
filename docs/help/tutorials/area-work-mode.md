@@ -19,8 +19,8 @@ Click **Equipment** in the list on the left.
 ## Tick your attachment
 <!-- target: text:ATTACHMENTS -->
 <!-- wait: closed:Settings -->
-Tick **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)** or
-**Conveyor feeder**, then close Settings.
+Tick **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
+**My own rotary (homemade or another make)** or **Conveyor feeder**, then close Settings.
 
 ## Open Work mode
 <!-- target: ribbon:Laser/Work mode -->
@@ -30,7 +30,8 @@ Click **Work mode** on the **Laser** tab.
 ## Choose the mode
 <!-- target: window:Work mode -->
 Click **Rotary** or **Conveyor** at the top.
-- Rotary: pick the **Attachment** and type the **Object Ø (mm)** where it's marked.
+- Rotary: pick the **Attachment** and type the **Object Ø (mm)** where it's marked. For
+  **Your own rotary**, also say how it **Holds the object** and its scale (correct it from a test turn).
 - Conveyor: **Belt calibration %** and **Angle**, or **Read from the machine**.
 
 ## Use it

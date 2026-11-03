@@ -37,6 +37,7 @@ public sealed partial class CanvasView
 
     // ---- guides ------------------------------------------------------------------------
 
+    static readonly IPen RotaryStartPen = new Pen(new SolidColorBrush(Color.Parse("#F59E0B")), 1.5, new DashStyle([10, 4], 0));
     static readonly IPen GuideLinePen = new Pen(new SolidColorBrush(Color.Parse("#3DD6F5")), 1, new DashStyle([6, 4], 0));
     (bool Vertical, int Index, double At)? _guideDrag;
 
@@ -80,7 +81,7 @@ public sealed partial class CanvasView
         {
             if (d.Index >= 0) _doc.Commit("Remove guide", _doc.State with { Guides = guides.RemoveAt(d.Index) });
         }
-        else if (d.Index >= 0) _doc.Commit("Move guide", _doc.State with { Guides = guides.SetItem(d.Index, new PhotonCanvas.Doc.Guide(d.Vertical, d.At)) });
+        else if (d.Index >= 0) _doc.Commit("Move guide", _doc.State with { Guides = guides.SetItem(d.Index, guides[d.Index] with { At = d.At }) });
         else _doc.Commit("Add guide", _doc.State with { Guides = guides.Add(new PhotonCanvas.Doc.Guide(d.Vertical, d.At)) });
         InvalidateVisual();
     }
@@ -88,9 +89,9 @@ public sealed partial class CanvasView
     void DrawGuidelines(DrawingContext ctx)
     {
         if (_doc is null) return;
-        var lines = _doc.State.Guides.Select((g, i) => (g.Vertical, _guideDrag is { Index: var k } dd && k == i ? dd.At : g.At)).ToList();
-        if (_guideDrag is { Index: -1 } nd) lines.Add((nd.Vertical, nd.At));
-        foreach (var (vertical, at) in lines)
+        var lines = _doc.State.Guides.Select((g, i) => (g.Vertical, _guideDrag is { Index: var k } dd && k == i ? dd.At : g.At, g.RotaryStart)).ToList();
+        if (_guideDrag is { Index: -1 } nd) lines.Add((nd.Vertical, nd.At, false));
+        foreach (var (vertical, at, start) in lines)
         {
             if (vertical)
             {
@@ -100,7 +101,10 @@ public sealed partial class CanvasView
             else
             {
                 double y = Math.Round(ToScreen(new Vec2(0, at)).Y) + 0.5;
-                ctx.DrawLine(GuideLinePen, new Point(RulerSize, y), new Point(Bounds.Width, y));
+                ctx.DrawLine(start ? RotaryStartPen : GuideLinePen, new Point(RulerSize, y), new Point(Bounds.Width, y));
+                if (start)
+                    ctx.DrawText(new FormattedText("Rotary start: faces the laser", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, Typeface.Default, 11, RotaryStartPen.Brush),
+                        new Point(RulerSize + 6, y - 15));
             }
         }
     }

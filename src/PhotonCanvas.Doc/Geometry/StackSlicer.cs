@@ -103,7 +103,20 @@ public sealed record SliceOptions
 public interface ISliceModifier
 {
     void Modify(SliceWork work, CancellationToken ct);
+
+    /// <summary>When it runs among the add-ons' steps: lower first (then in the order they were set). 0 by default.</summary>
+    int Order => 0;
+
+    /// <summary>
+    /// After "Make the slices" has put the parts in the design: add anything of the add-on's own
+    /// (a page, say), from what it handed on in <see cref="SliceStack.Extras"/>. Return
+    /// <paramref name="state"/> itself to add nothing.
+    /// </summary>
+    DocState AfterMake(DocState state, SliceStack stack, MachineProfile machine, string title) => state;
 }
+
+/// <summary>A round hole an add-on puts through every slice (a dowel up the middle, say): cut with the dowel holes, kept clear by the pins.</summary>
+public readonly record struct SliceHole(Vec2 At, double DiameterMm);
 
 /// <summary>
 /// What the 3D to slices window passes to add-on panels in its "stackslice.stacked" slot: the
@@ -129,6 +142,11 @@ public sealed class SliceWork
     public required IReadOnlyList<PathGeometry> Layers { get; init; }
     /// <summary>The dowel holes through every slice (already chosen; they're cut after the modifiers).</summary>
     public required IReadOnlyList<Vec2> Dowels { get; init; }
+    /// <summary>
+    /// More holes through every slice, added by the modifiers (a dowel up the middle): cut after the
+    /// modifiers with the dowel holes, kept clear by the pins. Later modifiers should keep material round them.
+    /// </summary>
+    public List<SliceHole> Holes { get; } = [];
     /// <summary>Each slice's parts, bottom slice first: change, add or remove them.</summary>
     public required List<List<PathGeometry>> Parts { get; init; }
     /// <summary>Sentences for the slicing summary.</summary>
@@ -178,6 +196,8 @@ public sealed record SliceStack(IReadOnlyList<SlicePart> Parts, int Slices, doub
     public IReadOnlyList<string> Notes { get; init; } = [];
     /// <summary>What the add-ons handed on, by their own keys.</summary>
     public IReadOnlyDictionary<string, object> Extras { get; init; } = new Dictionary<string, object>();
+    /// <summary>The holes the add-ons put through every slice (<see cref="SliceWork.Holes"/>).</summary>
+    public IReadOnlyList<SliceHole> Holes { get; init; } = [];
 }
 
 /// <summary>
@@ -265,7 +285,7 @@ public static class StackSlicer
         if (o.Modifiers.Count > 0)
         {
             work = new SliceWork { Mesh = tris, Options = o, SlabMm = slab, Layers = layers, Dowels = dowels, Parts = islands };
-            foreach (var m in o.Modifiers)
+            foreach (var m in o.Modifiers.Select((m, i) => (m, i)).OrderBy(x => x.m.Order).ThenBy(x => x.i).Select(x => x.m))
             {
                 ct.ThrowIfCancellationRequested();
                 m.Modify(work, ct);
@@ -274,6 +294,8 @@ public static class StackSlicer
             for (int i = 0; i < n; i++)
                 islands[i] = [.. islands[i].Where(g => !g.IsEmpty).OrderBy(g => Math.Round(g.Bounds().Center.X, 1)).ThenBy(g => g.Bounds().Center.Y)];
         }
+        // The pins keep clear of the dowels and of the add-ons' holes alike.
+        var through = dowels.Select(d => new SliceHole(d, o.DowelMm)).Concat(work?.Holes ?? []).ToList();
         // Pins: wherever a part overlaps the part above it, matching holes in both.
         var holes = islands.Select(l => l.Select(_ => new List<Vec2>()).ToList()).ToList();
         var pins = new List<(int, Vec2)>();
@@ -283,7 +305,7 @@ public static class StackSlicer
                     for (int b = 0; b < islands[i + 1].Count; b++)
                     {
                         ct.ThrowIfCancellationRequested();
-                        foreach (var p in PinSpots(islands[i][a], islands[i + 1][b], i > 0 ? layers[i - 1] : null, i + 2 < n ? layers[i + 2] : null, o.PinMm, holes[i][a], dowels, o.DowelMm))
+                        foreach (var p in PinSpots(islands[i][a], islands[i + 1][b], i > 0 ? layers[i - 1] : null, i + 2 < n ? layers[i + 2] : null, o.PinMm, holes[i][a], through))
                         {
                             holes[i][a].Add(p);
                             holes[i + 1][b].Add(p);
@@ -312,7 +334,7 @@ public static class StackSlicer
             for (int k = 0; k < islands[i].Count; k++)
             {
                 var part = islands[i][k];
-                var cut = dowels.Select(p => (p, o.DowelMm)).Concat(holes[i][k].Select(p => (p, o.PinMm))).ToList();
+                var cut = through.Select(h => (p: h.At, h.DiameterMm)).Concat(holes[i][k].Select(p => (p, o.PinMm))).ToList();
                 if (cut.Count > 0)
                     part = ShapeGeometry.Boolean(part, new PathGeometry(cut.SelectMany(c => PathGeometry.Ellipse(c.p.X, c.p.Y, c.Item2 / 2, c.Item2 / 2).Subpaths)), BoolOp.Subtract);
                 // The number goes clear of the holes and edges.
@@ -334,7 +356,7 @@ public static class StackSlicer
         return new SliceStack(parts, n, n * o.ThicknessMm, w, d, layers, dowels)
         {
             LeftOut = leftOut, Pins = pins, Joined = joined, ThicknessMm = o.ThicknessMm,
-            Notes = work?.Notes ?? [], Extras = work?.Extras ?? new Dictionary<string, object>(),
+            Notes = work?.Notes ?? [], Extras = work?.Extras ?? new Dictionary<string, object>(), Holes = work?.Holes ?? [],
         };
     }
 
@@ -568,7 +590,7 @@ public static class StackSlicer
     /// Two pins, far apart, when there's room for both (that stops the parts turning); else one.
     /// They keep clear of the lower part's other pins and of the dowel holes through every slice.
     /// </summary>
-    static List<Vec2> PinSpots(PathGeometry lower, PathGeometry upper, PathGeometry? below, PathGeometry? above, double pinMm, IReadOnlyList<Vec2> taken, IReadOnlyList<Vec2> dowels, double dowelMm)
+    static List<Vec2> PinSpots(PathGeometry lower, PathGeometry upper, PathGeometry? below, PathGeometry? above, double pinMm, IReadOnlyList<Vec2> taken, IReadOnlyList<SliceHole> through)
     {
         var overlap = ShapeGeometry.Boolean(lower, upper, BoolOp.Intersect);
         if (overlap.IsEmpty) return [];
@@ -582,7 +604,7 @@ public static class StackSlicer
             var room = ShapeGeometry.Offset(area, -clear, JoinStyle.Round, EndStyle.Round);
             // Clear of the holes already in the lower part (its pins from the joint below), and of the
             // dowel holes, with a wall as thick as the one kept to the edge between them.
-            var keepOff = taken.Select(t => (t, pinMm * 1.5 + 1)).Concat(dowels.Select(d => (d, dowelMm / 2 + clear))).ToList();
+            var keepOff = taken.Select(t => (t, pinMm * 1.5 + 1)).Concat(through.Select(d => (d.At, d.DiameterMm / 2 + clear))).ToList();
             if (keepOff.Count > 0 && !room.IsEmpty)
                 room = ShapeGeometry.Boolean(room, new PathGeometry(keepOff.SelectMany(k => PathGeometry.Ellipse(k.Item1.X, k.Item1.Y, k.Item2, k.Item2).Subpaths)), BoolOp.Subtract);
             if (room.IsEmpty) continue;

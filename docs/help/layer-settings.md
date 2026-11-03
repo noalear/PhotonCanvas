@@ -555,7 +555,8 @@ compared.
 
 ### Focus offset
 
-**Focus offset (mm)** (every kind of layer): move the focus for this layer, −10 to 10 mm. + is
+**Focus offset (mm)** (every kind of layer): move the focus for this layer, −10 to 10 mm (on the
+rotary up to 60 mm either way, for surfaces much nearer the middle than where you focused). + is
 deeper into the material (the head goes lower), − is above it (a softer, wider beam). 0 = at the
 surface. The head moves when a layer with a different offset starts, and goes back to where it
 started at the end of the job. Not yet burned on the machine.

@@ -174,6 +174,8 @@ public sealed class AppSettings
     public bool OwnsRa2 { get; set; }
     public bool OwnsRa3 { get; set; }
     public bool OwnsConveyor { get; set; }
+    /// <summary>A rotary of the user's own (homemade, or another make) on the machine's rotary port, with its own scale.</summary>
+    public bool OwnsCustomRotary { get; set; }
     /// <summary>Colour tests, measuring colours and colour pictures on metal.</summary>
     public bool ShowColourOnMetal { get; set; } = true;
     /// <summary>Diffraction gratings, shimmer pictures and the depth-map almost-hologram.</summary>
@@ -181,7 +183,7 @@ public sealed class AppSettings
     public bool ShowConsole { get; set; } = true;
 
     /// <summary>Any attachment that gives a work mode besides the flat bed.</summary>
-    public bool OwnsAttachment => OwnsRa2 || OwnsRa3 || OwnsConveyor;
+    public bool OwnsAttachment => OwnsRa2 || OwnsRa3 || OwnsConveyor || OwnsCustomRotary;
 
     /// <summary>Framing: power (%) and speed (mm/s) of the faint trace.</summary>
     public double FramePowerPct { get; set; } = 6.4;
@@ -189,9 +191,20 @@ public sealed class AppSettings
 
     /// <summary>"Flat", "Rotary" or "Conveyor".</summary>
     public string WorkMode { get; set; } = "Flat";
-    /// <summary>Rotary: 0 RA2 rollers, 1 RA2 chuck, 2 RA3 rollers, 3 RA3 chuck.</summary>
+    /// <summary>Rotary: 0 RA2 rollers, 1 RA2 chuck, 2 RA3 rollers, 3 RA3 chuck, 4 the user's own rotary.</summary>
     public int RotaryAttachment { get; set; }
     public double RotaryDiameterMm { get; set; } = 60;
+    /// <summary>The user's own rotary: holds the object in a chuck (it turns with the motor) or on rollers.</summary>
+    public bool CustomRotaryChuck { get; set; } = true;
+    /// <summary>
+    /// The user's own rotary with a chuck: the firmware's units for one turn of the object (the scale
+    /// sent is this ÷ the circumference). 128 on xTool's chucks; the calibration in Work mode corrects it.
+    /// </summary>
+    public double CustomRotaryTurnUnits { get; set; } = 128;
+    /// <summary>The user's own rotary on rollers: the firmware scale (0.59917 on the RA2 Pro).</summary>
+    public double CustomRotaryRollerScale { get; set; } = 0.59917;
+    /// <summary>The user's own rotary turns the other way from xTool's (a motor wired the other way round).</summary>
+    public bool CustomRotaryReverse { get; set; }
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
     public double ConveyorUMultiple { get; set; } = 0.74592;
     public double ConveyorAngle { get; set; }

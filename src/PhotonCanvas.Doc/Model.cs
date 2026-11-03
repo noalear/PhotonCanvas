@@ -459,7 +459,14 @@ public class PathShape : Shape
 }
 
 /// <summary>A guideline: vertical at X = <see cref="At"/>, or horizontal at Y = <see cref="At"/> (mm).</summary>
-public sealed record Guide(bool Vertical, double At);
+public sealed record Guide(bool Vertical, double At)
+{
+    /// <summary>
+    /// A line across (not <see cref="Vertical"/>) marking what faces the laser when a rotary job
+    /// starts: design Y = <see cref="At"/> is under the laser at the start, instead of the middle of the design.
+    /// </summary>
+    public bool RotaryStart { get; init; }
+}
 
 /// <summary>The whole editable state. Immutable; every edit produces a new one.</summary>
 public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> Shapes)
