@@ -420,7 +420,7 @@ public static class TutorialTargets
     public static readonly string[] TargetKinds = ["ribbon", "tab", "header", "panel", "canvas", "field", "button", "tabitem", "text", "window"];
     public static readonly string[] WaitKinds = ["window", "closed", "selection", "shapes", "tool", "tab", "layer-mode", "layers", "zoom", "picture-selected"];
     public static readonly string[] Headers = ["File", "Save", "Undo", "Redo", "Settings", "Help"];
-    public static readonly string[] Panels = ["Layers", "Selection", "Layer settings", "Job", "Machine"];
+    public static readonly string[] Panels = ["Layers", "Selection", "Layer settings", "Job", "Machine", "Zoom buttons"];
 
     /// <summary>The kind and the rest of a target or wait ("ribbon:Home/Text" → ("ribbon", "Home/Text")).</summary>
     public static (string Kind, string Value) Split(string s)

@@ -91,6 +91,7 @@ one page, with only the first key of a command that has more than one.
 | Zoom out | `Ctrl+-` or `Ctrl` and the keypad's `-` |
 | Fit work area | `Home`, `Ctrl+0` or `Ctrl` and the keypad's `0` |
 | Fit selection | `F` |
+| Fit design | `Shift+F` |
 | Grid settings… | `Ctrl+'` |
 | Object snaps on or off | `F3` |
 

@@ -70,6 +70,7 @@ public partial class MainWindow : ITutorialHost
                 {
                     "job" => JobHost,
                     "machine" => _hud,
+                    "zoom buttons" => _zoomButtons,
                     _ => _docking.Show(value),
                 };
             case "canvas":

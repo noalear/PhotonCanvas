@@ -73,7 +73,7 @@ Type the speeds to try, separated by commas.
 | `ribbon:Tab/Label` | A ribbon button (its tab is opened). Icon-only buttons by their tooltip: `ribbon:Arrange/Align left edges`. |
 | `tab:Name` | A ribbon tab's header. |
 | `header:File`, `Save`, `Undo`, `Redo`, `Settings`, `Help` | The buttons along the top. |
-| `panel:Layers`, `Selection`, `Layer settings`, `Job`, `Machine` | A panel (unfolded if folded). |
+| `panel:Layers`, `Selection`, `Layer settings`, `Job`, `Machine`, `Zoom buttons` | A panel (unfolded if folded); `Zoom buttons` is the row in the work area's bottom-right corner. |
 | `canvas` | The work area. |
 | `field:Label` | A setting by its name, in whichever window is open (the newest first). Sections it's in are opened. |
 | `button:Text` | A button or checkbox by its text (or, for a button whose text changes, how its text starts: `button:Save chosen squares`). |
