@@ -185,6 +185,29 @@ guide under **Add-ons** while you're on, and are searched with the rest. Link to
 file name; images go in `help/images/`. A `<!-- windows: PapercraftWindow -->` line makes F1 in that
 window open the page. Every add-on needs at least one page and one tutorial.
 
+### 3D views of a model put together
+
+Don't draw a 3D model by sorting its faces far to near and painting them over each other: with long
+faces beside small ones, or pieces slotted into each other, faces pop in front of or behind each other
+as the model turns. Use the program's painter (`PhotonCanvas.App.View3D`), which draws with a depth
+buffer so the nearest face always shows:
+
+```csharp
+readonly Scene3D _scene = new();
+readonly Model3DPainter _painter = new();
+
+// When the model changes: each flat piece, from its outline (u, v), where it sits and how thick it is.
+_scene.Clear();
+_scene.AddSlab(outline, new Frame3(origin, u, v), -t / 2, t / 2, style, etched, scoredLines, group: 0);
+
+// In Render: draft while dragging (quicker); groups can be hidden (e.g. a floor lifted off).
+_painter.Draw(ctx, this, _scene, Camera3D.YUp(yaw, pitch), UiKit.Brush("Bg2"), hiddenGroups, draft: dragging);
+```
+
+A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
+what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs
+maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building and roof makers all use it.
+
 ## Checks
 
 `tests/PhotonCanvas.Tests/HelpTests.Addons.cs` runs for every folder under `src/Addons` with an
