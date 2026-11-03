@@ -36,6 +36,15 @@ write_list() { # the version's folder, where the program is in it (. or Contents
   (cd "$1" && { find . -type f ! -name update-files.txt | LC_ALL=C sort; echo "./$2/update-files.txt"; } | sed 's|^\./\./|./|') > "$1/$2/update-files.txt"
 }
 
+build_addons() { # the published program's folder (ending in /)
+  local tmp=dist/.addons; rm -rf "$tmp"
+  dotnet new sln -n Addons -o "$tmp" >/dev/null
+  local sln; sln=$(ls "$tmp"/Addons.sln*)
+  dotnet sln "$sln" add src/Addons/*/PhotonCanvas.Addon.*.csproj >/dev/null
+  dotnet build "$sln" -c Release -p:Version="$VERSION" -p:AppOutDir="$1" -nologo -v q
+  rm -rf "$tmp"
+}
+
 for rid in "${TARGETS[@]}"; do
   out="dist/$rid"
   rm -rf "$out"
@@ -45,11 +54,10 @@ for rid in "${TARGETS[@]}"; do
   # The remote server for the phone, in its own folder beside the program (Laser → Remote access starts it).
   dotnet publish src/PhotonCanvas.Server -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin/server" -nologo -v q
-  # The add-ons that come with the program, each in addons/<id> beside it (docs/addons.md).
-  for proj in src/Addons/*/PhotonCanvas.Addon.*.csproj; do
-    [ -f "$proj" ] || continue
-    dotnet build "$proj" -c Release -p:Version="$VERSION" -p:AppOutDir="$PWD/$out/bin/" -nologo -v q
-  done
+  # The add-ons that come with the program, each in addons/<id> beside it (docs/addons.md). All in one
+  # build (a throwaway solution listing them), so the program they compile against is checked once and
+  # the add-ons build side by side, not one after another.
+  build_addons "$PWD/$out/bin/"
   # Where this copy gets new versions from, and which build it is.
   printf '{\n  "repo": "%s",\n  "platform": "%s",\n  "version": "%s"\n}\n' "$RELEASE_REPO" "$rid" "$VERSION" > "$out/bin/update.json"
 
