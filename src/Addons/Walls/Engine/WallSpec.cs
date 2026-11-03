@@ -14,6 +14,14 @@ public enum WindowBars { None, Cross, Bars }
 public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach, Lamps }
 public enum ColumnShape { Auto, Square, Octagon, Round }
 public enum LengthMeasure { Panel, Centres }
+/// <summary>How a wall is built: one flat panel (or two back to back), or a box with a front, back, top, bottom and ends.</summary>
+public enum WallBuild { Flat, Box }
+/// <summary>How a box wall's columns are built: a box of four sides with a top and bottom plate, or a stack of layers (any angle).</summary>
+public enum ColumnBuild { Boxed, Stacked }
+/// <summary>The top of a boxed column.</summary>
+public enum ColumnTop { Flush, Cap, SteppedCap, SteppedPoint, Battlements }
+/// <summary>The bottom of a boxed column.</summary>
+public enum ColumnBase { Flat, Foot, SteppedPlinth }
 
 /// <summary>A connector: a column that walls slide into, with a slot for each wall.</summary>
 public enum ConnectorKind { Straight, Corner, Angle135, Sharp45, Tee, Cross, EndCap, Custom }
@@ -31,6 +39,21 @@ public sealed record WallSpec
     /// <summary>Two panels glued back to back (mirror images), so both faces are textured and the wall is twice as thick.</summary>
     public bool TwoSided { get; init; }
     public int Walls { get; init; } = 1;
+
+    /// <summary>A flat panel (the first walls made), or a box: front, back, top, bottom and ends, which stands up on its own.</summary>
+    public WallBuild Build { get; init; } = WallBuild.Flat;
+    /// <summary>A box wall's whole thickness, front face to back face (mm). <see cref="ThicknessMm"/> is the panels'.</summary>
+    public double WallMm { get; init; } = 12;
+    /// <summary>A box wall's ends fit into columns (tabs on the faces go into slots in the columns); otherwise they're closed and finished.</summary>
+    public bool EndsIntoColumns { get; init; } = true;
+    /// <summary>How far a box wall's bottom plate sticks out past the faces, as a plinth (mm). 0 = flush.</summary>
+    public double PlinthMm { get; init; } = 1.5;
+    /// <summary>Most room between the ribs that hold a box wall's faces apart (mm).</summary>
+    public double RibSpacingMm { get; init; } = 45;
+    /// <summary>The texture on a box wall's back face too.</summary>
+    public bool TextureBack { get; init; } = true;
+    /// <summary>The texture on a box wall's ends and top too (and on the back of a parapet).</summary>
+    public bool TextureSides { get; init; }
 
     /// <summary>The look picked to start from (<see cref="WallThemes"/>): it set the texture, openings and accessories, which can be changed afterwards.</summary>
     public string Theme { get; init; } = "Medieval";
@@ -101,6 +124,19 @@ public sealed record WallSpec
     public bool Cap { get; init; } = true;
     /// <summary>A wider bottom layer on each column.</summary>
     public bool Foot { get; init; }
+    /// <summary>A box wall's columns: boxes (straight runs, corners, T junctions, crosses and ends) or stacks of layers (any angle).</summary>
+    public ColumnBuild ColumnBuild { get; init; } = ColumnBuild.Boxed;
+    /// <summary>What's on top of a box wall's columns.</summary>
+    public ColumnTop ColumnTop { get; init; } = ColumnTop.Cap;
+    /// <summary>What a box wall's columns stand on.</summary>
+    public ColumnBase ColumnBase { get; init; } = ColumnBase.Foot;
+    /// <summary>How far a boxed column's cap and foot stick out past its sides, each step (mm).</summary>
+    public double ColumnLipMm { get; init; } = 2;
+
+    /// <summary>A new boxed wall with sizes that suit it (12 mm thick from 3 mm sheet, 22 mm columns).</summary>
+    public static WallSpec NewBoxed => new() { Build = WallBuild.Box, WallMm = 12, ColumnMm = 22 };
+
+    [JsonIgnore] public bool Boxed => Build == WallBuild.Box;
 
     public int ConnectorCount(ConnectorKind k) => Connectors.TryGetValue(k, out var n) ? Math.Max(0, n) : 0;
 

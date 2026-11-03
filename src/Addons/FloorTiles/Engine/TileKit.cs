@@ -172,6 +172,7 @@ public static class TileKitMaker
                 if (bridge < 1.2 || Joints.TabReach(d) > g * 0.4) { findings.Add(new(Severity.Bad, $"The tabs are too big for {g:0.#} mm squares: make the tab size {most:0.#} mm or less.")); return false; }
                 if (bridge < 2) findings.Add(new(Severity.Warn, $"Only {bridge:0.#} mm is left between the sockets and the tiles' corners: it may snap in thin plywood. Smaller tabs are stronger there."));
                 if (d * 0.55 < 2.5) findings.Add(new(Severity.Warn, $"The tabs' necks are {d * 0.55:0.#} mm wide: they may snap. Bigger tabs are stronger."));
+                if (s.BaseLayer) findings.Add(new(Severity.Note, "The jigsaw is cut in the base layer only: the tops are plain squares that sit edge to edge over it and hide the joints."));
                 break;
             }
             case TileJoin.Clips:
@@ -243,8 +244,10 @@ public static class TileKitMaker
         switch (s.Join)
         {
             case TileJoin.Jigsaw:
-                top = Geo.Tidy(Geo.Subtract(Geo.Union(rect, tabs), Geo.Union(sockets)));
-                baseCut = top;
+                // With a base layer the jigsaw is in the base only: the tops are plain and sit edge to edge over it, hiding the joints.
+                var jigsaw = Geo.Tidy(Geo.Subtract(Geo.Union(rect, tabs), Geo.Union(sockets)));
+                top = s.BaseLayer ? rect : jigsaw;
+                baseCut = jigsaw;
                 break;
             case TileJoin.Clips:
                 var notched = Geo.Tidy(Geo.Subtract(rect, sockets));
@@ -310,6 +313,10 @@ public static class TileKitMaker
             if (other > 0) kinds.Add($"{other} other");
             string split = s.PlainBorder && kinds.Count > 1 ? $": {string.Join(", ", kinds)}" : "";
             findings.Add(new(Severity.Note, $"A board of {Squares(s.BoardAcross)} × {Squares(s.BoardDown)} squares ({s.BoardAcross * g:0.#} × {s.BoardDown * g:0.#} mm) in {jobs.Count} tile{(jobs.Count == 1 ? "" : "s")}{split}."));
+            if (!s.PlainBorder && s.Join != TileJoin.None)
+                findings.Add(new(Severity.Note, Frac(s.BoardAcross) || Frac(s.BoardDown)
+                    ? "The outside edges have joints too, so the board fits against others. The part squares at its far edge have none: line boards up by their whole squares."
+                    : "The outside edges have joints too, so the board fits against any other made on the same grid, turned any way round."));
         }
         if (clips > 0) findings.Add(new(Severity.Note, $"{clips} clip{(clips == 1 ? "" : "s")} to join them: push one into each pair of sockets that meet{(s.BaseLayer ? ", from underneath" : "")}."));
         if (s.Join == TileJoin.Magnets && magnets > 0)

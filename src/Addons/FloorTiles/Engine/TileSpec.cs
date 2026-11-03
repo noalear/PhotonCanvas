@@ -49,7 +49,7 @@ public sealed record TileSpec
     /// <summary>The largest tile the board is split into, in squares.</summary>
     public int TileAcross { get; init; } = 2;
     public int TileDown { get; init; } = 2;
-    /// <summary>Straight edges round the outside of the board, so it ends neatly.</summary>
+    /// <summary>Straight edges round the outside of the board, so it ends neatly. Off, the outside edges get joints too, so boards join to each other.</summary>
     public bool PlainBorder { get; init; } = true;
 
     /// <summary>The loose tiles (Tiles mode).</summary>
@@ -78,7 +78,7 @@ public sealed record TileSpec
     public double TabMm { get; init; } = 5;
     /// <summary>Play between a tab and its socket, or a clip and its socket (mm, half each side), on top of the kerf the cut layer allows for.</summary>
     public double FitMm { get; init; } = 0.15;
-    /// <summary>A second, plain layer glued under each tile: thicker, flatter tiles, and somewhere to hide the clips (magnets always have one).</summary>
+    /// <summary>A second layer glued under each tile: thicker, flatter tiles, with the joints (jigsaw, clip sockets or magnets) in it only, hidden under a plain top (magnets always have one).</summary>
     public bool BaseLayer { get; init; }
     /// <summary>The magnets' diameter (mm).</summary>
     public double MagnetMm { get; init; } = 5;
