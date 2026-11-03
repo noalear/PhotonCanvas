@@ -5,7 +5,7 @@ using Geo = PhotonCanvas.Addon.Walls.Geo;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
-/// <summary>How much of the walls the 3D view shows: all of them, the ones between you and the rooms cut away, or none (just the columns and floors).</summary>
+/// <summary>How much of the walls the 3D view shows: all of them and the roofs, the ones between you and the rooms cut away (and the roofs off), or none (just the columns and floors).</summary>
 public enum WallsShown { Up, CutAway, Down }
 
 /// <summary>
@@ -34,7 +34,7 @@ public sealed class HouseView : Model3DView
         Color.FromRgb(0x6B, 0x47, 0x28), new LineWidth(0.05, 0.25, 0.8));
 
     static readonly SlabStyle Wood = LookOf(Color.FromRgb(0xDD, 0xBE, 0x92)), Stone = LookOf(Color.FromRgb(0xD2, 0xC6, 0xB4)),
-        Column = LookOf(Color.FromRgb(0xC4, 0xB6, 0xA2));
+        Column = LookOf(Color.FromRgb(0xC4, 0xB6, 0xA2)), Roof = LookOf(Color.FromRgb(0xB9, 0x9A, 0x86));
 
     public HouseView() : base(35, 32) { }
 
@@ -85,7 +85,8 @@ public sealed class HouseView : Model3DView
         if (_kit is { } kit)
         {
             var groupOf = new Dictionary<(double, double, double, int), int>();
-            var shown = kit.Solids.Where(s => s.Level <= UpTo && !(Walls == WallsShown.Down && s.Kind == SolidKind.Wall)).ToList();
+            // The roofs come off with the walls cut away or down, to see in.
+            var shown = kit.Solids.Where(s => s.Level <= UpTo && !(Walls == WallsShown.Down && s.Kind == SolidKind.Wall) && !(Walls != WallsShown.Up && s.Kind == SolidKind.Roof)).ToList();
             foreach (var s in shown.Where(s => s.Kind != SolidKind.Ground))
             {
                 int group = 0;
@@ -126,7 +127,7 @@ public sealed class HouseView : Model3DView
     {
         double T = s.Thickness;
         var p = s.Pose;
-        var style = s.Kind switch { SolidKind.Floor or SolidKind.Furniture or SolidKind.Roof => Wood, SolidKind.Column => Column, _ => Stone };
+        var style = s.Kind switch { SolidKind.Floor or SolidKind.Furniture or SolidKind.Railing => Wood, SolidKind.Roof => Roof, SolidKind.Column => Column, _ => Stone };
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         var frame = new Frame3(V(p.O), V(p.U), V(p.V));
         Scene.AddSlab(outline, frame, -T / 2, T / 2, style, s.Etched, s.Lines, group: Math.Min(group, 63), faces: faces, sides: sides);

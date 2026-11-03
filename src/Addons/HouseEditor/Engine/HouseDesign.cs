@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Text.Json.Serialization.Metadata;
 using PhotonCanvas.Addon.Buildings;
 using PhotonCanvas.Addon.Walls;
+using GableWindow = PhotonCanvas.Addon.Roofs.GableWindow;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
@@ -66,6 +67,15 @@ public sealed record Opening
     };
 }
 
+/// <summary>A room's own floor pattern: the room is the one round the point (<see cref="X"/>, <see cref="Y"/>), in squares.</summary>
+public sealed record RoomFloor
+{
+    public double X { get; init; }
+    public double Y { get; init; }
+    /// <summary>A texture: one of the floor tile maker's (flagstones, floorboards, chequered tiles…).</summary>
+    public string Texture { get; init; } = "Floorboards";
+}
+
 /// <summary>One floor of the building: its walls, what's in them and the floor laid outside its rooms (a balcony or a deck).</summary>
 public sealed record Level
 {
@@ -73,6 +83,53 @@ public sealed record Level
     public List<Opening> Openings { get; init; } = [];
     /// <summary>Squares of floor laid by hand, each by its top-left corner (the rooms get a floor anyway).</summary>
     public List<GridPt> Floor { get; init; } = [];
+    /// <summary>Railings round the edges of this floor that have no wall on them (a balcony, a terrace).</summary>
+    public bool Railings { get; init; } = true;
+    /// <summary>Rooms with a floor pattern of their own.</summary>
+    public List<RoomFloor> RoomFloors { get; init; } = [];
+}
+
+/// <summary>A roof's shape: pitched with a gable at each end, hipped (sloping on all four sides), a lean-to sloping one way, or flat.</summary>
+public enum RoofKind { Gable, Hip, LeanTo, Flat }
+
+/// <summary>
+/// A roof put over part of a floor: a rectangle of the plan between grid points, resting on the column
+/// caps of the walls under it. <see cref="Turn"/> is which way it runs: 0 with the ridge left to right
+/// (a lean-to sloping down towards you), each step a quarter turn anticlockwise seen from above.
+/// </summary>
+public sealed record RoofArea
+{
+    /// <summary>The floor it sits on top of (0 = the ground floor's walls).</summary>
+    public int Level { get; init; }
+    public int X0 { get; init; }
+    public int Y0 { get; init; }
+    public int X1 { get; init; }
+    public int Y1 { get; init; }
+    public RoofKind Kind { get; init; } = RoofKind.Gable;
+    public int Turn { get; init; }
+    public double PitchDeg { get; init; } = 45;
+    /// <summary>What's on its slopes: one of the roof maker's coverings (slate, thatch, clay tiles…).</summary>
+    public string Covering { get; init; } = "Slate";
+    /// <summary>How far it reaches past the walls at the bottom of the slope (mm).</summary>
+    public double EaveMm { get; init; } = 4;
+    /// <summary>A window in each gable end (or a lean-to's sides).</summary>
+    public GableWindow Window { get; init; } = GableWindow.None;
+
+    /// <summary>The ridge runs left to right on the plan (otherwise up and down it).</summary>
+    public bool RidgeAcross => Turn % 2 == 0;
+
+    public static RoofArea Over(int level, GridPt a, GridPt b, BuildingSpec s)
+    {
+        int x0 = Math.Min(a.X, b.X), x1 = Math.Max(a.X, b.X), y0 = Math.Min(a.Y, b.Y), y1 = Math.Max(a.Y, b.Y);
+        return new RoofArea
+        {
+            Level = level, X0 = x0, Y0 = y0, X1 = x1, Y1 = y1,
+            Kind = s.Roof switch { RoofShape.Hip => RoofKind.Hip, RoofShape.LeanTo => RoofKind.LeanTo, _ => RoofKind.Gable },
+            // The ridge along the longer side.
+            Turn = x1 - x0 >= y1 - y0 ? 0 : 1,
+            PitchDeg = s.RoofPitchDeg, Covering = s.RoofTexture, EaveMm = s.RoofEaveMm,
+        };
+    }
 }
 
 /// <summary>
@@ -88,6 +145,8 @@ public sealed record HouseDesign
     /// <summary>The grid's square (mm): walls run along its lines.</summary>
     public double SquareMm { get; init; } = 25.4;
     public List<Level> Levels { get; init; } = [new()];
+    /// <summary>The roofs, each over a rectangle of one floor.</summary>
+    public List<RoofArea> Roofs { get; init; } = [];
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
     public static BuildingSpec DefaultStyle() => BuildingSpec.Preset(BuildingKind.Cottage) with { Items = [] };
@@ -120,7 +179,7 @@ public sealed record HouseDesign
 
     /// <summary>
     /// A two-storey house to show what the editor does: a ground floor of two rooms with a corner cut off
-    /// corner to corner, and a smaller room upstairs with a door out onto the roof of the room below.
+    /// corner to corner, and a smaller room upstairs under a gable roof, with a door out onto a terrace with railings.
     /// </summary>
     public static HouseDesign Sample()
     {
@@ -140,6 +199,7 @@ public sealed record HouseDesign
         var ground = new Level
         {
             Walls = [.. Lines((2, 2), (9, 2), (9, 5), (7, 7), (2, 7), (2, 2)), .. Lines((5, 2), (5, 7))],
+            RoomFloors = [new RoomFloor { X = 3.5, Y = 4.5, Texture = "Flagstones" }],
             Openings =
             [
                 Opening.NewDoor(style, 3.5, 7),
@@ -163,7 +223,8 @@ public sealed record HouseDesign
                 Opening.NewWindow(style, 4, 7),
             ],
         };
-        return new HouseDesign { Style = style, SquareMm = style.SquareMm, Levels = [ground, upstairs] }.Moved(10, 10);
+        var roof = RoofArea.Over(1, new GridPt(2, 2), new GridPt(6, 7), style) with { Kind = RoofKind.Gable, Covering = "Slate", PitchDeg = 45, Window = GableWindow.Round };
+        return new HouseDesign { Style = style, SquareMm = style.SquareMm, Levels = [ground, upstairs], Roofs = [roof] }.Moved(10, 10);
     }
 
     /// <summary>The whole building moved across the grid by whole squares.</summary>
@@ -177,7 +238,9 @@ public sealed record HouseDesign
                 Walls = [.. l.Walls.Select(w => new WallEdge(w.A + d, w.B + d))],
                 Openings = [.. l.Openings.Select(o => o with { X = o.X + dx, Y = o.Y + dy })],
                 Floor = [.. l.Floor.Select(f => f + d)],
+                RoomFloors = [.. l.RoomFloors.Select(r => r with { X = r.X + dx, Y = r.Y + dy })],
             })],
+            Roofs = [.. Roofs.Select(r => r with { X0 = r.X0 + dx, X1 = r.X1 + dx, Y0 = r.Y0 + dy, Y1 = r.Y1 + dy })],
         };
     }
 

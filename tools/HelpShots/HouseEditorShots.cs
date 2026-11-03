@@ -7,7 +7,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The building editor's pictures (in its own help/images): a two-storey house on each floor's plan, with its walls cut away, and its pieces.</summary>
+/// <summary>The building editor's pictures (in its own help/images): a two-storey house on each floor's plan (with its walls cut away, then its roof on and picked), and its pieces.</summary>
 static class HouseEditorShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -50,8 +50,8 @@ static class HouseEditorShots
         Shot("window-houseeditor-upstairs", sample, 1, 0, 0, 0, w =>
         {
             var plan = F<PlanEditor>(w, "_plan");
-            plan.Tool = PlanTool.Select;
-            plan.Select(0);
+            plan.Tool = PlanTool.Roof;
+            plan.SelectRoof(0);
         });
         Shot("window-houseeditor-pieces", sample, 0, 1, 1, 1);
     }

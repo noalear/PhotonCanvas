@@ -1,6 +1,6 @@
 # Draw your own building
 <!-- category: Drawing -->
-<!-- summary: Drag out rooms on a grid, drop in doors and windows, add a floor on top and see it in 3D with the walls cut away, then cut every wall, column and floor. -->
+<!-- summary: Drag out rooms on a grid, drop in doors and windows, add a floor on top, put a roof on and see it in 3D with the walls cut away, then cut every wall, column, floor and roof. -->
 <!-- page: houseeditor.md -->
 <!-- order: 78 -->
 The building editor lets you draw a building floor by floor, like building a house in a life-sim
@@ -30,6 +30,12 @@ Click **Select** and pick one to change its shape and size on the **Picked** tab
 <!-- target: button:Add a floor above -->
 Click **Add a floor above**. The floor below shows faintly: draw this floor's rooms over it. It can be
 smaller, with a door out onto the floor over the rooms below.
+
+## Put a roof on
+<!-- target: button:Roof -->
+Click **Roof** and drag a rectangle over the top floor's rooms (or click **Roof it**). Click the roof
+to change its shape, pitch and covering on the **Picked** tab. Railings go round any floor left open
+by themselves.
 
 ## Look inside
 <!-- target: tabitem:Put together -->
