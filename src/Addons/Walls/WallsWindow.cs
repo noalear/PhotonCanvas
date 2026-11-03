@@ -82,8 +82,15 @@ public sealed class WallsWindow : Window
     Control _doorRows = null!, _winRows = null!;
 
     // Mounts
-    readonly NumericUpDown _mounts = Number(0, 50, 1, "0"), _mountH = Number(1, 1000, 0.5m, "0.#"), _mountSlot = Number(2, 30, 0.5m, "0.#");
-    readonly ComboBox _acc = Combo("None", "Wall pegs (pictures, shields, banners)", "Torch sconces", "Shelf brackets", "One of each", "Wall lamps (sci-fi)");
+    const int MountsTabIndex = 4;
+
+    // The wall's own mount points, a card for each; the picked one is marked on the preview.
+    List<MountPoint> _mountList = [];
+    int _mountPicked = -1;
+    readonly StackPanel _mountCards = new() { Spacing = 8 };
+    readonly List<(Border Card, NumericUpDown X, NumericUpDown Y)> _mountEditors = [];
+    readonly ComboBox _accTex = Combo(["None", .. Textures.Presets.Where(p => p.Name != Textures.Plain).Select(p => p.Name)]);
+    readonly NumericUpDown _shelfDepth = Number(5, 60, 1, "0.#");
 
     // Connectors
     readonly Dictionary<ConnectorKind, NumericUpDown> _counts = [];
@@ -175,6 +182,15 @@ public sealed class WallsWindow : Window
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
         _make.Click += (_, _) => Make();
         Hook();
+        _preview.MountPicked += i => { PickMount(i); if (tabs.SelectedIndex != MountsTabIndex) tabs.SelectedIndex = MountsTabIndex; };
+        _preview.MountMoved += MountDragged;
+        // The mount points are dragged about on the pieces, so that's the view that goes with their tab.
+        tabs.SelectionChanged += (_, e) =>
+        {
+            if (e.Source != tabs) return;
+            _preview.FaceOnly = tabs.SelectedIndex == MountsTabIndex;
+            if (_preview.FaceOnly) _views.SelectedIndex = 1;
+        };
         Load(editing?.Spec ?? LoadLast() ?? WallSpec.NewBoxed);
         if (editing is not null) _make.Content = "Update in the design";
         Closed += (_, _) => { _debounce.Stop(); _generation++; SaveLast(); };
@@ -314,11 +330,137 @@ public sealed class WallsWindow : Window
             Field("Frame", _frame, tip: "A smooth band round each door and window where the texture stops, edged with a groove (mm). 0 = none."));
     }
 
-    Control MountsTab() => Stack(Explained("Mount points",
-        "Small slots right through the wall, as wide as the sheet is thick, that accessories plug into from either side: pegs for pictures, shields and banners, torch sconces, shelf brackets. Use the same slot for anything you make with a tab that size.",
-        Field("Mount points", _mounts, tip: "How many slots on each wall, spread evenly clear of the doors and windows."),
-        Row(Small("Mount height", _mountH, tip: "How high the middle of the slots is (mm)."), Small("Slot height", _mountSlot, tip: "How tall each slot is (mm).")),
-        Field("Accessories", _acc, tip: "Accessories to cut, one per mount point (one of each: three per mount point).")));
+    Control MountsTab()
+    {
+        var add = new Button { Content = "Add a mount point", HorizontalAlignment = HorizontalAlignment.Left };
+        add.Click += (_, _) => AddMount();
+        return Stack(
+            Explained("Mount points",
+                "Slots through the wall's face that accessories plug into: pegs for pictures, shields and banners, torch sconces, shelves on brackets and lamps. Add as many as you like, each with its own slots and accessory, and drag them about on the wall in the Pieces view, or type where they go.",
+                _mountCards, add),
+            Explained("Accessories", "Cut from the same sheet as the wall. A shelf comes with its brackets, their tops through slots in it.",
+                Field("Etch them with", _accTex, tip: "A texture etched on the accessories and shelves, smaller than on the wall: wood planks for shelves, metal plates for lamps."),
+                Field("Shelf depth", _shelfDepth, tip: "How far shelves and their brackets stick out from the wall (mm).")));
+    }
+
+    /// <summary>The mount points' cards made again from the list (after one's added or taken away, or a wall's loaded).</summary>
+    void MountCards()
+    {
+        _mountCards.Children.Clear();
+        _mountEditors.Clear();
+        if (_mountList.Count == 0) _mountCards.Children.Add(Hint("No mount points yet."));
+        for (int i = 0; i < _mountList.Count; i++) _mountCards.Children.Add(MountCard(i));
+        PickMount(Math.Min(_mountPicked, _mountList.Count - 1));
+    }
+
+    Control MountCard(int i)
+    {
+        var m = _mountList[i];
+        bool was = _loading;
+        _loading = true;
+        NumericUpDown N(decimal min, decimal max, decimal step, double v, string f = "0.#") { var n = Number(min, max, step, f); n.Value = D(v); return n; }
+        var x = N(-500, 5000, 0.5m, m.XMm); var y = N(0, 2000, 0.5m, m.YMm);
+        var holes = N(1, 8, 1, m.Count, "0"); var spacing = N(1, 300, 0.5m, m.SpacingMm);
+        var across = Combo("One above another", "Side by side"); across.SelectedIndex = m.Across ? 1 : 0;
+        var sw = N(0, 30, 0.1m, m.SlotWidthMm, "0.##"); var sh = N(2, 30, 0.5m, m.SlotHeightMm);
+        var item = Combo([.. Mounts.Items.Select(t => t.Name)]); item.SelectedIndex = Math.Max(0, Mounts.Items.ToList().FindIndex(t => t.Item == m.Item));
+        var side = Combo("The front", "The back (inside)"); side.SelectedIndex = m.OnBack ? 1 : 0;
+        _loading = was;
+        var remove = new Button { Content = "Remove", HorizontalAlignment = HorizontalAlignment.Right };
+        var title = new TextBlock { Text = $"Mount point {i + 1}", FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        var head = new Grid { ColumnDefinitions = new("*,Auto") };
+        head.Children.Add(title);
+        Grid.SetColumn(remove, 1);
+        head.Children.Add(remove);
+        var acrossRow = Field("Slots are", across, tip: "One above another (one accessory with a tab in each) or side by side (one each). A shelf's are side by side, a bracket in each.");
+        var spacingRow = Row(Small("Slots", holes, tip: "How many slots this mount point has."), Small("Spacing", spacing, tip: "From the middle of one slot to the next (mm)."));
+        void Rows()
+        {
+            int n = (int)V(holes, 1);
+            acrossRow.IsVisible = n > 1 && Mounts.Items[Math.Max(0, item.SelectedIndex)].Item != MountItem.Shelf;
+        }
+        Rows();
+        void Update()
+        {
+            if (_loading || i >= _mountList.Count) return;
+            _mountList[i] = new MountPoint
+            {
+                XMm = V(x, 50), YMm = V(y, 30), Holes = (int)V(holes, 1), SpacingMm = V(spacing, 12), Across = across.SelectedIndex == 1,
+                SlotWidthMm = V(sw, 0), SlotHeightMm = V(sh, 6), Item = Mounts.Items[Math.Max(0, item.SelectedIndex)].Item, OnBack = side.SelectedIndex == 1,
+            };
+            Rows();
+            MarkMounts();
+            Changed();
+        }
+        foreach (var n in new[] { x, y, holes, spacing, sw, sh }) n.ValueChanged += (_, _) => Update();
+        foreach (var c in new[] { across, item, side }) c.SelectionChanged += (_, _) => Update();
+        remove.Click += (_, _) =>
+        {
+            _mountList.RemoveAt(i);
+            if (_mountPicked >= _mountList.Count) _mountPicked = _mountList.Count - 1;
+            MountCards();
+            MarkMounts();
+            Changed();
+        };
+        var card = new Border
+        {
+            CornerRadius = new(6), BorderThickness = new(1), BorderBrush = Brush("Line"), Padding = new Thickness(10, 8),
+            Child = Stack(head,
+                Field("Accessory", item, tip: "What plugs into it. A shelf comes with a bracket in each slot."),
+                Field("On", side, tip: "Which face of a box wall it's on: the front, or the back for the inside of a room. A flat wall's slots go right through."),
+                Row(Small("Along", x, tip: "The middle of its slots from the wall's left end (mm)."), Small("Up", y, tip: "The middle of its slots above the bottom of the wall (mm).")),
+                Row(Small("Slot width", sw, tip: "How wide each slot is (mm). 0 = your sheet's thickness and the slot fit, for the accessories cut here."), Small("Slot height", sh, tip: "How tall each slot is (mm).")),
+                spacingRow, acrossRow),
+        };
+        card.PointerPressed += (_, _) => PickMount(i);
+        _mountEditors.Add((card, x, y));
+        return card;
+    }
+
+    void AddMount()
+    {
+        double L = V(_length, 100), H = V(_height, 50);
+        var last = _mountList.LastOrDefault();
+        var m = last is null
+            ? new MountPoint { XMm = Math.Round(L / 2 * 2) / 2, YMm = Math.Round(Math.Min(30, H * 0.55) * 2) / 2 }
+            : last with { XMm = Math.Round(Math.Min(L - 8, last.XMm + Math.Max(15, last.Bounds(MountSpec()).X1 - last.Bounds(MountSpec()).X0 + 8)) * 2) / 2 };
+        _mountList.Add(m);
+        _mountPicked = _mountList.Count - 1;
+        MountCards();
+        MarkMounts();
+        Changed();
+    }
+
+    WallSpec MountSpec() => new() { ThicknessMm = V(_thick, 3), FitMm = V(_fit, 0.15) };
+
+    void PickMount(int i)
+    {
+        _mountPicked = i;
+        for (int k = 0; k < _mountEditors.Count; k++)
+            _mountEditors[k].Card.BorderBrush = Brush(k == i ? "Accent" : "Line");
+        if (i >= 0 && i < _mountEditors.Count) _mountEditors[i].Card.BringIntoView();
+        MarkMounts();
+    }
+
+    /// <summary>The mount points marked on the wall's face in the preview.</summary>
+    void MarkMounts()
+    {
+        var s = MountSpec();
+        _preview.ShowMounts([.. _mountList.Select(m => new WallPreview.Mark(m.Slots(s), m.XMm, m.YMm, m.OnBack))], _mountPicked);
+    }
+
+    void MountDragged(int i, double x, double y)
+    {
+        if (i < 0 || i >= _mountEditors.Count) return;
+        // Setting both, then making the wall once.
+        _loading = true;
+        _mountEditors[i].X.Value = D(x);
+        _mountEditors[i].Y.Value = D(y);
+        _loading = false;
+        _mountList[i] = _mountList[i] with { XMm = x, YMm = y };
+        MarkMounts();
+        Changed();
+    }
 
     Control ConnectorsTab()
     {
@@ -378,11 +520,11 @@ public sealed class WallsWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _merlonStep, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
+        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _merlonStep, _shelfDepth, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _customAngle, _columnW, _slotDepth, _fit, _pin })
             n.ValueChanged += (_, _) => Changed();
         foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
         foreach (var n in new[] { _wear, _detail }) n.ValueChanged += (_, _) => Changed();
-        foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
+        foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _accTex, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
             c.SelectionChanged += (_, _) => Changed();
         foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides })
             c.IsCheckedChanged += (_, _) => Changed();
@@ -527,11 +669,14 @@ public sealed class WallsWindow : Window
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm); _doorAt.Value = D(s.DoorOffsetMm);
         _windows.Value = s.Windows; _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
         _bars.SelectedIndex = (int)s.Bars; _barW.Value = D(s.BarMm); _frame.Value = D(s.FrameMm);
-        _mounts.Value = s.Mounts; _mountH.Value = D(s.MountHeightMm); _mountSlot.Value = D(s.MountSlotMm); _acc.SelectedIndex = (int)s.Accessories;
+        // A wall saved with only a number of mount points: they're listed where it spread them.
+        _mountList = s.MountPoints.Count > 0 ? [.. s.MountPoints] : s.Mounts > 0 ? [.. WallKitMaker.Make(s).MountsUsed] : [];
+        _accTex.SelectedIndex = Math.Max(0, _accTex.ItemsSource!.Cast<string>().ToList().IndexOf(s.AccessoryTexture)); _shelfDepth.Value = D(s.ShelfDepthMm);
         foreach (var (k, n) in _counts) n.Value = s.ConnectorCount(k);
         _customAngle.Value = D(s.CustomAngleDeg); _column.SelectedIndex = (int)s.Column; _columnW.Value = D(s.ColumnMm); _slotDepth.Value = D(s.SlotDepthMm);
         _fit.Value = D(s.FitMm); _pin.Value = D(s.PinMm); _cap.IsChecked = s.Cap; _foot.IsChecked = s.Foot;
         _loading = false;
+        MountCards();
         FillTextures(s.Texture);
         ShowRows();
         CutChosen();
@@ -560,7 +705,9 @@ public sealed class WallsWindow : Window
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28), DoorOffsetMm = V(_doorAt, 0),
             Windows = (int)V(_windows, 0), WindowShape = (OpeningShape)Math.Max(0, _winShape.SelectedIndex), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 25),
             Bars = (WindowBars)Math.Max(0, _bars.SelectedIndex), BarMm = V(_barW, 1.5), FrameMm = V(_frame, 1.5),
-            Mounts = (int)V(_mounts, 0), MountHeightMm = V(_mountH, 30), MountSlotMm = V(_mountSlot, 6), Accessories = (Accessory)Math.Max(0, _acc.SelectedIndex),
+            // The count and first slot are kept too, for the other makers that read them.
+            MountPoints = [.. _mountList], Mounts = _mountList.Count, MountHeightMm = _mountList.FirstOrDefault()?.YMm ?? 30, MountSlotMm = _mountList.FirstOrDefault()?.SlotHeightMm ?? 6,
+            AccessoryTexture = _accTex.SelectedIndex > 0 ? (string)_accTex.SelectedItem! : Textures.Plain, ShelfDepthMm = V(_shelfDepth, 10),
             FitMm = V(_fit, 0.15),
             Connectors = _counts.Where(kv => (kv.Value.Value ?? 0) > 0).ToDictionary(kv => kv.Key, kv => (int)kv.Value.Value!.Value),
             CustomAngleDeg = V(_customAngle, 120), Column = (ColumnShape)Math.Max(0, _column.SelectedIndex), ColumnMm = V(_columnW, 16), SlotDepthMm = V(_slotDepth, 4),

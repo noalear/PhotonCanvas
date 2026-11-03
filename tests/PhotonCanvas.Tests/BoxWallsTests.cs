@@ -492,4 +492,112 @@ public class BoxWallsTests
         var back = WallSpec.FromJson(s.ToJson())!;
         Assert.Equal((RuinStyle.Breach, RuinPlace.Right, MerlonPattern.TallEnds, 2.5), (back.Breaks, back.RuinAt, back.Merlons, back.MerlonStepMm));
     }
+
+    // ---- the wall's own list of mount points ----
+
+    static List<MountPoint> SomeMounts() =>
+    [
+        new() { XMm = 20, YMm = 22, Item = MountItem.Sconce },
+        new() { XMm = 50, YMm = 30, Item = MountItem.Shelf, Holes = 2, SpacingMm = 24 },
+        new() { XMm = 85, YMm = 26, Item = MountItem.Peg, Holes = 2, SpacingMm = 10 },
+        new() { XMm = 70, YMm = 18, Item = MountItem.Lamp, OnBack = true },
+        new() { XMm = 95, YMm = 36, SlotWidthMm = 2, SlotHeightMm = 4 },
+    ];
+
+    [Fact]
+    public void Mount_points_go_where_they_are_put_each_with_its_own_slots_and_accessory()
+    {
+        var s = Box(x => x with { LengthMm = 110, HeightMm = 55, MountPoints = SomeMounts() });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.DoesNotContain(k.Findings, f => f.Level == Severity.Warn && f.Text.StartsWith("Mount point"));
+        Assert.Equal(5, k.MountsUsed.Count);
+        var front = Part(k, "Front").Cut;
+        bool Hole(PathsD cut, double x, double y) => !In(cut, x, y) && In(Geo.Offset(cut, 3), x, y);
+        // Each slot is a hole in the front at its place: the sconce, the shelf's two, the peg's two one above the other, the bare slot.
+        foreach (var (x, y) in new[] { (20.0, 22.0), (38.0, 30.0), (62.0, 30.0), (85.0, 21.0), (85.0, 31.0), (95.0, 36.0) }) Assert.True(Hole(front, x, y), $"no slot at {x}, {y}");
+        // The lamp's is in the back (drawn as seen from behind).
+        Assert.False(Hole(front, 70, 18));
+        Assert.True(Hole(Part(k, "Back").Cut, 110 - 70, 18));
+        // The bare slot is the size asked for.
+        var bare = Geo.Tidy(front).Where(p => Clipper.Area(p) < 0).Select(p => Clipper.GetBounds(p)).Single(b => Math.Abs((b.left + b.right) / 2 - 95) < 0.01);
+        Assert.Equal((2.0, 4.0), (Math.Round(bare.right - bare.left, 3), Math.Round(bare.bottom - bare.top, 3)));
+        // The accessories: a sconce, a shelf on two brackets, one peg with two tabs, a lamp.
+        Assert.Equal(1, Part(k, "Torch sconce").Copies);
+        Assert.Equal(2, Part(k, "Shelf bracket").Copies);
+        Assert.Equal(1, Part(k, "Shelf").Copies);
+        Assert.Equal(1, Part(k, "Wall peg").Copies);
+        Assert.Equal(1, Part(k, "Wall lamp").Copies);
+        var shelf = Geo.Bounds(Part(k, "Shelf").Cut);
+        Assert.Equal(s.ShelfDepthMm, shelf.bottom - shelf.top, 3);
+        Assert.True(shelf.right - shelf.left > 24);
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, 3, s.FitMm));
+    }
+
+    [Fact]
+    public void Flat_walls_take_the_mount_list_too()
+    {
+        var s = new WallSpec { LengthMm = 110, HeightMm = 55, Texture = "Brick", MountPoints = SomeMounts(), Connectors = new() { [ConnectorKind.Corner] = 2 } };
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Equal(5, k.MountsUsed.Count);
+        foreach (var name in new[] { "Torch sconce", "Shelf bracket", "Shelf", "Wall peg", "Wall lamp" }) Assert.Contains(k.Parts, p => p.Name == name);
+        Assert.Empty(Clashes(Assemble(k, 3).Where(p => p.Name != "Door").ToList()));
+    }
+
+    [Fact]
+    public void Mount_points_that_dont_fit_are_said_and_left_out()
+    {
+        var s = Box(x => x with
+        {
+            LengthMm = 100, HeightMm = 50, Door = DoorKind.Doorway, DoorOffsetMm = 0,
+            MountPoints = [new() { XMm = 3, YMm = 20 }, new() { XMm = 30, YMm = 48 }, new() { XMm = 50, YMm = 15 }, new() { XMm = 25, YMm = 20 }, new() { XMm = 26, YMm = 21 }, new() { XMm = 80, YMm = 20, Holes = 2, SpacingMm = 2 }],
+        });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        string W(int n) => string.Join("\n", k.Findings.Where(f => f.Text.StartsWith($"Mount point {n} ")).Select(f => f.Text));
+        Assert.Contains("past the end", W(1));
+        Assert.Contains("too high", W(2));
+        Assert.Contains("door", W(3));
+        Assert.Empty(W(4));
+        Assert.Contains("on top of mount point 4", W(5));
+        Assert.Contains("further apart", k.Findings.Single(f => f.Text.StartsWith("Mount point 6")).Text);
+        Assert.Single(k.MountsUsed);
+    }
+
+    [Fact]
+    public void A_wall_that_only_said_how_many_mount_points_lists_where_they_went()
+    {
+        var s = Box(x => x with { Mounts = 3, MountHeightMm = 25, Accessories = Accessory.OneOfEach });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Equal(3, k.MountsUsed.Count);
+        Assert.Equal([MountItem.Peg, MountItem.Sconce, MountItem.Shelf], k.MountsUsed.Select(m => m.Item));
+        Assert.All(k.MountsUsed, m => Assert.Equal(25, m.YMm));
+        // Made again from the list, the slots are in the same places.
+        var again = WallKitMaker.Make(s with { Mounts = 0, Accessories = Accessory.None, MountPoints = k.MountsUsed });
+        Assert.True(again.Ok, Why(again));
+        Assert.Equal(k.MountsUsed.Select(m => m.XMm), again.MountsUsed.Select(m => m.XMm));
+        var holes = (WallKit w) => Geo.Tidy(Part(w, "Front").Cut).Where(p => Clipper.Area(p) < 0).Select(p => Math.Round(Clipper.GetBounds(p).left, 2)).Order().ToList();
+        Assert.All(holes(k).Zip(holes(again)), h => Assert.Equal(h.First, h.Second, 0.011));
+    }
+
+    [Fact]
+    public void Accessories_and_shelves_can_be_etched_and_the_list_is_saved()
+    {
+        var s = Box(x => x with { LengthMm = 110, HeightMm = 55, MountPoints = SomeMounts(), AccessoryTexture = "Wood planks (across)", ShelfDepthMm = 14 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        foreach (var name in new[] { "Shelf", "Shelf bracket", "Torch sconce" })
+            Assert.True(Part(k, name).Etched.Count > 0 || Part(k, name).Lines.Count > 0, $"{name} not etched");
+        // Kept off the tabs, inside the wall.
+        Assert.True(Geo.Bounds(Part(k, "Shelf bracket").Etched.Count > 0 ? Part(k, "Shelf bracket").Etched : [.. Part(k, "Shelf bracket").Lines]).left >= 0);
+        Assert.Equal(14, Geo.Bounds(Part(k, "Shelf").Cut).bottom - Geo.Bounds(Part(k, "Shelf").Cut).top, 3);
+        var back = WallSpec.FromJson(s.ToJson())!;
+        Assert.Equal(s.MountPoints, back.MountPoints);
+        Assert.Equal(("Wood planks (across)", 14.0), (back.AccessoryTexture, back.ShelfDepthMm));
+        Assert.Equal(WallSpec.FromJson("""{"Mounts":2}""")!.MountPoints, []);
+    }
 }

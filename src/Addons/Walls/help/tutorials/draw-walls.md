@@ -50,6 +50,12 @@ Leave it on *Not broken* for a whole wall.
 On **Doors & windows**, choose a **Door** and its shape, and type how many **Windows**. They keep
 clear of each other and of the wall's ends.
 
+## Hang a torch or a shelf
+<!-- target: button:Add a mount point -->
+On **Mounts**, press **Add a mount point** and pick its **Accessory**: a torch sconce, a peg for a
+shield, or a shelf on brackets. Drag it about on the wall in the **Pieces** view to put it where you
+want it.
+
 ## Join walls with columns
 <!-- target: tabitem:Connectors -->
 On **Connectors**, type how many columns of each kind you need: four **Corner (90°)** make a square
