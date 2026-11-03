@@ -282,6 +282,8 @@ public sealed record HouseDesign
     public double Wear { get; init; } = 0.5;
     /// <summary>The size of the textures' smallest marks (pits, nicks, grain, bolts) in mm; 0 = each texture's own.</summary>
     public double DetailMm { get; init; }
+    /// <summary>Whether every piece has its number (the one in the building booklet) scored small on it.</summary>
+    public bool NumberPieces { get; init; } = true;
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
     public static BuildingSpec DefaultStyle() => BuildingSpec.Preset(BuildingKind.Cottage) with { Items = [] };

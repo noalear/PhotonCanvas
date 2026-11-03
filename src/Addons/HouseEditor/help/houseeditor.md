@@ -234,6 +234,7 @@ On the **Look** tab:
   (floorboards, flagstones, cobbles, tiles, sci-fi deck…). A room's own pattern goes over these.
 - **Square**: the plan's grid square (25.4 mm, an inch, for most tabletop games).
 - **Cut with** and **Etch with**: your material's settings, so slots come out their drawn width.
+- **Number the pieces**: each piece's number scored on it (see below).
 
 ![The same house's pieces, laid out flat](images/window-houseeditor-pieces.png)
 
@@ -261,3 +262,28 @@ above shows the opening dark). Drag and turn it like furniture; on the **Picked*
 **Kind**, turn it, or take it away. Its pieces are the stairs maker's ([Stairs and floors](stairs.md)).
 Stairs on the top floor, stairs running into a wall, an opening coming up into a wall above or past the
 edge of the floor above, and two ways up that cross get a yellow !.
+
+## Piece numbers and the building booklet
+
+Every piece gets a number, in the order the building goes together: the floor tiles and base first,
+then each floor's floor, railings, columns, walls, stairs and furniture, and the roofs last. Pieces
+that come out just alike share a number. With **Number the pieces** ticked (on the **Look** tab) the
+number is scored small and light on each piece, as single lines, low down where it's clear of the
+texture; a piece etched all over gets a little plain patch for it. **Pieces** shows the numbers in
+blue and in each piece's name ("#12 Wall A"). In the design they're on a layer of their own,
+*Building · numbers*, so you can turn it off to cut without them. Numbers that would read as
+another number upside down (6 and 9, 16 and 91) are underlined.
+
+**Building booklet** (beside **Put in the design**) makes step-by-step building instructions as a
+PDF, like a building set's, and opens it:
+
+- a cover with the finished building, how many pieces and what else you need;
+- every piece, with its number, how many to cut and its size;
+- then a step a page, from the ground up: the pieces it takes (with their numbers and how many), and
+  the building so far with the new pieces picked out in orange and their numbers on them. Walls go up
+  a few at a time, and the steps that go inside the rooms (furniture, stairs) leave out the walls in
+  front so you can see where things go.
+
+It's saved beside your design (or, before the design is saved, in the data folder's *Booklets*), named
+after it.
+

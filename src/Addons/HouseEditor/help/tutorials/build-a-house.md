@@ -53,3 +53,10 @@ drag to turn it round. **Engraving** shows the textures sunk in as deep as you'l
 <!-- target: button:Put in the design -->
 Pick your material on the **Look** tab under **Cut with**, then click **Put in the design**: every wall,
 column, floor and tile goes onto the bed, a page per bed.
+
+## Build it step by step
+<!-- target: button:Building booklet -->
+Click **Building booklet**: it makes a PDF with every piece numbered and a page for each step, from
+the ground up, with the new pieces picked out. The same numbers are scored small on the pieces, so
+you can find each one as you go.
+

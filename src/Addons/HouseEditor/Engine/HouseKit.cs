@@ -26,6 +26,8 @@ public sealed record HouseSolid(string Name, PathsD Outline, Pose Pose, double T
     public V3 Middle { get; init; }
     /// <summary>Where it is with the doors open (a door or shutter swung on its hinges, a portcullis slid up); null if it doesn't move.</summary>
     public Pose? Open { get; init; }
+    /// <summary>The number of the piece it is (<see cref="HouseNumbers"/>), 0 if it hasn't one.</summary>
+    public int Number { get; init; }
 }
 
 /// <summary>A straight wall as made: which floor, its letter, its two ends on the plan (squares) and what it was made from.</summary>
@@ -270,7 +272,9 @@ public static partial class HouseKitMaker
         var box = Geo.Bounds(outline);
         if (outline.Count > 0)
             findings.Add(new(Severity.Note, $"The building is about {box.right - box.left + C:0} × {box.bottom - box.top + C:0} mm on the ground, {levels} floor{(levels == 1 ? "" : "s")} high."));
-        return new(pieces, solids, findings, made) { Origin = (ox, oy) };
+        // Every piece numbered in the order it's put together, and (if asked) its number scored on it.
+        var numbered = HouseNumbers.Numbered(new(pieces, solids, findings, made) { Origin = (ox, oy) });
+        return d.NumberPieces ? numbered with { Pieces = HouseNumbers.Marked(numbered.Pieces, HouseNumbers.HeightMm * Math.Clamp(K(s), 0.6, 2)) } : numbered;
     }
 
     static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];

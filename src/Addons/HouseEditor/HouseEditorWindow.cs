@@ -138,6 +138,8 @@ public sealed class HouseEditorWindow : Window
     readonly StackPanel _findings = new() { Spacing = 4 };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
     readonly Button _make = new() { Content = "Put in the design", Classes = { "primary" }, MinWidth = 160 };
+    readonly Button _booklet = new() { Content = "Building booklet", MinWidth = 140 };
+    readonly CheckBox _numbers = new() { Content = "Number the pieces" };
     readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(300) };
     bool _loading;
     int _generation;
@@ -239,12 +241,14 @@ public sealed class HouseEditorWindow : Window
         right.Children.Add(side);
         right.Children.Add(resultScroll.With(c => Grid.SetRow(c, 1)));
 
-        var bottom = new Grid { ColumnDefinitions = new("*,Auto,Auto"), Margin = new Thickness(14, 8, 14, 14), ColumnSpacing = 12 };
+        var bottom = new Grid { ColumnDefinitions = new("*,Auto,Auto,Auto"), Margin = new Thickness(14, 8, 14, 14), ColumnSpacing = 12 };
         bottom.Children.Add(_status);
-        bottom.Children.Add(_make.With(c => Grid.SetColumn(c, 1)));
+        ToolTip.SetTip(_booklet, "Step-by-step building instructions as a PDF, like a building set's: every numbered piece, then the building going up a few pieces at a time, the new ones picked out with their numbers.");
+        bottom.Children.Add(_booklet.With(c => Grid.SetColumn(c, 1)));
+        bottom.Children.Add(_make.With(c => Grid.SetColumn(c, 2)));
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
         close.Click += (_, _) => Close();
-        bottom.Children.Add(close.With(c => Grid.SetColumn(c, 2)));
+        bottom.Children.Add(close.With(c => Grid.SetColumn(c, 3)));
 
         var body = new Grid { ColumnDefinitions = new("*,Auto"), RowDefinitions = new("Auto,*,Auto") };
         body.Children.Add(bar.With(c => Grid.SetColumnSpan(c, 2)));
@@ -255,6 +259,7 @@ public sealed class HouseEditorWindow : Window
 
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
         _make.Click += (_, _) => Make();
+        _booklet.Click += (_, _) => _ = Booklet();
         Hook();
         LoadLook();
         PickTool(PlanTool.Room);
@@ -360,7 +365,8 @@ public sealed class HouseEditorWindow : Window
             Explained("Grid", "The plan's squares: walls run along their lines. 25.4 mm (an inch) suits most tabletop games.",
                 Field("Square", _square, tip: "One square of the plan (mm).")),
             Explained("Cutting", "Your material's cut settings make slots come out their drawn width (the kerf is allowed for).",
-                Field("Cut with", _cut), _cutNote, Field("Etch with", _etchWith)));
+                Field("Cut with", _cut), _cutNote, Field("Etch with", _etchWith),
+                _numbers.With(c => ToolTip.SetTip(c, "Each piece's number (the one in the building booklet) scored small and light on it, low down and clear of its texture, on a layer of its own (turn it off to cut without them)."))));
     }
 
     void Library()
@@ -510,6 +516,7 @@ public sealed class HouseEditorWindow : Window
         foreach (var n in new[] { _wallMm, _sheet, _column, _storeyH, _square, _fit, _seed, _wear, _detailSize }) n.ValueChanged += (_, _) => LookChanged();
         foreach (var c in new[] { _texture, _upper, _etch, _tileTexture, _upperFloor, _base, _etchWith, _columnShape, _columnBuild, _columnTexture }) c.SelectionChanged += (_, _) => LookChanged();
         _build.SelectionChanged += (_, _) => BuildChosen();
+        _numbers.IsCheckedChanged += (_, _) => LookChanged();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
         _scale.SelectionChanged += (_, _) => ScaleChosen();
         _cut.SelectionChanged += (_, _) => CutChosen();
@@ -1040,6 +1047,7 @@ public sealed class HouseEditorWindow : Window
         _upperFloor.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.ToList().FindIndex(p => p.Name == _design.UpperFloor));
         _wallMmRow.IsVisible = s.BoxWalls;
         _tileRow.IsVisible = s.FloorTiles;
+        _numbers.IsChecked = _design.NumberPieces;
         _loading = false;
     }
 
@@ -1067,6 +1075,7 @@ public sealed class HouseEditorWindow : Window
             Wear = Math.Clamp(V(_wear, 50) / 100, 0, 1), DetailMm = Math.Max(0, V(_detailSize, 0)),
             ColumnBuild = Builds[Math.Clamp(_columnBuild.SelectedIndex, 0, Builds.Length - 1)],
             ColumnTexture = _columnTexture.SelectedIndex > 0 && _columnTexture.SelectedIndex - 1 < _textures.Count ? _textures[_columnTexture.SelectedIndex - 1] : null,
+            NumberPieces = _numbers.IsChecked == true,
         }, "Change the look");
     }
 
@@ -1167,6 +1176,7 @@ public sealed class HouseEditorWindow : Window
         foreach (var f in all.OrderByDescending(f => f.Level)) _findings.Children.Add(FindingRow(f));
         _summary.Text = kit.PieceCount == 0 ? "" : $"{kit.PieceCount} pieces from the {design.Style.WallSheetMm:0.##} mm sheet: {kit.Walls.Count} walls, labelled on the plan.";
         _make.IsEnabled = kit.Ok && kit.PieceCount > 0 && bad is null;
+        _booklet.IsEnabled = _make.IsEnabled && !_bookleting;
     }
 
     static Control FindingRow(Finding f)
@@ -1229,6 +1239,58 @@ public sealed class HouseEditorWindow : Window
         {
             _making = false;
             _make.IsEnabled = _kit?.Ok ?? true;
+        }
+    }
+
+    bool _bookleting;
+
+    /// <summary>What the building's called: its design's file name, when it's saved.</summary>
+    string BuildingName() => _doc.FilePath is { } saved && Path.GetFileNameWithoutExtension(saved) is { Length: > 0 } n ? n : "Building";
+
+    /// <summary>Where the booklet goes: beside the design when it's saved, else in the data folder's Booklets.</summary>
+    string BookletPath()
+    {
+        var name = string.Concat(BuildingName().Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch));
+        var dir = _doc.FilePath is { } saved && Path.GetDirectoryName(saved) is { Length: > 0 } d ? d : Path.Combine(AppIdentity.DataDir, "Booklets");
+        Directory.CreateDirectory(dir);
+        return Path.Combine(dir, $"{name} building instructions.pdf");
+    }
+
+    /// <summary>Writes the building booklet (in the background: a step a page, each with a picture) and opens it.</summary>
+    async Task Booklet()
+    {
+        if (_bookleting) return;
+        _bookleting = true;
+        _booklet.IsEnabled = false;
+        _status.Text = "Making the building booklet…";
+        try
+        {
+            var design = _design;
+            double longest = Math.Min(Longest, Math.Min(_machine.FieldW, _machine.FieldH) - 4);
+            var built = _kit is not null && _kitFrom == design.ToJson() ? _kit : null;
+            var o = new HouseBooklet.Options { Title = BuildingName(), Marked = design.NumberPieces };
+            var path = BookletPath();
+            int pages = await Task.Run(() =>
+            {
+                var kit = built ?? HouseKitMaker.Make(design, longest);
+                if (!kit.Ok) throw new InvalidOperationException(kit.Findings.First(f => f.Level == Severity.Bad).Text);
+                return HouseBooklet.SavePdf(kit, design, o, path);
+            });
+            _status.Text = $"Building booklet ({pages} pages): {path}";
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true })?.Dispose(); }
+            catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException) { AppLog.Error("building booklet", e); }
+        }
+        catch (IOException e) { _status.Text = $"Couldn't save the building booklet (is it open in a PDF viewer?): {e.Message}"; }
+        catch (InvalidOperationException e) { _status.Text = e.Message; }
+        catch (Exception e) when (e is UnauthorizedAccessException or ArgumentException or ArithmeticException or IndexOutOfRangeException or NullReferenceException)
+        {
+            AppLog.Error("building booklet", e);
+            _status.Text = $"Couldn't make the building booklet: {e.Message}";
+        }
+        finally
+        {
+            _bookleting = false;
+            _booklet.IsEnabled = _kit?.Ok ?? true;
         }
     }
 }

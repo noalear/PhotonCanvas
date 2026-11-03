@@ -19,6 +19,10 @@ public sealed record Piece(string Name, Sheet Sheet, PathsD Cut, PathsD Etched, 
 {
     /// <summary>The wall maker's settings it was made from (walls only), so the furniture maker can match a door or shelf to it.</summary>
     public string? WallSpecJson { get; init; }
+    /// <summary>Its number in the building's booklet (0 for none).</summary>
+    public int Number { get; init; }
+    /// <summary>Its number, scored on it as single lines (empty when it isn't marked).</summary>
+    public List<PathD> Marks { get; init; } = [];
 }
 
 /// <summary>
