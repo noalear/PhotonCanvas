@@ -10,13 +10,14 @@ using PlaceOptions = PhotonCanvas.Addon.Buildings.PlaceOptions;
 
 namespace PhotonCanvas.Tests;
 
+/// <summary>Buildings with flat walls (as they were first made) and, at the end, with box walls (as they come now).</summary>
 public class BuildingsTests
 {
     public static IEnumerable<object[]> Kinds() => BuildingSpec.Kinds.Select(k => new object[] { k.Kind });
 
     static BuildingKit Make(BuildingKind k, double scale = 28)
     {
-        var s = BuildingSpec.Preset(k);
+        var s = BuildingSpec.FlatPreset(k);
         // Furniture for small figures needs a thinner sheet.
         if (Math.Abs(scale - 28) > 1e-9) s = s.Scaled(scale / 28) with { FurnitureSheetMm = scale < 20 ? 1 : 2 };
         return BuildingKitMaker.Make(s);
@@ -135,7 +136,12 @@ public class BuildingsTests
     [MemberData(nameof(Kinds))]
     public void Storeys_stack_flush(BuildingKind k)
     {
-        var spec = BuildingSpec.Preset(k);
+        foreach (var spec in new[] { BuildingSpec.Preset(k), BuildingSpec.FlatPreset(k) })
+            StackFlush(spec);
+    }
+
+    static void StackFlush(BuildingSpec spec)
+    {
         var kit = BuildingKitMaker.Make(spec);
         double T = spec.WallSheetMm, H = BuildingKitMaker.StoreyHeight(spec);
         Assert.Equal(0, H / T % 1, 6);
@@ -147,14 +153,21 @@ public class BuildingsTests
             Assert.Equal(BuildingKitMaker.StoreyBase(spec, f.Storey), hi.Y, 6);
         }
         foreach (var c in kit.Solids.Where(s => s.Name == "Corner column" && s.Storey < spec.Storeys))
-            Assert.Equal(H, c.Thickness, 6);
+        {
+            // A stacked column is one solid as tall as the walls; a boxed one's sides reach from its storey's floor to the top of its walls.
+            var (lo, hi) = Box(c);
+            if (spec.BoxWalls) Assert.True(lo.Y >= BuildingKitMaker.StoreyBase(spec, c.Storey) - 1e-6 && hi.Y <= BuildingKitMaker.StoreyBase(spec, c.Storey) + H + 1e-6, $"{c.Name} {lo.Y}..{hi.Y}");
+            else Assert.Equal(H, c.Thickness, 6);
+        }
+        if (spec.BoxWalls)
+            Assert.Contains(kit.Solids, c => c.Name == "Corner column" && c.Storey == 0 && Math.Abs(Box(c).Max.Y - BuildingKitMaker.StoreyBase(spec, 0) - H) < 1e-6);
     }
 
     [Theory]
     [MemberData(nameof(Kinds))]
     public void Furniture_stands_in_its_room(BuildingKind k)
     {
-        var spec = BuildingSpec.Preset(k);
+        var spec = BuildingSpec.FlatPreset(k);
         var kit = BuildingKitMaker.Make(spec);
         double W = spec.WidthMm, D = spec.DepthMm, Wt = BuildingKitMaker.WallThickness(spec), H = BuildingKitMaker.StoreyHeight(spec);
         var furniture = kit.Solids.Where(s => s.IsFurniture && s.Name != "Front door").ToList();
@@ -177,7 +190,7 @@ public class BuildingsTests
     [InlineData(BuildingKind.Cottage, RoofShape.LeanTo)]
     public void The_roof_sits_on_the_top_storey_without_clashing(BuildingKind k, RoofShape shape)
     {
-        var spec = BuildingSpec.Preset(k) with { Roof = shape };
+        var spec = BuildingSpec.FlatPreset(k) with { Roof = shape };
         var kit = BuildingKitMaker.Make(spec);
         Assert.DoesNotContain(kit.Findings, f => f.Level != Severity.Note);
         var roof = kit.Solids.Where(s => s.Side == WallSide.Roof).ToList();
@@ -210,7 +223,7 @@ public class BuildingsTests
     [Fact]
     public void A_tower_with_battlements_has_no_roof()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Watchtower) with { Roof = RoofShape.Gable };
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Watchtower) with { Roof = RoofShape.Gable };
         var kit = BuildingKitMaker.Make(spec);
         Assert.DoesNotContain(kit.Solids, s => s.Side == WallSide.Roof);
     }
@@ -222,7 +235,7 @@ public class BuildingsTests
     [InlineData(WayUpStyle.None)]
     public void Each_way_up_stands_inside_without_clashing(WayUpStyle way)
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Tavern) with { WayUp = way };
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Tavern) with { WayUp = way };
         var kit = BuildingKitMaker.Make(spec);
         Assert.DoesNotContain(kit.Findings, f => f.Level != Severity.Note);
         var up = kit.Solids.Where(s => !s.IsFurniture && s.Side == WallSide.None && s.Name is not ("Corner column" or "Column cap")).ToList();
@@ -254,18 +267,22 @@ public class BuildingsTests
     [MemberData(nameof(Kinds))]
     public void The_building_stands_on_floor_tiles_that_cover_it(BuildingKind k)
     {
-        var spec = BuildingSpec.Preset(k);
+        var spec = BuildingSpec.FlatPreset(k);
         var kit = BuildingKitMaker.Make(spec);
         var tiles = kit.Solids.Where(s => s.Side == WallSide.Ground).ToList();
         Assert.NotEmpty(tiles);
         Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Floor tile", StringComparison.Ordinal) && p.Sheet == Sheet.Walls);
         // The tiles' top is where the walls stand, and together they cover the building's outside.
         Assert.All(tiles, t => Assert.Equal(BuildingKitMaker.StoreyBase(spec, 0), Box(t).Max.Y, 6));
-        double half = spec.ColumnMm / 2;
-        Assert.Equal(-spec.WidthMm / 2 - half, tiles.Min(t => Box(t).Min.X), 1);
-        Assert.Equal(spec.DepthMm / 2 + half, tiles.Max(t => Box(t).Max.Z), 1);
+        // Centred under it, reaching a whole square past a thin strip at the edge.
+        var board = BuildingKitMaker.TileSpecFor(spec);
+        double across = board.BoardAcross * board.SquareMm, down = board.BoardDown * board.SquareMm;
+        Assert.InRange(across, spec.WidthMm + spec.ColumnMm - 0.01, spec.WidthMm + spec.ColumnMm + board.SquareMm);
+        Assert.InRange(down, spec.DepthMm + spec.ColumnMm - 0.01, spec.DepthMm + spec.ColumnMm + board.SquareMm);
+        Assert.Equal(-across / 2, tiles.Min(t => Box(t).Min.X), 1);
+        Assert.Equal(down / 2, tiles.Max(t => Box(t).Max.Z), 1);
         double area = tiles.Sum(t => Geo.Area(t.Outline));
-        Assert.InRange(area, (spec.WidthMm + spec.ColumnMm) * (spec.DepthMm + spec.ColumnMm) * 0.98, (spec.WidthMm + spec.ColumnMm) * (spec.DepthMm + spec.ColumnMm) * 1.02);
+        Assert.InRange(area, across * down * 0.98, across * down * 1.02);
 
         var bare = BuildingKitMaker.Make(spec with { FloorTiles = false });
         Assert.DoesNotContain(bare.Pieces, p => p.Name.StartsWith("Floor tile", StringComparison.Ordinal));
@@ -275,7 +292,7 @@ public class BuildingsTests
     [Fact]
     public void A_swinging_door_fits_the_doorway()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Cottage);
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Cottage);
         var kit = BuildingKitMaker.Make(spec);
         Assert.Contains(kit.Pieces, p => p.Name == "Front door" && p.Sheet == Sheet.Furniture);
         Assert.Contains(kit.Pieces, p => p.Name == "Front door clip" && p.Copies == 2);
@@ -298,7 +315,7 @@ public class BuildingsTests
         Assert.Equal(4, walls.Sum(w => w.Copies));
         Assert.Contains(walls, w => w.Name == "Side walls" && w.Copies == 2);
         Assert.Contains(walls, w => w.Name == "Front wall" && w.Copies == 1);
-        var two = BuildingKitMaker.Make(BuildingSpec.Preset(BuildingKind.Cottage) with { TwoSided = true });
+        var two = BuildingKitMaker.Make(BuildingSpec.FlatPreset(BuildingKind.Cottage) with { TwoSided = true });
         Assert.Equal(4, two.Pieces.Where(p => p.Name.EndsWith("back panel", StringComparison.Ordinal)).Sum(p => p.Copies));
         var tower = Make(BuildingKind.Watchtower);
         Assert.Contains(tower.Pieces, w => w.Name == "Walls, storey 2" && w.Copies == 4);
@@ -309,7 +326,7 @@ public class BuildingsTests
     [Fact]
     public void Push_fit_furniture_gets_the_furniture_makers_grip_ribs()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Cottage);
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Cottage);
         var glued = BuildingKitMaker.Make(spec);
         var pushed = BuildingKitMaker.Make(spec with { FurniturePushFit = true });
         Assert.True(pushed.Ok);
@@ -321,7 +338,7 @@ public class BuildingsTests
     [Fact]
     public void Spec_survives_saving()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Tavern);
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Tavern);
         var back = BuildingSpec.FromJson(spec.ToJson())!;
         Assert.Equal(spec.ToJson(), back.ToJson());
         Assert.Equal("Bar counter", back.Label(4));
@@ -332,7 +349,7 @@ public class BuildingsTests
     [Fact]
     public void Scaling_resizes_everything_but_the_sheets()
     {
-        var s = BuildingSpec.Preset(BuildingKind.Cottage);
+        var s = BuildingSpec.FlatPreset(BuildingKind.Cottage);
         var big = s.Scaled(2);
         Assert.Equal(56, big.ScaleMm);
         Assert.Equal(s.WidthMm * 2, big.WidthMm);
@@ -345,7 +362,7 @@ public class BuildingsTests
     [Fact]
     public void Too_small_or_too_thin_is_said_plainly()
     {
-        var s = BuildingSpec.Preset(BuildingKind.Cottage);
+        var s = BuildingSpec.FlatPreset(BuildingKind.Cottage);
         Assert.False(BuildingKitMaker.Make(s with { WidthMm = 20 }).Ok);
         Assert.False(BuildingKitMaker.Make(s with { ColumnMm = 4 }).Ok);
         var big = BuildingKitMaker.Make(s with { WidthMm = 300 });
@@ -355,7 +372,7 @@ public class BuildingsTests
     [Fact]
     public void Goes_into_the_design_a_sheet_at_a_time()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Cottage);
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Cottage);
         var kit = BuildingKitMaker.Make(spec);
         var (s, pages, id) = Placement.Place(DocState.New(), kit, spec, MachineProfile.F2Ultra, new PlaceOptions());
         Assert.True(pages >= 2);
@@ -387,8 +404,87 @@ public class BuildingsTests
     [Fact]
     public void One_sheet_when_the_furniture_is_cut_from_the_walls_sheet()
     {
-        var spec = BuildingSpec.Preset(BuildingKind.Cottage) with { FurnitureSheetMm = 3 };
+        var spec = BuildingSpec.FlatPreset(BuildingKind.Cottage) with { FurnitureSheetMm = 3 };
         var sheets = Placement.Sheets(BuildingKitMaker.Make(spec), spec, new PlaceOptions());
         Assert.Single(sheets);
+    }
+
+    // ---- box walls ----
+
+    static BuildingKit MakeBox(BuildingKind k) => BuildingKitMaker.Make(BuildingSpec.Preset(k));
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void Every_box_walled_building_comes_out_whole_and_fits_the_bed(BuildingKind k)
+    {
+        var spec = BuildingSpec.Preset(k);
+        Assert.True(spec.BoxWalls);
+        var kit = BuildingKitMaker.Make(spec);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Findings, f => f.Level == Severity.Warn);
+        Assert.Empty(Placement.TooBig(kit, MachineProfile.F2Ultra));
+        foreach (var p in kit.Pieces) Assert.True(Geo.Pieces(p.Cut) == 1, $"{p.Name} comes out in {Geo.Pieces(p.Cut)} pieces");
+        // Each wall is a box: faces, a base, a top, ends; the corner columns are boxes too.
+        foreach (var part in new[] { ": back", ": base", ": top", ": end" }) Assert.Contains(kit.Pieces, p => p.Name.EndsWith(part, StringComparison.Ordinal));
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith("Corner column side", StringComparison.Ordinal));
+        Assert.Equal(12, kit.WallMm);
+    }
+
+    [Theory]
+    [MemberData(nameof(Kinds))]
+    public void Nothing_in_a_box_walled_building_runs_into_anything_else(BuildingKind k)
+    {
+        var kit = MakeBox(k);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        var structure = kit.Solids.Where(s => !s.IsFurniture).ToList();
+        Assert.Empty(Clashes(structure, structure, 0.4));
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.IsFurniture).ToList(), structure, 0.5));
+        // Every slot in a column's sides has a wall's tab in it.
+        var placed = structure.Select(s => new Placed(s, Geo.Offset(s.Outline, -0.03))).ToList();
+        foreach (var c in placed.Where(p => p.S.Name == "Corner column"))
+            foreach (var hole in Geo.Tidy(c.S.Outline).Where(h => Clipper.Area(h) < 0))
+            {
+                var b = Clipper.GetBounds(hole);
+                var centre = c.S.Pose.At((b.left + b.right) / 2, (b.top + b.bottom) / 2);
+                Assert.True(placed.Any(o => !ReferenceEquals(o, c) && o.Inside(centre, 0.01)), $"An empty slot in a corner column at {centre.X:0.#}, {centre.Y:0.#}, {centre.Z:0.#}");
+            }
+    }
+
+    [Fact]
+    public void A_box_walled_building_hangs_its_own_door()
+    {
+        var kit = MakeBox(BuildingKind.Cottage);
+        Assert.Contains(kit.Pieces, p => p.Name == "Front door" && p.Sheet == Sheet.Walls);
+        Assert.Contains(kit.Pieces, p => p.Name == "Front wall: door head");
+        Assert.DoesNotContain(kit.Pieces, p => p.Name.StartsWith("Front door clip", StringComparison.Ordinal));
+        Assert.Contains(kit.Solids, s => s.Name == "Front door" && s.Side == WallSide.Front && !s.IsFurniture);
+        // Loose: glued into its doorway; open: no door at all.
+        var loose = BuildingKitMaker.Make(BuildingSpec.Preset(BuildingKind.Cottage) with { Door = DoorStyle.Loose });
+        Assert.Contains(loose.Pieces, p => p.Name == "Front door");
+        Assert.DoesNotContain(loose.Pieces, p => p.Name == "Front wall: door head");
+        var open = BuildingKitMaker.Make(BuildingSpec.Preset(BuildingKind.Cottage) with { Door = DoorStyle.Open });
+        Assert.DoesNotContain(open.Pieces, p => p.Name.Contains("door", StringComparison.OrdinalIgnoreCase) && !p.Name.Contains("Floor", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Box_walled_buildings_say_when_their_columns_are_too_thin()
+    {
+        var kit = BuildingKitMaker.Make(BuildingSpec.Preset(BuildingKind.Cottage) with { ColumnMm = 16 });
+        Assert.False(kit.Ok);
+        Assert.Contains(kit.Findings, f => f.Level == Severity.Bad && f.Text.Contains("box walls"));
+        var scaled = BuildingSpec.Preset(BuildingKind.Cottage).Scaled(54.0 / 28);
+        Assert.Equal(0, scaled.WallMm % scaled.WallSheetMm, 6);
+        Assert.True(scaled.ColumnMm >= scaled.NarrowestBoxColumn);
+        Assert.True(BuildingKitMaker.Make(scaled with { FurnitureSheetMm = 2 }).Ok);
+    }
+
+    [Fact]
+    public void Old_buildings_keep_their_flat_walls()
+    {
+        var old = BuildingSpec.FromJson("""{"Kind":"Cottage","WidthMm":110}""")!;
+        Assert.False(old.BoxWalls);
+        var back = BuildingSpec.FromJson((BuildingSpec.Preset(BuildingKind.Tavern) with { WindowFill = Addon.Walls.WindowFill.Shutters }).ToJson())!;
+        Assert.True(back.BoxWalls);
+        Assert.Equal(Addon.Walls.WindowFill.Shutters, back.WindowFill);
     }
 }
