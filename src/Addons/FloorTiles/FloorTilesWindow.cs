@@ -48,6 +48,8 @@ public sealed class FloorTilesWindow : Window
     readonly NumericUpDown _sizeA = Number(0, 300, 0.5m, "0.##"), _sizeB = Number(0.5m, 300, 0.5m, "0.##"), _groove = Number(0.1m, 3, 0.1m, "0.##"), _seed = Number(1, 9999, 1, "0"), _cracks = Number(0, 100, 5, "0");
     readonly TextBlock _sizeALabel = Label("Size"), _sizeBLabel = Label("Size"), _textureAbout = Hint();
     Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!, _seedRow = null!, _cracksRow = null!;
+    readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
+    Control _wearRow = null!, _detailRow = null!;
     readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
     readonly ComboBox _grid = Combo("Not marked (the texture shows them)", "Scored lines", "Etched grooves");
 
@@ -208,6 +210,8 @@ public sealed class FloorTilesWindow : Window
         _seedRow = Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
             tip: "Stones and boards are laid out at random, differently on every tile: each number gives a different set.");
         _cracksRow = Field("Cracks %", _cracks, tip: "How many of the stones have a crack scored across them.");
+        _wearRow = Field("Wear %", _wear, tip: "How weathered the texture looks: 0 is new and crisp, 50 the usual look, 100 ancient and battered (more nicks, chipped corners, pits, cracks and scratches).");
+        _detailRow = Field("Detail size", _detail, tip: "Size of the smallest marks in mm: pits, nicks, wood grain, bolts, vent slats and greebles.");
         return Stack(
             Explained("Theme", "A look to start from, the same as the wall maker's, so floors match the walls, roofs and scatter of that theme. It picks the texture below; change it afterwards if you like.",
                 Field("Theme", _theme),
@@ -216,6 +220,7 @@ public sealed class FloorTilesWindow : Window
                 Field("Texture", _texture),
                 _textureAbout,
                 _sizeARow, _sizeBRow, _grooveRow, _seedRow, _cracksRow,
+                _wearRow, _detailRow,
                 Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each stone or board (much quicker).")),
             Explained("Grid squares", "Mark the squares on the tiles for games that count movement. Dungeon flagstones follow the grid already.",
                 Field("Mark squares", _grid)));
@@ -327,7 +332,7 @@ public sealed class FloorTilesWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _square, _thick, _boardA, _boardD, _tileA, _tileD, _sizeA, _sizeB, _groove, _seed, _cracks, _tab, _fit, _magnet })
+        foreach (var n in new[] { _square, _thick, _boardA, _boardD, _tileA, _tileD, _sizeA, _sizeB, _groove, _seed, _cracks, _tab, _fit, _magnet, _wear, _detail })
             n.ValueChanged += (_, _) => Changed();
         foreach (var c in new[] { _mode, _etch, _grid, _join, _etchWith })
             c.SelectionChanged += (_, _) => Changed();
@@ -376,6 +381,7 @@ public sealed class FloorTilesWindow : Window
             if (p.SizeALabel is not null) _sizeA.Value = D(Math.Round(a, 2));
             if (p.SizeBLabel is not null) _sizeB.Value = D(Math.Round(b, 2));
             if (p.UsesGroove) _groove.Value = D(p.Groove);
+            _detail.Value = D(p.Detail);
         }
         else if (OwnTexture is { } own) _sizeA.Value = D(Math.Clamp(own.TileWidthMm, 0.5, 300));
         _loading = false;
@@ -394,6 +400,7 @@ public sealed class FloorTilesWindow : Window
             _grooveRow.IsVisible = p.UsesGroove;
             _seedRow.IsVisible = p.Random;
             _cracksRow.IsVisible = p.Stone;
+            _wearRow.IsVisible = _detailRow.IsVisible = p.Name is not (FloorTextures.Plain or "Tread plate" or "Grating" or "Sand");
             _textureAbout.Text = p.About;
         }
         else
@@ -401,6 +408,7 @@ public sealed class FloorTilesWindow : Window
             _sizeALabel.Text = "Tile width";
             _sizeARow.IsVisible = true;
             _sizeBRow.IsVisible = _grooveRow.IsVisible = _seedRow.IsVisible = _cracksRow.IsVisible = false;
+            _wearRow.IsVisible = _detailRow.IsVisible = false;
             var own = OwnTexture;
             _textureAbout.Text = own is null ? "" : $"Your texture: a {own.TileWidthMm:0.#} × {own.TileHeightMm:0.#} mm tile, scaled to the tile width, repeated in rows.";
         }
@@ -444,6 +452,7 @@ public sealed class FloorTilesWindow : Window
         _sizes.Children.Clear();
         foreach (var t in s.Tiles) AddSizeRow(t);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(Math.Max(0.5, s.SizeB)); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999); _cracks.Value = D(s.CracksPct);
+        _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : FloorTextures.Preset(s.Texture)?.Detail ?? 0.6, 0.2, 5));
         _etch.SelectedIndex = (int)s.Etch; _grid.SelectedIndex = (int)s.Grid;
         _theme.SelectedIndex = Math.Max(0, FloorThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = FloorThemes.About(s.Theme);
         _join.SelectedIndex = (int)s.Join; _tab.Value = D(s.TabMm); _fit.Value = D(s.FitMm); _magnet.Value = D(s.MagnetMm); _base.IsChecked = s.BaseLayer;
@@ -459,6 +468,7 @@ public sealed class FloorTilesWindow : Window
         BoardAcross = V(_boardA, 6), BoardDown = V(_boardD, 6), TileAcross = (int)V(_tileA, 2), TileDown = (int)V(_tileD, 2), PlainBorder = _outside.IsChecked != true,
         Tiles = [.. _sizeRows.Select(r => r.Value)],
         Theme = ThemeName, Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 50), SizeB = V(_sizeB, 0), GrooveMm = V(_groove, 0.8), Seed = (int)V(_seed, 1), CracksPct = V(_cracks, 15),
+        Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.6),
         Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), Grid = (GridMarks)Math.Max(0, _grid.SelectedIndex),
         Join = (TileJoin)Math.Max(0, _join.SelectedIndex), TabMm = V(_tab, 5), FitMm = V(_fit, 0.15), MagnetMm = V(_magnet, 5), BaseLayer = _base.IsChecked == true,
     };

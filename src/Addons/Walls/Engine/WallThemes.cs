@@ -62,7 +62,7 @@ public static class WallThemes
         return s with
         {
             Theme = name,
-            Texture = texture, Custom = null, SizeA = a, SizeB = b, GrooveMm = groove,
+            Texture = texture, Custom = null, SizeA = a, SizeB = b, GrooveMm = groove, DetailMm = 0,
             DoorShape = doorShape, DoorLook = look,
             WindowShape = winShape, WindowWidthMm = Math.Round(ww * k, 1), WindowHeightMm = Math.Round(wh * k, 1), Bars = bars,
             FrameMm = name switch { TerrainThemes.Cave => 0, TerrainThemes.Desert => 2, TerrainThemes.SciFi => 1, _ => 1.5 },

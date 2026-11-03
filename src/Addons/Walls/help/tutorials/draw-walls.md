@@ -30,7 +30,8 @@ fills it in for you.
 ## Choose a texture
 <!-- target: tabitem:Texture -->
 On the **Texture** tab, pick **Brick** (or stone, wood, metal), or make your own from shapes you've
-drawn. The preview shows it on the wall.
+drawn. **Wear %** sets how weathered it looks (0 new and crisp, 100 ancient and battered) and
+**Detail size** how fine its pits, grain and bolts are. The preview shows it on the wall.
 
 ## Add battlements
 <!-- target: tabitem:Top -->

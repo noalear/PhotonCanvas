@@ -45,8 +45,8 @@ replaced wherever they are.
 | **Thickness** | 3 mm | Your sheet's thickness: every piece is cut from it. |
 | **Cut with**, **Etch with** | As set on the layer | Settings from your material library for the cut and for the texture. The cut settings bring the material's thickness, kerf and slot fit. |
 
-**Match the walls in the design** takes the sheet thickness, height, texture, its sizes and
-**Variation** from walls made with **Walls** (the ones selected, or else the first in the design).
+**Match the walls in the design** takes the sheet thickness, height, texture, its sizes, **Wear %**,
+**Detail size** and **Variation** from walls made with **Walls** (the ones selected, or else the first in the design).
 With the same variation the bricks or stones of a ruin are laid exactly as on those walls, so a broken
 wall slid into a column beside a whole one lines up with it course for course. A first ruin does this
 by itself when there are walls in the design.
@@ -81,6 +81,9 @@ How the wall breaks depends on the texture:
 
 **Variation** changes where the wall breaks, how the stones lie and how the rubble falls; each number
 gives a different ruin and the same number always the same one. **Shuffle** picks the next one.
+**Wear %** and **Detail size** age the texture as the wall maker's do: 0 is new and crisp, 50 the
+usual look, 100 ancient and battered (nicked edges, knocked corners, pits, cracks and scratches), and
+the detail size is how big the smallest of those marks are, in mm.
 **Etch as** etches the gaps as grooves (deeper, the most real) or scores lines round each brick or
 stone (much quicker).
 
