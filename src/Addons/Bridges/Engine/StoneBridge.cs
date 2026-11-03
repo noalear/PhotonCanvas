@@ -161,7 +161,7 @@ public static class StoneBridge
         var cut = Geo.Subtract(Geo.Union(outline), Geo.Union(holes));
         double maxTop = top.Max(p => p.y);
         var face = new Face(L, maxTop, 0, L, H);
-        var tex = Textures.Make(s.Texture, s.SizeA, s.SizeB, s.GrooveMm, s.Seed, s.Custom, face);
+        var tex = Textures.Make(s.Texture, s.SizeA, s.SizeB, s.GrooveMm, s.Seed, s.Custom, face, s.Wear, s.DetailMm);
         // A smooth coping along the top, edged with a groove.
         const double coping = 1.2;
         var body = Geo.Subtract(Geo.Union(outline), crenels);
@@ -196,7 +196,7 @@ public static class StoneBridge
         // The walls across.
         if (ends.Count > 0)
         {
-            var ef = Textures.Make(s.Texture, s.SizeA, s.SizeB, s.GrooveMm, s.Seed + 5, s.Custom, new Face(W, endH, 0, W, endH));
+            var ef = Textures.Make(s.Texture, s.SizeA, s.SizeB, s.GrooveMm, s.Seed + 5, s.Custom, new Face(W, endH, 0, W, endH), s.Wear, s.DetailMm);
             var (ee, el) = Stonework(new PathsD { Geo.Rect(0, 0, W, endH) }, ef, [], []);
             m.Add("End wall", Cross(endH, CrossTabs(endH)), [], [Pose.Left(xe, 0, -W / 2), Pose.Right(L - xe, 0, W / 2)], ee, el);
         }

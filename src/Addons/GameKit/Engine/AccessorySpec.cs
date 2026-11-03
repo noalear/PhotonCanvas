@@ -6,8 +6,8 @@ namespace PhotonCanvas.Addon.GameKit;
 
 public enum AccessoryKind { DiceTower, CardStand, DeckTray, Initiative, MoveGauge, Ruler, Template }
 
-/// <summary>What the marks on gauges, rulers and templates count in.</summary>
-public enum Units { Inches, Centimetres, GridFeet }
+/// <summary>What the marks on gauges, rulers and templates count in: <see cref="Custom"/> is a unit of your own (<see cref="AccessoryItem.UnitMm"/> long, called <see cref="AccessoryItem.UnitName"/>).</summary>
+public enum Units { Inches, Centimetres, GridFeet, Custom }
 
 public enum TemplateShape { Circle, Cone, Square }
 
@@ -78,6 +78,17 @@ public sealed record AccessoryItem
     /// <summary>Ruler: its length; template: its radius (circle), length (cone) or side (square), in <see cref="Units"/>.</summary>
     public double LengthUnits { get; init; } = 6;
     public TemplateShape Shape { get; init; } = TemplateShape.Circle;
+
+    // ---- a unit of your own (Units.Custom) ----
+    /// <summary>How long one of your own units is (mm).</summary>
+    public double UnitMm { get; init; } = 25.4;
+    /// <summary>What one unit counts as in the numbers (5: a grid square of 5 ft).</summary>
+    public double UnitCounts { get; init; } = 1;
+    /// <summary>What it's called, written after the numbers or on the ruler ("MU", "hexes", "paces").</summary>
+    public string UnitName { get; init; } = "units";
+
+    /// <summary>How the gauge, ruler or template is marked: the font, the numbers, a title, a border and ornaments.</summary>
+    public Markings Marks { get; init; } = new();
 }
 
 /// <summary>Everything cut from one sheet in one go: the accessories, the sheet and the finish.</summary>
@@ -138,17 +149,45 @@ public static class Defaults
 
     public static readonly IReadOnlyList<string> FinishNames = ["None", "Wood grain", "Planks", "Brick", "Stone blocks", "Fieldstone", "Tiles", "Metal plates", "Hexagons",
         "Dungeon blocks", "Cave rock", "Sci-fi panels", "Sandstone", "Adobe"];
-    public static readonly IReadOnlyList<string> UnitNames = ["Inches", "Centimetres", "Grid squares (1 inch = 5 ft)"];
+    public static readonly IReadOnlyList<string> UnitNames = ["Inches", "Centimetres", "Grid squares (1 inch = 5 ft)", "A unit of your own"];
 
-    /// <summary>One unit in mm.</summary>
+    /// <summary>One unit in mm (a unit of your own: 25.4 here; see <see cref="UnitMm(AccessoryItem)"/>).</summary>
     public static double UnitMm(Units u) => u == Units.Centimetres ? 10 : 25.4;
+
+    /// <summary>One of the item's units in mm, its own unit included.</summary>
+    public static double UnitMm(AccessoryItem it) => it.Units == Units.Custom ? Math.Clamp(it.UnitMm, 1, 1000) : UnitMm(it.Units);
+
+    /// <summary>The number written at <paramref name="units"/> along, a unit of your own counting as <see cref="AccessoryItem.UnitCounts"/>.</summary>
+    public static string Mark(AccessoryItem it, double units) =>
+        it.Units == Units.Custom ? Number(units * (it.UnitCounts > 0 ? it.UnitCounts : 1)) : Mark(it.Units, units);
+
+    /// <summary>What the numbers count: "inches", "cm", "ft", or the unit's own name.</summary>
+    public static string UnitWord(AccessoryItem it, bool plural = true) => it.Units switch
+    {
+        Units.Centimetres => "cm",
+        Units.GridFeet => "feet",
+        Units.Custom => string.IsNullOrWhiteSpace(it.UnitName) ? "units" : it.UnitName.Trim(),
+        _ => plural ? "inches" : "inch",
+    };
+
+    /// <summary>Written straight after a number: 3", 15 cm, 15 ft, 4 MU.</summary>
+    public static string UnitSuffix(AccessoryItem it) => it.Units switch
+    {
+        Units.Centimetres => " cm",
+        Units.GridFeet => " ft",
+        Units.Custom => string.IsNullOrWhiteSpace(it.UnitName) ? "" : " " + it.UnitName.Trim(),
+        _ => "\"",
+    };
 
     /// <summary>The number written at <paramref name="units"/> along: inches and centimetres as they are, grid squares as feet (5 a square).</summary>
     public static string Mark(Units u, double units)
     {
         double v = u == Units.GridFeet ? units * 5 : units;
-        return Math.Abs(v - Math.Round(v)) < 1e-6 ? ((int)Math.Round(v)).ToString(System.Globalization.CultureInfo.InvariantCulture) : v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+        return Number(v);
     }
+
+    static string Number(double v) =>
+        Math.Abs(v - Math.Round(v)) < 1e-6 ? ((int)Math.Round(v)).ToString(System.Globalization.CultureInfo.InvariantCulture) : v.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 static class GameKitJson

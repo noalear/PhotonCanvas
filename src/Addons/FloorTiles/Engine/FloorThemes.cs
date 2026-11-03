@@ -32,7 +32,7 @@ public static class FloorThemes
         return s with
         {
             Theme = name, Texture = p.Name, Custom = null, SizeA = a, SizeB = p.SizeBLabel is null ? s.SizeB : b,
-            GrooveMm = p.UsesGroove ? p.Groove : s.GrooveMm,
+            GrooveMm = p.UsesGroove ? p.Groove : s.GrooveMm, DetailMm = 0,
             CracksPct = name switch { TerrainThemes.Cave => 30, TerrainThemes.Dungeon => 20, TerrainThemes.Gothic => 5, _ => 12 },
         };
     }

@@ -66,6 +66,10 @@ public sealed record WallSpec
     public double SizeB { get; init; } = 3.5;
     public double GrooveMm { get; init; } = 0.6;
     public int Seed { get; init; } = 1;
+    /// <summary>How worn the texture is, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
+    public double DetailMm { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
     /// <summary>Leave the ends (the part inside the columns' slots) smooth, so they slide in at full thickness.</summary>
     public bool PlainEnds { get; init; } = true;
@@ -79,6 +83,17 @@ public sealed record WallSpec
     public double WalkwayDepthMm { get; init; } = 10;
     /// <summary>How far down a ruined top is broken, as a share of the height.</summary>
     public double RuinDepth { get; init; } = 0.4;
+    /// <summary>How the top is broken, with or without battlements (an old wall with a Ruined top is broken in steps).</summary>
+    public RuinStyle Broken { get; init; } = RuinStyle.None;
+    /// <summary>Where the break is deepest (or, for a fallen end, which end has fallen).</summary>
+    public RuinPlace RuinAt { get; init; } = RuinPlace.Anywhere;
+    /// <summary>The merlons' heights: all the same, every other one taller, or taller at the ends.</summary>
+    public MerlonPattern Merlons { get; init; } = MerlonPattern.Even;
+    /// <summary>How much lower the shorter merlons are than the tall ones (mm).</summary>
+    public double MerlonStepMm { get; init; } = 3;
+
+    /// <summary>How the top is broken, taking an old Ruined top as broken in steps.</summary>
+    [JsonIgnore] public RuinStyle Breaks => Broken != RuinStyle.None ? Broken : Top == TopStyle.Ruined ? RuinStyle.Stepped : RuinStyle.None;
 
     public DoorKind Door { get; init; } = DoorKind.None;
     public OpeningShape DoorShape { get; init; } = OpeningShape.Arched;

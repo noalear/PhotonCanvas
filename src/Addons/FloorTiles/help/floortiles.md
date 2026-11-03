@@ -102,7 +102,7 @@ tile to the next.
 | Tread plate | 4 mm | Non-slip metal plate: little bars etched in. |
 | Chequered tiles | 12.7 mm | Square tiles, every other one etched dark: halls, chapels and crypts. |
 | Cave floor | rock 18, layer 12 mm | Rough rock in uneven slabs, split by cracks and pitted, like the wall maker's cave rock. |
-| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels with cut corners, vents, bolts and hazard stripes, like the wall maker's sci-fi panels. |
+| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels laid as the wall maker's sci-fi panels: inset plates, vent grilles, hatches, pipe runs, greebles and hazard stripes between bolted ribs. |
 | Grating | slots 2.2 mm apart | Open grating: rows of slots etched in each square inside a solid frame, turned square by square. |
 | Sandstone slabs | length 16.9, row 8.47 mm | Long sandstone slabs with wind-worn lines and pits. |
 | Sand | ripples 3 mm apart | Sand blown into ripples, with the odd pebble: deserts, beaches and arenas. |
@@ -113,6 +113,10 @@ tile to the next.
   gives a different set, and **Shuffle** picks the next one. The same number always gives the same
   tiles.
 - **Cracks %**: how many of the stones have a crack scored across them.
+- **Wear %**: how weathered the texture looks, as in the wall maker: 0 is new and crisp, 50 the usual
+  look, 100 ancient and battered (nicked edges, knocked-off corners, pits and cracks; scratches and
+  rust pits on metal). Not for tread plate, grating or sand.
+- **Detail size**: the size of the smallest of those marks, and of wood grain, bolts and vent slats (mm).
 - **Etch as**: *Grooves* etches the gaps as filled areas (deeper and the most real). *Lines* scores
   round each stone instead, which is much quicker. Grain, rivets and cracks are always scored lines,
   on a light **Floor tiles · lines** layer.

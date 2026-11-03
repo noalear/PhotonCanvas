@@ -6,7 +6,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The wall maker's pictures (in its own help/images): a castle wall, a timber-framed house and the connectors.</summary>
+/// <summary>The wall maker's pictures (in its own help/images): a castle wall, a timber-framed house, a ruin, the connectors and a flat wall.</summary>
 static class WallsShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -52,9 +52,15 @@ static class WallsShots
         }, 3, 1);
         Shot("window-walls-connectors", WallSpec.NewBoxed with
         {
-            LengthMm = 100, HeightMm = 50, Texture = "Fieldstone", SizeA = 9, SizeB = 6, GrooveMm = 0.9, Top = TopStyle.Ruined, Seed = 3, ColumnTop = ColumnTop.SteppedCap,
+            LengthMm = 100, HeightMm = 50, Texture = "Fieldstone", SizeA = 9, SizeB = 6, GrooveMm = 0.9, Broken = RuinStyle.Crumbled, Seed = 3, ColumnTop = ColumnTop.SteppedCap,
             Connectors = new() { [ConnectorKind.Straight] = 1, [ConnectorKind.Corner] = 1, [ConnectorKind.Tee] = 1, [ConnectorKind.EndCap] = 1 },
         }, 5);
+        Shot("window-walls-ruins", WallSpec.NewBoxed with
+        {
+            LengthMm = 130, HeightMm = 60, Texture = "Brick", Top = TopStyle.Battlements, Merlons = MerlonPattern.Alternating, MerlonHeightMm = 8, MerlonStepMm = 3,
+            Broken = RuinStyle.Breach, RuinDepth = 0.45, RuinAt = RuinPlace.Middle, Seed = 4, Windows = 2, WindowShape = OpeningShape.ArrowSlit, WindowWidthMm = 2.5, WindowHeightMm = 12, SillMm = 20,
+            Connectors = new() { [ConnectorKind.Corner] = 2 },
+        }, 2);
         Shot("window-walls-flat", new WallSpec
         {
             LengthMm = 100, HeightMm = 45, Texture = "Brick", Top = TopStyle.Battlements,

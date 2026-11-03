@@ -120,6 +120,7 @@ keystone at the top.
 | **Parapet**, **Parapet height** | Walls along the road's edges: *Straight*, *Battlements* (on a level road) or *None*. A smooth coping runs along the top. |
 | **Road surface** | *Cobbles*, *Flagstones* or *Plain*, etched on the road. |
 | **Texture** | The stone on the walls' outer faces and on the end walls: the wall maker's textures (brick, stone blocks, fieldstone and the rest), with their sizes and **Groove**. |
+| **Wear %**, **Detail size** | How weathered the stone looks (0 new and crisp, 50 the usual look, 100 ancient and battered: nicked edges, knocked corners, pits and cracks) and how big the smallest of those marks are (mm), as in the wall maker. |
 
 **Match the walls in the design** takes the texture, its sizes and the sheet from walls made with
 the wall maker (the ones selected, or the first in the design), your own textures included, so a
