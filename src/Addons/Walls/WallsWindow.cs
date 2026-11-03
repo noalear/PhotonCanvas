@@ -35,6 +35,12 @@ public sealed class WallsWindow : Window
     readonly NumericUpDown _length = Number(10, 2000, 5, "0.#"), _height = Number(5, 1000, 1, "0.#"), _thick = Number(0.5m, 20, 0.5m, "0.##"), _walls = Number(1, 100, 1, "0");
     readonly ComboBox _measure = Combo("The panel as cut", "Column centre to centre");
     readonly CheckBox _twoSided = new() { Content = "Two panels back to back (texture on both faces)" };
+    readonly ComboBox _build = Combo("A box: front, back, top, bottom and ends", "A flat panel");
+    readonly NumericUpDown _wallT = Number(1, 200, 0.5m, "0.##"), _plinth = Number(0, 20, 0.5m, "0.#"), _ribSpacing = Number(15, 500, 5, "0");
+    readonly CheckBox _intoColumns = new() { Content = "Ends go into columns (tabs into their slots)", IsChecked = true };
+    readonly CheckBox _texBack = new() { Content = "Texture the back face too", IsChecked = true }, _texSides = new() { Content = "Texture the ends and the top too" };
+    readonly TextBlock _thickLabel = Label("Thickness"), _buildNote = Hint();
+    Control _boxRows = null!, _flatRows = null!;
     readonly ComboBox _cutWith = Combo(), _etchWith = Combo();
     readonly TextBlock _cutNote = Hint();
     List<(Material M, Recipe R)?> _cuts = [], _etches = [];
@@ -77,9 +83,16 @@ public sealed class WallsWindow : Window
     readonly NumericUpDown _customAngle = Number(20, 340, 5, "0.#"), _columnW = Number(3, 200, 0.5m, "0.#"), _slotDepth = Number(0.5m, 50, 0.5m, "0.#"), _fit = Number(-1, 2, 0.05m, "0.##"), _pin = Number(0, 10, 0.1m, "0.#");
     readonly ComboBox _column = Combo("Auto (to suit the angles)", "Square", "Octagon", "Round");
     readonly CheckBox _cap = new() { Content = "A wider cap on top", IsChecked = true }, _foot = new() { Content = "A wider foot at the bottom" };
+    readonly ComboBox _columnBuild = Combo("Boxes: four sides, a top and a bottom", "Stacks of layers");
+    readonly ComboBox _columnTop = Combo("Flush with the sides", "A wider cap", "A stepped cap", "A stepped point", "Battlements");
+    readonly ComboBox _columnBase = Combo("Flat", "A wider foot", "A stepped plinth");
+    readonly NumericUpDown _columnLip = Number(0, 20, 0.5m, "0.#");
+    Control _boxColumnRows = null!, _flatColumnRows = null!;
 
     readonly Border _tabsHost = new() { Width = 440, Padding = new Thickness(14, 10, 8, 0) };
     readonly WallPreview _preview = new();
+    readonly AssembledView _assembled = new();
+    readonly TabControl _views = new();
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly StackPanel _findings = new() { Spacing = 4 };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
@@ -126,7 +139,10 @@ public sealed class WallsWindow : Window
 
         var results = new StackPanel { Spacing = 8, Children = { _summary, _findings } };
         var right = new Grid { RowDefinitions = new("*,Auto"), Margin = new Thickness(0, 14, 14, 0), RowSpacing = 8 };
-        right.Children.Add(new Border { CornerRadius = new(8), ClipToBounds = true, BorderBrush = Brush("Line"), BorderThickness = new(1), Child = _preview });
+        static Border Framed(Control c) => new() { CornerRadius = new(8), ClipToBounds = true, BorderBrush = Brush("Line"), BorderThickness = new(1), Child = c };
+        _views.Items.Add(new TabItem { Header = "Put together", Content = Framed(_assembled) });
+        _views.Items.Add(new TabItem { Header = "Pieces", Content = Framed(_preview) });
+        right.Children.Add(_views);
         var resultScroll = new ScrollViewer { Content = results, MaxHeight = 200, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
         Grid.SetRow(resultScroll, 1);
         right.Children.Add(resultScroll);
@@ -152,7 +168,7 @@ public sealed class WallsWindow : Window
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
         _make.Click += (_, _) => Make();
         Hook();
-        Load(editing?.Spec ?? LoadLast() ?? new WallSpec());
+        Load(editing?.Spec ?? LoadLast() ?? WallSpec.NewBoxed);
         if (editing is not null) _make.Content = "Update in the design";
         Closed += (_, _) => { _debounce.Stop(); _generation++; SaveLast(); };
         Rebuild().ContinueWith(_ => { }, TaskScheduler.Default);
@@ -200,11 +216,19 @@ public sealed class WallsWindow : Window
         Explained("Theme", "A look to start from: it sets the texture, the doors and windows, the accessories and the columns to match the floor tiles, roofs, scatter and furniture of the same theme. Change anything afterwards.",
             Field("Theme", _theme),
             _themeAbout),
-        Explained("Size", "The wall panel. Thickness is your sheet's: the columns' slots and the mount points follow it.",
+        Explained("Build", "A box stands up on its own and looks solid from every side: a textured front and back, a base it stands on, a top, two ends and ribs inside. A flat panel is a single sheet (or two back to back) that slides into the columns' slots.",
+            Field("Build it as", _build),
+            _buildNote),
+        Explained("Size", "Panel thickness is your sheet's: the slots, tabs and mount points follow it.",
             Row(Small("Length", _length, tip: "How long the wall is (mm)."), Small("Height", _height, tip: "How high the wall is (mm), to the top of any battlements.")),
-            Field("Length is", _measure, tip: "The panel as cut, or the distance between the centres of the columns at its ends: handy for laying walls out on a grid."),
-            Field("Thickness", _thick, tip: "The sheet's thickness (mm)."),
-            _twoSided,
+            Field("Length is", _measure, tip: "The face as cut, or the distance between the centres of the columns at its ends: handy for laying walls out on a grid."),
+            _boxRows = Stack(
+                Field("Wall thickness", _wallT, tip: "The whole wall, front face to back face (mm). Two panels plus a whole number of panels between them fits exactly: 12 mm for 3 mm sheet."),
+                Field("Plinth", _plinth, tip: "How far the base sticks out past the faces (mm), like a footing course. 0 = flush."),
+                Field("Ribs every", _ribSpacing, tip: "Most room between the ribs inside that hold the faces apart (mm)."),
+                _intoColumns),
+            Line(_thickLabel, _thick, "The sheet's thickness (mm)."),
+            _flatRows = Stack(_twoSided),
             Field("How many walls", _walls, tip: "How many walls like this to cut.")),
         Explained("Material", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
             Field("Cut with", _cutWith),
@@ -232,7 +256,7 @@ public sealed class WallsWindow : Window
                 _textureAbout,
                 _sizeARow, _sizeBRow, _grooveRow, _seedRow,
                 Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker)."),
-                _plainEnds),
+                _plainEnds, _texBack, _texSides),
             Explained("Your own texture", "Shapes you drew (or an SVG) repeated over the face in rows. Closed shapes are etched as areas, open ones as lines. It's kept in the list for next time.",
                 Field("Name", _ownName),
                 Row(Small("Gap", _ownGap, tip: "Space between one tile and the next (mm)."), Small("Row shift %", _ownShift, tip: "Move every other row along by this much of a tile: 50 for a brick-like offset.")),
@@ -286,11 +310,16 @@ public sealed class WallsWindow : Window
             Explained("Connectors", "Columns the walls slide into, stacked from layers of the same sheet. Say how many of each to cut: for a square room, four corners.",
                 counts,
                 Field("Your angle (°)", _customAngle, tip: "The angle between the two walls for \"Your angle\" columns (degrees)."),
+                _boxColumnRows = Stack(
+                    Field("Columns are", _columnBuild, tip: "Boxes for straight runs, corners, T junctions, crosses and ends; columns at other angles are always stacks of layers."),
+                    Field("Top", _columnTop, tip: "Flush, a wider cap, a stepped cap (wider at the top), a stepped point, or battlements round the top like a turret."),
+                    Field("Bottom", _columnBase, tip: "What the column stands on: a flat plate, a wider foot or a stepped plinth. Where a wall comes in, it's notched so the wall reaches the column."),
+                    Field("Lip", _columnLip, tip: "How far each step of the cap, foot or plinth sticks out (mm).")),
                 Field("Column shape", _column, tip: "Auto is square for straight runs, corners, T and crosses, an octagon for 45° steps and round otherwise."),
-                Row(Small("Column width", _columnW, tip: "Across the column's flats (mm)."), Small("Slot depth", _slotDepth, tip: "How far the walls go into the column (mm). The walls' ends are kept smooth that far."))),
-            Explained("Fit", "Slots are the wall's thickness plus the fit. With your material's cut settings picked (Wall tab), the kerf is allowed for too.",
-                Row(Small("Slot fit", _fit, tip: "Added to the wall's thickness for the slots (mm): more is looser."), Small("Pin hole Ø", _pin, tip: "A hole up the middle of each layer, for a cocktail stick or wire that lines the stack up (mm). 0 = none.")),
-                _cap, _foot));
+                Row(Small("Column width", _columnW, tip: "Across the column's flats (mm)."), Small("Slot depth", _slotDepth, tip: "How far a flat wall goes into the column (mm). The walls' ends are kept smooth that far."))),
+            Explained("Fit", "Slots are the sheet's thickness (or a flat wall's) plus the fit. With your material's cut settings picked (Wall tab), the kerf is allowed for too.",
+                Row(Small("Slot fit", _fit, tip: "Added to the thickness for the slots (mm): more is looser."), Small("Pin hole Ø", _pin, tip: "A hole up the middle of each layer of a stacked column, for a cocktail stick or wire that lines the stack up (mm). 0 = none.")),
+                _flatColumnRows = Stack(_cap, _foot)));
     }
 
     // ---- the library ----
@@ -332,16 +361,34 @@ public sealed class WallsWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _length, _height, _thick, _walls, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
+        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
             n.ValueChanged += (_, _) => Changed();
         foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
-        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith })
+        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
             c.SelectionChanged += (_, _) => Changed();
-        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot })
+        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides })
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
+        _build.SelectionChanged += (_, _) => BuildChosen();
+    }
+
+    bool BoxPicked => _build.SelectedIndex == 0;
+
+    /// <summary>Box or flat picked: a box gets columns wide enough for it.</summary>
+    void BuildChosen()
+    {
+        if (_loading) return;
+        if (BoxPicked)
+        {
+            _loading = true;
+            var s = Current();
+            double narrowest = BoxColumns.NarrowestBoxed(s);
+            if (s.ColumnMm < narrowest) _columnW.Value = (decimal)Math.Ceiling(narrowest + 1);
+            _loading = false;
+        }
+        Changed();
     }
 
     static readonly OpeningShape[] DoorShapes = [OpeningShape.Rectangle, OpeningShape.Arched, OpeningShape.Pointed, OpeningShape.Chamfered, OpeningShape.Rough];
@@ -417,6 +464,14 @@ public sealed class WallsWindow : Window
 
     void ShowRows()
     {
+        bool box = BoxPicked;
+        _boxRows.IsVisible = _boxColumnRows.IsVisible = box;
+        _flatRows.IsVisible = _flatColumnRows.IsVisible = _plainEnds.IsVisible = !box;
+        _texBack.IsVisible = _texSides.IsVisible = box;
+        _thickLabel.Text = box ? "Panel thickness" : "Thickness";
+        _buildNote.Text = box
+            ? "Each wall is cut as a front, a back, a base, a top, two ends and ribs; doors and windows are lined between the faces."
+            : "One sheet thick (two with panels back to back): the ends slide into the columns' slots.";
         _battleRows.IsVisible = _top.SelectedIndex == 1;
         _ruinRow.IsVisible = _top.SelectedIndex == 2;
         _doorRows.IsVisible = _door.SelectedIndex > 0;
@@ -431,6 +486,9 @@ public sealed class WallsWindow : Window
         _loading = true;
         _length.Value = D(s.LengthMm); _height.Value = D(s.HeightMm); _thick.Value = D(s.ThicknessMm); _walls.Value = s.Walls;
         _measure.SelectedIndex = (int)s.Measure; _twoSided.IsChecked = s.TwoSided;
+        _build.SelectedIndex = s.Boxed ? 0 : 1; _wallT.Value = D(s.WallMm); _plinth.Value = D(s.PlinthMm); _ribSpacing.Value = D(s.RibSpacingMm);
+        _intoColumns.IsChecked = s.EndsIntoColumns; _texBack.IsChecked = s.TextureBack; _texSides.IsChecked = s.TextureSides;
+        _columnBuild.SelectedIndex = (int)s.ColumnBuild; _columnTop.SelectedIndex = (int)s.ColumnTop; _columnBase.SelectedIndex = (int)s.ColumnBase; _columnLip.Value = D(s.ColumnLipMm);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _etch.SelectedIndex = (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
         _top.SelectedIndex = (int)s.Top; _merlonW.Value = D(s.MerlonWidthMm); _crenelW.Value = D(s.CrenelWidthMm); _merlonH.Value = D(s.MerlonHeightMm);
@@ -458,6 +516,10 @@ public sealed class WallsWindow : Window
         {
             LengthMm = V(_length, 100), Measure = (LengthMeasure)Math.Max(0, _measure.SelectedIndex), HeightMm = V(_height, 50), ThicknessMm = V(_thick, 3),
             TwoSided = _twoSided.IsChecked == true, Walls = (int)V(_walls, 1), Theme = ThemeName,
+            Build = BoxPicked ? WallBuild.Box : WallBuild.Flat, WallMm = V(_wallT, 12), PlinthMm = V(_plinth, 1.5), RibSpacingMm = V(_ribSpacing, 45),
+            EndsIntoColumns = _intoColumns.IsChecked == true, TextureBack = _texBack.IsChecked == true, TextureSides = _texSides.IsChecked == true,
+            ColumnBuild = (ColumnBuild)Math.Max(0, _columnBuild.SelectedIndex), ColumnTop = (ColumnTop)Math.Max(0, _columnTop.SelectedIndex),
+            ColumnBase = (ColumnBase)Math.Max(0, _columnBase.SelectedIndex), ColumnLipMm = V(_columnLip, 2),
             Texture = TextureName, Custom = own, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
             Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), PlainEnds = _plainEnds.IsChecked == true,
             Top = (TopStyle)Math.Max(0, _top.SelectedIndex), MerlonWidthMm = V(_merlonW, 7), CrenelWidthMm = V(_crenelW, 5), MerlonHeightMm = V(_merlonH, 6),
@@ -565,14 +627,16 @@ public sealed class WallsWindow : Window
         try { kit = await Task.Run(() => WallKitMaker.Make(spec)); }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or ArithmeticException)
         {
-            if (gen == _generation) _preview.Show(null, e.Message);
+            if (gen == _generation) { _preview.Show(null, e.Message); _assembled.Show(null, spec.ThicknessMm, e.Message); }
             return;
         }
         if (gen != _generation) return;
         _kit = kit;
         _kitFrom = spec;
         var findings = kit.Findings.Concat(Placement.TooBig(kit, _machine)).ToList();
-        _preview.Show(kit.Parts.Count > 0 ? kit : null, findings.FirstOrDefault(f => f.Level == Severity.Bad)?.Text ?? "Nothing to show.");
+        string? bad = findings.FirstOrDefault(f => f.Level == Severity.Bad)?.Text;
+        _preview.Show(kit.Parts.Count > 0 ? kit : null, bad ?? "Nothing to show.");
+        _assembled.Show(kit.Parts.Count > 0 ? kit : null, spec.ThicknessMm, bad ?? "Nothing to show.");
         _findings.Children.Clear();
         foreach (var f in findings.OrderByDescending(f => f.Level)) _findings.Children.Add(FindingRow(f));
         int pieces = kit.PieceCount;

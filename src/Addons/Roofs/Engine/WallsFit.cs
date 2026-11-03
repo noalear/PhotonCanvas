@@ -43,7 +43,7 @@ public static class WallsFit
     /// <summary>The distance between the middles of the columns at a wall's two ends (mm).</summary>
     public static double CentreToCentre(WallSpec w) => WallKitMaker.PanelLength(w) + 2 * WallKitMaker.CentreToEnd(w);
 
-    static double Lip(WallSpec w) => w.Cap ? WallKitMaker.LipMm : 0;
+    static double Lip(WallSpec w) => WallKitMaker.ColumnLip(w);
 
     /// <summary>The outside of a room whose side is this wall: the columns' centres apart plus a column and its cap's lip (mm).</summary>
     public static double Outside(WallSpec w) => CentreToCentre(w) + w.ColumnMm + 2 * Lip(w);
@@ -57,7 +57,7 @@ public static class WallsFit
         b ??= a;
         if (CentreToCentre(b) > CentreToCentre(a)) (a, b) = (b, a);
         double wallT = WallKitMaker.WallThickness(a);
-        double colTop = WallKitMaker.ColumnLayers(a) * a.ThicknessMm + (a.Cap ? a.ThicknessMm : 0);
+        double colTop = WallKitMaker.ColumnTopMm(a);
         var fitted = r with
         {
             LengthMm = Math.Round(Outside(a), 2),

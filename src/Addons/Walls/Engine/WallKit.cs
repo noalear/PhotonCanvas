@@ -3,7 +3,14 @@ using Clipper2Lib;
 namespace PhotonCanvas.Addon.Walls;
 
 /// <summary>One piece to cut (y up, mm): its outline and holes, what's etched on it as areas, and lines scored on it.</summary>
-public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, int Copies);
+public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, int Copies)
+{
+    /// <summary>
+    /// Where copies of it sit in the 3D view: one wall put together, with a column at each end. Pieces
+    /// not shown there have none. The face towards the pose's normal is the etched one.
+    /// </summary>
+    public List<Model.Pose> Poses { get; init; } = [];
+}
 
 /// <summary>Everything a set of walls is cut from, with what was found while making it.</summary>
 public sealed record WallKit(List<Part> Parts, List<Finding> Findings, double PanelLengthMm, double WallThicknessMm, int ColumnLayers)
@@ -29,10 +36,19 @@ public static class WallKitMaker
     /// <summary>The walkway's top below the bottom of the gaps in the battlements (mm): a figure stands chest-high behind them.</summary>
     public const double WalkwayDropMm = 8;
 
-    public static double WallThickness(WallSpec s) => s.ThicknessMm * (s.TwoSided ? 2 : 1);
+    /// <summary>How thick the wall is (mm): its sheet (twice that for two panels back to back), or a box wall's whole thickness.</summary>
+    public static double WallThickness(WallSpec s) => s.Boxed ? s.WallMm : s.ThicknessMm * (s.TwoSided ? 2 : 1);
 
-    /// <summary>Distance from a column's centre to the end of a wall in its slot (mm).</summary>
-    public static double CentreToEnd(WallSpec s) => s.ColumnMm / 2 - s.SlotDepthMm + EndClearMm;
+    /// <summary>Distance from a column's centre to the end of a wall (mm): in its slot, or for a box wall against its side.</summary>
+    public static double CentreToEnd(WallSpec s) => s.Boxed ? s.ColumnMm / 2 : s.ColumnMm / 2 - s.SlotDepthMm + EndClearMm;
+
+    /// <summary>How high the top of the columns is (mm), cap and all.</summary>
+    public static double ColumnTopMm(WallSpec s) => s.Boxed ? BoxColumns.TopMm(s) : ColumnLayers(s) * s.ThicknessMm + (s.Cap ? s.ThicknessMm : 0);
+
+    /// <summary>How far a column's cap or foot sticks out past its sides (mm).</summary>
+    public static double ColumnLip(WallSpec s) => s.Boxed
+        ? (s.ColumnTop is ColumnTop.Cap or ColumnTop.SteppedPoint ? s.ColumnLipMm : s.ColumnTop == ColumnTop.SteppedCap ? 2 * s.ColumnLipMm : 0)
+        : s.Cap ? LipMm : 0;
 
     public static double PanelLength(WallSpec s) => s.Measure == LengthMeasure.Centres ? s.LengthMm - 2 * CentreToEnd(s) : s.LengthMm;
 
@@ -41,6 +57,7 @@ public static class WallKitMaker
 
     public static WallKit Make(WallSpec s)
     {
+        if (s.Boxed) return BoxWall.Make(s);
         var findings = new List<Finding>();
         var parts = new List<Part>();
         double L = PanelLength(s), H = s.HeightMm, T = s.ThicknessMm, wallT = WallThickness(s);
@@ -51,12 +68,12 @@ public static class WallKitMaker
 
         var wall = Panel(s, L, H, ez, findings);
         if (wall is null) return new(parts, findings, L, wallT, layers);
-        parts.Add(new Part("Wall", wall.Cut, wall.Etched, wall.Lines, Math.Max(1, s.Walls)));
+        parts.Add(new Part("Wall", wall.Cut, wall.Etched, wall.Lines, Math.Max(1, s.Walls)) { Poses = [Model.Pose.Front(0, 0, s.TwoSided ? T / 2 : 0)] });
         if (s.TwoSided)
         {
             // Cut as a mirror image: turned over, it lies exactly on the back of the front panel.
             PointD Mirror(PointD p) => new(L - p.x, p.y);
-            parts.Add(new Part("Wall back", Geo.Tidy(Geo.Map(wall.Cut, Mirror)), Geo.Tidy(Geo.Map(wall.Etched, Mirror)), Geo.Map(wall.Lines, Mirror), Math.Max(1, s.Walls)));
+            parts.Add(new Part("Wall back", Geo.Tidy(Geo.Map(wall.Cut, Mirror)), Geo.Tidy(Geo.Map(wall.Etched, Mirror)), Geo.Map(wall.Lines, Mirror), Math.Max(1, s.Walls)) { Poses = [Model.Pose.Back(L, 0, -T / 2)] });
         }
         foreach (var extra in wall.Extras) parts.Add(extra with { Copies = extra.Copies * Math.Max(1, s.Walls) });
         parts.AddRange(Connectors.Make(s, findings));
@@ -145,7 +162,8 @@ public static class WallKitMaker
                     var (le, ll) = DoorFace(leaf, s.Etch, groove, s.DoorLook);
                     // A loose portcullis has its gaps cut right through.
                     var leafCut = s.DoorLook == DoorLook.Bars ? Geo.Subtract(leaf, BarGaps(leaf)) : leaf;
-                    extras.Add(new Part(s.DoorLook == DoorLook.Bars ? "Portcullis" : "Door", Geo.Tidy(Geo.Move(leafCut, -(cx - w / 2), 0)), Geo.Move(le, -(cx - w / 2), 0), Geo.Map(ll, p => new PointD(p.x - (cx - w / 2), p.y)), 1));
+                    extras.Add(new Part(s.DoorLook == DoorLook.Bars ? "Portcullis" : "Door", Geo.Tidy(Geo.Move(leafCut, -(cx - w / 2), 0)), Geo.Move(le, -(cx - w / 2), 0), Geo.Map(ll, p => new PointD(p.x - (cx - w / 2), p.y)), 1)
+                    { Poses = [Model.Pose.Front(cx - w / 2, 0, 0)] });
                 }
             }
         }
@@ -172,6 +190,7 @@ public static class WallKitMaker
         // Mount slots: through the wall, as wide as the sheet (an accessory's tab) plus the fit.
         double slotW = T + fit, slotH = Math.Clamp(s.MountSlotMm, 2, 30);
         int mounts = 0;
+        var mountXs = new List<double>();
         if (s.Mounts > 0)
         {
             double y0 = s.MountHeightMm - slotH / 2, y1 = s.MountHeightMm + slotH / 2;
@@ -187,9 +206,15 @@ public static class WallKitMaker
                     taken.Add((x - slotW / 2 - 1, x + slotW / 2 + 1, y0 - 1, y1 + 1));
                 }
                 mounts = xs.Count;
+                mountXs = xs;
             }
         }
-        foreach (var a in Accessories(s, wallT, slotH)) extras.Add(a with { Copies = a.Copies * mounts });
+        var acc = Accessories(s, wallT, slotH);
+        for (int j = 0; j < acc.Count; j++)
+        {
+            double baseY = acc[j].Name == "Shelf bracket" ? s.MountHeightMm - slotH / 2 : s.MountHeightMm;
+            extras.Add(acc[j] with { Copies = acc[j].Copies * mounts, Poses = [.. mountXs.Where((_, i) => i % acc.Count == j).Select(x => Model.Pose.Left(x, baseY, wallT / 2))] });
+        }
 
         // A walkway behind battlements: a strip on brackets whose tabs plug into slots under it.
         if (s.Walkway && s.Top == TopStyle.Battlements)
@@ -211,8 +236,8 @@ public static class WallKitMaker
                 else
                 {
                     double length = L - 2 * Math.Max(ez, s.SlotDepthMm) - 1;
-                    extras.Add(new Part("Walkway", [Geo.Rect(0, 0, length, depth)], [], [], 1));
-                    extras.Add(new Part("Walkway bracket", Bracket(wallT, slotH, depth - 1, 0), [], [], xs.Count));
+                    extras.Add(new Part("Walkway", [Geo.Rect(0, 0, length, depth)], [], [], 1) { Poses = [Model.Pose.Up((L - length) / 2, top - T / 2, -wallT / 2)] });
+                    extras.Add(new Part("Walkway bracket", Bracket(wallT, slotH, depth - 1, 0), [], [], xs.Count) { Poses = [.. xs.Select(x => Model.Pose.Right(x, y0, -wallT / 2))] });
                     findings.Add(new(Severity.Note, $"The walkway's top is {top:0.#} mm up, {WalkwayDropMm:0} mm under the gaps in the battlements."));
                 }
             }
@@ -349,7 +374,7 @@ public static class WallKitMaker
     }
 
     /// <summary>A window with bars left across it: the panes that are cut out.</summary>
-    static PathsD Bars(PathsD window, WindowBars bars, double bar, double cx, double y, double w, double h)
+    internal static PathsD Bars(PathsD window, WindowBars bars, double bar, double cx, double y, double w, double h)
     {
         if (bars == WindowBars.None || w < bar * 3) return window;
         var strips = new PathsD();
@@ -602,7 +627,7 @@ public static class WallKitMaker
     static PathsD Peg(double wallT, double slotH) => Geo.Union([Tab(wallT, slotH, slotH / 2), Geo.Rect(0, -slotH / 2 - 1, 3, slotH / 2 + 1)]);
 
     /// <summary>A shelf bracket (or a walkway's): a triangle whose top is <paramref name="above"/> mm over the slot.</summary>
-    static PathsD Bracket(double wallT, double slotH, double size, double above)
+    internal static PathsD Bracket(double wallT, double slotH, double size, double above)
     {
         double top = slotH + above;
         return Geo.Union([Tab(wallT, slotH, slotH), [new(0, top), new(0, top - size), new(size, top)]]);
