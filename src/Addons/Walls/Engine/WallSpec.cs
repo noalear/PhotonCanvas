@@ -173,6 +173,12 @@ public sealed record WallSpec
     public bool Foot { get; init; }
     /// <summary>A box wall's columns: boxes (straight runs, corners, T junctions, crosses and ends) or stacks of layers (any angle).</summary>
     public ColumnBuild ColumnBuild { get; init; } = ColumnBuild.Boxed;
+    /// <summary>
+    /// Boxed columns of every straight-sided shape (an octagon, a hexagon, a chamfered square, a round column
+    /// as many flats), for flat walls too: a side on each flat, held in slots in the plates top and bottom.
+    /// Off, only square columns at right-angled joints of box walls are boxed and the rest are stacked.
+    /// </summary>
+    public bool BoxAnyShape { get; init; }
     /// <summary>What's on top of a box wall's columns.</summary>
     public ColumnTop ColumnTop { get; init; } = ColumnTop.Cap;
     /// <summary>What a box wall's columns stand on.</summary>

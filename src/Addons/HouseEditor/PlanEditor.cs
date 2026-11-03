@@ -4,11 +4,12 @@ using Avalonia.Input;
 using Avalonia.Media;
 using Clipper2Lib;
 using PhotonCanvas.App;
+using PhotonCanvas.Addon.Furniture;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>What dragging on the plan does.</summary>
-public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof }
+public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof, Furnish, Stairs }
 
 /// <summary>
 /// The floor plan, seen from above on a grid of squares: draw walls along the grid lines (or corner to
@@ -48,6 +49,50 @@ public sealed class PlanEditor : Control
     public int SelectedRoof { get; private set; } = -1;
     /// <summary>The room picked: a point in it (squares), or null.</summary>
     public (double X, double Y)? SelectedRoom { get; private set; }
+    /// <summary>The wall picked: one square of it (the whole straight wall it's in is picked), or null.</summary>
+    public WallEdge? SelectedWall { get; private set; }
+
+    /// <summary>The piece of furniture picked (its index on this floor), or −1.</summary>
+    public int SelectedItem { get; private set; } = -1;
+    /// <summary>The way up picked (its index on this floor), or −1.</summary>
+    public int SelectedWay { get; private set; } = -1;
+    /// <summary>What a click with Furniture puts down (null: nothing chosen yet).</summary>
+    public FurnitureItem? ToPlace { get; set; }
+    /// <summary>What a click with Stairs puts down.</summary>
+    public WayKind WayToPlace { get; set; } = WayKind.Stairs;
+
+    // Furniture or a way up being dragged: which, and where it was grabbed (squares from its middle).
+    int _dragItem = -1, _dragWay = -1;
+    (double X, double Y) _grab;
+
+    /// <summary>The column picked: the grid point it stands on, or null.</summary>
+    public GridPt? SelectedColumn { get; private set; }
+
+    /// <summary>The railing picked: one square of the floor's open edge it runs along, or null.</summary>
+    public WallEdge? SelectedRailing { get; private set; }
+
+    /// <summary>The stretch of open floor edge picked (with its railing, or with it taken away).</summary>
+    public RailingRun? PickedRailing => SelectedRailing is { } e ? OpenRuns().FirstOrDefault(r => EdgesOf(r).Contains(e)) : null;
+
+    /// <summary>Every stretch of this floor's edge with no wall on it, whether its railing is there or was taken away.</summary>
+    public List<RailingRun> OpenRuns() => _below is { } below
+        ? HouseKitMaker.RailingRuns(Floor with { Railings = true, NoRailing = [] }, below, _plan, _design.Style.WallSheetMm, _design.Style.ColumnMm)
+        : [];
+
+    /// <summary>The squares of edge a stretch of railing runs along.</summary>
+    public static IEnumerable<WallEdge> EdgesOf(RailingRun r) => Enumerable.Range(0, r.Steps).Select(i => WallEdge.Of(r.A + new GridPt(r.Step.X * i, r.Step.Y * i), r.A + new GridPt(r.Step.X * (i + 1), r.Step.Y * (i + 1))));
+
+    /// <summary>The straight wall picked, from column to column.</summary>
+    public Run? PickedRun => SelectedWall is { } e ? RunOf(_plan, e) : null;
+
+    /// <summary>The straight wall (column to column) a square of wall is in.</summary>
+    public static Run? RunOf(PlanShape plan, WallEdge e)
+    {
+        foreach (var r in plan.Runs)
+            for (int i = 0; i + 1 < r.Points.Count; i++)
+                if (WallEdge.Of(r.Points[i], r.Points[i + 1]) == e) return r;
+        return null;
+    }
 
     /// <summary>The design was changed on the plan (what changed, for Undo).</summary>
     public event Action<HouseDesign, string>? Changed;
@@ -69,11 +114,16 @@ public sealed class PlanEditor : Control
     {
         _design = design;
         _level = Math.Clamp(level, 0, design.Levels.Count - 1);
-        _plan = PlanShape.Of(design.Levels[_level].Walls);
-        _below = _level > 0 ? PlanShape.Of(design.Levels[_level - 1].Walls) : null;
+        _plan = design.Levels[_level].Shape();
+        _below = _level > 0 ? design.Levels[_level - 1].Shape() : null;
         if (Selected >= design.Levels[_level].Openings.Count) Select(-1);
         if (SelectedRoof >= 0 && (SelectedRoof >= design.Roofs.Count || design.Roofs[SelectedRoof].Level != _level)) SelectRoof(-1);
         if (SelectedRoom is { } rm && _plan.RoomAt(rm.X, rm.Y) < 0) SelectRoom(null);
+        if (SelectedWall is { } sw && !design.Levels[_level].Walls.Contains(sw)) SelectWall(null);
+        if (SelectedRailing is not null && PickedRailing is null) SelectRailing(null);
+        if (SelectedColumn is { } sc && !_plan.Joints.ContainsKey(sc)) SelectColumn(null);
+        if (SelectedItem >= design.Levels[_level].Furniture.Count) SelectItem(-1);
+        if (SelectedWay >= design.Levels[_level].WaysUp.Count) SelectWay(-1);
         if (!_fitted && Bounds.Width > 0) FitAll();
         InvalidateVisual();
     }
@@ -85,19 +135,35 @@ public sealed class PlanEditor : Control
         InvalidateVisual();
     }
 
-    public void Select(int i) => Pick(i, -1, null);
+    public void Select(int i) => Pick(i, -1, null, null, null, null);
 
-    public void SelectRoof(int i) => Pick(-1, i, null);
+    public void SelectRoof(int i) => Pick(-1, i, null, null, null, null);
 
-    public void SelectRoom((double X, double Y)? at) => Pick(-1, -1, at);
+    public void SelectRoom((double X, double Y)? at) => Pick(-1, -1, at, null, null, null);
 
-    /// <summary>Picks one thing (a door or window, a roof or a room) and nothing else.</summary>
-    void Pick(int opening, int roof, (double X, double Y)? room)
+    public void SelectWall(WallEdge? e) => Pick(-1, -1, null, e, null, null);
+
+    public void SelectRailing(WallEdge? e) => Pick(-1, -1, null, null, e, null);
+
+    public void SelectColumn(GridPt? at) => Pick(-1, -1, null, null, null, at);
+
+    public void SelectItem(int i) => Pick(-1, -1, null, null, null, null, i);
+
+    public void SelectWay(int i) => Pick(-1, -1, null, null, null, null, -1, i);
+
+    /// <summary>Picks one thing (a door or window, a roof, a room, a wall, a railing, a column, furniture or a way up) and nothing else.</summary>
+    void Pick(int opening, int roof, (double X, double Y)? room, WallEdge? wall, WallEdge? railing, GridPt? column, int item = -1, int way = -1)
     {
-        if (Selected == opening && SelectedRoof == roof && SelectedRoom == room) return;
+        if (Selected == opening && SelectedRoof == roof && SelectedRoom == room && SelectedWall == wall && SelectedRailing == railing && SelectedColumn == column
+            && SelectedItem == item && SelectedWay == way) return;
+        SelectedItem = item;
+        SelectedWay = way;
+        SelectedColumn = column;
         Selected = opening;
         SelectedRoof = roof;
         SelectedRoom = room;
+        SelectedWall = wall;
+        SelectedRailing = railing;
         SelectionChanged?.Invoke();
         InvalidateVisual();
     }
@@ -116,7 +182,7 @@ public sealed class PlanEditor : Control
         var levels = _design.Levels.ToList();
         levels[_level] = level;
         _design = _design with { Levels = levels };
-        _plan = PlanShape.Of(level.Walls);
+        _plan = level.Shape();
         Changed?.Invoke(_design, what);
         InvalidateVisual();
     }
@@ -233,8 +299,18 @@ public sealed class PlanEditor : Control
                     _moveFrom = _design;
                     break;
                 }
+                // A wall or a railing when the click is on it; otherwise a roof, or the room under it (click again to swap between them).
+                double reach = Math.Max(0.12, (WallPx / 2 + 5) / _scale);
+                if (ColumnAt(pt.Position) is { } col) { SelectColumn(col); break; }
+                if (ItemAt(pt.Position) is >= 0 and var item) { SelectItem(item); StartDrag(pt.Position, item, -1); break; }
+                if (WayAt(pt.Position) is >= 0 and var way) { SelectWay(way); StartDrag(pt.Position, -1, way); break; }
+                if (NearestEdge(pt.Position, reach) is { } wall) { SelectWall(wall); break; }
+                if (RailingAt(pt.Position, reach) is { } rail) { SelectRailing(rail); break; }
                 var (x, y) = ToPlan(pt.Position);
-                SelectRoom(_plan.RoomAt(x, y) >= 0 ? (x, y) : null);
+                bool inRoom = _plan.RoomAt(x, y) >= 0;
+                int roof = RoofAt(pt.Position);
+                if (roof >= 0 && !(SelectedRoof == roof && inRoom)) { SelectRoof(roof); break; }
+                SelectRoom(inRoom ? (x, y) : null);
                 break;
             }
             case PlanTool.Roof:
@@ -279,6 +355,28 @@ public sealed class PlanEditor : Control
                 _to = _from.Value;
                 break;
             }
+            case PlanTool.Furnish:
+            {
+                if (ItemAt(pt.Position) is >= 0 and var item) { SelectItem(item); StartDrag(pt.Position, item, -1); break; }
+                if (ToPlace is not { } what) break;
+                var (x, y) = SnapItem(ToPlan(pt.Position), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                // Turned as the last one picked was.
+                int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
+                Commit(Floor with { Furniture = [.. Floor.Furniture, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }] }, "Put in furniture");
+                SelectItem(Floor.Furniture.Count - 1);
+                StartDrag(pt.Position, Floor.Furniture.Count - 1, -1);
+                break;
+            }
+            case PlanTool.Stairs:
+            {
+                if (WayAt(pt.Position) is >= 0 and var way) { SelectWay(way); StartDrag(pt.Position, -1, way); break; }
+                var (x, y) = SnapItem(ToPlan(pt.Position), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                int turn = SelectedWay >= 0 && SelectedWay < Floor.WaysUp.Count ? Floor.WaysUp[SelectedWay].Turn : 0;
+                Commit(Floor with { WaysUp = [.. Floor.WaysUp, new PlacedWay { X = x, Y = y, Turn = turn, Kind = WayToPlace }] }, "Put in a way up");
+                SelectWay(Floor.WaysUp.Count - 1);
+                StartDrag(pt.Position, -1, Floor.WaysUp.Count - 1);
+                break;
+            }
             case PlanTool.Floor:
             {
                 var (x, y) = ToPlan(pt.Position);
@@ -310,7 +408,31 @@ public sealed class PlanEditor : Control
             return;
         }
         _mouse = p;
-        if (_moving >= 0 && _moving < Floor.Openings.Count && OnWall(p) is { } at)
+        if (_dragItem >= 0 || _dragWay >= 0)
+        {
+            var (mx, my) = ToPlan(p);
+            var (x, y) = SnapItem((mx - _grab.X, my - _grab.Y), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+            var level = Floor;
+            if (_dragItem >= 0 && _dragItem < level.Furniture.Count && level.Furniture[_dragItem] is var it && (it.X != x || it.Y != y))
+            {
+                var list = level.Furniture.ToList();
+                list[_dragItem] = it with { X = x, Y = y };
+                level = level with { Furniture = list };
+            }
+            else if (_dragWay >= 0 && _dragWay < level.WaysUp.Count && level.WaysUp[_dragWay] is var w && (w.X != x || w.Y != y))
+            {
+                var list = level.WaysUp.ToList();
+                list[_dragWay] = w with { X = x, Y = y };
+                level = level with { WaysUp = list };
+            }
+            if (!ReferenceEquals(level, Floor))
+            {
+                var levels = _design.Levels.ToList();
+                levels[_level] = level;
+                _design = _design with { Levels = levels };
+            }
+        }
+        else if (_moving >= 0 && _moving < Floor.Openings.Count && OnWall(p) is { } at)
         {
             var o = Floor.Openings[_moving];
             if (Math.Abs(o.X - at.X) > 1e-9 || Math.Abs(o.Y - at.Y) > 1e-9)
@@ -348,6 +470,15 @@ public sealed class PlanEditor : Control
         base.OnPointerReleased(e);
         e.Pointer.Capture(null);
         if (_pan is not null) { _pan = null; return; }
+        if (_dragItem >= 0 || _dragWay >= 0)
+        {
+            bool item = _dragItem >= 0;
+            _dragItem = _dragWay = -1;
+            if (_moveFrom is { } was && !ReferenceEquals(was, _design)) Commit(Floor, item ? "Move furniture" : "Move a way up");
+            _moveFrom = null;
+            InvalidateVisual();
+            return;
+        }
         if (_moving >= 0)
         {
             _moving = -1;
@@ -417,11 +548,114 @@ public sealed class PlanEditor : Control
         InvalidateVisual();
     }
 
-    WallEdge? NearestEdge(Point p)
+    // ---- furniture and ways up ----
+
+    void StartDrag(Point at, int item, int way)
+    {
+        var (x, y) = ToPlan(at);
+        var (cx, cy) = item >= 0 ? (Floor.Furniture[item].X, Floor.Furniture[item].Y) : (Floor.WaysUp[way].X, Floor.WaysUp[way].Y);
+        _grab = (x - cx, y - cy);
+        _dragItem = item;
+        _dragWay = way;
+        _moveFrom ??= _design;
+    }
+
+    /// <summary>Where a piece goes: on eighths of a square (whole millimetres with Shift held).</summary>
+    (double X, double Y) SnapItem((double X, double Y) p, bool free)
+    {
+        double step = free ? 1 / _design.SquareMm : 0.125;
+        return (Math.Clamp(Math.Round(p.X / step) * step, 0, GridSize), Math.Clamp(Math.Round(p.Y / step) * step, 0, GridSize));
+    }
+
+    /// <summary>Turns the furniture or way up picked a quarter turn: +1 anticlockwise (seen from above), −1 clockwise.</summary>
+    public void TurnPicked(int by, bool commit = true)
+    {
+        var level = Floor;
+        if (SelectedItem >= 0 && SelectedItem < level.Furniture.Count)
+        {
+            var list = level.Furniture.ToList();
+            list[SelectedItem] = list[SelectedItem] with { Turn = (((list[SelectedItem].Turn + by) % 4) + 4) % 4 };
+            level = level with { Furniture = list };
+        }
+        else if (SelectedWay >= 0 && SelectedWay < level.WaysUp.Count)
+        {
+            var list = level.WaysUp.ToList();
+            list[SelectedWay] = list[SelectedWay] with { Turn = (((list[SelectedWay].Turn + by) % 4) + 4) % 4 };
+            level = level with { WaysUp = list };
+        }
+        else return;
+        if (commit) { Commit(level, "Turn"); return; }
+        // While dragging: the step for Undo is made when it's let go.
+        var levels = _design.Levels.ToList();
+        levels[_level] = level;
+        _design = _design with { Levels = levels };
+        InvalidateVisual();
+    }
+
+    /// <summary>The piece of furniture under a point (the one on top), or −1.</summary>
+    int ItemAt(Point p)
+    {
+        var (x, y) = ToPlan(p);
+        for (int i = Floor.Furniture.Count - 1; i >= 0; i--)
+        {
+            var r = HouseKitMaker.ItemArea(_design.Style, Floor.Furniture[i], _design.SquareMm);
+            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>The way up under a point (its stairs or its opening above), or −1.</summary>
+    int WayAt(Point p)
+    {
+        var (x, y) = ToPlan(p);
+        var at = new PointD(x * _design.SquareMm, y * _design.SquareMm);
+        for (int i = Floor.WaysUp.Count - 1; i >= 0; i--)
+        {
+            var (hatch, foot) = HouseKitMaker.WayArea(_design.Style, Floor.WaysUp[i], _design.SquareMm);
+            if (hatch.Concat(foot).Any(q => Clipper.PointInPolygon(at, q) != PointInPolygonResult.IsOutside)) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>How wide walls are drawn (px).</summary>
+    double WallPx => Math.Max(4, _design.Style.BoxWalls ? _design.Style.WallMm / _design.SquareMm * _scale : 0.12 * _scale);
+
+    /// <summary>The column under a point, or null.</summary>
+    GridPt? ColumnAt(Point p)
+    {
+        var (x, y) = ToPlan(p);
+        double r = Math.Max(5, _design.Style.ColumnMm / _design.SquareMm * _scale / 2 + 2) / _scale;
+        GridPt? best = null;
+        double bestD = r;
+        foreach (var g in _plan.Joints.Keys)
+        {
+            double d = Math.Max(Math.Abs(g.X - x), Math.Abs(g.Y - y));
+            if (d < bestD) { bestD = d; best = g; }
+        }
+        return best;
+    }
+
+    /// <summary>The square of open floor edge (railed or not) under a point, or null.</summary>
+    WallEdge? RailingAt(Point p, double reach)
     {
         var (x, y) = ToPlan(p);
         WallEdge? best = null;
-        double bestD = 0.3;
+        double bestD = reach;
+        foreach (var e in OpenRuns().SelectMany(EdgesOf))
+        {
+            double ax = e.A.X, ay = e.A.Y, dx = e.B.X - ax, dy = e.B.Y - ay, len2 = dx * dx + dy * dy;
+            double t = Math.Clamp(((x - ax) * dx + (y - ay) * dy) / len2, 0, 1);
+            double px = ax + t * dx - x, py = ay + t * dy - y, d = Math.Sqrt(px * px + py * py);
+            if (d < bestD) { bestD = d; best = e; }
+        }
+        return best;
+    }
+
+    WallEdge? NearestEdge(Point p, double reach = 0.3)
+    {
+        var (x, y) = ToPlan(p);
+        WallEdge? best = null;
+        double bestD = reach;
         foreach (var w in Floor.Walls)
         {
             double ax = w.A.X, ay = w.A.Y, dx = w.B.X - ax, dy = w.B.Y - ay, len2 = dx * dx + dy * dy;
@@ -435,6 +669,13 @@ public sealed class PlanEditor : Control
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
+        // Turning what's being dragged.
+        if ((_dragItem >= 0 || _dragWay >= 0) && Math.Abs(e.Delta.Y) > 0.01)
+        {
+            TurnPicked(e.Delta.Y > 0 ? 1 : -1, commit: false);
+            e.Handled = true;
+            return;
+        }
         var at = e.GetPosition(this);
         double k = Math.Pow(1.15, e.Delta.Y);
         double next = Math.Clamp(_scale * k, 6, 120);
@@ -463,10 +704,30 @@ public sealed class PlanEditor : Control
             Commit(Floor with { Openings = [.. Floor.Openings.Where((_, j) => j != i)] }, "Take away a door or window");
             e.Handled = true;
         }
+        else if (e.Key is Key.Delete or Key.Back && SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count)
+        {
+            int i = SelectedItem;
+            SelectItem(-1);
+            Commit(Floor with { Furniture = [.. Floor.Furniture.Where((_, j) => j != i)] }, "Take away furniture");
+            e.Handled = true;
+        }
+        else if (e.Key is Key.Delete or Key.Back && SelectedWay >= 0 && SelectedWay < Floor.WaysUp.Count)
+        {
+            int i = SelectedWay;
+            SelectWay(-1);
+            Commit(Floor with { WaysUp = [.. Floor.WaysUp.Where((_, j) => j != i)] }, "Take away a way up");
+            e.Handled = true;
+        }
+        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && (SelectedItem >= 0 || SelectedWay >= 0))
+        {
+            TurnPicked(e.Key is Key.OemOpenBrackets or Key.OemComma ? 1 : -1);
+            e.Handled = true;
+        }
         else if (e.Key == Key.Escape)
         {
             _from = null;
             _moving = -1;
+            _dragItem = _dragWay = -1;
             Select(-1);
             InvalidateVisual();
         }
@@ -548,6 +809,12 @@ public sealed class PlanEditor : Control
         var laid = new SolidColorBrush(Color.FromArgb(0xA0, 0xC8, 0xA8, 0x78));
         var laidPen = new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0x8A, 0x6A, 0x40)), 1);
         foreach (var f in Floor.Floor) ctx.DrawRectangle(laid, laidPen, new Rect(ToScreen(f.X, f.Y), ToScreen(f.X + 1, f.Y + 1)));
+        // A floor kept to its yard: where its floor reaches, the edge dashed.
+        if (Floor.Yard is not null && HouseKitMaker.FloorArea(Floor, _below, _plan) is { Count: > 0 } yard)
+        {
+            var yardPen = new Pen(new SolidColorBrush(Color.FromArgb(0xC0, 0x6A, 0x50, 0x30)), Math.Max(1.5, _scale * 0.06), new DashStyle([4, 3], 0));
+            ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0x55, 0xC8, 0xA8, 0x78)), yardPen, Shape(yard));
+        }
         if (_from is { } fa && Tool == PlanTool.Floor)
         {
             var r = new Rect(ToScreen(Math.Min(fa.X, _to.X), Math.Min(fa.Y, _to.Y)), ToScreen(Math.Max(fa.X, _to.X) + 1, Math.Max(fa.Y, _to.Y) + 1));
@@ -569,19 +836,36 @@ public sealed class PlanEditor : Control
         }
 
         // The walls, then the columns at every joint.
-        double wallPx = Math.Max(4, _design.Style.BoxWalls ? _design.Style.WallMm / _design.SquareMm * _scale : 0.12 * _scale);
+        double wallPx = WallPx;
         var wallPen = new Pen(new SolidColorBrush(Color.FromRgb(0x5A, 0x4E, 0x42)), wallPx, lineCap: PenLineCap.Square);
-        foreach (var w in Floor.Walls) ctx.DrawLine(wallPen, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        // Walls with a look of their own a little lighter.
+        var ownPen = new Pen(new SolidColorBrush(Color.FromRgb(0x8C, 0x74, 0x52)), wallPx, lineCap: PenLineCap.Square);
+        foreach (var w in Floor.Walls) ctx.DrawLine(Floor.LookOf(w) is null ? wallPen : ownPen, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        if (PickedRun is { } picked0)
+        {
+            var sel = new Pen(new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0)), wallPx + 5, lineCap: PenLineCap.Square);
+            ctx.DrawLine(sel, ToScreen(picked0.A.X, picked0.A.Y), ToScreen(picked0.B.X, picked0.B.Y));
+            ctx.DrawLine(Floor.LookOf(SelectedWall!.Value) is null ? wallPen : ownPen, ToScreen(picked0.A.X, picked0.A.Y), ToScreen(picked0.B.X, picked0.B.Y));
+        }
         double colPx = Math.Max(6, _design.Style.ColumnMm / _design.SquareMm * _scale);
         var colBrush = new SolidColorBrush(Color.FromRgb(0x3E, 0x35, 0x2C));
-        foreach (var (g, _) in _plan.Joints)
+        var colPick = new Pen(new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0)), 3);
+        var ownCol = new SolidColorBrush(Color.FromRgb(0x6E, 0x58, 0x3C));
+        foreach (var (g, dirs) in _plan.Joints)
         {
-            var c = ToScreen(g.X, g.Y);
-            ctx.DrawRectangle(colBrush, null, new Rect(c.X - colPx / 2, c.Y - colPx / 2, colPx, colPx));
+            // Drawn its own shape, at least a few pixels across.
+            var foot = HouseKitMaker.ColumnFoot(Floor, _design.Style, g, dirs, _design.SquareMm);
+            double k = Math.Max(1, colPx / Math.Max(1e-6, _design.Style.ColumnMm / _design.SquareMm * _scale));
+            var shape = new PathsD { new PathD(foot.Select(p => new PointD(g.X + (p.x / _design.SquareMm - g.X) * k, g.Y + (p.y / _design.SquareMm - g.Y) * k))) };
+            ctx.DrawGeometry(Floor.PickAt(g) is null ? colBrush : ownCol, SelectedColumn == g ? colPick : null, Shape(shape));
         }
 
         // Doors and windows.
         for (int i = 0; i < Floor.Openings.Count; i++) DrawOpening(ctx, Floor.Openings[i], i == Selected, wallPx);
+
+        // The ways up from here and the openings coming up from the floor below, then the furniture.
+        DrawWays(ctx);
+        DrawFurniture(ctx);
 
         // Each wall's letter (as the pieces are named), inside the room beside its middle, when there's room.
         if (_scale >= 14)
@@ -654,6 +938,91 @@ public sealed class PlanEditor : Control
 
     static readonly Color RoofColour = Color.FromRgb(0x9A, 0x4E, 0x36);
 
+    static readonly IBrush Picked = new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0));
+
+    /// <summary>Which way a quarter-turned thing's front (or its climb, for a way up turned from the right) points on the plan.</summary>
+    static (double X, double Y) Facing(int turn, bool climb = false) => (((((turn % 4) + 4) % 4) + (climb ? 1 : 0)) % 4) switch
+    {
+        0 => (0, 1), 1 => (1, 0), 2 => (0, -1), _ => (-1, 0),
+    };
+
+    void DrawFurniture(DrawingContext ctx)
+    {
+        var fill = new SolidColorBrush(Color.FromArgb(0xD8, 0xB8, 0x8A, 0x58));
+        var edge = new Pen(new SolidColorBrush(Color.FromRgb(0x5A, 0x3E, 0x22)), 1.2);
+        var front = new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)), Math.Max(2.5, _scale * 0.08), lineCap: PenLineCap.Flat);
+        for (int i = 0; i < Floor.Furniture.Count; i++)
+        {
+            var p = Floor.Furniture[i];
+            var r = HouseKitMaker.ItemArea(_design.Style, p, _design.SquareMm);
+            var box = new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom));
+            ctx.DrawRectangle(fill, i == SelectedItem ? new Pen(Picked, 2.5) : edge, box, 2, 2);
+            // Its front: a dark edge.
+            var (fx, fy) = Facing(p.Turn);
+            var c = box.Center;
+            double hw = box.Width / 2, hh = box.Height / 2;
+            Point a, b;
+            if (fy != 0) { a = new Point(box.Left + 2, c.Y + fy * hh); b = new Point(box.Right - 2, c.Y + fy * hh); }
+            else { a = new Point(c.X + fx * hw, box.Top + 2); b = new Point(c.X + fx * hw, box.Bottom - 2); }
+            ctx.DrawLine(front, a, b);
+            if (_scale >= 18)
+            {
+                var name = HouseKitMaker.ItemName(p.Item);
+                var ft = new FormattedText(name, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), Math.Clamp(_scale * 0.26, 8, 12), new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)));
+                if (ft.Width < box.Width - 4 && ft.Height < box.Height - 2) ctx.DrawText(ft, new Point(c.X - ft.Width / 2, c.Y - ft.Height / 2));
+            }
+        }
+        // What a click would put down, faintly.
+        if (Tool == PlanTool.Furnish && ToPlace is { } what && _inside && _from is null && _dragItem < 0 && ItemAt(_mouse) < 0)
+        {
+            var (x, y) = SnapItem(ToPlan(_mouse), false);
+            int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
+            var r = HouseKitMaker.ItemArea(_design.Style, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }, _design.SquareMm);
+            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x60, 0xB8, 0x8A, 0x58)), new Pen(Picked, 1.5, new DashStyle([3, 2], 0)), new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom)), 2, 2);
+        }
+    }
+
+    void DrawWays(DrawingContext ctx)
+    {
+        double sq = _design.SquareMm;
+        StreamGeometry Mm(PathsD mm) => Shape(Walls.Geo.Map(mm, q => new PointD(q.x / sq, q.y / sq)));
+        // Openings from the floor below: holes in this floor.
+        if (_level > 0)
+            foreach (var w in _design.Levels[_level - 1].WaysUp)
+            {
+                var (hatch, _) = HouseKitMaker.WayArea(_design.Style, w, sq);
+                ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0xC0, 0x30, 0x2A, 0x24)), new Pen(new SolidColorBrush(Color.FromRgb(0x20, 0x1A, 0x14)), 1.5), Mm(hatch));
+            }
+        var stair = new SolidColorBrush(Color.FromArgb(0xD0, 0xA8, 0x9C, 0x8C));
+        var line = new Pen(new SolidColorBrush(Color.FromRgb(0x50, 0x46, 0x3C)), 1.2);
+        var dashed = new Pen(new SolidColorBrush(Color.FromRgb(0x50, 0x46, 0x3C)), 1.5, new DashStyle([3, 2], 0));
+        for (int i = 0; i < Floor.WaysUp.Count; i++)
+        {
+            var w = Floor.WaysUp[i];
+            var (hatch, foot) = HouseKitMaker.WayArea(_design.Style, w, sq);
+            ctx.DrawGeometry(stair, i == SelectedWay ? new Pen(Picked, 2.5) : line, Mm(foot));
+            ctx.DrawGeometry(null, i == SelectedWay ? new Pen(Picked, 1.5, new DashStyle([3, 2], 0)) : dashed, Mm(hatch));
+            // Which way it climbs.
+            var (dx, dy) = Facing(w.Turn, climb: true);
+            var b = Walls.Geo.Bounds(foot);
+            var mid = ToScreen((b.left + b.right) / 2 / sq, (b.top + b.bottom) / 2 / sq);
+            double len = Math.Max(8, Math.Min(b.right - b.left, b.bottom - b.top) / sq * _scale * 0.35);
+            var tip = new Point(mid.X + dx * len, mid.Y + dy * len);
+            var tail = new Point(mid.X - dx * len, mid.Y - dy * len);
+            var arrow = new Pen(new SolidColorBrush(Color.FromRgb(0x2A, 0x22, 0x1A)), 2);
+            ctx.DrawLine(arrow, tail, tip);
+            ctx.DrawLine(arrow, tip, new Point(tip.X - dx * 6 - dy * 5, tip.Y - dy * 6 + dx * 5));
+            ctx.DrawLine(arrow, tip, new Point(tip.X - dx * 6 + dy * 5, tip.Y - dy * 6 - dx * 5));
+        }
+        if (Tool == PlanTool.Stairs && _inside && _from is null && _dragWay < 0 && WayAt(_mouse) < 0)
+        {
+            var (x, y) = SnapItem(ToPlan(_mouse), false);
+            int turn = SelectedWay >= 0 && SelectedWay < Floor.WaysUp.Count ? Floor.WaysUp[SelectedWay].Turn : 0;
+            var (hatch, foot) = HouseKitMaker.WayArea(_design.Style, new PlacedWay { X = x, Y = y, Turn = turn, Kind = WayToPlace }, sq);
+            ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0x60, 0xA8, 0x9C, 0x8C)), new Pen(Picked, 1.5, new DashStyle([3, 2], 0)), Mm(Walls.Geo.Union(foot, hatch)));
+        }
+    }
+
     /// <summary>A roof seen from above: its outline, its ridge (and hips), or which way a lean-to slopes, and its number.</summary>
     void DrawRoof(DrawingContext ctx, RoofArea r, int index, bool selected)
     {
@@ -721,8 +1090,12 @@ public sealed class PlanEditor : Control
     {
         if (_below is not { } below) return;
         var runs = HouseKitMaker.RailingRuns(Floor, below, _plan, _design.Style.WallSheetMm, _design.Style.ColumnMm);
-        if (runs.Count == 0) return;
         var rail = new Pen(new SolidColorBrush(Color.FromRgb(0x8A, 0x6A, 0x40)), Math.Max(2, _scale * 0.06));
+        // Where a railing was taken away, faintly, so it can be picked and put back.
+        var gone = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x8A, 0x6A, 0x40)), 1.5, new DashStyle([2, 3], 0));
+        foreach (var e in Floor.NoRailing) ctx.DrawLine(gone, ToScreen(e.A.X, e.A.Y), ToScreen(e.B.X, e.B.Y));
+        if (PickedRailing is { } picked)
+            ctx.DrawLine(new Pen(new SolidColorBrush(Color.FromArgb(0xB0, 0x30, 0x80, 0xD0)), Math.Max(6, _scale * 0.2), lineCap: PenLineCap.Square), ToScreen(picked.A.X, picked.A.Y), ToScreen(picked.B.X, picked.B.Y));
         var post = new SolidColorBrush(Color.FromRgb(0x6A, 0x4E, 0x2E));
         double r = Math.Max(1.5, _scale * 0.05);
         foreach (var run in runs)
@@ -779,19 +1152,19 @@ public sealed class PlanEditor : Control
         var edge = new Pen(new SolidColorBrush(Color.FromArgb(alpha, 0x2A, 0x24, 0x1E)), 1.2);
         ctx.DrawGeometry(new SolidColorBrush(fill), edge, outline);
         if (o.Kind == OpeningKind.Window) ctx.DrawLine(edge, P(-half, 0), P(half, 0));
-        if (o.Kind == OpeningKind.Door)
+        if (o.Kind == OpeningKind.Door && o.Opens)
         {
-            // The leaf swung open a quarter, into the building, from its hinge.
+            // The leaf swung open a quarter, out of the building, from its hinge (left or right seen from outside).
             double side = o.Hinge == Walls.HingeSide.Left ? -1 : 1;
-            var hinge = P(side * half, -thick);
-            var tip = hinge - n * (2 * half);
+            var hinge = P(side * half, thick);
+            var tip = hinge + n * (2 * half);
             var swing = new Pen(new SolidColorBrush(Color.FromArgb((byte)(alpha * 0.7), 0x2A, 0x24, 0x1E)), 1, new DashStyle([3, 2], 0));
             ctx.DrawLine(edge, hinge, tip);
             var arc = new StreamGeometry();
             using (var g = arc.Open())
             {
                 g.BeginFigure(tip, false);
-                g.ArcTo(P(-side * half, -thick), new Size(2 * half, 2 * half), 0, false, side > 0 ? SweepDirection.CounterClockwise : SweepDirection.Clockwise);
+                g.ArcTo(P(-side * half, thick), new Size(2 * half, 2 * half), 0, false, side > 0 ? SweepDirection.Clockwise : SweepDirection.CounterClockwise);
                 g.EndFigure(false);
             }
             ctx.DrawGeometry(null, swing, arc);

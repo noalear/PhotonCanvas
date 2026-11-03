@@ -24,6 +24,8 @@ public sealed record HouseSolid(string Name, PathsD Outline, Pose Pose, double T
 {
     public V3 Facing { get; init; }
     public V3 Middle { get; init; }
+    /// <summary>Where it is with the doors open (a door or shutter swung on its hinges, a portcullis slid up); null if it doesn't move.</summary>
+    public Pose? Open { get; init; }
 }
 
 /// <summary>A straight wall as made: which floor, its letter, its two ends on the plan (squares) and what it was made from.</summary>
@@ -87,13 +89,15 @@ public static partial class HouseKitMaker
         if (Math.Abs(H - s.StoreyHeightMm) > 0.05)
             findings.Add(new(Severity.Note, $"Each storey is {H:0.#} mm high: a whole number of {T:0.##} mm layers, so the columns come out as tall as the walls."));
 
-        var plans = d.Levels.Take(levels).Select(l => PlanShape.Of(l.Walls)).ToList();
+        var plans = d.Levels.Take(levels).Select(l => l.Shape()).ToList();
         // The plan's middle (squares): the middle of everything drawn, so the building sits on the origin.
         var allPts = d.Levels.Take(levels).SelectMany(l => l.Walls.SelectMany(e => new[] { e.A, e.B }).Concat(l.Floor.SelectMany(f => new[] { f, f + new GridPt(1, 1) }))).ToList();
         double ox = (allPts.Min(p => p.X) + allPts.Max(p => p.X)) / 2.0, oy = (allPts.Min(p => p.Y) + allPts.Max(p => p.Y)) / 2.0;
         V3 World(double px, double py, double y) => new((px - ox) * sq, y, (py - oy) * sq);
 
         // Each floor's plate (plan mm, y towards you), worked out first: the columns under it are flush with it.
+        var swung = new List<SwungDoor>();
+        bool anyPolygon = false;
         var plates = new List<PathsD> { new() };
         for (int k = 1; k < levels; k++) plates.Add(PlateArea(d, plans, k, sq, C));
 
@@ -111,7 +115,7 @@ public static partial class HouseKitMaker
             {
                 string name = Letter(letter++);
                 double L = Length(run, sq);
-                var spec = WallFor(s, k, L, openings);
+                var spec = Looked(WallFor(s, k, L, openings), s, d, level.LookOf(WallEdge.Of(run.Points[0], run.Points[1])));
                 var kit = WallKitMaker.Make(spec);
                 string what = $"{(levels == 1 ? "Wall" : $"Floor {k + 1} wall")} {name}";
                 foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
@@ -130,14 +134,23 @@ public static partial class HouseKitMaker
                 {
                     foreach (var part in kit.Parts)
                         foreach (var at in part.Poses)
+                        {
+                            var moved = BoxWall.Opened(part, at, ShownOpenDeg);
                             solids.Add(new HouseSolid(part.Name == "Front" ? $"Wall {name}" : $"Wall {name} {part.Name.ToLowerInvariant()}", part.Cut, InWall(pose, at), T, Nil(part.Etched), Nil(part.Lines), k,
-                                part.Name == "Door" ? SolidKind.Furniture : SolidKind.Wall) { Facing = normal, Middle = middle });
+                                part.Name == "Door" ? SolidKind.Furniture : SolidKind.Wall) { Facing = normal, Middle = middle, Open = moved == at ? null : InWall(pose, moved) });
+                        }
                 }
                 else
                 {
                     solids.Add(new HouseSolid($"Wall {name}", panel.Cut, pose, Wt, Nil(panel.Etched), Nil(panel.Lines), k, SolidKind.Wall) { Facing = normal, Middle = middle });
                     if (kit.Parts.FirstOrDefault(p => p.Name is "Door" or "Portcullis") is { } leaf && leaf.Poses.Count > 0)
                         solids.Add(new HouseSolid($"Wall {name} door", leaf.Cut, pose with { O = pose.At(leaf.Poses[0].O.X, 0) }, Wt, Nil(leaf.Etched), Nil(leaf.Lines), k, SolidKind.Furniture) { Facing = normal, Middle = middle });
+                    // A door that swings: on clips beside its doorway, made with the others once every wall is.
+                    if (openings.FirstOrDefault(o => o.O.Kind != OpeningKind.Window) is { O: { Kind: OpeningKind.Door, Opens: true } door } dw)
+                    {
+                        if (WhyNoSwing(s, door, dw.Along, L) is { } why) findings.Add(new(Severity.Warn, $"{what}'s door: {why}"));
+                        else swung.Add(new SwungDoor(k, name, door, a + u * (dw.Along - door.WidthMm / 2), u, normal, middle));
+                    }
                 }
 
                 string key = spec.ToJson();
@@ -159,33 +172,42 @@ public static partial class HouseKitMaker
             // The columns: one at every corner, end and junction, and where a long wall was cut.
             var joints = plan.Joints.ToDictionary(j => j.Key, j => j.Value);
             foreach (var (g2, dirs) in extraJoints) joints[g2] = dirs;
-            var byShape = new Dictionary<string, (double[] Dirs, bool Flush, List<(Walls.Model.V3, double)> At)>();
+            var byShape = new Dictionary<string, (double[] Dirs, bool Flush, ColumnShape Shape, bool Boxed, string? Texture, List<(Walls.Model.V3, double)> At)>();
+            var unsuited = new List<ColumnShape>();
+            var unboxable = new List<ColumnShape>();
             foreach (var (pt, dirs) in joints)
             {
-                var angles = dirs.Select(PlanShape.Angle).Order().ToArray();
-                // Turned so the first slot is the one after the widest gap: the same junction turned round comes out the same.
-                int start = 0;
-                double widest = -1;
-                for (int i = 0; i < angles.Length; i++)
-                {
-                    double gap = ((angles[i] - angles[(i + angles.Length - 1) % angles.Length]) % 360 + 360) % 360;
-                    if (angles.Length == 1) gap = 360;
-                    if (gap > widest + 1e-6) { widest = gap; start = i; }
-                }
-                double yaw = angles[start];
-                var rel = angles.Select(x => Math.Round(((x - yaw) % 360 + 360) % 360, 3)).Order().ToArray();
+                var (yaw, rel) = JointFrame(dirs);
                 bool flush = k + 1 < levels && Inside(plates[k + 1], (pt.X) * sq, (pt.Y) * sq);
-                string key = $"{string.Join(",", rel)}|{flush}";
+                // The column's own shape, or the building's, changed to one that suits the walls' angles if it doesn't.
+                var wanted = level.ColumnAt(pt) ?? s.Column;
+                var shape = ColumnShapeFor(wanted, rel);
+                if (wanted != ColumnShape.Auto && shape != wanted && !unsuited.Contains(wanted)) unsuited.Add(wanted);
+                var pick = level.PickAt(pt);
+                bool boxed = Boxes(pick?.Build ?? d.ColumnBuild, s, shape, rel);
+                if ((pick?.Build ?? d.ColumnBuild) == ColumnMade.Boxed && !boxed && !unboxable.Contains(shape)) unboxable.Add(shape);
+                string? texture = boxed ? pick?.Texture ?? d.ColumnTexture : null;
+                string key = $"{string.Join(",", rel)}|{flush}|{shape}|{boxed}|{texture}";
                 var w = World(pt.X, pt.Y, y0);
-                if (!byShape.TryGetValue(key, out var e)) byShape[key] = e = (rel, flush, []);
+                if (!byShape.TryGetValue(key, out var e)) byShape[key] = e = (rel, flush, shape, boxed, texture, []);
                 e.At.Add((new Walls.Model.V3(w.X, w.Y, w.Z), yaw));
             }
-            foreach (var (_, (rel, flush, at)) in byShape.OrderBy(x => x.Value.Dirs.Length).ThenBy(x => x.Key, StringComparer.Ordinal))
+            foreach (var bad in unboxable)
+                findings.Add(new(Severity.Note, $"{(levels == 1 ? "" : $"Floor {k + 1}: ")}{ShapeName(bad)} columns can't be boxed {(bad == ColumnShape.Fluted ? "(their flutes can't be cut on flat sides)" : "at these angles")}: they're stacked layers."));
+            foreach (var bad in unsuited)
+                findings.Add(new(Severity.Note, $"{(levels == 1 ? "" : $"Floor {k + 1}: ")}{ShapeName(bad)} columns don't suit some of the corners (a wall would meet a corner of the column), so those are made to suit."));
+            foreach (var (_, (rel, flush, shape, boxed, texture, at)) in byShape.OrderBy(x => x.Value.Dirs.Length).ThenBy(x => x.Key, StringComparer.Ordinal))
             {
-                var spec = Topped(BuildingKitMaker.StoreyWall(s, k, 100), !flush);
-                string kind = ColumnName(rel);
-                string label = Cap($"{floorName}{kind}{(flush || levels == 1 ? "" : ", top")}");
-                if (s.BoxWalls)
+                var spec = Topped(BuildingKitMaker.StoreyWall(s, k, 100), !flush) with { Column = shape };
+                // A boxed column's sides take the columns' texture (or the walls'), worn like them.
+                spec = Looked(spec, s, d, texture is null ? null : new WallLook { Texture = texture, Wear = d.Wear, DetailMm = d.DetailMm });
+                bool usual = boxed == (s.BoxWalls && shape == ColumnShape.Square && rel.All(r => Math.Abs(Math.IEEERemainder(r, 90)) < 1e-6));
+                if (s.BoxWalls) spec = spec with { ColumnBuild = boxed ? ColumnBuild.Boxed : ColumnBuild.Stacked, BoxAnyShape = boxed };
+                else if (boxed) spec = spec with { ColumnBuild = ColumnBuild.Boxed, BoxAnyShape = true, ColumnBase = ColumnBase.Flat };
+                if (boxed && !usual) anyPolygon = true;
+                string kind = (shape == ColumnShape.Square ? "" : ShapeName(shape).ToLowerInvariant() + " ") + (boxed == s.BoxWalls ? "" : boxed ? "boxed " : "stacked ") + ColumnName(rel);
+                string label = Cap($"{floorName}{kind}{(texture is not null && boxed ? $" ({texture.ToLowerInvariant()})" : "")}{(flush || levels == 1 ? "" : ", top")}");
+                if (s.BoxWalls || boxed)
                 {
                     var parts = BoxColumns.Columns(spec, rel, label, at.Count, at, out var problem);
                     if (problem is not null) { findings.Add(new(Severity.Bad, $"{Cap(kind)}s: {problem}")); continue; }
@@ -214,17 +236,34 @@ public static partial class HouseKitMaker
             }
         }
         if (s.BoxWalls) findings.Add(new(Severity.Note, $"Every column is {C:0.#} mm across: a box (or, where walls meet at an angle, a stack of layers on a pin) with a slot for each wall's tabs."));
+        if (anyPolygon) findings.Add(new(Severity.Note, "Boxed columns of other shapes: stand each side's bottom tab in its slot in the base, put the walls in, then press the top plate down over the sides' top tabs, and glue."));
         else findings.Add(new(Severity.Note, $"Stack each column's layers on a {BuildingKitMaker.PinMm:0.#} mm pin (a cocktail stick) and glue them."));
 
+        var ways = WaysUp(d, s, plans, plates, sq, ox, oy, pieces, solids, findings);
         for (int k = 1; k < levels; k++)
         {
             var slots = Railings(d, s, plans, k, sq, World, pieces, solids, findings);
-            Floor(d, s, plans, plates[k], k, sq, longestMm, World, slots, pieces, solids, findings);
+            var hatches = new PathsD(ways.Where(w => w.Level + 1 == k).SelectMany(w => w.Hatch));
+            Floor(d, s, plans, hatches.Count > 0 ? Geo.Subtract(plates[k], hatches) : plates[k], k, sq, longestMm, World, slots, pieces, solids, findings);
         }
         RoomFloors(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
         Roofs(d, s, plans, plates, sq, World, pieces, solids, findings);
+        // A floor kept to its yard leaves the rest of the rooms below it open: they want a roof of their own.
+        for (int k = 1; k < levels; k++)
+        {
+            if (d.Levels[k].Yard is null || d.Levels[k].Walls.Count == 0) continue;
+            var below = new PathsD(plans[k - 1].Rooms.SelectMany(r => r.Area));
+            if (below.Count == 0) continue;
+            var open = Geo.Subtract(Geo.Map(Geo.Union(below), p => new PointD(p.x * sq, p.y * sq)), plates[k]);
+            var roofed = new PathsD(d.Roofs.Where(r => r.Level == k - 1).Select(r => Geo.Rect(r.X0 * sq, r.Y0 * sq, r.X1 * sq, r.Y1 * sq)));
+            if (roofed.Count > 0) open = Geo.Subtract(open, roofed);
+            if (Geo.Area(open) > sq * sq * 0.5)
+                findings.Add(new(Severity.Note, $"Floor {k + 1}'s yard stops short of some of the rooms below it: they're open on top. Give them a roof (Roof tool, on floor {k}) to close them in."));
+        }
         Tiles(d, s, sq, ox, oy, pieces, solids, findings);
         BasePlate(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
+        HangDoors(s, swung, pieces, solids, findings);
+        Furnish(d, s, plans, plates, sq, World, ways, pieces, solids, findings);
 
         double tallest = solids.Count == 0 ? 0 : solids.Max(x => x.Pose.O.Y + x.Thickness);
         var outline = new PathsD(solids.Where(x => x.Kind is SolidKind.Wall or SolidKind.Column).Select(x => Geo.Rect(x.Pose.O.X - 1, x.Pose.O.Z - 1, x.Pose.O.X + 1, x.Pose.O.Z + 1)));
@@ -235,6 +274,76 @@ public static partial class HouseKitMaker
     }
 
     static string Cap(string s) => s.Length == 0 ? s : char.ToUpperInvariant(s[0]) + s[1..];
+
+    /// <summary>
+    /// How a column is turned (degrees, anticlockwise seen from above) and the directions its walls leave in
+    /// from there: the first slot is the one after the widest gap, so the same junction turned round comes out the same.
+    /// </summary>
+    public static (double Yaw, double[] Rel) JointFrame(IEnumerable<GridPt> dirs)
+    {
+        var angles = dirs.Select(PlanShape.Angle).Order().ToArray();
+        if (angles.Length == 0) return (0, []);
+        int start = 0;
+        double widest = -1;
+        for (int i = 0; i < angles.Length; i++)
+        {
+            double gap = ((angles[i] - angles[(i + angles.Length - 1) % angles.Length]) % 360 + 360) % 360;
+            if (angles.Length == 1) gap = 360;
+            if (gap > widest + 1e-6) { widest = gap; start = i; }
+        }
+        double yaw = angles[start];
+        return (yaw, angles.Select(x => Math.Round(((x - yaw) % 360 + 360) % 360, 3)).Order().ToArray());
+    }
+
+    /// <summary>
+    /// Whether a column is boxed: as usual, square columns of box walls at right-angled joints are; asked
+    /// for, any shape that has flat sides for its walls is (flat walls too); fluted ones never are.
+    /// </summary>
+    public static bool Boxes(ColumnMade made, BuildingSpec s, ColumnShape shape, double[] rel) => made switch
+    {
+        ColumnMade.Stacked => false,
+        ColumnMade.Boxed => BoxColumns.BoxOutline(shape, s.ColumnMm, rel) is not null,
+        _ => s.BoxWalls && shape == ColumnShape.Square && rel.All(r => Math.Abs(Math.IEEERemainder(r, 90)) < 1e-6),
+    };
+
+    /// <summary>Whether the column at a joint is boxed (its own build, or the building's).</summary>
+    public static bool BoxedAt(HouseDesign d, Level level, GridPt at, IEnumerable<GridPt> dirs)
+    {
+        var rel = JointFrame(dirs).Rel;
+        return Boxes(level.PickAt(at)?.Build ?? d.ColumnBuild, StyleFor(d), ColumnShapeFor(level.ColumnAt(at) ?? d.Style.Column, rel), rel);
+    }
+
+    /// <summary>The shape the column at a joint is made (its own, or the building's, made to suit its walls).</summary>
+    public static ColumnShape ColumnShapeAt(Level level, BuildingSpec s, GridPt at, IEnumerable<GridPt> dirs) =>
+        ColumnShapeFor(level.ColumnAt(at) ?? s.Column, JointFrame(dirs).Rel);
+
+    /// <summary>A column's outline on the plan (mm, y towards you), as it stands at a joint.</summary>
+    public static PathD ColumnFoot(Level level, BuildingSpec s, GridPt at, IEnumerable<GridPt> dirs, double sq)
+    {
+        var list = dirs.ToList();
+        var (yaw, rel) = JointFrame(list);
+        var shape = Connectors.PlateShape(ColumnShapeFor(level.ColumnAt(at) ?? s.Column, rel));
+        var outline = Connectors.Outline(shape, s.ColumnMm, rel, BuildingKitMaker.WallThickness(s));
+        double a = yaw * Math.PI / 180, c = Math.Cos(a), sn = Math.Sin(a), cx = at.X * sq, cy = at.Y * sq;
+        // The column's own (x, y) lying flat turned by yaw (Flat's frame): world X = x·c − y·s, Z = −x·s − y·c.
+        return [.. outline.Select(p => new PointD(cx + p.x * c - p.y * sn, cy - p.x * sn - p.y * c))];
+    }
+
+    /// <summary>The shape a column is made: the one wanted if every wall meets a flat side of it (any shape for a lone end), otherwise one that suits.</summary>
+    public static ColumnShape ColumnShapeFor(ColumnShape wanted, double[] rel) =>
+        rel.Length <= 1 && wanted != ColumnShape.Auto ? wanted : Connectors.Matching(wanted, rel);
+
+    /// <summary>A column shape as it's called.</summary>
+    public static string ShapeName(ColumnShape c) => c switch
+    {
+        ColumnShape.Auto => "Matching",
+        ColumnShape.Octagon => "Octagonal",
+        ColumnShape.Hexagon => "Hexagonal",
+        ColumnShape.Chamfered => "Chamfered",
+        ColumnShape.Fluted => "Fluted",
+        ColumnShape.Round => "Round",
+        _ => "Square",
+    };
 
     /// <summary>A column by the walls that meet at it.</summary>
     static string ColumnName(double[] rel) => rel.Length switch
@@ -258,7 +367,9 @@ public static partial class HouseKitMaker
         {
             spec = spec with
             {
-                Door = door.Kind == OpeningKind.Doorway ? DoorKind.Doorway : DoorKind.DoorwayAndDoor,
+                // A door that swings in a flat wall hangs on clips beside the doorway (the furniture maker's), so the wall has just the doorway.
+                Door = door.Kind == OpeningKind.Doorway || (!s.BoxWalls && door.Kind == OpeningKind.Door && door.Opens && WhyNoSwing(s, door, dw.Along, length) is null)
+                    ? DoorKind.Doorway : DoorKind.DoorwayAndDoor,
                 DoorOpens = door.Kind == OpeningKind.Door && s.BoxWalls && door.Opens,
                 DoorShape = door.Shape, DoorLook = door.Look, DoorHinge = door.Hinge,
                 DoorWidthMm = door.WidthMm, DoorHeightMm = door.HeightMm,
@@ -278,6 +389,22 @@ public static partial class HouseKitMaker
             };
         }
         return spec;
+    }
+
+    /// <summary>A wall with its own look, or the building's wear and detail when it has none.</summary>
+    public static WallSpec Looked(WallSpec spec, BuildingSpec s, HouseDesign d, WallLook? look)
+    {
+        if (look is null) return spec with { Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
+        spec = spec with { Wear = Math.Clamp(look.Wear, 0, 1), DetailMm = Math.Max(0, look.DetailMm) };
+        if (Textures.Preset(look.Texture) is not { } preset || preset.Name == spec.Texture) return spec;
+        double k28 = K(s);
+        return spec with
+        {
+            Texture = preset.Name,
+            SizeA = Math.Round(preset.SizeA * k28, 2),
+            SizeB = Math.Round(preset.SizeB * k28, 2),
+            GrooveMm = preset.UsesGroove ? Math.Round(Math.Max(0.4, preset.Groove * Math.Sqrt(k28)), 2) : preset.Groove,
+        };
     }
 
     /// <summary>
@@ -403,12 +530,9 @@ public static partial class HouseKitMaker
     /// </summary>
     public static PathsD PlateArea(HouseDesign d, List<PlanShape> plans, int k, double sq, double columnMm)
     {
-        var area = new PathsD();
-        foreach (var r in plans[k - 1].Rooms) area.AddRange(r.Area);
-        foreach (var r in plans[k].Rooms) area.AddRange(r.Area);
-        foreach (var f in d.Levels[k].Floor) area.Add(Geo.Rect(f.X, f.Y, f.X + 1, f.Y + 1));
+        var area = FloorArea(d.Levels[k], plans[k - 1], plans[k]);
         if (area.Count == 0) return [];
-        var mm = Geo.Map(Geo.Union(area), p => new PointD(p.x * sq, p.y * sq));
+        var mm = Geo.Map(area, p => new PointD(p.x * sq, p.y * sq));
         return Geo.Union(Clipper.InflatePaths(mm, columnMm / 2, JoinType.Miter, EndType.Polygon, 4, 3));
     }
 
@@ -438,7 +562,7 @@ public static partial class HouseKitMaker
             var b = new PointD(e.B.X * sq, e.B.Y * sq);
             foot.Add(Textures.Strip(a, b, Wt));
         }
-        foreach (var (g, _) in plans[k].Joints) foot.Add(Geo.Rect(g.X * sq - C / 2, g.Y * sq - C / 2, g.X * sq + C / 2, g.Y * sq + C / 2));
+        foreach (var (g, dirs) in plans[k].Joints) foot.Add(ColumnFoot(d.Levels[k], s, g, dirs, sq));
         foot = Geo.Union(foot);
         var shows = Geo.Subtract(area, foot);
         // Rooms with a floor of their own, then the building's floor everywhere else.
@@ -450,12 +574,12 @@ public static partial class HouseKitMaker
             if (RoomTexture(d.Levels[k], plans[k], room) is not { } tex) continue;
             var roomMm = Geo.Map(room.Area, p => new PointD(p.x * sq, p.y * sq));
             var region = Geo.Intersect(roomMm, shows);
-            var (e1, l1) = FloorTexture(s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 31 * k + room.Index);
+            var (e1, l1) = FloorTexture(d, s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 31 * k + room.Index);
             etched.AddRange(e1);
             lines.AddRange(l1);
             own.AddRange(region);
         }
-        var (e0, l0) = FloorTexture(s, d.UpperFloor, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(area), sq), sq, s.Seed + 101 + k);
+        var (e0, l0) = FloorTexture(d, s, d.UpperFloor, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(area), sq), sq, s.Seed + 101 + k);
         etched.AddRange(e0);
         lines.AddRange(l0);
         lines.AddRange(Geo.ClipLines(foot.Select(Geo.Loop), area));
@@ -568,7 +692,7 @@ public static partial class HouseKitMaker
         if (!s.FloorTiles || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0 || d.Base != BaseKind.Tiles) return;
         var pts = d.Levels[0].Walls.SelectMany(e => new[] { e.A, e.B }).ToList();
         double x0 = pts.Min(p => p.X), x1 = pts.Max(p => p.X), y0 = pts.Min(p => p.Y), y1 = pts.Max(p => p.Y);
-        var spec = BuildingKitMaker.TileSpecFor(s with { WidthMm = (x1 - x0) * sq, DepthMm = (y1 - y0) * sq });
+        var spec = BuildingKitMaker.TileSpecFor(s with { WidthMm = (x1 - x0) * sq, DepthMm = (y1 - y0) * sq, YardMm = TileYardMm(d, s, sq) }) with { Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
         var kit = TileKitMaker.Make(spec);
         foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
             findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Floor tiles: {f.Text}"));

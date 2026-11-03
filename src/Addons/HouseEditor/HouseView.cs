@@ -24,6 +24,8 @@ public sealed class HouseView : Model3DView
     public WallsShown Walls { get; private set; } = WallsShown.CutAway;
     /// <summary>The top floor shown (0 = the ground floor); everything above is left out.</summary>
     public int UpTo { get; private set; } = int.MaxValue;
+    /// <summary>How deep the engraving is shown sunk into the pieces (mm); 0 paints it on flat.</summary>
+    public double EtchDepth { get; private set; } = 0.6;
 
     static readonly Vec3 Light = new(0.35, 0.85, 0.45);
 
@@ -49,6 +51,21 @@ public sealed class HouseView : Model3DView
     public void SetWalls(WallsShown walls)
     {
         Walls = walls;
+        Build();
+    }
+
+    /// <summary>The doors shown swung open (and portcullises up), to see which way they go.</summary>
+    public bool DoorsOpen { get; private set; }
+
+    public void SetDoorsOpen(bool open)
+    {
+        DoorsOpen = open;
+        Build();
+    }
+
+    public void SetEtchDepth(double mm)
+    {
+        EtchDepth = Math.Max(0, mm);
         Build();
     }
 
@@ -126,10 +143,10 @@ public sealed class HouseView : Model3DView
     void Add(HouseSolid s, int group, bool faces = true, bool sides = true)
     {
         double T = s.Thickness;
-        var p = s.Pose;
+        var p = DoorsOpen && s.Open is { } open ? open : s.Pose;
         var style = s.Kind switch { SolidKind.Floor or SolidKind.Furniture or SolidKind.Railing => Wood, SolidKind.Roof => Roof, SolidKind.Column => Column, _ => Stone };
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         var frame = new Frame3(V(p.O), V(p.U), V(p.V));
-        Scene.AddSlab(outline, frame, -T / 2, T / 2, style, s.Etched, s.Lines, group: Math.Min(group, 63), faces: faces, sides: sides);
+        Scene.AddSlab(outline, frame, -T / 2, T / 2, style, s.Etched, s.Lines, group: Math.Min(group, 63), faces: faces, sides: sides, etchDepth: EtchDepth);
     }
 }

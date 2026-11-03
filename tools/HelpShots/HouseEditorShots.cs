@@ -54,5 +54,12 @@ static class HouseEditorShots
             plan.SelectRoof(0);
         });
         Shot("window-houseeditor-pieces", sample, 0, 1, 1, 1);
+        Shot("window-houseeditor-furnish", sample, 0, 1, 0, 0, w =>
+        {
+            var plan = F<PlanEditor>(w, "_plan");
+            typeof(HouseEditorWindow).GetMethod("PickTool", Any)!.Invoke(w, [PlanTool.Furnish]);
+            plan.SelectItem(0);
+            F<CheckBox>(w, "_doorsOpen").IsChecked = true;
+        });
     }
 }

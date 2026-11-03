@@ -5,6 +5,7 @@ using PhotonCanvas.Addon.HouseEditor;
 using PhotonCanvas.Addon.Walls;
 using Geo = PhotonCanvas.Addon.Walls.Geo;
 using Severity = PhotonCanvas.Addon.Buildings.Severity;
+using HingeSide = PhotonCanvas.Addon.Walls.HingeSide;
 
 namespace PhotonCanvas.Tests;
 
@@ -324,6 +325,17 @@ public class HouseEditorTests
         var off = HouseKitMaker.Make(d with { Levels = [d.Levels[0], d.Levels[1] with { Railings = false }] });
         Assert.DoesNotContain(off.Solids, s => s.Kind == SolidKind.Railing);
         Assert.Single(Assert.Single(off.Solids, s => s.Kind == SolidKind.Floor).Outline);
+
+        // One stretch taken away (the right-hand end): the other two stay, and stop on the grid where it was.
+        var gap = d with { Levels = [d.Levels[0], d.Levels[1] with { NoRailing = Line(6, 0, 6, 3) }] };
+        var left = HouseKitMaker.RailingRuns(gap.Levels[1], below, plan, style.WallSheetMm, style.ColumnMm);
+        Assert.Equal(2, left.Count);
+        Assert.All(left, r => Assert.Equal(0, r.A.X == 6 ? r.TrimA : r.TrimB, 6));
+        var gapKit = HouseKitMaker.Make(gap);
+        Assert.True(gapKit.Ok, string.Join("\n", gapKit.Findings.Select(f => f.Text)));
+        Assert.Equal(2, gapKit.Solids.Count(s => s.Kind == SolidKind.Railing));
+        Assert.Equal(1 + 4, Assert.Single(gapKit.Solids, s => s.Kind == SolidKind.Floor).Outline.Count);
+        Assert.Equal(3, HouseDesign.FromJson(gap.ToJson())!.Levels[1].NoRailing.Count);
     }
 
     [Fact]
@@ -406,6 +418,68 @@ public class HouseEditorTests
         Assert.NotEqual(Geo.Area(a.Etched), Geo.Area(c.Etched), 0);
     }
 
+    [Fact]
+    public void A_wall_can_have_a_look_of_its_own_and_gets_a_column_where_it_changes()
+    {
+        var walls = Box(0, 0, 6, 3);
+        var own = Line(0, 0, 3, 0).Select(e => new WallLook { Edge = e, Texture = "Brick", Wear = 0.9, DetailMm = 0.6 }).ToList();
+        var d = new HouseDesign { Wear = 0.2, Levels = [new Level { Walls = walls, WallLooks = own }] };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        // The top wall is cut where its look changes.
+        Assert.Equal(5, kit.Walls.Count);
+        Assert.Equal(5, d.Levels[0].Shape().Joints.Count);
+        var brick = Assert.Single(kit.Walls, w => w.Spec.Texture == "Brick");
+        Assert.Equal(0.9, brick.Spec.Wear, 6);
+        Assert.Equal(0.6, brick.Spec.DetailMm, 6);
+        Assert.Contains(new GridPt(3, 0), new[] { brick.A, brick.B });
+        Assert.All(kit.Walls.Where(w => w != brick), w =>
+        {
+            Assert.Equal(HouseDesign.DefaultStyle().Texture, w.Spec.Texture);
+            Assert.Equal(0.2, w.Spec.Wear, 6);
+        });
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column).ToList(), step: 0.7));
+
+        // Saved, opened and moved with the design.
+        var back = HouseDesign.FromJson(d.Moved(2, 1).ToJson())!;
+        Assert.Equal(0.2, back.Wear, 6);
+        Assert.Equal(3, back.Levels[0].WallLooks.Count);
+        Assert.Equal("Brick", back.Levels[0].LookOf(WallEdge.Of(new(2, 1), new(3, 1)))?.Texture);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Columns_take_the_shape_picked_for_them_where_it_suits(bool box)
+    {
+        // A square room with one corner cut off corner to corner: walls meet there at 135°.
+        var walls = Line(0, 0, 4, 0).Concat(Line(4, 0, 4, 2)).Concat(Line(4, 2, 2, 4)).Concat(Line(2, 4, 0, 4)).Concat(Line(0, 4, 0, 0)).ToList();
+        var style = HouseDesign.DefaultStyle();
+        if (!box) style = style with { BoxWalls = false, ColumnMm = 12 };
+        var d = new HouseDesign
+        {
+            Style = style with { Column = ColumnShape.Round },
+            Levels = [new Level { Walls = walls, Columns = [new ColumnPick { At = new(0, 0), Shape = ColumnShape.Octagon }, new ColumnPick { At = new(4, 0), Shape = ColumnShape.Chamfered }] }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        var level = d.Levels[0];
+        var plan = level.Shape();
+        ColumnShape At(int x, int y) => HouseKitMaker.ColumnShapeAt(level, d.Style, new(x, y), plan.Joints[new(x, y)]);
+        Assert.Equal(ColumnShape.Octagon, At(0, 0));
+        Assert.Equal(ColumnShape.Chamfered, At(4, 0));
+        Assert.Equal(ColumnShape.Round, At(0, 4));
+        Assert.Equal(ColumnShape.Round, At(4, 2));
+        Assert.Contains(kit.Pieces, p => p.Name.Contains("octagonal", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(kit.Pieces, p => p.Name.Contains("round", StringComparison.OrdinalIgnoreCase));
+        // A shape that doesn't suit: chamfered at 135° is made to suit (an octagon), and a note says so.
+        var odd = d with { Levels = [level with { Columns = [new ColumnPick { At = new(4, 2), Shape = ColumnShape.Chamfered }] }] };
+        Assert.Equal(ColumnShape.Octagon, HouseKitMaker.ColumnShapeAt(odd.Levels[0], d.Style, new(4, 2), plan.Joints[new(4, 2)]));
+        Assert.Contains(HouseKitMaker.Make(odd).Findings, f => f.Text.StartsWith("Chamfered columns don't suit", StringComparison.Ordinal));
+        Assert.Empty(Clashes(kit.Solids.Where(s => s.Kind is SolidKind.Wall or SolidKind.Column).ToList(), step: 0.7));
+        Assert.Equal(2, HouseDesign.FromJson(d.Moved(1, 1).ToJson())!.Levels[0].Columns.Count(c => c.At.X >= 1));
+    }
+
     static List<V3> Corners(HouseSolid s)
     {
         var b = Geo.Bounds(s.Outline);
@@ -435,6 +509,216 @@ public class HouseEditorTests
     }
 
     /// <summary>Places where two solids would be in the same space (sampled where their boxes meet).</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_door_that_opens_swings_from_the_side_it_is_hinged(bool box)
+    {
+        var style = HouseDesign.DefaultStyle();
+        if (!box) style = style with { BoxWalls = false, ColumnMm = 12 };
+        var start = HouseDesign.Starter() with { Style = style };
+        HouseDesign With(HingeSide side) => start with
+        {
+            Levels = [start.Levels[0] with { Openings = [.. start.Levels[0].Openings.Select(o => o.Kind == OpeningKind.Door ? o with { Opens = true, Shape = OpeningShape.Arched, Hinge = side } : o)] }],
+        };
+        var left = HouseKitMaker.Make(With(HingeSide.Left));
+        var right = HouseKitMaker.Make(With(HingeSide.Right));
+        Assert.True(left.Ok, string.Join("\n", left.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(left.Findings, f => f.Level == Severity.Warn && f.Text.Contains("door", StringComparison.OrdinalIgnoreCase));
+        if (!box)
+        {
+            // A flat wall has just the doorway: the door hangs on clips beside it, cut from the furniture's sheet.
+            Assert.Contains(left.Walls, w => w.Spec.Door == DoorKind.Doorway);
+            Assert.DoesNotContain(left.Walls, w => w.Spec.Door == DoorKind.DoorwayAndDoor);
+            Assert.Contains(left.Pieces, p => p.Sheet == Sheet.Furniture && p.Name.EndsWith(": door clip", StringComparison.Ordinal) && p.Copies == 2);
+        }
+        else Assert.True(left.Walls.Single(w => w.Spec.Door == DoorKind.DoorwayAndDoor).Spec.DoorOpens);
+
+        // Shown open, the leaf turns about its hinge: the hinge stays put, and it swings out the other way when hinged on the other side.
+        HouseSolid Leaf(HouseKit k) => k.Solids.Single(x => x.Open is not null && x.Name.EndsWith("door", StringComparison.Ordinal));
+        var l = Leaf(left);
+        var r = Leaf(right);
+        var (lo, ro) = (l.Open!, r.Open!);
+        Assert.True(Math.Abs(lo.U.Dot(l.Pose.U)) < 0.5, "the leaf turns well away from the wall");
+        Assert.True(lo.U.Dot(l.Facing) > 0.5 || lo.U.Dot(l.Facing) < -0.5);
+        // Its far edge goes out of the building (the way the wall faces), whichever side it's hinged.
+        V3 Far(HouseSolid x, Pose at, bool hingedRight)
+        {
+            var b = Geo.Bounds(x.Outline);
+            return at.At(hingedRight ? b.left : b.right, (b.top + b.bottom) / 2);
+        }
+        Assert.True((Far(l, lo, false) - Far(l, l.Pose, false)).Dot(l.Facing) > 1);
+        Assert.True((Far(r, ro, true) - Far(r, r.Pose, true)).Dot(r.Facing) > 1);
+        Assert.True(lo.U.Dot(ro.U) < 0.5, "hinged on the other side it turns the other way");
+    }
+
+    [Fact]
+    public void Each_floor_can_be_kept_to_a_yard_round_its_walls()
+    {
+        var style = HouseDesign.DefaultStyle();
+        double sq = 25.4, C = style.ColumnMm;
+        // A long ground floor, and a smaller room on the left of it upstairs.
+        var d = new HouseDesign
+        {
+            Base = BaseKind.Plate,
+            Levels = [new Level { Walls = Box(0, 0, 6, 3) }, new Level { Walls = Box(0, 0, 3, 3) }],
+        };
+        double Width(HouseKit k, string name) { var b = Geo.Bounds(k.Pieces.Single(p => p.Name == name).Cut); return b.right - b.left; }
+        var drawn = HouseKitMaker.Make(d);
+        Assert.Equal(6 * sq + C, Width(drawn, "Floor 2"), 0.5);
+        Assert.Equal(6 * sq + C + 4, Width(drawn, "Base"), 0.5);
+
+        // No yard upstairs: its floor stops at its walls, and the rooms below past it want a roof.
+        HouseDesign Yards(int? ground, int? upper) => d with { Levels = [d.Levels[0] with { Yard = ground }, d.Levels[1] with { Yard = upper }] };
+        var none = HouseKitMaker.Make(Yards(null, 0));
+        Assert.Equal(3 * sq + C, Width(none, "Floor 2"), 0.5);
+        Assert.Contains(none.Findings, f => f.Text.Contains("yard stops short", StringComparison.Ordinal));
+        var plans = new[] { d.Levels[0].Shape(), d.Levels[1].Shape() };
+        Assert.Empty(HouseKitMaker.RailingRuns(d.Levels[1] with { Yard = 0 }, plans[0], plans[1], style.WallSheetMm, C));
+        // A roof over them and the note goes.
+        var roofed = HouseKitMaker.Make(Yards(null, 0) with { Roofs = [new RoofArea { Level = 0, X0 = 3, Y0 = 0, X1 = 6, Y1 = 3, Kind = RoofKind.Flat }] });
+        Assert.DoesNotContain(roofed.Findings, f => f.Text.Contains("yard stops short", StringComparison.Ordinal));
+        Assert.DoesNotContain(roofed.Findings, f => f.Text.Contains("under floor 2", StringComparison.Ordinal));
+
+        // A yard of one square: the floor reaches a square past the walls, with a railing round its edge.
+        var one = HouseKitMaker.Make(Yards(null, 1));
+        Assert.Equal(4 * sq + C, Width(one, "Floor 2"), 0.5);
+        var runs = HouseKitMaker.RailingRuns(d.Levels[1] with { Yard = 1 }, plans[0], plans[1], style.WallSheetMm, C);
+        Assert.Equal(5, runs.Sum(r => r.Steps));
+
+        // On the ground floor the base reaches the yard all round.
+        var ground = HouseKitMaker.Make(Yards(2, null), longestMm: 400);
+        Assert.Equal(10 * sq + C + 4, Width(ground, "Base"), 0.5);
+        var b = Geo.Bounds(ground.Pieces.Single(p => p.Name == "Base").Cut);
+        Assert.Equal(7 * sq + C + 4, b.bottom - b.top, 0.5);
+
+        // Saved and opened again.
+        Assert.Equal(1, HouseDesign.FromJson(Yards(null, 1).ToJson())!.Levels[1].Yard);
+        Assert.Null(HouseDesign.FromJson(d.ToJson())!.Levels[1].Yard);
+    }
+
+    [Fact]
+    public void Furniture_stands_where_it_is_put_turned_and_crowding_is_warned_of()
+    {
+        var style = HouseDesign.DefaultStyle();
+        var table = HouseKitMaker.NewItem(style, ItemKind.Table);
+        var bed = HouseKitMaker.NewItem(style, ItemKind.Bed);
+        var d = new HouseDesign
+        {
+            Levels = [new Level { Walls = Box(0, 0, 6, 4), Furniture = [new PlacedItem { X = 1.5, Y = 2, Item = table }, new PlacedItem { X = 3.8, Y = 2, Turn = 1, Item = bed }] }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Findings, f => f.Level == Severity.Warn);
+        Assert.Contains(kit.Pieces, p => p.Sheet == Sheet.Furniture && p.Name.StartsWith("Table: ", StringComparison.Ordinal));
+        Assert.Contains(kit.Pieces, p => p.Sheet == Sheet.Furniture && p.Name.StartsWith("Bed: ", StringComparison.Ordinal));
+        // Each stands over where it was put on the plan, the bed turned a quarter so it's long front to back.
+        var (ox, oy) = kit.Origin;
+        (double X0, double Z0, double X1, double Z1) Span(string name)
+        {
+            var pts = kit.Solids.Where(x => x.Name == name).SelectMany(x => x.Outline.SelectMany(path => path.Select(q => x.Pose.At(q.x, q.y)))).ToList();
+            return (pts.Min(p => p.X), pts.Min(p => p.Z), pts.Max(p => p.X), pts.Max(p => p.Z));
+        }
+        double sq = d.SquareMm;
+        var t = Span("Table");
+        Assert.Equal((1.5 - ox) * sq, (t.X0 + t.X1) / 2, 1.0);
+        Assert.Equal((2 - oy) * sq, (t.Z0 + t.Z1) / 2, 1.0);
+        var b = Span("Bed");
+        Assert.Equal((3.8 - ox) * sq, (b.X0 + b.X1) / 2, 1.0);
+        // Turned a quarter, it takes the floor the other way round, as the plan shows it.
+        var area = HouseKitMaker.ItemArea(style, d.Levels[0].Furniture[1], sq);
+        var straight = HouseKitMaker.ItemArea(style, d.Levels[0].Furniture[1] with { Turn = 0 }, sq);
+        Assert.Equal(straight.right - straight.left, area.bottom - area.top, 6);
+        Assert.Equal((area.right - area.left) * sq, b.X1 - b.X0, 1.5);
+        Assert.Equal((area.bottom - area.top) * sq, b.Z1 - b.Z0, 1.5);
+        // The same piece twice is cut twice from one set of parts.
+        var two = HouseKitMaker.Make(d with { Levels = [d.Levels[0] with { Furniture = [.. d.Levels[0].Furniture, new PlacedItem { X = 1.8, Y = 2.3, Item = table }] }] });
+        Assert.Equal(2 * kit.Pieces.Where(p => p.Name.StartsWith("Table: ", StringComparison.Ordinal)).Sum(p => p.Copies),
+            two.Pieces.Where(p => p.Name.StartsWith("Table: ", StringComparison.Ordinal)).Sum(p => p.Copies));
+        Assert.Contains(two.Findings, f => f.Level == Severity.Warn && f.Text.Contains("runs into the table", StringComparison.Ordinal));
+        // In a wall, or off the floor, it's warned of.
+        var bad = HouseKitMaker.Make(d with { Levels = [d.Levels[0] with { Furniture = [new PlacedItem { X = 0, Y = 2, Item = table }, new PlacedItem { X = 8, Y = 2, Item = table }] }] });
+        Assert.Contains(bad.Findings, f => f.Text.Contains("stands in a wall", StringComparison.Ordinal));
+        Assert.Contains(bad.Findings, f => f.Text.Contains("off the edge of the floor", StringComparison.Ordinal));
+        // Saved, opened and moved with the design.
+        var back = HouseDesign.FromJson(d.Moved(1, 1).ToJson())!;
+        Assert.Equal(2.5, back.Levels[0].Furniture[0].X, 6);
+        Assert.Equal(1, back.Levels[0].Furniture[1].Turn);
+        Assert.Equal(ItemKind.Bed, back.Levels[0].Furniture[1].Item.Kind);
+    }
+
+    [Theory]
+    [InlineData(WayKind.Stairs)]
+    [InlineData(WayKind.Ladder)]
+    [InlineData(WayKind.Spiral)]
+    public void A_way_up_goes_through_an_opening_cut_in_the_floor_above(WayKind kind)
+    {
+        var walls = Box(0, 0, 6, 4);
+        var d = new HouseDesign
+        {
+            Levels = [new Level { Walls = walls, WaysUp = [new PlacedWay { X = 3, Y = 2, Kind = kind }] }, new Level { Walls = walls }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        Assert.DoesNotContain(kit.Findings, f => f.Level == Severity.Warn);
+        string name = HouseKitMaker.WayName(kind);
+        Assert.Contains(kit.Pieces, p => p.Name.StartsWith(name + ": ", StringComparison.Ordinal));
+        Assert.Contains(kit.Solids, x => x.Name == name);
+        // The floor above has a hole where it comes up.
+        var floor = kit.Pieces.Single(p => p.Name == "Floor 2");
+        var plain = HouseKitMaker.Make(d with { Levels = [d.Levels[0] with { WaysUp = [] }, d.Levels[1]] }).Pieces.Single(p => p.Name == "Floor 2");
+        Assert.True(Geo.Area(floor.Cut) < Geo.Area(plain.Cut) - 100);
+        var (hatch, foot) = HouseKitMaker.WayArea(d.Style, d.Levels[0].WaysUp[0], d.SquareMm);
+        Assert.True(Geo.Area(hatch) > 100);
+        Assert.True(Geo.Area(foot) > 0);
+
+        // On the top floor it leads nowhere; into a wall it's warned of.
+        var top = HouseKitMaker.Make(d with { Levels = [d.Levels[0]] });
+        Assert.Contains(top.Findings, f => f.Text.Contains("lead nowhere", StringComparison.Ordinal));
+        var walled = HouseKitMaker.Make(d with { Levels = [d.Levels[0] with { WaysUp = [new PlacedWay { X = 0.4, Y = 2, Kind = kind }] }, d.Levels[1]] });
+        Assert.Contains(walled.Findings, f => f.Level == Severity.Warn && f.Text.Contains("wall", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Columns_can_be_boxed_whatever_their_shape_with_a_texture_of_their_own(bool box)
+    {
+        // A room with a corner cut off corner to corner: octagonal columns suit every joint.
+        var walls = Line(0, 0, 8, 0).Concat(Line(8, 0, 8, 4)).Concat(Line(8, 4, 4, 8)).Concat(Line(4, 8, 0, 8)).Concat(Line(0, 8, 0, 0)).ToList();
+        var style = HouseDesign.DefaultStyle();
+        style = box ? style with { ColumnMm = 50 } : style with { BoxWalls = false, ColumnMm = 28 };
+        var d = new HouseDesign
+        {
+            Style = style with { Column = ColumnShape.Octagon },
+            ColumnBuild = ColumnMade.Boxed, ColumnTexture = "Brick",
+            Levels = [new Level { Walls = walls, Columns = [new ColumnPick { At = new(0, 0), Build = ColumnMade.Stacked }] }],
+        };
+        var kit = HouseKitMaker.Make(d);
+        Assert.True(kit.Ok, string.Join("\n", kit.Findings.Select(f => f.Text)));
+        // Four boxed columns: a slotted base and top plate each, and eight sides; the one picked stacked is layers.
+        var boxedPieces = kit.Pieces.Where(p => p.Name.Contains("(brick)", StringComparison.Ordinal)).ToList();
+        Assert.Equal(4, boxedPieces.Where(p => p.Name.EndsWith(" top", StringComparison.Ordinal)).Sum(p => p.Copies));
+        Assert.Equal(4, boxedPieces.Where(p => p.Name.EndsWith(" base", StringComparison.Ordinal)).Sum(p => p.Copies));
+        int sides = boxedPieces.Where(p => p.Name.Contains("side", StringComparison.Ordinal)).Sum(p => p.Copies);
+        Assert.Equal(4 * 8 + (box ? 0 : 4 * 2), sides);
+        Assert.Contains(boxedPieces, p => p.Name.EndsWith("blank side", StringComparison.Ordinal) && p.Etched.Count > 0);
+        Assert.Contains(kit.Pieces, p => p.Name.Contains("layer", StringComparison.Ordinal));
+        // The plates hold the sides' tabs in slots.
+        var top = boxedPieces.First(p => p.Name.EndsWith(" top", StringComparison.Ordinal));
+        Assert.True(top.Cut.Count >= 7, "the top plate has a slot for the tab of each side no wall comes into");
+        Assert.Empty(Clashes(kit.Solids.Where(x => x.Kind is SolidKind.Wall or SolidKind.Column).ToList(), step: 0.7));
+        // Columns too thin for octagonal boxes say how wide they must be.
+        var thin = HouseKitMaker.Make(d with { Style = d.Style with { ColumnMm = box ? 30 : 16 } });
+        Assert.Contains(thin.Findings, f => f.Level == Severity.Bad && f.Text.Contains("must be at least", StringComparison.Ordinal));
+        // Saved and opened again.
+        var back = HouseDesign.FromJson(d.ToJson())!;
+        Assert.Equal(ColumnMade.Boxed, back.ColumnBuild);
+        Assert.Equal("Brick", back.ColumnTexture);
+        Assert.Equal(ColumnMade.Stacked, back.Levels[0].PickAt(new(0, 0))?.Build);
+        Assert.Null(back.Levels[0].PickAt(new(0, 0))?.Shape);
+    }
+
     static List<string> Clashes(IReadOnlyList<HouseSolid> all, double step = 0.5)
     {
         var found = new List<string>();

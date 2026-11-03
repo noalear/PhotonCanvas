@@ -25,6 +25,53 @@ public static partial class HouseKitMaker
     /// <summary>A railing's height (mm) for 28 mm figures: about a metre.</summary>
     public const double RailingMm = 15;
 
+    // ---- each floor's floor, and its yard ----
+
+    /// <summary>
+    /// A floor's floor on the plan (squares): over the rooms below it (none for the ground) and its own, and
+    /// the floor laid by hand; kept within <see cref="Level.Yard"/> squares of its own rooms and walls when
+    /// it has a yard set. The ground floor with a yard set reaches that far all round, laid or not.
+    /// </summary>
+    public static PathsD FloorArea(Level level, PlanShape? below, PlanShape plan)
+    {
+        var area = new PathsD();
+        if (below is not null) foreach (var r in below.Rooms) area.AddRange(r.Area);
+        foreach (var r in plan.Rooms) area.AddRange(r.Area);
+        foreach (var f in level.Floor) area.Add(Geo.Rect(f.X, f.Y, f.X + 1, f.Y + 1));
+        if (level.Yard is not int yard) return area.Count == 0 ? [] : Geo.Union(area);
+        var own = OwnArea(level, plan);
+        if (own.Count == 0) return area.Count == 0 ? [] : Geo.Union(area);
+        var reach = Reach(own, Math.Max(0, yard));
+        if (below is null) return reach;
+        return area.Count == 0 ? [] : Geo.Intersect(Geo.Union(area), reach);
+    }
+
+    /// <summary>What a floor stands on itself (squares): its rooms, and a hairline along each of its walls.</summary>
+    static PathsD OwnArea(Level level, PlanShape plan)
+    {
+        var own = new PathsD();
+        foreach (var r in plan.Rooms) own.AddRange(r.Area);
+        foreach (var e in level.Walls) own.Add(Textures.Strip(new PointD(e.A.X, e.A.Y), new PointD(e.B.X, e.B.Y), 0.002));
+        return own.Count == 0 ? [] : Geo.Union(own);
+    }
+
+    /// <summary><paramref name="own"/> and every whole square within <paramref name="yard"/> squares of it (across or corner to corner).</summary>
+    static PathsD Reach(PathsD own, int yard)
+    {
+        if (yard <= 0) return own;
+        var grown = Clipper.InflatePaths(own, yard - 0.25, JoinType.Miter, EndType.Polygon, 4, 3);
+        static bool In(PathsD a, PointD p) => a.Count(path => Clipper.PointInPolygon(p, path) == PointInPolygonResult.IsInside) % 2 == 1;
+        var b = Geo.Bounds(grown);
+        var cells = new PathsD(own);
+        for (int x = (int)Math.Floor(b.left); x < Math.Ceiling(b.right); x++)
+            for (int y = (int)Math.Floor(b.top); y < Math.Ceiling(b.bottom); y++)
+                if (In(grown, new PointD(x + 0.5, y + 0.5))) cells.Add(Geo.Rect(x, y, x + 1, y + 1));
+        return Geo.Union(cells);
+    }
+
+    /// <summary>The ground floor's yard (mm) for floor tiles: the building's own, or the floor's when it has one set.</summary>
+    static double TileYardMm(HouseDesign d, BuildingSpec s, double sq) => d.Levels.Count > 0 && d.Levels[0].Yard is int y ? Math.Max(0, y) * sq : s.YardMm;
+
     // ---- railings ----
 
     /// <summary>
@@ -36,12 +83,11 @@ public static partial class HouseKitMaker
     public static List<RailingRun> RailingRuns(Level level, PlanShape below, PlanShape plan, double sheetMm, double columnMm)
     {
         if (!level.Railings) return [];
-        var area = new PathsD();
-        foreach (var r in below.Rooms) area.AddRange(r.Area);
-        foreach (var r in plan.Rooms) area.AddRange(r.Area);
-        foreach (var f in level.Floor) area.Add(Geo.Rect(f.X, f.Y, f.X + 1, f.Y + 1));
+        var area = FloorArea(level, below, plan);
         if (area.Count == 0) return [];
         var walls = level.Walls.ToHashSet();
+        // Stretches whose railing was taken away count as walled: the railing stops there.
+        walls.UnionWith(level.NoRailing);
         var joints = plan.Joints;
         var runs = new List<(GridPt A, GridPt B)>();
         foreach (var path in Geo.Union(area))
@@ -88,6 +134,8 @@ public static partial class HouseKitMaker
         double Trim((GridPt A, GridPt B) run, GridPt end)
         {
             if (joints.ContainsKey(end)) return columnMm / 2 + 0.2;
+            // A free end (the railing beside it was taken away): it stops on the grid point.
+            if (!runs.Any(o => o != run && (o.A == end || o.B == end) && Dir(o) != Dir(run) && Dir(o) != new GridPt(-Dir(run).X, -Dir(run).Y))) return 0;
             // Meeting another railing at a corner.
             bool across = run.A.Y == run.B.Y;
             return across ? -sheetMm / 2 : sheetMm / 2;
@@ -169,13 +217,13 @@ public static partial class HouseKitMaker
         level.RoomFloors.FirstOrDefault(f => plan.RoomAt(f.X, f.Y) == room.Index)?.Texture;
 
     /// <summary>One of the floor tile maker's textures over an area, laid from the corner of <paramref name="from"/> (so it follows the grid).</summary>
-    static (PathsD Etched, List<PathD> Lines) FloorTexture(BuildingSpec s, string name, PathsD region, RectD from, double sq, int seed)
+    static (PathsD Etched, List<PathD> Lines) FloorTexture(HouseDesign d, BuildingSpec s, string name, PathsD region, RectD from, double sq, int seed)
     {
         if (region.Count == 0 || FloorTextures.Preset(name) is not { } preset || name == FloorTextures.Plain) return ([], []);
         double w = from.right - from.left, h = from.bottom - from.top;
         if (w <= 0 || h <= 0) return ([], []);
         var (a, b) = FloorTextures.SizesFor(preset, sq);
-        var spec = new TileSpec { Texture = name, SquareMm = sq, SizeA = a, SizeB = b, GrooveMm = preset.UsesGroove ? preset.Groove : 0.5, Seed = seed, Etch = s.Etch, CracksPct = 0 };
+        var spec = new TileSpec { Texture = name, SquareMm = sq, SizeA = a, SizeB = b, GrooveMm = preset.UsesGroove ? preset.Groove : 0.5, Seed = seed, Etch = s.Etch, CracksPct = 0, Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
         var tex = FloorTextures.Make(spec, w, h, seed);
         PointD Map(PointD p) => new(from.left + p.x, from.top + p.y);
         var etched = new PathsD();
@@ -211,15 +259,13 @@ public static partial class HouseKitMaker
         if (!OnPlate(d, s) || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0) return;
         double T = s.WallSheetMm, Wt = BuildingKitMaker.WallThickness(s), C = s.ColumnMm;
         var level = d.Levels[0];
-        var area = new PathsD();
-        foreach (var r in plan.Rooms) area.AddRange(r.Area);
-        foreach (var f in level.Floor) area.Add(Geo.Rect(f.X, f.Y, f.X + 1, f.Y + 1));
-        foreach (var e in level.Walls) area.Add(Textures.Strip(new PointD(e.A.X, e.A.Y), new PointD(e.B.X, e.B.Y), 0.002));
+        var area = FloorArea(level, null, plan);
+        area.AddRange(OwnArea(level, plan));
         var mm = Geo.Map(Geo.Union(area), p => new PointD(p.x * sq, p.y * sq));
         var plate = Geo.Tidy(Geo.Union(Clipper.InflatePaths(mm, C / 2 + 2, JoinType.Miter, EndType.Polygon, 4, 3)));
         var foot = new PathsD();
         foreach (var e in level.Walls) foot.Add(Textures.Strip(new PointD(e.A.X * sq, e.A.Y * sq), new PointD(e.B.X * sq, e.B.Y * sq), Wt));
-        foreach (var (g, _) in plan.Joints) foot.Add(Geo.Rect(g.X * sq - C / 2, g.Y * sq - C / 2, g.X * sq + C / 2, g.Y * sq + C / 2));
+        foreach (var (g, dirs) in plan.Joints) foot.Add(ColumnFoot(level, s, g, dirs, sq));
         foot = Geo.Union(foot);
         var shows = Geo.Subtract(plate, foot);
         var etched = new PathsD();
@@ -230,12 +276,12 @@ public static partial class HouseKitMaker
             if (RoomTexture(level, plan, room) is not { } tex) continue;
             var roomMm = Geo.Map(room.Area, p => new PointD(p.x * sq, p.y * sq));
             var region = Geo.Intersect(roomMm, shows);
-            var (e1, l1) = FloorTexture(s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 17 + room.Index);
+            var (e1, l1) = FloorTexture(d, s, tex, region, Geo.Bounds(roomMm), sq, s.Seed + 17 + room.Index);
             etched.AddRange(e1);
             lines.AddRange(l1);
             own.AddRange(region);
         }
-        var (e0, l0) = FloorTexture(s, s.FloorTexture, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(plate), sq), sq, s.Seed + 7);
+        var (e0, l0) = FloorTexture(d, s, s.FloorTexture, own.Count > 0 ? Geo.Subtract(shows, Geo.Union(own)) : shows, OnGrid(Geo.Bounds(plate), sq), sq, s.Seed + 7);
         etched.AddRange(e0);
         lines.AddRange(l0);
         lines.AddRange(Geo.ClipLines(foot.Select(Geo.Loop), plate));
@@ -263,14 +309,14 @@ public static partial class HouseKitMaker
     {
         if (d.Levels.Count == 0 || OnPlate(d, s)) return;
         double T = s.WallSheetMm, Wt = BuildingKitMaker.WallThickness(s), C = s.ColumnMm, clear = 0.3;
-        var columns = new PathsD(plan.Joints.Keys.Select(g => Geo.Rect(g.X * sq - C / 2 - clear, g.Y * sq - C / 2 - clear, g.X * sq + C / 2 + clear, g.Y * sq + C / 2 + clear)));
+        var columns = Geo.Offset(new PathsD(plan.Joints.Select(j => ColumnFoot(d.Levels[0], s, j.Key, j.Value, sq))), clear);
         foreach (var room in plan.Rooms)
         {
             if (RoomTexture(d.Levels[0], plan, room) is not { } tex) continue;
             var roomMm = Geo.Map(room.Area, p => new PointD(p.x * sq, p.y * sq));
             var plate = Geo.Tidy(Geo.Subtract(Clipper.InflatePaths(roomMm, -(Wt / 2 + clear), JoinType.Miter, EndType.Polygon, 4, 3), columns));
             if (Geo.Area(plate) < 50) continue;
-            var (etched, lines) = FloorTexture(s, tex, plate, Geo.Bounds(roomMm), sq, s.Seed + 17 + room.Index);
+            var (etched, lines) = FloorTexture(d, s, tex, plate, Geo.Bounds(roomMm), sq, s.Seed + 17 + room.Index);
             var b = Geo.Bounds(plate);
             if (Math.Max(b.right - b.left, b.bottom - b.top) > longestMm || Math.Min(b.right - b.left, b.bottom - b.top) > longestMm)
                 findings.Add(new(Severity.Warn, $"Room {room.Index + 1}'s floor is bigger than the bed: cut it in two by hand, or leave it plain."));
@@ -354,7 +400,8 @@ public static partial class HouseKitMaker
             double lip = WallKitMaker.ColumnLip(wall);
             double baseY = BuildingKitMaker.StoreyBase(s, r.Level) + WallKitMaker.ColumnTopMm(wall);
             var rectMm = new PathsD { Geo.Rect(r.X0 * sq, r.Y0 * sq, r.X1 * sq, r.Y1 * sq) };
-            if (r.Level + 1 < levels && plates[r.Level + 1].Count > 0 && Geo.Area(Geo.Intersect(rectMm, plates[r.Level + 1])) > sq * sq * 0.25)
+            // (The floor above reaches half a column past its edge onto the walls: that much is no matter.)
+            if (r.Level + 1 < levels && plates[r.Level + 1].Count > 0 && Geo.Area(Geo.Intersect(rectMm, Geo.Offset(plates[r.Level + 1], -(s.ColumnMm / 2 + 0.5)))) > sq * sq * 0.25)
                 findings.Add(new(Severity.Warn, $"{what} is under floor {r.Level + 2}'s floor: put it on the floor above, or over rooms with nothing above them."));
             for (int j = 0; j < i; j++)
             {
@@ -370,7 +417,7 @@ public static partial class HouseKitMaker
 
             if (r.Kind == RoofKind.Flat)
             {
-                FlatRoof(s, r, i, n, sq, lip, oneRoom, centre, pieces, solids, findings);
+                FlatRoof(d, s, r, i, n, sq, lip, oneRoom, centre, pieces, solids, findings);
                 continue;
             }
             var spec = RoofSpecFor(d, r, plans[r.Level], i)!;
@@ -403,7 +450,7 @@ public static partial class HouseKitMaker
     }
 
     /// <summary>A flat roof: a plate over the column caps with its covering etched on, and a frame under it inside the walls when it's over one room.</summary>
-    static void FlatRoof(BuildingSpec s, RoofArea r, int i, int n, double sq, double lip, bool oneRoom, V3 centre,
+    static void FlatRoof(HouseDesign d, BuildingSpec s, RoofArea r, int i, int n, double sq, double lip, bool oneRoom, V3 centre,
         List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
     {
         double T = s.WallSheetMm, C = s.ColumnMm, Wt = BuildingKitMaker.WallThickness(s);
@@ -411,7 +458,7 @@ public static partial class HouseKitMaker
         string label = n == 1 ? "Roof" : $"Roof {i + 1}";
         var plate = new PathsD { Geo.Rect(-w / 2, -h / 2, w / 2, h / 2) };
         string tex = FloorTextures.Preset(r.Covering) is not null ? r.Covering : "Stone blocks";
-        var (etched, lines) = FloorTexture(s, tex, plate, new RectD(-w / 2, -h / 2, w / 2, h / 2), sq, s.Seed + 211 + i);
+        var (etched, lines) = FloorTexture(d, s, tex, plate, new RectD(-w / 2, -h / 2, w / 2, h / 2), sq, s.Seed + 211 + i);
         PointD Flip(PointD p) => new(p.x, -p.y);
         var etchF = Geo.Map(etched, Flip);
         var linesF = Geo.Map(lines, Flip);

@@ -137,10 +137,12 @@ public sealed class Scene3D
     /// A flat piece cut from a sheet: <paramref name="outline"/> (outlines anticlockwise, holes clockwise, in the
     /// piece's own u, v) placed by <paramref name="frame"/>, from <paramref name="w0"/> to <paramref name="w1"/>
     /// through its thickness (w1 is the top: what's <paramref name="etched"/> and <paramref name="scored"/> goes on it).
-    /// <paramref name="faces"/> and <paramref name="sides"/> leave out its two faces or its edges.
+    /// <paramref name="faces"/> and <paramref name="sides"/> leave out its two faces or its edges. With
+    /// <paramref name="etchDepth"/> above 0 what's etched is sunk that deep into the top, with the sides of the
+    /// grooves lit as they face, so you can see how the engraving will stand out; otherwise it's painted on.
     /// </summary>
     public void AddSlab(PathsD outline, Frame3 frame, double w0, double w1, SlabStyle style, PathsD? etched = null, IEnumerable<PathD>? scored = null,
-        int group = 0, bool faces = true, bool sides = true)
+        int group = 0, bool faces = true, bool sides = true, double etchDepth = 0)
     {
         var loops = outline.Where(c => c.Count >= 3).ToList();
         if (loops.Count == 0) return;
@@ -149,7 +151,35 @@ public sealed class Scene3D
         Vec3 At(PointD p, double w) => frame.At(p.x, p.y, w);
         bool edged = style.Edge.A > 0;
         int top = -1, bottom = -1;
-        if (faces)
+        double depth = Math.Min(etchDepth, (w1 - w0) * 0.9);
+        if (faces && depth > 0 && etched is { Count: > 0 })
+        {
+            // Sunk in: the top with the grooves as holes, their floors lower down, and their sides.
+            var grooves = Clipper.Union(Clipper.SimplifyPaths(new PathsD(etched.Where(c => c.Count >= 3)), 0.08), Clipper2Lib.FillRule.NonZero)
+                .Where(c => c.Count >= 3 && Math.Abs(Clipper.Area(c)) > 0.01).ToList();
+            top = AddFace(loops.Concat(grooves).Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group);
+            bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group);
+            double floor = w1 - depth;
+            AddFace(grooves.Select(c => c.Select(p => At(p, floor)).ToArray()), n, Shade(style.Etched, 0.92), group);
+            foreach (var c in grooves)
+            {
+                // Outer edges of an etched area run anticlockwise, the edges of islands in it clockwise: the
+                // groove's side faces into the groove, to the left of the edge.
+                for (int i = 0; i < c.Count; i++)
+                {
+                    var a = c[i];
+                    var b = c[(i + 1) % c.Count];
+                    double dx = b.x - a.x, dy = b.y - a.y, len = Math.Sqrt(dx * dx + dy * dy);
+                    if (len < 1e-6) continue;
+                    var into = (frame.U * (-dy / len) + frame.V * (dx / len)).Unit;
+                    AddFace([[At(a, w1), At(a, floor), At(b, floor), At(b, w1)]], into, Shade(style.Paint(into, true), 0.9), group);
+                }
+            }
+            if (scored is not null)
+                foreach (var l in scored)
+                    if (l.Count >= 2) AddLine(top, [.. l.Select(p => At(p, w1))], style.Score, style.ScoreWidth);
+        }
+        else if (faces)
         {
             top = AddFace(loops.Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group);
             bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group);
