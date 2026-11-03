@@ -300,13 +300,18 @@ Guides are lines across the work area to line things up against.
 | To | Do this |
 |---|---|
 | Zoom in or out where the cursor is | Turn the mouse wheel. |
-| Zoom in or out about the middle of the view | View → **Zoom in**, View → **Zoom out**, or `Ctrl+=` and `Ctrl+-` (the keypad's + and − work too). |
-| See the whole work area | View → **Fit bed**, `Home` or `Ctrl+0`. |
+| Zoom in or out about the middle of the view | View → **Zoom in**, View → **Zoom out**, `Ctrl+=` and `Ctrl+-` (the keypad's + and − work too), or the last two zoom buttons. |
+| See the whole work area | View → **Fit bed**, `Home`, `Ctrl+0`, or the first zoom button. |
 | Fill the view with the selection (or the whole design if nothing is selected) | View → **Fit selection** or `F`. Right-click → Zoom to it does the same. |
+| Fill the view with the whole design, whatever is selected | View → **Fit design**, `Shift+F`, or the second zoom button. |
 | Pan | Hold `Space` and drag, drag with the middle mouse button, or choose Home → **Pan** (`H`) and drag. |
 | Scroll sideways | `Shift` + mouse wheel. |
 | Scroll up and down | `Ctrl` + mouse wheel. |
 
+- **The zoom buttons** are the four small icons in the work area's bottom-right corner, from left
+  to right: the whole bed, the whole design, zoom in and zoom out. Hover over one for its
+  shortcut. They sit in the margin around the bed, so they don't cover it when it's fitted; with
+  the close-up camera open, its picture sits just above them.
 - The status bar shows the zoom: 100% is about life size on a typical screen. It goes from about
   5% to about 10 000%.
 - The program opens showing the whole work area, or, when it reopens your last design, the view
