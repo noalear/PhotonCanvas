@@ -8,12 +8,13 @@ using PhotonCanvas.App;
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>What dragging on the plan does.</summary>
-public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor }
+public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof }
 
 /// <summary>
 /// The floor plan, seen from above on a grid of squares: draw walls along the grid lines (or corner to
 /// corner), drag out a whole room at once, rub walls out, drop doors and windows into the walls and drag
-/// them along, and lay floor outside the rooms (a balcony). The floor below shows faintly underneath.
+/// them along, lay floor outside the rooms (a balcony), and put roofs over them. The floor below shows
+/// faintly underneath, and the railings that will go round open floor show along its edges.
 /// Scroll to zoom, drag with the middle or right button to move about.
 /// </summary>
 public sealed class PlanEditor : Control
@@ -43,6 +44,10 @@ public sealed class PlanEditor : Control
     public PlanTool Tool { get; set; } = PlanTool.Wall;
     /// <summary>The door or window picked (its index on this floor), or −1.</summary>
     public int Selected { get; private set; } = -1;
+    /// <summary>The roof picked (its index in the design), or −1.</summary>
+    public int SelectedRoof { get; private set; } = -1;
+    /// <summary>The room picked: a point in it (squares), or null.</summary>
+    public (double X, double Y)? SelectedRoom { get; private set; }
 
     /// <summary>The design was changed on the plan (what changed, for Undo).</summary>
     public event Action<HouseDesign, string>? Changed;
@@ -67,6 +72,8 @@ public sealed class PlanEditor : Control
         _plan = PlanShape.Of(design.Levels[_level].Walls);
         _below = _level > 0 ? PlanShape.Of(design.Levels[_level - 1].Walls) : null;
         if (Selected >= design.Levels[_level].Openings.Count) Select(-1);
+        if (SelectedRoof >= 0 && (SelectedRoof >= design.Roofs.Count || design.Roofs[SelectedRoof].Level != _level)) SelectRoof(-1);
+        if (SelectedRoom is { } rm && _plan.RoomAt(rm.X, rm.Y) < 0) SelectRoom(null);
         if (!_fitted && Bounds.Width > 0) FitAll();
         InvalidateVisual();
     }
@@ -78,15 +85,31 @@ public sealed class PlanEditor : Control
         InvalidateVisual();
     }
 
-    public void Select(int i)
+    public void Select(int i) => Pick(i, -1, null);
+
+    public void SelectRoof(int i) => Pick(-1, i, null);
+
+    public void SelectRoom((double X, double Y)? at) => Pick(-1, -1, at);
+
+    /// <summary>Picks one thing (a door or window, a roof or a room) and nothing else.</summary>
+    void Pick(int opening, int roof, (double X, double Y)? room)
     {
-        if (Selected == i) return;
-        Selected = i;
+        if (Selected == opening && SelectedRoof == roof && SelectedRoom == room) return;
+        Selected = opening;
+        SelectedRoof = roof;
+        SelectedRoom = room;
         SelectionChanged?.Invoke();
         InvalidateVisual();
     }
 
     Level Floor => _design.Levels[_level];
+
+    void CommitDesign(HouseDesign design, string what)
+    {
+        _design = design;
+        Changed?.Invoke(_design, what);
+        InvalidateVisual();
+    }
 
     void Commit(Level level, string what)
     {
@@ -158,6 +181,18 @@ public sealed class PlanEditor : Control
         return best;
     }
 
+    /// <summary>The roof on this floor under the pointer (the last one drawn, if they overlap), or −1.</summary>
+    int RoofAt(Point p)
+    {
+        var (x, y) = ToPlan(p);
+        for (int i = _design.Roofs.Count - 1; i >= 0; i--)
+        {
+            var r = _design.Roofs[i];
+            if (r.Level == _level && x >= r.X0 && x <= r.X1 && y >= r.Y0 && y <= r.Y1) return i;
+        }
+        return -1;
+    }
+
     int OpeningAt(Point p)
     {
         var (x, y) = ToPlan(p);
@@ -191,9 +226,23 @@ public sealed class PlanEditor : Control
             case PlanTool.Select:
             {
                 int i = OpeningAt(pt.Position);
-                Select(i);
-                _moving = i;
-                _moveFrom = _design;
+                if (i >= 0)
+                {
+                    Select(i);
+                    _moving = i;
+                    _moveFrom = _design;
+                    break;
+                }
+                var (x, y) = ToPlan(pt.Position);
+                SelectRoom(_plan.RoomAt(x, y) >= 0 ? (x, y) : null);
+                break;
+            }
+            case PlanTool.Roof:
+            {
+                int i = RoofAt(pt.Position);
+                if (i >= 0) { SelectRoof(i); break; }
+                _from = Snap(pt.Position);
+                _to = _from.Value;
                 break;
             }
             case PlanTool.Door or PlanTool.Doorway or PlanTool.Window:
@@ -331,6 +380,17 @@ public sealed class PlanEditor : Control
                 foreach (var w in RoomEdges(a, b)) walls.Add(w);
                 Commit(Floor with { Walls = [.. walls] }, "Draw a room");
                 break;
+            case PlanTool.Roof:
+            {
+                if (a.X == b.X || a.Y == b.Y) break;
+                var roof = RoofArea.Over(_level, a, b, _design.Style);
+                // Like the roof picked before: its shape, pitch and covering.
+                if (SelectedRoof >= 0 && SelectedRoof < _design.Roofs.Count && _design.Roofs[SelectedRoof] is { } like)
+                    roof = roof with { Kind = like.Kind, PitchDeg = like.PitchDeg, Covering = like.Covering, EaveMm = like.EaveMm, Window = like.Window, Turn = like.Kind == RoofKind.LeanTo ? like.Turn : roof.Turn };
+                CommitDesign(_design with { Roofs = [.. _design.Roofs, roof] }, "Put on a roof");
+                SelectRoof(_design.Roofs.Count - 1);
+                break;
+            }
             case PlanTool.Erase:
             {
                 var gone = a == b ? NearestEdge(_mouse) is { } one ? [one] : new List<WallEdge>() : Edges(a, b).ToList();
@@ -389,7 +449,14 @@ public sealed class PlanEditor : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Key is Key.Delete or Key.Back && Selected >= 0 && Selected < Floor.Openings.Count)
+        if (e.Key is Key.Delete or Key.Back && SelectedRoof >= 0 && SelectedRoof < _design.Roofs.Count)
+        {
+            int i = SelectedRoof;
+            SelectRoof(-1);
+            CommitDesign(_design with { Roofs = [.. _design.Roofs.Where((_, j) => j != i)] }, "Take away a roof");
+            e.Handled = true;
+        }
+        else if (e.Key is Key.Delete or Key.Back && Selected >= 0 && Selected < Floor.Openings.Count)
         {
             int i = Selected;
             Select(-1);
@@ -487,11 +554,18 @@ public sealed class PlanEditor : Control
             ctx.DrawRectangle(new SolidColorBrush(_erasing ? Color.FromArgb(0x50, 0xD0, 0x40, 0x30) : Color.FromArgb(0x70, 0xC8, 0xA8, 0x78)), laidPen, r);
         }
 
-        // The rooms.
+        // The rooms, with the floor pattern of any that has its own.
         foreach (var r in _plan.Rooms)
         {
             var c = RoomColours[r.Index % RoomColours.Length];
             ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0xC0, c.R, c.G, c.B)), null, Shape(r.Area));
+            if (_scale >= 14 && HouseKitMaker.RoomTexture(Floor, _plan, r) is { } tex)
+            {
+                var b = Walls.Geo.Bounds(r.Area);
+                var ft = new FormattedText(tex, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Italic), Math.Clamp(_scale * 0.3, 9, 13), new SolidColorBrush(Color.FromRgb(0x6A, 0x5A, 0x48)));
+                var mid = ToScreen((b.left + b.right) / 2, (b.top + b.bottom) / 2 + 0.8);
+                ctx.DrawText(ft, new Point(mid.X - ft.Width / 2, mid.Y - ft.Height / 2));
+            }
         }
 
         // The walls, then the columns at every joint.
@@ -526,8 +600,22 @@ public sealed class PlanEditor : Control
             }
         }
 
+        // The roofs on this floor, and the railings round its open floor.
+        DrawRailings(ctx);
+        for (int i = 0; i < _design.Roofs.Count; i++)
+            if (_design.Roofs[i].Level == _level) DrawRoof(ctx, _design.Roofs[i], i, i == SelectedRoof);
+            else if (_design.Roofs[i].Level == _level - 1) DrawRoofBelow(ctx, _design.Roofs[i]);
+        if (SelectedRoom is { } picked && _plan.RoomAt(picked.X, picked.Y) is >= 0 and var ri)
+            ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0)), 2.5, new DashStyle([3, 2], 0)), Shape(_plan.Rooms[ri].Area));
+
         // What's being drawn.
-        if (_from is { } a && Tool is PlanTool.Wall or PlanTool.Room or PlanTool.Erase)
+        if (_from is { } ra && Tool == PlanTool.Roof)
+        {
+            var r = new Rect(ToScreen(Math.Min(ra.X, _to.X), Math.Min(ra.Y, _to.Y)), ToScreen(Math.Max(ra.X, _to.X), Math.Max(ra.Y, _to.Y)));
+            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x50, 0xA0, 0x50, 0x38)), new Pen(new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0)), 2, new DashStyle([3, 2], 0)), r);
+            Label(ctx, ToScreen(_to.X, _to.Y) + new Point(12, 8), $"Roof {Math.Abs(_to.X - ra.X)} × {Math.Abs(_to.Y - ra.Y)} squares");
+        }
+        else if (_from is { } a && Tool is PlanTool.Wall or PlanTool.Room or PlanTool.Erase)
         {
             var colour = Tool == PlanTool.Erase ? Color.FromArgb(0xC0, 0xD0, 0x40, 0x30) : Color.FromArgb(0xB0, 0x30, 0x80, 0xD0);
             var pen = new Pen(new SolidColorBrush(colour), wallPx, lineCap: PenLineCap.Square);
@@ -540,7 +628,7 @@ public sealed class PlanEditor : Control
         else if (_inside && _from is null && _moving < 0)
         {
             // Where a click would go.
-            if (Tool is PlanTool.Wall or PlanTool.Room or PlanTool.Erase)
+            if (Tool is PlanTool.Wall or PlanTool.Room or PlanTool.Erase or PlanTool.Roof)
             {
                 var g = Snap(_mouse);
                 var c = ToScreen(g.X, g.Y);
@@ -561,6 +649,89 @@ public sealed class PlanEditor : Control
                 : "This floor is empty. The floor below shows faintly: draw this floor's walls on top of it (a room here gets a floor under it).";
             var ft = new FormattedText(hint, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 13, UiKit.Brush("TextMuted")) { MaxTextWidth = Math.Max(80, bounds.Width - 60), TextAlignment = TextAlignment.Center };
             ctx.DrawText(ft, new Point((bounds.Width - ft.Width) / 2, 18));
+        }
+    }
+
+    static readonly Color RoofColour = Color.FromRgb(0x9A, 0x4E, 0x36);
+
+    /// <summary>A roof seen from above: its outline, its ridge (and hips), or which way a lean-to slopes, and its number.</summary>
+    void DrawRoof(DrawingContext ctx, RoofArea r, int index, bool selected)
+    {
+        var tl = ToScreen(r.X0, r.Y0);
+        var br = ToScreen(r.X1, r.Y1);
+        var rect = new Rect(tl, br);
+        ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x40, RoofColour.R, RoofColour.G, RoofColour.B)), null, rect);
+        var pen = new Pen(new SolidColorBrush(RoofColour), 2);
+        var thin = new Pen(new SolidColorBrush(Color.FromArgb(0xC0, RoofColour.R, RoofColour.G, RoofColour.B)), 1.5);
+        ctx.DrawRectangle(null, pen, rect);
+        var mid = rect.Center;
+        bool across = r.RidgeAcross;
+        switch (r.Kind)
+        {
+            case RoofKind.Gable:
+                ctx.DrawLine(pen, across ? new Point(rect.Left, mid.Y) : new Point(mid.X, rect.Top), across ? new Point(rect.Right, mid.Y) : new Point(mid.X, rect.Bottom));
+                break;
+            case RoofKind.Hip:
+            {
+                // The ridge along the longer side, the hips down to the corners.
+                bool wide = rect.Width >= rect.Height;
+                double inset = (wide ? rect.Height : rect.Width) / 2;
+                var a = wide ? new Point(rect.Left + inset, mid.Y) : new Point(mid.X, rect.Top + inset);
+                var b = wide ? new Point(rect.Right - inset, mid.Y) : new Point(mid.X, rect.Bottom - inset);
+                ctx.DrawLine(pen, a, b);
+                ctx.DrawLine(thin, rect.TopLeft, a); ctx.DrawLine(thin, rect.BottomLeft, wide ? a : b);
+                ctx.DrawLine(thin, rect.TopRight, wide ? b : a); ctx.DrawLine(thin, rect.BottomRight, b);
+                break;
+            }
+            case RoofKind.LeanTo:
+            {
+                // An arrow down the slope.
+                var (_, f) = HouseKitMaker.Directions(r.Turn);
+                double len = (f.X != 0 ? rect.Width : rect.Height) * 0.3;
+                var from = mid - new Vector(f.X, f.Y) * len;
+                var to = mid + new Vector(f.X, f.Y) * len;
+                ctx.DrawLine(pen, from, to);
+                var side = new Vector(-f.Y, f.X) * 6;
+                var back = new Vector(f.X, f.Y) * 9;
+                ctx.DrawLine(pen, to, to - back + side);
+                ctx.DrawLine(pen, to, to - back - side);
+                break;
+            }
+            default:
+                ctx.DrawRectangle(null, thin, rect.Deflate(Math.Min(8, Math.Min(rect.Width, rect.Height) / 6)));
+                break;
+        }
+        if (selected) ctx.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0)), 2.5, new DashStyle([3, 2], 0)), rect.Inflate(4));
+        if (_scale >= 12)
+        {
+            string text = $"Roof {index + 1}";
+            var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, weight: FontWeight.Bold), 11, Brushes.White);
+            var at = new Point(rect.Left + 5, rect.Top + 4);
+            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0xD0, RoofColour.R, RoofColour.G, RoofColour.B)), null, new Rect(at.X - 3, at.Y - 1, ft.Width + 6, ft.Height + 2), 3, 3);
+            ctx.DrawText(ft, at);
+        }
+    }
+
+    /// <summary>A roof on the floor below, faintly: this floor mustn't stand on it.</summary>
+    void DrawRoofBelow(DrawingContext ctx, RoofArea r) =>
+        ctx.DrawRectangle(null, new Pen(new SolidColorBrush(Color.FromArgb(0x90, RoofColour.R, RoofColour.G, RoofColour.B)), 1.5, new DashStyle([4, 3], 0)), new Rect(ToScreen(r.X0, r.Y0), ToScreen(r.X1, r.Y1)));
+
+    /// <summary>The railings that go round this floor's open edges: a rail with balusters.</summary>
+    void DrawRailings(DrawingContext ctx)
+    {
+        if (_below is not { } below) return;
+        var runs = HouseKitMaker.RailingRuns(Floor, below, _plan, _design.Style.WallSheetMm, _design.Style.ColumnMm);
+        if (runs.Count == 0) return;
+        var rail = new Pen(new SolidColorBrush(Color.FromRgb(0x8A, 0x6A, 0x40)), Math.Max(2, _scale * 0.06));
+        var post = new SolidColorBrush(Color.FromRgb(0x6A, 0x4E, 0x2E));
+        double r = Math.Max(1.5, _scale * 0.05);
+        foreach (var run in runs)
+        {
+            var a = ToScreen(run.A.X, run.A.Y);
+            var b = ToScreen(run.B.X, run.B.Y);
+            ctx.DrawLine(rail, a, b);
+            int dots = Math.Max(1, (int)(run.Steps * (run.Diagonal ? 1.41 : 1) * 4));
+            for (int i = 1; i < dots; i++) ctx.DrawEllipse(post, null, a + (b - a) * (i / (double)dots), r, r);
         }
     }
 
