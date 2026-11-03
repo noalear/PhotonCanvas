@@ -61,7 +61,7 @@ public sealed class BuildingWindow : Window
     readonly NumericUpDown _wallMm = Number(6, 60, 1, "0.#");
     readonly ComboBox _winFill = Combo("Nothing (bars left in the wall)", "A frame with its bars", "A shutter, glued in", "Shutters that open");
     Control _wallMmRow = null!, _winFillRow = null!;
-    readonly ComboBox _texture = Combo(), _upper = Combo(), _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
+    readonly ComboBox _texture = Combo(), _upper = Combo(), _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)", "Relief (carved in depth, slowest)");
     readonly List<string> _textures = [.. Textures.Presets.Select(p => p.Name)];
     readonly ComboBox _wallCut = Combo(), _etchWith = Combo();
     readonly TextBlock _wallCutNote = Hint();
@@ -347,7 +347,7 @@ public sealed class BuildingWindow : Window
         _wallT.Value = D(s.WallSheetMm); _twoSided.IsChecked = s.TwoSided; _fit.Value = D(s.FitMm); _column.Value = D(s.ColumnMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _texture.SelectedIndex = Math.Max(0, _textures.IndexOf(s.Texture));
         _upper.SelectedIndex = s.UpperTexture is { Length: > 0 } up && _textures.IndexOf(up) is >= 0 and var ui ? ui + 1 : 0;
-        _etch.SelectedIndex = (int)s.Etch;
+        _etch.SelectedIndex = s.Relief ? 2 : (int)s.Etch;
         _furnT.Value = D(s.FurnitureSheetMm); _furnFit.Value = D(s.FurnitureFitMm); _detail.SelectedIndex = (int)s.Detail;
         _joints.SelectedIndex = s.FurniturePushFit ? 1 : 0; _grip.Value = D(Math.Clamp(s.FurnitureGripMm, 0.02, 0.5)); _gripRow.IsVisible = s.FurniturePushFit;
         _wallMmRow.IsVisible = _winFillRow.IsVisible = s.BoxWalls; _twoSided.IsVisible = !s.BoxWalls;
@@ -377,7 +377,7 @@ public sealed class BuildingWindow : Window
             FloorTiles = _tiles.IsChecked == true, FloorTexture = PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets[Math.Clamp(Index(_tileTexture), 0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Count - 1)].Name,
             SquareMm = V(_square, 25.4), YardMm = V(_yard, 0),
             WallSheetMm = V(_wallT, 3), TwoSided = _twoSided.IsChecked == true, FitMm = V(_fit, 0.15), ColumnMm = V(_column, 16), Seed = (int)V(_seed, 1),
-            Texture = _textures[Math.Clamp(Index(_texture), 0, _textures.Count - 1)], UpperTexture = upper, Etch = (EtchStyle)Index(_etch),
+            Texture = _textures[Math.Clamp(Index(_texture), 0, _textures.Count - 1)], UpperTexture = upper, Etch = Index(_etch) == 1 ? EtchStyle.Lines : EtchStyle.Grooves, Relief = Index(_etch) == 2,
             FurnitureSheetMm = V(_furnT, 2), FurnitureFitMm = V(_furnFit, 0.1), Detail = (WoodDetail)Index(_detail),
             FurniturePushFit = _joints.SelectedIndex == 1, FurnitureGripMm = V(_grip, 0.15),
         };
@@ -423,7 +423,7 @@ public sealed class BuildingWindow : Window
         _spec = s with
         {
             WallSheetMm = _spec.WallSheetMm, TwoSided = _spec.TwoSided, FitMm = _spec.FitMm, WindowFill = _spec.WindowFill,
-            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Seed = _spec.Seed, Etch = _spec.Etch,
+            FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Seed = _spec.Seed, Etch = _spec.Etch, Relief = _spec.Relief,
         };
         _sel = 0;
         Load();
@@ -644,7 +644,8 @@ public sealed class BuildingWindow : Window
             _editing = (id, spec);
             _make.Content = "Update in the design";
             _status.Text = $"{(options.Replace is null ? "Put" : "Updated")} {kit.PieceCount} pieces in the design over {pages} page{(pages == 1 ? "" : "s")} (a bed each)" +
-                           $": outlines on \"{Placement.CutLayer}\", the texture and detail on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).";
+                           (spec.Relief ? $": outlines on \"{Placement.CutLayer}\", the texture and detail as depth maps on \"{Placement.ReliefLayer}\" (carved first, in slices)."
+                                         : $": outlines on \"{Placement.CutLayer}\", the texture and detail on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).");
         }
         catch (InvalidOperationException ex) { _status.Text = ex.Message; }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)

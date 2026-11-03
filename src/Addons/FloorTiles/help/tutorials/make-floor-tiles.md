@@ -25,7 +25,8 @@ the outside get straight edges.
 ## Choose a texture
 <!-- target: tabitem:Texture -->
 On the **Texture** tab, pick **Dungeon flagstones**, or flagstones, cobbles, floorboards, brick or
-metal. Each tile gets its own layout of stones.
+metal. Each tile gets its own layout of stones. **Etch as** *Relief* carves them in depth, each
+stone at its own height, instead of etching them flat (much slower).
 
 ## Or pick a theme
 <!-- target: field:Theme -->

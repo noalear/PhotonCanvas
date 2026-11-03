@@ -65,6 +65,7 @@ public sealed class BridgesWindow : Window
     static readonly double[] Scales = [15, 28, 32, 54];
     readonly NumericUpDown _thick = Number(0.3m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0");
     readonly CheckBox _grain = new() { Content = "Wood grain and rope twist scored on" };
+    readonly CheckBox _relief = new CheckBox { Content = "Carve as a relief (greyscale depth map, much slower)" }.With(c => ToolTip.SetTip(c, "Carve the detail as a greyscale depth map in slices instead of etching it at one depth: each stone or plank at its own height, edges rounded into the grooves. The most real, and much slower."));
     readonly CheckBox _metal = new() { Content = "Metal deck: grating on the planks, rivets on the beams (sci-fi gantry)" };
     readonly ComboBox _theme = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = BridgeThemes.Names.ToList(), SelectedIndex = 0 };
     readonly TextBlock _themeAbout = Hint();
@@ -238,6 +239,7 @@ public sealed class BridgesWindow : Window
                 Field("Figures", _scale, tip: "Changing it scales every size to suit figures that size.")),
             Explained("Detail", "Scored and etched on the faces that show.",
                 _grain,
+                _relief,
                 _metal,
                 Field("Variation", new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _seed, shuffle.With(b => Grid.SetColumn(b, 1)) } },
                     tip: "Stones, grain and rough planks are laid out at random: each number gives a different layout.")),
@@ -296,6 +298,7 @@ public sealed class BridgesWindow : Window
         _kind.SelectionChanged += (_, _) => KindChosen();
         foreach (var n in new[] { _thick, _fit, _seed }) n.ValueChanged += (_, _) => SheetChanged();
         _grain.IsCheckedChanged += (_, _) => SheetChanged();
+        _relief.IsCheckedChanged += (_, _) => SheetChanged();
         _metal.IsCheckedChanged += (_, _) => SheetChanged();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
         _etchWith.SelectionChanged += (_, _) => SheetChanged();
@@ -354,6 +357,7 @@ public sealed class BridgesWindow : Window
         _loading = true;
         _thick.Value = D(_spec.ThicknessMm); _fit.Value = D(_spec.FitMm); _seed.Value = Math.Clamp(_spec.Seed, 1, 9999);
         _grain.IsChecked = _spec.Grain;
+        _relief.IsChecked = _spec.Relief;
         _metal.IsChecked = _spec.Metal;
         int sc = Array.FindIndex(Scales, x => Math.Abs(x - _spec.ScaleMm) < 1e-6);
         _scale.SelectedIndex = sc < 0 ? 1 : sc;
@@ -472,7 +476,7 @@ public sealed class BridgesWindow : Window
     void SheetChanged()
     {
         if (_loading) return;
-        _spec = _spec with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Grain = _grain.IsChecked == true, Metal = _metal.IsChecked == true };
+        _spec = _spec with { ThicknessMm = V(_thick, 2), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Grain = _grain.IsChecked == true, Relief = _relief.IsChecked == true, Metal = _metal.IsChecked == true };
         Changed();
     }
 
@@ -593,7 +597,8 @@ public sealed class BridgesWindow : Window
             int pieces = kit.PieceCount;
             _status.Text = $"{(replace is null ? "Put" : "Updated")} {pieces} piece{(pieces == 1 ? "" : "s")} in the design" +
                            (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
-                           $": outlines on \"{Placement.CutLayer}\", the detail on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).";
+                           (spec.Relief ? $": outlines on \"{Placement.CutLayer}\", the detail as depth maps on \"{Placement.ReliefLayer}\" (carved first, in slices)."
+                                        : $": outlines on \"{Placement.CutLayer}\", the detail on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).");
         }
         catch (InvalidOperationException ex) { _status.Text = ex.Message; }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)

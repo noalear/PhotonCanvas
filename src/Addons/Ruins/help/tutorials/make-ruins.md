@@ -20,6 +20,7 @@ sheet, height, texture and variation, so its bricks line up with theirs.
 <!-- target: field:Theme -->
 **Theme** at the top of the **Texture** tab gives the ruin a look of its own: dungeon blocks, cave
 rock, sci-fi panels (the rubble comes out as twisted plates), sandstone or fine gothic stone.
+**Etch as** *Relief* carves the bricks or stones in depth instead of etching them flat (much slower).
 
 ## Size the wall and its ends
 <!-- target: field:Length -->

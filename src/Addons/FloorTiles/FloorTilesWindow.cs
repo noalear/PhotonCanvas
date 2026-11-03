@@ -50,7 +50,7 @@ public sealed class FloorTilesWindow : Window
     Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!, _seedRow = null!, _cracksRow = null!;
     readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
     Control _wearRow = null!, _detailRow = null!;
-    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
+    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)", "Relief (carved in depth, slowest)");
     readonly ComboBox _grid = Combo("Not marked (the texture shows them)", "Scored lines", "Etched grooves");
 
     // Joints
@@ -221,7 +221,7 @@ public sealed class FloorTilesWindow : Window
                 _textureAbout,
                 _sizeARow, _sizeBRow, _grooveRow, _seedRow, _cracksRow,
                 _wearRow, _detailRow,
-                Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each stone or board (much quicker).")),
+                Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each stone or board (much quicker). Relief carves a greyscale depth map in slices: each piece at its own height, edges rounded into the grooves (the most real, and much slower).")),
             Explained("Grid squares", "Mark the squares on the tiles for games that count movement. Dungeon flagstones follow the grid already.",
                 Field("Mark squares", _grid)));
     }
@@ -453,7 +453,7 @@ public sealed class FloorTilesWindow : Window
         foreach (var t in s.Tiles) AddSizeRow(t);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(Math.Max(0.5, s.SizeB)); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999); _cracks.Value = D(s.CracksPct);
         _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : FloorTextures.Preset(s.Texture)?.Detail ?? 0.6, 0.2, 5));
-        _etch.SelectedIndex = (int)s.Etch; _grid.SelectedIndex = (int)s.Grid;
+        _etch.SelectedIndex = s.Relief ? 2 : (int)s.Etch; _grid.SelectedIndex = (int)s.Grid;
         _theme.SelectedIndex = Math.Max(0, FloorThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = FloorThemes.About(s.Theme);
         _join.SelectedIndex = (int)s.Join; _tab.Value = D(s.TabMm); _fit.Value = D(s.FitMm); _magnet.Value = D(s.MagnetMm); _base.IsChecked = s.BaseLayer;
         _loading = false;
@@ -469,7 +469,7 @@ public sealed class FloorTilesWindow : Window
         Tiles = [.. _sizeRows.Select(r => r.Value)],
         Theme = ThemeName, Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 50), SizeB = V(_sizeB, 0), GrooveMm = V(_groove, 0.8), Seed = (int)V(_seed, 1), CracksPct = V(_cracks, 15),
         Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.6),
-        Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), Grid = (GridMarks)Math.Max(0, _grid.SelectedIndex),
+        Etch = _etch.SelectedIndex == 1 ? EtchStyle.Lines : EtchStyle.Grooves, Relief = _etch.SelectedIndex == 2, Grid = (GridMarks)Math.Max(0, _grid.SelectedIndex),
         Join = (TileJoin)Math.Max(0, _join.SelectedIndex), TabMm = V(_tab, 5), FitMm = V(_fit, 0.15), MagnetMm = V(_magnet, 5), BaseLayer = _base.IsChecked == true,
     };
 
@@ -576,7 +576,8 @@ public sealed class FloorTilesWindow : Window
             int pieces = kit.PieceCount;
             _status.Text = $"{(replace is null ? "Put" : "Updated")} {pieces} piece{(pieces == 1 ? "" : "s")} in the design" +
                            (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
-                           $": outlines on \"{TilePlacement.CutLayer}\", the texture on \"{TilePlacement.EtchLayer}\" and \"{TilePlacement.LineLayer}\" (done first).";
+                           (spec.Relief ? $": outlines on \"{TilePlacement.CutLayer}\", the texture as a depth map on \"{TilePlacement.ReliefLayer}\" (carved first, in slices)."
+                                        : $": outlines on \"{TilePlacement.CutLayer}\", the texture on \"{TilePlacement.EtchLayer}\" and \"{TilePlacement.LineLayer}\" (done first).");
         }
         catch (InvalidOperationException ex) { _status.Text = ex.Message; }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)
