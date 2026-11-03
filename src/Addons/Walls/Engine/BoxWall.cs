@@ -83,7 +83,8 @@ public static class BoxWall
         return [(bottom + span * 0.25 - th / 2, bottom + span * 0.25 + th / 2), (bottom + span * 0.75 - th / 2, bottom + span * 0.75 + th / 2)];
     }
 
-    sealed record Hole(PathsD Shape, PathsD FrontCut, PathsD BackCut, double X0, double X1, double Y0, double Y1, bool Through);
+    /// <summary>A door or window through the faces; <paramref name="Groove"/> is how far a piece set into it reaches past its edge.</summary>
+    sealed record Hole(PathsD Shape, PathsD FrontCut, PathsD BackCut, double X0, double X1, double Y0, double Y1, bool Through, double Groove = 0);
 
     public static WallKit Make(WallSpec s)
     {
@@ -202,9 +203,176 @@ public static class BoxWall
         var doorEtched = new PathsD();    // a closed door, etched on both faces
         var doorLines = new List<PathD>();
         var taken = new List<(double X0, double X1, double Y0, double Y1)>();
-        double margin = Math.Max(frame, RevealMm);
-        PathsD? door = null;
-        double doorX = 0;
+        double margin = Math.Max(frame, Math.Max(RevealMm, T));
+
+        // What fills the doors and windows. Glued pieces sit in one layer between the faces, its lining cut back
+        // to make a groove they fit in; a hinged door or shutters turn on square pins, cut on the leaf, in round
+        // holes in the base and in plates across the opening (between the faces, in the middle of the wall).
+        double gIns = Math.Clamp(s.InsertGrooveMm, 0.8, RevealMm - 1);
+        double zi = zs[zs.Length / 2];                       // the layer glued pieces sit in
+        double cH = Math.Max(0.6, 0.22 * T + 0.25);          // room beside a hinged leaf for its corners to swing past
+        double pinD = T * Math.Sqrt(2) + fit + 0.3;          // the round holes the square pins turn in
+        bool pinRoom = G >= pinD + 1;
+        var bands = new PathsD();          // taken out of every lining layer: plates across an opening
+        var grooves = new PathsD();        // taken out of the glued pieces' layer
+        var stops = new List<(double Z, PathsD Area)>();     // a strip a door shuts against, added to a layer
+        var pinHoles = new PathsD();       // in the base plate
+        var slides = new List<(double X0, double X1, double Bottom, double Top)>();   // a portcullis's channel up inside the wall
+        var fillPieces = new List<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, Pose Pose)>();
+        var hingeAt = new Dictionary<string, double>();   // the leaves that swing, and where their pins are (u)
+        double lifts = 0;
+        var said = new HashSet<string>();
+        void Say(string t) { if (said.Add(t)) findings.Add(new(Severity.Note, t)); }
+
+        // A piece standing upright between the faces at z (drawn in the wall's x, y), moved so its corner is at 0, 0.
+        void Stand(string name, PathsD cut, PathsD etched, List<PathD> lines, double z)
+        {
+            var b = Geo.Bounds(cut);
+            PointD To(PointD p) => new(p.x - b.left, p.y - b.top);
+            fillPieces.Add((name, Geo.Tidy(Geo.Map(cut, To)), Geo.Map(etched, To), Geo.Map(lines, To), Pose.Front(b.left, b.top, z)));
+        }
+
+        // A plate across an opening between the faces (from y0 up one sheet), with a hole for each pin.
+        void Plate(string name, double x0, double x1, double y0, IEnumerable<double> pins)
+        {
+            var cut = Geo.Subtract([Geo.Rect(0, 0, x1 - x0, G)], new PathsD(pins.Select(px => Geo.Circle(px - x0, G / 2, pinD / 2))));
+            fillPieces.Add((name, cut, [], [], Pose.Up(x0, y0 + T / 2, G / 2)));
+            bands.Add(Geo.Rect(x0 - 0.01, y0, x1 + 0.01, y0 + T));
+            taken.Add((x0 - 2, x1 + 2, y0 - 1, y0 + T + 1));
+        }
+
+        // A leaf from x0 to x1 and y0 to y1, a square pin on its hinge side at the top and bottom (from pinLow to pinHigh).
+        double Leaf(string name, double x0, double x1, double y0, double y1, bool hingeLeft, double pinLow, double pinHigh, DoorLook look)
+        {
+            double px = hingeLeft ? x0 + T / 2 : x1 - T / 2;
+            var cut = Geo.Union(new PathsD { Geo.Rect(x0, y0, x1, y1), Geo.Rect(px - T / 2, pinLow, px + T / 2, y0 + 0.01), Geo.Rect(px - T / 2, y1 - 0.01, px + T / 2, pinHigh) });
+            var (e, l) = WallKitMaker.DoorFace([Geo.Rect(x0, y0, x1, y1)], s.Etch, groove, look);
+            Stand(name, cut, e, l, 0);
+            hingeAt[name] = px - x0;
+            return px;
+        }
+
+        // A piece glued into a groove round an opening (a door, a window's frame or shutter), in the middle layer.
+        void Glued(string name, PathsD shape, PathsD cut, PathsD etched, List<PathD> lines)
+        {
+            Stand(name, cut, etched, lines, zi);
+            grooves.AddRange(Geo.Offset(shape, gIns));
+            holes[^1] = holes[^1] with { Groove = gIns };
+        }
+        // An opening's outline grown into its groove, standing on y ≥ floorY.
+        PathsD InGroove(PathsD shape, double floorY)
+        {
+            var b = Geo.Bounds(shape);
+            return Geo.Intersect(Geo.Offset(shape, gIns - fit / 2), [Geo.Rect(b.left - 5, floorY, b.right + 5, b.bottom + 5)]);
+        }
+
+        // The arched or pointed head of an opening above a hinged leaf's head plate: a panel glued in a groove.
+        void ArchPanel(PathsD shape, double from, DoorLook look)
+        {
+            var b = Geo.Bounds(shape);
+            if (b.bottom - from < 1.5) return;
+            var above = new PathsD { Geo.Rect(b.left - 5, from, b.right + 5, b.bottom + 5) };
+            var piece = Geo.Intersect(Geo.Offset(shape, gIns - fit / 2), above);
+            var seen = Geo.Intersect(shape, above);
+            if (Geo.Area(seen) < 2) return;
+            var (e, l) = WallKitMaker.DoorFace(seen, s.Etch, groove, look);
+            Stand("Arch panel", piece, e, l, zi);
+            grooves.AddRange(Geo.Intersect(Geo.Offset(shape, gIns), above));
+            holes[^1] = holes[^1] with { Groove = gIns };
+        }
+
+        // What hangs in the doorway: a door on hinges, glued in, or a portcullis that slides up inside the wall.
+        void DoorFill(OpeningShape kind, PathsD shape, double x, double w, double h)
+        {
+            var b = Geo.Bounds(shape);
+            if (s.DoorLook == DoorLook.Bars)
+            {
+                Glued("Portcullis", shape, Geo.Subtract(InGroove(shape, T), WallKitMaker.BarGaps(shape)), [], []);
+                if (s.DoorOpens) slides.Add((b.left - gIns, b.right + gIns, T, b.bottom));
+                return;
+            }
+            var (ax0, ax1, spring) = Springing(kind, shape, x, T, w, h);
+            bool left = s.DoorHinge == HingeSide.Left;
+            double lx0 = left ? ax0 + cH : ax0 + 0.5, lx1 = left ? ax1 - 0.5 : ax1 - cH, ly0 = T + 0.4, ly1 = spring - 0.4;
+            string? why = !s.DoorOpens ? ""
+                : !pinRoom ? $"The door is glued in place: a wall {2 * T + pinD + 1:0.#} mm thick or more has room for its hinge pins to turn."
+                : spring + T > bodyTop - 0.2 ? "The door is glued in place: there's no room over it, inside the wall, for the plate its top pin turns in. Make the door lower or the wall taller."
+                : lx1 - lx0 < T + 3 || ly1 - ly0 < 4 ? "The door is glued in place: it's too small to hang on hinges."
+                : null;
+            if (why is not null)
+            {
+                if (why.Length > 0) Say(why);
+                var (e, l) = WallKitMaker.DoorFace(shape, s.Etch, groove, s.DoorLook);
+                Glued("Door", shape, InGroove(shape, T), e, l);
+                return;
+            }
+            double px = Leaf("Door", lx0, lx1, ly0, ly1, left, 0.2, spring + T - 0.2, s.DoorLook);
+            pinHoles.Add(Geo.Circle(px, 0, pinD / 2));
+            Plate("Door head", b.left - RevealMm, b.right + RevealMm, spring, [px]);
+            // A strip the door shuts against, on its latch side behind it: in the nearest layer wholly behind it, or the back face.
+            var strip = new PathsD { left ? Geo.Rect(lx1 - 1, T, b.right + 0.01, spring) : Geo.Rect(b.left - 0.01, T, lx0 + 1, spring) };
+            var behind = zs.Where(z => z <= -T + 1e-6).ToList();
+            if (behind.Count > 0) stops.Add((behind.Max(), strip));
+            else holes[^1] = holes[^1] with { BackCut = Geo.Subtract(holes[^1].BackCut, strip) };
+            ArchPanel(shape, spring + T, s.DoorLook);
+        }
+
+        // What fills a window: a frame with its bars or a shutter glued in, or shutters that open.
+        void WindowFillIn(PathsD win, double x, double sill, double w, double h)
+        {
+            var fill = s.WindowFill;
+            var look = s.DoorLook is DoorLook.Metal or DoorLook.Studded ? s.DoorLook : DoorLook.Planks;
+            if (fill == WindowFill.Shutters)
+            {
+                var kind = s.WindowShape;
+                var b = Geo.Bounds(win);
+                var (ax0, ax1, spring) = Springing(kind, win, x - w / 2, sill, w, h);
+                double y0 = sill + 0.4, y1 = spring - 0.4, half = (ax1 - ax0) / 2, mid = (ax0 + ax1) / 2;
+                // Room between a pair for their corners to pass as they swing open together.
+                double wl = half - cH, gap = Math.Sqrt(wl * wl + T * T / 4) - wl + 0.15;
+                bool pair = wl - gap >= T + 1.5, single = ax1 - ax0 - cH - 0.5 >= T + 2;
+                string? why = kind is OpeningShape.Round or OpeningShape.ArrowSlit ? "Round windows and arrow slits have a shutter glued in: they can't have shutters that open."
+                    : !pinRoom ? $"The shutters are glued in place: a wall {2 * T + pinD + 1:0.#} mm thick or more has room for their hinge pins to turn."
+                    : sill - T < T + 0.5 ? "The shutters are glued in place: the sill is too low for the plate under them. Raise the windows."
+                    : spring + T > bodyTop - 0.2 ? "The shutters are glued in place: there's no room over the windows, inside the wall, for the plate their top pins turn in. Make the windows lower or the wall taller."
+                    : !pair && !single || y1 - y0 < 4 ? "The shutters are glued in place: the windows are too small to hang shutters on hinges."
+                    : null;
+                if (why is null)
+                {
+                    var pins = new List<double>();
+                    double lo = sill - T + 0.2, hi = spring + T - 0.2;
+                    if (pair)
+                    {
+                        pins.Add(Leaf("Left shutter", ax0 + cH, mid - gap, y0, y1, true, lo, hi, look));
+                        pins.Add(Leaf("Right shutter", mid + gap, ax1 - cH, y0, y1, false, lo, hi, look));
+                    }
+                    else
+                    {
+                        bool left = s.DoorHinge == HingeSide.Left;
+                        pins.Add(Leaf("Shutter", left ? ax0 + cH : ax0 + 0.5, left ? ax1 - 0.5 : ax1 - cH, y0, y1, left, lo, hi, look));
+                    }
+                    Plate("Window sill", b.left - RevealMm, b.right + RevealMm, sill - T, pins);
+                    Plate("Window head", b.left - RevealMm, b.right + RevealMm, spring, pins);
+                    ArchPanel(win, spring + T, look);
+                    return;
+                }
+                Say(why);
+                fill = WindowFill.Shutter;
+            }
+            if (fill == WindowFill.Shutter)
+            {
+                var (e, l) = WallKitMaker.DoorFace(win, s.Etch, groove, look);
+                Glued("Shutter", win, InGroove(win, -1e6), e, l);
+            }
+            else if (fill == WindowFill.Frame)
+            {
+                double fw = Math.Clamp(s.BarMm, 0.8, 2.5);
+                var inside = Geo.Offset(win, -fw);
+                if (Geo.Area(inside) < 0.3 * Geo.Area(win)) return;   // an arrow slit or a tiny window: a frame would all but fill it
+                var panes = Geo.Intersect(WallKitMaker.Bars(win, s.Bars, Math.Max(0.6, s.BarMm), x, sill, w, h), inside);
+                Glued("Window frame", win, Geo.Subtract(InGroove(win, -1e6), panes), [], []);
+            }
+        }
 
         void Frame(PathsD shape)
         {
@@ -239,8 +407,7 @@ public static class BoxWall
                 else
                 {
                     holes.Add(new Hole(shapeD, shapeD, shapeD, cx - w / 2, cx + w / 2, T, T + h, true));
-                    door = shapeD;
-                    doorX = cx - w / 2;
+                    if (s.Door == DoorKind.DoorwayAndDoor) DoorFill(shape, shapeD, cx - w / 2, w, h);
                 }
             }
         }
@@ -261,8 +428,10 @@ public static class BoxWall
                     var win = WallKitMaker.Opening(s.WindowShape, x - w / 2, sill, w, h);
                     taken.Add((x - w / 2 - margin, x + w / 2 + margin, sill - margin, sill + h + margin));
                     Frame(win);
-                    // Bars are left in the front face; the back face's window is open.
-                    holes.Add(new Hole(win, WallKitMaker.Bars(win, s.Bars, Math.Max(0.6, s.BarMm), x, sill, w, h), win, x - w / 2, x + w / 2, sill, sill + h, false));
+                    // Left open, the bars are left in the front face and the back face's window is open; filled, both are clear.
+                    var front0 = s.WindowFill == WindowFill.Open ? WallKitMaker.Bars(win, s.Bars, Math.Max(0.6, s.BarMm), x, sill, w, h) : win;
+                    holes.Add(new Hole(win, front0, win, x - w / 2, x + w / 2, sill, sill + h, false));
+                    WindowFillIn(win, x, sill, w, h);
                     fitted++;
                 }
                 if (fitted < s.Windows) findings.Add(new(Severity.Warn, fitted == 0 ? "No window fits beside the door and the ends, under the top." : $"Only {fitted} of the {s.Windows} windows fit."));
@@ -413,6 +582,7 @@ public static class BoxWall
         foreach (var x in ribXs) InnerSlots(x);
         bool endTabsIn = intoColumns || pl - fit / 2 >= BridgeMm;
         if (endTabsIn) { InnerSlots(endX + T / 2); InnerSlots(L - endX - T / 2); }
+        baseSlots.AddRange(pinHoles);
         var basePlate = Geo.Subtract([Geo.Rect(bx0, -half, bx1, half)], Geo.Union(baseSlots));
         parts.Add(new Part("Base", basePlate, [], [], walls) { Poses = [Pose.Up(0, T / 2, 0)] });
 
@@ -422,7 +592,7 @@ public static class BoxWall
         var band = new PathsD { Geo.Rect(-1, bodyTop - 0.01, L + 1, hb + 0.01) };
         foreach (var h in holes)
         {
-            var through = Geo.Intersect(h.Shape, band);
+            var through = Geo.Intersect(h.Groove > 0 ? Geo.Offset(h.Shape, h.Groove + 0.1) : h.Shape, band);
             if (through.Count == 0) continue;
             var b = Geo.Bounds(through);
             topPlate = Geo.Subtract(topPlate, [Geo.Rect(b.left, tv0 - 1, b.right, tv1 + 1)]);
@@ -447,6 +617,7 @@ public static class BoxWall
         foreach (var (z, p) in core)
         {
             var region = Geo.Subtract(p.Under(hb), allHoles);
+            if (Math.Abs(z - zi) < 1e-6 && grooves.Count > 0) region = Geo.Subtract(region, Geo.Union(grooves));
             foreach (var piece in Separate(region))
             {
                 string name = walkway ? "Parapet backing" : breaks == RuinStyle.None ? "Merlon filling" : "Broken top layer";
@@ -467,26 +638,48 @@ public static class BoxWall
         if (holes.Count > 0)
         {
             var rings = Geo.Subtract(Geo.Union(new PathsD(holes.SelectMany(h => Geo.Offset(h.Shape, RevealMm)))), allHoles);
-            rings = Geo.Intersect(rings, [Geo.Rect(inner0 + 0.3, T, inner1 - 0.3, bodyTop)]);
-            var pieces = Separate(rings).Where(p => Geo.Area(p) >= 2).ToList();
-            for (int k = 0; k < pieces.Count; k++)
+            var inside = new PathsD { Geo.Rect(inner0 + 0.3, T, inner1 - 0.3, bodyTop) };
+            rings = Geo.Intersect(rings, inside);
+            if (bands.Count > 0) rings = Geo.Subtract(rings, Geo.Union(bands));
+            // A portcullis slides up a channel in its layer, as far as whatever's above it allows.
+            var cut = new PathsD(grooves);
+            foreach (var (sx0, sx1, bottom, top) in slides)
             {
-                var b = Geo.Bounds(pieces[k]);
-                parts.Add(new Part(pieces.Count == 1 ? "Lining" : $"Lining {k + 1}", Geo.Move(pieces[k], -b.left, -b.top), [], [], zs.Length * walls)
-                { Poses = [.. zs.Select(z => Pose.Front(b.left, b.top, z))] });
+                double ceiling = bodyTop - 0.2;
+                bool Over(double a, double b) => a < sx1 + 0.5 && b > sx0 - 0.5;
+                foreach (var h in holes) if (h.Y0 > top && Over(h.X0 - RevealMm, h.X1 + RevealMm)) ceiling = Math.Min(ceiling, h.Y0 - Math.Max(RevealMm, T) - 0.5);
+                foreach (var m in used) { var mb = m.Bounds(s); if (mb.Y0 > top && Over(mb.X0, mb.X1)) ceiling = Math.Min(ceiling, mb.Y0 - 0.5); }
+                foreach (var bx in bracketXs) if (Over(bx - slotW / 2, bx + slotW / 2)) ceiling = Math.Min(ceiling, bracketY0 - 0.5);
+                double lift = ceiling - top - gIns;   // its top is in the groove over the doorway
+                if (lift >= 1)
+                {
+                    cut.Add(Geo.Rect(sx0, bottom, sx1, ceiling));
+                    lifts = Math.Floor(lift * 10) / 10;
+                    Say($"The portcullis slides up {Math.Floor(lift * 10) / 10:0.#} mm inside the wall; it drops back down on its own.");
+                }
+                else Say("The portcullis sits in its grooves: there's no room above it inside the wall for it to slide up.");
             }
+            var groovesCut = cut.Count > 0 ? Geo.Union(cut) : cut;
+            var lining = new List<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, Pose Pose)>();
+            foreach (var z in zs)
+            {
+                var r = Math.Abs(z - zi) < 1e-6 && groovesCut.Count > 0 ? Geo.Subtract(rings, groovesCut) : rings;
+                foreach (var (sz, area) in stops) if (Math.Abs(sz - z) < 1e-6) r = Geo.Union(r, Geo.Intersect(area, inside));
+                foreach (var piece in Separate(r).Where(p => Geo.Area(p) >= 2)) lining.Add(("Lining", piece, [], [], Pose.Front(0, 0, z)));
+            }
+            var groups = Group(lining);
+            for (int k = 0; k < groups.Count; k++)
+                parts.Add(new Part(groups.Count == 1 ? "Lining" : $"Lining {k + 1}", groups[k].Cut, [], [], groups[k].Poses.Count * walls) { Poses = groups[k].Poses });
         }
 
-        // ---- a loose door to fit the doorway ----
-        if (s.Door == DoorKind.DoorwayAndDoor && door is not null)
-        {
-            var leaf = Geo.Offset(door, -WallKitMaker.DoorClearMm);
-            var (le, ll) = WallKitMaker.DoorFace(leaf, s.Etch, groove, s.DoorLook);
-            var leafCut = s.DoorLook == DoorLook.Bars ? Geo.Subtract(leaf, WallKitMaker.BarGaps(leaf)) : leaf;
-            PointD To(PointD p) => new(p.x - doorX, p.y - T);
-            parts.Add(new Part(s.DoorLook == DoorLook.Bars ? "Portcullis" : "Door", Geo.Tidy(Geo.Map(leafCut, To)), Geo.Map(le, To), Geo.Map(ll, To), walls)
-            { Poses = [Pose.Front(doorX, T, 0)] });
-        }
+        // ---- doors, shutters, frames and the plates they hang from ----
+        foreach (var g in Group(fillPieces, sameEtching: true))
+            parts.Add(new Part(g.Name, g.Cut, g.Etched, g.Lines, g.Poses.Count * walls)
+            {
+                Poses = g.Poses,
+                HingeU = hingeAt.TryGetValue(g.Name, out var hu) ? hu : null,
+                SlideMm = g.Name == "Portcullis" ? lifts : 0,
+            });
 
         // ---- accessories on the mounts, brackets under a walkway ----
         if (placed.Count > 0)
@@ -510,12 +703,61 @@ public static class BoxWall
 
         // ---- notes ----
         int each = parts.Where(p => !p.Name.Contains("column", StringComparison.OrdinalIgnoreCase)).Sum(p => p.Copies) / walls;
-        findings.Add(new(Severity.Note, $"Each wall is a box {W:0.#} mm thick: {each} pieces (front, back, base, top, two ends{(ribXs.Count > 0 ? $", {ribXs.Count} rib{(ribXs.Count == 1 ? "" : "s")}" : "")}{(holes.Count > 0 ? ", linings" : "")}{(core.Count > 0 ? (walkway ? ", the parapet's backing" : breaks == RuinStyle.None ? ", merlon filling" : ", the broken top's layers") : "")})."));
+        findings.Add(new(Severity.Note, $"Each wall is a box {W:0.#} mm thick: {each} pieces (front, back, base, top, two ends{(ribXs.Count > 0 ? $", {ribXs.Count} rib{(ribXs.Count == 1 ? "" : "s")}" : "")}{(holes.Count > 0 ? ", linings" : "")}{(fillPieces.Count > 0 ? ", what fills the door and windows" : "")}{(core.Count > 0 ? (walkway ? ", the parapet's backing" : breaks == RuinStyle.None ? ", merlon filling" : ", the broken top's layers") : "")})."));
         findings.Add(new(Severity.Note, "Put it together on the base: the faces' tabs and the ribs into its slots, the ends, linings and ribs glued to the inside of the front, the top plate on, then the back. Glue as you go."));
+        if (fillPieces.Any(f => f.Name is "Door head" or "Window head"))
+            findings.Add(new(Severity.Note, "Hang the door and shutters before the back goes on: each one's bottom pin in its hole (in the base, or the window's sill plate), the head plate over its top pin and glued to the linings. Then they swing open."));
+        if (grooves.Count > 0)
+            findings.Add(new(Severity.Note, "The glued-in pieces (frames, shutters, a door or arch panels) go in the grooves in the middle layer of the linings as you build it up."));
         if (walkway) findings.Add(new(Severity.Note, $"The walkway is {hb:0.#} mm up, {WallKitMaker.WalkwayDropMm:0} mm under the gaps in the battlements, and {Math.Clamp(s.WalkwayDepthMm, 4, 80):0.#} mm deep behind the parapet."));
         if (s.Measure == LengthMeasure.Centres) findings.Add(new(Severity.Note, $"Each wall is {L:0.#} mm long, so the columns' centres are {s.LengthMm:0.#} mm apart."));
         else if (intoColumns && s.Connectors.Values.Any(c => c > 0)) findings.Add(new(Severity.Note, $"Columns' centres end up {L + 2 * WallKitMaker.CentreToEnd(s):0.#} mm apart."));
         return Done();
+    }
+
+    /// <summary>
+    /// Where a piece sits with the doors open: a hinged leaf turned <paramref name="deg"/> on its pins, its far
+    /// edge out to the front; a portcullis slid all the way up. Anything else stays put.
+    /// </summary>
+    public static Pose Opened(Part part, Pose pose, double deg = 75)
+    {
+        if (part.SlideMm > 0) return pose with { O = pose.O + new V3(0, part.SlideMm, 0) };
+        if (part.HingeU is not double hu) return pose;
+        var b = Geo.Bounds(part.Cut);
+        var p = pose.At(hu, 0);
+        double a = deg * Math.PI / 180 * (hu < (b.left + b.right) / 2 ? 1 : -1), c = Math.Cos(a), sn = Math.Sin(a);
+        // Turned about the upright line through the pins (the piece stands upright, facing the front).
+        V3 R(V3 v) => new(v.X * c - v.Z * sn, v.Y, v.X * sn + v.Z * c);
+        return new Pose(p + R(pose.O - p), R(pose.U), pose.V);
+    }
+
+    /// <summary>
+    /// The upright part of an opening (its bottom-left corner at x, y), up to where its head starts to narrow
+    /// (its springing): the x range a flat leaf fits in, and the top. Round windows and arrow slits have none.
+    /// </summary>
+    internal static (double X0, double X1, double Top) Springing(OpeningShape kind, PathsD outline, double x, double y, double w, double h)
+    {
+        double top = kind switch
+        {
+            OpeningShape.Arched or OpeningShape.Rough => Math.Max(y, y + h - w / 2),
+            OpeningShape.Pointed => Math.Max(y, y + h - w * Math.Sqrt(3) / 2),
+            OpeningShape.Chamfered => y + h - Math.Min(w * 0.3, h * 0.3),
+            OpeningShape.Rectangle => y + h,
+            _ => y,
+        };
+        if (kind != OpeningShape.Rough) return (x, x + w, top);
+        // A rough mouth's sides wander in and out: a leaf goes between the narrowest of them, below where its top wanders down.
+        double x0 = x - 1, x1 = x + w + 1;
+        top -= w * 0.1;
+        for (double yy = y + 0.1; yy <= top; yy += 0.25)
+        {
+            var cuts = Geo.ClipLines([[new PointD(x - 2, yy), new PointD(x + w + 2, yy)]], outline);
+            if (cuts.Count == 0) return (x, x, y);
+            var c = cuts.OrderByDescending(p => Math.Abs(p[^1].x - p[0].x)).First();
+            x0 = Math.Max(x0, Math.Min(c[0].x, c[^1].x));
+            x1 = Math.Min(x1, Math.Max(c[0].x, c[^1].x));
+        }
+        return (x0, x1, top);
     }
 
     /// <summary>A rib (or an end): across the gap between the faces (u, 0 to G), from the base up to the top plate, with tabs into the base.</summary>
@@ -598,7 +840,8 @@ public static class BoxWall
     }
 
     /// <summary>Pieces of the same name and shape gathered into one part, with every place one sits.</summary>
-    static List<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, List<Pose> Poses)> Group(IEnumerable<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, Pose Pose)> pieces)
+    /// <remarks>Etched pieces are only gathered when <paramref name="sameEtching"/> (each was etched the same way from its own outline).</remarks>
+    static List<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, List<Pose> Poses)> Group(IEnumerable<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, Pose Pose)> pieces, bool sameEtching = false)
     {
         var groups = new List<(string Name, PathsD Cut, PathsD Etched, List<PathD> Lines, List<Pose> Poses, string Key)>();
         foreach (var p in pieces)
@@ -606,9 +849,9 @@ public static class BoxWall
             var b = Geo.Bounds(p.Cut);
             // Moved so its corner is at 0, 0: the same shape anywhere along the wall is the same piece.
             var cut = Geo.Move(p.Cut, -b.left, -b.top);
-            string key = $"{p.Name}|{Geo.Area(cut):0.00}|{b.right - b.left:0.00}|{b.bottom - b.top:0.00}|{p.Etched.Count}";
+            string key = $"{p.Name}|{Geo.Area(cut):0.00}|{b.right - b.left:0.00}|{b.bottom - b.top:0.00}|{p.Etched.Count}|{p.Lines.Count}|{Geo.Area(p.Etched):0.0}";
             var pose = p.Pose with { O = p.Pose.At(b.left, b.top) };
-            int i = groups.FindIndex(g => g.Key == key && g.Etched.Count == 0 && g.Lines.Count == 0 && p.Etched.Count == 0 && p.Lines.Count == 0);
+            int i = groups.FindIndex(g => g.Key == key && (sameEtching || g.Etched.Count == 0 && g.Lines.Count == 0 && p.Etched.Count == 0 && p.Lines.Count == 0));
             if (i >= 0) groups[i].Poses.Add(pose);
             else groups.Add((p.Name, cut, Geo.Move(p.Etched, -b.left, -b.top), [.. p.Lines.Select(l => Geo.Map(l, q => new PointD(q.x - b.left, q.y - b.top)))], [pose], key));
         }

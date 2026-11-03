@@ -18,7 +18,7 @@ static class WallsShots
         var folder = Path.Combine(Environment.GetEnvironmentVariable("PHOTONCANVAS_HELP")!, "..", "..", "src", "Addons", "Walls", "help", "images");
         Directory.CreateDirectory(folder);
 
-        void Shot(string name, WallSpec spec, int tab, int view = 0)
+        void Shot(string name, WallSpec spec, int tab, int view = 0, bool open = false)
         {
             // No data folder: the pictures show the settings given here, not the last ones used.
             var win = new WallsWindow(doc, machine, lib, null, null);
@@ -30,6 +30,7 @@ static class WallsShots
             F<TabControl>(win, "_views").SelectedIndex = view;
             var t = (Task)typeof(WallsWindow).GetMethod("Rebuild", Any)!.Invoke(win, null)!;
             for (int i = 0; i < 400 && !t.IsCompleted; i++) settle(50);
+            if (open) F<CheckBox>(win, "_openDoors").IsChecked = true;
             settle(600);
             win.CaptureRenderedFrame()?.Save(Path.Combine(folder, name + ".png"));
             Console.WriteLine($"walls: {name}.png");
@@ -50,6 +51,13 @@ static class WallsShots
             Door = DoorKind.ClosedDoor, DoorShape = OpeningShape.Rectangle, DoorOffsetMm = -30, Windows = 2, WindowShape = OpeningShape.Rectangle, WindowWidthMm = 12, WindowHeightMm = 14, Bars = WindowBars.Cross, SillMm = 26,
             Mounts = 2, MountHeightMm = 20, Accessories = Accessory.Sconces, Connectors = [],
         }, 3, 1);
+        Shot("window-walls-doors", WallSpec.NewBoxed with
+        {
+            LengthMm = 130, HeightMm = 62, Texture = "Stone blocks", SizeA = 12, SizeB = 6, GrooveMm = 0.8,
+            Door = DoorKind.DoorwayAndDoor, DoorShape = OpeningShape.Arched, DoorLook = DoorLook.Studded, DoorWidthMm = 20, DoorHeightMm = 36,
+            Windows = 2, WindowShape = OpeningShape.Arched, WindowWidthMm = 16, WindowHeightMm = 20, SillMm = 26, WindowFill = WindowFill.Shutters,
+            Connectors = new() { [ConnectorKind.Corner] = 2 },
+        }, 3, 0, open: true);
         Shot("window-walls-connectors", WallSpec.NewBoxed with
         {
             LengthMm = 100, HeightMm = 50, Texture = "Fieldstone", SizeA = 9, SizeB = 6, GrooveMm = 0.9, Broken = RuinStyle.Crumbled, Seed = 3, ColumnTop = ColumnTop.SteppedCap,

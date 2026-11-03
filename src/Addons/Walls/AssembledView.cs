@@ -20,6 +20,19 @@ public sealed class AssembledView : Control
     double _yaw = 28, _pitch = 22;
     Point? _drag;
     string? _message;
+    WallKit? _kit;
+    double _thickness;
+    bool _open;
+
+    /// <summary>Doors and shutters swung open, a portcullis slid up.</summary>
+    public bool Open
+    {
+        get => _open;
+        set { if (_open == value) return; _open = value; Show(_kit, _thickness, _message); }
+    }
+
+    /// <summary>The wall has a door or shutters that open, or a portcullis.</summary>
+    public bool HasMoving => _kit?.Parts.Any(p => p.HingeU is not null || p.SlideMm > 0) == true;
 
     static readonly SlabStyle Look = new(
         SlabStyle.Lit(Color.FromRgb(0xDD, 0xBE, 0x92), new Vec3(0.35, 0.85, 0.45)),
@@ -38,6 +51,8 @@ public sealed class AssembledView : Control
     {
         _scene.Clear();
         _message = message;
+        _kit = kit;
+        _thickness = thickness;
         if (kit is not null)
         {
             double T = thickness;
@@ -46,7 +61,7 @@ public sealed class AssembledView : Control
                 if (part.Poses.Count == 0) continue;
                 var outline = Geo.Tidy(Clipper.SimplifyPaths(part.Cut, 0.02));
                 foreach (var pose in part.Poses)
-                    _scene.AddSlab(outline, Frame(pose), -T / 2, T / 2, Look, part.Etched.Count > 0 ? part.Etched : null, part.Lines.Count > 0 ? part.Lines : null);
+                    _scene.AddSlab(outline, Frame(_open ? BoxWall.Opened(part, pose) : pose), -T / 2, T / 2, Look, part.Etched.Count > 0 ? part.Etched : null, part.Lines.Count > 0 ? part.Lines : null);
             }
             if (_scene.IsEmpty) _message ??= "Nothing to show.";
         }

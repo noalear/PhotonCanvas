@@ -79,7 +79,11 @@ public sealed class WallsWindow : Window
     readonly NumericUpDown _windows = Number(0, 50, 1, "0"), _winW = Number(1, 300, 0.5m, "0.#"), _winH = Number(1, 300, 0.5m, "0.#"), _sill = Number(0, 1000, 0.5m, "0.#"), _barW = Number(0.6m, 10, 0.1m, "0.#"), _frame = Number(0, 10, 0.5m, "0.#");
     readonly ComboBox _winShape = Combo("Square top", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)");
     readonly ComboBox _bars = Combo("No bars", "A cross", "Upright bars");
-    Control _doorRows = null!, _winRows = null!;
+    readonly CheckBox _doorOpens = new() { Content = "The door opens (it hangs on pins)", IsChecked = true };
+    readonly ComboBox _hinge = Combo("Hinged on the left", "Hinged on the right");
+    readonly ComboBox _winFill = Combo("Nothing (bars left in the front face)", "A frame with its bars", "A shutter, glued in", "Shutters that open");
+    readonly NumericUpDown _insertGroove = Number(0.8m, 2, 0.1m, "0.0");
+    Control _doorRows = null!, _winRows = null!, _fillRows = null!, _hingeRow = null!, _grooveInRow = null!, _winFillRow = null!;
 
     // Mounts
     const int MountsTabIndex = 4;
@@ -106,6 +110,7 @@ public sealed class WallsWindow : Window
     readonly Border _tabsHost = new() { Width = 440, Padding = new Thickness(14, 10, 8, 0) };
     readonly WallPreview _preview = new();
     readonly AssembledView _assembled = new();
+    readonly CheckBox _openDoors = new() { Content = "Open the doors", IsVisible = false, Margin = new Thickness(10, 6), VerticalAlignment = VerticalAlignment.Top, HorizontalAlignment = HorizontalAlignment.Left };
     readonly TabControl _views = new();
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly StackPanel _findings = new() { Spacing = 4 };
@@ -154,7 +159,9 @@ public sealed class WallsWindow : Window
         var results = new StackPanel { Spacing = 8, Children = { _summary, _findings } };
         var right = new Grid { RowDefinitions = new("*,Auto"), Margin = new Thickness(0, 14, 14, 0), RowSpacing = 8 };
         static Border Framed(Control c) => new() { CornerRadius = new(8), ClipToBounds = true, BorderBrush = Brush("Line"), BorderThickness = new(1), Child = c };
-        _views.Items.Add(new TabItem { Header = "Put together", Content = Framed(_assembled) });
+        _openDoors.IsCheckedChanged += (_, _) => _assembled.Open = _openDoors.IsChecked == true;
+        ToolTip.SetTip(_openDoors, "Swing the door and shutters open (and lift a portcullis) to see how they work.");
+        _views.Items.Add(new TabItem { Header = "Put together", Content = Framed(new Panel { Children = { _assembled, _openDoors } }) });
         _views.Items.Add(new TabItem { Header = "Pieces", Content = Framed(_preview) });
         right.Children.Add(_views);
         var resultScroll = new ScrollViewer { Content = results, MaxHeight = 200, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -314,7 +321,7 @@ public sealed class WallsWindow : Window
     {
         _doorRows = Stack(
             Field("Door shape", _doorShape),
-            Field("Door look", _doorLook, tip: "What's etched on the door: planks, planks with iron studs, a metal blast door, a portcullis (a loose one has its gaps cut through) or a stone slab."),
+            Field("Door look", _doorLook, tip: "What's etched on the door: planks, planks with iron studs, a metal blast door, a portcullis (one cut out has its gaps cut through) or a stone slab."),
             Row(Small("Door width", _doorW), Small("Door height", _doorH)),
             Field("Door position", _doorAt, tip: "Where the door's middle is, in mm from the middle of the wall (less than 0 = to the left)."));
         _winRows = Stack(
@@ -322,11 +329,18 @@ public sealed class WallsWindow : Window
             Row(Small("Window width", _winW), Small("Window height", _winH)),
             Field("Sill height", _sill, tip: "How high the bottom of the windows is above the bottom of the wall (mm)."),
             Row(Small("Bars", _bars), Small("Bar width", _barW, tip: "How wide the bars left across the window are (mm). Very thin bars break: 1.5 mm or more in plywood.")));
+        _hingeRow = Field("Hinges", _hinge, tip: "Which side the door (or a window's single shutter) turns on.");
+        _grooveInRow = Field("Groove depth", _insertGroove, tip: "How far the glued-in pieces reach into the groove round the opening (mm). Deeper holds better; the lining round it is 3 mm wide.");
+        _fillRows = Explained("Inside the openings", "In a box wall the door, the windows' frames and shutters are cut out too, and sit between the faces. A door that opens hangs on square pins cut on it: the bottom one turns in a hole in the base, the top one in a plate across the doorway inside the wall. Shutters hang the same way, between a sill plate and a head plate. A portcullis slides up inside the wall. Anything that doesn't open is glued into a groove cut in the lining round the opening.",
+            _doorOpens, _hingeRow,
+            _winFillRow = Field("In the windows", _winFill, tip: "A frame with the bars in it, a solid shutter glued in, or shutters that swing open (a pair when the window is wide enough, one when it's narrow). The front face's window is cut clear when the window is filled."),
+            _grooveInRow);
         return Stack(
-            Explained("Door", "Cut through, etched on as a closed door, or cut through with a loose door to fit it, with planks, iron studs, a blast door, a portcullis or a stone slab etched on.",
+            Explained("Door", "Cut through, etched on as a closed door, or cut through with a door cut out to fit it, with planks, iron studs, a blast door, a portcullis or a stone slab etched on.",
                 Field("Door", _door), _doorRows),
             Explained("Windows", "Spread evenly along the wall, clear of the door and the ends.",
                 Field("Windows", _windows), _winRows),
+            _fillRows,
             Field("Frame", _frame, tip: "A smooth band round each door and window where the texture stops, edged with a groove (mm). 0 = none."));
     }
 
@@ -520,13 +534,13 @@ public sealed class WallsWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _merlonStep, _shelfDepth, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _customAngle, _columnW, _slotDepth, _fit, _pin })
+        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _merlonStep, _shelfDepth, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _insertGroove, _customAngle, _columnW, _slotDepth, _fit, _pin })
             n.ValueChanged += (_, _) => Changed();
         foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
         foreach (var n in new[] { _wear, _detail }) n.ValueChanged += (_, _) => Changed();
-        foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _accTex, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
+        foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _winFill, _hinge, _accTex, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
             c.SelectionChanged += (_, _) => Changed();
-        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides })
+        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides, _doorOpens })
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
@@ -642,6 +656,14 @@ public sealed class WallsWindow : Window
         _merlonStepRow.IsVisible = _merlons.SelectedIndex > 0;
         _doorRows.IsVisible = _door.SelectedIndex > 0;
         _winRows.IsVisible = (_windows.Value ?? 0) > 0;
+        bool doorFill = _door.SelectedIndex == (int)DoorKind.DoorwayAndDoor, winFill = _winRows.IsVisible;
+        var fill = (WindowFill)Math.Max(0, _winFill.SelectedIndex);
+        _fillRows.IsVisible = box && (doorFill || winFill);
+        _doorOpens.IsVisible = doorFill;
+        _doorOpens.Content = _doorLook.SelectedIndex == (int)DoorLook.Bars ? "The portcullis slides up inside the wall" : "The door opens (it hangs on pins)";
+        _hingeRow.IsVisible = doorFill && _doorOpens.IsChecked == true && _doorLook.SelectedIndex != (int)DoorLook.Bars || winFill && fill == WindowFill.Shutters;
+        _winFillRow.IsVisible = winFill;
+        _grooveInRow.IsVisible = doorFill || winFill && fill != WindowFill.Open;
     }
 
     static decimal D(double v) => (decimal)v;
@@ -669,6 +691,7 @@ public sealed class WallsWindow : Window
         _doorW.Value = D(s.DoorWidthMm); _doorH.Value = D(s.DoorHeightMm); _doorAt.Value = D(s.DoorOffsetMm);
         _windows.Value = s.Windows; _winShape.SelectedIndex = (int)s.WindowShape; _winW.Value = D(s.WindowWidthMm); _winH.Value = D(s.WindowHeightMm); _sill.Value = D(s.SillMm);
         _bars.SelectedIndex = (int)s.Bars; _barW.Value = D(s.BarMm); _frame.Value = D(s.FrameMm);
+        _doorOpens.IsChecked = s.DoorOpens; _hinge.SelectedIndex = (int)s.DoorHinge; _winFill.SelectedIndex = (int)s.WindowFill; _insertGroove.Value = D(Math.Clamp(s.InsertGrooveMm, 0.8, 2));
         // A wall saved with only a number of mount points: they're listed where it spread them.
         _mountList = s.MountPoints.Count > 0 ? [.. s.MountPoints] : s.Mounts > 0 ? [.. WallKitMaker.Make(s).MountsUsed] : [];
         _accTex.SelectedIndex = Math.Max(0, _accTex.ItemsSource!.Cast<string>().ToList().IndexOf(s.AccessoryTexture)); _shelfDepth.Value = D(s.ShelfDepthMm);
@@ -705,6 +728,7 @@ public sealed class WallsWindow : Window
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28), DoorOffsetMm = V(_doorAt, 0),
             Windows = (int)V(_windows, 0), WindowShape = (OpeningShape)Math.Max(0, _winShape.SelectedIndex), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 25),
             Bars = (WindowBars)Math.Max(0, _bars.SelectedIndex), BarMm = V(_barW, 1.5), FrameMm = V(_frame, 1.5),
+            DoorOpens = _doorOpens.IsChecked == true, DoorHinge = (HingeSide)Math.Max(0, _hinge.SelectedIndex), WindowFill = (WindowFill)Math.Max(0, _winFill.SelectedIndex), InsertGrooveMm = V(_insertGroove, 1.2),
             // The count and first slot are kept too, for the other makers that read them.
             MountPoints = [.. _mountList], Mounts = _mountList.Count, MountHeightMm = _mountList.FirstOrDefault()?.YMm ?? 30, MountSlotMm = _mountList.FirstOrDefault()?.SlotHeightMm ?? 6,
             AccessoryTexture = _accTex.SelectedIndex > 0 ? (string)_accTex.SelectedItem! : Textures.Plain, ShelfDepthMm = V(_shelfDepth, 10),
@@ -816,6 +840,7 @@ public sealed class WallsWindow : Window
         string? bad = findings.FirstOrDefault(f => f.Level == Severity.Bad)?.Text;
         _preview.Show(kit.Parts.Count > 0 ? kit : null, bad ?? "Nothing to show.");
         _assembled.Show(kit.Parts.Count > 0 ? kit : null, spec.ThicknessMm, bad ?? "Nothing to show.");
+        _openDoors.IsVisible = _assembled.HasMoving;
         _findings.Children.Clear();
         foreach (var f in findings.OrderByDescending(f => f.Level)) _findings.Children.Add(FindingRow(f));
         int pieces = kit.PieceCount;
