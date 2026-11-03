@@ -117,14 +117,27 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
 and symbols. *The list's theme* follows the theme at the top.
 
-| | |
-|---|---|
-| ![A medieval four-poster bed with its canopy and valance](images/window-furniture-four-poster.png) | ![A wardrobe with panelled doors under a cornice](images/window-furniture-wardrobe.png) |
-| ![A throne on a two-step dais](images/window-furniture-throne.png) | ![A dresser with plates on its shelves](images/window-furniture-dresser.png) |
-| ![A weapon rack with spears, a sword, an axe and a halberd](images/window-furniture-weapon-rack.png) | ![A forge with its hood and flames](images/window-furniture-forge.png) |
-| ![A sci-fi helm console with screens and buttons](images/window-furniture-console.png) | ![Three sci-fi lockers](images/window-furniture-lockers.png) |
-| ![A gothic grandfather clock](images/window-furniture-clock.png) | ![A sarcophagus with an effigy on its lid](images/window-furniture-sarcophagus.png) |
-| ![A gothic tracery screen](images/window-furniture-screen.png) | |
+![A medieval four-poster bed with its canopy and valance](images/window-furniture-four-poster.png)
+
+![A wardrobe with panelled doors under a cornice](images/window-furniture-wardrobe.png)
+
+![A throne on a two-step dais](images/window-furniture-throne.png)
+
+![A dresser with plates on its shelves](images/window-furniture-dresser.png)
+
+![A weapon rack with spears, a sword, an axe and a halberd](images/window-furniture-weapon-rack.png)
+
+![A forge with its hood and flames](images/window-furniture-forge.png)
+
+![A sci-fi helm console with screens and buttons](images/window-furniture-console.png)
+
+![Three sci-fi lockers](images/window-furniture-lockers.png)
+
+![A gothic grandfather clock](images/window-furniture-clock.png)
+
+![A sarcophagus with an effigy on its lid](images/window-furniture-sarcophagus.png)
+
+![A gothic tracery screen](images/window-furniture-screen.png)
 
 If a size is too small for the sheet (a slot that would cut a piece in two, a tab with nothing round
 it), the list under the preview says what to change and the furniture can't go in until it's fixed.
