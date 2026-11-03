@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using PhotonCanvas.App;
 using PhotonCanvas.Core;
@@ -56,6 +57,33 @@ public sealed class GameKitWindow : Window
     readonly NumericUpDown _segments = Number(2, 40, 1, "0"), _step = Number(0.25m, 20, 0.25m, "0.##"), _length = Number(0.25m, 100, 0.5m, "0.##");
     readonly TextBlock _lengthLabel = Label("Length");
     Control _towerRows = null!, _standRows = null!, _trayRows = null!, _initRows = null!, _unitsRow = null!, _gaugeRows = null!, _lengthRow = null!, _shapeRow = null!;
+    // A unit of your own
+    readonly NumericUpDown _unitMm = Number(1, 1000, 0.5m, "0.##"), _unitCounts = Number(0.01m, 1000, 1, "0.##");
+    readonly TextBox _unitName = new() { Watermark = "MU, hexes, paces…" };
+    Control _ownUnitRows = null!;
+
+    // Markings (gauges, rulers, templates)
+    readonly TextBlock _marksFor = new() { FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
+    readonly TextBlock _marksNone = Hint("Pick a movement gauge, range ruler or area template on the Accessories tab (or add one) to set how it's marked.");
+    Control _marksBody = null!;
+    readonly MarkGallery _designs = new(), _borders = new(), _ornaments = new();
+    readonly TextBlock _designAbout = Hint();
+    readonly ComboBox _markFont = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
+    List<string> _markFonts = [];
+    readonly CheckBox _bold = new() { Content = "Bold" }, _italic = new() { Content = "Italic" }, _showUnit = new() { Content = "Write the unit along the bottom" };
+    readonly ComboBox _look = Combo("Engraved (filled in)", "Outlined (scored round)", "Single lines (one pass, fastest)");
+    readonly ComboBox _numbering = Combo("1  2  3", "1\"  2\"  3\"  (with the unit)", "I  II  III  (Roman)", "Dice pips (up to 9)", "Tally marks (up to 25)", "No numbers");
+    readonly NumericUpDown _every = Number(1, 10, 1, "0"), _textScale = Number(50, 150, 5, "0");
+    readonly TextBox _markTitle = new() { Watermark = "MOVE, CHARGE, FIREBALL, your army's name…" };
+    readonly ComboBox _place = Combo("At the ends", "Each side of the title", "With every number");
+    readonly ComboBox _ticks = Combo();
+    int[] _tickParts = [0];
+    readonly ComboBox _borderArt = Combo();
+    readonly Button _upload = UiKit.Button("Upload a design…"), _removeArt = UiKit.Button("Remove from the list"), _allMarks = UiKit.Button("Use these on every gauge, ruler and template");
+    readonly TextBlock _artNote = Hint();
+    Control _ticksRow = null!, _borderArtRow = null!, _everyRow = null!;
+    readonly ArtStore? _artStore;
+    List<MarkArt> _arts = [];
 
     // The sheet
     readonly NumericUpDown _thick = Number(0.5m, 12, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _seed = Number(1, 9999, 1, "0"), _scaleTex = Number(0.25m, 10, 0.25m, "0.##");
@@ -88,6 +116,8 @@ public sealed class GameKitWindow : Window
         _library = library;
         _dataFolder = dataFolder;
         _editing = editing;
+        HandFonts.Folder = HandFonts.FolderBeside(dataFolder);
+        _artStore = dataFolder is null ? null : new ArtStore(Path.Combine(dataFolder, "designs"));
         _set = editing?.Spec ?? LoadLast() ?? new AccessorySet();
         if (_set.Items.Count == 0) _set = _set with { Items = [Defaults.For(AccessoryKind.DiceTower)] };
         Title = "Game accessories";
@@ -100,7 +130,8 @@ public sealed class GameKitWindow : Window
 
         Library();
         Fonts();
-        var tabs = new TabControl { Items = { Tab("Accessories", ItemsTab()), Tab("Sheet", SheetTab()) } };
+        _arts = _artStore?.All() ?? [];
+        var tabs = new TabControl { Items = { Tab("Accessories", ItemsTab()), Tab("Markings", MarksTab()), Tab("Sheet", SheetTab()) } };
         var left = new Border { Width = 450, Padding = new Thickness(14, 10, 8, 0), Child = tabs };
 
         _views.Items.Add(new TabItem { Header = "Put together", Content = Framed(_assembled) });
@@ -133,6 +164,8 @@ public sealed class GameKitWindow : Window
         _debounce.Tick += (_, _) => { _debounce.Stop(); _ = Rebuild(); };
         _make.Click += (_, _) => Make();
         Hook();
+        _shownFont = _set.Font;
+        RefreshArts();
         LoadSheet();
         FillList(0);
         if (editing is not null) _make.Content = "Update in the design";
@@ -203,7 +236,11 @@ public sealed class GameKitWindow : Window
             Field("Tile height", _tileH, tip: "How tall each tile is (mm), the part in the groove included."),
             Field("Tile tops", _tileTop),
             Field("Names", _names, tip: "Etched on the tiles in order, one a line. Tiles without a name get a number."));
-        _unitsRow = Field("Marked in", _units, tip: "Inches for most wargames; grid squares count 5 ft an inch, for role-playing games.");
+        _unitsRow = Field("Marked in", _units, tip: "Inches for most wargames; grid squares count 5 ft an inch, for role-playing games; or a unit of your own.");
+        _ownUnitRows = Stack(
+            Field("Unit length", _unitMm, tip: "How long one of your units is (mm): 25.4 is an inch, 31.75 a 1¼ inch hex."),
+            Field("Counts as", _unitCounts, tip: "What each unit adds to the numbers: 1 counts 1, 2, 3…; 5 counts 5, 10, 15 (feet on a grid)."),
+            Field("Called", _unitName, tip: "Its name, written after the numbers (with the unit) and on the ruler."));
         _gaugeRows = Stack(
             Field("Segments", _segments, tip: "How many segments; they're joined by pins, so the gauge bends."),
             Field("Each segment", _step, tip: "How long each segment is, in the units above."));
@@ -217,7 +254,7 @@ public sealed class GameKitWindow : Window
             Explained("This accessory", "",
                 _title, _about,
                 Field("How many", _count),
-                _shapeRow, _unitsRow, _wRow, _dRow, _hRow, _lengthRow,
+                _shapeRow, _unitsRow, _ownUnitRows, _wRow, _dRow, _hRow, _lengthRow,
                 _towerRows, _standRows, _trayRows, _initRows, _gaugeRows));
     }
 
@@ -242,6 +279,283 @@ public sealed class GameKitWindow : Window
                 Field("Cut with", _cutWith),
                 Field("Etch with", _etchWith, tip: "Settings for the texture, numbers and names (an engrave/fill recipe from your library)."),
                 _cutNote));
+    }
+
+    Control MarksTab()
+    {
+        _everyRow = Field("Number every", _every, tip: "A number on every mark (1), every second (2), every fifth (5)…; the last always has one.");
+        _ticksRow = Field("Finest ticks", _ticks, tip: "The ruler's smallest ticks.");
+        _borderArtRow = Field("Design", _borderArt, tip: "Which of your designs is repeated along the border (upload one under Ornament).");
+        _upload.HorizontalAlignment = HorizontalAlignment.Left;
+        _allMarks.HorizontalAlignment = HorizontalAlignment.Left;
+        ToolTip.SetTip(_upload, "A drawing (SVG, DXF, PDF, Illustrator, EPS…) or a picture (PNG, JPEG…; its dark parts are traced) to engrave as the ornament or along the border.");
+        ToolTip.SetTip(_allMarks, "Copy these markings to every movement gauge, ruler and template on the list.");
+        ToolTip.SetTip(_textScale, "The numbers' and title's size, as a share of what fits (%).");
+        _marksBody = Stack(
+            Explained("Design", "A border, ornament and numbers that go together. Pick one to start from, then change anything below.",
+                _designs, _designAbout),
+            Explained("Numbers and title", "",
+                Field("Font", _markFont, tip: "Fonts on this computer, and your handwriting fonts (✎, made with Home → Draw → Handwriting) written as single lines."),
+                Row(_bold, _italic),
+                Field("Burned as", _look, tip: "Engraved fills the letters and designs in; outlined scores round them; single lines draws each letter as one pass down its middle (fastest)."),
+                Field("Numbers", _numbering),
+                _everyRow,
+                Field("Size", _textScale),
+                Field("Title", _markTitle, tip: "Words to etch on it: on the gauge's first segment, along the ruler's bottom, round the circle's edge."),
+                _showUnit,
+                _ticksRow),
+            Explained("Border", "Round each segment, the ruler's bottom band or the template's edge.",
+                _borders, _borderArtRow),
+            Explained("Ornament", "",
+                _ornaments,
+                Field("Goes", _place),
+                Row(_upload, _removeArt),
+                _artNote),
+            _allMarks);
+        return Stack(_marksFor, _marksNone, _marksBody);
+    }
+
+    // ---- markings: the pictures to pick from ----
+
+    const double DesignTile = 84, BorderTile = 84, OrnTile = 46;
+
+    void Galleries()
+    {
+        string font = _set.Font;
+        _designs.SetTiles(MarkDesigns.All.Select(d =>
+        {
+            var (cut, etched, lines) = Measures.Sample(MarkDesigns.Apply(new Markings(), d.Name), font, 34, 12.5);
+            return ((Control)new MarkPicture(cut, etched, lines, DesignTile, 31), d.Name, (string?)d.About);
+        }), DesignTile);
+        _borders.SetTiles(Borders.All.Select(b =>
+        {
+            if (b.Style == BorderStyle.Art)
+            {
+                var art = _arts.FirstOrDefault() ?? Item.Marks.BorderArt;
+                var mk = new Markings { Border = art is null ? BorderStyle.None : BorderStyle.Art, BorderArt = art };
+                var (c0, e0, l0) = Measures.Sample(mk, font, 34, 11, null);
+                return ((Control)new MarkPicture(c0, e0, l0, BorderTile, 27), b.Name, (string?)"One of your designs (upload one under Ornament), repeated along the border.");
+            }
+            var (cut, etched, lines) = Measures.Sample(new Markings { Border = b.Style }, font, 34, 11, null);
+            return ((Control)new MarkPicture(cut, etched, lines, BorderTile, 27), b.Name, (string?)null);
+        }), BorderTile);
+        OrnamentTiles();
+    }
+
+    /// <summary>None, the built-in ornaments, then your designs (and the accessory's own, if it isn't in your list).</summary>
+    List<(string Name, MarkArt? Art)> _ornList = [];
+
+    void OrnamentTiles()
+    {
+        _ornList = [("", null), .. Ornaments.Names.Select(n => (n, (MarkArt?)null)), .. _arts.Select(a => (Ornaments.ArtName, (MarkArt?)a))];
+        if (MarkDesigns.Marked(Item.Kind) && Item.Marks.Art is { } own && !_arts.Any(a => a.Name == own.Name && a.Areas == own.Areas))
+            _ornList.Add((Ornaments.ArtName, own));
+        _ornaments.SetTiles(_ornList.Select(o =>
+        {
+            if (o.Name.Length == 0) return ((Control)new MarkPicture(null, [], [], OrnTile, OrnTile), "None", (string?)"No ornament");
+            if (o.Art is { } art)
+            {
+                var (a, l) = MarkArts.Unit(art);
+                return ((Control)new MarkPicture(null, a, l, OrnTile, OrnTile), art.Name, (string?)$"Your design: {art.Name}");
+            }
+            return ((Control)new MarkPicture(null, Ornaments.Shape(o.Name), null, OrnTile, OrnTile), o.Name, (string?)null);
+        }), OrnTile);
+    }
+
+    void MarkFonts()
+    {
+        var hands = HandFonts.All().Select(f => HandFonts.Prefix + f.Name);
+        _markFonts = ["", .. hands, .. _fonts];
+        var own = Item.Marks.Font;
+        if (!string.IsNullOrEmpty(own) && !_markFonts.Contains(own)) _markFonts.Insert(1, own);
+        _markFont.ItemsSource = _markFonts.Select(f => f.Length == 0 ? $"Same as the sheet ({_set.Font})" : f).ToList();
+    }
+
+    void RefreshArts()
+    {
+        _arts = _artStore?.All() ?? [];
+        _borderArt.ItemsSource = _arts.Count == 0 ? ["(upload a design first)"] : _arts.Select(a => a.Name).ToList();
+        Galleries();
+    }
+
+    // ---- markings in and out ----
+
+    /// <summary>The markings controls from the accessory picked (if it's marked).</summary>
+    void LoadMarks()
+    {
+        var it = Item;
+        bool marked = MarkDesigns.Marked(it.Kind);
+        _marksBody.IsVisible = marked;
+        _marksNone.IsVisible = !marked;
+        _marksFor.Text = marked ? $"For the {Lower(GameKitMaker.Label(_set, _sel))}" : "";
+        if (!marked) return;
+        bool was = _loading;
+        _loading = true;
+        var mk = it.Marks;
+        MarkFonts();
+        OrnamentTiles();
+        _markFont.SelectedIndex = Math.Max(0, _markFonts.IndexOf(mk.Font));
+        _bold.IsChecked = mk.Bold;
+        _italic.IsChecked = mk.Italic;
+        _look.SelectedIndex = (int)mk.Look;
+        _numbering.SelectedIndex = (int)mk.Numbers;
+        _every.Value = Math.Clamp(mk.Every, 1, 10);
+        _textScale.Value = (decimal)Math.Round(Math.Clamp(mk.TextScale, 0.5, 1.5) * 100);
+        if (_markTitle.Text != mk.Title) _markTitle.Text = mk.Title;
+        _showUnit.IsChecked = mk.ShowUnit;
+        _place.SelectedIndex = (int)mk.Place;
+        _showUnit.IsVisible = it.Kind == AccessoryKind.Ruler;
+        _ticksRow.IsVisible = it.Kind == AccessoryKind.Ruler;
+        _everyRow.IsVisible = it.Kind != AccessoryKind.Template || it.Shape != TemplateShape.Square;
+        var (labels, parts) = TickChoices(it.Units);
+        _tickParts = parts;
+        _ticks.ItemsSource = labels;
+        _ticks.SelectedIndex = Math.Max(0, Array.IndexOf(parts, mk.Ticks));
+        _borders.Select(Borders.All.ToList().FindIndex(b => b.Style == mk.Border));
+        _borderArtRow.IsVisible = mk.Border == BorderStyle.Art;
+        _borderArt.SelectedIndex = mk.BorderArt is { } ba ? Math.Max(0, _arts.FindIndex(a => a.Name == ba.Name)) : 0;
+        _ornaments.Select(OrnIndex(mk));
+        _removeArt.IsVisible = mk.Ornament == Ornaments.ArtName && mk.Art is { } art && _arts.Any(a => a.Name == art.Name);
+        ShowDesign(mk);
+        _loading = was;
+    }
+
+    int OrnIndex(Markings mk)
+    {
+        if (string.IsNullOrEmpty(mk.Ornament)) return 0;
+        if (mk.Ornament == Ornaments.ArtName)
+            return mk.Art is { } art ? _ornList.FindIndex(o => o.Art is { } a && a.Name == art.Name && a.Areas == art.Areas) is var i and >= 0 ? i : _ornList.FindIndex(o => o.Art?.Name == art.Name) : -1;
+        return _ornList.FindIndex(o => o.Art is null && string.Equals(o.Name, mk.Ornament, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>The design picked shows as picked while its border, ornament and numbers are still the design's.</summary>
+    void ShowDesign(Markings mk)
+    {
+        var d = MarkDesigns.Find(mk.Design);
+        bool same = d is not null && d.Border == mk.Border && d.Ornament == mk.Ornament && d.Numbers == mk.Numbers && d.Place == mk.Place;
+        _designs.Select(same ? MarkDesigns.All.ToList().IndexOf(d!) : -1);
+        _designAbout.Text = same ? d!.About : "Your own mix of border, ornament and numbers.";
+    }
+
+    static (List<string> Labels, int[] Parts) TickChoices(Units u) => u switch
+    {
+        Units.Centimetres => (["The usual (millimetres)", "Centimetres", "Half centimetres", "2 mm", "Millimetres"], [0, 1, 2, 5, 10]),
+        Units.GridFeet => (["The usual (half squares)", "Squares", "Half squares", "Quarter squares"], [0, 1, 2, 4]),
+        Units.Custom => (["The usual", "Whole units", "Halves", "Quarters", "Fifths", "Tenths"], [0, 1, 2, 4, 5, 10]),
+        _ => (["The usual (quarter inches)", "Inches", "Half inches", "Quarter inches", "Eighths", "Sixteenths"], [0, 1, 2, 4, 8, 16]),
+    };
+
+    /// <summary>The picked accessory's markings changed to <paramref name="mk"/>.</summary>
+    void SetMarks(Markings mk)
+    {
+        if (!MarkDesigns.Marked(Item.Kind)) return;
+        var items = _set.Items.ToList();
+        items[_sel] = Item with { Marks = mk };
+        _set = _set with { Items = items };
+        ShowDesign(mk);
+        _borderArtRow.IsVisible = mk.Border == BorderStyle.Art;
+        _removeArt.IsVisible = mk.Ornament == Ornaments.ArtName && mk.Art is { } art && _arts.Any(a => a.Name == art.Name);
+        Changed();
+    }
+
+    void MarksChanged()
+    {
+        if (_loading || !MarkDesigns.Marked(Item.Kind)) return;
+        var mk = Item.Marks;
+        int f = _markFont.SelectedIndex;
+        SetMarks(mk with
+        {
+            Font = f >= 0 && f < _markFonts.Count ? _markFonts[f] : mk.Font,
+            Bold = _bold.IsChecked == true,
+            Italic = _italic.IsChecked == true,
+            Look = (MarkLook)Math.Max(0, _look.SelectedIndex),
+            Numbers = (Numbering)Math.Max(0, _numbering.SelectedIndex),
+            Every = (int)V(_every, 1),
+            TextScale = V(_textScale, 100) / 100,
+            Title = _markTitle.Text ?? "",
+            ShowUnit = _showUnit.IsChecked == true,
+            Place = (OrnamentPlace)Math.Max(0, _place.SelectedIndex),
+            Ticks = _ticks.SelectedIndex >= 0 && _ticks.SelectedIndex < _tickParts.Length ? _tickParts[_ticks.SelectedIndex] : 0,
+            BorderArt = mk.Border == BorderStyle.Art && _borderArt.SelectedIndex >= 0 && _borderArt.SelectedIndex < _arts.Count ? _arts[_borderArt.SelectedIndex] : mk.BorderArt,
+        });
+    }
+
+    void DesignPicked(int i)
+    {
+        if (_loading || i < 0 || i >= MarkDesigns.All.Count || !MarkDesigns.Marked(Item.Kind)) return;
+        SetMarks(MarkDesigns.Apply(Item.Marks, MarkDesigns.All[i].Name));
+        LoadMarks();
+    }
+
+    void BorderPicked(int i)
+    {
+        if (_loading || i < 0 || i >= Borders.All.Count || !MarkDesigns.Marked(Item.Kind)) return;
+        var style = Borders.All[i].Style;
+        var mk = Item.Marks with { Border = style };
+        if (style == BorderStyle.Art)
+        {
+            if (_arts.Count == 0 && mk.BorderArt is null) { _artNote.Text = "Upload a design first (under Ornament), then pick Your design here to repeat it along the border."; return; }
+            mk = mk with { BorderArt = mk.BorderArt ?? _arts[0] };
+        }
+        SetMarks(mk);
+        LoadMarks();
+    }
+
+    void OrnamentPicked(int i)
+    {
+        if (_loading || i < 0 || i >= _ornList.Count || !MarkDesigns.Marked(Item.Kind)) return;
+        var (name, art) = _ornList[i];
+        SetMarks(Item.Marks with { Ornament = name, Art = art ?? (name == Ornaments.ArtName ? Item.Marks.Art : null) });
+        LoadMarks();
+    }
+
+    async Task Upload()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Upload a design to engrave",
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Drawings and pictures") { Patterns = [.. MarkArts.Extensions.Select(e => "*" + e)] },
+                new FilePickerFileType("All files") { Patterns = ["*"] },
+            ],
+        });
+        if (files.Count == 0 || files[0].TryGetLocalPath() is not { } path) return;
+        _artNote.Text = $"Reading {Path.GetFileName(path)}…";
+        MarkArt art;
+        try { art = await Task.Run(() => MarkArts.FromFile(path)); }
+        catch (Exception e) when (e is FormatException or IOException or UnauthorizedAccessException or OutOfMemoryException or InvalidOperationException)
+        {
+            _artNote.Text = $"Couldn't use it: {e.Message}";
+            return;
+        }
+        try { if (_artStore is not null) art = _artStore.Save(art); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _artNote.Text = $"It's on this accessory, but couldn't be kept for next time: {e.Message}"; }
+        RefreshArts();
+        if (MarkDesigns.Marked(Item.Kind)) SetMarks(Item.Marks with { Ornament = Ornaments.ArtName, Art = art });
+        LoadMarks();
+        _artNote.Text = $"\"{art.Name}\" is the ornament now. Pick Your design under Border to repeat it along the border too.";
+    }
+
+    void RemoveArt()
+    {
+        if (Item.Marks.Art is not { } art || _artStore is null) return;
+        try { _artStore.Delete(art.Name); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _artNote.Text = $"Couldn't remove it: {e.Message}"; return; }
+        RefreshArts();
+        LoadMarks();
+        _artNote.Text = $"\"{art.Name}\" is off the list (accessories already using it keep their copy).";
+    }
+
+    void MarksOnAll()
+    {
+        if (!MarkDesigns.Marked(Item.Kind)) return;
+        var mk = Item.Marks;
+        // Ticks are the ruler's own; the rest goes on every marked accessory.
+        _set = _set with { Items = [.. _set.Items.Select(i => MarkDesigns.Marked(i.Kind) ? i with { Marks = mk with { Ticks = i.Marks.Ticks } } : i)] };
+        int n = _set.Items.Count(i => MarkDesigns.Marked(i.Kind));
+        _artNote.Text = n > 1 ? $"All {n} gauges, rulers and templates are marked the same now." : "There's only this one on the list.";
+        Changed();
     }
 
     // ---- the library and fonts ----
@@ -307,6 +621,19 @@ public sealed class GameKitWindow : Window
         _add.Click += (_, _) => AddItem(Defaults.For(Defaults.Kinds[Math.Max(0, _addKind.SelectedIndex)].Kind));
         _copy.Click += (_, _) => AddItem(_set.Items[_sel]);
         _remove.Click += (_, _) => RemoveItem();
+        foreach (var n in new[] { _unitMm, _unitCounts }) n.ValueChanged += (_, _) => ItemChanged();
+        _unitName.TextChanged += (_, _) => ItemChanged();
+        // Markings
+        _designs.Picked += DesignPicked;
+        _borders.Picked += BorderPicked;
+        _ornaments.Picked += OrnamentPicked;
+        foreach (var c in new[] { _markFont, _look, _numbering, _place, _ticks, _borderArt }) c.SelectionChanged += (_, _) => MarksChanged();
+        foreach (var n in new[] { _every, _textScale }) n.ValueChanged += (_, _) => MarksChanged();
+        foreach (var b in new[] { _bold, _italic, _showUnit }) b.IsCheckedChanged += (_, _) => MarksChanged();
+        _markTitle.TextChanged += (_, _) => MarksChanged();
+        _upload.Click += async (_, _) => await Upload();
+        _removeArt.Click += (_, _) => RemoveArt();
+        _allMarks.Click += (_, _) => MarksOnAll();
     }
 
     static decimal D(double v) => (decimal)v;
@@ -398,6 +725,8 @@ public sealed class GameKitWindow : Window
         if (_names.Text != it.Names) _names.Text = it.Names;
         _units.SelectedIndex = (int)it.Units; _shape.SelectedIndex = (int)it.Shape;
         _segments.Value = it.Segments; _step.Value = D(it.StepUnits); _length.Value = D(it.LengthUnits);
+        _unitMm.Value = D(Math.Clamp(it.UnitMm, 1, 1000)); _unitCounts.Value = D(Math.Clamp(it.UnitCounts, 0.01, 1000));
+        if (_unitName.Text != it.UnitName) _unitName.Text = it.UnitName;
 
         (string? W, string? D, string? H) labels = kind switch
         {
@@ -418,11 +747,13 @@ public sealed class GameKitWindow : Window
         _initRows.IsVisible = kind == AccessoryKind.Initiative;
         bool measure = kind is AccessoryKind.MoveGauge or AccessoryKind.Ruler or AccessoryKind.Template;
         _unitsRow.IsVisible = measure;
+        _ownUnitRows.IsVisible = measure && it.Units == Units.Custom;
         _gaugeRows.IsVisible = kind == AccessoryKind.MoveGauge;
         _shapeRow.IsVisible = kind == AccessoryKind.Template;
         _lengthRow.IsVisible = kind is AccessoryKind.Ruler or AccessoryKind.Template;
         _lengthLabel.Text = kind == AccessoryKind.Ruler ? "Length" : it.Shape switch { TemplateShape.Circle => "Radius", TemplateShape.Cone => "Length", _ => "Side" };
         ToolTip.SetTip(_lengthRow, "In the units above.");
+        LoadMarks();
         _loading = was;
     }
 
@@ -441,6 +772,7 @@ public sealed class GameKitWindow : Window
             Tiles = (int)V(_tiles, it.Tiles), TileWMm = V(_tileW, it.TileWMm), TileHMm = V(_tileH, it.TileHMm), Top = (TileTop)Math.Max(0, _tileTop.SelectedIndex), Names = _names.Text ?? "",
             Units = (Units)Math.Max(0, _units.SelectedIndex), Shape = (TemplateShape)Math.Max(0, _shape.SelectedIndex),
             Segments = (int)V(_segments, it.Segments), StepUnits = V(_step, it.StepUnits), LengthUnits = V(_length, it.LengthUnits),
+            UnitMm = V(_unitMm, it.UnitMm), UnitCounts = V(_unitCounts, it.UnitCounts), UnitName = _unitName.Text ?? it.UnitName,
         };
     }
 
@@ -454,7 +786,7 @@ public sealed class GameKitWindow : Window
         _set = _set with { Items = items };
         if (it.Count != before.Count) FillList(_sel);
         // The length's label follows the template's shape; the card size its numbers.
-        else if (it.Shape != before.Shape || it.CardWMm != before.CardWMm || it.CardHMm != before.CardHMm) LoadItem();
+        else if (it.Shape != before.Shape || it.Units != before.Units || it.CardWMm != before.CardWMm || it.CardHMm != before.CardHMm) LoadItem();
         Changed();
     }
 
@@ -466,8 +798,17 @@ public sealed class GameKitWindow : Window
             ThicknessMm = V(_thick, 3), FitMm = V(_fit, 0.1), Seed = (int)V(_seed, 1), Finish = (Finish)Math.Max(0, _finish.SelectedIndex),
             TextureScale = V(_scaleTex, 2), Font = _font.SelectedItem as string ?? _set.Font,
         };
+        if (_set.Font != _shownFont)
+        {
+            // The markings' "same as the sheet" and the pictures follow the sheet's font.
+            _shownFont = _set.Font;
+            Galleries();
+            LoadMarks();
+        }
         Changed();
     }
+
+    string? _shownFont;
 
     string? LastFile => _dataFolder is null ? null : Path.Combine(_dataFolder, "last.json");
 
