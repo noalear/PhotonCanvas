@@ -61,6 +61,16 @@ public sealed record WallSpec
     public bool TextureBack { get; init; } = true;
     /// <summary>The texture on a box wall's ends and top too (and on the back of a parapet).</summary>
     public bool TextureSides { get; init; }
+    /// <summary>
+    /// The look on the wall's other side (a box wall's back face, the back panel of two panels back to back, or a
+    /// single panel's back when <see cref="EngraveBack"/>); null = the same as the front.
+    /// </summary>
+    public FaceLook? Back { get; init; }
+    /// <summary>
+    /// A single flat panel engraved on its back too: after the pieces are cut, turn them over and run the
+    /// "back sides" page, an engrave only, lined up on each piece with Fit to piece.
+    /// </summary>
+    public bool EngraveBack { get; init; }
 
     /// <summary>The look picked to start from (<see cref="WallThemes"/>): it set the texture, openings and accessories, which can be changed afterwards.</summary>
     public string Theme { get; init; } = "Medieval";
@@ -185,6 +195,25 @@ public sealed record WallSpec
 
     [JsonIgnore] public bool Boxed => Build == WallBuild.Box;
 
+    /// <summary>A single flat panel with its back engraved as a second job (the piece turned over).</summary>
+    [JsonIgnore] public bool FlipsForBack => EngraveBack && !Boxed && !TwoSided;
+
+    /// <summary>The front's look (texture, sizes, groove, wear, detail).</summary>
+    [JsonIgnore] public FaceLook FrontLook => new()
+    {
+        Texture = Texture, Custom = Custom, SizeA = SizeA, SizeB = SizeB, GrooveMm = GrooveMm, Wear = Wear, DetailMm = DetailMm,
+    };
+
+    /// <summary>The same spec with another look in place of the front's (the seed stays, so each face is still its own).</summary>
+    public WallSpec WithLook(FaceLook l) => this with
+    {
+        Texture = l.Texture, Custom = l.Custom ?? (Custom is { } c && c.Name == l.Texture ? c : null), SizeA = l.SizeA, SizeB = l.SizeB,
+        GrooveMm = l.GrooveMm, Wear = l.Wear, DetailMm = l.DetailMm,
+    };
+
+    /// <summary>The spec the other side is textured with: its own look, or the front's.</summary>
+    [JsonIgnore] public WallSpec BackSpec => Back is { } b ? WithLook(b) : this;
+
     public int ConnectorCount(ConnectorKind k) => Connectors.TryGetValue(k, out var n) ? Math.Max(0, n) : 0;
 
     public string ToJson() => JsonSerializer.Serialize(this, WallJson.Options);
@@ -193,6 +222,30 @@ public sealed record WallSpec
     {
         try { return JsonSerializer.Deserialize<WallSpec>(json, WallJson.Options); }
         catch (Exception e) when (e is JsonException or NotSupportedException or ArgumentException) { return null; }
+    }
+}
+
+/// <summary>How one side of a wall looks: its texture and the texture's sizes, groove, wear and detail.</summary>
+public sealed record FaceLook
+{
+    /// <summary>A preset (<see cref="Textures.Presets"/>), Plain, or the name of your own (<see cref="Custom"/>).</summary>
+    public string Texture { get; init; } = "Brick";
+    public CustomTexture? Custom { get; init; }
+    public double SizeA { get; init; } = 8;
+    public double SizeB { get; init; } = 3.5;
+    public double GrooveMm { get; init; } = 0.6;
+    public double Wear { get; init; } = 0.5;
+    public double DetailMm { get; init; }
+
+    /// <summary>A preset with its own sizes and groove.</summary>
+    public static FaceLook Of(string texture, double wear = 0.5)
+    {
+        var p = Textures.Preset(texture);
+        return new()
+        {
+            Texture = texture, SizeA = p is { SizeA: > 0 } ? p.SizeA : 8, SizeB = p is { SizeB: > 0 } ? p.SizeB : 3.5,
+            GrooveMm = p is { UsesGroove: true, Groove: > 0 } ? p.Groove : 0.6, Wear = wear,
+        };
     }
 }
 

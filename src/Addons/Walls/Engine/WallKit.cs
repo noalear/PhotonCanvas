@@ -16,6 +16,16 @@ public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Li
 
     /// <summary>A portcullis: how far it slides up (mm).</summary>
     public double SlideMm { get; init; }
+
+    /// <summary>
+    /// Etched on the piece's back, in a second job after it's turned over (left to right). Drawn in the piece's own
+    /// coordinates as seen through it from the front, so it lies exactly behind the front; null = nothing.
+    /// </summary>
+    public PathsD? BackEtched { get; init; }
+    /// <summary>Lines scored on the piece's back, as <see cref="BackEtched"/>.</summary>
+    public List<PathD>? BackLines { get; init; }
+    /// <summary>The piece has something to engrave on its back after turning it over.</summary>
+    public bool HasBack => BackEtched is { Count: > 0 } || BackLines is { Count: > 0 };
 }
 
 /// <summary>Everything a set of walls is cut from, with what was found while making it.</summary>
@@ -77,12 +87,18 @@ public static class WallKitMaker
         var used = new List<MountPoint>();
         var wall = Panel(s, L, H, ez, findings, used);
         if (wall is null) return new(parts, findings, L, wallT, layers);
-        parts.Add(new Part("Wall", wall.Cut, wall.Etched, wall.Lines, Math.Max(1, s.Walls)) { Poses = [Model.Pose.Front(0, 0, s.TwoSided ? T / 2 : 0)] });
+        parts.Add(new Part("Wall", wall.Cut, wall.Etched, wall.Lines, Math.Max(1, s.Walls))
+        {
+            Poses = [Model.Pose.Front(0, 0, s.TwoSided ? T / 2 : 0)],
+            BackEtched = s.FlipsForBack ? wall.Back?.Etched : null,
+            BackLines = s.FlipsForBack ? wall.Back?.Lines : null,
+        });
         if (s.TwoSided)
         {
             // Cut as a mirror image: turned over, it lies exactly on the back of the front panel.
             PointD Mirror(PointD p) => new(L - p.x, p.y);
-            parts.Add(new Part("Wall back", Geo.Tidy(Geo.Map(wall.Cut, Mirror)), Geo.Tidy(Geo.Map(wall.Etched, Mirror)), Geo.Map(wall.Lines, Mirror), Math.Max(1, s.Walls)) { Poses = [Model.Pose.Back(L, 0, -T / 2)] });
+            var (be, bl) = wall.Back ?? (wall.Etched, wall.Lines);
+            parts.Add(new Part("Wall back", Geo.Tidy(Geo.Map(wall.Cut, Mirror)), Geo.Tidy(Geo.Map(be, Mirror)), Geo.Map(bl, Mirror), Math.Max(1, s.Walls)) { Poses = [Model.Pose.Back(L, 0, -T / 2)] });
         }
         foreach (var extra in wall.Extras) parts.Add(extra with { Copies = extra.Copies * Math.Max(1, s.Walls) });
         parts.AddRange(Connectors.Make(s, findings));
@@ -90,10 +106,16 @@ public static class WallKitMaker
         if (s.Measure == LengthMeasure.Centres) findings.Add(new(Severity.Note, $"Each panel is {L:0.#} mm long, so the columns' centres are {s.LengthMm:0.#} mm apart."));
         else if (parts.Any(p => p.Name.Contains("column"))) findings.Add(new(Severity.Note, $"Columns' centres end up {L + 2 * CentreToEnd(s):0.#} mm apart."));
         if (s.TwoSided) findings.Add(new(Severity.Note, $"Two panels glued back to back make a {wallT:0.#} mm wall; the columns' slots fit that."));
+        if (s.FlipsForBack)
+            findings.Add(new(Severity.Note, "The backs are engraved on a page of their own: once the pieces are cut, turn them over left to right, then run that page, lining each piece up with Fit to piece."));
         return new(parts, findings, L, wallT, layers) { MountsUsed = used };
     }
 
-    sealed record PanelResult(PathsD Cut, PathsD Etched, List<PathD> Lines, List<Part> Extras);
+    sealed record PanelResult(PathsD Cut, PathsD Etched, List<PathD> Lines, List<Part> Extras)
+    {
+        /// <summary>The other side's etching, in the front's x (as seen through the panel); null = none of its own.</summary>
+        public (PathsD Etched, List<PathD> Lines)? Back { get; init; }
+    }
 
     static PanelResult? Panel(WallSpec s, double L, double H, double ez, List<Finding> findings, List<MountPoint> used)
     {
@@ -282,21 +304,31 @@ public static class WallKitMaker
         // The texture, kept off the plain ends, the frames, a closed door and round the slots.
         var region = Geo.Subtract(cut, Geo.Union(keepClear));
         if (ez > 0) region = Geo.Subtract(region, [Geo.Rect(-1, -1, ez, H + 1), Geo.Rect(L - ez, -1, L + 1, H + 1)]);
-        var tex = Textures.Make(s, new Face(L, H, ez, L - ez, body));
-        if (s.Etch == EtchStyle.Grooves)
+        (PathsD Etched, List<PathD> Lines) Dress(WallSpec look)
         {
-            var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-1, -1, L + 1, H + 1)], Geo.Union(tex.Raised)) : [];
-            etched.AddRange(Geo.Intersect(Geo.Union(mortar, tex.Etched), region));
+            var e = new PathsD(etched);
+            var l = new List<PathD>(lines);
+            var tex = Textures.Make(look, new Face(L, H, ez, L - ez, body));
+            if (s.Etch == EtchStyle.Grooves)
+            {
+                var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-1, -1, L + 1, H + 1)], Geo.Union(tex.Raised)) : [];
+                e.AddRange(Geo.Intersect(Geo.Union(mortar, tex.Etched), region));
+            }
+            else
+            {
+                l.AddRange(Geo.ClipLines(tex.Raised.Select(Geo.Loop), region));
+                l.AddRange(Geo.ClipLines(tex.Etched.Select(Geo.Loop), region));
+            }
+            l.AddRange(Geo.ClipLines(tex.Lines, region));
+            e.AddRange(Geo.Intersect(Geo.Union(frameRings), cut));
+            l.AddRange(Geo.ClipLines(frameLines, cut));
+            return (Geo.Union(e), l);
         }
-        else
-        {
-            lines.AddRange(Geo.ClipLines(tex.Raised.Select(Geo.Loop), region));
-            lines.AddRange(Geo.ClipLines(tex.Etched.Select(Geo.Loop), region));
-        }
-        lines.AddRange(Geo.ClipLines(tex.Lines, region));
-        etched.AddRange(Geo.Intersect(Geo.Union(frameRings), cut));
-        lines.AddRange(Geo.ClipLines(frameLines, cut));
-        return new(cut, Geo.Union(etched), lines, extras);
+        var (frontEtched, frontLines) = Dress(s);
+        // The other side, when it has a look of its own or is engraved after turning the panel over: drawn as
+        // seen through the panel from the front (the same x as the front), its own seed so it isn't the front's twin.
+        (PathsD Etched, List<PathD> Lines)? back = s.Back is not null || s.FlipsForBack ? Dress(s.BackSpec with { Seed = s.Seed + 101 }) : null;
+        return new(cut, frontEtched, frontLines, extras) { Back = back };
     }
 
     /// <summary>The broken-away part of a ruined top: a dip in stone-sized steps, deepest somewhere near the middle, the ends whole.</summary>

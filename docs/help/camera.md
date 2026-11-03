@@ -253,6 +253,9 @@ nearest mark. After the fourth, PhotonCanvas finds all the others.
 (if you allow it) resizes the design so its outline sits on the piece's edges. Use it to engrave or
 cut a design that must match a piece already on the bed: a pre-cut blank, a coaster, a tag. The
 outline is what's matched, so the design should be (or include) the piece's outline.
+When the selection has shapes on a guide layer (**Output** off) as well as others, only the guide
+shapes are matched and everything selected moves with them. The wall maker uses this for the backs
+of turned-over walls: each piece's outline is on a guide layer round the engraving for its back.
 
 Select the design (shapes, text and codes; pictures don't count), place it roughly over the piece
 with the camera picture on, then click **Fit to piece** (or press `Ctrl+Shift+F`). It's also **Fit to

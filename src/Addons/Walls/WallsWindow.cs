@@ -54,6 +54,13 @@ public sealed class WallsWindow : Window
     // How worn the texture is and how fine its marks (Shared/Terrain/Weathering.cs).
     readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
     Control _wearRow = null!, _detailRow = null!;
+    // A single panel's back, engraved after turning the pieces over.
+    readonly CheckBox _engraveBack = new() { Content = "Engrave the back too (turn the cut pieces over for a second job)" };
+    readonly ComboBox _backTexture = Combo([.. Textures.Presets.Select(p => p.Name).Where(n => n != Textures.Plain)]);
+    readonly NumericUpDown _backWear = Number(0, 100, 5, "0");
+    Control _backSection = null!, _backRows = null!;
+    /// <summary>The back's look as loaded, kept when its texture isn't changed (its sizes, groove, detail and your own texture).</summary>
+    FaceLook? _backLoaded;
     readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)", "Relief (carved in depth, slowest)");
     readonly CheckBox _plainEnds = new() { Content = "Keep the ends smooth where they go into the columns", IsChecked = true };
     readonly TextBox _ownName = new() { Watermark = "A name for your texture" };
@@ -290,6 +297,11 @@ public sealed class WallsWindow : Window
                 _wearRow, _detailRow,
                 Field("Etch as", _etch, tip: "Grooves etch the gaps as areas at one depth. Lines score round each brick or stone (much quicker). Relief carves a greyscale depth map in slices: each brick or stone at its own height, edges rounded into the mortar, worn surfaces uneven (the most real, and much slower)."),
                 _plainEnds, _texBack, _texSides),
+            _backSection = Explained("Back of the wall", "A single panel can have another look on its back. The backs go on a page of their own after the sheets: cut the pieces, turn them over left to right, then run that page (an engrave only, no cut), lining each piece's back up with Fit to piece.",
+                _engraveBack,
+                _backRows = Stack(
+                    Field("Back texture", _backTexture, tip: "The texture on the back of each panel."),
+                    Field("Back wear %", _backWear, tip: "How weathered the back looks: 0 new and crisp, 50 the usual look, 100 ancient and battered."))),
             Explained("Your own texture", "Shapes you drew (or an SVG) repeated over the face in rows. Closed shapes are etched as areas, open ones as lines. It's kept in the list for next time.",
                 Field("Name", _ownName),
                 Row(Small("Gap", _ownGap, tip: "Space between one tile and the next (mm)."), Small("Row shift %", _ownShift, tip: "Move every other row along by this much of a tile: 50 for a brick-like offset.")),
@@ -540,7 +552,9 @@ public sealed class WallsWindow : Window
         foreach (var n in new[] { _wear, _detail }) n.ValueChanged += (_, _) => Changed();
         foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _winFill, _hinge, _accTex, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
             c.SelectionChanged += (_, _) => Changed();
-        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides, _doorOpens })
+        _backWear.ValueChanged += (_, _) => Changed();
+        _backTexture.SelectionChanged += (_, _) => Changed();
+        foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides, _doorOpens, _engraveBack })
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
@@ -645,6 +659,8 @@ public sealed class WallsWindow : Window
         _boxRows.IsVisible = _boxColumnRows.IsVisible = box;
         _flatRows.IsVisible = _flatColumnRows.IsVisible = _plainEnds.IsVisible = !box;
         _texBack.IsVisible = _texSides.IsVisible = box;
+        _backSection.IsVisible = !box && _twoSided.IsChecked != true;
+        _backRows.IsVisible = _engraveBack.IsChecked == true;
         _thickLabel.Text = box ? "Panel thickness" : "Thickness";
         _buildNote.Text = box
             ? "Each wall is cut as a front, a back, a base, a top, two ends and ribs; doors and windows are lined between the faces."
@@ -676,6 +692,10 @@ public sealed class WallsWindow : Window
         _measure.SelectedIndex = (int)s.Measure; _twoSided.IsChecked = s.TwoSided;
         _build.SelectedIndex = s.Boxed ? 0 : 1; _wallT.Value = D(s.WallMm); _plinth.Value = D(s.PlinthMm); _ribSpacing.Value = D(s.RibSpacingMm);
         _intoColumns.IsChecked = s.EndsIntoColumns; _texBack.IsChecked = s.TextureBack; _texSides.IsChecked = s.TextureSides;
+        _engraveBack.IsChecked = s.EngraveBack; _backLoaded = s.Back;
+        var backLook = s.Back ?? s.FrontLook;
+        _backTexture.SelectedIndex = Math.Max(0, _backTexture.ItemsSource!.Cast<string>().ToList().IndexOf(backLook.Texture));
+        _backWear.Value = D(Math.Clamp(backLook.Wear, 0, 1) * 100);
         _columnBuild.SelectedIndex = (int)s.ColumnBuild; _columnTop.SelectedIndex = (int)s.ColumnTop; _columnBase.SelectedIndex = (int)s.ColumnBase; _columnLip.Value = D(s.ColumnLipMm);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
@@ -736,7 +756,17 @@ public sealed class WallsWindow : Window
             Connectors = _counts.Where(kv => (kv.Value.Value ?? 0) > 0).ToDictionary(kv => kv.Key, kv => (int)kv.Value.Value!.Value),
             CustomAngleDeg = V(_customAngle, 120), Column = (ColumnShape)Math.Max(0, _column.SelectedIndex), ColumnMm = V(_columnW, 16), SlotDepthMm = V(_slotDepth, 4),
             PinMm = V(_pin, 2), Cap = _cap.IsChecked == true, Foot = _foot.IsChecked == true,
+            EngraveBack = _engraveBack.IsChecked == true, Back = BackLook(),
         };
+    }
+
+    /// <summary>The back's look: the one loaded while its texture is the same (with the wear set here), else the picked preset's own.</summary>
+    FaceLook? BackLook()
+    {
+        if (_engraveBack.IsChecked != true) return _backLoaded;
+        string name = _backTexture.SelectedItem as string ?? "Brick";
+        double wear = V(_backWear, 50) / 100;
+        return _backLoaded is { } b && b.Texture == name ? b with { Wear = wear } : FaceLook.Of(name, wear);
     }
 
     string? LastFile => _dataFolder is null ? null : Path.Combine(_dataFolder, "last.json");
