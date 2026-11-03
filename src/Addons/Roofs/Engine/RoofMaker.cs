@@ -210,19 +210,23 @@ public static class RoofMaker
             standing.Add((truss, tabs));
         }
 
-        // The slopes. At the ridge the left one runs on over the right one's end (see the class notes in the help).
+        // The slopes. Without caps, at the ridge the left one runs on over the right one's end (see the class
+        // notes in the help); with caps both stop at the ridge and the cap closes the joint.
         double sin2 = Math.Sin(2 * Math.Atan(t)), tan2 = Math.Tan(2 * Math.Atan(t));
-        double startR = tan2 > 1e-9 ? T / tan2 : 0, startL = -T / Math.Max(1e-6, sin2);
+        double startR = s.Caps ? 0 : tan2 > 1e-9 ? T / tan2 : 0, startL = s.Caps ? 0 : -T / Math.Max(1e-6, sin2);
         double S = W / 2 / c + e, lp = L + 2 * s.GableOverhangMm, go = s.GableOverhangMm;
         if (lp < 5 || S - startR < 5) { findings.Add(new(Severity.Bad, "The slopes come out too small: make the roof bigger.")); return; }
-        parts.Add(Slope(s, "Slope (right)", lp, S - startR, new Pose(new V3(L + go, W / 2 + e * c, z0 - e * sn), -V3.UnitX, new V3(0, -c, sn))));
-        parts.Add(Slope(s, "Slope (left)", lp, S - startL, new Pose(new V3(-go, -W / 2 - e * c, z0 - e * sn), V3.UnitX, new V3(0, c, sn))));
+        var right = new Pose(new V3(L + go, W / 2 + e * c, z0 - e * sn), -V3.UnitX, new V3(0, -c, sn));
+        var left = new Pose(new V3(-go, -W / 2 - e * c, z0 - e * sn), V3.UnitX, new V3(0, c, sn));
+        parts.Add(Slope(s, "Slope (right)", lp, S - startR, right));
+        parts.Add(Slope(s, "Slope (left)", lp, S - startL, left));
         if (s.Caps)
         {
-            // Resting on the high corner of the left slope's end, which runs on past the ridge.
-            double ext = -startL, cw = 2 * T + 2;
-            var top = new V3(0, ext * c - T * sn, z0 + h + ext * sn + T * c);
-            parts.Add(Cap(s, "Ridge cap", lp, cw, new Pose(new V3(-go, top.Y - cw / 2, top.Z), V3.UnitX, V3.UnitY)));
+            // A strip on each slope along the ridge, the left one running on over the right one's edge.
+            double phi = 2 * Math.Atan(t);
+            PathD Strip() => [new(0, 0), new(lp, 0), new(lp, S), new(0, S)];
+            parts.Add(Caps(s, "Ridge cap (right)", Strip(), [new Seam(2, phi, false)], T, [right]));
+            parts.Add(Caps(s, "Ridge cap (left)", Strip(), [new Seam(2, phi, true)], T, [left]));
         }
         if (s.TrussSpacingMm > 0 && xs.Count == 0 && L - 2 * x0 > 90) findings.Add(new(Severity.Note, "No trusses: the gables hold the slopes up."));
     }
@@ -320,36 +324,16 @@ public static class RoofMaker
 
         if (s.Caps)
         {
-            double cw = 2 * T + 2;
-            // One cap on each hip, from the eave's corner up towards the end of the ridge, lying across the joint;
-            // each stops short where it would run into the next hip's cap or the ridge cap.
-            var poses = new List<Pose>();
-            double len = 0, a = cw / 2;
-            var corners = new[] { (1, 1), (1, -1), (-1, -1), (-1, 1) };
-            foreach (var (sx, sy) in corners)
-            {
-                var corner = new V3(sx > 0 ? L + oh : -oh, sy * (W / 2 + oh), z0 - drop);
-                var end = new V3(sx > 0 ? L - W / 2 : W / 2, 0, z0 + h);
-                var others = corners.Where(q => q != (sx, sy) && (q.Item1 == sx || ridge <= 1))
-                    .Select(q => new V3(q.Item1 > 0 ? L + oh : -oh, q.Item2 * (W / 2 + oh), z0 - drop) - end).ToList();
-                if (ridge > 1) others.Add(new V3(-sx * ridge, 0, 0));
-                var away = (corner - end).Unit;
-                double angle = others.Min(o => Math.Acos(Math.Clamp(o.Unit.Dot(away), -1, 1)));
-                double back = a / Math.Tan(Math.Max(0.2, angle) / 2) + a * 0.3;
-                var bis = (new V3(0, sy * sn, c) + new V3(sx * sn, 0, c)).Unit;
-                double lift = T * new V3(0, sy * sn, c).Dot(bis);
-                var dir = (end - corner).Unit;
-                var side = bis.Cross(dir);
-                len = Math.Max(cw, (end - corner).Length - back);
-                poses.Add(new Pose(corner + bis * lift - side * a, dir, side));
-            }
-            parts.Add(Cap(s, "Hip cap", len, cw, poses[0]) with { Copies = 4, Poses = poses });
-            if (ridge > 1)
-            {
-                double z = z0 + h + T * c;
-                parts.Add(Cap(s, "Ridge cap", ridge, cw, new Pose(new V3(W / 2, -a, z), V3.UnitX, V3.UnitY)));
-            }
-            else findings.Add(new(Severity.Note, "The hip caps stop short of the point: glue a bead or a cocktail stick on top as a finial."));
+            // Each slope gets one cap piece lying on it along its hips (and the ridge): where two meet over a
+            // joint, the long slope's runs on over the end slope's edge, and the front one's over the back one's
+            // at the ridge, so the joints close up tight.
+            double hipPhi = Math.Acos(Math.Clamp(c * c, -1, 1)), ridgePhi = 2 * Math.Atan(t);
+            // Over a point (no ridge), the long slopes' caps meet at the top as if over a ridge with no length.
+            var front = trapPart.Poses[0];
+            var back = new Pose(new V3(-oh, -W / 2 - oh, z0 - drop), V3.UnitX, new V3(0, c, sn));
+            parts.Add(Caps(s, "Long slope cap (front)", trap, [new Seam(1, hipPhi, true), new Seam(2, ridgePhi, true), new Seam(3, hipPhi, true)], T, [front]));
+            parts.Add(Caps(s, "Long slope cap (back)", trap, [new Seam(1, hipPhi, true), new Seam(2, ridgePhi, false), new Seam(3, hipPhi, true)], T, [back]));
+            parts.Add(Caps(s, "End slope cap", tri, [new Seam(1, hipPhi, false), new Seam(2, hipPhi, false)], T, [.. triPart.Poses, new Pose(new V3(-oh, W / 2 + oh, z0 - drop), -V3.UnitY, new V3(c, 0, sn))]));
         }
         findings.Add(new(Severity.Note, n == 1 ? "The ridge board and the cross board slot together halfway, and stand in slots in the base." : $"The ridge board and the {n} trusses slot together halfway, and stand in slots in the base."));
     }
@@ -365,6 +349,100 @@ public static class RoofMaker
         var tex = Shingles.Make(s.Shingle, s.ShingleA, s.ShingleB, s.ShingleGrooveMm, s.Seed, x1, y1);
         var (etched, lines) = Shingles.Apply(tex, Geo.Tidy(outline), s.Etch);
         return new RoofPart(name, Geo.Tidy(outline), etched, lines, 1, [pose]);
+    }
+
+    /// <summary>
+    /// A joint along edge <see cref="Edge"/> of a slope's flat outline (from its point Edge to the next) with
+    /// the slope beyond it: <see cref="Phi"/> is the angle between the two slopes' faces (between their
+    /// normals), and <see cref="Over"/> whether this side's cap runs on over the other's edge.
+    /// </summary>
+    internal readonly record struct Seam(int Edge, double Phi, bool Over);
+
+    /// <summary>How wide a cap's strip is on each side of a joint (mm).</summary>
+    internal static double CapStrip(double T) => Math.Max(3, T + 1.5);
+
+    /// <summary>
+    /// The cap piece that lies on a slope along its joints: a strip on top of the slope beside each joint,
+    /// running to where the strips on the slopes either side meet over the joint, so the two make a tight
+    /// ridge (the one that runs <see cref="Seam.Over"/> covers the other's edge, as the slopes do without
+    /// caps). Each strip has the joints between ridge tiles etched across it.
+    /// </summary>
+    internal static RoofPart Caps(RoofSpec s, string name, PathD slope, IReadOnlyList<Seam> seams, double T, List<Pose> slopePoses)
+    {
+        int n = slope.Count;
+        double w = CapStrip(T), big = 1e4;
+        var mid = new PointD(slope.Average(p => p.x), slope.Average(p => p.y));
+        // The edge from point i to the next: its direction and its outward normal, or null if it has no length.
+        (PointD A, PointD D, PointD Out)? EdgeOf(int i)
+        {
+            var a = slope[i];
+            var b = slope[(i + 1) % n];
+            double dx = b.x - a.x, dy = b.y - a.y, len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1e-6 && n >= 4)
+            {
+                // An edge with no length (a hipped roof's ridge, when it comes to a point): it runs the way
+                // the edge across from it does, back the other way.
+                var p0 = slope[(i + n - 1) % n];
+                var p1 = slope[(i + 2) % n];
+                dx = p1.x - p0.x; dy = p1.y - p0.y; len = Math.Sqrt(dx * dx + dy * dy);
+            }
+            if (len < 1e-6) return null;
+            var d = new PointD(dx / len, dy / len);
+            var o = new PointD(d.y, -d.x);
+            if ((mid.x - a.x) * o.x + (mid.y - a.y) * o.y > 0) o = new PointD(-o.x, -o.y);
+            return (a, d, o);
+        }
+        // Everything on the inside of edge i, moved out by shift.
+        PathsD Inside(int i, double shift)
+        {
+            if (EdgeOf(i) is not { } e) return [Geo.Rect(-big, -big, big, big)];
+            var a = new PointD(e.A.x + e.Out.x * shift, e.A.y + e.Out.y * shift);
+            PointD At(double along, double inward) => new(a.x + e.D.x * along - e.Out.x * inward, a.y + e.D.y * along - e.Out.y * inward);
+            return [[At(-big, 0), At(big, 0), At(big, big), At(-big, big)]];
+        }
+        // How far each joint's strip reaches past the slope's edge: to where the faces on top of the two
+        // slopes meet, then on over the other's edge or back off it.
+        // Up to a right angle the one underneath stops where its top meets the other's underside, and the
+        // other runs on to cover its end; steeper, the one underneath stops at the joint (its end then stays
+        // clear of the other) and the other runs on over it.
+        double Reach(Seam j)
+        {
+            double phi = Math.Clamp(j.Phi, 0.05, Math.PI - 0.05), meet = T * Math.Tan(phi / 2);
+            if (phi <= Math.PI / 2) return meet + (j.Over ? T / Math.Sin(phi) : -T / Math.Tan(phi));
+            return meet + (j.Over ? T * Math.Sin(phi) : 0);
+        }
+        var shift = new double[n];
+        foreach (var j in seams) shift[j.Edge] = Reach(j);
+        PathsD outer = [Geo.Rect(-big, -big, big, big)], inner = [Geo.Rect(-big, -big, big, big)];
+        for (int i = 0; i < n; i++)
+        {
+            bool seam = seams.Any(j => j.Edge == i);
+            outer = Geo.Intersect(outer, Inside(i, shift[i]));
+            inner = Geo.Intersect(inner, Inside(i, seam ? shift[i] - w : 0));
+        }
+        var cut = Geo.Tidy(Geo.Subtract(outer, inner));
+        // The joints between ridge tiles, across each strip.
+        var marks = new PathsD();
+        var lines = new List<PathD>();
+        double g = Math.Clamp(s.ShingleGrooveMm, 0.3, 1);
+        foreach (var j in seams)
+        {
+            if (EdgeOf(j.Edge) is not { } e) continue;
+            var a = new PointD(e.A.x + e.Out.x * shift[j.Edge], e.A.y + e.Out.y * shift[j.Edge]);
+            var b0 = slope[(j.Edge + 1) % n];
+            double len = (b0.x - e.A.x) * e.D.x + (b0.y - e.A.y) * e.D.y;
+            var strip = Geo.Intersect(cut, Geo.Subtract(Inside(j.Edge, shift[j.Edge]), Inside(j.Edge, shift[j.Edge] - w)));
+            for (double x = 7; x < len - 2; x += 7)
+            {
+                PointD P(double along, double inward) => new(a.x + e.D.x * along - e.Out.x * inward, a.y + e.D.y * along - e.Out.y * inward);
+                if (s.Etch == EtchStyle.Grooves) marks.AddRange(Geo.Intersect([[P(x - g / 2, -1), P(x + g / 2, -1), P(x + g / 2, w + 1), P(x - g / 2, w + 1)]], strip));
+                else lines.AddRange(Geo.ClipLines([[P(x, -1), P(x, w + 1)]], strip));
+            }
+        }
+        PathsD etched = s.Shingle != Shingles.Plain && s.Etch == EtchStyle.Grooves ? Geo.Union(marks) : [];
+        if (s.Shingle == Shingles.Plain) lines.Clear();
+        var poses = slopePoses.Select(p => p.Moved(p.N * T)).ToList();
+        return new RoofPart(name, cut, etched, lines, poses.Count, poses);
     }
 
     /// <summary>A strip over a ridge or hip, with the joints between ridge tiles etched across it.</summary>

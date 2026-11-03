@@ -19,6 +19,8 @@ public static class HousePlacement
     public const string CutLayer = "Building · cut";
     public const string EtchLayer = "Building · etch";
     public const string LineLayer = "Building · lines";
+    /// <summary>The pieces' numbers, scored lightly (turn the layer off to cut without them).</summary>
+    public const string NumberLayer = "Building · numbers";
     /// <summary>Which building a shape belongs to (an id shared by all its pieces).</summary>
     public const string IdKey = "houseeditor.id";
     /// <summary>The settings it was made from (JSON), on each piece's outline.</summary>
@@ -137,8 +139,8 @@ public static class HousePlacement
     /// <summary>One sheet's pieces nested onto as many pages (beds) as they need, from the page shown on; returns how many pages.</summary>
     static int PlaceSheet(ref DocState s, List<Piece> pieces, string title, Guid id, string json, MachineProfile machine, PlaceOptions o, CancellationToken ct)
     {
-        bool anyEtch = pieces.Any(p => p.Etched.Count > 0), anyLines = pieces.Any(p => p.Lines.Count > 0);
-        (Layer Cut, Layer? Etch, Layer? Lines) Layers(ref DocState st)
+        bool anyEtch = pieces.Any(p => p.Etched.Count > 0), anyLines = pieces.Any(p => p.Lines.Count > 0), anyMarks = pieces.Any(p => p.Marks.Count > 0);
+        (Layer Cut, Layer? Etch, Layer? Lines, Layer? Marks) Layers(ref DocState st)
         {
             var cut = st.Layers.FirstOrDefault(l => l.Name == CutLayer);
             if (cut is null)
@@ -159,11 +161,12 @@ public static class HousePlacement
             }
             var etch = Before(ref st, anyEtch, EtchLayer, LayerMode.Fill, l => l);
             var lines = Before(ref st, anyLines, LineLayer, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 15) } });
-            return (cut, etch, lines);
+            var marks = Before(ref st, anyMarks, NumberLayer, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 10) } });
+            return (cut, etch, lines, marks);
         }
-        var (cutLayer, etchLayer, lineLayer) = Layers(ref s);
+        var (cutLayer, etchLayer, lineLayer, markLayer) = Layers(ref s);
 
-        // Each piece (each copy of it) made at the bed's corner; the nesting moves it into place. Kind of each shape: 0 cut, 1 etch, 2 lines.
+        // Each piece (each copy of it) made at the bed's corner; the nesting moves it into place. Kind of each shape: 0 cut, 1 etch, 2 lines, 3 its number.
         var units = new List<List<(Shape Shape, int Kind)>>();
         foreach (var part in pieces)
         {
@@ -175,14 +178,17 @@ public static class HousePlacement
             outline = outline.Transform(move);
             var etched = part.Etched.Count > 0 ? Geo.ToGeometry(part.Etched).Transform(move) : null;
             var lines = part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
+            var marks = part.Marks.Count > 0 ? Geo.ToGeometry([], part.Marks).Transform(move) : null;
             for (int c = 0; c < part.Copies; c++)
             {
-                string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
+                string label = part.Number > 0 ? $"#{part.Number} {part.Name}" : part.Name;
+                string name = part.Copies > 1 ? $"{label} ({c + 1} of {part.Copies})" : label;
                 Shape cutShape = new PathShape { Name = name, LayerId = cutLayer.Id, Geometry = outline };
                 if (part.WallSpecJson is { } wall && c == 0) cutShape = cutShape.WithAddonData(WallSpecKey, wall);
                 var shapes = new List<(Shape, int)> { (cutShape, 0) };
                 if (etched is not null) shapes.Add((new PathShape { Name = $"{name} · etching", LayerId = etchLayer!.Id, Geometry = etched }, 1));
                 if (lines is not null) shapes.Add((new PathShape { Name = $"{name} · lines", LayerId = lineLayer!.Id, Geometry = lines }, 2));
+                if (marks is not null) shapes.Add((new PathShape { Name = $"{name} · number", LayerId = markLayer!.Id, Geometry = marks }, 3));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
                 units.Add([.. shapes.Select(x => (x.Item1.WithGroup(g).WithAddonData(IdKey, id.ToString()), x.Item2))]);
             }
@@ -199,7 +205,7 @@ public static class HousePlacement
             // The settings on the biggest piece of each page (it always goes on): enough to find the building
             // again from any of its pieces, where every outline carrying them would make the file big.
             if (!units[0][0].Shape.AddonData.ContainsKey(SpecKey)) units[0][0] = (units[0][0].Shape.WithAddonData(SpecKey, json), 0);
-            var onPage = units.Select(u => u.Select(x => x.Shape.With(layerId: x.Kind == 0 ? cutLayer.Id : x.Kind == 1 ? etchLayer!.Id : lineLayer!.Id)).ToList()).ToList();
+            var onPage = units.Select(u => u.Select(x => x.Shape.With(layerId: x.Kind switch { 0 => cutLayer.Id, 1 => etchLayer!.Id, 2 => lineLayer!.Id, _ => markLayer!.Id })).ToList()).ToList();
             s = Ops.AddShapes(s, onPage.SelectMany(u => u));
             var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
             var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
@@ -210,7 +216,7 @@ public static class HousePlacement
             units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
             if (units.Count == 0) break;
             s = Pages.Add(s, $"{title} {++sheets}");
-            (cutLayer, etchLayer, lineLayer) = Layers(ref s);
+            (cutLayer, etchLayer, lineLayer, markLayer) = Layers(ref s);
         }
         return sheets;
     }

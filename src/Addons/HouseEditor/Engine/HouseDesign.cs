@@ -4,6 +4,8 @@ using System.Text.Json.Serialization.Metadata;
 using PhotonCanvas.Addon.Buildings;
 using PhotonCanvas.Addon.Walls;
 using GableWindow = PhotonCanvas.Addon.Roofs.GableWindow;
+using PhotonCanvas.Addon.Furniture;
+using HingeSide = PhotonCanvas.Addon.Walls.HingeSide;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
@@ -88,10 +90,123 @@ public sealed record Level
     public List<Opening> Openings { get; init; } = [];
     /// <summary>Squares of floor laid by hand, each by its top-left corner (the rooms get a floor anyway).</summary>
     public List<GridPt> Floor { get; init; } = [];
+    /// <summary>
+    /// How far (squares) this floor's floor reaches past its own rooms and walls: the ground floor's base all
+    /// round, an upper floor's over the rooms below (the rest of them are left open, for a roof). None: as
+    /// drawn (an upper floor covers everything below it, and floor laid by hand).
+    /// </summary>
+    public int? Yard { get; init; }
     /// <summary>Railings round the edges of this floor that have no wall on them (a balcony, a terrace).</summary>
     public bool Railings { get; init; } = true;
     /// <summary>Rooms with a floor pattern of their own.</summary>
     public List<RoomFloor> RoomFloors { get; init; } = [];
+    /// <summary>The furniture standing on this floor.</summary>
+    public List<PlacedItem> Furniture { get; init; } = [];
+    /// <summary>Stairs and ladders from this floor up to the one above, each through an opening in its floor.</summary>
+    public List<PlacedWay> WaysUp { get; init; } = [];
+    /// <summary>Columns with a shape of their own (the rest take the building's).</summary>
+    public List<ColumnPick> Columns { get; init; } = [];
+    /// <summary>Squares of this floor's open edge whose railing was taken away.</summary>
+    public List<WallEdge> NoRailing { get; init; } = [];
+    /// <summary>Walls with a look of their own, one square of wall at a time.</summary>
+    public List<WallLook> WallLooks { get; init; } = [];
+
+    /// <summary>The shape a column picked for itself, or null when it's the building's.</summary>
+    public ColumnPick? PickAt(GridPt at) => Columns.FirstOrDefault(c => c.At == at);
+
+    public ColumnShape? ColumnAt(GridPt at)
+    {
+        foreach (var c in Columns) if (c.At == at) return c.Shape;
+        return null;
+    }
+
+    /// <summary>The look a square of wall has of its own, or null when it's like the rest of the building.</summary>
+    public WallLook? LookOf(WallEdge e)
+    {
+        foreach (var l in WallLooks) if (l.Edge == e) return l;
+        return null;
+    }
+
+    /// <summary>
+    /// The plan of this floor's walls, with a column wherever a wall's look changes along a straight line
+    /// (each straight wall is cut from one texture).
+    /// </summary>
+    public PlanShape Shape()
+    {
+        if (WallLooks.Count == 0) return PlanShape.Of(Walls);
+        var looks = new Dictionary<WallEdge, WallLook>();
+        foreach (var l in WallLooks) looks[l.Edge] = l;
+        var walls = Walls.ToHashSet();
+        var splits = new HashSet<GridPt>();
+        foreach (var e in walls)
+        {
+            // The next square on along the same line, if there's wall there.
+            var next = WallEdge.Of(e.B, e.B + e.Step);
+            if (!walls.Contains(next)) continue;
+            looks.TryGetValue(e, out var a);
+            looks.TryGetValue(next, out var b);
+            if (!WallLook.Same(a, b)) splits.Add(e.B);
+        }
+        return PlanShape.Of(Walls, splits);
+    }
+}
+
+/// <summary>
+/// A piece of furniture (the furniture maker's) standing on a floor: the middle of it on the plan
+/// (squares) and how many quarter turns it's turned (anticlockwise seen from above; 0 with its front
+/// towards you, the bottom of the plan).
+/// </summary>
+public sealed record PlacedItem
+{
+    public double X { get; init; }
+    public double Y { get; init; }
+    public int Turn { get; init; }
+    public FurnitureItem Item { get; init; } = Defaults.For(ItemKind.Table);
+}
+
+/// <summary>What climbs to the floor above: open stairs, solid stairs (stacked layers), spiral stairs or a leaning ladder.</summary>
+public enum WayKind { Stairs, SolidStairs, Spiral, Ladder }
+
+/// <summary>
+/// A way up from a floor to the one above: the middle of it and its opening on the plan (squares), and
+/// which way it climbs (0 towards the right of the plan, each step a quarter turn anticlockwise).
+/// </summary>
+public sealed record PlacedWay
+{
+    public double X { get; init; }
+    public double Y { get; init; }
+    public int Turn { get; init; }
+    public WayKind Kind { get; init; } = WayKind.Stairs;
+}
+
+/// <summary>How a column is built: as usual (a box when it's square in box walls, otherwise stacked layers), a box whatever its shape, or stacked layers on a pin.</summary>
+public enum ColumnMade { Usual, Boxed, Stacked }
+
+/// <summary>A column's own shape, build and texture (null: the building's): the column at grid point <see cref="At"/> (squares).</summary>
+public sealed record ColumnPick
+{
+    public GridPt At { get; init; }
+    public ColumnShape? Shape { get; init; }
+    public ColumnMade? Build { get; init; }
+    /// <summary>The texture etched on a boxed column's sides (one of the wall maker's).</summary>
+    public string? Texture { get; init; }
+    [JsonIgnore] public bool Empty => Shape is null && Build is null && Texture is null;
+}
+
+/// <summary>
+/// One square of wall's own look: its texture, how worn it is (0 crisp to 1 battered) and the size of
+/// its smallest marks (mm, 0 = the texture's own). Every square of a straight wall gets the same look.
+/// </summary>
+public sealed record WallLook
+{
+    public WallEdge Edge { get; init; }
+    public string Texture { get; init; } = "Fieldstone";
+    public double Wear { get; init; } = 0.5;
+    public double DetailMm { get; init; }
+
+    /// <summary>Whether two squares of wall look the same (null: like the rest of the building).</summary>
+    public static bool Same(WallLook? a, WallLook? b) =>
+        a is null ? b is null : b is not null && a.Texture == b.Texture && Math.Abs(a.Wear - b.Wear) < 1e-9 && Math.Abs(a.DetailMm - b.DetailMm) < 1e-9;
 }
 
 /// <summary>A roof's shape: pitched with a gable at each end, hipped (sloping on all four sides), a lean-to sloping one way, or flat.</summary>
@@ -159,6 +274,16 @@ public sealed record HouseDesign
     public BaseKind Base { get; init; } = BaseKind.Tiles;
     /// <summary>The pattern on the floors between storeys: one of the floor tile maker's.</summary>
     public string UpperFloor { get; init; } = "Floorboards";
+    /// <summary>How the columns are built (a column can have its own).</summary>
+    public ColumnMade ColumnBuild { get; init; } = ColumnMade.Usual;
+    /// <summary>The texture on boxed columns' sides (null: the walls' own).</summary>
+    public string? ColumnTexture { get; init; }
+    /// <summary>How worn the walls' and floors' textures are, 0 (new and crisp) to 1 (ancient and battered); 0.5 is each texture's usual look.</summary>
+    public double Wear { get; init; } = 0.5;
+    /// <summary>The size of the textures' smallest marks (pits, nicks, grain, bolts) in mm; 0 = each texture's own.</summary>
+    public double DetailMm { get; init; }
+    /// <summary>Whether every piece has its number (the one in the building booklet) scored small on it.</summary>
+    public bool NumberPieces { get; init; } = true;
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
     public static BuildingSpec DefaultStyle() => BuildingSpec.Preset(BuildingKind.Cottage) with { Items = [] };
@@ -212,9 +337,17 @@ public sealed record HouseDesign
         {
             Walls = [.. Lines((2, 2), (9, 2), (9, 5), (7, 7), (2, 7), (2, 2)), .. Lines((5, 2), (5, 7))],
             RoomFloors = [new RoomFloor { X = 3.5, Y = 4.5, Texture = "Flagstones" }],
+            Furniture =
+            [
+                new PlacedItem { X = 3.5, Y = 4, Item = HouseKitMaker.NewItem(style, ItemKind.Table) },
+                new PlacedItem { X = 3.5, Y = 2.75, Item = HouseKitMaker.NewItem(style, ItemKind.Bench) },
+                new PlacedItem { X = 5.9, Y = 2.6, Item = HouseKitMaker.NewItem(style, ItemKind.Chest) },
+                new PlacedItem { X = 6.25, Y = 6.5, Item = HouseKitMaker.NewItem(style, ItemKind.Crate) },
+            ],
+            WaysUp = [new PlacedWay { X = 7.5, Y = 3.7, Turn = 1, Kind = WayKind.Stairs }],
             Openings =
             [
-                Opening.NewDoor(style, 3.5, 7),
+                Opening.NewDoor(style, 3.5, 7) with { Opens = true },
                 Opening.NewDoorway(style, 5, 5.5),
                 Opening.NewWindow(style, 2, 4.5),
                 Opening.NewWindow(style, 3.5, 2),
@@ -227,6 +360,11 @@ public sealed record HouseDesign
         var upstairs = new Level
         {
             Walls = Lines((2, 2), (6, 2), (6, 7), (2, 7), (2, 2)),
+            Furniture =
+            [
+                new PlacedItem { X = 3.25, Y = 4.5, Turn = 1, Item = HouseKitMaker.NewItem(style, ItemKind.Bed) },
+                new PlacedItem { X = 5.2, Y = 2.75, Turn = 2, Item = HouseKitMaker.NewItem(style, ItemKind.Bookshelf) },
+            ],
             Openings =
             [
                 Opening.NewDoor(style, 6, 4.5),
@@ -251,6 +389,11 @@ public sealed record HouseDesign
                 Openings = [.. l.Openings.Select(o => o with { X = o.X + dx, Y = o.Y + dy })],
                 Floor = [.. l.Floor.Select(f => f + d)],
                 RoomFloors = [.. l.RoomFloors.Select(r => r with { X = r.X + dx, Y = r.Y + dy })],
+                WallLooks = [.. l.WallLooks.Select(w => w with { Edge = new WallEdge(w.Edge.A + d, w.Edge.B + d) })],
+                NoRailing = [.. l.NoRailing.Select(w => new WallEdge(w.A + d, w.B + d))],
+                Columns = [.. l.Columns.Select(c => c with { At = c.At + d })],
+                Furniture = [.. l.Furniture.Select(f => f with { X = f.X + dx, Y = f.Y + dy })],
+                WaysUp = [.. l.WaysUp.Select(w => w with { X = w.X + dx, Y = w.Y + dy })],
             })],
             Roofs = [.. Roofs.Select(r => r with { X0 = r.X0 + dx, X1 = r.X1 + dx, Y0 = r.Y0 + dy, Y1 = r.Y1 + dy })],
         };
