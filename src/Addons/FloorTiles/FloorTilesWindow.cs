@@ -31,7 +31,8 @@ public sealed class FloorTilesWindow : Window
     readonly NumericUpDown _square = Number(5, 300, 0.1m, "0.##"), _thick = Number(0.5m, 20, 0.5m, "0.##");
     readonly ComboBox _mode = Combo("A board, split into tiles", "Loose tiles");
     readonly NumericUpDown _boardA = Number(0.5m, 200, 1, "0.##"), _boardD = Number(0.5m, 200, 1, "0.##"), _tileA = Number(1, 20, 1, "0"), _tileD = Number(1, 20, 1, "0");
-    readonly CheckBox _border = new() { Content = "Straight edges round the outside of the board", IsChecked = true };
+    readonly CheckBox _outside = new() { Content = "Joints round the outside of the board too" };
+    readonly TextBlock _outsideAbout = Hint();
     readonly StackPanel _sizes = new() { Spacing = 6 };
     readonly List<SizeRow> _sizeRows = [];
     Control _boardRows = null!, _tilesRows = null!;
@@ -173,8 +174,7 @@ public sealed class FloorTilesWindow : Window
     {
         _boardRows = Stack(
             Row(Small("Squares across", _boardA, tip: "How wide the board is, in grid squares. A part square (4.5) makes the last column narrower."), Small("Squares down", _boardD, tip: "How deep the board is, in grid squares.")),
-            Row(Small("Tile up to (across)", _tileA, tip: "The biggest tile the board is cut into, in squares across."), Small("Tile up to (down)", _tileD, tip: "The biggest tile, in squares down.")),
-            _border);
+            Row(Small("Tile up to (across)", _tileA, tip: "The biggest tile the board is cut into, in squares across."), Small("Tile up to (down)", _tileD, tip: "The biggest tile, in squares down.")));
         var add = UiKit.Button("Add a tile size");
         add.HorizontalAlignment = HorizontalAlignment.Left;
         add.Click += (_, _) => { AddSizeRow(new TileSize { Count = 1 }); Changed(); };
@@ -187,7 +187,7 @@ public sealed class FloorTilesWindow : Window
         return Stack(
             Explained("Grid", "Tiles are made on a square grid, so they line up with each other and with your game's movement squares. 25.4 mm (an inch) suits 28–32 mm figures.",
                 Field("Grid square", _square, tip: "One square of the grid (mm)."),
-                Field("Make", _mode, tip: "A whole board, split into tiles with straight edges round the outside, or tiles of the sizes you list."),
+                Field("Make", _mode, tip: "A whole board, split into tiles (straight round the outside, or with joints there too: see Joints), or tiles of the sizes you list."),
                 _boardRows, _tilesRows),
             Explained("Sheet", "Picking your material's settings brings its thickness and, from your cut test, its kerf and slot fit.",
                 Field("Thickness", _thick, tip: "The sheet's thickness (mm)."),
@@ -232,7 +232,10 @@ public sealed class FloorTilesWindow : Window
                 _tabRow,
                 _magnetRow,
                 Field("Fit", _fit, tip: "Play between a tab or clip and its socket (mm): more is looser. With your material's cut settings picked, the kerf is allowed for too.")),
-            Explained("Base layer", "A second, plain layer glued under each tile makes them thicker and flatter. Clips then go in the base layer only, out of sight; magnets always have one.",
+            Explained("Outside edges", "Straight round the outside, the board ends neatly. With joints there too, it locks onto other boards made on the same grid, to build a bigger floor from several.",
+                _outside,
+                _outsideAbout),
+            Explained("Base layer", "A second layer glued under each tile makes them thicker and flatter. The joints then go in the base layer only, under a plain top that hides them; magnets always have one.",
                 _base));
     }
 
@@ -328,7 +331,7 @@ public sealed class FloorTilesWindow : Window
             n.ValueChanged += (_, _) => Changed();
         foreach (var c in new[] { _mode, _etch, _grid, _join, _etchWith })
             c.SelectionChanged += (_, _) => Changed();
-        foreach (var c in new[] { _border, _base })
+        foreach (var c in new[] { _outside, _base })
             c.IsCheckedChanged += (_, _) => Changed();
         _cutWith.SelectionChanged += (_, _) => CutChosen();
         _texture.SelectionChanged += (_, _) => TextureChosen();
@@ -413,6 +416,12 @@ public sealed class FloorTilesWindow : Window
         _tabLabel.Text = join == TileJoin.Clips ? "Clip size" : "Tab size";
         _magnetRow.IsVisible = join == TileJoin.Magnets;
         _base.IsEnabled = join != TileJoin.Magnets;
+        _outside.IsVisible = board;
+        _outside.IsEnabled = join != TileJoin.None;
+        _outsideAbout.Text = !board
+            ? "Loose tiles have joints on every side but the straight sides you pick for each size (Tiles tab): pick None for joints all round."
+            : _outside.IsChecked == true ? "The tiles round the outside get joints on their outer sides as well, the same as between tiles." : "";
+        _outsideAbout.IsVisible = _outsideAbout.Text.Length > 0;
         _joinAbout.Text = join switch
         {
             TileJoin.Jigsaw => "A jigsaw tab and a socket on every square of every edge. They push together from above and hold the floor flat.",
@@ -430,7 +439,7 @@ public sealed class FloorTilesWindow : Window
         _loading = true;
         _square.Value = D(s.SquareMm); _thick.Value = D(s.ThicknessMm); _mode.SelectedIndex = (int)s.Mode;
         _boardA.Value = D(s.BoardAcross); _boardD.Value = D(s.BoardDown); _tileA.Value = Math.Clamp(s.TileAcross, 1, 20); _tileD.Value = Math.Clamp(s.TileDown, 1, 20);
-        _border.IsChecked = s.PlainBorder;
+        _outside.IsChecked = !s.PlainBorder;
         _sizeRows.Clear();
         _sizes.Children.Clear();
         foreach (var t in s.Tiles) AddSizeRow(t);
@@ -447,7 +456,7 @@ public sealed class FloorTilesWindow : Window
     TileSpec Current() => new()
     {
         SquareMm = V(_square, 25.4), ThicknessMm = V(_thick, 3), Mode = (TileMode)Math.Max(0, _mode.SelectedIndex),
-        BoardAcross = V(_boardA, 6), BoardDown = V(_boardD, 6), TileAcross = (int)V(_tileA, 2), TileDown = (int)V(_tileD, 2), PlainBorder = _border.IsChecked == true,
+        BoardAcross = V(_boardA, 6), BoardDown = V(_boardD, 6), TileAcross = (int)V(_tileA, 2), TileDown = (int)V(_tileD, 2), PlainBorder = _outside.IsChecked != true,
         Tiles = [.. _sizeRows.Select(r => r.Value)],
         Theme = ThemeName, Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 50), SizeB = V(_sizeB, 0), GrooveMm = V(_groove, 0.8), Seed = (int)V(_seed, 1), CracksPct = V(_cracks, 15),
         Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), Grid = (GridMarks)Math.Max(0, _grid.SelectedIndex),

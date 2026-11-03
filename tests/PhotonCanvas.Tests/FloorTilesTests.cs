@@ -131,6 +131,84 @@ public class FloorTilesTests
     }
 
     [Fact]
+    public void With_a_base_layer_the_jigsaw_is_only_in_the_base()
+    {
+        var k = Make(new TileSpec { BoardAcross = 6, BoardDown = 6, Join = TileJoin.Jigsaw, BaseLayer = true, Texture = FloorTextures.Plain });
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Findings, f => f.Text.Contains("base layer only"));
+        foreach (var spot in k.Board)
+        {
+            // The top is a plain rectangle, exactly its squares.
+            var tb = Geo.Bounds(spot.Tile.Cut);
+            Assert.Equal(0, tb.left, 6); Assert.Equal(0, tb.top, 6);
+            Assert.Equal(spot.W, tb.right, 6); Assert.Equal(spot.H, tb.bottom, 6);
+            Assert.Equal(spot.W * spot.H, Geo.Area(spot.Tile.Cut), 3);
+        }
+        // The middle tile's base has the tabs and sockets the top no longer has.
+        var middle = k.Board.Single(b => b.Plain == Sides.None);
+        var mbase = k.Parts.Single(p => p.Name == middle.Tile.Name + TileKitMaker.BaseSuffix);
+        var bb = Geo.Bounds(mbase.Cut);
+        Assert.True(bb.left < -5 && bb.right > middle.W + 5 && bb.top < -5 && bb.bottom > middle.H + 5);
+        Assert.True(Geo.Area(Geo.Subtract([Geo.Rect(0, 0, middle.W, middle.H)], mbase.Cut)) > 30, "no sockets in the base");
+        // And the bases lock together on the board without overlapping.
+        var bases = k.Board.Select(b => Geo.Move(k.Parts.Single(p => p.Name == b.Tile.Name + TileKitMaker.BaseSuffix).Cut, b.X, b.Y)).ToList();
+        for (int i = 0; i < bases.Count; i++)
+            for (int j = i + 1; j < bases.Count; j++)
+                Assert.True(Geo.Area(Geo.Intersect(bases[i], bases[j])) < 1e-3, $"bases {i} and {j} overlap");
+        // Without a base layer the top has the jigsaw itself.
+        var plain = Make(new TileSpec { BoardAcross = 6, BoardDown = 6, Join = TileJoin.Jigsaw, Texture = FloorTextures.Plain });
+        Assert.DoesNotContain(plain.Parts, p => p.Name.EndsWith(TileKitMaker.BaseSuffix));
+        var pm = Geo.Bounds(plain.Board.Single(b => b.Plain == Sides.None).Tile.Cut);
+        Assert.True(pm.left < -5);
+    }
+
+    [Theory]
+    [InlineData(TileJoin.Jigsaw)]
+    [InlineData(TileJoin.Clips)]
+    [InlineData(TileJoin.Magnets)]
+    public void Base_layer_tops_are_plain_and_hold_the_whole_texture(TileJoin join)
+    {
+        var k = Make(new TileSpec { BoardAcross = 2, BoardDown = 2, Join = join, BaseLayer = true, Texture = "Dungeon flagstones" });
+        Assert.True(k.Ok, Why(k));
+        var tile = k.Board.Single().Tile;
+        Assert.Equal(2 * G * 2 * G, Geo.Area(tile.Cut), 3);
+        Assert.True(Geo.Area(Geo.Subtract(tile.Etched, tile.Cut)) < 1e-3);
+    }
+
+    [Fact]
+    public void Boards_with_joints_round_the_outside_lock_onto_each_other()
+    {
+        var spec = new TileSpec { BoardAcross = 4, BoardDown = 4, TileAcross = 2, TileDown = 2, PlainBorder = false, Texture = FloorTextures.Plain };
+        var k = Make(spec);
+        Assert.True(k.Ok, Why(k));
+        Assert.All(k.Board, b => Assert.Equal(Sides.None, b.Plain));
+        Assert.Contains(k.Findings, f => f.Text.Contains("outside edges have joints"));
+        // A corner tile now has tabs out past the board's edge.
+        var corner = Geo.Bounds(k.Board.Single(b => b.X == 0 && b.Y == 0).Tile.Cut);
+        Assert.True(corner.left < -5 && corner.top < -5);
+
+        PathsD Board(double dx, double dy) => Geo.Union(new PathsD(k.Board.SelectMany(b => Geo.Move(b.Tile.Cut, b.X + dx, b.Y + dy))));
+        var a = Board(0, 0);
+        foreach (var (dx, dy) in new[] { (4 * G, 0.0), (0.0, 4 * G) })
+        {
+            // A second board beside or above it: they don't overlap and its tabs reach into the first one's sockets.
+            var b = Board(dx, dy);
+            Assert.True(Geo.Area(Geo.Intersect(a, b)) < 1e-3, "the boards overlap");
+            var past = dx > 0 ? Geo.Rect(-G, -G, 4 * G, 5 * G) : Geo.Rect(-G, -G, 5 * G, 4 * G);
+            Assert.True(Geo.Area(Geo.Intersect(b, [past])) > 10, "no tabs reach across");
+        }
+        // Turned round, a board still fits against another.
+        var turned = Geo.Move(Turned(a, 2, 4 * G, 4 * G), 4 * G, 0);
+        Assert.True(Geo.Area(Geo.Intersect(a, turned)) < 1e-3, "a turned board overlaps");
+
+        // Straight round the outside (the default), the corner is square there.
+        var straight = Make(spec with { PlainBorder = true });
+        var sc = Geo.Bounds(straight.Board.Single(b => b.X == 0 && b.Y == 0).Tile.Cut);
+        Assert.Equal(0, sc.left, 6);
+        Assert.DoesNotContain(straight.Findings, f => f.Text.Contains("outside edges have joints"));
+    }
+
+    [Fact]
     public void Clips_without_a_base_are_cut_through_the_tile()
     {
         var k = Make(Loose(1, 1, TileJoin.Clips));

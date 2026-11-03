@@ -3,8 +3,8 @@
 <!-- summary: Make a brick wall for a tabletop game with battlements, a door and a window, and the corner columns that join walls into a room, and pick a theme (dungeon, cave, sci-fi, desert, gothic) for other looks. -->
 <!-- page: walls.md -->
 <!-- order: 75 -->
-Wall panels cut from sheet with a texture etched on make quick, sturdy scenery for tabletop games.
-Columns join them, and the walls slide out again so the layout can change.
+Walls cut from sheet with a texture etched on make quick, sturdy scenery for tabletop games. Each
+wall is a box that stands up on its own, and columns join the walls into rooms.
 
 ## Open the wall maker
 <!-- target: ribbon:Home/Walls -->
@@ -19,8 +19,13 @@ have the same themes, so a set made in one theme matches.
 
 ## Size the wall
 <!-- target: field:Length -->
-Type the wall's **Length** and **Height**, and your sheet's **Thickness**: the columns' slots are
-made to fit it. Picking your material in **Cut with** fills the thickness in for you.
+Type the wall's **Length** and **Height**. Leave **Build it as** on a box.
+
+## Set the thicknesses
+<!-- target: field:Wall thickness -->
+**Wall thickness** is the whole wall, front to back: 12 mm suits 28 mm figures. **Panel thickness**
+is your sheet's, and every slot and tab is made to fit it. Picking your material in **Cut with**
+fills it in for you.
 
 ## Choose a texture
 <!-- target: tabitem:Texture -->
@@ -30,7 +35,8 @@ drawn. The preview shows it on the wall.
 ## Add battlements
 <!-- target: tabitem:Top -->
 On the **Top** tab, choose **Battlements (parapet)** for gaps along the top, and tick **Walkway
-behind the battlements** for somewhere to stand figures.
+behind the battlements** for somewhere to stand figures. **Put together** on the right shows the
+wall built; drag it round to see the walkway.
 
 ## Add a door and a window
 <!-- target: tabitem:Doors & windows -->
@@ -40,9 +46,10 @@ clear of each other and of the wall's ends.
 ## Join walls with columns
 <!-- target: tabitem:Connectors -->
 On **Connectors**, type how many columns of each kind you need: four **Corner (90°)** make a square
-room. Each column is a stack of layers with a slot for each wall.
+room. Each column is a box with slots for the walls' tabs; pick its **Top** and **Bottom**.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->
 Press **Put in the design**. The pieces are nested onto the bed, the texture on an etch layer that
-runs before the cut. Cut one wall and a column first, and change **Slot fit** if the fit is wrong.
+runs before the cut. Cut one wall and a column first, and change **Slot fit** if the tabs are too
+tight or too loose.
