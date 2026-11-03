@@ -1,0 +1,10 @@
+{
+  "id": "rotary-finish",
+  "name": "Finish stacks on the rotary",
+  "version": "1.0.0",
+  "description": "Put a dowel up the middle of stacked slices, then engrave the glued stack down to the model's shape on the rotary, with the focus moved for each height.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["slicer"],
+  "onByDefault": true
+}

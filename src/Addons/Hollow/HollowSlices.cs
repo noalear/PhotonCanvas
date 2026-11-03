@@ -94,7 +94,7 @@ public sealed class HollowSlices(HollowOptions options) : ISliceModifier
         }
         // Solid round the dowels, so the holes have a wall.
         var dowelMm = work.Options.DowelMm;
-        var solid = work.Dowels.Select(d => (d, dowelMm / 2 + wall / 2)).ToList();
+        var solid = work.Dowels.Select(d => (d, r: dowelMm / 2 + wall / 2)).Concat(work.Holes.Select(h => (d: h.At, r: h.DiameterMm / 2 + wall / 2))).ToList();
         // The channel: up through the solid base into the lowest hollow, at its roomiest spot.
         Vec2? channel = null;
         int channelSlices = 0;

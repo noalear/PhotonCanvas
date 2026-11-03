@@ -257,6 +257,7 @@ public static class AssemblyBooklet
             };
             if (o.PinMm > 0 && stack.Pins.Count > 0) facts.Add($"{stack.Pins.Count} pins, {o.PinMm:0.#} mm across, {PinLength(o, t)}");
             if (o.DowelMm > 0 && stack.Dowels.Count > 0) facts.Add($"2 dowels, {o.DowelMm:0.#} mm across, {stack.StackHeightMm:0} mm long, through every slice");
+            foreach (var h in stack.Holes) facts.Add($"1 dowel up the middle, {h.DiameterMm:0.#} mm across, longer than the stack ({stack.StackHeightMm:0} mm), through every slice");
             facts.Add("Wood glue, and a flat board to build on");
             float y = o.PageHeight - 160;
             foreach (var line in facts) { Text(c, "•  " + line, Margin, y, f, Ink); y += 18; }
@@ -287,6 +288,7 @@ public static class AssemblyBooklet
                     var also = new List<string> { $"{parts.Count} parts from {stack.Slices} slices, all drawn to the same scale." };
                     if (o.PinMm > 0 && stack.Pins.Count > 0) also.Add($"Also: {stack.Pins.Count} pins ({o.PinMm:0.#} mm, {PinLength(o, t)}).");
                     if (o.DowelMm > 0 && stack.Dowels.Count > 0) also.Add($"Also: 2 dowels ({o.DowelMm:0.#} mm × {stack.StackHeightMm:0} mm).");
+                    foreach (var h in stack.Holes) also.Add($"Also: a dowel up the middle ({h.DiameterMm:0.#} mm, longer than {stack.StackHeightMm:0} mm).");
                     if (parts.Any(p => p.Part.Floating && !plan.Hangs(p))) also.Add("Parts in red start in mid-air: glue them on by eye.");
                     foreach (var line in also) { Text(c, line, Margin, top + 6, f, Muted); top += 15; }
                     top += 10;

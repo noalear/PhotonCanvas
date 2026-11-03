@@ -25,8 +25,8 @@ In a narrow window, the small buttons show only their icons: hover over one for 
 up to 610 mm).
 
 > **Note:** The **Work mode** button is hidden until you tick an attachment in Settings →
-> **Equipment** (**RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)** or
-> **Conveyor feeder**). You're asked this once when the program first starts. Only the attachments
+> **Equipment** (**RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
+> **My own rotary (homemade or another make)** or **Conveyor feeder**). You're asked this once when the program first starts. Only the attachments
 > you tick are offered. Untick the one in use and jobs go back to the flat bed.
 
 > **Warning:** The rotary and conveyor modes are experimental. Their commands follow xTool Studio's
@@ -43,13 +43,41 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
-| **Attachment** | the ones you have: RA2 Pro · rollers, RA2 Pro · chuck, RA3 · rollers, RA3 · chuck | the first | Which attachment and how it holds the object. |
+| **Attachment** | the ones you have: RA2 Pro · rollers, RA2 Pro · chuck, RA3 · rollers, RA3 · chuck, Your own rotary | the first | Which attachment and how it holds the object. |
 | **Object Ø (mm)** | 2 to 200 | 60 | The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale. |
 
 - The work area becomes the field's width (220 mm) × once round the object. The window shows
   "Once round": π × the diameter. Only the first 375 mm can be used (xTool Studio's limit).
 - Design X runs along the object (the galvo), design Y goes round it (the attachment turns it). The
-  middle row of the design faces the laser at the start.
+  middle row of the design faces the laser at the start, unless the page has a **rotary start
+  line**: an orange guide across the page labelled "Rotary start: faces the laser". Then that line
+  faces the laser at the start, whatever is drawn. Pages made for the rotary (a stacked model's
+  finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
+- On the rotary a layer's **Focus offset (mm)** can go up to 60 mm either way (10 mm on the flat
+  bed), for surfaces much nearer the middle than where you focused.
+
+#### Your own rotary
+
+**Your own rotary** is a rotary you made (or another make) plugged into the machine's rotary port.
+Tick **My own rotary (homemade or another make)** in Settings → **Equipment** first. It has its own
+settings:
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Holds the object** | Chuck, Rollers | Chuck | A chuck turns the object with the motor; rollers turn it by its surface. |
+| **Units a turn** | 1 to 100000 | 128 | Chuck: the machine's units for one whole turn of the object. xTool's chucks take 128; other gearing or motor steps need their own number. |
+| **Roller scale** | 0.001 to 1000 | 0.59917 | Rollers: the machine's scale for a millimetre of surface (the RA2 Pro's). |
+| **It turns the other way** | off | off | Tick if a test mark comes out mirrored round the object (the motor turns the other way from xTool's). |
+
+To check the scale, make a design as tall as the work area (once round), mark a line across it, and
+put a tape flag on the object. Run it on scrap and count how far the object turned. If it isn't one
+whole turn, type 1 under **Turns asked** and what it made under **Turns made** (a quarter is 0.25),
+and click **Correct the scale**: the number is multiplied by asked ÷ made. Click **OK** to keep it,
+and run the test again to check.
+
+> **Warning:** The machine drives your rotary through its own port as if it were xTool's. Check
+> the motor and wiring suit the port before you plug it in, and keep a hand near the stop button on
+> the first test.
 - With rollers the scale round the object is fixed (the RA3's is four times the RA2 Pro's). With
   the chuck it's worked out from the diameter, so the diameter must be right for the design to come
   out the right size.

@@ -57,8 +57,8 @@ short steps. **Next** moves on, **Back** goes back; "Step 1 of 5" at the bottom 
 3. **Connect your laser.** **Set up connection keys…** opens the one-time setup (see
    [Connecting to the machine](#connecting-to-the-machine)). It says "✓ Connection keys are set
    up." when they are. You can skip this and do it later in Settings.
-4. **Your equipment.** Tick the attachments you have (RA2 Pro rotary, RA3 rotary, Conveyor
-   feeder) and the specialist features to show (Colour on metal, Diffraction gratings, G-code
+4. **Your equipment.** Tick the attachments you have (RA2 Pro rotary, RA3 rotary, a rotary of
+   your own, Conveyor feeder) and the specialist features to show (Colour on metal, Diffraction gratings, G-code
    console). Features you don't tick stay out of the ribbon. You can change this any time in
    Settings → Equipment; see [The machine and settings](machine.md).
 5. **How a job works.** Draw or import, choose what each layer does, find the right settings,
