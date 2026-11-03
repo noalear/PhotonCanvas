@@ -1,9 +1,9 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using Clipper2Lib;
 using PhotonCanvas.App;
+using PhotonCanvas.App.View3D;
 
 namespace PhotonCanvas.Addon.PuzzleBox;
 
@@ -12,9 +12,10 @@ namespace PhotonCanvas.Addon.PuzzleBox;
 /// pieces at the sheet's thickness, the body that has just moved picked out, and one just taken out
 /// shown beside the box (lifted off, or slid out in front). Drawn a layer at a time from the bottom:
 /// seen from above, a higher layer is always in front of a lower one where they overlap. Drag to
-/// turn it round; "see inside" makes the box's own layers and the tops over the hidden parts faint.
+/// turn it round, scroll to zoom, middle-drag or the arrow keys to move it (<see cref="ViewNavigator"/>);
+/// "see inside" makes the box's own layers and the tops over the hidden parts faint.
 /// </summary>
-public sealed class BoxView : Control
+public sealed class BoxView : Control, INavigable
 {
     readonly record struct P3(double X, double Y, double Z)
     {
@@ -33,7 +34,9 @@ public sealed class BoxView : Control
     Pose? _pose;
     int _moved = -1;
     double _yaw = 28, _pitch = 30;
-    Point? _drag;
+    // Zoom (1 = the whole box fits, at every step of opening it) and how far the view's been moved (screen units).
+    double _zoom = 1;
+    Vector _offset;
     string? _message;
     bool _inside;
 
@@ -41,8 +44,9 @@ public sealed class BoxView : Control
 
     public BoxView()
     {
-        ClipToBounds = true;
-        Cursor = new Cursor(StandardCursorType.SizeAll);
+        var nav = new ViewNavigator(this, this);
+        VisualChildren.Add(nav.Buttons);
+        LogicalChildren.Add(nav.Buttons);
     }
 
     /// <summary>Faint layers for the box itself, so the drawer, bolt and hooks inside show.</summary>
@@ -154,7 +158,9 @@ public sealed class BoxView : Control
         for (int i = 1; i < poses.Count; i++) Take(poses[i], moves[i - 1].Body);
         double k = Math.Min((Bounds.Width - 30) / Math.Max(1e-6, sx1 - sx0), (Bounds.Height - 40) / Math.Max(1e-6, sy1 - sy0));
         if (!(k > 0)) return;
-        double ox = Bounds.Width / 2 - (sx0 + sx1) / 2 * k, oy = Bounds.Height / 2 - (sy0 + sy1) / 2 * k - 6;
+        k *= _zoom;
+        var middle = Middle + _offset;
+        double ox = middle.X - (sx0 + sx1) / 2 * k, oy = middle.Y - (sy0 + sy1) / 2 * k;
         Point Screen(P3 q) { var s = Flat(q); return new Point(ox + s.X * k, oy + s.Y * k); }
 
         var light = new P3(0.35, 0.85, 0.45);
@@ -225,9 +231,11 @@ public sealed class BoxView : Control
                 if (pc.Etched is { } et && !Faint(pc.Body, pc.Layer)) ctx.DrawGeometry(PiecesView.Burnt, null, Shape(et, On));
             }
         }
-        var hint = new FormattedText("Drag to turn it round", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
-        ctx.DrawText(hint, new Point(10, Bounds.Height - hint.Height - 6));
+        ViewNavigator.DrawHint(ctx, Bounds);
     }
+
+    /// <summary>Where the middle of the box goes when it's fitted in the view.</summary>
+    Point Middle => new(Bounds.Width / 2, Bounds.Height / 2 - 6);
 
     static StreamGeometry Shape(IEnumerable<PathD> paths, Func<PointD, Point> on)
     {
@@ -244,29 +252,41 @@ public sealed class BoxView : Control
         return g;
     }
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    public void Turn(double dx, double dy)
     {
-        base.OnPointerPressed(e);
-        _drag = e.GetPosition(this);
-        e.Pointer.Capture(this);
-    }
-
-    protected override void OnPointerMoved(PointerEventArgs e)
-    {
-        base.OnPointerMoved(e);
-        if (_drag is not { } from) return;
-        var at = e.GetPosition(this);
-        _yaw = (_yaw - (at.X - from.X) * 0.5) % 360;
+        _yaw = (_yaw - dx * 0.5) % 360;
         // Always from above: that's what makes drawing a layer at a time right.
-        _pitch = Math.Clamp(_pitch + (at.Y - from.Y) * 0.4, 8, 85);
-        _drag = at;
+        _pitch = Math.Clamp(_pitch + dy * 0.4, 8, 85);
         InvalidateVisual();
     }
 
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    public void Move(Vector by)
     {
-        base.OnPointerReleased(e);
-        _drag = null;
-        e.Pointer.Capture(null);
+        _offset += by;
+        InvalidateVisual();
+    }
+
+    public void Zoom(double factor, Point? at)
+    {
+        double zoom = Math.Clamp(_zoom * factor, 0.1, 100), k = zoom / _zoom;
+        // The point under the pointer, measured from the box's middle, scales by k: move the view so it lands back there.
+        var middle = Middle + _offset;
+        if (at is { } p) _offset += (p - middle) * (1 - k);
+        _zoom = zoom;
+        InvalidateVisual();
+    }
+
+    public void Fit()
+    {
+        _zoom = 1;
+        _offset = default;
+        InvalidateVisual();
+    }
+
+    public void Reset()
+    {
+        _yaw = 28;
+        _pitch = 30;
+        Fit();
     }
 }

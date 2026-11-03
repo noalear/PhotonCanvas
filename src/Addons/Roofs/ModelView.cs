@@ -11,20 +11,17 @@ namespace PhotonCanvas.Addon.Roofs;
 
 /// <summary>
 /// The roof or tower put together, drawn in 3D from above and to one side: every piece at its
-/// thickness where it sits, the etched face showing its shingles or stonework. Drag to turn it round;
-/// the wheel lifts the roof off (pulls the pieces apart upwards) to show inside.
+/// thickness where it sits, the etched face showing its shingles or stonework. Drag to turn it round,
+/// scroll to zoom, middle-drag or the arrow keys to move it; Ctrl + the wheel lifts the roof off (pulls the
+/// pieces apart upwards) to show inside.
 /// </summary>
-public sealed class ModelView : Control
+public sealed class ModelView : Model3DView
 {
     /// <summary>One copy of a piece in the model, and how far up it goes when the pieces are lifted apart (0–1).</summary>
     sealed record Slab(PathsD Outline, Pose Pose, double T, PathsD? Etched, List<PathD>? Lines, double Lift);
 
     readonly List<Slab> _slabs = [];
-    readonly Scene3D _scene = new();
-    readonly Model3DPainter _painter = new();
-    double _yaw = 35, _pitch = 28, _apart, _built = -1;
-    Point? _drag;
-    string? _message;
+    double _apart, _built = -1;
 
     static readonly Color Wood = Color.FromRgb(0xDD, 0xBE, 0x92);
     static readonly Vec3 Light = new Vec3(-0.35, -0.45, 0.85).Unit;
@@ -39,17 +36,13 @@ public sealed class ModelView : Control
         Color.FromRgb(0x8C, 0x61, 0x37),
         Color.FromRgb(0x6B, 0x47, 0x28), new LineWidth(0.05, 0.3, 0.9));
 
-    public ModelView()
-    {
-        ClipToBounds = true;
-        Cursor = new Cursor(StandardCursorType.SizeAll);
-    }
+    public ModelView() : base(35, 28, 5, 85) { }
 
     /// <summary>Shows a kit put together (or, with none, a message saying why there's nothing to show).</summary>
     public void Show(RoofKit? kit, string? message = null)
     {
         _slabs.Clear();
-        _message = message;
+        Message = message;
         if (kit is not null)
         {
             double T = kit.ThicknessMm;
@@ -78,69 +71,31 @@ public sealed class ModelView : Control
     }
 
     /// <summary>The model, with the pieces lifted apart as far as the wheel says.</summary>
-    void Build()
+    protected override void BeforeDraw()
     {
         if (_built == _apart) return;
         _built = _apart;
-        _scene.Clear();
+        Scene.Clear();
         double spread = _apart * 40;
         foreach (var s in _slabs)
         {
             var p = s.Pose;
             var o = p.O + new V3(0, 0, s.Lift * spread);
             var frame = new Frame3(new(o.X, o.Y, o.Z), new(p.U.X, p.U.Y, p.U.Z), new(p.V.X, p.V.Y, p.V.Z));
-            _scene.AddSlab(s.Outline, frame, 0, s.T, Look, s.Etched, s.Lines);
+            Scene.AddSlab(s.Outline, frame, 0, s.T, Look, s.Etched, s.Lines);
         }
     }
 
-    public override void Render(DrawingContext ctx)
-    {
-        Build();
-        if (!_painter.Draw(ctx, this, _scene, Camera3D.ZUp(_yaw, _pitch), UiKit.Brush("Bg2"), draft: _drag is not null))
-        {
-            if (_message is { } m)
-            {
-                var text = new FormattedText(m, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 13, UiKit.Brush("TextMuted"))
-                { MaxTextWidth = Math.Max(50, Bounds.Width - 40), TextAlignment = TextAlignment.Center };
-                ctx.DrawText(text, new Point(20, Bounds.Height / 2 - text.Height / 2));
-            }
-            return;
-        }
-        var hint = new FormattedText("Drag to turn it round · scroll to lift the pieces apart", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
-        ctx.DrawText(hint, new Point(10, Bounds.Height - hint.Height - 6));
-    }
+    protected override Camera3D CameraAt(double yaw, double pitch) => Camera3D.ZUp(yaw, pitch);
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
-    {
-        base.OnPointerPressed(e);
-        _drag = e.GetPosition(this);
-        e.Pointer.Capture(this);
-    }
+    protected override string Hint => "Drag to turn · middle-drag to move · scroll to zoom · Ctrl+scroll to lift it apart";
 
-    protected override void OnPointerMoved(PointerEventArgs e)
+    /// <summary>Ctrl + the wheel lifts the pieces apart.</summary>
+    protected override bool Wheel(PointerWheelEventArgs e)
     {
-        base.OnPointerMoved(e);
-        if (_drag is not { } from) return;
-        var at = e.GetPosition(this);
-        _yaw = (_yaw - (at.X - from.X) * 0.5) % 360;
-        _pitch = Math.Clamp(_pitch + (at.Y - from.Y) * 0.4, 5, 85);
-        _drag = at;
-        InvalidateVisual();
-    }
-
-    protected override void OnPointerReleased(PointerReleasedEventArgs e)
-    {
-        base.OnPointerReleased(e);
-        _drag = null;
-        e.Pointer.Capture(null);
-        InvalidateVisual();
-    }
-
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
-    {
-        base.OnPointerWheelChanged(e);
+        if ((e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Meta)) == 0) return false;
         _apart = Math.Clamp(_apart + e.Delta.Y * 0.15, 0, 3);
         InvalidateVisual();
-        e.Handled = true;
+        return true;
     }
 }

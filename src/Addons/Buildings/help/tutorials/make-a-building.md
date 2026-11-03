@@ -36,7 +36,7 @@ more under the list.
 ## Look inside
 <!-- target: field:Show -->
 Pick **With the front cut away** under **Show** to see the rooms, the stairs and the furniture
-standing in them. Drag the building to turn it round.
+standing in them. Drag the building to turn it round, and scroll to zoom in on a room; press **F** to see it all again.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

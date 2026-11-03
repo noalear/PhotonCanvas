@@ -121,4 +121,100 @@ public class Model3DPainterTests
         pic = painter.Picture(scene, Camera3D.YUp(0, 0), W, H, Bg)!;
         Near(Green, At(pic, painter, new(0, 10, 0.5)));
     }
+
+    // ---- the camera: fitted, zoomed and moved ----
+
+    /// <summary>A floor with a card standing on it, as in the tests above.</summary>
+    static Scene3D FloorAndCard()
+    {
+        var scene = new Scene3D();
+        scene.AddSlab(Rect(-50, -50, 50, 50), new Frame3(new(0, 0, 0), new(1, 0, 0), new(0, 0, -1)), -1, 0, Plain(Blue));
+        scene.AddSlab(Rect(-5, 0, 5, 20), new Frame3(new(0, 0, -40), new(1, 0, 0), new(0, 1, 0)), -0.5, 0.5, Plain(Red));
+        return scene;
+    }
+
+    static void Same(Avalonia.Point want, Avalonia.Point got, double within = 0.01)
+    {
+        Assert.True(Math.Abs(want.X - got.X) < within && Math.Abs(want.Y - got.Y) < within, $"wanted {want}, got {got}");
+    }
+
+    [Fact]
+    public void Fitted_the_whole_model_is_in_the_view_inside_its_margins()
+    {
+        var painter = new Model3DPainter();
+        var cam = Camera3D.YUp(32, 24);
+        Assert.NotNull(painter.Picture(FloorAndCard(), cam, W, H, Bg));
+        Assert.Equal(painter.Fitted, painter.Shown);
+        foreach (var x in new[] { -50.0, 50 })
+            foreach (var y in new[] { -1.0, 0, 20 })
+                foreach (var z in new[] { -50.0, 50 })
+                {
+                    var p = painter.ToView(new Vec3(x, y, z));
+                    Assert.InRange(p.X, 14.9, W - 14.9);
+                    Assert.InRange(p.Y, 13.9, H - 39.9);
+                }
+        // Its target, the middle of the model, is in the middle of the room the margins leave.
+        Same(Model3DPainter.Middle(new Avalonia.Size(W, H)), painter.ToView(painter.Fitted.Target));
+    }
+
+    [Fact]
+    public void A_framing_puts_its_target_in_the_middle_at_its_size()
+    {
+        var painter = new Model3DPainter();
+        var cam = Camera3D.YUp(32, 24);
+        var target = new Vec3(0, 10, -40);
+        var pic = painter.Picture(FloorAndCard(), cam, W, H, Bg, framing: new Framing(20, target))!;
+        Assert.Equal(20, painter.PxPerMm, 6);
+        Same(Model3DPainter.Middle(new Avalonia.Size(W, H)), painter.ToView(target));
+        // Zoomed in on the card, it fills the middle of the view; the floor's corners are far off it.
+        Near(Red, At(pic, painter, target + new Vec3(0, 0, 0.5)));
+        var far = painter.ToView(new Vec3(-50, 0, -50));
+        Assert.True(far.X < 0 || far.X > W || far.Y < 0 || far.Y > H, $"{far}");
+        // 1 mm across the screen is 20 screen units.
+        Assert.Equal(20, painter.ToView(target + cam.Right).X - painter.ToView(target).X, 6);
+    }
+
+    [Fact]
+    public void Zooming_keeps_the_point_under_the_pointer_where_it_is()
+    {
+        var painter = new Model3DPainter();
+        var cam = Camera3D.YUp(40, 30);
+        var scene = FloorAndCard();
+        painter.Picture(scene, cam, W, H, Bg);
+        var fitted = painter.Shown;
+        var middle = Model3DPainter.Middle(new Avalonia.Size(W, H));
+        // A point on the floor, its place on the screen, and the framing zoomed 3 times about it.
+        var corner = new Vec3(40, 0, 40);
+        var at = painter.ToView(corner);
+        var zoomed = fitted.Zoomed(cam, fitted.PxPerMm * 3, at - middle);
+        painter.Picture(scene, cam, W, H, Bg, framing: zoomed);
+        Same(at, painter.ToView(corner), 1e-6);
+        Assert.Equal(fitted.PxPerMm * 3, painter.PxPerMm, 6);
+        // Anything else has moved away from it, three times as far.
+        var other = painter.ToView(new Vec3(0, 0, 0));
+        painter.Picture(scene, cam, W, H, Bg);
+        var was = painter.ToView(new Vec3(0, 0, 0));
+        Assert.Equal((was.X - at.X) * 3, other.X - at.X, 6);
+        Assert.Equal((was.Y - at.Y) * 3, other.Y - at.Y, 6);
+    }
+
+    [Fact]
+    public void Moving_moves_the_picture_and_turning_turns_it_about_the_middle()
+    {
+        var painter = new Model3DPainter();
+        var cam = Camera3D.YUp(40, 30);
+        var scene = FloorAndCard();
+        var f = new Framing(5, new Vec3(10, 0, 10));
+        var p = new Vec3(-30, 0, 20);
+        painter.Picture(scene, cam, W, H, Bg, framing: f);
+        var before = painter.ToView(p);
+        painter.Picture(scene, cam, W, H, Bg, framing: f.Moved(cam, new Avalonia.Vector(25, -12)));
+        var after = painter.ToView(p);
+        Same(new Avalonia.Point(before.X + 25, before.Y - 12), after, 1e-6);
+        // Turned, the target stays in the middle (it turns about it) and the size stays the same.
+        var turned = Camera3D.YUp(100, 50);
+        painter.Picture(scene, turned, W, H, Bg, framing: f);
+        Same(Model3DPainter.Middle(new Avalonia.Size(W, H)), painter.ToView(f.Target));
+        Assert.Equal(5, painter.PxPerMm, 6);
+    }
 }

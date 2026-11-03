@@ -1,7 +1,7 @@
 using PhotonCanvas.App;
+using PhotonCanvas.App.View3D;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -20,13 +20,13 @@ public enum StackMaterial { Basswood, BirchPlywood, Walnut, Mdf, Cardboard, Whit
 /// The slices stacked up in 3D, as they'll be glued: shaded solid in a chosen material (drawn with
 /// a depth buffer, so nearer parts hide farther ones from any angle), or as see-through outlines.
 /// A range of slices can be shown on its own, to look inside. Parts joined to nothing are red.
-/// Drag to turn; the wheel zooms in on the pointer, a right- or middle-drag moves the view, a double-click shows it all again.
+/// Drag to turn; the wheel zooms in on the pointer, a right- or middle-drag (or the arrow keys) moves the view, a double-click
+/// or F shows it all again (<see cref="ViewNavigator"/>, with its buttons in the corner).
 /// </summary>
-public sealed class StackView : Control
+public sealed class StackView : Control, INavigable
 {
     SliceStack? _stack;
     double _t = 3, _yaw = -30, _pitch = 30;
-    Point? _drag, _pan;
     // Zoom (1 = the whole model fits) and how far the view's been moved, in screen pixels.
     double _zoom = 1;
     Vector _offset;
@@ -47,53 +47,52 @@ public sealed class StackView : Control
         InvalidateVisual();
     }
 
+    public StackView()
+    {
+        var nav = new ViewNavigator(this, this);
+        VisualChildren.Add(nav.Buttons);
+        LogicalChildren.Add(nav.Buttons);
+    }
+
     /// <summary>The whole model in view again, as it's first shown (the angle is kept).</summary>
-    public void ResetView()
+    public void ResetView() => Fit();
+
+    public void Fit()
     {
         _zoom = 1;
         _offset = default;
         InvalidateVisual();
     }
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    public void Reset()
     {
-        var p = e.GetPosition(this);
-        var props = e.GetCurrentPoint(this).Properties;
-        if (props.IsLeftButtonPressed && e.ClickCount == 2) { ResetView(); return; }
-        // Right or middle button moves the view (as on the work area); left turns it.
-        if (props.IsMiddleButtonPressed || props.IsRightButtonPressed) _pan = p; else _drag = p;
-        e.Pointer.Capture(this);
+        _yaw = -30;
+        _pitch = 30;
+        Fit();
     }
-    protected override void OnPointerReleased(PointerReleasedEventArgs e) { _drag = _pan = null; e.Pointer.Capture(null); }
-    protected override void OnPointerMoved(PointerEventArgs e)
+
+    public void Turn(double dx, double dy)
     {
-        var p = e.GetPosition(this);
-        if (_pan is { } at)
-        {
-            _offset += p - at;
-            _pan = p;
-            InvalidateVisual();
-            return;
-        }
-        if (_drag is not { } from) return;
-        _yaw += (p.X - from.X) * 0.5;
-        _pitch = Math.Clamp(_pitch + (p.Y - from.Y) * 0.4, -60, 89);
-        _drag = p;
+        _yaw += dx * 0.5;
+        _pitch = Math.Clamp(_pitch + dy * 0.4, -60, 89);
         InvalidateVisual();
     }
 
-    /// <summary>The wheel zooms in on what's under the pointer, which stays where it is.</summary>
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    public void Move(Vector by)
     {
-        base.OnPointerWheelChanged(e);
-        e.Handled = true;
+        _offset += by;
+        InvalidateVisual();
+    }
+
+    /// <summary>Zooms in on what's under the pointer, which stays where it is.</summary>
+    public void Zoom(double factor, Point? at)
+    {
         if (_stack is null) return;
-        var p = e.GetPosition(this);
-        double zoom = Math.Clamp(_zoom * Math.Pow(1.15, e.Delta.Y), 0.25, 40);
+        double zoom = Math.Clamp(_zoom * factor, 0.25, 40);
         double k = zoom / _zoom;
         // The point under the pointer, measured from the view's centre, scales by k: move the view so it lands back there.
         var c = new Vector(Bounds.Width / 2, Bounds.Height / 2) + _offset;
-        _offset += (new Vector(p.X, p.Y) - c) * (1 - k);
+        if (at is { } p) _offset += (new Vector(p.X, p.Y) - c) * (1 - k);
         _zoom = zoom;
         InvalidateVisual();
     }
@@ -139,7 +138,7 @@ public sealed class StackView : Control
         if (Look == StackLook.Solid) RenderSolid(ctx, st);
         else RenderLines(ctx, st);
         int last = Math.Min(To, st.Slices);
-        Caption(ctx, (Sheets(st) ? From > 1 || last < st.Slices ? $"Sheets {From}–{last} of {st.Slices}" : $"{st.Slices} sheets" : From > 1 || last < st.Slices ? $"Slices {From}–{last} of {st.Slices}" : $"{st.Slices} slices") + (_zoom == 1 && _offset == default ? " · drag to turn · wheel to zoom" : $" · {_zoom * 100:0}% · right-drag to move · double-click to see it all"), new Point(8, b.Height - 14));
+        Caption(ctx, (Sheets(st) ? From > 1 || last < st.Slices ? $"Sheets {From}–{last} of {st.Slices}" : $"{st.Slices} sheets" : From > 1 || last < st.Slices ? $"Slices {From}–{last} of {st.Slices}" : $"{st.Slices} slices") + (_zoom == 1 && _offset == default ? " · drag to turn · middle-drag to move · scroll to zoom" : $" · {_zoom * 100:0}% · F or double-click to see it all"), new Point(8, b.Height - 14));
     }
 
     static void Caption(DrawingContext ctx, string text, Point at, bool centre = false)

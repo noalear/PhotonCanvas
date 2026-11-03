@@ -24,7 +24,8 @@ Click **Stairs & floors** on the **Home** tab (in the **Draw** group). The **Flo
 window opens. If there are walls from the wall maker in the design, the window starts with the
 floor made to fit them. The settings are on the left in tabs. On the right, **Put together** shows
 the floor and the way up in the room, with the walls and columns faint around them: drag it to
-turn it round, and tick **Lift the floor off** to see under the floor. **Pieces to cut** shows one
+turn it round, scroll to zoom in on a part, middle-drag or the arrow keys to move it, press **F** to see
+it all again, and tick **Lift the floor off** to see under the floor. **Pieces to cut** shows one
 of each piece, with how many there are. Under the picture are the number of pieces and any
 problems: a red ✕ has to be fixed before the pieces can go in, a yellow ! is worth a look, and a
 grey • is just for your information.

@@ -23,7 +23,7 @@ slots up the side that the wall maker's walls slide into, as they do into its co
 
 Click **Roofs** on the **Home** tab (in the **Draw** group); **Towers**, beside it, opens the same
 window for a tower. The settings are on the left in tabs. On the right, **Put together** shows the
-roof or tower in 3D (drag to turn it, scroll to lift the pieces apart and see inside) and **Pieces**
+roof or tower in 3D (drag to turn it, scroll to zoom, middle-drag or the arrow keys to move it, press **F** to see it all again, and hold Ctrl while you scroll to lift the pieces apart and see inside) and **Pieces**
 shows every piece flat at the same scale. Under them are the number of pieces and notes: a red ✕
 has to be fixed before it can go in, a yellow ! is worth a look, and a grey • is for your information.
 
