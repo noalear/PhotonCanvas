@@ -15,7 +15,7 @@ public class FurnitureTests
     public static IEnumerable<object[]> Kinds() => Defaults.Kinds.Select(k => new object[] { k.Kind });
 
     /// <summary>Every piece where it sits once put together, with its outline shrunk a hair so touching faces don't count.</summary>
-    sealed record Placed(string Name, Pose Pose, PathsD Shrunk, PathsD Cut, double T)
+    internal sealed record Placed(string Name, Pose Pose, PathsD Shrunk, PathsD Cut, double T)
     {
         public bool Inside(V3 p, double eps = 0.03)
         {
@@ -38,11 +38,11 @@ public class FurnitureTests
 
     static bool In(PathsD area, double u, double v) => OutlineGrid.In(area, u, v);
 
-    static List<Placed> Assemble(ItemKit k, double T) =>
+    internal static List<Placed> Assemble(ItemKit k, double T) =>
         [.. k.Parts.SelectMany(p => p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(p.Cut, -0.03), p.Cut, T)))];
 
     /// <summary>Places where two pieces would be in the same space once put together (sampled every 0.1 mm where their boxes meet).</summary>
-    static List<string> Clashes(List<Placed> all)
+    internal static List<string> Clashes(List<Placed> all)
     {
         var found = new List<string>();
         for (int i = 0; i < all.Count; i++)
@@ -69,7 +69,7 @@ public class FurnitureTests
     }
 
     /// <summary>Slot-like holes (one side as wide as the sheet plus the fit) with no other piece through their middle.</summary>
-    static List<string> EmptySlots(List<Placed> all, double T, double fit)
+    internal static List<string> EmptySlots(List<Placed> all, double T, double fit)
     {
         var empty = new List<string>();
         foreach (var a in all)
@@ -86,11 +86,11 @@ public class FurnitureTests
     }
 
     /// <summary>Pieces joined to the rest (their boxes overlap another's by nearly a sheet's thickness every way: a tab in a slot).</summary>
-    static bool AllJoined(List<Placed> all, double T)
+    internal static List<string> Unjoined(List<Placed> all, double T)
     {
         // A loose lid and its rim just sit on top.
         all = [.. all.Where(p => p.Name is not ("Lid rim" or "Lid rail" or "Lid") || !all.Any(q => q.Name is "Lid rim" or "Lid rail"))];
-        if (all.Count < 2) return true;
+        if (all.Count < 2) return [];
         bool Joined(Placed a, Placed b)
         {
             var (a0, a1) = a.Box();
@@ -106,8 +106,10 @@ public class FurnitureTests
             for (int j = 0; j < all.Count; j++)
                 if (!seen.Contains(j) && Joined(all[i], all[j])) { seen.Add(j); queue.Enqueue(j); }
         }
-        return seen.Count == all.Count;
+        return [.. all.Where((p, i) => !seen.Contains(i)).Select(p => p.Name)];
     }
+
+    internal static bool AllJoined(List<Placed> all, double T) => Unjoined(all, T).Count == 0;
 
     [Theory]
     [MemberData(nameof(Kinds))]
@@ -174,7 +176,8 @@ public class FurnitureTests
 
     public static IEnumerable<object[]> PushVariants()
     {
-        foreach (var k in Defaults.Kinds) yield return [Defaults.For(k.Kind), 2.0];
+        // Rugs and wall hangings are single pieces, with no joints for ribs.
+        foreach (var k in Defaults.Kinds.Where(k => k.Kind is not (ItemKind.Rug or ItemKind.WallHanging))) yield return [Defaults.For(k.Kind), 2.0];
         yield return [Defaults.For(ItemKind.Table) with { Legs = LegStyle.Round, WidthMm = 20 }, 2.0];
         yield return [Defaults.For(ItemKind.Chest) with { Lid = LidStyle.Flat }, 2.0];
         yield return [Defaults.For(ItemKind.Chest) with { WidthMm = 24, DepthMm = 14, HeightMm = 12 }, 3.0];
@@ -188,7 +191,7 @@ public class FurnitureTests
     {
         var push = Make(it, Push with { ThicknessMm = t });
         Assert.True(push.Ok, string.Join("\n", push.Findings));
-        Assert.All(push.Parts, p => Assert.Equal(1, Geo.Pieces(p.Cut)));
+        Assert.All(push.Parts, p => Assert.True(Geo.Pieces(p.Cut) == 1, $"{p.Name} in {Geo.Pieces(p.Cut)} pieces"));
         // Ribs on the pieces with slots, notches or finger joints, and only on the outline's edge.
         Assert.True(push.Parts.Sum(p => Geo.Area(p.Ribs)) > 0.01, "no ribs");
         Assert.All(push.Parts, p => Assert.True(Geo.Area(Geo.Subtract(p.Ribs, p.Cut)) < 1e-6));

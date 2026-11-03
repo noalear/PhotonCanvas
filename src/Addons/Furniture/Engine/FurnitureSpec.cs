@@ -4,7 +4,12 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace PhotonCanvas.Addon.Furniture;
 
-public enum ItemKind { Table, Bench, Stool, Chair, Bookshelf, Chest, Crate, Bed, WallDoor, WallShelf }
+/// <summary>What a piece of furniture is. New kinds go on the end, so saved lists keep their meaning.</summary>
+public enum ItemKind
+{
+    Table, Bench, Stool, Chair, Bookshelf, Chest, Crate, Bed, WallDoor, WallShelf,
+    Cabinet, Desk, Armchair, Fireplace, SlantDesk, WeaponRack, Stand, Coffin, Rug, WallHanging, Candlestand, Screen, Stocks,
+}
 
 /// <summary>How a table's or bench's legs are made.</summary>
 public enum LegStyle { Legs, Slab, Trestle, Round }
@@ -16,6 +21,66 @@ public enum HingeSide { Left, Right }
 /// <summary>The wood detail etched and scored on the faces.</summary>
 /// <summary>What's etched on the faces: nothing, wood grain, planks and grain, metal panels with rivets (sci-fi), or stone (cracks and pits).</summary>
 public enum WoodDetail { None, Grain, Planks, Metal, Stone }
+
+/// <summary>A cabinet's front: what's on it (etched), or cut through it, and what can be seen behind it.</summary>
+public enum CabinetFront
+{
+    /// <summary>One or more doors (wardrobe, cupboard).</summary>
+    Doors,
+    /// <summary>Rows of drawers (chest of drawers, apothecary's drawers).</summary>
+    Drawers,
+    /// <summary>A row of drawers over doors (sideboard, dresser, bedside table).</summary>
+    DrawersOverDoors,
+    /// <summary>Glazed doors: panes cut through, the shelves and what's on them seen behind.</summary>
+    Glass,
+    /// <summary>No front: shelves with things on them (pantry, bar shelves).</summary>
+    Open,
+    /// <summary>A cupboard below and open shelves above, set back (a dresser with plates).</summary>
+    Hutch,
+    /// <summary>Plain frame-and-panel (a counter, a bar).</summary>
+    Panelled,
+    /// <summary>Tall metal doors with vents, a name plate and a handle.</summary>
+    Locker,
+    /// <summary>Racks of machines: lights, vents, screens and tape reels.</summary>
+    Tech,
+    /// <summary>A tall case clock: a dial up top and the pendulum seen through a window.</summary>
+    Clock,
+    /// <summary>Doors with a lattice screen cut through them.</summary>
+    Lattice,
+    /// <summary>An altar's front: panels and a symbol in the middle, a cloth along the top.</summary>
+    Altar,
+}
+
+/// <summary>What's on the top of a cabinet.</summary>
+public enum Crown { Flat, Cornice, Pediment, Arch }
+
+/// <summary>What stands on open shelves, seen from the front.</summary>
+public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty }
+
+/// <summary>Seats with arms and a back.</summary>
+public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command }
+
+/// <summary>The top of a seat's back.</summary>
+public enum BackTop { Square, Rounded, Arched, Pointed, Winged }
+
+public enum BedStyle { Plain, FourPoster, Bunk, Pallet }
+
+public enum HearthStyle { Fireplace, Oven, Forge }
+
+/// <summary>Things with a sloping top on two shaped sides.</summary>
+public enum SlantStyle { Lectern, Scriptorium, Console, MapTable }
+
+public enum StandStyle { Armour, Dummy, Coats }
+
+public enum CoffinStyle { Coffin, Sarcophagus, Pod }
+
+public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round }
+
+public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor }
+
+public enum CandleStyle { Candelabra, Lamp, Torch }
+
+public enum ScreenStyle { Lattice, Tracery, Panels, Barrier }
 
 /// <summary>
 /// One piece of furniture and how many to cut. Sizes are the outside sizes in millimetres; which of the
@@ -72,6 +137,46 @@ public sealed record FurnitureItem
     public double OverlapMm { get; init; } = 1.5;
     /// <summary>Wall shelves: how tall the wall's mount slots are (mm).</summary>
     public double MountSlotMm { get; init; } = 6;
+
+    /// <summary>A name for lists and part labels ("Wardrobe", "Captain's chair"); null = the kind's name.</summary>
+    public string? Name { get; init; }
+    /// <summary>
+    /// The look this piece is made in (a <see cref="FurnitureThemes"/> name: door panels, handles, ornament);
+    /// null = the set's. Lets a sci-fi console stand in a set that's otherwise medieval.
+    /// </summary>
+    public string? Theme { get; init; }
+    /// <summary>What's etched on this piece's faces; null = the set's (a stone altar among wooden pews).</summary>
+    public WoodDetail? Detail { get; init; }
+
+    /// <summary>Cabinets: the front.</summary>
+    public CabinetFront Front { get; init; } = CabinetFront.Doors;
+    /// <summary>Cabinets: the top.</summary>
+    public Crown Crown { get; init; } = Crown.Cornice;
+    /// <summary>Cabinets with shelves that show: what's on them.</summary>
+    public ShelfContents Contents { get; init; } = ShelfContents.Books;
+    /// <summary>Cabinets: rows of drawers (or of machines). Weapon racks: weapons.</summary>
+    public int Rows { get; init; } = 3;
+    /// <summary>Cabinets: doors, or drawers in a row. Armchairs: seats (a sofa or pew).</summary>
+    public int Columns { get; init; } = 2;
+
+    /// <summary>Armchairs and thrones.</summary>
+    public SeatStyle Seat { get; init; } = SeatStyle.Armchair;
+    /// <summary>Chairs, armchairs and thrones: the top of the back.</summary>
+    public BackTop BackTop { get; init; } = BackTop.Square;
+    /// <summary>Armchairs: the arms' height (mm).</summary>
+    public double ArmMm { get; init; } = 11;
+
+    public BedStyle BedStyle { get; init; } = BedStyle.Plain;
+    public HearthStyle Hearth { get; init; } = HearthStyle.Fireplace;
+    public SlantStyle Slant { get; init; } = SlantStyle.Lectern;
+    public StandStyle Stand { get; init; } = StandStyle.Armour;
+    public CoffinStyle Coffin { get; init; } = CoffinStyle.Coffin;
+    public RugPattern Rug { get; init; } = RugPattern.Border;
+    public HangingStyle Hanging { get; init; } = HangingStyle.Tapestry;
+    public CandleStyle Candle { get; init; } = CandleStyle.Candelabra;
+    public ScreenStyle ScreenStyle { get; init; } = ScreenStyle.Lattice;
+    /// <summary>Wall hangings: how high the bottom edge is off the floor (mm).</summary>
+    public double HangMm { get; init; } = 10;
 }
 
 /// <summary>Everything cut from one sheet in one go: the pieces of furniture, the sheet and the detail.</summary>
@@ -123,6 +228,19 @@ public static class Defaults
         new(ItemKind.Bed, "Bed", "Head and foot boards, a mattress that slots between them and side rails, with bedding etched on."),
         new(ItemKind.WallDoor, "Door for a wall", "A door that hangs on two clips slid onto the side of a doorway from the wall maker, and swings open."),
         new(ItemKind.WallShelf, "Wall shelf", "A shelf on two brackets that plug into the wall maker's mount points."),
+        new(ItemKind.Cabinet, "Cabinet", "Sides, shelves and a top slotted together, with doors, drawers, glass, a lattice or open shelves on the front: wardrobes, dressers, lockers, clocks and more."),
+        new(ItemKind.Desk, "Desk", "A top on two solid ends joined by a back panel, with a drawer front under the top."),
+        new(ItemKind.Armchair, "Armchair or throne", "A seat between two shaped arms and a back: armchairs, thrones, sofas, pews and command chairs."),
+        new(ItemKind.Fireplace, "Fireplace or oven", "A surround with a mantel shelf for against a wall, a hearth on the floor and logs inside: fireplaces, bread ovens and forges."),
+        new(ItemKind.SlantDesk, "Lectern or console", "A sloping top on two shaped sides: lecterns, writing desks, map tables and control consoles."),
+        new(ItemKind.WeaponRack, "Weapon rack", "Spears, swords and axes standing in a notched rail on two feet."),
+        new(ItemKind.Stand, "Armour stand", "Two profiles crossed on a base: armour on a stand, a training dummy or a coat stand."),
+        new(ItemKind.Coffin, "Coffin or sarcophagus", "Layers glued into a solid shape, the lid carved: a coffin, a sarcophagus with its effigy, or a sleeper pod."),
+        new(ItemKind.Rug, "Rug", "One flat piece with a pattern etched on it: a bordered rug, a kilim, damask, a hide, a deck mat or a round rug."),
+        new(ItemKind.WallHanging, "Wall hanging", "A tapestry, banner, painting, shield, map or screen to glue on a wall."),
+        new(ItemKind.Candlestand, "Candle stand or lamp", "Two profiles crossed on a round foot: a candelabra, a floor lamp or a torch stand."),
+        new(ItemKind.Screen, "Screen", "A standing screen on two feet: a lattice, tracery, plain panels or a barrier."),
+        new(ItemKind.Stocks, "Stocks", "Two posts on feet and a board with holes for the head and hands."),
     ];
 
     public static KindInfo Info(ItemKind k) => Kinds.First(x => x.Kind == k);
@@ -139,6 +257,19 @@ public static class Defaults
         ItemKind.Bed => new() { Kind = k, WidthMm = 32, DepthMm = 16, HeightMm = 13, FootMm = 8, MattressMm = 6 },
         ItemKind.WallDoor => new() { Kind = k, WidthMm = 16, HeightMm = 28, DepthMm = 0, Shape = DoorShape.Arched, WallMm = 3 },
         ItemKind.WallShelf => new() { Kind = k, WidthMm = 20, DepthMm = 5, HeightMm = 6, WallMm = 3, MountSlotMm = 6 },
+        ItemKind.Desk => new() { Kind = k, WidthMm = 24, DepthMm = 12, HeightMm = 13, Contents = ShelfContents.Books },
+        ItemKind.Fireplace => new() { Kind = k, WidthMm = 26, DepthMm = 9, HeightMm = 40, Hearth = HearthStyle.Fireplace },
+        ItemKind.SlantDesk => new() { Kind = k, WidthMm = 9, DepthMm = 8, HeightMm = 22, Slant = SlantStyle.Lectern },
+        ItemKind.WeaponRack => new() { Kind = k, WidthMm = 18, DepthMm = 8, HeightMm = 30, Rows = 5 },
+        ItemKind.Stand => new() { Kind = k, WidthMm = 14, DepthMm = 10, HeightMm = 32, Stand = StandStyle.Armour },
+        ItemKind.Coffin => new() { Kind = k, WidthMm = 34, DepthMm = 11, HeightMm = 6, Coffin = CoffinStyle.Coffin },
+        ItemKind.Rug => new() { Kind = k, WidthMm = 36, DepthMm = 24, HeightMm = 1, Rug = RugPattern.Border },
+        ItemKind.WallHanging => new() { Kind = k, WidthMm = 16, DepthMm = 0, HeightMm = 22, HangMm = 10, Hanging = HangingStyle.Tapestry },
+        ItemKind.Candlestand => new() { Kind = k, WidthMm = 10, DepthMm = 7, HeightMm = 24, Candle = CandleStyle.Candelabra },
+        ItemKind.Screen => new() { Kind = k, WidthMm = 30, DepthMm = 7, HeightMm = 30, Columns = 3, ScreenStyle = ScreenStyle.Lattice },
+        ItemKind.Stocks => new() { Kind = k, WidthMm = 22, DepthMm = 9, HeightMm = 28 },
+        ItemKind.Armchair => new() { Kind = k, WidthMm = 14, DepthMm = 12, HeightMm = 20, SeatMm = 7.5, ArmMm = 11, Seat = SeatStyle.Armchair, BackTop = BackTop.Rounded, Columns = 1 },
+        ItemKind.Cabinet => new() { Kind = k, WidthMm = 22, DepthMm = 11, HeightMm = 34, Front = CabinetFront.Doors, Crown = Crown.Cornice, Columns = 2, Shelves = 2 },
         _ => new() { Kind = k },
     };
 }

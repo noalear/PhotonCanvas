@@ -36,6 +36,10 @@ public sealed class Maker
     public double T { get; }
     public double Fit { get; }
     public WoodDetail Detail { get; }
+    /// <summary>The look it's made in (a <see cref="FurnitureThemes"/> name): the item's own, or the set's.</summary>
+    public string Theme { get; }
+    /// <summary>Metal faces: handles are bars, panels have chamfered corners.</summary>
+    public bool IsMetal => Detail == WoodDetail.Metal;
     /// <summary>Grip ribs in the joints (see <see cref="FurnitureSet.PushFit"/>).</summary>
     public bool PushFit { get; }
     /// <summary>How much tighter than the sheet the ribs make a joint (mm, both sides together).</summary>
@@ -54,7 +58,9 @@ public sealed class Maker
         Item = item;
         T = Math.Clamp(set.ThicknessMm, 0.3, 20);
         Fit = Math.Clamp(set.FitMm, -0.5, 2);
-        Detail = set.Detail;
+        Theme = FurnitureThemes.Names.Contains(item.Theme ?? "") ? item.Theme! : FurnitureThemes.Names.Contains(set.Theme) ? set.Theme : FurnitureThemes.Names[0];
+        // A piece of another theme than the set's keeps its own theme's faces unless it says otherwise.
+        Detail = item.Detail ?? (Theme != set.Theme ? FurnitureThemes.Detail(Theme) : set.Detail);
         PushFit = set.PushFit;
         Grip = Math.Clamp(set.GripMm, 0.02, 0.5);
         Rnd = new Random(set.Seed * 7919 + index * 104729 + (int)item.Kind * 31 + 17);
@@ -93,10 +99,13 @@ public sealed class Maker
         {
             var more = Ribs(cut, [SlotW, .. RibGaps], (Fit + Grip) / 2);
             if (ribs is not null) more.AddRange(ribs);
+            // Only teeth standing on the piece (a slot's edges matched across a sloping cut can put one adrift).
+            more = [.. more.Where(q => Geo.Area(Geo.Intersect([q], cut)) > 1e-5)];
             if (more.Count > 0)
             {
                 grip = Geo.Subtract(Geo.Union(more), cut);
-                cut = Geo.Union(cut, grip);
+                // Joined with their feet (which overlap the wall), so a sloping edge leaves no hairline gap.
+                cut = Geo.Union(cut, Geo.Union(more));
             }
         }
         var part = new Part(name, cut, etch, scored, [.. poses]) { Ribs = grip };

@@ -54,7 +54,26 @@ public sealed class FurnitureWindow : Window
     readonly NumericUpDown _wallT = Number(0.5m, 50, 0.5m, "0.##"), _wallSheet = Number(0.5m, 20, 0.5m, "0.##"), _overlap = Number(0, 10, 0.5m, "0.#"), _slot = Number(2, 30, 0.5m, "0.#");
     readonly Button _match = UiKit.Button("Match the walls in the design", tip: "Reads the doorway, the wall's thickness and the mount slots from walls made with Walls (the ones selected, or the first in the design).");
     readonly TextBlock _matchNote = Hint();
-    Control _legRows = null!, _topRow = null!, _chairRows = null!, _shelfRows = null!, _boxRows = null!, _bedRows = null!, _doorRows = null!, _shelfWallRows = null!, _wallRows = null!, _legWRow = null!;
+    Control _legRows = null!, _topRow = null!, _seatRow = null!, _backRow = null!, _shelvesRow = null!, _shelfRows = null!, _boxRows = null!, _bedRows = null!, _doorRows = null!, _shelfWallRows = null!, _wallRows = null!, _legWRow = null!;
+    readonly TextBlock _hLabelRow = Label("");
+    Control _hRow = null!;
+    // The newer kinds' options: a style (front, kind of seat, pattern...) and the sizes and choices that go with it.
+    readonly TextBlock _styleLabel = Label("Style");
+    readonly ComboBox _style = Combo();
+    readonly ComboBox _crown = Combo("Flat", "Cornice (two layers)", "Pediment", "Arch");
+    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing");
+    readonly ComboBox _backTop = Combo("Square", "Rounded", "Arched", "Pointed", "Winged");
+    readonly NumericUpDown _cols = Number(1, 12, 1, "0"), _rows = Number(1, 12, 1, "0"), _arm = Number(2, 500, 0.5m, "0.#"), _hang = Number(0, 500, 0.5m, "0.#");
+    readonly TextBlock _colsLabel = Label("Across"), _rowsLabel = Label("Rows");
+    readonly ComboBox _look = Combo(["The list's theme", .. FurnitureThemes.Names]);
+    Control _styleRow = null!, _crownRow = null!, _contentsRow = null!, _backTopRow = null!, _colsRow = null!, _rowsRow = null!, _armRow = null!, _hangRow = null!, _lookRow = null!;
+
+    // Ready-made furniture from the catalog, for the theme picked
+    readonly ComboBox _room = Combo(["Every room", .. FurnitureCatalog.Rooms]);
+    readonly ComboBox _ready = Combo();
+    readonly TextBlock _readyAbout = Hint();
+    readonly Button _addReady = UiKit.Button("Add");
+    List<CatalogEntry> _readyList = [];
 
     // The sheet
     readonly ComboBox _scale = Combo("15 mm", "28 mm", "32 mm", "54 mm");
@@ -136,6 +155,7 @@ public sealed class FurnitureWindow : Window
         _make.Click += (_, _) => Make();
         Hook();
         LoadSheet();
+        FillReady();
         FillList(0);
         if (editing is not null) _make.Content = "Update in the design";
         Closed += (_, _) => { _debounce.Stop(); _generation++; SaveLast(); };
@@ -181,8 +201,19 @@ public sealed class FurnitureWindow : Window
         _legWRow = Field("Leg width", _legW, tip: "How wide the legs are (mm). 0 = to suit the sheet.");
         _legRows = Stack(Field("Legs", _legs), _rail);
         _topRow = Field("Seat shape", _top);
-        _chairRows = Stack(Field("Seat height", _seat, tip: "How high the top of the seat is (mm)."), Field("Back", _back));
-        _shelfRows = Stack(Field("Shelves", _shelves, tip: "Shelves between the bottom one and the top."), _backPanel, _books);
+        _seatRow = Field("Seat height", _seat, tip: "How high the top of the seat is (mm).");
+        _backRow = Field("Back", _back);
+        _shelvesRow = Field("Shelves", _shelves, tip: "Shelves between the bottom one and the top.");
+        _shelfRows = Stack(_backPanel, _books);
+        _styleRow = Line(_styleLabel, _style);
+        _crownRow = Field("Top", _crown, tip: "What's on top: a flat top, a stepped cornice, a pointed pediment or an arch.");
+        _contentsRow = Field("On the shelves", _contents, tip: "What's etched on the back between the shelves, where it shows through open shelves or glass.");
+        _backTopRow = Field("Back's top", _backTop);
+        _armRow = Field("Arm height", _arm, tip: "How high the arms are (mm).");
+        _colsRow = Line(_colsLabel, _cols);
+        _rowsRow = Line(_rowsLabel, _rows);
+        _hangRow = Field("Hangs at", _hang, tip: "How high its bottom edge is up the wall (mm).");
+        _lookRow = Field("Look", _look, tip: "The theme this piece is made in: its doors, handles and ornament. Ready-made pieces keep their own, so a sci-fi console can stand in a medieval list.");
         _boxRows = Stack(Field("Lid", _lid), _bands);
         _bedRows = Stack(Field("Foot board", _foot, tip: "How high the foot board is (mm)."), Field("Mattress", _mattress, tip: "How high the top of the mattress is (mm)."), _bedding);
         _doorRows = Stack(Field("Doorway", _doorShape, tip: "The doorway's shape, as cut by Walls."), Field("Hinges", _hinge, tip: "Which side of the doorway the door hangs on, seen from the side it opens to."),
@@ -190,9 +221,14 @@ public sealed class FurnitureWindow : Window
         _shelfWallRows = Stack(Field("Wall's sheet", _wallSheet, tip: "The sheet the wall was cut from (mm): its mount slots are that wide."), Field("Slot height", _slot, tip: "How tall the wall's mount slots are (mm)."));
         _wallRows = Stack(Field("Wall thickness", _wallT, tip: "How thick the wall is (mm): both panels if it's two-sided."), _shelfWallRows, _match, _matchNote);
         _dRow = Line(_dLabel, _d);
+        _hRow = Line(_hLabel, _h);
+        var readyRow = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 6, Children = { _ready, _addReady.With(b => { Grid.SetColumn(b, 1); b.MinWidth = 70; }) } };
+        ToolTip.SetTip(_ready, "Furniture already set up for the theme and the room: press Add to put it on the list.");
         return Stack(
             Explained("Theme", "A look to start from, the same as the wall maker's: it sets the detail on the faces (planks, rough grain, metal panels or stone) and the doors' shape. Start the list from it for furniture that suits it.",
                 Field("Theme", _theme), _themeAbout, _starter),
+            Explained("Ready-made", "Pieces already set up for the theme above and a room: four-posters and wardrobes, thrones on a dais, lockers and bunks for a ship, a forge, a sarcophagus. Each keeps its theme's look whatever the list's theme.",
+                Field("Room", _room), readyRow, _readyAbout),
             Explained("Furniture to cut", "Everything on the list is cut from the same sheet and nested onto the bed together. Pick one to change it.",
                 _list,
                 addRow,
@@ -200,8 +236,9 @@ public sealed class FurnitureWindow : Window
             Explained("This piece", "",
                 _title, _about,
                 Field("How many", _count),
-                Line(_wLabel, _w), _dRow, Line(_hLabel, _h),
-                _legRows, _topRow, _legWRow, _chairRows, _shelfRows, _boxRows, _bedRows, _doorRows, _wallRows));
+                _styleRow,
+                Line(_wLabel, _w), _dRow, _hRow,
+                _legRows, _topRow, _legWRow, _seatRow, _armRow, _backRow, _backTopRow, _crownRow, _colsRow, _rowsRow, _shelvesRow, _contentsRow, _shelfRows, _boxRows, _bedRows, _hangRow, _doorRows, _wallRows, _lookRow));
     }
 
     Control SheetTab()
@@ -265,9 +302,10 @@ public sealed class FurnitureWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _count, _w, _d, _h, _legW, _seat, _shelves, _foot, _mattress, _wallT, _wallSheet, _overlap, _slot })
+        foreach (var n in new[] { _count, _w, _d, _h, _legW, _seat, _shelves, _foot, _mattress, _wallT, _wallSheet, _overlap, _slot, _cols, _rows, _arm, _hang })
             n.ValueChanged += (_, _) => ItemChanged();
-        foreach (var c in new[] { _legs, _top, _back, _lid, _doorShape, _hinge })
+        _style.SelectionChanged += (_, _) => { if (!_loading) { ItemChanged(); LoadItem(); } };
+        foreach (var c in new[] { _legs, _top, _back, _lid, _doorShape, _hinge, _crown, _contents, _backTop, _look })
             c.SelectionChanged += (_, _) => ItemChanged();
         foreach (var c in new[] { _rail, _backPanel, _books, _bands, _bedding })
             c.IsCheckedChanged += (_, _) => ItemChanged();
@@ -281,6 +319,9 @@ public sealed class FurnitureWindow : Window
         _scale.SelectionChanged += (_, _) => ScaleChosen();
         _list.SelectionChanged += (_, _) => { if (!_loading && _list.SelectedIndex >= 0 && _list.SelectedIndex != _sel) { _sel = _list.SelectedIndex; LoadItem(); Changed(); } };
         _add.Click += (_, _) => AddItem(Defaults.For(Defaults.Kinds[Math.Max(0, _addKind.SelectedIndex)].Kind));
+        _room.SelectionChanged += (_, _) => FillReady();
+        _ready.SelectionChanged += (_, _) => _readyAbout.Text = ReadyChosen?.About ?? "";
+        _addReady.Click += (_, _) => { if (ReadyChosen is { } e) AddItem(e.Item); };
         _copy.Click += (_, _) => AddItem(_set.Items[_sel]);
         _remove.Click += (_, _) => RemoveItem();
         _match.Click += (_, _) => MatchWalls();
@@ -296,6 +337,7 @@ public sealed class FurnitureWindow : Window
     void ThemeChosen()
     {
         _themeAbout.Text = FurnitureThemes.About(ThemeName);
+        FillReady();
         if (_loading) return;
         _set = FurnitureThemes.Apply(_set, ThemeName);
         LoadSheet();
@@ -345,12 +387,7 @@ public sealed class FurnitureWindow : Window
         Changed();
     }
 
-    static FurnitureItem Scaled(FurnitureItem it, double k) => it with
-    {
-        WidthMm = Math.Round(it.WidthMm * k, 1), DepthMm = Math.Round(it.DepthMm * k, 1), HeightMm = Math.Round(it.HeightMm * k, 1),
-        SeatMm = Math.Round(it.SeatMm * k, 1), FootMm = Math.Round(it.FootMm * k, 1), MattressMm = Math.Round(it.MattressMm * k, 1),
-        LegMm = Math.Round(it.LegMm * k, 1), MountSlotMm = it.MountSlotMm,
-    };
+    static FurnitureItem Scaled(FurnitureItem it, double k) => FurnitureCatalog.Scale(it, k);
 
     void ScaleChosen()
     {
@@ -384,7 +421,7 @@ public sealed class FurnitureWindow : Window
         bool was = _loading;
         _loading = true;
         var info = Defaults.Info(kind);
-        _title.Text = info.Name;
+        _title.Text = string.IsNullOrWhiteSpace(it.Name) ? info.Name : $"{it.Name} ({info.Name.ToLowerInvariant()})";
         _about.Text = info.About;
         _count.Value = Math.Max(1, it.Count);
         _w.Value = D(it.WidthMm); _d.Value = D(it.DepthMm); _h.Value = D(it.HeightMm);
@@ -400,6 +437,18 @@ public sealed class FurnitureWindow : Window
         _doorShape.SelectedIndex = (int)it.Shape; _hinge.SelectedIndex = (int)it.Hinge; _overlap.Value = D(it.OverlapMm);
         _wallT.Value = D(it.WallMm); _wallSheet.Value = D(it.WallSheetMm); _slot.Value = D(it.MountSlotMm);
         _matchNote.Text = "";
+        var styles = StylesOf(kind);
+        _styleRow.IsVisible = styles is not null;
+        if (styles is { } st)
+        {
+            _styleLabel.Text = st.Label;
+            _style.ItemsSource = st.Names.ToList();
+            _style.SelectedIndex = Math.Clamp(StyleOf(it), 0, st.Names.Length - 1);
+        }
+        _crown.SelectedIndex = (int)it.Crown; _contents.SelectedIndex = (int)it.Contents; _backTop.SelectedIndex = (int)it.BackTop;
+        _cols.Value = Math.Max(1, it.Columns); _rows.Value = Math.Max(1, it.Rows); _arm.Value = D(it.ArmMm); _hang.Value = D(it.HangMm);
+        int lookAt = it.Theme is { } th ? FurnitureThemes.Names.ToList().IndexOf(th) : -1;
+        _look.SelectedIndex = lookAt + 1;
 
         (string W, string? D, string H) labels = kind switch
         {
@@ -410,16 +459,40 @@ public sealed class FurnitureWindow : Window
             ItemKind.Bookshelf or ItemKind.Chest or ItemKind.Crate => ("Width", "Depth", "Height"),
             ItemKind.Bed => ("Length", "Width", "Head board"),
             ItemKind.WallDoor => ("Doorway width", null, "Doorway height"),
-            _ => ("Length", "Depth", "Bracket size"),
+            ItemKind.WallShelf => ("Length", "Depth", "Bracket size"),
+            ItemKind.Armchair => ("Width", "Depth", "Back height"),
+            ItemKind.Coffin => ("Length", "Width", "Height"),
+            ItemKind.Rug => (it.Rug == RugPattern.Round ? "Across" : "Length", it.Rug == RugPattern.Round ? null : "Width", ""),
+            ItemKind.WallHanging => ("Width", null, "Height"),
+            ItemKind.Candlestand => ("Spread", "Foot", "Height"),
+            _ => ("Width", "Depth", "Height"),
         };
         _wLabel.Text = labels.W;
         _hLabel.Text = labels.H;
+        _hRow.IsVisible = labels.H != "";
         _dLabel.Text = labels.D ?? "";
         _dRow.IsVisible = labels.D is not null;
         _legRows.IsVisible = kind is ItemKind.Table or ItemKind.Bench;
         _legWRow.IsVisible = kind is ItemKind.Table or ItemKind.Bench or ItemKind.Chair or ItemKind.Bed;
         _topRow.IsVisible = kind == ItemKind.Stool;
-        _chairRows.IsVisible = kind == ItemKind.Chair;
+        _seatRow.IsVisible = kind is ItemKind.Chair or ItemKind.Armchair;
+        _backRow.IsVisible = kind == ItemKind.Chair;
+        _armRow.IsVisible = _backTopRow.IsVisible = kind == ItemKind.Armchair && it.Seat != SeatStyle.Pew;
+        _crownRow.IsVisible = kind == ItemKind.Cabinet;
+        _contentsRow.IsVisible = kind == ItemKind.Cabinet && it.Front is CabinetFront.Open or CabinetFront.Glass or CabinetFront.Hutch;
+        _shelvesRow.IsVisible = kind == ItemKind.Bookshelf || kind == ItemKind.Cabinet && it.Front is not (CabinetFront.Clock or CabinetFront.Altar or CabinetFront.Drawers);
+        (string? cols, string? rows) counts = kind switch
+        {
+            ItemKind.Cabinet => (it.Front is CabinetFront.Clock or CabinetFront.Altar or CabinetFront.Open ? null : "Across", it.Front is CabinetFront.Drawers or CabinetFront.DrawersOverDoors ? "Drawer rows" : null),
+            ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew => ("Seats", null),
+            ItemKind.Screen => ("Panels", null),
+            ItemKind.WeaponRack => (null, "Weapons"),
+            _ => (null, null),
+        };
+        _colsLabel.Text = counts.cols ?? ""; _colsRow.IsVisible = counts.cols is not null;
+        _rowsLabel.Text = counts.rows ?? ""; _rowsRow.IsVisible = counts.rows is not null;
+        _hangRow.IsVisible = kind == ItemKind.WallHanging;
+        _lookRow.IsVisible = (int)kind >= (int)ItemKind.Cabinet;
         _shelfRows.IsVisible = kind == ItemKind.Bookshelf;
         _boxRows.IsVisible = kind is ItemKind.Chest or ItemKind.Crate;
         _bedRows.IsVisible = kind == ItemKind.Bed;
@@ -447,7 +520,78 @@ public sealed class FurnitureWindow : Window
             FootMm = V(_foot, it.FootMm), MattressMm = V(_mattress, it.MattressMm), Bedding = _bedding.IsChecked == true,
             Shape = (DoorShape)Math.Max(0, _doorShape.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _hinge.SelectedIndex), OverlapMm = V(_overlap, it.OverlapMm),
             WallMm = V(_wallT, it.WallMm), WallSheetMm = V(_wallSheet, it.WallSheetMm), MountSlotMm = V(_slot, it.MountSlotMm),
-        };
+            Crown = (Crown)Math.Max(0, _crown.SelectedIndex), Contents = (ShelfContents)Math.Max(0, _contents.SelectedIndex), BackTop = (BackTop)Math.Max(0, _backTop.SelectedIndex),
+            Columns = (int)V(_cols, it.Columns), Rows = (int)V(_rows, it.Rows), ArmMm = V(_arm, it.ArmMm), HangMm = V(_hang, it.HangMm),
+            Theme = _look.SelectedIndex > 0 ? FurnitureThemes.Names[_look.SelectedIndex - 1] : null,
+        } is var made && StylesOf(kind) is not null && _style.SelectedIndex >= 0 ? WithStyle(made, _style.SelectedIndex) : made;
+    }
+
+    // ---- the newer kinds' styles ----
+
+    static (string Label, string[] Names)? StylesOf(ItemKind k) => k switch
+    {
+        ItemKind.Cabinet => ("Front", ["Doors", "Drawers", "Drawers over doors", "Glass doors", "Open shelves", "Dresser (shelves over a cupboard)", "Panelled doors", "Lockers", "Machine panels", "Clock", "Lattice doors", "Altar"]),
+        ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa or settle", "Pew", "Command chair"]),
+        ItemKind.Bed => ("Kind", ["Plain", "Four-poster", "Bunk beds", "Pallet on sleepers"]),
+        ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge"]),
+        ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),
+        ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand"]),
+        ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
+        ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round"]),
+        ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen"]),
+        ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
+        ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
+        ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),
+        _ => null,
+    };
+
+    static int StyleOf(FurnitureItem it) => it.Kind switch
+    {
+        ItemKind.Cabinet => (int)it.Front,
+        ItemKind.Armchair => (int)it.Seat,
+        ItemKind.Bed => (int)it.BedStyle,
+        ItemKind.Fireplace => (int)it.Hearth,
+        ItemKind.SlantDesk => (int)it.Slant,
+        ItemKind.Stand => (int)it.Stand,
+        ItemKind.Coffin => (int)it.Coffin,
+        ItemKind.Rug => (int)it.Rug,
+        ItemKind.WallHanging => (int)it.Hanging,
+        ItemKind.Candlestand => (int)it.Candle,
+        ItemKind.Screen => (int)it.ScreenStyle,
+        ItemKind.Desk => it.Contents == ShelfContents.Tech ? 1 : 0,
+        _ => 0,
+    };
+
+    static FurnitureItem WithStyle(FurnitureItem it, int i) => it.Kind switch
+    {
+        ItemKind.Cabinet => it with { Front = (CabinetFront)i },
+        ItemKind.Armchair => it with { Seat = (SeatStyle)i },
+        ItemKind.Bed => it with { BedStyle = (BedStyle)i },
+        ItemKind.Fireplace => it with { Hearth = (HearthStyle)i },
+        ItemKind.SlantDesk => it with { Slant = (SlantStyle)i },
+        ItemKind.Stand => it with { Stand = (StandStyle)i },
+        ItemKind.Coffin => it with { Coffin = (CoffinStyle)i },
+        ItemKind.Rug => it with { Rug = (RugPattern)i },
+        ItemKind.WallHanging => it with { Hanging = (HangingStyle)i },
+        ItemKind.Candlestand => it with { Candle = (CandleStyle)i },
+        ItemKind.Screen => it with { ScreenStyle = (ScreenStyle)i },
+        ItemKind.Desk => it with { Contents = i == 1 ? ShelfContents.Tech : ShelfContents.Books },
+        _ => it,
+    };
+
+    // ---- ready-made furniture ----
+
+    CatalogEntry? ReadyChosen => _ready.SelectedIndex >= 0 && _ready.SelectedIndex < _readyList.Count ? _readyList[_ready.SelectedIndex] : null;
+
+    /// <summary>The ready-made list for the theme and room picked.</summary>
+    void FillReady()
+    {
+        string? room = _room.SelectedIndex > 0 ? FurnitureCatalog.Rooms[_room.SelectedIndex - 1] : null;
+        _readyList = [.. FurnitureCatalog.For(ThemeName, room)];
+        _ready.ItemsSource = _readyList.Select(e => room is null ? $"{e.Name} ({e.Room.ToLowerInvariant()})" : e.Name).ToList();
+        _ready.SelectedIndex = _readyList.Count > 0 ? 0 : -1;
+        _addReady.IsEnabled = _readyList.Count > 0;
+        _readyAbout.Text = ReadyChosen?.About ?? "Nothing ready-made for this room in this theme yet: try another room.";
     }
 
     void ItemChanged()
