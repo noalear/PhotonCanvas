@@ -26,6 +26,9 @@ public partial class MainWindow : IAddonServices
                 _settings.Addons[id] = on;
                 _settings.Save();
             });
+        // Right-click on anything: disable its add-on, its tutorial, its help.
+        ContextHelp.Install(this);
+        DescribeForHelp();
         _doc.Changed += _ => _documentChanged?.Invoke();
         _machine.PhotoChanged += _ => _photoChanged?.Invoke();
         _job.RunFinished += from => _jobFinished?.Invoke(from);
@@ -148,6 +151,7 @@ public partial class MainWindow : IAddonServices
                 (false, false) => g.Small(b.Label, b.Icon, b.Run, b.Tip, b.Enabled),
             };
             if (b.Visible is { } v) _ribbon.ShowWhen(c, v);
+            if (b.AddonId is { } owner) ContextHelp.Own(c, owner);
             return c;
         }, b.GroupAfter, b.Order);
         _ribbon.Refresh();

@@ -18,6 +18,9 @@ when to use it.
 - **Pictures** can be clicked to see them full size.
 - **F1** in any window of the program opens this guide at the page explaining that window.
   In the main window it opens this page.
+- **Right-click** anything (a button, a setting, a shape) and choose **See help** for the section
+  about that very thing, or **See tutorial** for its tutorial. See
+  [Right-click for help](workspace.md#right-click-for-help).
 
 ![Searching for "kerf": tutorials first, then every section that mentions it](images/help-guide-search.png)
 

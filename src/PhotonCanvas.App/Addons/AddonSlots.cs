@@ -37,13 +37,14 @@ public static class AddonSlots
     {
         var ctx = new SlotContext { Slot = slot, Window = window, Data = data, Changed = changed ?? (() => { }) };
         int n = 0;
-        foreach (var (s, make, _) in Panels.ToList())
+        foreach (var (s, make, owner) in Panels.ToList())
         {
             if (s != slot) continue;
             Control? c;
             try { c = make(ctx); }
             catch (Exception e) { AppLog.Write("addons", $"Add-on panel for {slot} failed: {e.Message}"); continue; }
             if (c is null) continue;
+            if (owner is AddonHost host) ContextHelp.Own(c, host.Manifest.Id);
             into.Children.Add(c);
             n++;
         }

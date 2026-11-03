@@ -304,6 +304,9 @@ sealed class AddonLoadContext : AssemblyLoadContext
 
     public Assembly? Loaded(AssemblyName name) => _mine.GetValueOrDefault(name.Name ?? "");
 
+    /// <summary>The add-on this context loads (to know which add-on a window or panel class belongs to).</summary>
+    public AddonManifest Manifest => _manifest;
+
     Assembly FromFile(string file)
     {
         // From memory, so the file stays free to be replaced or deleted.

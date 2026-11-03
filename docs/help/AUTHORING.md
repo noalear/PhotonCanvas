@@ -125,6 +125,16 @@ Name pictures after what they show (`laser-cut-test.png`). Use a screenshot wher
 window full of settings, a panel, a result on the work area. Not for every button, and not for a
 plain message or a one-line prompt.
 
+## Right-click help
+
+Right-clicking anything in the program offers **See help** and **See tutorial** for it, found from
+these files: a ribbon button goes to the first section naming it in bold and to a tutorial with a
+step pointing at it (`ribbon:Tab/Label`); a setting or button in a window to the section of the
+window's page (its `windows:` line) that names it in bold, else to that section; a shape an add-on made, or anything
+in an add-on's window, to the add-on's pages and tutorials. So name every control in bold exactly as
+the program shows it, on the page of the window it's in. The tests in
+`tests/PhotonCanvas.Tests/HelpTests.ContextHelp.cs` check every ribbon button finds its section and tutorial.
+
 ## When a feature is added or changed
 
 1. Describe it on its page (bold names exactly as shown; every setting, what it does, its range).

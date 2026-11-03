@@ -408,6 +408,11 @@ do with the selection opens. Items that don't apply are greyed.
 Right-click on empty space: it selects nothing and offers **Paste**, **Select all**, **Fit work
 area** and **Grid & snapping…**.
 
+Last, below a line, come **Disable add-on**, **See tutorial** and **See help** for what you clicked:
+for a shape an add-on made (a wall, a building, a mechanism), its add-on, tutorial and page; for
+other shapes, the help on them (text, pictures, codes) or on this menu. See
+[Right-click for help](workspace.md#right-click-for-help).
+
 What each command does is explained with its ribbon button: [Editing shapes](editing-shapes.md),
 [Arranging](arrange.md), [Pictures](pictures.md) and [Camera](camera.md).
 

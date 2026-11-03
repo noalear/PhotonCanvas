@@ -305,6 +305,21 @@ The **?** at the top right opens the help menu:
 
 The same items are on the **Help** page of the settings window.
 
+## Right-click for help
+
+Right-click anything in the program: a ribbon button, a setting, a panel, a shape on the work area
+or in the Layers panel, or something in another window. At the end of the menu that opens (or in a
+small menu of its own, where there was none) are three items about the thing you clicked:
+
+| Item | Does |
+|---|---|
+| **Disable add-on: …** | Turns off the add-on that made it, named after the dash (for a shape, the add-on that made the shape, such as **Textured wall maker**). Add-ons that need it go off too, after asking. Turn it back on in **Settings → Add-ons**; see [Add-ons](addons.md). For things that are part of PhotonCanvas itself it reads **Disable add-on (this is part of PhotonCanvas)** and is greyed. |
+| **See tutorial: …** | Starts the tutorial about it, named after the dash. When there isn't one it reads **See tutorials…** and opens the list. |
+| **See help: …** | Opens this guide at the section explaining it, named after the dash; when nothing explains that very thing, at the page about the window, panel or add-on it's in. |
+
+In a text box, the three come after **Cut**, **Copy** and **Paste**. Right-clicking a menu itself
+does nothing.
+
 ## Units and colours
 
 In Settings → Appearance:

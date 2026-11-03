@@ -210,7 +210,7 @@ public sealed class AddonHost : IAddonHost
     };
 
     public IDisposable AddRibbonButton(RibbonButton b) =>
-        Keep(_s.AddRibbonButton(b with { Run = Safe(b.Run), Enabled = Safe(b.Enabled), Checked = Safe(b.Checked), Visible = Safe(b.Visible) }));
+        Keep(_s.AddRibbonButton(b with { Run = Safe(b.Run), Enabled = Safe(b.Enabled), Checked = Safe(b.Checked), Visible = Safe(b.Visible), AddonId = Manifest.Id }));
 
     public IDisposable AddCommand(AddonCommand c) => Keep(_s.AddCommand(c with { Run = Safe(c.Run) }));
 

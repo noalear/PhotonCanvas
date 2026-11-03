@@ -185,6 +185,28 @@ guide under **Add-ons** while you're on, and are searched with the rest. Link to
 file name; images go in `help/images/`. A `<!-- windows: PapercraftWindow -->` line makes F1 in that
 window open the page. Every add-on needs at least one page and one tutorial.
 
+### Right-click: Disable add-on, See tutorial, See help
+
+Right-clicking anything in the program ends its menu with **Disable add-on**, **See tutorial** and
+**See help** for what was clicked (`src/PhotonCanvas.App/ContextHelp.cs`, the lookup in
+`PhotonCanvas.Doc.Help.HelpFinder`). You don't add anything for it:
+
+- **Which add-on**: your ribbon buttons and slot panels are marked as yours when added; anything in
+  a window or control class from your assembly is yours (found by its load context); a shape is
+  yours when it carries a note under your id (`Shape.AddonData` key `"walls.id"`, or just `"hollow"`).
+  When several add-ons' notes are on one shape, the one that needs the others (in `requires`) is named first.
+- **See help**: a ribbon button goes to the first section of your pages naming its label in bold;
+  something in your window to the section of the window's page (the `windows:` line) that names
+  the setting or button in bold, else that page; a shape you made to your first page in your contents.
+- **See tutorial**: one with a step pointing at it (`ribbon:Tab/Label`, `button:…`, `field:…`), else
+  one whose `page:` is the page found, else your first tutorial.
+
+So write help as `docs/help/AUTHORING.md` says (labels in bold, exactly as shown) and it works.
+Your own right-click menus (a `ContextMenu` on a control) get the items too. A control of yours that
+should say more can call `ContextHelp.Describe(control, () => new HelpSubject { Page = "mine.md#section", Tutorial = "my-tutorial" })`.
+`HelpTests.ContextHelp.cs` checks every ribbon button of every add-on finds its own page and a
+tutorial that points at it.
+
 ### 3D views of a model put together
 
 Don't draw a 3D model by sorting its faces far to near and painting them over each other: with long

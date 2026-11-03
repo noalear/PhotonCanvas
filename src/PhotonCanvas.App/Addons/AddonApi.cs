@@ -209,6 +209,8 @@ public sealed record RibbonButton(string Tab, string Group, string Label, string
     public string? GroupAfter { get; init; }
     /// <summary>Where it goes among add-ons' buttons in the same group: lower first (then in the order they came). The program's own buttons come first.</summary>
     public int Order { get; init; }
+    /// <summary>Set by the program: the add-on that added it (for the right-click help).</summary>
+    internal string? AddonId { get; init; }
 }
 
 /// <summary>
