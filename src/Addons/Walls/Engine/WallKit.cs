@@ -96,6 +96,7 @@ public static class WallKitMaker
         // The outline, with its top.
         var panel = new PathsD { Geo.Rect(0, 0, L, H) };
         double body = H;
+        var outline = Profile.Level(0, L, H);
         if (s.Top == TopStyle.Battlements)
         {
             double mh = Math.Clamp(s.MerlonHeightMm, 1, H * 0.6), cw = Math.Max(1, s.CrenelWidthMm), mw = Math.Max(1, s.MerlonWidthMm);
@@ -106,16 +107,20 @@ public static class WallKitMaker
             else
             {
                 double pitch = u / gaps;
-                var crenels = new PathsD();
-                for (int i = 0; i < gaps; i++)
-                {
-                    double cx = ez + pitch * (i + 0.5);
-                    crenels.Add(Geo.Rect(cx - cw / 2, body, cx + cw / 2, H + 1));
-                }
-                panel = Geo.Subtract(panel, crenels);
+                var crenels = Enumerable.Range(0, gaps).Select(i => ez + pitch * (i + 0.5)).Select(cx => (cx - cw / 2, cx + cw / 2)).ToList();
+                outline = Tops.Battlements(s, L, H, body, crenels);
+                if (s.Merlons != MerlonPattern.Even && s.MerlonStepMm > mh - 1)
+                    findings.Add(new(Severity.Warn, $"The shorter merlons can only be {Math.Max(0, mh - 1):0.#} mm lower than the tall ones: make the merlons taller."));
             }
         }
-        else if (s.Top == TopStyle.Ruined) panel = Geo.Subtract(panel, [Ruin(s, L, H, ez)]);
+        var breaks = s.Breaks;
+        if (breaks is not (RuinStyle.None or RuinStyle.Stepped))
+        {
+            var stones = breaks == RuinStyle.Shattered ? null : Textures.Make(s, new Face(L, H, ez, L - ez, body)).Raised;
+            outline = Tops.Break(s, outline, L, ez + 1, H, Math.Max(4, 0.15 * H), 0, 1, stones, out _);
+        }
+        panel = Geo.Intersect(panel, outline.Under(-1));
+        if (breaks == RuinStyle.Stepped) panel = Geo.Subtract(panel, [Ruin(s, L, H, ez)]);
 
         // Doors and windows: where they are, what's cut, and the shape their frame follows.
         var holes = new PathsD();

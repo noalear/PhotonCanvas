@@ -37,7 +37,13 @@ drawn. **Wear %** sets how weathered it looks (0 new and crisp, 100 ancient and 
 <!-- target: tabitem:Top -->
 On the **Top** tab, choose **Battlements (parapet)** for gaps along the top, and tick **Walkway
 behind the battlements** for somewhere to stand figures. **Put together** on the right shows the
-wall built; drag it round to see the walkway.
+wall built; drag it round to see the walkway. **Merlon heights** can make every other merlon taller.
+
+## Break it for a ruin (if you like)
+<!-- target: field:Broken -->
+Still on **Top**, **Broken** turns the wall into a ruin: *Crumbled*, a *Breach*, a *Fallen end* and
+more, with or without battlements. On brick the break follows the joints, taking whole bricks away.
+Leave it on *Not broken* for a whole wall.
 
 ## Add a door and a window
 <!-- target: tabitem:Doors & windows -->
