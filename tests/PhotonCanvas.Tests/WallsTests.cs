@@ -396,9 +396,10 @@ public class WallsTests
     [InlineData(5)]
     public void Sci_fi_panels_are_bays_between_ribs(int seed)
     {
-        // Scored as lines, unworn: every long upright edge is a rib's, or a plate's beside a rib, so they all sit a bay apart.
-        double bay = 16;
-        var spec = new WallSpec { Texture = "Sci-fi panels", SizeA = bay, SizeB = 12, GrooveMm = 0.5, Seed = seed, Wear = 0, Etch = EtchStyle.Lines, PlainEnds = false, Connectors = [] };
+        // Scored as lines, unworn: every long upright edge is a pillar's, or a plate's beside a pillar, so they all sit a bay apart.
+        // Panel width 16 makes a bay of 1.9 panels plus a pillar (a third of a panel, kept between 2.6 and 7 mm).
+        double a = 16, bay = a * 1.9 + Math.Clamp(a * 0.32, 2.6, 7);
+        var spec = new WallSpec { Texture = "Sci-fi panels", SizeA = a, SizeB = 12, GrooveMm = 0.5, Seed = seed, Wear = 0, Etch = EtchStyle.Lines, PlainEnds = false, Connectors = [] };
         var wall = Make(spec).Parts[0];
         var upright = wall.Lines.SelectMany(l => l.Zip(l.Skip(1)))
             .Where(p => Math.Abs(p.First.x - p.Second.x) < 0.01 && Math.Abs(p.First.y - p.Second.y) > spec.HeightMm * 0.25)

@@ -67,6 +67,7 @@ internal static class Relief
         int inside = 0;
         for (int i = 0; i < n; i++) if (mask[i] >= 128) inside++;
         var stack = new Stack<int>();
+        var plainIds = new HashSet<int>();
         // How much the pieces' heights differ (share of the full depth): metal plates are made level, stone isn't.
         double vary = metal ? 0.03 + 0.05 * wear : wood ? 0.06 + 0.1 * wear : 0.07 + 0.18 * wear;
         double lean = metal ? 0.01 : 0.03 + 0.07 * wear;
@@ -92,10 +93,30 @@ internal static class Relief
             // The plain parts of a piece (smooth ends, frames, the band above the texture) are one big
             // area: they stay at the surface, so the face reads as level and the pieces in it as worn.
             bool plain = count > inside * 0.2;
+            if (plain) plainIds.Add(id);
             double size = Math.Max(1, Math.Max(maxX - minX, maxY - minY));
             pieces.Add(plain
                 ? (0, 0, 0, 0, 0)
                 : (rnd.NextDouble() * vary, (rnd.NextDouble() * 2 - 1) * lean / size, (rnd.NextDouble() * 2 - 1) * lean / size, (double)sx / count, (double)sy / count));
+        }
+
+        // ---- what stands in a recess sits part way down ----
+        // How open the ground round each piece is: a brick has only its mortar round it, but a pipe, a
+        // box or a grille's slats stand in a wide recess, and are set lower than the face, so the layers read.
+        {
+            int reach = Math.Max(2, (int)Math.Round(1.2 * ppm));
+            var open = Blur(Blur(ToFloat(etch), W, H, reach), W, H, reach);
+            var sum = new double[pieces.Count];
+            var count = new int[pieces.Count];
+            for (int i = 0; i < n; i++)
+                if (label[i] > 0) { sum[label[i]] += open[i]; count[label[i]]++; }
+            for (int id = 1; id < pieces.Count; id++)
+            {
+                var pc = pieces[id];
+                if (count[id] == 0 || plainIds.Contains(id)) continue;
+                double sink = Math.Clamp((sum[id] / count[id] - 0.38) / 0.3, 0, 1) * 0.42;
+                pieces[id] = pc with { Base = pc.Base + sink };
+            }
         }
 
         // ---- how deep each etched mark goes ----
