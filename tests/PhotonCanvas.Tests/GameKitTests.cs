@@ -36,13 +36,7 @@ public class GameKitTests
         }
     }
 
-    static bool In(PathsD area, double u, double v)
-    {
-        int inside = 0;
-        foreach (var p in area)
-            if (Clipper.PointInPolygon(new PointD(u, v), p) == PointInPolygonResult.IsInside) inside++;
-        return inside % 2 == 1;
-    }
+    static bool In(PathsD area, double u, double v) => OutlineGrid.In(area, u, v);
 
     static List<Placed> Assemble(ItemKit k, double T) =>
         [.. k.Parts.SelectMany(p => p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(p.Cut, -0.03), p.Cut, T)))];

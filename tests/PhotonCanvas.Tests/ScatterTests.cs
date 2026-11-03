@@ -39,13 +39,7 @@ public class ScatterTests
         }
     }
 
-    static bool In(PathsD area, double u, double v)
-    {
-        int inside = 0;
-        foreach (var p in area)
-            if (Clipper.PointInPolygon(new PointD(u, v), p) == PointInPolygonResult.IsInside) inside++;
-        return inside % 2 == 1;
-    }
+    static bool In(PathsD area, double u, double v) => OutlineGrid.In(area, u, v);
 
     /// <summary>Every piece where it sits; push-fit ribs are taken off first (they squash flat as the joint goes together).</summary>
     static List<Placed> Assemble(ItemKit k, double T) =>

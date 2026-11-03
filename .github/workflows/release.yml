@@ -8,7 +8,7 @@
 #             repository), set the RELEASES_REPO variable to "owner/name" and the RELEASES_TOKEN
 #             secret to a token that can write releases there. Copies built from then on update
 #             from there (it's written into their update.json).
-#   Checked   the tests run first; a failing test means no release.
+#   Checked   the tests run beside the build; a failing test means no release.
 #   Safe      every download is listed in SHA256SUMS, and the program refuses a file that doesn't match.
 #   Small     PhotonCanvas-<build>.files.txt lists every file's SHA-256, so the program downloads only
 #             the files that changed, read straight out of the zip.
@@ -34,30 +34,57 @@ on:
         type: boolean
         default: false
 
-# A newer push replaces a build that hasn't finished: only the latest master is worth publishing.
+# One build at a time. A build that has started always finishes and publishes; pushes that land
+# meanwhile wait, and only the newest of them builds next. (Cancelling the running build instead
+# meant that, with merges every few minutes, no build ever got to the end.)
 concurrency:
   group: release
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
+# Tests and the build run side by side on two machines; the release waits for both.
 jobs:
-  release:
+  test:
+    if: ${{ !inputs.skip_tests }}
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
 
+      - name: Package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-test-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
+          restore-keys: nuget-test-
+
       - name: Test
-        if: ${{ !inputs.skip_tests }}
         run: dotnet test tests/PhotonCanvas.Tests -c Release -nologo
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Package cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-build-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
+          restore-keys: nuget-build-
 
       - name: Version
         id: v
@@ -81,10 +108,37 @@ jobs:
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          retention-days: 3
+          compression-level: 0
+          path: |
+            dist/PhotonCanvas-*.zip
+            dist/PhotonCanvas-*.tar.gz
+            dist/PhotonCanvas-*.files.txt
+            dist/SHA256SUMS
+
+  release:
+    needs: [test, build]
+    # Tests skipped by hand still count as passed; a failed or cancelled test run means no release.
+    if: ${{ !cancelled() && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.RELEASES_TOKEN || github.token }}
-          VERSION: ${{ steps.v.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
           REPO: ${{ vars.RELEASES_REPO || github.repository }}
         run: |
           last=$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)
