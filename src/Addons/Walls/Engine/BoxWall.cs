@@ -92,7 +92,8 @@ public static class BoxWall
         double T = Math.Max(0.3, s.ThicknessMm), W = s.WallMm, G = W - 2 * T, H = s.HeightMm, fit = Math.Max(0, s.FitMm);
         double L = WallKitMaker.PanelLength(s), frame = Math.Max(0, s.FrameMm), pl = Math.Max(0, s.PlinthMm);
         int walls = Math.Max(1, s.Walls);
-        WallKit Done() => new(parts, findings, L, W, 0);
+        var used = new List<MountPoint>();
+        WallKit Done() => new(parts, findings, L, W, 0) { MountsUsed = used };
         void Bad(string t) => findings.Add(new(Severity.Bad, t));
 
         if (G < T - 1e-6) { Bad($"A boxed wall needs room for a layer of sheet between its faces: make it at least {3 * T:0.#} mm thick (three {T:0.#} mm panels)."); return Done(); }
@@ -269,11 +270,28 @@ public static class BoxWall
         }
         var allHoles = Geo.Union(new PathsD(holes.SelectMany(h => h.Shape)));
 
-        // ---- mount points (slots through the front face) ----
+        // ---- mount points (slots through the front face, or the back's) ----
         double slotW = T + fit, slotH = Math.Clamp(s.MountSlotMm, 2, 30);
         var mountXs = new List<double>();
+        var mountBlocks = new List<(double X0, double X1)>();   // where the ribs keep clear of the accessories' tabs
         var frontSlots = new PathsD();
-        if (s.Mounts > 0)
+        var backSlots = new PathsD();
+        var frontClear = new PathsD();    // where the front's texture stops (the back keeps clear of its own slots)
+        List<(MountPoint Mount, List<PathD> Slots)> placed = [];
+        if (s.MountPoints.Count > 0)
+        {
+            placed = Mounts.Place(s, inner0 + 2, inner1 - 2, T + 2, (a, b, onBack) => Math.Min(bodyTop, (onBack ? back : front).Lowest(a, b)), taken, findings);
+            foreach (var (m, slots) in placed)
+            {
+                (m.OnBack ? backSlots : frontSlots).AddRange(slots);
+                var b = m.Bounds(s);
+                if (!m.OnBack) frontClear.AddRange(Geo.Offset(new PathsD(slots), 0.5));
+                taken.Add((b.X0 - 2, b.X1 + 2, b.Y0 - 1, b.Y1 + 1));
+                foreach (var sl in slots) { var r = Geo.Bounds([sl]); mountBlocks.Add((r.left - 1.5, r.right + 1.5)); }
+                used.Add(m);
+            }
+        }
+        else if (s.Mounts > 0)
         {
             double y0 = s.MountHeightMm - slotH / 2, y1 = s.MountHeightMm + slotH / 2;
             if (y0 < T + 2 || y1 > Math.Min(bodyTop, front.Min) - 2)
@@ -282,8 +300,11 @@ public static class BoxWall
             {
                 mountXs = WallKitMaker.Spread(s.Mounts, slotW + 4, inner0 + 2, inner1 - 2, [.. taken.Where(t => t.Y0 < y1 + 1 && t.Y1 > y0 - 1).Select(t => (t.X0, t.X1))], 4);
                 if (mountXs.Count < s.Mounts) findings.Add(new(Severity.Warn, $"Only {mountXs.Count} of the {s.Mounts} mount points fit clear of the doors and windows."));
-                foreach (var x in mountXs)
+                for (int i = 0; i < mountXs.Count; i++)
                 {
+                    double x = mountXs[i];
+                    used.Add(new MountPoint { XMm = Math.Round(x, 2), YMm = s.MountHeightMm, SlotHeightMm = slotH, Item = Mounts.Legacy(s.Accessories, i) });
+                    mountBlocks.Add((x - slotW / 2 - 1.5, x + slotW / 2 + 1.5));
                     frontSlots.Add(Geo.Rect(x - slotW / 2, y0, x + slotW / 2, y1));
                     keepClear.Add(Geo.Rect(x - slotW / 2 - 0.5, y0 - 0.5, x + slotW / 2 + 0.5, y1 + 0.5));
                     taken.Add((x - slotW / 2 - 2, x + slotW / 2 + 2, y0 - 1, y1 + 1));
@@ -294,7 +315,6 @@ public static class BoxWall
         // ---- a walkway wider than the wall rests on brackets plugged into the back face ----
         double over = walkway ? Math.Max(0, Math.Clamp(s.WalkwayDepthMm, 4, 80) - (W - 2 * T)) : 0;
         var bracketXs = new List<double>();
-        var backSlots = new PathsD();
         double bracketY0 = bodyTop - 1.5 - slotH;
         if (over > T)
         {
@@ -315,7 +335,7 @@ public static class BoxWall
         // ---- ribs between the faces, clear of the openings, slots and brackets ----
         int ribs = Math.Max(0, (int)Math.Ceiling((inner1 - inner0) / Math.Max(15, s.RibSpacingMm)) - 1);
         var ribBlock = holes.Select(h => (h.X0 - RevealMm - 1, h.X1 + RevealMm + 1))
-            .Concat(mountXs.Select(x => (x - slotW / 2 - 1.5, x + slotW / 2 + 1.5)))
+            .Concat(mountBlocks)
             .Concat(bracketXs.Select(x => (x - slotW / 2 - 1.5, x + slotW / 2 + 1.5))).ToList();
         var ribXs = WallKitMaker.Spread(ribs, T, inner0 + 6, inner1 - 6, ribBlock, 6);
 
@@ -350,7 +370,7 @@ public static class BoxWall
             return Done();
         }
         var bodyRect = new PathsD { Geo.Rect(0, T, L, H + 1) };
-        var (fe, fl) = FaceTexture(s, 0, L, H, Geo.Subtract(Geo.Intersect(frontCut, bodyRect), Geo.Union(keepClear)));
+        var (fe, fl) = FaceTexture(s, 0, L, H, Geo.Subtract(Geo.Intersect(frontCut, bodyRect), Geo.Union(keepClear, frontClear)));
         fe.AddRange(Geo.Intersect(Geo.Union(frameRings), frontCut));
         fe.AddRange(doorEtched);
         fl.AddRange(Geo.ClipLines(frameLines, frontCut));
@@ -469,7 +489,9 @@ public static class BoxWall
         }
 
         // ---- accessories on the mounts, brackets under a walkway ----
-        if (mountXs.Count > 0)
+        if (placed.Count > 0)
+            parts.AddRange(Mounts.Accessories(s, placed.Select(p => p.Mount), tl + 0.7, W / 2, walls));
+        else if (mountXs.Count > 0)
         {
             var acc = WallKitMaker.Accessories(s, tl + 0.7, slotH);
             for (int j = 0; j < acc.Count; j++)

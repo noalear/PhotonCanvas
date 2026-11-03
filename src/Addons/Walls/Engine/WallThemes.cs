@@ -73,6 +73,16 @@ public static class WallThemes
                 TerrainThemes.Desert => Accessory.Brackets,
                 _ => s.Accessories == Accessory.Lamps ? Accessory.Pegs : s.Accessories,
             },
+            MountPoints = [.. s.MountPoints.Select(m => m.Item == MountItem.None ? m : m with
+            {
+                Item = name switch
+                {
+                    TerrainThemes.SciFi => MountItem.Lamp,
+                    TerrainThemes.Dungeon or TerrainThemes.Cave or TerrainThemes.Gothic => MountItem.Sconce,
+                    TerrainThemes.Desert => MountItem.Shelf,
+                    _ => m.Item == MountItem.Lamp ? MountItem.Peg : m.Item,
+                },
+            })],
             Column = name switch { TerrainThemes.Dungeon or TerrainThemes.Desert => ColumnShape.Square, TerrainThemes.Gothic => ColumnShape.Octagon, TerrainThemes.Cave => ColumnShape.Round, _ => ColumnShape.Auto },
         };
     }

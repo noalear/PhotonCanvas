@@ -121,6 +121,16 @@ public sealed record WallSpec
     /// <summary>How tall each mount slot is (mm); it's as wide as the sheet is thick.</summary>
     public double MountSlotMm { get; init; } = 6;
     public Accessory Accessories { get; init; } = Accessory.None;
+    /// <summary>
+    /// The wall's own mount points, each placed where you like with its own slots and accessory. When there are
+    /// any, <see cref="Mounts"/>, <see cref="MountHeightMm"/>, <see cref="MountSlotMm"/> and <see cref="Accessories"/>
+    /// aren't used (walls saved before keep them).
+    /// </summary>
+    public List<MountPoint> MountPoints { get; init; } = [];
+    /// <summary>How far a shelf (and its brackets) sticks out from the wall (mm).</summary>
+    public double ShelfDepthMm { get; init; } = 10;
+    /// <summary>A texture etched on the accessories and shelves (a preset's name; Plain for none).</summary>
+    public string AccessoryTexture { get; init; } = Textures.Plain;
 
     /// <summary>Gap added to slots so parts slide together (mm), on top of the kerf the cut layer allows for.</summary>
     public double FitMm { get; init; } = 0.15;

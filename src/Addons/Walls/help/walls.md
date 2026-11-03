@@ -205,21 +205,35 @@ front face; the back face's window is open.
 
 ## Mount points
 
-**Mount points** are small slots through the wall (through a box wall's front face), as wide as the
-sheet is thick (plus the fit) and **Slot height** tall, at **Mount height**. They're spread evenly
-along the wall clear of the doors and windows. Anything cut from the same sheet with a tab that size
-plugs into them, so one slot takes whatever you want to hang there. A box wall's ribs keep clear of
-the mount points, so an accessory's tab has room inside.
+![The Mounts tab: a list of mount points, each with its place, slots and accessory, and the wall's pieces with the mount points marked on the face](images/window-walls-mounts.png)
 
-**Accessories** cuts one of these for each mount point (or one of each):
+**Mount points** are small slots through the wall's face that accessories plug into. **Add a mount
+point** adds one to the list; each has its own card:
 
-- **Wall pegs**: a tab with a shoulder that sticks out of the wall; glue a picture, shield or
-  banner to its end.
-- **Torch sconces**: a torch in a bracket, standing out from the wall.
-- **Shelf brackets**: a triangle that holds a little shelf.
-- **Wall lamps (sci-fi)**: a lamp housing that stands out from the wall, its lens scored on.
+| Setting | What it does |
+|---|---|
+| **Accessory** | What plugs into it: *Just the slots* (for something of your own), *A peg* (glue a picture, shield or banner to its end), *A torch sconce*, *A shelf on brackets* or *A wall lamp*. |
+| **On** | A box wall's *front*, or its *back* for the inside of a room. A flat wall's slots go right through. |
+| **Along**, **Up** | Where the middle of its slots is: from the wall's left end, and above its bottom (mm). |
+| **Slot width**, **Slot height** | Each slot's size (mm). A width of 0 is your sheet's thickness plus the slot fit, which suits the accessories cut here; type your own for something else. |
+| **Slots**, **Spacing** | How many slots, and from the middle of one to the next (mm). |
+| **Slots are** | *One above another*: one accessory with a tab in each, held firm. *Side by side*: an accessory in each. A shelf's are always side by side, a bracket in each. |
 
-The accessories stand out from the wall at right angles, so they're drawn side-on.
+**Drag a mount point about on the wall** in the **Pieces** view (it opens, showing just the face, bigger, when you go to the Mounts
+tab): its number and where it is show as you drag, and its card's **Along** and **Up** change when
+you let go. Clicking one picks its card. Ones on the back are marked with a dashed line. A mount
+point past the end of the wall, too high or low, in a door or window, on top of another, or with its
+slots run together is left out and the checks say which.
+
+**A shelf on brackets** cuts a bracket for each slot and the shelf they hold: each bracket's top has a
+tab that goes up through a slot in the shelf, so it sits square. **Shelf depth** is how far the shelf
+and its brackets stick out. **Etch them with** etches a texture on the accessories and shelves,
+smaller than on the wall: wood planks suit shelves, metal plates suit lamps. Their tabs, inside the
+wall, are left plain.
+
+A box wall's ribs keep clear of the mount points, so a tab has room inside. The accessories stand out
+from the wall at right angles, so they're drawn side-on. A wall saved before this kept just a number
+of mount points; opened again, they're listed where they were spread.
 
 ## Boxed walls
 

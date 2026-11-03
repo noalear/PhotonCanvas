@@ -15,6 +15,8 @@ public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Li
 /// <summary>Everything a set of walls is cut from, with what was found while making it.</summary>
 public sealed record WallKit(List<Part> Parts, List<Finding> Findings, double PanelLengthMm, double WallThicknessMm, int ColumnLayers)
 {
+    /// <summary>The mount points the wall ended up with (for walls that only say how many, where they were spread to).</summary>
+    public List<MountPoint> MountsUsed { get; init; } = [];
     public Part? Front => Parts.FirstOrDefault();
     public bool Ok => !Findings.Any(f => f.Level == Severity.Bad);
     public int PieceCount => Parts.Sum(p => p.Copies);
@@ -66,7 +68,8 @@ public static class WallKitMaker
         if (L < 2 * ez + 5 || L < 10) { findings.Add(new(Severity.Bad, $"The wall is too short ({L:0.#} mm): make it longer.")); return new(parts, findings, L, wallT, layers); }
         if (H < 5) { findings.Add(new(Severity.Bad, "The wall is too low: make it at least 5 mm high.")); return new(parts, findings, L, wallT, layers); }
 
-        var wall = Panel(s, L, H, ez, findings);
+        var used = new List<MountPoint>();
+        var wall = Panel(s, L, H, ez, findings, used);
         if (wall is null) return new(parts, findings, L, wallT, layers);
         parts.Add(new Part("Wall", wall.Cut, wall.Etched, wall.Lines, Math.Max(1, s.Walls)) { Poses = [Model.Pose.Front(0, 0, s.TwoSided ? T / 2 : 0)] });
         if (s.TwoSided)
@@ -81,12 +84,12 @@ public static class WallKitMaker
         if (s.Measure == LengthMeasure.Centres) findings.Add(new(Severity.Note, $"Each panel is {L:0.#} mm long, so the columns' centres are {s.LengthMm:0.#} mm apart."));
         else if (parts.Any(p => p.Name.Contains("column"))) findings.Add(new(Severity.Note, $"Columns' centres end up {L + 2 * CentreToEnd(s):0.#} mm apart."));
         if (s.TwoSided) findings.Add(new(Severity.Note, $"Two panels glued back to back make a {wallT:0.#} mm wall; the columns' slots fit that."));
-        return new(parts, findings, L, wallT, layers);
+        return new(parts, findings, L, wallT, layers) { MountsUsed = used };
     }
 
     sealed record PanelResult(PathsD Cut, PathsD Etched, List<PathD> Lines, List<Part> Extras);
 
-    static PanelResult? Panel(WallSpec s, double L, double H, double ez, List<Finding> findings)
+    static PanelResult? Panel(WallSpec s, double L, double H, double ez, List<Finding> findings, List<MountPoint> used)
     {
         double T = s.ThicknessMm, wallT = WallThickness(s), frame = Math.Max(0, s.FrameMm), fit = Math.Max(0, s.FitMm);
         // Frames and doors use the texture's groove, or 0.6 mm when the texture has none of its own.
@@ -196,7 +199,20 @@ public static class WallKitMaker
         double slotW = T + fit, slotH = Math.Clamp(s.MountSlotMm, 2, 30);
         int mounts = 0;
         var mountXs = new List<double>();
-        if (s.Mounts > 0)
+        if (s.MountPoints.Count > 0)
+        {
+            var placed = Mounts.Place(s, ez + 1, L - ez - 1, 2, (_, _, _) => body, taken, findings);
+            foreach (var (m, slots) in placed)
+            {
+                holes.AddRange(slots);
+                var b = m.Bounds(s);
+                keepClear.AddRange(Geo.Offset(new PathsD(slots), 0.5));
+                taken.Add((b.X0 - 1, b.X1 + 1, b.Y0 - 1, b.Y1 + 1));
+                used.Add(m);
+            }
+            extras.AddRange(Mounts.Accessories(s, used, wallT, wallT / 2, 1));
+        }
+        else if (s.Mounts > 0)
         {
             double y0 = s.MountHeightMm - slotH / 2, y1 = s.MountHeightMm + slotH / 2;
             if (y0 < 2 || y1 > body - 2) findings.Add(new(Severity.Bad, $"The mount points are too high or too low: put them between {2 + slotH / 2:0.#} and {body - 2 - slotH / 2:0.#} mm."));
@@ -212,6 +228,7 @@ public static class WallKitMaker
                 }
                 mounts = xs.Count;
                 mountXs = xs;
+                used.AddRange(xs.Select((x, i) => new MountPoint { XMm = Math.Round(x, 2), YMm = s.MountHeightMm, SlotHeightMm = slotH, Item = Mounts.Legacy(s.Accessories, i) }));
             }
         }
         var acc = Accessories(s, wallT, slotH);
@@ -624,6 +641,18 @@ public static class WallKitMaker
         if (a is Accessory.Lamps) list.Add(new Part("Wall lamp", Lamp(wallT, slotH), [], [], 1));
         return list;
     }
+
+    /// <summary>The piece for an accessory, side-on, its tab into the wall (u &lt; 0) round v = 0.</summary>
+    internal static PathsD AccessoryPiece(MountItem item, double wallT, double slotH) => item switch
+    {
+        MountItem.Peg => Peg(wallT, slotH),
+        MountItem.Sconce => Sconce(wallT, slotH),
+        MountItem.Lamp => Lamp(wallT, slotH),
+        _ => [],
+    };
+
+    /// <summary>A tab into a mount slot whose top is at <paramref name="top"/>.</summary>
+    internal static PathD MountTab(double wallT, double slotH, double top) => Tab(wallT, slotH, top);
 
     /// <summary>The tab that goes through a mount slot: a touch shorter than the wall is thick and than the slot is tall.</summary>
     static PathD Tab(double wallT, double slotH, double top) => Geo.Rect(-(wallT - 0.2), top - slotH + 0.1, 0.01, top - 0.1);

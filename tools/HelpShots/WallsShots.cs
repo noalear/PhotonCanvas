@@ -55,6 +55,17 @@ static class WallsShots
             LengthMm = 100, HeightMm = 50, Texture = "Fieldstone", SizeA = 9, SizeB = 6, GrooveMm = 0.9, Broken = RuinStyle.Crumbled, Seed = 3, ColumnTop = ColumnTop.SteppedCap,
             Connectors = new() { [ConnectorKind.Straight] = 1, [ConnectorKind.Corner] = 1, [ConnectorKind.Tee] = 1, [ConnectorKind.EndCap] = 1 },
         }, 5);
+        Shot("window-walls-mounts", WallSpec.NewBoxed with
+        {
+            LengthMm = 120, HeightMm = 55, Texture = "Stone blocks", SizeA = 12, SizeB = 6, GrooveMm = 0.8, AccessoryTexture = "Wood planks (across)", ShelfDepthMm = 12,
+            MountPoints =
+            [
+                new() { XMm = 22, YMm = 24, Item = MountItem.Sconce },
+                new() { XMm = 60, YMm = 30, Item = MountItem.Shelf, Holes = 2, SpacingMm = 30 },
+                new() { XMm = 98, YMm = 26, Item = MountItem.Peg, Holes = 2, SpacingMm = 10 },
+            ],
+            Connectors = new() { [ConnectorKind.Corner] = 2 },
+        }, 4, 1);
         Shot("window-walls-ruins", WallSpec.NewBoxed with
         {
             LengthMm = 130, HeightMm = 60, Texture = "Brick", Top = TopStyle.Battlements, Merlons = MerlonPattern.Alternating, MerlonHeightMm = 8, MerlonStepMm = 3,
