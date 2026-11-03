@@ -134,6 +134,7 @@ bridge can lead into a castle in the same stone.
 | **Slot fit** | −0.5 to 2 mm (0.1) | Added to the thickness for the slots and notches: more is looser. 0.1 is a snug fit to glue. |
 | **Figures** | 15, 28, 32 or 54 mm (28) | The size of figures the bridge is for. Changing it scales every size. |
 | **Wood grain and rope twist scored on** | On | Grain on planks, beams and posts, and a twist on the ropes, as light scored lines. |
+| **Carve as a relief** | Off | Carves the detail from a greyscale depth map on a **Bridge · relief** picture layer, in depth slices, instead of etching it at one depth: every stone or plank at its own height, its edges rounded into the gaps, grain and rope cut shallow. The most real, and much the slowest; set its depth on that layer. |
 | **Variation** | 1 to 9999 (1) | Stones, grain and rough planks are laid out at random; each number gives a different layout, and **Shuffle** picks the next one. |
 | **Cut with** | As set on the cut layer | Cut settings from your material library. Their kerf goes on the cut layer, so the slots come out the width they're drawn, and the material's thickness and slot fit from your cut test are filled in. |
 | **Etch with** | As set on the etch layer | Engrave (fill) settings from your library for the stone and the road. |

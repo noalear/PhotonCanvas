@@ -100,7 +100,7 @@ Pick one in **Texture**. The sizes it asks for change with it; the defaults suit
 | Hexagons | 8 mm | Hexagonal tiles or armour, some with an inset face. |
 | Dungeon blocks | length 14, course 8 mm | Big, worn blocks: chipped, spalled, pitted and cracked. |
 | Cave rock | rock 16, layer 10 mm | Rough rock in uneven, tilted layers with bedding lines, split by cracks and pitted. |
-| Sci-fi panels | 16 × 12 mm | A bulkhead: a kick plate of vents along the foot, bays of panels with bolted ribs between them, and modules of different heights in each bay (inset plates, recessed panels, vent grilles, hatches with hinges and a grip, pipe runs with clamps, clusters of ports and knurled blocks, light strips, display panels and the odd band of hazard stripes). |
+| Sci-fi panels | panel 16, band 12 mm | A corridor wall, drawn from a concept reference: wide bays between tall bolted pillars, each pillar with a slotted vent, a light and a small grille. Every bay has a kick plate and a skirt with a big vent along the floor, a deep recess with a stepped armour plate standing in it, and a cornice of angled plates along the top on taller walls. Above the plate the recess shows its services: bent pipes running into a control box, or bundled cables clamped to a junction box. The two bay designs take turns, mirrored, with a maintenance hatch or a console now and then. **Panel width** sets the bay (about half of it), **Panel height** sets the bands. In relief the recess carves deepest and the plate stands proud of it. |
 | Sandstone | length 16, course 7 mm | Long, soft-cornered blocks eaten by the wind: rounded edges, wind lines and clusters of pits. |
 | Adobe | patch 14, brick 3 mm | Smooth mud plaster with ragged patches fallen away to show worn bricks, and spreading cracks. |
 | Plain | | No texture: just the outline, doors, windows and mounts. |
@@ -121,6 +121,15 @@ Pick one in **Texture**. The sizes it asks for change with it; the defaults suit
 - **Etch as**: *Grooves* etches the gaps as filled areas (deeper and the most real). *Lines* scores
   round each brick or stone instead, which is much quicker. Grain, rivets and door handles are always
   scored lines, on a light **Walls · lines** layer.
+  *Relief* carves the texture in depth instead of etching it all at one depth. Each wall gets a
+  greyscale depth map (dark is deep) on a **Walls · relief** picture layer, carved in depth slices
+  before anything is cut. The mortar and grooves go deepest, with floors that aren't quite flat. Pits,
+  chips and nail holes go part of the way, each its own depth, and grain, scratches and small cracks
+  are cut shallow. Every brick, stone, plank or plate stands at a height of its own and leans a
+  little, its edges round over into the grooves, and worn surfaces are gently uneven. More **Wear %**
+  makes all of that stronger; metal plates stay nearly level. It's the most real look and much the
+  slowest. Set how deep it goes on the relief layer (its **Slices**, power and speed): run a depth
+  test on your material first.
 - **Keep the ends smooth** (flat walls): leaves the ends of the wall (as far as the slots are deep)
   without texture, so they slide into the columns at full thickness. On by default.
 - **Texture the back face too** (box walls): on by default. The back is laid out differently from

@@ -72,6 +72,8 @@ public sealed record BuildingSpec
     /// <summary>The texture of the storeys above (null = the same as the ground floor).</summary>
     public string? UpperTexture { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
+    /// <summary>Carve the texture as a relief instead of etching it at one depth: a greyscale depth map on a depth-slices picture layer (the grooves' shapes, with depth).</summary>
+    public bool Relief { get; init; }
     /// <summary>Corner columns' size across (mm).</summary>
     public double ColumnMm { get; init; } = 16;
 

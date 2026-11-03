@@ -50,7 +50,7 @@ public sealed class RuinsWindow : Window
     Control _sizeARow = null!, _sizeBRow = null!, _grooveRow = null!;
     readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
     Control _wearRow = null!, _detailRow = null!;
-    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
+    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)", "Relief (carved in depth, slowest)");
 
     // Damage
     readonly ComboBox _break = Combo("A dip in the middle", "Falls away to the left", "Falls away to the right", "Two gaps", "A low stump");
@@ -245,7 +245,7 @@ public sealed class RuinsWindow : Window
             _textureAbout,
             _sizeARow, _sizeBRow, _grooveRow, seedRow,
             _wearRow, _detailRow,
-            Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker).")));
+            Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker). Relief carves a greyscale depth map in slices: each piece at its own height, edges rounded into the grooves (the most real, and much slower).")));
     }
 
     Control DamageTab() => Stack(
@@ -437,7 +437,7 @@ public sealed class RuinsWindow : Window
         _slotDepth.Value = D(s.SlotDepthMm); _plainEnds.IsChecked = s.PlainEnds;
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(Math.Clamp(s.GrooveMm, 0.1, 3)); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
-        _etch.SelectedIndex = (int)s.Etch;
+        _etch.SelectedIndex = s.Relief ? 2 : (int)s.Etch;
         _theme.SelectedIndex = Math.Max(0, RuinThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = RuinThemes.About(s.Theme);
         _break.SelectedIndex = (int)s.Break; _breakDepth.Value = D(Math.Round(Math.Clamp(s.BreakDepth, 0.05, 0.9) * 100));
         _breaches.Value = Math.Clamp(s.Breaches, 0, 6); _breachSize.Value = D(s.BreachMm); _knocked.Value = Math.Clamp(s.KnockedOut, 0, 40); _cracks.Value = Math.Clamp(s.Cracks, 0, 10);
@@ -461,7 +461,7 @@ public sealed class RuinsWindow : Window
         SlotDepthMm = V(_slotDepth, 4), PlainEnds = _plainEnds.IsChecked == true,
         Texture = TextureName, Custom = OwnTexture, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
         Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.5),
-        Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex),
+        Etch = _etch.SelectedIndex == 1 ? EtchStyle.Lines : EtchStyle.Grooves, Relief = _etch.SelectedIndex == 2,
         Break = (BreakShape)Math.Max(0, _break.SelectedIndex), BreakDepth = V(_breakDepth, 55) / 100,
         Breaches = (int)V(_breaches, 0), BreachMm = V(_breachSize, 14), KnockedOut = (int)V(_knocked, 3), Cracks = (int)V(_cracks, 2),
         Base = _base.IsChecked == true, BaseMm = V(_baseMm, 14), FootRubble = _footRubble.IsChecked == true, FitMm = V(_fit, 0.15),
@@ -618,7 +618,8 @@ public sealed class RuinsWindow : Window
             int pieces = kit.PieceCount;
             _status.Text = $"{(replace is null ? "Put" : "Updated")} {pieces} piece{(pieces == 1 ? "" : "s")} in the design" +
                            (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
-                           $": outlines on \"{Placement.CutLayer}\", the texture on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).";
+                           (spec.Relief ? $": outlines on \"{Placement.CutLayer}\", the texture as a depth map on \"{Placement.ReliefLayer}\" (carved first, in slices)."
+                                        : $": outlines on \"{Placement.CutLayer}\", the texture on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).");
         }
         catch (InvalidOperationException ex) { _status.Text = ex.Message; }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)

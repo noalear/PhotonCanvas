@@ -1,3 +1,4 @@
+using PhotonCanvas.Addon.Terrain;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
@@ -32,6 +33,8 @@ public static class Placement
     public const string CutLayer = "Building · cut";
     public const string EtchLayer = "Building · etch";
     public const string LineLayer = "Building · lines";
+    /// <summary>The texture as a greyscale depth map, carved in slices (<see cref="BuildingSpec.Relief"/>).</summary>
+    public const string ReliefLayer = "Building · relief";
     /// <summary>Which building a shape belongs to (an id shared by all its pieces).</summary>
     public const string IdKey = "buildings.id";
     /// <summary>The settings it was made from (JSON), on each piece's outline.</summary>
@@ -87,6 +90,13 @@ public static class Placement
         return Pages.SwitchTo(s, shown);
     }
 
+    /// <summary>How the relief is carved for a set: its texture's groove, wear, detail and material.</summary>
+    static Terrain.Relief.Look LookOf(BuildingSpec s)
+    {
+        var t = TextureEngine.Find(s.Texture);
+        return new(0.6, 0.5, t?.Detail ?? 0.5, t?.Stuff ?? Stuff.Stone, s.Seed);
+    }
+
     static bool Fits(double w, double h, MachineProfile machine, double gap) =>
         Math.Max(w, h) + 2 * gap <= Math.Max(machine.FieldW, machine.FieldH) + 1e-6
         && Math.Min(w, h) + 2 * gap <= Math.Min(machine.FieldW, machine.FieldH) + 1e-6;
@@ -135,7 +145,7 @@ public static class Placement
             firstSheet = false;
             int from = s.PageIndex;
             if (firstPage < 0) firstPage = from;
-            int sheets = PlaceSheet(ref s, pieces, title, id, json, machine, o, ct);
+            int sheets = PlaceSheet(ref s, pieces, title, id, json, spec, machine, o, ct);
             pages += sheets;
             if (cutSettings is { } cut)
                 s = Pages.UpdateLayers(s, from, sheets, l => l.Name == CutLayer, l => cut(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
@@ -147,10 +157,12 @@ public static class Placement
     }
 
     /// <summary>One sheet's pieces nested onto as many pages (beds) as they need, from the page shown on; returns how many pages.</summary>
-    static int PlaceSheet(ref DocState s, List<Piece> pieces, string title, Guid id, string json, MachineProfile machine, PlaceOptions o, CancellationToken ct)
+    static int PlaceSheet(ref DocState s, List<Piece> pieces, string title, Guid id, string json, BuildingSpec spec, MachineProfile machine, PlaceOptions o, CancellationToken ct)
     {
-        bool anyEtch = pieces.Any(p => p.Etched.Count > 0), anyLines = pieces.Any(p => p.Lines.Count > 0);
-        (Layer Cut, Layer? Etch, Layer? Lines) Layers(ref DocState st)
+        bool relief = spec.Relief;
+        bool anyEtch = !relief && pieces.Any(p => p.Etched.Count > 0), anyLines = !relief && pieces.Any(p => p.Lines.Count > 0);
+        bool anyRelief = relief && pieces.Any(p => p.Etched.Count > 0 || p.Lines.Count > 0);
+        (Layer Cut, Layer? Etch, Layer? Lines, Layer? Relief) Layers(ref DocState st)
         {
             var cut = st.Layers.FirstOrDefault(l => l.Name == CutLayer);
             if (cut is null)
@@ -171,9 +183,11 @@ public static class Placement
             }
             var etch = Before(ref st, anyEtch, EtchLayer, LayerMode.Fill, l => l);
             var lines = Before(ref st, anyLines, LineLayer, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 15) } });
-            return (cut, etch, lines);
+            var carve = Before(ref st, anyRelief, ReliefLayer, LayerMode.Image, Terrain.Relief.Setup);
+            return (cut, etch, lines, carve);
         }
-        var (cutLayer, etchLayer, lineLayer) = Layers(ref s);
+        var (cutLayer, etchLayer, lineLayer, reliefLayer) = Layers(ref s);
+        var look = LookOf(spec);
 
         // Each piece (each copy of it) made at the bed's corner; the nesting moves it into place. Kind of each shape: 0 cut, 1 etch, 2 lines.
         var units = new List<List<(Shape Shape, int Kind)>>();
@@ -185,8 +199,10 @@ public static class Placement
             if (box.IsEmpty) continue;
             var move = Affine.Translate(o.GapMm - box.MinX, o.GapMm - box.MinY);
             outline = outline.Transform(move);
-            var etched = part.Etched.Count > 0 ? Geo.ToGeometry(part.Etched).Transform(move) : null;
-            var lines = part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
+            var etched = !relief && part.Etched.Count > 0 ? Geo.ToGeometry(part.Etched).Transform(move) : null;
+            var lines = !relief && part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
+            var map = relief ? Terrain.Relief.Render(part.Cut, part.Etched, part.Lines, look with { Seed = look.Seed + units.Count }) : null;
+            var source = map is null ? null : ImageSource.FromEncoded(map.Png);
             for (int c = 0; c < part.Copies; c++)
             {
                 string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
@@ -195,6 +211,12 @@ public static class Placement
                 var shapes = new List<(Shape, int)> { (cutShape, 0) };
                 if (etched is not null) shapes.Add((new PathShape { Name = $"{name} · etching", LayerId = etchLayer!.Id, Geometry = etched }, 1));
                 if (lines is not null) shapes.Add((new PathShape { Name = $"{name} · lines", LayerId = lineLayer!.Id, Geometry = lines }, 2));
+                if (map is not null)
+                    shapes.Add((new ImageShape
+                    {
+                        Name = $"{name} · relief", LayerId = reliefLayer!.Id, Source = source!, SizeMm = new Vec2(map.WidthMm, map.HeightMm),
+                        Transform = Affine.Translate(map.Left, -map.Top).Then(move),
+                    }, 3));
                 var g = shapes.Count > 1 ? Guid.NewGuid() : (Guid?)null;
                 units.Add([.. shapes.Select(x => (x.Item1.WithGroup(g).WithAddonData(IdKey, id.ToString()), x.Item2))]);
             }
@@ -211,7 +233,7 @@ public static class Placement
             // The settings on the biggest piece of each page (it always goes on): enough to find the building
             // again from any of its pieces, where every outline carrying them would make the file big.
             if (!units[0][0].Shape.AddonData.ContainsKey(SpecKey)) units[0][0] = (units[0][0].Shape.WithAddonData(SpecKey, json), 0);
-            var onPage = units.Select(u => u.Select(x => x.Shape.With(layerId: x.Kind == 0 ? cutLayer.Id : x.Kind == 1 ? etchLayer!.Id : lineLayer!.Id)).ToList()).ToList();
+            var onPage = units.Select(u => u.Select(x => x.Shape.With(layerId: x.Kind switch { 0 => cutLayer.Id, 1 => etchLayer!.Id, 2 => lineLayer!.Id, _ => reliefLayer!.Id })).ToList()).ToList();
             s = Ops.AddShapes(s, onPage.SelectMany(u => u));
             var ids = onPage.SelectMany(u => u.Select(sh => sh.Id)).ToHashSet();
             var (nested, report) = Nesting.Nest(s, ids, options, machine, ct);
@@ -222,7 +244,7 @@ public static class Placement
             units = [.. units.Where((u, i) => onPage[i].Any(sh => unplaced.Contains(sh.Id)))];
             if (units.Count == 0) break;
             s = Pages.Add(s, $"{title} {++sheets}");
-            (cutLayer, etchLayer, lineLayer) = Layers(ref s);
+            (cutLayer, etchLayer, lineLayer, reliefLayer) = Layers(ref s);
         }
         return sheets;
     }

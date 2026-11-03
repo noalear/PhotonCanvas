@@ -100,6 +100,8 @@ public sealed record BridgeSpec
     public double Wear { get; init; } = 0.5;
     /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
     public double DetailMm { get; init; }
+    /// <summary>Carve the texture as a relief instead of etching it at one depth: a greyscale depth map on a depth-slices picture layer (the grooves' shapes, with depth).</summary>
+    public bool Relief { get; init; }
     /// <summary>The figures it's for (mm): only used to scale the sizes when it's changed.</summary>
     public double ScaleMm { get; init; } = 28;
 

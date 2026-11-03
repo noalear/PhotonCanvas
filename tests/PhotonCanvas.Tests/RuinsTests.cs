@@ -390,4 +390,21 @@ public class RuinsTests
         Assert.DoesNotContain(s2.Shapes, x => x.Name.StartsWith("Rubble") || x.Name.StartsWith("Pillar"));
         Assert.Equal("Tiles", Placement.Find(s2, [s2.Shapes[0].Id])!.Value.Spec.Texture);
     }
+
+    [Fact]
+    public void Relief_carves_the_broken_wall_as_a_depth_map()
+    {
+        var spec = new RuinSpec { Relief = true, Piles = 0, LooseStones = 0, Chunks = 0 };
+        var kit = Make(spec);
+        Assert.True(kit.Ok, Bad(kit));
+        var (s, _, _) = Placement.Place(DocState.New(), kit, spec, MachineProfile.F2Ultra, new PlaceOptions());
+        var relief = Assert.Single(s.Layers, l => l.Name == Placement.ReliefLayer);
+        Assert.Equal(ImageEngraveMode.Slices, relief.ImageMode);
+        Assert.DoesNotContain(s.Layers, l => l.Name == Placement.EtchLayer);
+        var pic = Assert.Single(s.Shapes.OfType<ImageShape>());
+        var (dark, light, _, clear) = WallsTests.Tones(pic);
+        Assert.True(dark > 0.03 && light > 0.3, $"{dark:P0} deep, {light:P0} near the surface");
+        // The broken top is see-through: nothing carved above where the wall is broken down.
+        Assert.True(clear > 0.05, $"only {clear:P0} see-through");
+    }
 }
