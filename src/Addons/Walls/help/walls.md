@@ -24,7 +24,7 @@ settings are on the left in tabs; the preview on the right updates as you change
 
 - **Put together** shows one wall built, in 3D, with a column at each end (the first kind of column
   you're cutting at its left, the second at its right), its door, accessories and walkway in place.
-  Drag it to turn it round.
+  Drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again.
 - **Pieces** shows every piece at the same scale, as it will be cut: the wall's front on top, then
   one of each other piece.
 

@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Media;
 using PhotonCanvas.Core;
 
@@ -8,10 +7,11 @@ namespace PhotonCanvas.App;
 
 /// <summary>
 /// A curved surface in 3D: a mesh over the area, the measured points (red when they don't agree
-/// with their neighbours), and the design's outline lying on it. Drag to turn it. Heights are drawn
+/// with their neighbours), and the design's outline lying on it. Drag to turn it, scroll to zoom, middle-drag
+/// or the arrow keys to move it (<see cref="View3D.ViewNavigator"/>). Heights are drawn
 /// taller than life so small curves show; the factor is written in the corner.
 /// </summary>
-public sealed class SurfaceView : Control
+public sealed class SurfaceView : Control, View3D.INavigable
 {
     Surface? _surface;
     Rect2 _area = new(0, 0, 220, 220);
@@ -19,7 +19,16 @@ public sealed class SurfaceView : Control
     IReadOnlySet<int> _suspect = new HashSet<int>();
     IReadOnlyList<IReadOnlyList<Vec2>> _design = [];
     double _yaw = -35, _pitch = 35;
-    Point? _drag;
+    // Zoom (1 = the whole area fits) and how far the view's been moved (screen units).
+    double _zoom = 1;
+    Vector _offset;
+
+    public SurfaceView()
+    {
+        var nav = new View3D.ViewNavigator(this, this);
+        VisualChildren.Add(nav.Buttons);
+        LogicalChildren.Add(nav.Buttons);
+    }
 
     public void Show(Surface? surface, Rect2 area, IReadOnlyList<SurfacePoint> points, IReadOnlySet<int> suspect, IReadOnlyList<IReadOnlyList<Vec2>> design)
     {
@@ -31,16 +40,41 @@ public sealed class SurfaceView : Control
         InvalidateVisual();
     }
 
-    protected override void OnPointerPressed(PointerPressedEventArgs e) { _drag = e.GetPosition(this); e.Pointer.Capture(this); }
-    protected override void OnPointerReleased(PointerReleasedEventArgs e) { _drag = null; e.Pointer.Capture(null); }
-    protected override void OnPointerMoved(PointerEventArgs e)
+    public void Turn(double dx, double dy)
     {
-        if (_drag is not { } from) return;
-        var p = e.GetPosition(this);
-        _yaw += (p.X - from.X) * 0.5;
-        _pitch = Math.Clamp(_pitch + (p.Y - from.Y) * 0.4, 5, 89);
-        _drag = p;
+        _yaw += dx * 0.5;
+        _pitch = Math.Clamp(_pitch + dy * 0.4, 5, 89);
         InvalidateVisual();
+    }
+
+    public void Move(Vector by)
+    {
+        _offset += by;
+        InvalidateVisual();
+    }
+
+    public void Zoom(double factor, Point? at)
+    {
+        double zoom = Math.Clamp(_zoom * factor, 0.2, 50), k = zoom / _zoom;
+        // What's under the pointer stays there.
+        var c = new Point(Bounds.Width / 2, Bounds.Height / 2) + _offset;
+        if (at is { } p) _offset += (p - c) * (1 - k);
+        _zoom = zoom;
+        InvalidateVisual();
+    }
+
+    public void Fit()
+    {
+        _zoom = 1;
+        _offset = default;
+        InvalidateVisual();
+    }
+
+    public void Reset()
+    {
+        _yaw = -35;
+        _pitch = 35;
+        Fit();
     }
 
     public override void Render(DrawingContext ctx)
@@ -67,14 +101,15 @@ public sealed class SurfaceView : Control
         double stretch = Math.Clamp(span * 0.25 / relief, 1, 50);
         double mid = (lo + hi) / 2;
         double yaw = _yaw * Math.PI / 180, pitch = _pitch * Math.PI / 180;
-        double scale = Math.Min(b.Width, b.Height) * 0.75 / span;
+        double scale = Math.Min(b.Width, b.Height) * 0.75 / span * _zoom;
+        double cx = b.Width / 2 + _offset.X, cy = b.Height / 2 + _offset.Y;
         Point P(Vec2 xy, double z)
         {
             double x = xy.X - _area.Center.X, y = xy.Y - _area.Center.Y, zz = (z - mid) * stretch;
             double rx = x * Math.Cos(yaw) - y * Math.Sin(yaw), ry = x * Math.Sin(yaw) + y * Math.Cos(yaw);
             // Looking down at the pitch angle: bed depth shortens, height rises.
             double sx = rx, sy = ry * Math.Sin(pitch) - zz * Math.Cos(pitch);
-            return new Point(b.Width / 2 + sx * scale, b.Height / 2 + sy * scale);
+            return new Point(cx + sx * scale, cy + sy * scale);
         }
         var mesh = new Pen(new SolidColorBrush(Color.FromArgb(150, 127, 176, 255)), 1);
         for (int i = 0; i <= N; i++)
@@ -94,7 +129,7 @@ public sealed class SurfaceView : Control
             var bad = _suspect.Contains(i);
             ctx.DrawEllipse(bad ? new SolidColorBrush(Color.Parse("#E5484D")) : Brushes.White, null, P(_points[i].At, _points[i].Height), bad ? 4 : 2.5, bad ? 4 : 2.5);
         }
-        var label = new FormattedText($"Heights shown ×{stretch:0.#} · {lo:0.0}–{hi:0.0} mm · drag to turn", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
+        var label = new FormattedText($"Heights shown ×{stretch:0.#} · {lo:0.0}–{hi:0.0} mm · drag to turn · scroll to zoom", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 11, UiKit.Brush("TextMuted"));
         ctx.DrawText(label, new Point(8, b.Height - 20));
 
         Vec2 At(double u, double v) => new(_area.MinX + _area.Width * u, _area.MinY + _area.Height * v);

@@ -34,7 +34,7 @@ the walls' height, texture and doors.
 
 ## See it put together
 <!-- target: tabitem:Put together -->
-**Put together** shows the terrain in 3D: drag it to turn it round.
+**Put together** shows the terrain in 3D: drag it to turn it round, and scroll to zoom in on a part (press **F** to see it all again).
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

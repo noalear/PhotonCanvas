@@ -114,7 +114,8 @@ In the job:
 ### The window
 
 The left side is a 3D view of the surface: a mesh over the area, the measured points (white; red
-when they disagree with their neighbours) and your design's outline lying on it. Drag to turn it.
+when they disagree with their neighbours) and your design's outline lying on it. Drag to turn it, scroll to zoom, middle-drag or the arrow keys to move
+it, and press **F** to see it all again.
 Heights are drawn taller than life so small curves show; the corner says by how much, and the range
 of heights.
 

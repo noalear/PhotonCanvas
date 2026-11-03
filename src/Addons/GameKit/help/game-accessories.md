@@ -27,7 +27,7 @@ wall maker's textures (**Home → Draw → Walls**), so a dice tower can match t
 Click **Game kit** on the **Home** tab (in the **Draw** group). The **Game accessories** window
 opens. On the left, the **Accessories** tab has the list of what to cut and the settings of the one
 picked; the **Sheet** tab has the sheet it's all cut from and the finish. On the right, **Put
-together** shows the accessory picked in 3D (drag it to turn it round) and **Pieces** shows its
+together** shows the accessory picked in 3D (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its
 pieces flat, one of each, with how many of each there are. Under them are the number of pieces and
 notes: how it goes together, a red ✕ that has to be fixed before it can go in, a yellow ! worth a
 look.

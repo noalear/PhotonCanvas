@@ -22,7 +22,7 @@ it opens, and that it doesn't open any sooner.
 Click **Puzzle box** on the **Home** tab (in the **Draw** group). The **Puzzle box** window opens. On
 the left, the **Box** tab has the kind of box, its size, its top, the hidden drawer and a message;
 the **Sheet** tab has the sheet it's cut from. On the right, **Put together** shows the box in 3D
-(drag it to turn it round) and **Pieces** shows every piece flat, with how many of each there are.
+(drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows every piece flat, with how many of each there are.
 Under them: how many pieces and layers, **How it opens** (every move, in order), **How it goes
 together**, and notes: a red ✕ has to be fixed before the box can go in, a yellow ! is worth a look.
 

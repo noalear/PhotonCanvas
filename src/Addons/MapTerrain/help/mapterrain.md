@@ -28,7 +28,7 @@ Click **Map to terrain** on the **Home** tab (in the **Draw** group). The **Map 
 opens with a small dungeon to start from (or the last map you made). On the left are three tabs:
 **Plan** (the look, the grid, reading a battle map), **Walls** (the sheet, the walls and the doors)
 and **Floor** (the floor tiles). On the right, **Plan** is the floor plan you draw on, **Put
-together** shows the terrain in 3D (drag it to turn it round), and **Pieces** and **Door pieces**
+together** shows the terrain in 3D (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again), and **Pieces** and **Door pieces**
 show the pieces flat, one of each, with how many of each there are. Under them are the number of
 pieces and notes: how it goes together, a red ✕ that has to be fixed before it can go in, a yellow !
 worth a look.

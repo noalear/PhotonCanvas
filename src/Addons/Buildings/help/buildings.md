@@ -27,7 +27,7 @@ Click **Buildings** on the **Home** tab (in the **Draw** group). The **Whole bui
 opens. On the left are three tabs: **Building** (which building, its size, storeys, door and
 windows), **Walls** (the sheet the walls are cut from and their texture) and **Furniture** (what's
 in each room, and the sheet it's cut from). On the right, **Put together** shows the building in 3D
-(drag it to turn it round), and **Wall pieces** and **Furniture pieces** show the pieces flat, one of
+(drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again), and **Wall pieces** and **Furniture pieces** show the pieces flat, one of
 each, with how many of each there are. Under them are the number of pieces and notes: how it goes
 together, a red ✕ that has to be fixed before the building can go in, a yellow ! worth a look.
 

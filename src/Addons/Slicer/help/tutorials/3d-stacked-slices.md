@@ -45,7 +45,7 @@ to sand back, **Inner** never sticks out.
 ## Check the summary
 <!-- target: text:the stack stands -->
 Read how many slices and parts you'll get, and any warnings. Drag the preview to turn it, and use
-the mouse wheel to zoom in on a spot (double-click to see it all again); red parts start in mid-air.
+the mouse wheel to zoom in on a spot, middle-drag or the arrow keys to move it (double-click or **F** to see it all again); red parts start in mid-air.
 
 ## Make the slices
 <!-- target: button:Make the slices -->
