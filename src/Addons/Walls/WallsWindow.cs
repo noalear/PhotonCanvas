@@ -99,7 +99,7 @@ public sealed class WallsWindow : Window
     // Connectors
     readonly Dictionary<ConnectorKind, NumericUpDown> _counts = [];
     readonly NumericUpDown _customAngle = Number(20, 340, 5, "0.#"), _columnW = Number(3, 200, 0.5m, "0.#"), _slotDepth = Number(0.5m, 50, 0.5m, "0.#"), _fit = Number(-1, 2, 0.05m, "0.##"), _pin = Number(0, 10, 0.1m, "0.#");
-    readonly ComboBox _column = Combo("Auto (to suit the angles)", "Square", "Octagon", "Round");
+    readonly ComboBox _column = Combo("Auto (to suit the angles)", "Square", "Octagon", "Round", "Hexagon", "Chamfered square", "Fluted");
     readonly CheckBox _cap = new() { Content = "A wider cap on top", IsChecked = true }, _foot = new() { Content = "A wider foot at the bottom" };
     readonly ComboBox _columnBuild = Combo("Boxes: four sides, a top and a bottom", "Stacks of layers");
     readonly ComboBox _columnTop = Combo("Flush with the sides", "A wider cap", "A stepped cap", "A stepped point", "Battlements");

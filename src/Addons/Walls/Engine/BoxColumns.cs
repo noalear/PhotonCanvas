@@ -248,7 +248,7 @@ public static class BoxColumns
         problem = null;
         double C = Math.Max(3, s.ColumnMm), T = s.ThicknessMm, W = s.WallMm, H = s.HeightMm, fit = Math.Max(0, s.FitMm), pl = Math.Max(0, s.PlinthMm);
         var shape = Connectors.ShapeFor(s, dirs);
-        var outline = Connectors.Outline(shape, C);
+        var outline = Connectors.Outline(shape, C, dirs, W);
         double depth = BoxWall.TabLength(s) + WallKitMaker.EndClearMm;
         PathsD Slots()
         {
@@ -274,7 +274,7 @@ public static class BoxColumns
         var bases = BaseSizes(s, C, false);
         for (int i = 0; i < bases.Count; i++)
         {
-            var bigger = Connectors.Outline(shape, bases[i]);
+            var bigger = Connectors.Outline(Connectors.PlateShape(shape), bases[i]);
             var foot = Geo.Subtract(Notches([bigger], dirs, C / 2, (i == 0 ? W + 2 * pl : W) + fit), Geo.Union(slots));
             double y = i * T + T / 2;
             pieces.Add(new(bases.Count == 1 ? "foot" : i == 0 ? "plinth" : "foot", Geo.Subtract(foot, pin), [], [], (c, yaw) => Plate(c, y, yaw)));
@@ -296,7 +296,7 @@ public static class BoxColumns
         for (int i = 0; i < caps.Count; i++)
         {
             double y = top + i * T + T / 2;
-            pieces.Add(new(caps.Count == 1 ? "cap" : $"cap {i + 1}", Geo.Subtract([Connectors.Outline(shape, caps[i])], i == 0 ? pin : []), [], [], (c, yaw) => Plate(c, y, yaw)));
+            pieces.Add(new(caps.Count == 1 ? "cap" : $"cap {i + 1}", Geo.Subtract([Connectors.Outline(Connectors.PlateShape(shape), caps[i])], i == 0 ? pin : []), [], [], (c, yaw) => Plate(c, y, yaw)));
         }
         if (s.ColumnTop == Walls.ColumnTop.Battlements)
         {

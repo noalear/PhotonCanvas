@@ -3,8 +3,8 @@
 An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors** and **Roofs and towers** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
 
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
-**Cottage**, a **Tavern** or a **Watchtower** (or a sci-fi outpost, a gothic chapel, a dungeon crypt
-or an adobe house) and you get every wall with its doorway and windows,
+**Cottage**, a **Tavern** or a **Watchtower** (or a sci-fi outpost, a gothic chapel, a dungeon crypt,
+an adobe house, an octagonal tower or an L-shaped manor) and you get every wall with its doorway and windows,
 the corner columns the walls go into, the floor tiles it stands on, a floor between the storeys
 with stairs or a ladder up to it, a roof that lifts off, a door that swings open, and the furniture
 for every room. Each
@@ -42,7 +42,7 @@ pieces are replaced wherever they are.
 **Building** starts again from one of these, sized for the **Figures** chosen (15, 28, 32 or 54 mm;
 changing **Figures** later scales every size, the furniture's too). Everything can then be changed.
 
-Each comes with box walls 12 mm thick on boxed corner columns 24 mm across (see [Walls and columns](#walls-and-columns)); the sizes below are between the columns' centres.
+Each comes with box walls 12 mm thick on boxed corner columns 24 mm across (the octagonal tower's columns are octagonal stacks) (see [Walls and columns](#walls-and-columns)); the sizes below are between the columns' centres.
 
 | Building | What you get (at 28 mm) |
 |---|---|
@@ -52,6 +52,8 @@ Each comes with box walls 12 mm thick on boxed corner columns 24 mm across (see 
 | **Sci-fi outpost** | One storey, 118 × 93 mm of sci-fi panels under a corrugated lean-to roof, on a sci-fi deck, with a metal blast door with angled corners glued into its doorway and wide angled windows. Bunks, lockers, a mess table, chairs and crates with metal panels and rivets. |
 | **Gothic chapel** | One tall storey, 88 × 144 mm, of fine stone blocks under a steep slate roof, on chequered tiles, with a pointed door that swings and three tall pointed windows down each side. Six pews, an altar, two high-backed chairs and a bookshelf. |
 | **Dungeon crypt** | One squat storey, 108 mm square, of dungeon blocks under a low slate roof, on dungeon flagstones, with a studded door glued into its arched doorway and small barred windows high up. A tomb, chests, crates and a bench. |
+| **Octagonal tower** | Two storeys of stone blocks, 140 mm across, its eight walls 58 mm long between the centres of its octagonal columns (20 mm across, stacked on pins), under a steep pointed slate roof, with arched windows in every wall, spiral stairs up and an arched door that swings. Crates and a chest below, a bed and a table above. |
+| **L-shaped manor** | Two storeys in an L, 168 × 148 mm with wings 78 mm wide: stone blocks below and timber frame above, square windows, under clay-tiled gables that meet over the corner, the door in the step between the wings. A long table, benches and a bookshelf below, beds and chests above. |
 | **Adobe house** | Two storeys, 108 × 88 mm: sandstone below and adobe plaster above, a flat roof behind a low wall, a ladder up, on sandstone slabs, with small square windows. A low round table, stools, a chest and crates below, two beds and a chest above. |
 
 ## Themes
@@ -67,6 +69,47 @@ they are. A watchtower keeps its arrow slits in the medieval, dungeon and gothic
 
 A door that swings is only made for square, arched and pointed doorways: a sci-fi or cave doorway
 gets a loose door instead (a note says so).
+## Building shape and column shape
+
+On the **Building** tab, **Shape** picks the building's plan as seen from above. The walls, the
+corner columns, the floors between storeys, the floor tiles, the furniture and the roof all follow it.
+
+- **Building shape**:
+  - *Rectangle*: four walls at right angles (the usual).
+  - *L-shaped*, *T-shaped* and *U-shaped*: a back wing across the whole **Width**, with wings
+    **Wing width** wide coming forward to the full **Depth**. An L's wing is on the left and its door
+    is in the step between the wings. A T's wing comes from the middle with the door in its front. A
+    U has a wing at each end round a courtyard, with the door in the courtyard.
+  - *Hexagon*, *Octagon* and *Round*: equal flat walls all round, like a tower. **Width** becomes
+    **Across**: from the middle of one side to the middle of the side opposite, between the columns'
+    centres. *Round* has as many **Sides** as you pick (an even number from 6 to 24, 10 to start
+    with; more is rounder but each wall is narrower). The door is in the front wall. Where that wall
+    is too short for the door, the door is made narrower (down to two thirds of its width), and
+    with flat walls a door that would swing on clips sits loose in the doorway instead. A note says
+    so.
+
+  Each wall of another shape gets **Each side** windows, or fewer if the wall is too narrow (the
+  front fits them round the door).
+- **Column shape**: the corner columns' shape.
+  - *Match the corners* (the usual) picks for each corner: square at right angles, octagonal at an
+    octagon's corners, and hexagonal or round at others.
+  - Or pick *Square*, *Chamfered square* (its corners cut off), *Octagonal*, *Hexagonal*, *Round* or
+    *Fluted* (round with grooves down it, kept clear of the walls' slots).
+
+  A column only takes walls at the angles its sides allow. A square or chamfered column needs right
+  angles, an octagonal one 45° steps, and a hexagonal one 60° steps. Where the shape you picked
+  doesn't suit a corner (a square column on an octagon, say), that corner gets the nearest shape that
+  does, and a note says so. Round and fluted columns suit any corner. Their width is **Columns** on
+  the **Walls** tab.
+
+  With box walls, square columns are boxes (see [Walls and columns](#walls-and-columns)). Every other
+  shape is a stack of layers on a 2 mm pin, the same as flat walls' columns, with slots at the
+  corner's angles for the box walls' end tabs.
+
+![The octagonal tower: eight stone walls on octagonal columns under a pointed slate roof](images/window-buildings-octagon.png)
+
+![The L-shaped manor: stone below and timber frame above, its wings' gables meeting over the corner](images/window-buildings-manor.png)
+
 ## Size, storeys, roof, floor tiles, door and windows
 
 On the **Building** tab:
@@ -78,11 +121,19 @@ On the **Building** tab:
 - **Top**: *Straight (for a roof)*, or *A floor on top behind battlements*: a floor on the top
   storey with a low wall of battlements round it, **Battlements** high.
 - **Way up**: *Stairs*, *Spiral stairs*, *Ladder* or *None (a plain floor)*. Each floor gets an
-  opening in its back right corner, away from the door, with the stair maker's stairs or ladder
+  opening in its back right corner, away from the door (in a building of another shape, in the
+  biggest square corner of the room that's clear of the door), with the stair maker's stairs or ladder
   standing under it on the storey below. The furniture is kept clear of them, and of the space
   under the opening upstairs.
-- **Roof** (with straight walls on top): the roof maker's roof, *Pitched, with gable ends*,
-  *Hipped* or *Lean-to*, or *None*. Its ridge runs along the longer side. It's built on a base as
+- **Roof** (with straight walls on top): the roof maker's roof. Only the roofs that suit the
+  building's shape are listed:
+  - A rectangle can have *Gable*, *Hipped* or *Lean-to*, with its ridge along the longer side.
+  - An L, T or U gets *Gables (meeting over the corners)*: the back wing's gable roof, with each
+    wing's gable roof running back into its front slope and cut along the valley where they meet.
+  - A hexagon, an octagon or a round tower gets *Pointed*: a triangular slope over every wall, rising
+    to a point. Two crossed boards standing in slots in the base hold the slopes up, and a cap lies
+    over each hip. Glue a bead or a cocktail stick on top as a finial.
+  - *None (a flat top)* suits any shape. It's built on a base as
   big as the column caps, resting on them, with a frame under the base that drops inside the top
   walls so it can't slide; the gable ends get the top storey's wall texture. It's glued together and
   lifts off to show the rooms. Pick its **Covering** (slate, wooden shingles, clay tiles, thatch and
@@ -94,7 +145,7 @@ On the **Building** tab:
   stand on them. Pick their **Texture** (flagstones, floorboards, cobbles and the rest) and the
   **Grid square** they're laid out on (25.4 mm, an inch, for 28–32 mm figures). Untick it to stand
   the building straight on the table.
-- **Door**: in the middle of the ground floor's front. With box walls, the first choice hangs the
+- **Door**: in the middle of the ground floor's front (or the door wall of an L, T or U, above). With box walls, the first choice hangs the
   wall maker's door on pins inside the wall so it swings open (a portcullis slides up instead), and
   *Loose in the doorway* glues it into a groove round the doorway. With flat walls, the first choice is
   the furniture maker's door for a wall, cut from the furniture sheet, on two clips slid onto the side
@@ -182,4 +233,7 @@ or one storey on its own.
    up, and drop the door's pins into them.
 6. Put the furniture together as the furniture maker says and stand it in the rooms.
 7. Glue the roof together on its base as the roof maker says, and lift it onto the top storey's
-   column caps, the frame underneath inside the walls.
+   column caps, the frame underneath inside the walls. A pointed roof: slot the two cross boards
+   together halfway and stand them in the base's slots, then glue the slopes to them and to each
+   other along the hips, then the hip caps. An L, T or U: glue the back wing's roof first, then each
+   wing's slopes up into the valley against it.

@@ -52,12 +52,14 @@ public sealed class BuildingView : Model3DView
         Build();
     }
 
+    static readonly string[] Hidden = ["truss", "locator", "cross board"];
+
     bool Shown(Solid s) => Mode switch
     {
         ViewMode.CutAway => s.Side is not (WallSide.Front or WallSide.Right or WallSide.Roof),
         ViewMode.Storey => s.Storey == Storey && s.Side is not (WallSide.Front or WallSide.Right or WallSide.Roof),
         // Inside the roof, out of sight: left out, to save drawing them.
-        _ => !(s.Side == WallSide.Roof && (s.Name.StartsWith("Roof truss", StringComparison.Ordinal) || s.Name.StartsWith("Roof locator", StringComparison.Ordinal))),
+        _ => !(s.Side == WallSide.Roof && s.Name.StartsWith("Roof", StringComparison.Ordinal) && Hidden.Any(h => s.Name.Contains(h, StringComparison.Ordinal))),
     };
 
     void Build()

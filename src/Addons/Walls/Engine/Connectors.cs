@@ -44,21 +44,94 @@ public static class Connectors
         return Steps(dirs, 90) ? ColumnShape.Square : Steps(dirs, 45) ? ColumnShape.Octagon : ColumnShape.Round;
     }
 
-    /// <summary>The column's outline, <paramref name="across"/> mm across its flats.</summary>
-    public static PathD Outline(ColumnShape shape, double across)
+    /// <summary>
+    /// The column's outline, <paramref name="across"/> mm across its flats. A fluted column's grooves keep
+    /// clear of the walls going in along <paramref name="walls"/> (degrees), each <paramref name="wallWidth"/> wide.
+    /// </summary>
+    public static PathD Outline(ColumnShape shape, double across, IReadOnlyList<double>? walls = null, double wallWidth = 0)
     {
         double r = across / 2;
         switch (shape)
         {
             case ColumnShape.Square: return Geo.Rect(-r, -r, r, r);
-            case ColumnShape.Octagon:
+            case ColumnShape.Octagon: return Regular(8, r, 0);
+            case ColumnShape.Hexagon: return Regular(6, r, 0);
+            case ColumnShape.Chamfered:
             {
-                double c = r / Math.Cos(Math.PI / 8);
-                return [.. Enumerable.Range(0, 8).Select(i => new PointD(c * Math.Cos(Math.PI / 8 + i * Math.PI / 4), c * Math.Sin(Math.PI / 8 + i * Math.PI / 4)))];
+                // A square with its corners cut off at 45°, a fifth of the way along each side.
+                double k = r * 0.4;
+                return [new(r, -r + k), new(r, r - k), new(r - k, r), new(-r + k, r), new(-r, r - k), new(-r, -r + k), new(-r + k, -r), new(r - k, -r)];
             }
+            case ColumnShape.Fluted: return Fluted(r, walls ?? [], wallWidth);
             default: return Geo.Circle(0, 0, r);
         }
     }
+
+    /// <summary>A regular polygon with <paramref name="sides"/> sides, <paramref name="r"/> from its middle to each flat, one flat facing <paramref name="flatDeg"/>.</summary>
+    public static PathD Regular(int sides, double r, double flatDeg)
+    {
+        double c = r / Math.Cos(Math.PI / sides), a0 = flatDeg * Math.PI / 180 + Math.PI / sides;
+        return [.. Enumerable.Range(0, sides).Select(i => new PointD(c * Math.Cos(a0 + i * 2 * Math.PI / sides), c * Math.Sin(a0 + i * 2 * Math.PI / sides)))];
+    }
+
+    /// <summary>How many flutes round a fluted column, so a ridge faces each of these directions (0 if no count suits them).</summary>
+    public static int Flutes(IReadOnlyList<double> walls)
+    {
+        foreach (var n in new[] { 8, 12, 16, 24 })
+            if (walls.All(d => Math.Abs(Math.IEEERemainder(d, 360.0 / n)) < 1e-6)) return n;
+        return 0;
+    }
+
+    /// <summary>A round column with grooves down it between ridges, none where a wall comes in.</summary>
+    static PathD Fluted(double r, IReadOnlyList<double> walls, double wallWidth)
+    {
+        int n = Math.Max(Flutes(walls), 8);
+        double step = 2 * Math.PI / n, groove = r * Math.Sin(step / 2) * 0.55;
+        var cuts = new PathsD();
+        for (int i = 0; i < n; i++)
+        {
+            double a = (i + 0.5) * step, cx = r * Math.Cos(a), cy = r * Math.Sin(a);
+            // Clear of every wall: the groove's nearest edge sideways from the wall's line, on the wall's side of the column.
+            bool clear = walls.All(d =>
+            {
+                double w = d * Math.PI / 180, along = cx * Math.Cos(w) + cy * Math.Sin(w), side = Math.Abs(-cx * Math.Sin(w) + cy * Math.Cos(w));
+                return along < 0 || side - groove > wallWidth / 2 + 0.5;
+            });
+            if (clear) cuts.Add(Geo.Circle(cx, cy, groove));
+        }
+        var shape = Geo.Subtract([Geo.Circle(0, 0, r)], cuts);
+        return shape.Count == 1 ? shape[0] : Geo.Circle(0, 0, r);
+    }
+
+    /// <summary>Whether a column of this shape has a flat side (or round) facing a wall at each of these directions, so the wall's end meets it.</summary>
+    public static bool Suits(ColumnShape shape, IReadOnlyList<double> walls)
+    {
+        static bool Steps(IReadOnlyList<double> d, double step) => d.All(a => Math.Abs(Math.IEEERemainder(a, step)) < 1e-6);
+        return shape switch
+        {
+            ColumnShape.Square or ColumnShape.Chamfered => Steps(walls, 90),
+            ColumnShape.Octagon => Steps(walls, 45),
+            ColumnShape.Hexagon => Steps(walls, 60),
+            ColumnShape.Fluted => Flutes(walls) > 0,
+            _ => true,
+        };
+    }
+
+    /// <summary>
+    /// The shape for a column whose walls go in along <paramref name="walls"/>: the one asked for if it suits
+    /// them (see <see cref="Suits"/>), otherwise (and for <see cref="ColumnShape.Auto"/>) square for right
+    /// angles, an octagon for 45° steps, a hexagon for 60° steps and round for anything else.
+    /// </summary>
+    public static ColumnShape Matching(ColumnShape wanted, IReadOnlyList<double> walls)
+    {
+        if (wanted != ColumnShape.Auto && Suits(wanted, walls)) return wanted;
+        foreach (var s in new[] { ColumnShape.Square, ColumnShape.Octagon, ColumnShape.Hexagon })
+            if (Suits(s, walls)) return s;
+        return ColumnShape.Round;
+    }
+
+    /// <summary>The shape of a column's wider plates (a cap or a foot): a fluted column's are round.</summary>
+    public static ColumnShape PlateShape(ColumnShape shape) => shape == ColumnShape.Fluted ? ColumnShape.Round : shape;
 
     /// <summary>How far from the middle the outline's edge is, looking along a direction (degrees).</summary>
     public static double Reach(PathD outline, double deg)
@@ -153,8 +226,8 @@ public static class Connectors
         problem = null;
         var shape = ShapeFor(s, dirs);
         double across = Math.Max(3, s.ColumnMm);
-        var outline = Outline(shape, across);
-        var bigger = Outline(shape, across + 2 * WallKitMaker.LipMm);
+        var outline = Outline(shape, across, dirs, slotW);
+        var bigger = Outline(PlateShape(shape), across + 2 * WallKitMaker.LipMm);
         PathsD Slots(double past)
         {
             var slots = new PathsD();

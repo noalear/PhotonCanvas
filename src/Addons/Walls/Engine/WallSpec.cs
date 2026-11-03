@@ -15,7 +15,11 @@ public enum WindowBars { None, Cross, Bars }
 public enum WindowFill { Open, Frame, Shutter, Shutters }
 public enum HingeSide { Left, Right }
 public enum Accessory { None, Pegs, Sconces, Brackets, OneOfEach, Lamps }
-public enum ColumnShape { Auto, Square, Octagon, Round }
+/// <summary>
+/// A column's outline. <see cref="Auto"/> suits the angles its walls meet at; <see cref="Chamfered"/> is a square with
+/// its corners cut off, <see cref="Fluted"/> a round column with grooves down it (kept clear of where the walls go in).
+/// </summary>
+public enum ColumnShape { Auto, Square, Octagon, Round, Hexagon, Chamfered, Fluted }
 public enum LengthMeasure { Panel, Centres }
 /// <summary>How a wall is built: one flat panel (or two back to back), or a box with a front, back, top, bottom and ends.</summary>
 public enum WallBuild { Flat, Box }

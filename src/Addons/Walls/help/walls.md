@@ -345,7 +345,9 @@ cocktail stick or a piece of wire through the stack to line the layers up while 
 at the bottom** makes the bottom layer 2 mm bigger all round.
 
 - **Column shape**: *Auto* makes square columns for straight runs, corners, T junctions and crosses,
-  octagons for 45° steps and round ones for other angles, so each wall meets a flat side.
+  octagons for 45° steps and round ones for other angles, so each wall meets a flat side. *Hexagon*
+  suits walls 60° or 120° apart, *Chamfered square* is a square with its corners cut off (right
+  angles), and *Fluted* is a round column with grooves down it, kept clear of where the walls go in.
 - **Column width**: across the flats.
 - If the slots would run into each other or the pin hole, or leave the column too thin, the list
   says so: make the column wider or the slots shallower.
