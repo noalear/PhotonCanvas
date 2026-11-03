@@ -105,9 +105,30 @@ public static class PolyRoof
             double beta = Math.Atan2(hw, S), spread = 2 * beta * 0.9;
             var apex = tri[2];
             PathsD wedge = [[apex, new(apex.x + 1e3 * Math.Sin(spread), apex.y - 1e3 * Math.Cos(spread)), new(apex.x - 1e3 * Math.Sin(spread), apex.y - 1e3 * Math.Cos(spread))]];
-            RoofPart Kept(RoofPart cap) => cap with { Cut = Geo.Tidy(Geo.Intersect(cap.Cut, wedge)), Etched = Geo.Intersect(cap.Etched, wedge), Lines = Geo.ClipLines(cap.Lines, wedge) };
-            parts.Add(Kept(RoofMaker.Caps(s, "Cap (over)", pointed, [new RoofMaker.Seam(1, phi, true), new RoofMaker.Seam(2, across, false), new RoofMaker.Seam(3, phi, true)], T, over)));
-            if (under.Count > 0) parts.Add(Kept(RoofMaker.Caps(s, "Cap (under)", pointed, [new RoofMaker.Seam(1, phi, false), new RoofMaker.Seam(2, across, false), new RoofMaker.Seam(3, phi, false)], T, under)));
+            // Each cap kept to the wedge; one that runs over its neighbours comes apart into two strips, one down
+            // each hip (they met above the point, where they'd run into the next ones round), cut as two pieces.
+            IEnumerable<RoofPart> Kept(RoofPart cap)
+            {
+                var cut = Geo.Tidy(Geo.Intersect(cap.Cut, wedge));
+                // The wedge can leave slivers off the caps' outer corners near the point: they're dropped.
+                var outer = cut.Where(p => Clipper.Area(p) > 0).ToList();
+                double biggest = outer.Select(p => Clipper.Area(p)).DefaultIfEmpty(0).Max();
+                var strips = outer.Where(p => Clipper.Area(p) >= 0.05 * biggest).OrderBy(p => Clipper.GetBounds(p).left).ToList();
+                if (strips.Count <= 1)
+                {
+                    var one = strips.Count == 1 ? Geo.Intersect(cut, [strips[0]]) : cut;
+                    yield return cap with { Cut = one, Etched = Geo.Intersect(cap.Etched, one), Lines = Geo.ClipLines(cap.Lines, one) };
+                    yield break;
+                }
+                for (int i = 0; i < strips.Count; i++)
+                {
+                    var one = Geo.Intersect(cut, [strips[i]]);
+                    string side = strips.Count == 2 ? (i == 0 ? "left" : "right") : $"{i + 1}";
+                    yield return cap with { Name = $"{cap.Name[..^1]}, {side})", Cut = one, Etched = Geo.Intersect(cap.Etched, one), Lines = Geo.ClipLines(cap.Lines, one) };
+                }
+            }
+            parts.AddRange(Kept(RoofMaker.Caps(s, "Cap (over)", pointed, [new RoofMaker.Seam(1, phi, true), new RoofMaker.Seam(2, across, false), new RoofMaker.Seam(3, phi, true)], T, over)));
+            if (under.Count > 0) parts.AddRange(Kept(RoofMaker.Caps(s, "Cap (under)", pointed, [new RoofMaker.Seam(1, phi, false), new RoofMaker.Seam(2, across, false), new RoofMaker.Seam(3, phi, false)], T, under)));
             findings.Add(new(Severity.Note, "Glue a bead or a cocktail stick on top as a finial, where the caps meet at the point."));
         }
         findings.Add(new(Severity.Note, $"The point is {A * t + T:0.#} mm above the base ({A * t + 2 * T:0.#} mm above what it sits on)."));
