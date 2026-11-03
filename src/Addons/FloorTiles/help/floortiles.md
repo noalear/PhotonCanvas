@@ -102,7 +102,7 @@ tile to the next.
 | Tread plate | 4 mm | Non-slip metal plate: little bars etched in. |
 | Chequered tiles | 12.7 mm | Square tiles, every other one etched dark: halls, chapels and crypts. |
 | Cave floor | rock 18, layer 12 mm | Rough rock in uneven slabs, split by cracks and pitted, like the wall maker's cave rock. |
-| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels laid as the wall maker's sci-fi panels: bays of plates between bolted ribs, with vents, hatches, pipes and lights in their bands. |
+| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels laid as the wall maker's sci-fi panels: bays between bolted pillars, each with vents along its edge and a stepped armour plate in a recess with pipes or cables. |
 | Grating | slots 2.2 mm apart | Open grating: rows of slots etched in each square inside a solid frame, turned square by square. |
 | Sandstone slabs | length 16.9, row 8.47 mm | Long sandstone slabs with wind-worn lines and pits. |
 | Sand | ripples 3 mm apart | Sand blown into ripples, with the odd pebble: deserts, beaches and arenas. |
