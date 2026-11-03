@@ -26,6 +26,12 @@ close a space in make a room.
 Click **Door**, **Doorway** or **Window**, then click a wall. Keep the button down to slide it along.
 Click **Select** and pick one to change its shape and size on the **Picked** tab.
 
+## Give a wall a different inside
+<!-- target: button:Select -->
+Click **Select** and click a wall. On the **Picked** tab, **Other side** puts another texture on its
+inside, wood panelling in a stone house, say. With single-panel walls that side is engraved after
+the pieces are cut and turned over: the backs get a page of their own, lined up with **Fit to piece**.
+
 ## Add a floor above
 <!-- target: button:Add a floor above -->
 Click **Add a floor above**. The floor below shows faintly: draw this floor's rooms over it. It can be

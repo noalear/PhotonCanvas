@@ -23,6 +23,10 @@ public sealed record Piece(string Name, Sheet Sheet, PathsD Cut, PathsD Etched, 
     public int Number { get; init; }
     /// <summary>Its number, scored on it as single lines (empty when it isn't marked).</summary>
     public List<PathD> Marks { get; init; } = [];
+    /// <summary>Engraved on its back after it's turned over (a single-panel wall's other side), as seen through it from the front; null = nothing.</summary>
+    public PathsD? BackEtched { get; init; }
+    /// <summary>Scored on its back after it's turned over, as <see cref="BackEtched"/>.</summary>
+    public List<PathD>? BackLines { get; init; }
 }
 
 /// <summary>

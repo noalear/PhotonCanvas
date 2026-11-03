@@ -38,6 +38,8 @@ public static class Placement
     public const string BackReliefLayer = "Walls · back relief";
     /// <summary>Each turned-over piece's outline, not burned: what Fit to piece lines the back's engraving up by.</summary>
     public const string BackGuideLayer = "Walls · back outline (guide)";
+    /// <summary>The layers a set's backs go on.</summary>
+    public static readonly BackLayers WallBacks = new(BackEtchLayer, BackLineLayer, BackReliefLayer, BackGuideLayer);
     /// <summary>The name ending the page each sheet's backs are on.</summary>
     public const string BackPage = "backs (turn the pieces over)";
     /// <summary>Which set a shape belongs to (an id shared by all its pieces).</summary>
@@ -166,7 +168,7 @@ public static class Placement
             var lines = !relief && part.Lines.Count > 0 ? Geo.ToGeometry([], part.Lines).Transform(move) : null;
             var map = relief ? Terrain.Relief.Render(part.Cut, part.Etched, part.Lines, look with { Seed = look.Seed + units.Count }) : null;
             var source = map is null ? null : ImageSource.FromEncoded(map.Png);
-            var back = part.HasBack ? Back(part, outline, move, relief, look with { Seed = look.Seed + 500 + units.Count }) : null;
+            var back = part.HasBack ? BackShapes(part.Cut, part.BackEtched, part.BackLines, outline, move, relief ? look with { Seed = look.Seed + 500 + units.Count } : null) : null;
             for (int c = 0; c < part.Copies; c++)
             {
                 string name = part.Copies > 1 ? $"{part.Name} ({c + 1} of {part.Copies})" : part.Name;
@@ -214,7 +216,7 @@ public static class Placement
             (cutLayer, etchLayer, lineLayer, reliefLayer) = Layers(ref s);
         }
         int backPages = 0;
-        if (backSheets.Count > 0) (s, backPages) = AddBacks(s, backSheets, firstPage, sheets, machine, title);
+        if (backSheets.Count > 0) (s, backPages) = AddBackPages(s, backSheets, firstPage, sheets, machine, title, WallBacks);
         if (o.CutSettings is { } cutSettings)
             s = Pages.UpdateLayers(s, firstPage, sheets, l => l.Name == CutLayer, l => cutSettings(l) with { Id = l.Id, Name = l.Name, Mode = LayerMode.Cut, ParentId = l.ParentId });
         if (o.EtchSettings is { } etchSettings)
@@ -227,22 +229,26 @@ public static class Placement
     /// what's engraved, both as they lie seen through the piece from the front. Mirrored across the bed afterwards, it's
     /// where the piece's back is once it's turned over left to right.
     /// </summary>
-    static List<(Shape Shape, int Kind, string Suffix)> Back(Part part, PathGeometry outline, Affine move, bool relief, Terrain.Relief.Look look)
+    /// <remarks>Kinds: 4 etch, 5 lines, 6 relief (with <paramref name="relief"/>), 7 the guide outline; each shape's name is left for the caller, its suffix given.</remarks>
+    public static List<(Shape Shape, int Kind, string Suffix)> BackShapes(PathsD cut, PathsD? backEtched, List<PathD>? backLines, PathGeometry outline, Affine move) =>
+        BackShapes(cut, backEtched, backLines, outline, move, null);
+
+    internal static List<(Shape Shape, int Kind, string Suffix)> BackShapes(PathsD cut, PathsD? backEtched, List<PathD>? backLines, PathGeometry outline, Affine move, Terrain.Relief.Look? relief)
     {
         var list = new List<(Shape, int, string)> { (new PathShape { Name = "", Geometry = outline }, 7, " outline") };
-        var etched = part.BackEtched ?? [];
-        var lines = part.BackLines ?? [];
-        if (!relief)
+        var etched = backEtched ?? [];
+        var lines = backLines ?? [];
+        if (relief is not { } look)
         {
             if (etched.Count > 0) list.Add((new PathShape { Name = "", Geometry = Geo.ToGeometry(etched).Transform(move) }, 4, " texture"));
             if (lines.Count > 0) list.Add((new PathShape { Name = "", Geometry = Geo.ToGeometry([], lines).Transform(move) }, 5, " lines"));
             return list;
         }
         // A relief is a picture: drawn as seen from behind (so it's never shown mirrored), then turned to lie through the front.
-        var b = Geo.Bounds(part.Cut);
+        var b = Geo.Bounds(cut);
         double c = b.left + b.right;
         PointD M(PointD p) => new(c - p.x, p.y);
-        var map = Terrain.Relief.Render(Geo.Tidy(Geo.Map(part.Cut, M)), Geo.Tidy(Geo.Map(etched, M)), Geo.Map(lines, M), look);
+        var map = Terrain.Relief.Render(Geo.Tidy(Geo.Map(cut, M)), Geo.Tidy(Geo.Map(etched, M)), Geo.Map(lines, M), look);
         if (map is null) return list;
         var box = outline.Bounds();
         var through = Affine.ScaleAbout(new Vec2(box.Center.X, 0), -1, 1);
@@ -257,9 +263,10 @@ public static class Placement
     /// <summary>
     /// The backs of each sheet's pieces on a page after all the sheets: mirrored across the bed's middle, so they lie
     /// where the pieces are once the sheet is turned over left to right. Only engraved; each piece's outline is a guide
-    /// for Fit to piece. Returns how many pages were added.
+    /// for Fit to piece. <paramref name="first"/> and <paramref name="sheets"/> are the sheets' pages; the backs go after them.
+    /// Returns how many pages were added, with the last of them shown.
     /// </summary>
-    static (DocState, int) AddBacks(DocState s, List<(int Sheet, Affine Nested, List<(Shape Shape, int Kind)> Shapes)> backs, int first, int sheets, MachineProfile machine, string title)
+    public static (DocState, int) AddBackPages(DocState s, List<(int Sheet, Affine Nested, List<(Shape Shape, int Kind)> Shapes)> backs, int first, int sheets, MachineProfile machine, string title, BackLayers names)
     {
         var flip = Affine.ScaleAbout(new Vec2(machine.FieldW / 2, 0), -1, 1);
         int added = 0;
@@ -280,10 +287,10 @@ public static class Placement
                 s = Ops.AddLayer(s, l);
                 layers[kind] = l.Id;
             }
-            Want(4, BackEtchLayer, LayerMode.Fill, l => l);
-            Want(5, BackLineLayer, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 15) } });
-            Want(6, BackReliefLayer, LayerMode.Image, Terrain.Relief.Setup);
-            Want(7, BackGuideLayer, LayerMode.Score, l => l with { Output = false, Color = 0x9CA3AF });
+            Want(4, names.Etch, LayerMode.Fill, l => l);
+            Want(5, names.Lines, LayerMode.Score, l => l with { Laser = l.Laser with { Power = Math.Min(l.Laser.Power, 15) } });
+            Want(6, names.Relief, LayerMode.Image, Terrain.Relief.Setup);
+            Want(7, names.Guide, LayerMode.Score, l => l with { Output = false, Color = 0x9CA3AF });
             if (empty.Count > 0) s = Ops.DeleteLayers(s, empty, null);
             var shapes = new List<Shape>();
             foreach (var (_, nested, parts) in sheet)
@@ -297,6 +304,9 @@ public static class Placement
                 }
             s = Ops.AddShapes(s, shapes);
         }
-        return (Pages.SwitchTo(s, first), added);
+        return (s, added);
     }
 }
+
+/// <summary>The names of the layers turned-over pieces' backs go on: what's etched, scored and carved, and the outline guide.</summary>
+public sealed record BackLayers(string Etch, string Lines, string Relief, string Guide);
