@@ -32,6 +32,12 @@ Back on the **Accessories** tab, the dice tower is on the list. Type the size of
 Pick **Movement gauge** under the list and press **Add**. Choose what it's **Marked in** and how
 many **Segments** it has.
 
+## Mark it your way
+<!-- target: tabitem:Markings -->
+Open the **Markings** tab and pick a **Design** for the gauge: a border, an ornament and numbers
+that go together. Change the **Font**, type a **Title** such as *MOVE*, or press **Upload a
+design…** to engrave your own logo. The rulers and templates have markings of their own.
+
 ## Look at it put together
 <!-- target: tabitem:Put together -->
 **Put together** shows the accessory picked in 3D: drag it round to check it from every side.

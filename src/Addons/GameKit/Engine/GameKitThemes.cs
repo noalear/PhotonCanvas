@@ -4,8 +4,8 @@ namespace PhotonCanvas.Addon.GameKit;
 
 /// <summary>
 /// The themes (the wall maker's: Medieval, Dungeon, Cave, Sci-fi, Desert, Gothic) for the game kit:
-/// each sets the finish on every face, whether dice towers have battlements and the shape of the
-/// initiative tiles' tops, so the kit matches the table's scenery. Sizes are left as they are.
+/// each sets the finish on every face, whether dice towers have battlements, the shape of the
+/// initiative tiles' tops and the design gauges, rulers and templates are marked with, so the kit matches the table's scenery. Sizes are left as they are.
 /// </summary>
 public static class GameKitThemes
 {
@@ -34,7 +34,13 @@ public static class GameKitThemes
             Finish = FinishFor(name),
             // The themes' textures are drawn at the wall maker's sizes for 28 mm figures: a little bigger suits a tower.
             TextureScale = name == TerrainThemes.Medieval ? s.TextureScale : Math.Max(1, Math.Min(s.TextureScale, 1.5)),
-            Items = [.. s.Items.Select(i => i with { Battlements = i.Kind == AccessoryKind.DiceTower ? battlements : i.Battlements, Top = top })],
+            // Gauges, rulers and templates take the theme's design: its border, ornament and numbers.
+            Items = [.. s.Items.Select(i => i with
+            {
+                Battlements = i.Kind == AccessoryKind.DiceTower ? battlements : i.Battlements,
+                Top = top,
+                Marks = MarkDesigns.Marked(i.Kind) ? MarkDesigns.Apply(i.Marks, MarkDesigns.ForTheme(name)) : i.Marks,
+            })],
         };
     }
 }
