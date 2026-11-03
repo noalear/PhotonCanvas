@@ -80,6 +80,11 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _wTexture = Combo();
     readonly NumericUpDown _wWear = Number(0, 100, 5, "0"), _wDetail = Number(0, 10, 0.1m, "0.#");
     readonly Button _wAll = UiKit.Button("Make every wall on this floor like it"), _wRest = UiKit.Button("Like the rest of the building");
+    // Its other side.
+    readonly TextBlock _wSides = Hint();
+    readonly ComboBox _wBack = Combo();
+    readonly NumericUpDown _wBackWear = Number(0, 100, 5, "0");
+    Control _wBackWearRow = null!;
     // Furniture and ways up: what to put down, and one picked.
     readonly StackPanel _placePanel = new() { Spacing = 8 };
     readonly ListBox _placeList = new() { MaxHeight = 260, SelectionMode = SelectionMode.Single };
@@ -171,6 +176,7 @@ public sealed class HouseEditorWindow : Window
         _texture.ItemsSource = _textures.ToList();
         _upper.ItemsSource = new[] { "The same as the ground floor" }.Concat(_textures).ToList();
         _wTexture.ItemsSource = _textures.ToList();
+        _wBack.ItemsSource = new[] { "The same as the front" }.Concat(_textures).ToList();
         _columnTexture.ItemsSource = new[] { "Like the walls" }.Concat(_textures).ToList();
         _cTexture.ItemsSource = new[] { "Like the rest of the building" }.Concat(_textures).ToList();
 
@@ -316,6 +322,9 @@ public sealed class HouseEditorWindow : Window
             _wInfo, Field("Texture", _wTexture),
             Field("Wear %", _wWear, tip: "0 is new and crisp, 100 ancient and battered; 50 is the texture's usual look."),
             Field("Detail size", _wDetail, tip: "The size of the smallest marks (pits, nicks, grain, bolts) in mm; 0 is the texture's own."),
+            _wSides,
+            Field("Other side", _wBack, tip: "The texture on the wall's other side: the inside of an outside wall. Single-panel walls get it engraved after the cut pieces are turned over (a page of its own); a box wall's back face just takes it."),
+            _wBackWearRow = Field("Other side's wear %", _wBackWear, tip: "How worn the other side looks: 0 new and crisp, 100 ancient and battered."),
             new StackPanel { Spacing = 6, Children = { _wAll, _wRest } }));
         _columnPanel.Children.Add(Explained("Column", "A column can have a shape of its own. A shape that a wall would meet at a corner (a square column where walls meet at 45°) is made to suit there instead. A column with a shape of its own is drawn lighter.",
             _cInfo, Field("Shape", _cShape),
@@ -437,6 +446,8 @@ public sealed class HouseEditorWindow : Window
         };
         _roomFloor.SelectionChanged += (_, _) => RoomFloorChanged();
         _wTexture.SelectionChanged += (_, _) => WallLookChanged();
+        _wBack.SelectionChanged += (_, _) => WallLookChanged();
+        _wBackWear.ValueChanged += (_, _) => WallLookChanged();
         _railHere.IsCheckedChanged += (_, _) => RailingChanged();
         _cShape.SelectionChanged += (_, _) => ColumnChanged();
         _cBuild.SelectionChanged += (_, _) => ColumnChanged();
@@ -877,7 +888,22 @@ public sealed class HouseEditorWindow : Window
         _wWear.Value = (decimal)Math.Round((look?.Wear ?? _design.Wear) * 100);
         _wDetail.Value = (decimal)Math.Clamp(look?.DetailMm ?? _design.DetailMm, 0, 10);
         _wRest.IsEnabled = look is not null;
+        _wBack.SelectedIndex = look?.BackTexture is { } back ? Math.Max(0, _textures.IndexOf(back) + 1) : 0;
+        _wBackWear.Value = (decimal)Math.Round((look?.BackTexture is null ? look?.Wear ?? _design.Wear : look.BackWear) * 100);
+        _wBackWearRow.IsVisible = _wBack.SelectedIndex > 0;
+        _wSides.Text = SidesText(run);
         _loading = false;
+    }
+
+    /// <summary>Which way the wall's texture faces, and so which is its other side (the kit turns a wall's texture out of the building).</summary>
+    string SidesText(Run run)
+    {
+        var (left, right) = _design.Levels[_plan.Level].Shape().Sides(run.Points[0], run.Points[1]);
+        string single = _design.Style.BoxWalls || _design.Style.TwoSided ? "" : " Its other side is engraved after the cut pieces are turned over.";
+        if ((left == -1) != (right == -1)) return "Its texture faces out of the building; the other side is inside." + single;
+        int dx = run.Points[1].X - run.Points[0].X, dy = run.Points[1].Y - run.Points[0].Y;
+        static string Dir(int x, int y) => string.Join(" and ", new[] { y > 0 ? "down" : y < 0 ? "up" : null, x > 0 ? "right" : x < 0 ? "left" : null }.Where(w => w is not null));
+        return $"Its texture faces {Dir(-dy, dx)} the plan; the other side faces {Dir(dy, -dx)}." + single;
     }
 
     void WallLookChanged(bool reset = false)
@@ -892,9 +918,12 @@ public sealed class HouseEditorWindow : Window
             {
                 Texture = _textures[Math.Clamp(_wTexture.SelectedIndex, 0, _textures.Count - 1)],
                 Wear = Math.Clamp(V(_wWear, 50) / 100, 0, 1), DetailMm = Math.Max(0, V(_wDetail, 0)),
+                BackTexture = _wBack.SelectedIndex > 0 ? _textures[Math.Clamp(_wBack.SelectedIndex - 1, 0, _textures.Count - 1)] : null,
+                BackWear = Math.Clamp(V(_wBackWear, 50) / 100, 0, 1),
             };
             // The same as the rest of the building is no look of its own.
-            bool plain = look.Texture == BuildingTexture(_plan.Level) && Math.Abs(look.Wear - _design.Wear) < 1e-9 && Math.Abs(look.DetailMm - _design.DetailMm) < 1e-9;
+            bool plain = look.Texture == BuildingTexture(_plan.Level) && Math.Abs(look.Wear - _design.Wear) < 1e-9 && Math.Abs(look.DetailMm - _design.DetailMm) < 1e-9
+                && look.BackTexture is null;
             if (!plain) rest.AddRange(edges.Select(e => look with { Edge = e }));
         }
         SetLevel(level with { WallLooks = rest }, reset ? "Make a wall like the rest" : "Change a wall's look");

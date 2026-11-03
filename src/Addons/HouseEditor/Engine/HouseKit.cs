@@ -167,7 +167,12 @@ public static partial class HouseKitMaker
                     if (!spec.Boxed && part.Name.Contains("column", StringComparison.Ordinal)) continue;
                     bool face = part.Name is "Front" or "Wall";
                     string pn = face ? "" : $": {part.Name.ToLowerInvariant()}";
-                    pieces.Add(new Piece($"{Cap(floorName + label)}{pn}", Sheet.Walls, part.Cut, part.Etched, part.Lines, part.Copies * letters.Count) { WallSpecJson = face ? key : null });
+                    pieces.Add(new Piece($"{Cap(floorName + label)}{pn}", Sheet.Walls, part.Cut, part.Etched, part.Lines, part.Copies * letters.Count)
+                    {
+                        WallSpecJson = face ? key : null,
+                        BackEtched = part.HasBack ? part.BackEtched : null,
+                        BackLines = part.HasBack ? part.BackLines : null,
+                    });
                 }
             }
 
@@ -400,9 +405,19 @@ public static partial class HouseKitMaker
     {
         if (look is null) return spec with { Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
         spec = spec with { Wear = Math.Clamp(look.Wear, 0, 1), DetailMm = Math.Max(0, look.DetailMm) };
+        // The other side (inside an outside wall): a single panel's back is engraved after turning it over; a box wall's back face just takes it.
+        if (look.BackTexture is { } back && Textures.Preset(back) is { } bp)
+            spec = spec with { EngraveBack = true, Back = Scaled(bp, s) with { Wear = Math.Clamp(look.BackWear, 0, 1), DetailMm = Math.Max(0, look.DetailMm) } };
         if (Textures.Preset(look.Texture) is not { } preset || preset.Name == spec.Texture) return spec;
+        var f = Scaled(preset, s);
+        return spec with { Texture = f.Texture, SizeA = f.SizeA, SizeB = f.SizeB, GrooveMm = f.GrooveMm };
+    }
+
+    /// <summary>A preset texture sized for the building's figures.</summary>
+    static FaceLook Scaled(TexturePreset preset, BuildingSpec s)
+    {
         double k28 = K(s);
-        return spec with
+        return new FaceLook
         {
             Texture = preset.Name,
             SizeA = Math.Round(preset.SizeA * k28, 2),
