@@ -51,6 +51,7 @@ public sealed class EquipmentPanel : UserControl
                 new TextBlock { Text = "ATTACHMENTS", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
                 Box("RA2 Pro rotary (rollers and chuck)", settings.OwnsRa2, v => settings.OwnsRa2 = v, "For marking round things: cups, tumblers, rings."),
                 Box("RA3 rotary (rollers and chuck)", settings.OwnsRa3, v => settings.OwnsRa3 = v, "The newer rotary."),
+                Box("My own rotary (homemade or another make)", settings.OwnsCustomRotary, v => settings.OwnsCustomRotary = v, "A rotary on the machine's rotary port with its own scale: set it under Laser → Work mode, and correct it from a test turn."),
                 Box("Conveyor feeder", settings.OwnsConveyor, v => settings.OwnsConveyor = v, "Feeds long pieces through, up to 610 mm."),
                 Hint("Only the attachments you have show up under Laser → Work mode. With none, the Work mode button is hidden and jobs are always on the flat bed."),
                 new TextBlock { Text = "FEATURES TO SHOW", Classes = { "h" }, Margin = new(0, 8, 0, 0) },

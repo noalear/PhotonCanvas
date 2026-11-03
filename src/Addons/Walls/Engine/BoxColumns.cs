@@ -95,6 +95,29 @@ public static class BoxColumns
         return parts;
     }
 
+    /// <summary>
+    /// The pieces of <paramref name="count"/> columns whose slots point the <paramref name="dirs"/> given
+    /// (degrees anticlockwise from the first, which is 0), called <paramref name="name"/>, shown standing
+    /// at each of <paramref name="at"/>. Boxed when every slot is at a right angle to the first (and boxed
+    /// columns are asked for), otherwise a stack of layers.
+    /// </summary>
+    public static List<Part> Columns(WallSpec s, double[] dirs, string name, int count, IReadOnlyList<(V3 Centre, double Yaw)> at, out string? problem)
+    {
+        var parts = new List<Part>();
+        bool square = dirs.All(d => Math.Abs(Math.IEEERemainder(d, 90)) < 1e-6);
+        var pieces = s.ColumnBuild == ColumnBuild.Boxed && square ? Boxed(s, dirs, out problem) : Stacked(s, dirs, out problem);
+        if (problem is not null) return parts;
+        foreach (var g in pieces.GroupBy(p => p.Name))
+        {
+            var first = g.First();
+            parts.Add(new Part($"{name} {first.Name}", first.Cut, first.Etched, first.Lines, g.Count() * count)
+            {
+                Poses = [.. at.SelectMany(p => g.Select(x => x.At(p.Centre, p.Yaw)))],
+            });
+        }
+        return parts;
+    }
+
     /// <summary>How high the top of a column is (mm), cap and all.</summary>
     public static double TopMm(WallSpec s)
     {

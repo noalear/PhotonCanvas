@@ -32,7 +32,8 @@ floor tiles, the furniture's faces and the way up. Try *Dungeon* on the cottage,
 <!-- target: tabitem:Walls -->
 On the **Walls** tab, **Walls** is *Boxes*: thick walls that stand up on their own, with their own
 door that swings open on pins. Pick your material in **Cut with** (or type the sheet's
-**Panel thickness**), then the texture for the ground floor and the storeys above.
+**Panel thickness**), then the texture for the ground floor and the storeys above. **Etched as**
+*Relief* carves the texture in depth instead of etching it flat: the most real, and much slower.
 
 ## Furnish the rooms
 <!-- target: tabitem:Furniture -->
@@ -42,7 +43,7 @@ more under the list.
 ## Look inside
 <!-- target: field:Show -->
 Pick **With the front cut away** under **Show** to see the rooms, the stairs and the furniture
-standing in them. Drag the building to turn it round.
+standing in them. Drag the building to turn it round, and scroll to zoom in on a room; press **F** to see it all again.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

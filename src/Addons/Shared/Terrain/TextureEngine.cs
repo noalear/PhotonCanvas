@@ -38,7 +38,7 @@ internal static class TextureEngine
         new("Hexagons", "Hexagon size", 8, null, 0, true, 0.7, 0.5, Stuff.Metal, "Hexagonal tiles or armour, some with an inset face, for sci-fi walls."),
         new(ThemeTextures.DungeonBlocks, "Block length", 14, "Course height", 8, true, 0.9, 0.7, Stuff.Stone, "Big, worn stone blocks, chipped, spalled, pitted and cracked: dungeons, crypts and keeps."),
         new(ThemeTextures.CaveRock, "Rock size", 16, "Layer height", 10, true, 1.0, 0.8, Stuff.SoftStone, "Rough rock in uneven layers with bedding lines, split by cracks and pitted: caves, cliffs and mines."),
-        new(ThemeTextures.SciFiPanels, "Panel width", 16, "Panel height", 12, true, 0.5, 0.6, Stuff.Metal, "Bays of metal panels between ribs: inset plates, vent grilles, hatches, pipe runs, greebles, light strips and hazard stripes, scratched and worn."),
+        new(ThemeTextures.SciFiPanels, "Panel width", 16, "Panel height", 12, true, 0.5, 0.6, Stuff.Metal, "Wide bays between bolted pillars: a stepped armour plate in a deep recess with pipes, cables and control boxes, vents along the floor and angled plates along the top, scratched and worn."),
         new(ThemeTextures.Sandstone, "Block length", 16, "Course height", 7, true, 0.7, 0.7, Stuff.SoftStone, "Long, soft-cornered sandstone blocks eaten by the wind: rounded edges, wind lines and clusters of pits."),
         new(ThemeTextures.Adobe, "Patch size", 14, "Brick height", 3, true, 0.5, 0.6, Stuff.Plaster, "Smooth mud plaster with ragged patches fallen away to show worn bricks beneath, and spreading cracks."),
     ];

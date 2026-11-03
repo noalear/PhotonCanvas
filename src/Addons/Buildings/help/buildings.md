@@ -27,7 +27,7 @@ Click **Buildings** on the **Home** tab (in the **Draw** group). The **Whole bui
 opens. On the left are three tabs: **Building** (which building, its size, storeys, door and
 windows), **Walls** (the sheet the walls are cut from and their texture) and **Furniture** (what's
 in each room, and the sheet it's cut from). On the right, **Put together** shows the building in 3D
-(drag it to turn it round), and **Wall pieces** and **Furniture pieces** show the pieces flat, one of
+(drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again), and **Wall pieces** and **Furniture pieces** show the pieces flat, one of
 each, with how many of each there are. Under them are the number of pieces and notes: how it goes
 together, a red ✕ that has to be fixed before the building can go in, a yellow ! worth a look.
 
@@ -176,7 +176,9 @@ On the **Walls** tab:
   *Boxes* widens them if they're too thin). Pick your material in **Cut with** to bring in its thickness, slot fit and
   kerf.
 - **Ground floor** and **Upper storeys**: the wall maker's textures (brick, stones, planks, timber
-  frame and the rest), sized for the figures. **Etched as** grooves or scored lines, and
+  frame and the rest), sized for the figures. **Etched as** grooves, scored lines or a **Relief**
+  (carved in depth from a greyscale depth map on a **Building · relief** picture layer, every stone
+  or plank at its own height, as in the wall maker: the most real, and much the slowest), and
   **Variation** for a different layout of stones and planks.
 
 With flat walls, each corner column is a stack of layers with a slot for each wall and a hole up the

@@ -78,7 +78,8 @@ public sealed class LayerEditor : UserControl
     readonly TextBlock _runCount = new() { Classes = { "muted" }, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
     readonly Button _resetRuns = new() { Content = "Start again", Padding = new(8, 2) };
     readonly Control _fillStyleRow, _lineRows, _runRow;
-    readonly NumericUpDown _focusOff = Number(-10, 10, 0.1m, "0.##");
+    // (Up to ±10 mm on the flat bed; the rotary allows more, for surfaces near its axis. The job says which.)
+    readonly NumericUpDown _focusOff = Number(-(decimal)Job.MaxRotaryFocusOffsetMm, (decimal)Job.MaxRotaryFocusOffsetMm, 0.1m, "0.##");
     // depth slices
     readonly NumericUpDown _slices = Number(2, DepthSlices.MaxCount, 1, "0");
     readonly CheckBox _negative = new() { Content = "Light = deep (negative)" };

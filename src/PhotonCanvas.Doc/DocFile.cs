@@ -227,7 +227,7 @@ public static class DocFile
             ["machine"] = MachineProfile.F2Ultra.DeviceCode,
             ["layers"] = layers,
             ["shapes"] = shapes,
-            ["guides"] = new JsonArray([.. s.Guides.Select(g => (JsonNode)new JsonObject { ["vertical"] = g.Vertical, ["at"] = g.At })]),
+            ["guides"] = new JsonArray([.. s.Guides.Select(g => (JsonNode)(g.RotaryStart ? new JsonObject { ["vertical"] = g.Vertical, ["at"] = g.At, ["rotaryStart"] = true } : new JsonObject { ["vertical"] = g.Vertical, ["at"] = g.At }))]),
             ["curve"] = CurveJson(s.Curve),
             ["variables"] = new JsonObject
             {
@@ -510,7 +510,7 @@ public static class DocFile
                 .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty, x => AddonFrom(x["addonData"]));
             if (notes.Count > 0) all = [.. all.Select(sh => notes.TryGetValue(sh.Id, out var d) ? sh.WithAddonData(d) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
-                .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0)).ToImmutableList();
+                .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0) { RotaryStart = g["rotaryStart"]?.GetValue<bool>() ?? false }).ToImmutableList();
             return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Spread = SpreadFrom(root["spreadHeat"]), AddonData = AddonFrom(root["addonData"]) };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)

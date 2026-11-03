@@ -46,5 +46,6 @@ notches.
 Back on the **Bridge** tab, choose **Stone arch bridge** in **Kind**. Set the **Arches** and their
 **Arch width**, pick a **Road** (level, or humped with ramps) and a **Texture** for the stone. If
 there are walls from the wall maker in the design, **Match the walls in the design** uses their
-stone. **Update in the design** swaps the footbridge for it; to keep both, close the window and
+stone. Tick **Carve as a relief** on the **Sheet** tab to carve the stones in depth instead of
+etching them flat (much slower). **Update in the design** swaps the footbridge for it; to keep both, close the window and
 click **Bridges** again for a new bridge.

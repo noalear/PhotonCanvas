@@ -1,0 +1,10 @@
+{
+  "id": "houseeditor",
+  "name": "Building editor",
+  "version": "1.0.0",
+  "description": "Draw a building floor by floor on a grid, like building a house in a life-sim game: walls and rooms of any shape, diagonal walls, doors and windows dropped anywhere along a wall, a different shape on every floor, seen in 3D with the walls cut away. Every wall, column, floor and tile then comes out as laser-cut pieces that slot together.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["walls", "furniture", "floortiles", "stairs", "roofs", "buildings"],
+  "onByDefault": true
+}

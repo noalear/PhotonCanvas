@@ -73,6 +73,8 @@ public sealed record TileSpec
     /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
     public double DetailMm { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
+    /// <summary>Carve the texture as a relief instead of etching it at one depth: a greyscale depth map on a depth-slices picture layer (the grooves' shapes, with depth).</summary>
+    public bool Relief { get; init; }
     /// <summary>Share of the stones (%) with a crack scored across them.</summary>
     public double CracksPct { get; init; } = 15;
     public GridMarks Grid { get; init; } = GridMarks.None;

@@ -78,6 +78,8 @@ public sealed record WallSpec
     /// <summary>Size of the texture's smallest marks (pits, nicks, grain, bolts, vent slats) in mm; 0 = the texture's own.</summary>
     public double DetailMm { get; init; }
     public EtchStyle Etch { get; init; } = EtchStyle.Grooves;
+    /// <summary>Carve the texture as a relief instead of etching it at one depth: a greyscale depth map on a depth-slices picture layer (the grooves' shapes, with depth).</summary>
+    public bool Relief { get; init; }
     /// <summary>Leave the ends (the part inside the columns' slots) smooth, so they slide in at full thickness.</summary>
     public bool PlainEnds { get; init; } = true;
 
@@ -112,6 +114,11 @@ public sealed record WallSpec
     public DoorLook DoorLook { get; init; } = DoorLook.Planks;
 
     public int Windows { get; init; }
+    /// <summary>
+    /// Where each window's centre goes, from the middle of the wall (mm; less than 0 = to the left). When
+    /// there are any, the wall has these windows instead of <see cref="Windows"/> spread evenly.
+    /// </summary>
+    public List<double> WindowAtMm { get; init; } = [];
     public OpeningShape WindowShape { get; init; } = OpeningShape.Arched;
     public double WindowWidthMm { get; init; } = 8;
     public double WindowHeightMm { get; init; } = 12;

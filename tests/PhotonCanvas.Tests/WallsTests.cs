@@ -326,4 +326,91 @@ public class WallsTests
         Assert.DoesNotContain(s2.Shapes, x => x.Name.Contains("column"));
         Assert.Equal("Tiles", Placement.Find(s2, [s2.Shapes[0].Id])!.Value.Spec.Texture);
     }
+
+    /// <summary>The share of a picture's opaque pixels darker than <paramref name="below"/> (0-255), and the number of different greys among those lighter than <paramref name="above"/>.</summary>
+    internal static (double Dark, double Light, int Greys, double Clear) Tones(ImageShape pic, int below = 70, int above = 170)
+    {
+        var px = pic.Source.Pixels;
+        int opaque = 0, dark = 0, light = 0, clear = 0;
+        var greys = new HashSet<int>();
+        for (int i = 0; i < px.Width * px.Height; i++)
+        {
+            if (px.Rgba[i * 4 + 3] < 128) { clear++; continue; }
+            opaque++;
+            int v = px.Rgba[i * 4];
+            if (v < below) dark++;
+            if (v > above) { light++; greys.Add(v); }
+        }
+        return ((double)dark / opaque, (double)light / opaque, greys.Count, (double)clear / (px.Width * px.Height));
+    }
+
+    [Fact]
+    public void Relief_carves_the_texture_as_a_depth_map_on_a_slices_layer()
+    {
+        var machine = MachineProfile.F2Ultra;
+        var spec = new WallSpec { Texture = "Brick", Relief = true, Connectors = [] };
+        var kit = Make(spec);
+        var (s, _, _) = Placement.Place(DocState.New(), kit, spec, machine, new PlaceOptions());
+        var relief = Assert.Single(s.Layers, l => l.Name == Placement.ReliefLayer);
+        Assert.Equal(LayerMode.Image, relief.Mode);
+        Assert.Equal(ImageEngraveMode.Slices, relief.ImageMode);
+        // Carved instead of etched, and before anything is cut.
+        Assert.DoesNotContain(s.Layers, l => l.Name == Placement.EtchLayer || l.Name == Placement.LineLayer);
+        Assert.True(s.Layers.FindIndex(l => l.Name == Placement.ReliefLayer) < s.Layers.FindIndex(l => l.Name == Placement.CutLayer));
+
+        var pic = s.Shapes.OfType<ImageShape>().OrderByDescending(x => x.Bounds.Width * x.Bounds.Height).First();
+        Assert.Equal(relief.Id, pic.LayerId);
+        // It sits on its panel, grouped with it, so they nest and move together.
+        var panel = s.Shapes.Single(x => x.GroupId == pic.GroupId && x.LayerId != relief.Id);
+        Assert.NotNull(pic.GroupId);
+        Assert.InRange(Math.Abs(pic.Bounds.MinX - panel.Bounds.MinX), 0, 0.2);
+        Assert.InRange(Math.Abs(pic.Bounds.MinY - panel.Bounds.MinY), 0, 0.2);
+        Assert.InRange(Math.Abs(pic.Bounds.Width - panel.Bounds.Width), 0, 0.2);
+
+        // The mortar is deep (dark), the bricks near the surface (light), each brick at a height of its own.
+        var (dark, light, greys, _) = Tones(pic);
+        Assert.InRange(dark, 0.05, 0.5);
+        Assert.True(light > 0.4, $"only {light:P0} of the bricks near the surface");
+        Assert.True(greys > 20, $"only {greys} heights among the bricks");
+    }
+
+    [Fact]
+    public void Relief_leaves_the_rest_of_the_bed_alone()
+    {
+        // A door cut out of the wall: the picture is see-through there and round the panel, so nothing burns off the wall.
+        var spec = new WallSpec { Texture = "Stone blocks", Relief = true, Door = DoorKind.Doorway, Connectors = [] };
+        var (s, _, _) = Placement.Place(DocState.New(), Make(spec), spec, MachineProfile.F2Ultra, new PlaceOptions());
+        var pic = s.Shapes.OfType<ImageShape>().OrderByDescending(x => x.Bounds.Width * x.Bounds.Height).First();
+        var (_, _, _, clear) = Tones(pic);
+        Assert.True(clear > 0.05, $"only {clear:P0} see-through");
+        // A wall etched the usual way gets no picture at all.
+        var flat = spec with { Relief = false };
+        var (f, _, _) = Placement.Place(DocState.New(), Make(flat), flat, MachineProfile.F2Ultra, new PlaceOptions());
+        Assert.Empty(f.Shapes.OfType<ImageShape>());
+        Assert.DoesNotContain(f.Layers, l => l.Name == Placement.ReliefLayer);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(5)]
+    public void Sci_fi_panels_are_bays_between_ribs(int seed)
+    {
+        // Scored as lines, unworn: every long upright edge is a pillar's, or a plate's beside a pillar, so they all sit a bay apart.
+        // Panel width 16 makes a bay of 1.9 panels plus a pillar (a third of a panel, kept between 2.6 and 7 mm).
+        double a = 16, bay = a * 1.9 + Math.Clamp(a * 0.32, 2.6, 7);
+        var spec = new WallSpec { Texture = "Sci-fi panels", SizeA = a, SizeB = 12, GrooveMm = 0.5, Seed = seed, Wear = 0, Etch = EtchStyle.Lines, PlainEnds = false, Connectors = [] };
+        var wall = Make(spec).Parts[0];
+        var upright = wall.Lines.SelectMany(l => l.Zip(l.Skip(1)))
+            .Where(p => Math.Abs(p.First.x - p.Second.x) < 0.01 && Math.Abs(p.First.y - p.Second.y) > spec.HeightMm * 0.25)
+            .Select(p => p.First.x).ToList();
+        Assert.True(upright.Count >= 8, $"only {upright.Count} long upright edges");
+        // Where the ribs are along the bay: the edges come in pairs either side of one, so their (circular) mean.
+        double sx = upright.Sum(x => Math.Cos(x / bay * 2 * Math.PI)), sy = upright.Sum(x => Math.Sin(x / bay * 2 * Math.PI));
+        double rib = Math.Atan2(sy, sx) / (2 * Math.PI) * bay;
+        double Off(double x) { double d = x - rib; return Math.Abs(d - bay * Math.Round(d / bay)); }
+        // None stands out in the middle of a bay: the wide plates there are left calm.
+        double worst = upright.Max(Off);
+        Assert.True(worst < bay * 0.3, $"an upright edge {worst:0.0} mm from the nearest rib, in a {bay} mm bay");
+    }
 }

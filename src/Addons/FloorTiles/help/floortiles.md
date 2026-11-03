@@ -102,7 +102,7 @@ tile to the next.
 | Tread plate | 4 mm | Non-slip metal plate: little bars etched in. |
 | Chequered tiles | 12.7 mm | Square tiles, every other one etched dark: halls, chapels and crypts. |
 | Cave floor | rock 18, layer 12 mm | Rough rock in uneven slabs, split by cracks and pitted, like the wall maker's cave rock. |
-| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels laid as the wall maker's sci-fi panels: inset plates, vent grilles, hatches, pipe runs, greebles and hazard stripes between bolted ribs. |
+| Sci-fi deck | 25.4 × 12.7 mm | Metal deck panels laid as the wall maker's sci-fi panels: bays between bolted pillars, each with vents along its edge and a stepped armour plate in a recess with pipes or cables. |
 | Grating | slots 2.2 mm apart | Open grating: rows of slots etched in each square inside a solid frame, turned square by square. |
 | Sandstone slabs | length 16.9, row 8.47 mm | Long sandstone slabs with wind-worn lines and pits. |
 | Sand | ripples 3 mm apart | Sand blown into ripples, with the odd pebble: deserts, beaches and arenas. |
@@ -119,7 +119,10 @@ tile to the next.
 - **Detail size**: the size of the smallest of those marks, and of wood grain, bolts and vent slats (mm).
 - **Etch as**: *Grooves* etches the gaps as filled areas (deeper and the most real). *Lines* scores
   round each stone instead, which is much quicker. Grain, rivets and cracks are always scored lines,
-  on a light **Floor tiles · lines** layer.
+  on a light **Floor tiles · lines** layer. *Relief* carves each tile from a greyscale depth map on a
+  **Floor tiles · relief** picture layer, in depth slices, with every stone or board at its own
+  height and its edges rounded into the gaps, as in the wall maker (the most real, and much the
+  slowest; set its depth on that layer).
 - **Mark squares**: the grid squares on the tiles, for games that count movement: *Scored lines*
   or *Etched grooves*. Dungeon flagstones follow the grid already.
 

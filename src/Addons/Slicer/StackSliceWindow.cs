@@ -715,9 +715,22 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
                 s = Pages.SwitchTo(s, slicesShown);
                 pinsMade = $" The {plan.Made} pins are on their own page, \"{_name} pins\" (layer \"{DowelPins.CutLayer}\"): move the cuts onto the dowel in the camera picture.";
             }
+            // Add-ons' own additions (a rotary finishing page, say), the slices' first page still shown.
+            string added = "";
+            if (stack.Method == SliceMethod.Stacked)
+                foreach (var (_, step) in _modifiers)
+                {
+                    int pages = s.OtherPages.Count, shown = s.PageIndex;
+                    s = step.AfterMake(s, stack, _machine, string.IsNullOrWhiteSpace(_name) ? "Slices" : _name);
+                    if (s.OtherPages.Count > pages)
+                    {
+                        added += $" Also a page \"{s.PageName}\".";
+                        s = Pages.SwitchTo(s, shown);
+                    }
+                }
             _doc.Commit($"Stacked slices of {_name}", s, []);
             _summary.Text = $"Made {stack.Parts.Count} parts on {sheets} {(stock.Outline is null ? "bed" : "board")}{(sheets == 1 ? "" : "s")}" + (sheets > 1 ? " (a page each: the tabs above the work area" + (stock.Outline is null ? ")." : ", each with the same material outline).") : ".") +
-                            " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\"." + pinsMade;
+                            " The cut layer is \"Slices · cut\" (set its kerf for snug dowels), the light marks \"Slices · marks\"." + pinsMade + added;
             if (_booklet.IsChecked == true && stack.Method == SliceMethod.Stacked) _ = Booklet(stack, PinPlan() is { Made: > 0 } bp ? bp.PinLengthMm : null);
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }

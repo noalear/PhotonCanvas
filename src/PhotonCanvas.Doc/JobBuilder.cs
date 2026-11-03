@@ -266,7 +266,7 @@ public static class JobBuilder
             try
             {
                 layer.Laser.Validate(opt.Machine, layer.Reflective);
-                ValidateExtras(layer);
+                ValidateExtras(layer, Job.FocusLimitMm(opt.Mode));
                 if (layer.Mode == LayerMode.Image && layer.ImageMode == ImageEngraveMode.Slices && layer.Slices.CleanupEvery > 0)
                 {
                     try { CleanupLaser(layer).Validate(opt.Machine, layer.Reflective); }
@@ -655,7 +655,8 @@ public static class JobBuilder
         var mode = opt.Mode switch
         {
             // Round the object from the middle of the design: what faces the laser at the start is the design's middle row.
-            WorkMode.Rotary r => r with { OriginY = (bounds.MinY + bounds.MaxY) / 2 },
+            // (A rotary start line on the page says what faces it instead.)
+            WorkMode.Rotary r => r with { OriginY = s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (bounds.MinY + bounds.MaxY) / 2 },
             _ => opt.Mode,
         };
         if (mode is WorkMode.Conveyor)
@@ -1221,9 +1222,9 @@ public static class JobBuilder
     }
 
     /// <summary>Checks the layer's cut, fill and image extras; messages are for the person at the laser.</summary>
-    static void ValidateExtras(Layer l)
+    static void ValidateExtras(Layer l, double focusLimit)
     {
-        JobException.CheckRange("focus offset", l.FocusOffsetMm, -Job.MaxFocusOffsetMm, Job.MaxFocusOffsetMm, "mm");
+        JobException.CheckRange("focus offset", l.FocusOffsetMm, -focusLimit, focusLimit, "mm");
         switch (l.Mode)
         {
             case LayerMode.Cut or LayerMode.Score:

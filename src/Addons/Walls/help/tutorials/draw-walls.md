@@ -31,7 +31,9 @@ fills it in for you.
 <!-- target: tabitem:Texture -->
 On the **Texture** tab, pick **Brick** (or stone, wood, metal), or make your own from shapes you've
 drawn. **Wear %** sets how weathered it looks (0 new and crisp, 100 ancient and battered) and
-**Detail size** how fine its pits, grain and bolts are. The preview shows it on the wall.
+**Detail size** how fine its pits, grain and bolts are. The preview shows it on the wall. For the
+most real look, set **Etch as** to **Relief**: the texture is carved in depth from a greyscale depth
+map instead of etched flat (much slower; set its depth on the **Walls · relief** layer).
 
 ## Add battlements
 <!-- target: tabitem:Top -->

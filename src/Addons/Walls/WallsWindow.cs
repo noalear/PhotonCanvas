@@ -54,7 +54,7 @@ public sealed class WallsWindow : Window
     // How worn the texture is and how fine its marks (Shared/Terrain/Weathering.cs).
     readonly NumericUpDown _wear = Number(0, 100, 5, "0"), _detail = Number(0.2m, 5, 0.1m, "0.##");
     Control _wearRow = null!, _detailRow = null!;
-    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
+    readonly ComboBox _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)", "Relief (carved in depth, slowest)");
     readonly CheckBox _plainEnds = new() { Content = "Keep the ends smooth where they go into the columns", IsChecked = true };
     readonly TextBox _ownName = new() { Watermark = "A name for your texture" };
     readonly NumericUpDown _ownGap = Number(0, 100, 0.5m, "0.##"), _ownShift = Number(0, 100, 5, "0");
@@ -288,7 +288,7 @@ public sealed class WallsWindow : Window
                 _textureAbout,
                 _sizeARow, _sizeBRow, _grooveRow, _seedRow,
                 _wearRow, _detailRow,
-                Field("Etch as", _etch, tip: "Grooves etch the gaps as areas (deeper, the most real). Lines score round each brick or stone (much quicker)."),
+                Field("Etch as", _etch, tip: "Grooves etch the gaps as areas at one depth. Lines score round each brick or stone (much quicker). Relief carves a greyscale depth map in slices: each brick or stone at its own height, edges rounded into the mortar, worn surfaces uneven (the most real, and much slower)."),
                 _plainEnds, _texBack, _texSides),
             Explained("Your own texture", "Shapes you drew (or an SVG) repeated over the face in rows. Closed shapes are etched as areas, open ones as lines. It's kept in the list for next time.",
                 Field("Name", _ownName),
@@ -679,7 +679,7 @@ public sealed class WallsWindow : Window
         _columnBuild.SelectedIndex = (int)s.ColumnBuild; _columnTop.SelectedIndex = (int)s.ColumnTop; _columnBase.SelectedIndex = (int)s.ColumnBase; _columnLip.Value = D(s.ColumnLipMm);
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
-        _etch.SelectedIndex = (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
+        _etch.SelectedIndex = s.Relief ? 2 : (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
         _top.SelectedIndex = s.Top == TopStyle.Battlements ? 1 : 0;
         _broken.SelectedIndex = Math.Max(0, Tops.Styles.ToList().FindIndex(t => t.Style == s.Breaks)); _ruinAt.SelectedIndex = (int)s.RuinAt;
         _merlons.SelectedIndex = (int)s.Merlons; _merlonStep.Value = D(s.MerlonStepMm);
@@ -718,7 +718,7 @@ public sealed class WallsWindow : Window
             ColumnBase = (ColumnBase)Math.Max(0, _columnBase.SelectedIndex), ColumnLipMm = V(_columnLip, 2),
             Texture = TextureName, Custom = own, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
             Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.5),
-            Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), PlainEnds = _plainEnds.IsChecked == true,
+            Etch = _etch.SelectedIndex == 1 ? EtchStyle.Lines : EtchStyle.Grooves, Relief = _etch.SelectedIndex == 2, PlainEnds = _plainEnds.IsChecked == true,
             Top = _top.SelectedIndex == 1 ? TopStyle.Battlements : TopStyle.Straight,
             Broken = Tops.Styles[Math.Max(0, _broken.SelectedIndex)].Style, RuinAt = (RuinPlace)Math.Max(0, _ruinAt.SelectedIndex),
             Merlons = (MerlonPattern)Math.Max(0, _merlons.SelectedIndex), MerlonStepMm = V(_merlonStep, 3),
@@ -900,7 +900,9 @@ public sealed class WallsWindow : Window
             int pieces = kit.PieceCount;
             _status.Text = $"{(replace is null ? "Put" : "Updated")} {pieces} piece{(pieces == 1 ? "" : "s")} in the design" +
                            (sheets > 1 ? $", over {sheets} pages (a bed each)" : "") +
-                           $": outlines on \"{Placement.CutLayer}\", the texture on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).";
+                           (spec.Relief
+                               ? $": outlines on \"{Placement.CutLayer}\", the texture as a depth map on \"{Placement.ReliefLayer}\" (carved first, in slices: set its depth on that layer)."
+                               : $": outlines on \"{Placement.CutLayer}\", the texture on \"{Placement.EtchLayer}\" and \"{Placement.LineLayer}\" (done first).");
         }
         catch (InvalidOperationException ex) { _status.Text = ex.Message; }
         catch (Exception ex) when (ex is ArgumentException or IndexOutOfRangeException or ArithmeticException or NullReferenceException)
