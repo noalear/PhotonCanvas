@@ -206,7 +206,7 @@ _painter.Draw(ctx, this, _scene, Camera3D.YUp(yaw, pitch), UiKit.Brush("Bg2"), h
 
 A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
 what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs
-maker's walls). The bridge, stairs, furniture, scatter, game kit, building and roof makers all use it.
+maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building and roof makers all use it.
 
 ## Checks
 
