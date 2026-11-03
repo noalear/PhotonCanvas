@@ -444,6 +444,15 @@ public sealed class Job
     /// <summary>Furthest the focus may be moved either way for a block (mm).</summary>
     public const double MaxFocusOffsetMm = 10;
 
+    /// <summary>
+    /// On the rotary the surface can be much nearer the axis in places than where the focus was set
+    /// (a stacked model finished on its dowel), so there the focus may move this far (mm).
+    /// </summary>
+    public const double MaxRotaryFocusOffsetMm = 60;
+
+    /// <summary>Furthest the focus may move either way in this job's work mode (mm).</summary>
+    public static double FocusLimitMm(WorkMode mode) => mode is WorkMode.Rotary ? MaxRotaryFocusOffsetMm : MaxFocusOffsetMm;
+
     public MachineProfile Machine { get; }
     public IReadOnlyList<Block> Blocks { get; }
     public PassMode PassMode { get; init; } = new PassMode.PerBlock();
@@ -519,8 +528,8 @@ public sealed class Job
             var block = Blocks[i];
             block.Laser.Validate(Machine);
             var ctx = $" (item {i + 1})";
-            if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > MaxFocusOffsetMm + 1e-9)
-                throw new JobException($"The focus can move at most {MaxFocusOffsetMm:0} mm either way (asked for {block.FocusOffsetMm:0.##} mm).");
+            if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > FocusLimitMm(Mode) + 1e-9)
+                throw new JobException($"The focus can move at most {FocusLimitMm(Mode):0} mm either way{(Mode is WorkMode.Rotary ? " on the rotary" : "")} (asked for {block.FocusOffsetMm:0.##} mm).");
             foreach (var z in HeadHeights(block))
                 if (!double.IsFinite(z) || z < MinHeadZ - 1e-9 || z > MaxHeadZ + 1e-9)
                     throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");
