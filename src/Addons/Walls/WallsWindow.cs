@@ -62,10 +62,14 @@ public sealed class WallsWindow : Window
     readonly TextBlock _ownNote = Hint();
 
     // Top
-    readonly ComboBox _top = Combo("Straight", "Battlements (parapet)", "Ruined");
+    readonly ComboBox _top = Combo("Straight", "Battlements (parapet)");
+    readonly ComboBox _merlons = Combo("All the same height", "Every other one taller", "Taller at the ends");
+    readonly ComboBox _broken = Combo([.. Tops.Styles.Select(t => t.Name)]), _ruinAt = Combo("Anywhere", "Left", "Middle", "Right");
+    readonly NumericUpDown _merlonStep = Number(0.5m, 50, 0.5m, "0.#");
+    readonly TextBlock _brokenNote = Hint();
     readonly NumericUpDown _merlonW = Number(1, 100, 0.5m, "0.#"), _crenelW = Number(1, 100, 0.5m, "0.#"), _merlonH = Number(1, 100, 0.5m, "0.#"), _walkDepth = Number(4, 60, 1, "0.#"), _ruin = Number(5, 80, 5, "0");
     readonly CheckBox _walkway = new() { Content = "Walkway behind the battlements (a strip on brackets)" };
-    Control _battleRows = null!, _ruinRow = null!;
+    Control _battleRows = null!, _ruinRow = null!, _merlonStepRow = null!;
 
     // Doors and windows
     readonly ComboBox _door = Combo("No door", "Doorway (cut through)", "Closed door (etched)", "Doorway and a door to fit it");
@@ -276,11 +280,18 @@ public sealed class WallsWindow : Window
         _battleRows = Stack(
             Row(Small("Merlon width", _merlonW, tip: "The raised blocks along the top (mm)."), Small("Gap width", _crenelW, tip: "The gaps between them (mm).")),
             Field("Merlon height", _merlonH, tip: "How deep the gaps go (mm)."),
+            Field("Merlon heights", _merlons, tip: "All the same, every other one taller, or taller at the ends (like towers at the corners)."),
+            _merlonStepRow = Field("Shorter by", _merlonStep, tip: "How much lower the shorter merlons are than the tall ones (mm)."),
             _walkway,
             Field("Walkway depth", _walkDepth, tip: "How far the walkway sticks out behind the wall (mm). Its brackets plug into slots in the wall."));
-        _ruinRow = Field("Broken down %", _ruin, tip: "How far down the broken part goes, as a share of the height.");
-        return Stack(Explained("The top", "A straight top, battlements (a parapet with gaps, and a walkway behind if you like), or a ruined, broken top. The ends stay whole so they still go into the columns.",
-            Field("Top", _top), _battleRows, _ruinRow));
+        _ruinRow = Stack(
+            Field("Broken down %", _ruin, tip: "How far down the broken part goes, as a share of the height."),
+            Field("Where", _ruinAt, tip: "Where the break is deepest. For a fallen end, which end has fallen."));
+        return Stack(
+            Explained("The top", "A straight top, or battlements: a parapet with gaps, and a walkway behind if you like.",
+                Field("Top", _top), _battleRows),
+            Explained("Broken top", "Break the top for a ruin, straight or battlemented. On brick and stone the break follows the joints, taking whole stones away; on planks, metal or rock it's a jagged crack. The front and back break differently round the same place, and the ends stay up so they still go into the columns.",
+                Field("Broken", _broken), _brokenNote, _ruinRow));
     }
 
     Control OpeningsTab()
@@ -367,11 +378,11 @@ public sealed class WallsWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
+        foreach (var n in new[] { _length, _height, _thick, _walls, _wallT, _plinth, _ribSpacing, _columnLip, _sizeA, _sizeB, _groove, _seed, _merlonW, _crenelW, _merlonH, _walkDepth, _ruin, _merlonStep, _doorW, _doorH, _doorAt, _windows, _winW, _winH, _sill, _barW, _frame, _mounts, _mountH, _mountSlot, _customAngle, _columnW, _slotDepth, _fit, _pin })
             n.ValueChanged += (_, _) => Changed();
         foreach (var n in _counts.Values) n.ValueChanged += (_, _) => Changed();
         foreach (var n in new[] { _wear, _detail }) n.ValueChanged += (_, _) => Changed();
-        foreach (var c in new[] { _measure, _etch, _top, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
+        foreach (var c in new[] { _measure, _etch, _top, _merlons, _broken, _ruinAt, _door, _doorShape, _doorLook, _winShape, _bars, _acc, _column, _etchWith, _columnBuild, _columnTop, _columnBase })
             c.SelectionChanged += (_, _) => Changed();
         foreach (var c in new[] { _twoSided, _plainEnds, _walkway, _cap, _foot, _intoColumns, _texBack, _texSides })
             c.IsCheckedChanged += (_, _) => Changed();
@@ -483,7 +494,10 @@ public sealed class WallsWindow : Window
             ? "Each wall is cut as a front, a back, a base, a top, two ends and ribs; doors and windows are lined between the faces."
             : "One sheet thick (two with panels back to back): the ends slide into the columns' slots.";
         _battleRows.IsVisible = _top.SelectedIndex == 1;
-        _ruinRow.IsVisible = _top.SelectedIndex == 2;
+        int broken = Math.Max(0, _broken.SelectedIndex);
+        _ruinRow.IsVisible = broken > 0;
+        _brokenNote.Text = Tops.Styles[broken].About;
+        _merlonStepRow.IsVisible = _merlons.SelectedIndex > 0;
         _doorRows.IsVisible = _door.SelectedIndex > 0;
         _winRows.IsVisible = (_windows.Value ?? 0) > 0;
     }
@@ -502,7 +516,10 @@ public sealed class WallsWindow : Window
         _sizeA.Value = D(s.SizeA); _sizeB.Value = D(s.SizeB); _groove.Value = D(s.GrooveMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _wear.Value = D(Math.Clamp(s.Wear, 0, 1) * 100); _detail.Value = D(Math.Clamp(s.DetailMm > 0 ? s.DetailMm : Textures.Preset(s.Texture)?.Detail ?? 0.5, 0.2, 5));
         _etch.SelectedIndex = (int)s.Etch; _plainEnds.IsChecked = s.PlainEnds;
-        _top.SelectedIndex = (int)s.Top; _merlonW.Value = D(s.MerlonWidthMm); _crenelW.Value = D(s.CrenelWidthMm); _merlonH.Value = D(s.MerlonHeightMm);
+        _top.SelectedIndex = s.Top == TopStyle.Battlements ? 1 : 0;
+        _broken.SelectedIndex = Math.Max(0, Tops.Styles.ToList().FindIndex(t => t.Style == s.Breaks)); _ruinAt.SelectedIndex = (int)s.RuinAt;
+        _merlons.SelectedIndex = (int)s.Merlons; _merlonStep.Value = D(s.MerlonStepMm);
+        _merlonW.Value = D(s.MerlonWidthMm); _crenelW.Value = D(s.CrenelWidthMm); _merlonH.Value = D(s.MerlonHeightMm);
         _walkway.IsChecked = s.Walkway; _walkDepth.Value = D(s.WalkwayDepthMm); _ruin.Value = D(Math.Round(s.RuinDepth * 100));
         _theme.SelectedIndex = Math.Max(0, WallThemes.Names.ToList().IndexOf(s.Theme)); _themeAbout.Text = WallThemes.About(s.Theme);
         _door.SelectedIndex = (int)s.Door; _doorShape.SelectedIndex = Math.Max(0, Array.IndexOf(DoorShapes, s.DoorShape is OpeningShape.Round or OpeningShape.ArrowSlit ? OpeningShape.Arched : s.DoorShape));
@@ -534,7 +551,10 @@ public sealed class WallsWindow : Window
             Texture = TextureName, Custom = own, SizeA = V(_sizeA, 8), SizeB = V(_sizeB, 3.5), GrooveMm = V(_groove, 0.6), Seed = (int)V(_seed, 1),
             Wear = V(_wear, 50) / 100, DetailMm = V(_detail, 0.5),
             Etch = (EtchStyle)Math.Max(0, _etch.SelectedIndex), PlainEnds = _plainEnds.IsChecked == true,
-            Top = (TopStyle)Math.Max(0, _top.SelectedIndex), MerlonWidthMm = V(_merlonW, 7), CrenelWidthMm = V(_crenelW, 5), MerlonHeightMm = V(_merlonH, 6),
+            Top = _top.SelectedIndex == 1 ? TopStyle.Battlements : TopStyle.Straight,
+            Broken = Tops.Styles[Math.Max(0, _broken.SelectedIndex)].Style, RuinAt = (RuinPlace)Math.Max(0, _ruinAt.SelectedIndex),
+            Merlons = (MerlonPattern)Math.Max(0, _merlons.SelectedIndex), MerlonStepMm = V(_merlonStep, 3),
+            MerlonWidthMm = V(_merlonW, 7), CrenelWidthMm = V(_crenelW, 5), MerlonHeightMm = V(_merlonH, 6),
             Walkway = _walkway.IsChecked == true, WalkwayDepthMm = V(_walkDepth, 10), RuinDepth = V(_ruin, 40) / 100,
             Door = (DoorKind)Math.Max(0, _door.SelectedIndex), DoorShape = DoorShapes[Math.Clamp(_doorShape.SelectedIndex, 0, DoorShapes.Length - 1)], DoorLook = (DoorLook)Math.Max(0, _doorLook.SelectedIndex),
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28), DoorOffsetMm = V(_doorAt, 0),

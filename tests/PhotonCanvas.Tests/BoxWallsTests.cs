@@ -347,4 +347,149 @@ public class BoxWallsTests
         Assert.Equal(w.ColumnMm + 8, r.CornerMm, 2);
         Assert.Equal(BoxColumns.TopMm(w) - w.HeightMm, r.RestAboveWallsMm, 2);
     }
+
+    // ---- broken tops and merlon heights ----
+
+    public static TheoryData<RuinStyle, bool, bool> Breaks()
+    {
+        var d = new TheoryData<RuinStyle, bool, bool>();
+        foreach (var style in Enum.GetValues<RuinStyle>().Where(r => r != RuinStyle.None))
+        {
+            d.Add(style, false, false);
+            d.Add(style, true, false);
+        }
+        d.Add(RuinStyle.Crumbled, true, true);
+        d.Add(RuinStyle.Breach, true, true);
+        return d;
+    }
+
+    [Theory]
+    [MemberData(nameof(Breaks))]
+    public void Every_broken_top_goes_together_with_or_without_battlements(RuinStyle style, bool battlements, bool walkway)
+    {
+        var s = Box(x => x with
+        {
+            LengthMm = 110, HeightMm = 64, RuinDepth = 0.4, Texture = "Brick", SizeA = 8, SizeB = 3.5, Broken = style,
+            Top = battlements ? TopStyle.Battlements : TopStyle.Straight, Merlons = MerlonPattern.Alternating, Walkway = walkway, WalkwayDepthMm = 14,
+            Windows = 2, SillMm = 18, WindowHeightMm = 8, Connectors = new() { [ConnectorKind.Corner] = 1, [ConnectorKind.Tee] = 1 },
+        });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        var front = Geo.Bounds(Part(k, "Front").Cut);
+        var all = Assemble(k, 3);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, 3, s.FitMm));
+        if (walkway) Assert.Contains(k.Parts, p => p.Name == "Walkway");
+        // Broken: somewhere along the front is well below the top.
+        var under = Geo.Intersect(Part(k, "Front").Cut, [Geo.Rect(5, 0, 105, 64)]);
+        Assert.True(Geo.Area(under) < 100 * 64 - 150, $"{style}: hardly broken");
+        Assert.True(front.bottom <= 64 + 1e-6);
+    }
+
+    [Theory]
+    [InlineData(RuinStyle.Crumbled)]
+    [InlineData(RuinStyle.Breach)]
+    [InlineData(RuinStyle.Weathered)]
+    public void A_break_in_brick_follows_the_joints(RuinStyle style)
+    {
+        var s = Box(x => x with { LengthMm = 120, HeightMm = 60, Texture = "Brick", SizeA = 8, SizeB = 3.5, GrooveMm = 0.6, Wear = 0, Broken = style, RuinDepth = 0.4 });
+        var stones = Textures.Make(s, new Face(120, 60, 0, 120, 60)).Raised;
+        var p = Tops.Break(s, Profile.Level(0, 120, 60), 120, 3, 60, 10, 0, 1, stones, out _);
+        // Where the top is level and broken, it runs along a joint between rows of bricks (half a joint above a brick's top).
+        var tops = stones.Select(st => Clipper2Lib.Clipper.GetBounds(st).bottom).Distinct().ToList();
+        double level = 0, onJoint = 0;
+        foreach (var seg in p.Segs.Where(g => Math.Abs(g.Y0 - g.Y1) < 1e-6 && g.Y0 < 59.5 && g.X1 - g.X0 > 0.2))
+        {
+            level += seg.X1 - seg.X0;
+            if (tops.Any(t => Math.Abs(seg.Y0 - (t + 0.35)) < 0.3)) onJoint += seg.X1 - seg.X0;
+        }
+        Assert.True(level > 20, $"broken along only {level:0.#} mm");
+        Assert.True(onJoint > 0.9 * level, $"{onJoint:0.#} of {level:0.#} mm on the joints");
+        // And its ends are upright, not sloping across a brick.
+        Assert.DoesNotContain(p.Segs, g => Math.Abs(g.Y1 - g.Y0) > 0.5 && g.X1 - g.X0 > 0.1);
+    }
+
+    [Fact]
+    public void Planks_and_shattered_tops_break_in_a_jagged_line()
+    {
+        foreach (var (tex, style) in new[] { ("Wood planks (across)", RuinStyle.Crumbled), ("Brick", RuinStyle.Shattered) })
+        {
+            var preset = Textures.Preset(tex)!;
+            var s = Box(x => x with { LengthMm = 120, HeightMm = 60, Texture = tex, SizeA = preset.SizeA, SizeB = preset.SizeB, Broken = style });
+            var k = WallKitMaker.Make(s);
+            Assert.True(k.Ok, Why(k));
+            var front = Part(k, "Front").Cut;
+            // Sloping edges along the break.
+            Assert.Contains(front.SelectMany(path => path.Zip(path.Skip(1))), e => Math.Abs(e.First.x - e.Second.x) > 0.5 && Math.Abs(e.First.y - e.Second.y) > 0.5);
+        }
+    }
+
+    [Fact]
+    public void A_fallen_end_stands_at_one_end_and_falls_away_at_the_other()
+    {
+        var s = Box(x => x with { LengthMm = 120, HeightMm = 60, Texture = "Brick", SizeA = 8, SizeB = 3.5, Broken = RuinStyle.FallenEnd, RuinAt = RuinPlace.Left, RuinDepth = 0.6 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        var front = Part(k, "Front").Cut;
+        double Height(double x0, double x1) => Geo.Bounds(Geo.Intersect(front, [Geo.Rect(x0, 0, x1, 70)])).bottom;
+        Assert.True(Height(8, 20) < 45, $"left end {Height(8, 20):0.#} mm high");
+        Assert.True(Height(100, 112) > 58);
+        // Its tabs into the columns are kept low, below the fallen end.
+        Assert.True(BoxWall.EndTabs(s).Max(t => t.Y1) < Height(0, 3));
+        Assert.Empty(Clashes(Assemble(k, 3)));
+    }
+
+    [Fact]
+    public void A_deep_break_on_a_low_wall_is_made_shallower()
+    {
+        var s = Box(x => x with { HeightMm = 30, Broken = RuinStyle.Breach, RuinDepth = 0.8, Texture = "Brick", SizeA = 8, SizeB = 3.5 });
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Contains(k.Findings, f => f.Text.Contains("as far as a box wall this high allows"));
+        Assert.True(Geo.Bounds(Part(k, "Top").Cut).bottom - Geo.Bounds(Part(k, "Top").Cut).top > 0);
+    }
+
+    [Theory]
+    [InlineData(MerlonPattern.Alternating)]
+    [InlineData(MerlonPattern.TallEnds)]
+    public void Merlons_can_vary_in_height(MerlonPattern pattern)
+    {
+        var s = Box(x => x with { LengthMm = 120, HeightMm = 60, Top = TopStyle.Battlements, MerlonHeightMm = 8, Merlons = pattern, MerlonStepMm = 3 });
+        var crenels = BoxWall.Crenels(120, s.MerlonWidthMm, s.CrenelWidthMm);
+        var p = Tops.Battlements(s, 120, 60, 52, crenels);
+        var merlons = p.Segs.Where(g => g.Y0 > 52.5).Select(g => g.Y0).ToList();
+        Assert.Equal(crenels.Count + 1, merlons.Count);
+        Assert.Equal(60, merlons[0]);
+        Assert.Equal(60, merlons[^1] + (pattern == MerlonPattern.Alternating && merlons.Count % 2 == 0 ? 3 : 0));
+        Assert.Equal(pattern == MerlonPattern.Alternating ? 57 : merlons.Count > 2 ? 57 : 60, merlons[1]);
+        foreach (var build in new[] { s, s with { Build = WallBuild.Flat } })
+        {
+            var k = WallKitMaker.Make(build);
+            Assert.True(k.Ok, Why(k));
+            var cut = (build.Boxed ? Part(k, "Front") : Part(k, "Wall")).Cut;
+            Assert.Equal(60, Geo.Bounds(cut).bottom, 3);
+            Assert.True(Geo.Area(Geo.Intersect(cut, [Geo.Rect(-5, 57.5, 125, 61)])) < Geo.Area(Geo.Intersect(cut, [Geo.Rect(-5, 54, 125, 57.5)])) * 0.9);
+        }
+        Assert.Empty(Clashes(Assemble(WallKitMaker.Make(s), 3)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Breaks))]
+    public void Flat_walls_break_every_way_too(RuinStyle style, bool battlements, bool walkway)
+    {
+        var s = new WallSpec { LengthMm = 110, HeightMm = 60, Texture = "Stone blocks", SizeA = 12, SizeB = 6, Broken = style, Top = battlements ? TopStyle.Battlements : TopStyle.Straight, Walkway = walkway, Connectors = new() { [ConnectorKind.Corner] = 2 } };
+        var k = WallKitMaker.Make(s);
+        Assert.True(k.Ok, Why(k));
+        Assert.Equal(1, Geo.Pieces(Part(k, "Wall").Cut));
+    }
+
+    [Fact]
+    public void An_old_ruined_top_is_broken_in_steps_and_new_settings_are_saved()
+    {
+        var old = WallSpec.FromJson("""{"LengthMm":80,"HeightMm":40,"ThicknessMm":3,"Top":"Ruined"}""")!;
+        Assert.Equal(RuinStyle.Stepped, old.Breaks);
+        var s = Box(x => x with { Top = TopStyle.Battlements, Broken = RuinStyle.Breach, RuinAt = RuinPlace.Right, Merlons = MerlonPattern.TallEnds, MerlonStepMm = 2.5 });
+        var back = WallSpec.FromJson(s.ToJson())!;
+        Assert.Equal((RuinStyle.Breach, RuinPlace.Right, MerlonPattern.TallEnds, 2.5), (back.Breaks, back.RuinAt, back.Merlons, back.MerlonStepMm));
+    }
 }

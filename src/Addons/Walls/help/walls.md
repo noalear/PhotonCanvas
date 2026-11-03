@@ -149,11 +149,37 @@ your texture is saved in the design too, so it can be opened and changed on anot
 - **Straight**: a flat top.
 - **Battlements (parapet)**: gaps along the top. **Merlon width** is the raised blocks, **Gap width**
   the gaps between them and **Merlon height** how deep the gaps go. The ends stay full height.
+  **Merlon heights** can be *All the same height*, *Every other one taller* or *Taller at the ends*
+  (like towers at the corners); **Shorter by** is how much lower the shorter merlons are. The wall's
+  **Height** is the top of the tall ones.
   **Walkway behind the battlements** adds a strip, **Walkway depth** deep, that sits on brackets
   behind the wall 8 mm below the gaps; the brackets' tabs plug into slots cut through the wall under
   it. The walkway is as long as the wall between the columns.
-- **Ruined**: a broken top, stepped like fallen stones, deepest somewhere near the middle; the ends
-  stay whole. **Broken down %** is how far down it goes. **Variation** changes where it breaks.
+
+## Broken tops
+
+![A brick wall with battlements of alternating heights, broken by a breach in the middle, put together with its corner columns](images/window-walls-ruins.png)
+
+**Broken** breaks the top for a ruin, whether it's straight or has battlements, so a castle wall can
+have its battlements and a breach through them. On brick, stone blocks, fieldstone and the other
+stone textures, the break follows the joints: whole stones are taken away, so the edge runs round the
+stones like real fallen masonry. On planks, metal and the like it breaks in a jagged line instead.
+
+| Broken | What it looks like |
+|---|---|
+| *Crumbled* | Stones fallen out along the top, most of them in one place. |
+| *Breach* | A deep gap knocked through the top, with steep sides and crumbled shoulders. |
+| *Fallen end* | Standing to full height at one end, falling away towards the other. |
+| *Weathered* | Worn down unevenly all along, with a few deeper gaps. |
+| *Shattered* | Jagged cracks rather than stones, for concrete, rock or metal. |
+| *Stepped* | The first broken top: a dip in stone-sized steps (walls made before keep it). |
+
+**Broken down %** is how far down the break goes, as a share of the height, and **Where** is where
+it's deepest (*Anywhere*, *Left*, *Middle* or *Right*); for a fallen end it's which end has fallen.
+**Variation** on the Texture tab breaks it another way. On a box wall the front and back break round
+the same place, each its own way, and a break is never so deep there's no room for the box under it
+(the wall's checks say when it's been made shallower). Behind a walkway only the parapet breaks. The
+ends stay up to the top of their tabs into the columns; with a fallen end those tabs are kept low.
 
 ## Doors and windows
 
@@ -211,7 +237,7 @@ A box wall is cut as these pieces (the **Pieces** view shows each one):
 | **Lining** | Layers of sheet between the faces round each door and window, 3 mm wide: from any side the opening looks cut through solid wall. One per layer that fits between the faces. |
 | **Merlon filling** | Battlements: the gap between the faces' merlons filled with layers, sitting on the top plate at the bottom of the gaps. |
 | **Parapet backing**, **Walkway** | Battlements with a walkway: the front face goes up as the parapet with a second layer behind it, the back face stops under the walkway, and the top plate is the walkway. A walkway deeper than the wall reaches back over the back face on **Walkway brackets** plugged into slots in the back face. |
-| **Broken top layer** | A ruined top: the front and back break in the same place but each its own way, and the layers between them break a little lower here and there, so the top looks broken right through. |
+| **Broken top layer** | A broken top: the front and back break in the same place but each its own way, and the layers between them break a little lower here and there, so the top looks broken right through. |
 
 **Putting it together**: stand the faces' bottom tabs in the base. Glue the ends, the ribs and the
 linings to the inside of the front, with the ribs' and ends' tabs in the base too; put the top plate
