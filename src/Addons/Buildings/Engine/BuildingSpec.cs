@@ -56,8 +56,15 @@ public sealed record BuildingSpec
 
     /// <summary>The sheet the walls, columns and floors are cut from (mm).</summary>
     public double WallSheetMm { get; init; } = 3;
-    /// <summary>Walls of two panels glued back to back, textured inside and out.</summary>
+    /// <summary>Walls of two panels glued back to back, textured inside and out (flat walls).</summary>
     public bool TwoSided { get; init; }
+    /// <summary>
+    /// Walls built as boxes (the wall maker's): a textured front and back, a base, a top, ends and ribs, so
+    /// they're as thick as <see cref="WallMm"/>; their corner columns are boxes too. Flat walls are a sheet thick.
+    /// </summary>
+    public bool BoxWalls { get; init; }
+    /// <summary>Box walls' thickness, outside to inside (mm).</summary>
+    public double WallMm { get; init; } = 12;
     /// <summary>Gap added to the columns' slots (mm), on top of the kerf the cut layer allows for.</summary>
     public double FitMm { get; init; } = 0.15;
     /// <summary>The ground floor's texture (a wall maker preset).</summary>
@@ -85,6 +92,8 @@ public sealed record BuildingSpec
     /// <summary>Bottom of the windows above the floor of their storey (mm).</summary>
     public double SillMm { get; init; } = 22;
     public WindowBars Bars { get; init; } = WindowBars.Cross;
+    /// <summary>What fills box walls' windows: a frame with the bars, a shutter glued in, shutters that open, or nothing.</summary>
+    public WindowFill WindowFill { get; init; } = WindowFill.Frame;
 
     /// <summary>The roof on top of straight walls (none with battlements).</summary>
     public RoofShape Roof { get; init; } = RoofShape.Gable;
@@ -160,8 +169,25 @@ public sealed record BuildingSpec
         return Items.Count(Same) < 2 ? name : $"{name} {Items.Take(i + 1).Count(Same)}";
     }
 
-    /// <summary>A kind of building as it comes, for 28 mm figures.</summary>
-    public static BuildingSpec Preset(BuildingKind k) => k switch
+    /// <summary>
+    /// A kind of building as it comes, for 28 mm figures: box walls 12 mm thick, on boxed corner columns. It's as
+    /// much bigger than the flat-walled one as its columns are, so the walls between them are as long.
+    /// </summary>
+    public static BuildingSpec Preset(BuildingKind k)
+    {
+        var flat = FlatPreset(k);
+        double grow = BoxColumnMm - flat.ColumnMm;
+        return flat with { BoxWalls = true, WallMm = 12, ColumnMm = BoxColumnMm, WidthMm = flat.WidthMm + grow, DepthMm = flat.DepthMm + grow };
+    }
+
+    /// <summary>Corner columns for 12 mm box walls of 3 mm sheet, at 28 mm (mm across).</summary>
+    public const double BoxColumnMm = 24;
+
+    /// <summary>The narrowest corner columns box walls this thick fit (mm across).</summary>
+    public double NarrowestBoxColumn => WallMm + Math.Max(0, FitMm) + 2 * WallSheetMm + 2;
+
+    /// <summary>A kind of building as it was first made, with flat walls.</summary>
+    public static BuildingSpec FlatPreset(BuildingKind k) => k switch
     {
         BuildingKind.Tavern => new BuildingSpec
         {
@@ -251,7 +277,8 @@ public sealed record BuildingSpec
         {
             ScaleMm = R(ScaleMm * k),
             WidthMm = R(WidthMm * k), DepthMm = R(DepthMm * k), SquareMm = R(SquareMm * k), YardMm = R(YardMm * k), StoreyHeightMm = R(StoreyHeightMm * k), ParapetHeightMm = R(ParapetHeightMm * k),
-            ColumnMm = Math.Max(WallSheetMm * (TwoSided ? 2 : 1) + 6, R(ColumnMm * k)),
+            WallMm = Math.Max(3, Math.Round(WallMm * k / Math.Max(0.1, WallSheetMm))) * WallSheetMm,
+            ColumnMm = Math.Max(BoxWalls ? Math.Ceiling(NarrowestBoxColumn + 1) : WallSheetMm * (TwoSided ? 2 : 1) + 6, R(ColumnMm * k)),
             DoorWidthMm = R(DoorWidthMm * k), DoorHeightMm = R(DoorHeightMm * k), RoofEaveMm = R(RoofEaveMm * k),
             WindowWidthMm = R(WindowWidthMm * k), WindowHeightMm = R(WindowHeightMm * k), SillMm = R(SillMm * k),
             Items = [.. Items.Select(r => r with { Item = ScaledItem(r.Item, k) })],

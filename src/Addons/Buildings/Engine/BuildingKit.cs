@@ -56,7 +56,14 @@ public static class BuildingKitMaker
     /// <summary>Room the furniture keeps from the walls and each other in the 3D view (mm).</summary>
     public const double Clearance = 1.5;
 
-    public static double WallThickness(BuildingSpec s) => s.WallSheetMm * (s.TwoSided ? 2 : 1);
+    public static double WallThickness(BuildingSpec s) => s.BoxWalls ? s.WallMm : s.WallSheetMm * (s.TwoSided ? 2 : 1);
+
+    /// <summary>A storey's walls with their columns' top: a cap (for a roof to sit on, or the top of the building) or flush (for a floor), battlements round a box parapet.</summary>
+    static WallSpec Topped(WallSpec w, bool cap, bool parapet = false) => w with
+    {
+        Cap = cap,
+        ColumnTop = !cap ? ColumnTop.Flush : parapet ? ColumnTop.Battlements : ColumnTop.Cap,
+    };
 
     /// <summary>A height rounded to whole layers of the wall sheet (at least 2).</summary>
     public static double Layers(double h, double t) => Math.Max(2, Math.Round(h / Math.Max(0.1, t))) * t;
@@ -116,7 +123,12 @@ public static class BuildingKitMaker
             SlotDepthMm = Math.Round(Math.Min(SlotDepthMm * k28, s.ColumnMm / 2 - 1), 2),
             PinMm = PinMm,
             Cap = false,
-        };
+        } is var w && s.BoxWalls ? w with
+        {
+            Build = WallBuild.Box, WallMm = s.WallMm, TwoSided = false, PlinthMm = 0, EndsIntoColumns = true,
+            ColumnBuild = ColumnBuild.Boxed, ColumnTop = ColumnTop.Flush, ColumnBase = ColumnBase.Flat,
+            WindowFill = s.WindowFill, MerlonHeightMm = Math.Round(MerlonMm * k28, 1),
+        } : w;
     }
 
     public static BuildingKit Make(BuildingSpec s)
@@ -127,13 +139,14 @@ public static class BuildingKitMaker
         double T = s.WallSheetMm, Wt = WallThickness(s), W = s.WidthMm, D = s.DepthMm, H = StoreyHeight(s);
         int storeys = Math.Clamp(s.Storeys, 1, 6);
         s = s with { Storeys = storeys };
-        if (s.Door == DoorStyle.Swinging && s.DoorShape is OpeningShape.Chamfered or OpeningShape.Rough)
+        if (!s.BoxWalls && s.Door == DoorStyle.Swinging && s.DoorShape is OpeningShape.Chamfered or OpeningShape.Rough)
         {
             findings.Add(new(Severity.Note, "A door that swings is only made for square, arched and pointed doorways: this one has a loose door instead."));
             s = s with { Door = DoorStyle.Loose };
         }
         if (T < 0.5) { findings.Add(new(Severity.Bad, "The wall sheet is too thin: use at least 0.5 mm.")); return new([], [], findings, H, Wt, null); }
         if (W < 30 || D < 30) { findings.Add(new(Severity.Bad, "The building is too small: make it at least 30 × 30 mm.")); return new([], [], findings, H, Wt, null); }
+        if (s.BoxWalls && s.ColumnMm < s.NarrowestBoxColumn) { findings.Add(new(Severity.Bad, $"The corner columns are too thin for {Wt:0.#} mm box walls: make them at least {Math.Ceiling(s.NarrowestBoxColumn * 10) / 10:0.#} mm across.")); return new([], [], findings, H, Wt, null); }
         if (s.ColumnMm < Wt + 3) { findings.Add(new(Severity.Bad, $"The corner columns are too thin for a {Wt:0.#} mm wall: make them at least {Wt + 3:0.#} mm across.")); return new([], [], findings, H, Wt, null); }
         if (Math.Abs(H - s.StoreyHeightMm) > 0.05)
             findings.Add(new(Severity.Note, $"Each storey is {H:0.#} mm high: a whole number of {T:0.##} mm layers, so the columns come out as tall as the walls."));
@@ -159,7 +172,9 @@ public static class BuildingKitMaker
                 {
                     spec = spec with
                     {
-                        Door = s.Door == DoorStyle.Loose ? DoorKind.DoorwayAndDoor : DoorKind.Doorway,
+                        // Box walls hang their own door on pins (or glue it in when it's loose); flat walls have the furniture maker's.
+                        Door = s.BoxWalls ? (s.Door == DoorStyle.Open ? DoorKind.Doorway : DoorKind.DoorwayAndDoor) : s.Door == DoorStyle.Loose ? DoorKind.DoorwayAndDoor : DoorKind.Doorway,
+                        DoorOpens = s.Door == DoorStyle.Swinging,
                         DoorShape = s.DoorShape, DoorLook = s.DoorLook, DoorWidthMm = s.DoorWidthMm, DoorHeightMm = s.DoorHeightMm,
                     };
                     frontGround = spec;
@@ -181,12 +196,25 @@ public static class BuildingKitMaker
                     string what = (side == WallSide.Front ? "Front wall" : side == WallSide.Back ? "Back wall" : "Side wall") + (k == 0 ? "" : k >= s.Storeys ? ", battlements" : $", storey {k + 1}");
                     foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
                         findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"{what}: {f.Text}"));
-                    // A loose door (the wall maker's) and anything else that isn't a wall panel.
-                    foreach (var extra in kit.Parts.Skip(1).Where(p => p.Name != "Wall back"))
-                        extras.Add(new Piece(extra.Name == "Door" ? "Front door" : extra.Name, Sheet.Walls, extra.Cut, extra.Etched, extra.Lines, extra.Copies));
+                    // A loose door (the wall maker's) and anything else that isn't a wall panel (a box wall's pieces are all listed with the wall).
+                    if (!spec.Boxed)
+                        foreach (var extra in kit.Parts.Skip(1).Where(p => p.Name != "Wall back"))
+                            extras.Add(new Piece(extra.Name == "Door" ? "Front door" : extra.Name, Sheet.Walls, extra.Cut, extra.Etched, extra.Lines, extra.Copies));
                 }
                 group.Sides.Add(side);
                 if (!group.Kit.Ok || group.Kit.Front is not { } panel) continue;
+                if (spec.Boxed)
+                {
+                    // Every piece of the box where it sits in the wall, the wall where it stands.
+                    foreach (var part in group.Kit.Parts)
+                        foreach (var at in part.Poses)
+                        {
+                            if (part.Name == "Front") named.Add((solids.Count, group));
+                            string what = part.Name switch { "Front" => "Wall", "Door" => "Front door", _ => "Wall " + part.Name.ToLowerInvariant() };
+                            solids.Add(new Solid(what, part.Cut, InWall(pose, at), T, Nil(part.Etched), Nil(part.Lines), k, side, false));
+                        }
+                    continue;
+                }
                 named.Add((solids.Count, group));
                 solids.Add(new Solid("Wall", panel.Cut, pose, Wt, Nil(panel.Etched), Nil(panel.Lines), k, side, false));
                 if (side == WallSide.Front && k == 0 && group.Kit.Parts.FirstOrDefault(p => p.Name == "Door") is { } leaf)
@@ -198,6 +226,16 @@ public static class BuildingKitMaker
         {
             var panel = g.Kit.Front!;
             string name = g.Name(wallStoreys, storeys);
+            if (g.Spec.Boxed)
+            {
+                // The box's pieces: its front named for the wall, the rest after it ("Walls: back", "Front wall: door").
+                foreach (var part in g.Kit.Parts)
+                {
+                    string what = part.Name == "Front" ? name : part.Name == "Door" ? "Front door" : $"{name}: {part.Name.ToLowerInvariant()}";
+                    pieces.Add(new Piece(what, Sheet.Walls, part.Cut, part.Etched, part.Lines, part.Copies * g.Sides.Count) { WallSpecJson = part.Name == "Front" ? g.Spec.ToJson() : null });
+                }
+                continue;
+            }
             pieces.Add(new Piece(name, Sheet.Walls, panel.Cut, panel.Etched, panel.Lines, g.Sides.Count) { WallSpecJson = g.Spec.ToJson() });
             if (g.Kit.Parts.FirstOrDefault(p => p.Name == "Wall back") is { } back)
                 pieces.Add(new Piece($"{name}: back panel", Sheet.Walls, back.Cut, back.Etched, back.Lines, g.Sides.Count));
@@ -261,8 +299,8 @@ public static class BuildingKitMaker
         if (s.Roof == RoofShape.None || s.Top != BuildingTop.Straight) return null;
         int top = Math.Clamp(s.Storeys, 1, 6) - 1;
         double k28 = K(s);
-        var along = StoreyWall(s, top, s.WidthMm) with { Cap = true };
-        var across = StoreyWall(s, top, s.DepthMm) with { Cap = true };
+        var along = Topped(StoreyWall(s, top, s.WidthMm), true);
+        var across = Topped(StoreyWall(s, top, s.DepthMm), true);
         var shingle = Roofs.Shingles.Preset(s.RoofTexture) ?? Roofs.Shingles.Preset("Slate")!;
         var roof = new Roofs.RoofSpec
         {
@@ -288,9 +326,9 @@ public static class BuildingKitMaker
             findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Roof: {f.Text}"));
         if (!kit.Ok) return;
         int top = Math.Clamp(s.Storeys, 1, 6) - 1;
-        var wall = StoreyWall(s, top, s.WidthMm) with { Cap = true };
+        var wall = Topped(StoreyWall(s, top, s.WidthMm), true);
         // The roof's Z = 0 is the top of the column caps it rests on.
-        double baseY = StoreyBase(s, top) + WallKitMaker.ColumnLayers(wall) * s.WallSheetMm + s.WallSheetMm;
+        double baseY = StoreyBase(s, top) + WallKitMaker.ColumnTopMm(wall);
         double L = spec.LengthMm, T = kit.ThicknessMm;
         bool alongX = s.WidthMm >= s.DepthMm;
         // The roof's model (X along the ridge from 0, Y across from the middle, Z up) → the building (X right, Y up, Z toward you).
@@ -315,10 +353,33 @@ public static class BuildingKitMaker
     {
         double W = s.WidthMm, D = s.DepthMm, T = s.WallSheetMm;
         var corners = new (double X, double Z, double Turn)[] { (-W / 2, D / 2, 0), (W / 2, D / 2, 90), (W / 2, -D / 2, 180), (-W / 2, -D / 2, 270) };
+        if (s.BoxWalls)
+        {
+            // Boxed columns (the wall maker's): sides with slots for the walls' tabs, on a base plate, flush on top under a floor.
+            for (int k = 0; k < wallStoreys; k++)
+            {
+                bool top = k == wallStoreys - 1;
+                var spec = Topped(StoreyWall(s, k, W), top, k == storeys);
+                double y0 = StoreyBase(s, k);
+                var at = corners.Select(c => (new Walls.Model.V3(c.X, y0, c.Z), c.Turn)).ToList();
+                var parts = BoxColumns.Columns(spec, ConnectorKind.Corner, 4, at, out var problem);
+                if (problem is not null) { findings.Add(new(Severity.Bad, $"Corner columns: {problem}")); return; }
+                string where = wallStoreys == 1 ? "" : k == storeys ? ", battlements" : $", storey {k + 1}";
+                foreach (var p in parts)
+                {
+                    string name = p.Name + where;
+                    pieces.Add(new Piece(name, Sheet.Walls, p.Cut, p.Etched, p.Lines, p.Copies));
+                    foreach (var pose in p.Poses)
+                        solids.Add(new Solid(p.Name.Contains("cap") || p.Name.Contains("merlons") ? "Column cap" : "Corner column", p.Cut, Building(pose), T, Nil(p.Etched), Nil(p.Lines), k, WallSide.None, false));
+                }
+            }
+            findings.Add(new(Severity.Note, $"Each corner column is a box {s.ColumnMm:0.#} mm square: its sides go round the plug on its base, the walls' tabs into their slots, then its top."));
+            return;
+        }
         for (int k = 0; k < wallStoreys; k++)
         {
             bool top = k == wallStoreys - 1;
-            var spec = StoreyWall(s, k, W) with { Connectors = new() { [ConnectorKind.Corner] = 4 }, Cap = top };
+            var spec = Topped(StoreyWall(s, k, W), top) with { Connectors = new() { [ConnectorKind.Corner] = 4 } };
             double slotW = WallKitMaker.WallThickness(spec) + Math.Max(0, spec.FitMm);
             var col = Connectors.Column(spec, [0, 90], slotW, Math.Max(0.5, spec.SlotDepthMm), out var problem);
             if (problem is not null) { findings.Add(new(Severity.Bad, $"Corner columns: {problem}")); return; }
@@ -342,11 +403,17 @@ public static class BuildingKitMaker
         double sq = Math.Max(5, s.SquareMm), yard = Math.Max(0, s.YardMm);
         var preset = FloorTextures.Preset(s.FloorTexture) ?? FloorTextures.Preset("Flagstones")!;
         var (a, b) = FloorTextures.SizesFor(preset, sq);
+        // A strip less than half a square wide at the edge is too thin for the jigsaw joints: the board reaches a whole square instead.
+        static double Squares(double mm, double sq)
+        {
+            double n = mm / sq, frac = n - Math.Floor(n);
+            return Math.Round(frac > 0.02 && frac < 0.5 ? Math.Ceiling(n) : n, 4);
+        }
         return new TileSpec
         {
             Mode = TileMode.Board, SquareMm = sq,
-            BoardAcross = Math.Round((s.WidthMm + s.ColumnMm + 2 * yard) / sq, 4),
-            BoardDown = Math.Round((s.DepthMm + s.ColumnMm + 2 * yard) / sq, 4),
+            BoardAcross = Squares(s.WidthMm + s.ColumnMm + 2 * yard, sq),
+            BoardDown = Squares(s.DepthMm + s.ColumnMm + 2 * yard, sq),
             TileAcross = 2, TileDown = 2, PlainBorder = true,
             ThicknessMm = s.WallSheetMm,
             Texture = preset.Name, SizeA = a, SizeB = b, GrooveMm = preset.Groove, Seed = s.Seed + 7, Etch = s.Etch,
@@ -365,8 +432,8 @@ public static class BuildingKitMaker
         if (!kit.Ok) return;
         foreach (var p in kit.Parts)
             pieces.Add(new Piece(p.Name == TileKitMaker.ClipName ? "Floor tile clip" : $"Floor tile {p.Name}", Sheet.Walls, p.Cut, p.Etched, p.Lines, p.Copies));
-        // The board's corner at the building's front left (outside the columns and the yard), its rows running back.
-        double x0 = -s.WidthMm / 2 - s.ColumnMm / 2 - Math.Max(0, s.YardMm), z1 = s.DepthMm / 2 + s.ColumnMm / 2 + Math.Max(0, s.YardMm);
+        // The board centred under the building (it can reach a little past the yard to a whole square), its rows running back.
+        double x0 = -spec.BoardAcross * spec.SquareMm / 2, z1 = spec.BoardDown * spec.SquareMm / 2;   // centred under the building
         foreach (var spot in kit.Board)
             solids.Add(new Solid("Floor tile", spot.Tile.Cut, Pose.Up(x0 + spot.X, s.WallSheetMm / 2, z1 - spot.Y), s.WallSheetMm, Nil(spot.Tile.Etched), Nil(spot.Tile.Lines), 0, WallSide.Ground, false));
         findings.Add(new(Severity.Note, $"The building stands on {kit.Board.Count} floor tiles ({spec.BoardAcross:0.#} × {spec.BoardDown:0.#} squares of {spec.SquareMm:0.#} mm) that lock together with jigsaw edges."));
@@ -385,7 +452,7 @@ public static class BuildingKitMaker
         double k28 = K(s), Wt = WallThickness(s);
         return new FloorSpec
         {
-            WallHeightMm = StoreyHeight(s), WallSheetMm = s.WallSheetMm, TwoSidedWalls = s.TwoSided,
+            WallHeightMm = StoreyHeight(s), WallSheetMm = s.WallSheetMm, TwoSidedWalls = s.TwoSided && !s.BoxWalls, WallThickMm = s.BoxWalls ? s.WallMm : 0,
             WallLengthMm = s.WidthMm, WallsAlong = 1, WallWidthMm = s.DepthMm, WallsAcross = 1,
             // Told about the columns so the opening and the way up keep clear of them. The building's columns
             // are only as tall as the walls, though, so the floor lies on them: Floors() fills their holes back in.
@@ -422,7 +489,8 @@ public static class BuildingKitMaker
         // Plan (x along, y across, from the first corner column) → the building, turned half round: the first corner is the back right.
         V3 Point(Stairs.V3 p, double up) => new(W / 2 - p.X, p.Y + up, -D / 2 - p.Z);
         V3 Dir(Stairs.V3 p) => new(-p.X, p.Y, -p.Z);
-        var pins = new PathsD { Geo.Circle(0, 0, PinMm / 2), Geo.Circle(W, 0, PinMm / 2), Geo.Circle(0, D, PinMm / 2), Geo.Circle(W, D, PinMm / 2) };
+        // Stacked columns carry a pin up through the floors; boxed ones have none.
+        var pins = s.BoxWalls ? [] : new PathsD { Geo.Circle(0, 0, PinMm / 2), Geo.Circle(W, 0, PinMm / 2), Geo.Circle(0, D, PinMm / 2), Geo.Circle(W, D, PinMm / 2) };
         var columnHoles = Plate.ColumnHoles(spec);
         foreach (var part in kit.Parts)
         {
@@ -472,7 +540,7 @@ public static class BuildingKitMaker
     {
         var chosen = s.Items.Select((r, i) => (Room: r, Label: s.Label(i))).Where(x => x.Room.Item.Count > 0 && x.Room.Item.Kind is not (ItemKind.WallDoor or ItemKind.WallShelf)).ToList();
         var items = chosen.Select(x => x.Room).ToList();
-        bool door = s.Door == DoorStyle.Swinging && front is not null;
+        bool door = s.Door == DoorStyle.Swinging && front is not null && !s.BoxWalls;
         var all = items.Select(r => r.Item).ToList();
         if (door)
         {
@@ -530,6 +598,16 @@ public static class BuildingKitMaker
         WoodDetail.Stone => (12, 6),
         _ => (5, 35),
     };
+
+    /// <summary>A piece of a box wall (placed in the wall's own frame: x along it, y up, z out of its front) where the wall stands.</summary>
+    static Pose InWall(Pose wall, Walls.Model.Pose local)
+    {
+        V3 Dir(Walls.Model.V3 d) => wall.U * d.X + wall.V * d.Y + wall.N * d.Z;
+        return new Pose(wall.O + Dir(local.O), Dir(local.U), Dir(local.V));
+    }
+
+    /// <summary>The wall maker's pose as the building's (the same room: X right, Y up, Z towards you).</summary>
+    static Pose Building(Walls.Model.Pose p) => new(new V3(p.O.X, p.O.Y, p.O.Z), new V3(p.U.X, p.U.Y, p.U.Z), new V3(p.V.X, p.V.Y, p.V.Z));
 
     static PathsD? Nil(PathsD p) => p.Count > 0 ? p : null;
     static List<PathD>? Nil(List<PathD> p) => p.Count > 0 ? p : null;

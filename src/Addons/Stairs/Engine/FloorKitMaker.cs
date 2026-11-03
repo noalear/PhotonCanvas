@@ -22,7 +22,7 @@ public static class FloorKitMaker
     /// <summary>The plate's rim round the columns with <see cref="FloorEdge.OverColumns"/> (mm).</summary>
     public const double RimMm = 2;
 
-    public static double WallThickness(FloorSpec s) => Math.Max(0.3, s.WallSheetMm) * (s.TwoSidedWalls ? 2 : 1);
+    public static double WallThickness(FloorSpec s) => s.WallThickMm > 0 ? s.WallThickMm : Math.Max(0.3, s.WallSheetMm) * (s.TwoSidedWalls ? 2 : 1);
 
     /// <summary>The room's size on the plan, column centre to column centre (mm).</summary>
     public static (double X, double Y) Room(FloorSpec s) => (Math.Max(1, s.WallLengthMm) * Math.Max(1, s.WallsAlong), Math.Max(1, s.WallWidthMm) * Math.Max(1, s.WallsAcross));

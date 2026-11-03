@@ -196,6 +196,9 @@ public class BoxWallsTests
         var k = WallKitMaker.Make(s);
         Assert.True(k.Ok, Why(k));
         Assert.Contains(k.Parts, p => p.Name == "Cross column side");
+        // A side no wall comes into has no slots.
+        var end = k.Parts.Single(p => p.Name == "End column blank side");
+        Assert.DoesNotContain(Geo.Tidy(end.Cut), h => Clipper.Area(h) < 0);
         Assert.Contains(k.Parts, p => p.Name == "End column side");
         var all = Assemble(k, 3);
         Assert.Empty(Clashes(all));
@@ -341,6 +344,11 @@ public class BoxWallsTests
         Assert.Equal(w.WallMm, r.WallMm);
         Assert.Equal(w.ColumnMm + 8, r.CornerMm, 2);
         Assert.Equal(BoxColumns.TopMm(w) - w.HeightMm, r.RestAboveWallsMm, 2);
+        // A tower's slots take the whole box wall, deep enough for the tabs on its faces' ends.
+        var t = PhotonCanvas.Addon.Roofs.WallsFit.Fit(new PhotonCanvas.Addon.Roofs.TowerSpec(), w);
+        Assert.Equal(w.WallMm, t.WallMm);
+        Assert.Equal(BoxWall.TabLength(w) + WallKitMaker.EndClearMm, t.SlotDepthMm, 2);
+        Assert.True(PhotonCanvas.Addon.Roofs.TowerMaker.Make(t).Ok);
     }
 
     // ---- broken tops and merlon heights ----

@@ -19,7 +19,7 @@ public static class BoxColumns
     }
 
     /// <summary>A plate lying flat, its (u, v) the column's own plan (u along its first slot), its middle at <paramref name="c"/>.</summary>
-    static Pose Plate(V3 c, double y, double yaw) => new(new V3(c.X, y, c.Z), Dir(yaw), Dir(yaw + 90));
+    static Pose Plate(V3 c, double y, double yaw) => new(new V3(c.X, c.Y + y, c.Z), Dir(yaw), Dir(yaw + 90));
 
     /// <summary>A side standing <paramref name="dist"/> out from the middle, facing <paramref name="facing"/>, <paramref name="width"/> wide (u across it, v up).</summary>
     static Pose Side(V3 c, double facing, double dist, double width)
@@ -59,27 +59,39 @@ public static class BoxColumns
         bool anyStacked = false;
         foreach (var kind in kinds)
         {
-            int count = s.ConnectorCount(kind.Id);
             var dirs = Connectors.Directions(kind.Id, s.CustomAngleDeg);
-            bool square = dirs.All(d => Math.Abs(Math.IEEERemainder(d, 90)) < 1e-6);
-            bool boxed = s.ColumnBuild == ColumnBuild.Boxed && square;
-            if (s.ColumnBuild == ColumnBuild.Boxed && !square) anyStacked = true;
-            var pieces = boxed ? Boxed(s, dirs, out var problem) : Stacked(s, dirs, out problem);
+            if (s.ColumnBuild == ColumnBuild.Boxed && !dirs.All(d => Math.Abs(Math.IEEERemainder(d, 90)) < 1e-6)) anyStacked = true;
+            var these = Columns(s, kind.Id, s.ConnectorCount(kind.Id), shown.TryGetValue(kind.Id, out var places) ? places : [], out var problem);
             if (problem is not null) { findings.Add(new(Severity.Bad, $"{kind.Name}: {problem}")); continue; }
-            string name = $"{char.ToUpperInvariant(kind.Short[0])}{kind.Short[1..]} column";
-            var at = shown.TryGetValue(kind.Id, out var places) ? places : [];
-            foreach (var g in pieces.GroupBy(p => p.Name))
-            {
-                var first = g.First();
-                parts.Add(new Part($"{name} {first.Name}", first.Cut, first.Etched, first.Lines, g.Count() * count)
-                {
-                    Poses = [.. at.SelectMany(p => g.Select(x => x.At(p.Centre, p.Yaw)))],
-                });
-            }
+            parts.AddRange(these);
         }
         if (anyStacked) findings.Add(new(Severity.Note, "Columns at angles other than a right angle are stacks of layers: line them up on a pin through the middle and glue them."));
         if (kinds.Any(k => s.ColumnBuild == ColumnBuild.Boxed && Connectors.Directions(k.Id, s.CustomAngleDeg).All(d => Math.Abs(Math.IEEERemainder(d, 90)) < 1e-6)))
             findings.Add(new(Severity.Note, $"Each boxed column is {C:0.#} mm square, {TopMm(s):0.#} mm tall: its sides go round the plug on its base, the walls' tabs into their slots, then the top."));
+        return parts;
+    }
+
+    /// <summary>
+    /// The pieces of <paramref name="count"/> columns of one kind, shown standing at each of <paramref name="at"/>
+    /// (its middle on the table, its first slot turned <paramref name="yaw"/> degrees anticlockwise seen from above).
+    /// </summary>
+    public static List<Part> Columns(WallSpec s, ConnectorKind kind, int count, IReadOnlyList<(V3 Centre, double Yaw)> at, out string? problem)
+    {
+        var parts = new List<Part>();
+        var dirs = Connectors.Directions(kind, s.CustomAngleDeg);
+        bool square = dirs.All(d => Math.Abs(Math.IEEERemainder(d, 90)) < 1e-6);
+        var pieces = s.ColumnBuild == ColumnBuild.Boxed && square ? Boxed(s, dirs, out problem) : Stacked(s, dirs, out problem);
+        if (problem is not null) return parts;
+        var k = Connectors.Kinds.First(x => x.Id == kind);
+        string name = $"{char.ToUpperInvariant(k.Short[0])}{k.Short[1..]} column";
+        foreach (var g in pieces.GroupBy(p => p.Name))
+        {
+            var first = g.First();
+            parts.Add(new Part($"{name} {first.Name}", first.Cut, first.Etched, first.Lines, g.Count() * count)
+            {
+                Poses = [.. at.SelectMany(p => g.Select(x => x.At(p.Centre, p.Yaw)))],
+            });
+        }
         return parts;
     }
 
@@ -177,7 +189,8 @@ public static class BoxColumns
             if (wall) region = Geo.Subtract(region, [Geo.Rect(w / 2 - W / 2 - 0.5, 0, w / 2 + W / 2 + 0.5, H)]);
             var (e, l) = BoxWall.FaceTexture(s, 10 + (int)facing / 90, w, sideTop, region);
             double f = facing;
-            pieces.Add(new(full ? "side" : "inner side", cut, Geo.Union(e), l, (c, yaw) => Side(c, yaw + f, C / 2 - T / 2, w)));
+            // A side no wall comes into has no slots: it's a piece of its own.
+            pieces.Add(new((wall ? "" : "blank ") + (full ? "side" : "inner side"), cut, Geo.Union(e), l, (c, yaw) => Side(c, yaw + f, C / 2 - T / 2, w)));
         }
 
         // The top.
