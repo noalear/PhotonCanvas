@@ -3,7 +3,11 @@
 An add-on (Settings → Add-ons → **Mini furniture maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Furniture**, and **Edit furniture…** is on the right-click menu of the pieces it made.
 
 **Furniture** makes flat-pack furniture for tabletop games, dioramas and model rooms: tables,
-benches, stools, chairs, bookshelves, chests, crates and beds, cut from one sheet. The pieces slot
+benches, stools, chairs, bookshelves, chests, crates and beds; cabinets of every kind (wardrobes,
+dressers, lockers, clocks, altars), armchairs, thrones, sofas and pews, four-posters and bunks,
+fireplaces, ovens and forges, desks, lecterns and consoles, weapon racks, armour stands, coffins
+and sarcophagi, candle stands, screens, stocks, rugs and wall hangings, all cut from one sheet.
+Nearly 200 of them come **ready-made** for each theme and room. The pieces slot
 together with tabs and finger joints, so they stand up square on their own (a drop of glue keeps
 them that way). Wood grain and planks are etched and scored on the faces that show. It also makes a
 **door for a wall** that hangs in a doorway from the wall maker (**Home → Draw → Walls**) and swings
@@ -47,6 +51,31 @@ of that theme. **Start the list from this theme** replaces the list with furnitu
 | Desert | Wood grain | Square top | A low round table, stools, a chest, crates and wall shelves |
 | Gothic | Planks and grain | Pointed arch | A long table, high-backed chairs, bookshelves, a chest and a door |
 
+## Ready-made furniture
+
+![A gothic hall from the ready-made list: a grand fireplace, a wing chair, a grandfather clock, a glass bookcase and a candelabra](images/window-furniture-ready-made.png)
+
+**Ready-made**, under the theme, lists furniture already set up for the theme picked and a
+**Room**. Pick one and press **Add** to put it on the list; then change it like any other.
+Each ready-made piece keeps its own theme's look (the **Look** setting at the bottom of the piece's
+settings), so a sci-fi console can stand among medieval furniture.
+
+| Room | For example |
+|---|---|
+| Bedroom | Four-posters, bunks, pallets, wardrobes, chests of drawers, lockers, rugs, tapestries, dressing screens |
+| Kitchen | Dressers with plates, bread ovens, galley units, larder cupboards, jar shelves |
+| Hall & tavern | Great fireplaces, long tables, settles and sofas, bar counters, bottle shelves, banners |
+| Study & library | Bookcases, glass bookcases, scroll shelves, writing desks, lecterns, map tables, terminals |
+| Workshop & forge | Forges, workbenches, tool cupboards and lockers, work consoles |
+| Storage | Crates, chests, shelving, barred and machine cabinets |
+| Chapel & temple | Altars, pews, candelabras, rood screens, shrines |
+| Armoury & guardroom | Weapon and rifle racks, armour stands, training dummies, shields, barriers |
+| Throne room & bridge | Thrones on a dais, captain's chairs, helm consoles, star maps, long carpets |
+| Prison & crypt | Stocks, cell bunks, coffins, sarcophagi |
+| Lab & infirmary | Sleeper pods, potion cabinets, apothecary drawers, lab consoles |
+
+They're sized for 28 mm figures on 2 mm sheet, and scale with **Figures** like everything else.
+
 ## The list
 
 Everything on the list is cut together. Pick a kind of furniture under the list and press **Add**;
@@ -69,8 +98,33 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Bed** | A **Head board** and **Foot board**, a mattress that slots between them at **Mattress** height, and side rails; **A pillow and a blanket etched on**. | 32 long, 16 wide, head 13, foot 8 |
 | **Door for a wall** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | doorway 16 × 28 |
 | **Wall shelf** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | 20 long, 5 deep |
+| **Cabinet** | Two sides, a bottom, shelves and a top slotted together, a back and a front. **Front**: *Doors*, *Drawers*, *Drawers over doors*, *Glass doors*, *Open shelves*, *Dresser (shelves over a cupboard)*, *Panelled doors*, *Lockers*, *Machine panels*, *Clock*, *Lattice doors* or *Altar*. **Top**: *Flat*, *Cornice (two layers)*, *Pediment* or *Arch*. **Across** (doors or drawers side by side), **Drawer rows**, **Shelves** and what's **On the shelves** (books, bottles, jars, plates, scrolls or machines). | 22 wide, 11 deep, 34 high |
+| **Desk** | A top on two solid ends with a back panel and a drawer front. **On top**: papers, a book and ink, or a screen and keyboard. | 24 × 12, 13 high |
+| **Armchair or throne** | Two shaped sides, a tufted seat and a back. **Kind**: *Armchair*, *Throne on a dais*, *Sofa or settle* (**Seats** side by side), *Pew* or *Command chair*. **Seat height**, **Arm height** and the **Back's top** (*Square*, *Rounded*, *Arched*, *Pointed* or *Winged*). | 14 × 12, 20 high |
+| **Bed** (more kinds) | **Kind**: *Plain*, *Four-poster* (a canopy on four posts with a valance), *Bunk beds* (a ladder in the foot board) or *Pallet on sleepers* (with a fur). | as the bed |
+| **Fireplace or oven** | A front, cheeks, a fire back with logs and flames, a hearth and a mantel. **Kind**: *Fireplace* (with a chimney breast), *Bread oven* (a domed front, a wood store below) or *Forge* (a hood over the fire bed). | 26 wide, 9 deep, 40 high |
+| **Lectern or console** | A sloping top between two shaped sides. **Kind**: *Lectern*, *Writing desk (scriptorium)*, *Control console* or *Map table*. | 9 × 8, 22 high |
+| **Weapon rack** | Two ends, a holder and a base, with **Weapons** standing in two rows: spears, swords, axes and halberds, or rifles in sci-fi. | 18 × 8, 30 high |
+| **Armour stand** | Two profiles crossed on a foot: *Armour*, *Training dummy* or *Coat stand*. | 14 × 10, 32 high |
+| **Coffin or sarcophagus** | Layers glued into a solid shape on two keys: *Coffin*, *Sarcophagus* (an effigy on the lid) or *Sleeper pod*. | 34 × 11, 6 high |
+| **Rug** | One flat piece: *Bordered*, *Kilim*, *Damask*, *Hide*, *Deck mat* or *Round*. | 36 × 24 |
+| **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry*, *Banner*, *Painting*, *Shield and swords*, *Map* or *Screen*. | 16 × 22 |
+| **Candle stand or lamp** | Two profiles crossed on a foot: *Candelabra*, *Lamp* or *Torch*. | 10 across, 24 high |
+| **Screen** | A standing screen of **Panels** on two feet: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. | 30 wide, 30 high |
+| **Stocks** | Two posts on feet, a board with holes for the head and hands, and a rail. | 22 × 9, 28 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
+**Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
+and symbols. *The list's theme* follows the theme at the top.
+
+| | |
+|---|---|
+| ![A medieval four-poster bed with its canopy and valance](images/window-furniture-four-poster.png) | ![A wardrobe with panelled doors under a cornice](images/window-furniture-wardrobe.png) |
+| ![A throne on a two-step dais](images/window-furniture-throne.png) | ![A dresser with plates on its shelves](images/window-furniture-dresser.png) |
+| ![A weapon rack with spears, a sword, an axe and a halberd](images/window-furniture-weapon-rack.png) | ![A forge with its hood and flames](images/window-furniture-forge.png) |
+| ![A sci-fi helm console with screens and buttons](images/window-furniture-console.png) | ![Three sci-fi lockers](images/window-furniture-lockers.png) |
+| ![A gothic grandfather clock](images/window-furniture-clock.png) | ![A sarcophagus with an effigy on its lid](images/window-furniture-sarcophagus.png) |
+| ![A gothic tracery screen](images/window-furniture-screen.png) | |
 
 If a size is too small for the sheet (a slot that would cut a piece in two, a tab with nothing round
 it), the list under the preview says what to change and the furniture can't go in until it's fixed.

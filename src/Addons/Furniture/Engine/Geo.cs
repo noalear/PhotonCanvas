@@ -48,6 +48,12 @@ public static class Geo
     }
 
     public static PathsD Union(PathsD a) => a.Count == 0 ? [] : Clipper.BooleanOp(ClipType.Union, a, null, FillRule.NonZero, Precision);
+    /// <summary>Math.Clamp that doesn't throw when the limits cross (tiny furniture): the low limit wins.</summary>
+    public static double Clamp(double v, double lo, double hi) => hi < lo ? lo : Math.Clamp(v, lo, hi);
+    public static int Clamp(int v, int lo, int hi) => hi < lo ? lo : Math.Clamp(v, lo, hi);
+
+    /// <summary>Every path filled, whichever way round it was drawn, then joined.</summary>
+    public static PathsD Solid(PathsD a) => Union([.. a.Select(q => Clipper.IsPositive(q) ? q : Clipper.ReversePath(q))]);
     public static PathsD Union(PathsD a, PathsD b) => Clipper.Union(a, b, FillRule.NonZero, Precision);
     public static PathsD Subtract(PathsD a, PathsD b) => a.Count == 0 ? [] : b.Count == 0 ? a : Clipper.Difference(a, b, FillRule.EvenOdd, Precision);
     public static PathsD Intersect(PathsD a, PathsD b) => a.Count == 0 || b.Count == 0 ? [] : Clipper.Intersect(a, b, FillRule.EvenOdd, Precision);
