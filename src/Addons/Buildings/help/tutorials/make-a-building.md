@@ -24,8 +24,9 @@ floor tiles, the furniture's faces and the way up. Try *Dungeon* on the cottage,
 
 ## Set the wall sheet and texture
 <!-- target: tabitem:Walls -->
-On the **Walls** tab, pick your material in **Cut with** (or type the sheet's **Thickness**), then
-the texture for the ground floor and the storeys above.
+On the **Walls** tab, **Walls** is *Boxes*: thick walls that stand up on their own, with their own
+door that swings open on pins. Pick your material in **Cut with** (or type the sheet's
+**Panel thickness**), then the texture for the ground floor and the storeys above.
 
 ## Furnish the rooms
 <!-- target: tabitem:Furniture -->
@@ -40,5 +41,5 @@ standing in them. Drag the building to turn it round.
 ## Put it in the design
 <!-- target: button:Put in the design -->
 Press **Put in the design**. The walls' pieces go on their own pages, nested onto the bed, and the
-furniture's on pages of their own. Cut a column and the end of a wall first and change **Slot fit**
-if the wall is too tight or too loose in the slot.
+furniture's on pages of their own. Cut a column side and the end of a wall first and change **Slot fit**
+if the wall's tabs are too tight or too loose in the slots.

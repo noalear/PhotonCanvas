@@ -82,11 +82,12 @@ public static class WallsFit
             ThicknessMm = w.ThicknessMm,
             WallMm = WallKitMaker.WallThickness(w),
             WallHeightMm = w.HeightMm,
-            SlotDepthMm = w.SlotDepthMm,
+            // A box wall's faces have tabs at their ends that go into the slot (it's as wide as the whole wall).
+            SlotDepthMm = w.Boxed ? Math.Round(BoxWall.TabLength(w) + WallKitMaker.EndClearMm, 2) : w.SlotDepthMm,
             FitMm = w.FitMm,
             Join = t.Join ?? ConnectorKind.Corner,
             HeightMm = Math.Max(t.HeightMm, w.HeightMm + 25),
-            RingMm = Math.Max(t.RingMm, w.SlotDepthMm + 2.5),
+            RingMm = Math.Max(t.RingMm, (w.Boxed ? BoxWall.TabLength(w) + WallKitMaker.EndClearMm : w.SlotDepthMm) + 2.5),
         };
         if (Rings.Textures.Contains(w.Texture)) fitted = fitted with { Texture = w.Texture, SizeA = w.SizeA, SizeB = w.SizeB, GrooveMm = w.GrooveMm, Seed = w.Seed };
         return fitted;

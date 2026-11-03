@@ -57,6 +57,10 @@ public sealed class BuildingWindow : Window
     // Walls
     readonly NumericUpDown _wallT = Number(0.5m, 20, 0.5m, "0.##"), _fit = Number(-0.5m, 2, 0.05m, "0.##"), _column = Number(5, 200, 1, "0.#"), _seed = Number(1, 9999, 1, "0");
     readonly CheckBox _twoSided = new() { Content = "Two panels back to back (textured inside too)" };
+    readonly ComboBox _build = Combo("Boxes: a front, back, top and bottom", "Flat: one sheet thick");
+    readonly NumericUpDown _wallMm = Number(6, 60, 1, "0.#");
+    readonly ComboBox _winFill = Combo("Nothing (bars left in the wall)", "A frame with its bars", "A shutter, glued in", "Shutters that open");
+    Control _wallMmRow = null!, _winFillRow = null!;
     readonly ComboBox _texture = Combo(), _upper = Combo(), _etch = Combo("Grooves (etched areas, deeper)", "Lines (scored, faster)");
     readonly List<string> _textures = [.. Textures.Presets.Select(p => p.Name)];
     readonly ComboBox _wallCut = Combo(), _etchWith = Combo();
@@ -202,16 +206,17 @@ public sealed class BuildingWindow : Window
                     Field("Grid square", _square, tip: "One square of the grid the tiles are laid out on (mm): 25.4 (an inch) for 28–32 mm figures."),
                     Field("Yard", _yard, tip: "How far the tiles reach past the building's outside, all round (mm)."))),
             Explained("Door", "In the middle of the front of the ground floor.",
-                Field("Door", _door, tip: "Hung on clips (from the furniture maker) it swings open; loose, it just sits in the doorway."),
-                Field("Shape", _doorShape, tip: "A door that swings is made for square, arched and pointed doorways; the others get a loose door."),
-                Field("Look", _doorLook, tip: "What a loose door looks like, as the wall maker makes it."),
+                Field("Door", _door, tip: "Box walls hang the door on pins so it swings open, or glue it into the doorway if it's loose. Flat walls hang it on clips (from the furniture maker), or it just sits loose in the doorway."),
+                Field("Shape", _doorShape, tip: "In flat walls a door that swings is made for square, arched and pointed doorways; the others get a loose door."),
+                Field("Look", _doorLook, tip: "What the wall maker's door looks like (box walls, or a loose door)."),
                 Field("Width", _doorW), Field("Height", _doorH)),
             Explained("Windows", "On every storey; the ground floor's front fits them round the door.",
                 Field("Front and back", _winFront, tip: "Windows in the front wall and in the back wall of each storey."),
                 Field("Each side", _winSide, tip: "Windows in each side wall of each storey."),
                 Field("Shape", _winShape), Field("Width", _winW), Field("Height", _winH),
                 Field("Sill", _sill, tip: "How high the bottom of the windows is above the floor (mm)."),
-                Field("Bars", _bars)));
+                Field("Bars", _bars),
+                _winFillRow = Field("In the windows", _winFill, tip: "Box walls: a frame with the bars in it, a solid shutter glued in, or shutters that swing open.")));
     }
 
     Control WallsTab()
@@ -222,7 +227,9 @@ public sealed class BuildingWindow : Window
         _upper.ItemsSource = new List<string> { "The same as the ground floor" }.Concat(_textures).ToList();
         return Stack(
             Explained("Sheet", "The walls, the corner columns and the floors are cut from this sheet: its thickness sets the columns' slots and the storeys' heights.",
-                Field("Thickness", _wallT, tip: "The wall sheet's thickness (mm)."),
+                Field("Walls", _build, tip: "Box walls are thick and stand up on their own: a textured outside and inside, a base, a top, ends and ribs, and boxed corner columns. Flat walls are one sheet (or two) thick, in columns of stacked layers."),
+                _wallMmRow = Field("Wall thickness", _wallMm, tip: "How thick a box wall is, outside to inside (mm): a whole number of sheets fits best, 12 mm for 3 mm sheet."),
+                Field("Panel thickness", _wallT, tip: "The wall sheet's thickness (mm): a box wall's faces, ends and plates, the columns, floors, stairs, roof and floor tiles are cut from it."),
                 _twoSided,
                 Field("Slot fit", _fit, tip: "Added to the wall's thickness for the columns' slots (mm): more is looser."),
                 Field("Columns", _column, tip: "How wide the corner columns are (mm)."),
@@ -292,12 +299,13 @@ public sealed class BuildingWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
+        foreach (var n in new[] { _width, _depth, _storeys, _storeyH, _parapet, _doorW, _doorH, _winFront, _winSide, _winW, _winH, _sill, _wallT, _wallMm, _fit, _column, _seed, _furnT, _furnFit, _grip, _square, _yard })
             n.ValueChanged += (_, _) => FromControls();
         _theme.SelectionChanged += (_, _) => ThemeChosen();
-        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _doorLook, _winShape, _bars, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
+        foreach (var c in new[] { _top, _wayUp, _door, _doorShape, _doorLook, _winShape, _bars, _winFill, _texture, _upper, _etch, _detail, _etchWith, _joints, _tileTexture })
             c.SelectionChanged += (_, _) => FromControls();
         _twoSided.IsCheckedChanged += (_, _) => FromControls();
+        _build.SelectionChanged += (_, _) => BuildChosen();
         _tiles.IsCheckedChanged += (_, _) => FromControls();
         _wallCut.SelectionChanged += (_, _) => CutChosen(_wallCut, _wallT, _fit, _wallCutNote);
         _furnCut.SelectionChanged += (_, _) => CutChosen(_furnCut, _furnT, _furnFit, _furnCutNote);
@@ -335,12 +343,14 @@ public sealed class BuildingWindow : Window
         _tiles.IsChecked = s.FloorTiles; _tileRows.IsVisible = s.FloorTiles;
         _tileTexture.SelectedIndex = Math.Max(0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.ToList().FindIndex(p => p.Name == s.FloorTexture));
         _square.Value = D(s.SquareMm); _yard.Value = D(s.YardMm);
+        _build.SelectedIndex = s.BoxWalls ? 0 : 1; _wallMm.Value = D(s.WallMm); _winFill.SelectedIndex = (int)s.WindowFill;
         _wallT.Value = D(s.WallSheetMm); _twoSided.IsChecked = s.TwoSided; _fit.Value = D(s.FitMm); _column.Value = D(s.ColumnMm); _seed.Value = Math.Clamp(s.Seed, 1, 9999);
         _texture.SelectedIndex = Math.Max(0, _textures.IndexOf(s.Texture));
         _upper.SelectedIndex = s.UpperTexture is { Length: > 0 } up && _textures.IndexOf(up) is >= 0 and var ui ? ui + 1 : 0;
         _etch.SelectedIndex = (int)s.Etch;
         _furnT.Value = D(s.FurnitureSheetMm); _furnFit.Value = D(s.FurnitureFitMm); _detail.SelectedIndex = (int)s.Detail;
         _joints.SelectedIndex = s.FurniturePushFit ? 1 : 0; _grip.Value = D(Math.Clamp(s.FurnitureGripMm, 0.02, 0.5)); _gripRow.IsVisible = s.FurniturePushFit;
+        _wallMmRow.IsVisible = _winFillRow.IsVisible = s.BoxWalls; _twoSided.IsVisible = !s.BoxWalls;
         _parapetRow.IsVisible = s.Top == BuildingTop.Battlements;
         _loading = false;
         FillList(_sel);
@@ -362,7 +372,8 @@ public sealed class BuildingWindow : Window
             DoorWidthMm = V(_doorW, 16), DoorHeightMm = V(_doorH, 28),
             WindowsFront = (int)V(_winFront, 0), WindowsSide = (int)V(_winSide, 0),
             WindowShape = (OpeningShape)Index(_winShape), WindowWidthMm = V(_winW, 8), WindowHeightMm = V(_winH, 12), SillMm = V(_sill, 22),
-            Bars = (WindowBars)Index(_bars),
+            Bars = (WindowBars)Index(_bars), WindowFill = (WindowFill)Index(_winFill),
+            BoxWalls = _build.SelectedIndex == 0, WallMm = V(_wallMm, 12),
             FloorTiles = _tiles.IsChecked == true, FloorTexture = PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets[Math.Clamp(Index(_tileTexture), 0, PhotonCanvas.Addon.FloorTiles.FloorTextures.Presets.Count - 1)].Name,
             SquareMm = V(_square, 25.4), YardMm = V(_yard, 0),
             WallSheetMm = V(_wallT, 3), TwoSided = _twoSided.IsChecked == true, FitMm = V(_fit, 0.15), ColumnMm = V(_column, 16), Seed = (int)V(_seed, 1),
@@ -371,6 +382,8 @@ public sealed class BuildingWindow : Window
             FurniturePushFit = _joints.SelectedIndex == 1, FurnitureGripMm = V(_grip, 0.15),
         };
         _gripRow.IsVisible = _spec.FurniturePushFit;
+        _wallMmRow.IsVisible = _winFillRow.IsVisible = _spec.BoxWalls;
+        _twoSided.IsVisible = !_spec.BoxWalls;
         _parapetRow.IsVisible = top == BuildingTop.Battlements;
         _tileRows.IsVisible = _spec.FloorTiles;
         if (_spec.Storeys != storeysBefore) FillList(_sel);
@@ -388,16 +401,28 @@ public sealed class BuildingWindow : Window
         Changed();
     }
 
+    /// <summary>Box or flat walls picked: box walls get corner columns wide enough for them.</summary>
+    void BuildChosen()
+    {
+        if (_loading) return;
+        if (_build.SelectedIndex == 0)
+        {
+            double need = Math.Ceiling(_spec.NarrowestBoxColumn + 1);
+            if (V(_column, 16) < need) { _loading = true; _column.Value = D(need); _loading = false; }
+        }
+        FromControls();
+    }
+
     void KindChosen()
     {
         if (_loading) return;
         var kind = (BuildingKind)Index(_kind);
         // Start again from the building, at the figures chosen; the sheets stay as they are.
-        var s = BuildingSpec.Preset(kind);
+        var s = _spec.BoxWalls ? BuildingSpec.Preset(kind) : BuildingSpec.FlatPreset(kind);
         s = s.Scaled(_spec.ScaleMm / s.ScaleMm);
         _spec = s with
         {
-            WallSheetMm = _spec.WallSheetMm, TwoSided = _spec.TwoSided, FitMm = _spec.FitMm,
+            WallSheetMm = _spec.WallSheetMm, TwoSided = _spec.TwoSided, FitMm = _spec.FitMm, WindowFill = _spec.WindowFill,
             FurnitureSheetMm = _spec.FurnitureSheetMm, FurnitureFitMm = _spec.FurnitureFitMm, FurniturePushFit = _spec.FurniturePushFit, FurnitureGripMm = _spec.FurnitureGripMm, Seed = _spec.Seed, Etch = _spec.Etch,
         };
         _sel = 0;

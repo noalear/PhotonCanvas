@@ -5,7 +5,7 @@ An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanv
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
 **Cottage**, a **Tavern** or a **Watchtower** (or a sci-fi outpost, a gothic chapel, a dungeon crypt
 or an adobe house) and you get every wall with its doorway and windows,
-the corner columns the walls slide into, the floor tiles it stands on, a floor between the storeys
+the corner columns the walls go into, the floor tiles it stands on, a floor between the storeys
 with stairs or a ladder up to it, a roof that lifts off, a door that swings open, and the furniture
 for every room. Each
 piece is made the way the wall maker ([Textured walls](walls.md)), the furniture maker
@@ -16,7 +16,7 @@ jigsaw together and the furniture slots together.
 > **Note:** The buildings have been checked on screen and in tests (every wall, column and floor is
 > put together in 3D and checked for clashes, and every piece of furniture stands inside its room),
 > but not yet cut on the machine. Cut one corner column and the end of one wall first, check the
-> wall slides into the slot, and change **Slot fit** on the **Walls** tab if it's too tight or too loose.
+> wall's tabs go into the column's slots, and change **Slot fit** on the **Walls** tab if they're too tight or too loose.
 
 ## The Whole buildings window
 <!-- windows: BuildingWindow -->
@@ -42,15 +42,17 @@ pieces are replaced wherever they are.
 **Building** starts again from one of these, sized for the **Figures** chosen (15, 28, 32 or 54 mm;
 changing **Figures** later scales every size, the furniture's too). Everything can then be changed.
 
+Each comes with box walls 12 mm thick on boxed corner columns 24 mm across (see [Walls and columns](#walls-and-columns)); the sizes below are between the columns' centres.
+
 | Building | What you get (at 28 mm) |
 |---|---|
-| **Cottage** | One storey, 110 × 80 mm between the corner columns, fieldstone walls on flagstone tiles under a thatched roof, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
-| **Tavern** | Two storeys, 150 × 100 mm: stone blocks below and timber frame above, square windows, stairs up, floorboard tiles and a clay-tiled roof. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
-| **Watchtower** | A 72 mm square tower of two storeys with arrow slits, a ladder up to each floor, a floor on top with battlements round it, on dungeon flagstones. Crates and a chest below, two bunks, a table and stools above. |
-| **Sci-fi outpost** | One storey, 110 × 85 mm of sci-fi panels under a corrugated lean-to roof, on a sci-fi deck, with a metal blast door with angled corners loose in the doorway and wide angled windows. Bunks, lockers, a mess table, chairs and crates with metal panels and rivets. |
-| **Gothic chapel** | One tall storey, 80 × 136 mm, of fine stone blocks under a steep slate roof, on chequered tiles, with a pointed door that swings and three tall pointed windows down each side. Six pews, an altar, two high-backed chairs and a bookshelf. |
-| **Dungeon crypt** | One squat storey, 100 mm square, of dungeon blocks under a low slate roof, on dungeon flagstones, with a studded door loose in its arched doorway and small barred windows high up. A tomb, chests, crates and a bench. |
-| **Adobe house** | Two storeys, 100 × 80 mm: sandstone below and adobe plaster above, a flat roof behind a low wall, a ladder up, on sandstone slabs, with small square windows. A low round table, stools, a chest and crates below, two beds and a chest above. |
+| **Cottage** | One storey, 118 × 88 mm between the corner columns, fieldstone walls on flagstone tiles under a thatched roof, an arched door that swings, arched windows with a cross, and a table, two chairs, a bed, a chest and a bookshelf. |
+| **Tavern** | Two storeys, 158 × 108 mm: stone blocks below and timber frame above, square windows, stairs up, floorboard tiles and a clay-tiled roof. A taproom with two long tables, four benches, three stools, two crates and a bar counter; three beds, two chests and a chair upstairs. |
+| **Watchtower** | An 80 mm square tower of two storeys with arrow slits, a ladder up to each floor, a floor on top with battlements round it, on dungeon flagstones. Crates and a chest below, two bunks, a table and stools above. |
+| **Sci-fi outpost** | One storey, 118 × 93 mm of sci-fi panels under a corrugated lean-to roof, on a sci-fi deck, with a metal blast door with angled corners glued into its doorway and wide angled windows. Bunks, lockers, a mess table, chairs and crates with metal panels and rivets. |
+| **Gothic chapel** | One tall storey, 88 × 144 mm, of fine stone blocks under a steep slate roof, on chequered tiles, with a pointed door that swings and three tall pointed windows down each side. Six pews, an altar, two high-backed chairs and a bookshelf. |
+| **Dungeon crypt** | One squat storey, 108 mm square, of dungeon blocks under a low slate roof, on dungeon flagstones, with a studded door glued into its arched doorway and small barred windows high up. A tomb, chests, crates and a bench. |
+| **Adobe house** | Two storeys, 108 × 88 mm: sandstone below and adobe plaster above, a flat roof behind a low wall, a ladder up, on sandstone slabs, with small square windows. A low round table, stools, a chest and crates below, two beds and a chest above. |
 
 ## Themes
 
@@ -72,7 +74,7 @@ On the **Building** tab:
 - **Width** and **Depth** are measured between the corner columns' centres (the building's outside
   is a column wider each way). **Storeys** (1 to 4) are storeys with rooms; a floor lies on the walls
   between each. **Storey height** is rounded to whole layers of the wall sheet (a note says so), so
-  the columns, a stack of layers, come out exactly as tall as the walls and the floor lies flat on both.
+  the columns come out exactly as tall as the walls and the floor lies flat on both.
 - **Top**: *Straight (for a roof)*, or *A floor on top behind battlements*: a floor on the top
   storey with a low wall of battlements round it, **Battlements** high.
 - **Way up**: *Stairs*, *Spiral stairs*, *Ladder* or *None (a plain floor)*. Each floor gets an
@@ -87,43 +89,56 @@ On the **Building** tab:
   the rest, etched on the slopes and sized for the figures), its **Pitch** and how far the
   **Eaves** reach past the walls.
 - **Floor tiles under the building**: the floor tile maker's jigsaw tiles, cut from the wall sheet,
-  covering the building's outside and as much **Yard** round it as you like. The walls and columns
+  covering the building's outside and as much **Yard** round it as you like (rounded up to a whole
+  grid square where the edge row would be thinner than half a square). The walls and columns
   stand on them. Pick their **Texture** (flagstones, floorboards, cobbles and the rest) and the
   **Grid square** they're laid out on (25.4 mm, an inch, for 28–32 mm figures). Untick it to stand
   the building straight on the table.
-- **Door**: in the middle of the ground floor's front. *Hung on clips: it swings open* is the
-  furniture maker's door for a wall, cut from the furniture sheet, on two clips slid onto the side of
-  the doorway; *Loose in the doorway* is the wall maker's door that just sits in it; *Just a
+- **Door**: in the middle of the ground floor's front. With box walls, the first choice hangs the
+  wall maker's door on pins inside the wall so it swings open (a portcullis slides up instead), and
+  *Loose in the doorway* glues it into a groove round the doorway. With flat walls, the first choice is
+  the furniture maker's door for a wall, cut from the furniture sheet, on two clips slid onto the side
+  of the doorway, and *Loose in the doorway* is the wall maker's door that just sits in it. *Just a
   doorway* leaves it open. Its **Shape** (square top, round arch, pointed arch, angled corners or a rough cave mouth), **Look**
-(what a loose door looks like: planks, iron studs, a metal blast door, a portcullis or a stone slab, as
-in the wall maker), **Width** and **Height**.
+(the wall maker's door: planks, iron studs, a metal blast door, a portcullis or a stone slab),
+**Width** and **Height**.
 - **Windows**: how many in the **Front and back** walls and in **Each side** wall of every storey
   (the battlements have none, and the ground floor's front fits them round the door), their
   **Shape** (*Arrow slit* for towers, angled corners for sci-fi, rough for a cave), size, **Sill** height above the floor and **Bars**.
+  With box walls, **In the windows** is what fills them: a frame with the bars in it (the usual), a
+  shutter glued in, shutters that swing open, or nothing (the bars left in the wall).
 
 ## Walls and columns
 
 On the **Walls** tab:
 
-- **Thickness**: the wall sheet. The walls, the corner columns, the floors, the stairs, the roof and the floor tiles are all cut from it.
-  Tick **Two panels back to back** for walls textured inside and out (twice as thick).
-- **Slot fit**: added to the wall's thickness for the columns' slots. **Columns**: how wide the
-  corner columns are. Pick your material in **Cut with** to bring in its thickness, slot fit and
+- **Walls**: *Boxes* (the usual) or *Flat*. A box wall is the wall maker's box wall
+  ([Boxed walls](walls.md#boxed-walls)): a textured outside and inside, a base, a top, ends and ribs,
+  lined round its door and windows, **Wall thickness** thick (12 mm for 3 mm sheet). Its corner
+  columns are boxes too: four sides with slots for the walls' tabs, on a base plate with a plug, flush
+  on top under the floor above, with a cap on the top storey (battlements round a parapet). A flat
+  wall is one sheet thick in columns of stacked layers; tick **Two panels back to back** for walls
+  textured inside and out (twice as thick). Buildings made before box walls keep their flat walls.
+- **Panel thickness**: the wall sheet. The walls, the corner columns, the floors, the stairs, the roof and the floor tiles are all cut from it.
+- **Slot fit**: added to the slots the walls go into. **Columns**: how wide the corner columns
+  are. Box walls need columns at least the wall's thickness plus two sheets and 2 mm across (picking
+  *Boxes* widens them if they're too thin). Pick your material in **Cut with** to bring in its thickness, slot fit and
   kerf.
 - **Ground floor** and **Upper storeys**: the wall maker's textures (brick, stones, planks, timber
   frame and the rest), sized for the figures. **Etched as** grooves or scored lines, and
   **Variation** for a different layout of stones and planks.
 
-Each corner column is a stack of layers with a slot for each wall and a hole up the middle: stack
-them on a 2 mm pin (a cocktail stick or a piece of wire) and glue them. The floor between storeys has
-a hole over each column too, so the pin carries on up into the column above and holds the storeys in
-line. The floor has floorboards etched on it, and the stairs or ladder up to it are the stair
+With flat walls, each corner column is a stack of layers with a slot for each wall and a hole up the
+middle: stack them on a 2 mm pin (a cocktail stick or a piece of wire) and glue them. The floor
+between storeys has a hole over each column too, so the pin carries on up into the column above and
+holds the storeys in line. With box walls the floor is glued onto the walls' and columns' tops. The floor has floorboards etched on it, and the stairs or ladder up to it are the stair
 maker's, cut from the same sheet.
 
 ![A tavern's ground floor on its own: the stairs along the back wall of the taproom, up to the opening in the floor above, and the floorboard tiles it stands on](images/window-buildings-tavern-inside.png)
 
 Walls that come out the same are cut together: a cottage's two side walls are one piece ×2, a
-tower's upper storey is **Walls, storey 2** ×4. Each wall also carries the wall maker's settings, so
+tower's upper storey is **Walls, storey 2** ×4. A box wall's other pieces are listed after it
+(**Side walls: back**, **Side walls: base** and so on). Each wall also carries the wall maker's settings, so
 **Match the walls in the design** in the furniture maker can fit a door or shelf to it.
 
 ## Furniture
@@ -151,16 +166,18 @@ or one storey on its own.
 ## Putting it together
 
 1. Jigsaw the floor tiles together, if you made them, and stand the building on them.
-2. Stack and glue the corner columns of the ground floor on their pins.
-3. Slide the ground floor's walls into the columns' slots: the front wall (with the doorway) at the
-   front. A drop of glue in each slot.
+2. Box walls: build each wall as the wall maker says (the faces on the base, the ends, ribs and
+   linings, the door hung on its pins before the back goes on, the top). Build each corner column
+   round the plug on its base, the walls' end tabs in its sides' slots as you go, then its top.
+   Flat walls: stack and glue the corner columns of the ground floor on their pins, and slide the
+   walls into the columns' slots.
+3. The front wall (with the doorway) goes at the front. A drop of glue in each slot.
 4. Put the stairs or ladder together as the stair maker says and stand it in the back right
    corner, under where the opening will be. Lay the floor on top, its holes over the pins, and push
-   the pins up through. Build the next
-   storey's columns on the pins and slide its walls in; and so on to the top (the top columns get a
-   wider cap).
-5. Slide the door's clips onto the side of the doorway, one at the floor and one high up, and drop
-   the door's pins into them.
+   the pins up through (flat walls; box walls' floors are glued on). Build the next storey the same
+   way on the floor; and so on to the top (the top columns get a wider cap).
+5. Flat walls: slide the door's clips onto the side of the doorway, one at the floor and one high
+   up, and drop the door's pins into them.
 6. Put the furniture together as the furniture maker says and stand it in the rooms.
 7. Glue the roof together on its base as the roof maker says, and lift it onto the top storey's
    column caps, the frame underneath inside the walls.

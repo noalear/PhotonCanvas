@@ -29,6 +29,8 @@ public sealed record FloorSpec
     public double WallSheetMm { get; init; } = 3;
     /// <summary>The walls are two panels glued back to back.</summary>
     public bool TwoSidedWalls { get; init; }
+    /// <summary>Box walls' thickness, front to back (mm); 0 = flat walls, the sheet thick (two with <see cref="TwoSidedWalls"/>).</summary>
+    public double WallThickMm { get; init; }
     /// <summary>The room's length along x, column centre to column centre, for one wall (mm).</summary>
     public double WallLengthMm { get; init; } = 108.5;
     /// <summary>Walls end to end along the room's length.</summary>
@@ -132,7 +134,7 @@ public sealed record FloorSpec
         double centres = WallKitMaker.PanelLength(w) + 2 * WallKitMaker.CentreToEnd(w);
         return this with
         {
-            WallHeightMm = w.HeightMm, WallSheetMm = w.ThicknessMm, TwoSidedWalls = w.TwoSided,
+            WallHeightMm = w.HeightMm, WallSheetMm = w.ThicknessMm, TwoSidedWalls = w.TwoSided, WallThickMm = w.Boxed ? w.WallMm : 0,
             WallLengthMm = Math.Round(centres, 2), WallWidthMm = Math.Round(centres, 2),
             Columns = true, Column = w.Column, ColumnMm = w.ColumnMm, ColumnCaps = w.Cap,
             SheetMm = w.ThicknessMm, FitMm = w.FitMm,
