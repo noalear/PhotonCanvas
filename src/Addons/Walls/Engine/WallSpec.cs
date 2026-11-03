@@ -108,6 +108,11 @@ public sealed record WallSpec
     public DoorLook DoorLook { get; init; } = DoorLook.Planks;
 
     public int Windows { get; init; }
+    /// <summary>
+    /// Where each window's centre goes, from the middle of the wall (mm; less than 0 = to the left). When
+    /// there are any, the wall has these windows instead of <see cref="Windows"/> spread evenly.
+    /// </summary>
+    public List<double> WindowAtMm { get; init; } = [];
     public OpeningShape WindowShape { get; init; } = OpeningShape.Arched;
     public double WindowWidthMm { get; init; } = 8;
     public double WindowHeightMm { get; init; } = 12;

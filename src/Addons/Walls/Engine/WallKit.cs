@@ -182,15 +182,16 @@ public static class WallKitMaker
             }
         }
 
-        if (s.Windows > 0)
+        if (WindowCount(s) > 0)
         {
             double w = Math.Max(1, s.WindowWidthMm), h = s.WindowShape == OpeningShape.Round ? w : Math.Max(1, s.WindowHeightMm), sill = s.SillMm;
             if (sill + h + frame > body - 1 || sill < frame + 1)
                 findings.Add(new(Severity.Bad, $"The windows don't fit in the wall's height: lower the sill or make them shorter (the top must be under {body - frame - 1:0.#} mm)."));
             else
             {
-                var xs = Spread(s.Windows, w + 2 * frame, ez, L - ez, taken.Where(t => t.Y0 < sill + h + frame && t.Y1 > sill - frame).Select(t => (t.X0, t.X1)).ToList(), 2);
-                if (xs.Count < s.Windows) findings.Add(new(Severity.Warn, xs.Count == 0 ? "No window fits beside the door and the ends." : $"Only {xs.Count} of the {s.Windows} windows fit."));
+                var clear = taken.Where(t => t.Y0 < sill + h + frame && t.Y1 > sill - frame).Select(t => (t.X0, t.X1)).ToList();
+                var xs = s.WindowAtMm.Count > 0 ? Placed(s.WindowAtMm, L, w + 2 * frame, ez, L - ez, clear, 2) : Spread(s.Windows, w + 2 * frame, ez, L - ez, clear, 2);
+                if (xs.Count < WindowCount(s)) findings.Add(new(Severity.Warn, xs.Count == 0 ? "No window fits beside the door and the ends." : $"Only {xs.Count} of the {WindowCount(s)} windows fit."));
                 foreach (var x in xs)
                 {
                     var win = Opening(s.WindowShape, x - w / 2, sill, w, h);
@@ -595,6 +596,28 @@ public static class WallKitMaker
         double r = Math.Clamp(w * 0.07, 0.6, 2);
         lines.Add(Geo.Loop(Geo.Circle(b.left + w * 0.78, b.top + h * 0.45, r)));
         return (Geo.Intersect(Geo.Union(etched), door), lines);
+    }
+
+    /// <summary>How many windows the wall asks for: one at each of <see cref="WallSpec.WindowAtMm"/>, or <see cref="WallSpec.Windows"/> spread out.</summary>
+    public static int WindowCount(WallSpec s) => s.WindowAtMm.Count > 0 ? s.WindowAtMm.Count : Math.Max(0, s.Windows);
+
+    /// <summary>
+    /// Centres for things <paramref name="width"/> wide at the places asked for (mm from the middle of a
+    /// panel <paramref name="length"/> long), keeping those that fit between from and to, clear of the
+    /// taken stretches and of each other.
+    /// </summary>
+    public static List<double> Placed(IEnumerable<double> fromMiddle, double length, double width, double from, double to, List<(double X0, double X1)> taken, double gap)
+    {
+        var xs = new List<double>();
+        foreach (var x in fromMiddle.Select(m => length / 2 + m).Order())
+        {
+            double a = x - width / 2, b = x + width / 2;
+            if (a < from - 1e-6 || b > to + 1e-6) continue;
+            if (taken.Any(t => a < t.X1 + gap && b > t.X0 - gap)) continue;
+            if (xs.Count > 0 && a < xs[^1] + width / 2 + gap) continue;
+            xs.Add(x);
+        }
+        return xs;
     }
 
     /// <summary>

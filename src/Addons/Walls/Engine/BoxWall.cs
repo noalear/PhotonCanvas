@@ -412,14 +412,15 @@ public static class BoxWall
             }
         }
 
-        if (s.Windows > 0)
+        if (WallKitMaker.WindowCount(s) > 0)
         {
             double w = Math.Max(1, s.WindowWidthMm), h = s.WindowShape == OpeningShape.Round ? w : Math.Max(1, s.WindowHeightMm), sill = s.SillMm;
             if (sill < T + Math.Max(frame, 1) + 1 || sill + h + frame > H - 1.5)
                 Bad($"The windows don't fit in the wall's height: keep the sill above {T + Math.Max(frame, 1) + 1:0.#} mm and the top under {H - frame - 1.5:0.#} mm.");
             else
             {
-                var xs = WallKitMaker.Spread(s.Windows, w + 2 * margin, inner0, inner1, [.. taken.Where(t => t.Y0 < sill + h + margin && t.Y1 > sill - margin).Select(t => (t.X0, t.X1))], 2);
+                List<(double X0, double X1)> clear = [.. taken.Where(t => t.Y0 < sill + h + margin && t.Y1 > sill - margin).Select(t => (t.X0, t.X1))];
+                var xs = s.WindowAtMm.Count > 0 ? WallKitMaker.Placed(s.WindowAtMm, L, w + 2 * margin, inner0, inner1, clear, 2) : WallKitMaker.Spread(s.Windows, w + 2 * margin, inner0, inner1, clear, 2);
                 int fitted = 0;
                 foreach (var x in xs)
                 {
@@ -434,7 +435,7 @@ public static class BoxWall
                     WindowFillIn(win, x, sill, w, h);
                     fitted++;
                 }
-                if (fitted < s.Windows) findings.Add(new(Severity.Warn, fitted == 0 ? "No window fits beside the door and the ends, under the top." : $"Only {fitted} of the {s.Windows} windows fit."));
+                if (fitted < WallKitMaker.WindowCount(s)) findings.Add(new(Severity.Warn, fitted == 0 ? "No window fits beside the door and the ends, under the top." : $"Only {fitted} of the {WallKitMaker.WindowCount(s)} windows fit."));
             }
         }
         var allHoles = Geo.Union(new PathsD(holes.SelectMany(h => h.Shape)));

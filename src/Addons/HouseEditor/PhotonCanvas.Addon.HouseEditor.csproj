@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>houseeditor</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The whole-building kits and the makers they use make the pieces (addon.json "requires" them): compile against them, never copy them. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\FloorTiles\PhotonCanvas.Addon.FloorTiles.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Stairs\PhotonCanvas.Addon.Stairs.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Roofs\PhotonCanvas.Addon.Roofs.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Furniture\PhotonCanvas.Addon.Furniture.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Buildings\PhotonCanvas.Addon.Buildings.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The terrain themes and their textures, shared by every terrain maker: compiled into each, so none needs another to run. -->
+    <Compile Include="..\Shared\Terrain\*.cs" Link="Terrain\%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
