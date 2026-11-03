@@ -39,7 +39,6 @@ are replaced wherever they are.
 | **Make** | A board | *A board, split into tiles*: a whole floor cut into tiles. *Loose tiles*: tiles of the sizes you list. |
 | **Squares across**, **Squares down** | 0.5 to 200 (6 × 6) | The board's size in squares. A part square (such as 4.5) makes the last column or row narrower, to fill a room exactly. |
 | **Tile up to** | 1 to 20 squares (2 × 2) | The biggest tile the board is cut into. Where the board doesn't divide evenly the last column or row is smaller. |
-| **Straight edges round the outside** | on | The tiles round the outside of the board have straight sides there, so the floor ends neatly. |
 | **Thickness** | 0.5 to 20 mm (3) | Your sheet's thickness. |
 | **Cut with** | As set on the cut layer | Cut settings from your material library. Their kerf goes on the cut layer, so tabs and sockets come out the size they're drawn, and the material's thickness and slot fit from your cut test are filled in. |
 | **Etch with** | As set on the etch layer | Engrave (fill) settings from your library for the texture. |
@@ -140,8 +139,18 @@ with the tiles.
   doesn't, and warns when what's left beside a corner gets thin.
 - **Magnet size**: the magnets' diameter (5 mm). Use magnets no thicker than the sheet.
 - **Fit**: the play between a tab or clip and its socket, half of it each side. More is looser.
-- **Base layer**: a second, plain layer glued under each tile, for thicker, flatter tiles. Glue it
-  lined up all round. With jigsaw edges the base has the same tabs, so the two layers lock as one.
+- **Joints round the outside of the board too** (boards only, off by default): off, the tiles round
+  the outside of the board have straight sides there, so the floor ends neatly. On, the outside edges
+  get the same joints as between tiles, so the board locks onto other boards made on the same grid
+  (turned any way round) to build a bigger floor. Loose tiles have joints on every side but the
+  **Straight sides** you pick for them.
+- **Base layer**: a second layer glued under each tile, for thicker, flatter tiles. Glue it lined up
+  all round. The joints are then in the base layer only: jigsaw tabs and sockets, clip sockets or
+  magnet holes are cut in the base, and the top is a plain square (with the texture) that sits edge
+  to edge with its neighbours and hides them. The preview shows the tops put together, with one base
+  layer underneath.
+
+![A board with jigsaw joints in a base layer only, and joints round the outside to join it to other boards](images/window-floortiles-base.png)
 
 Where a board isn't a whole number of squares, the part squares at its far edge have no joint (on
 both tiles that meet there), and a tile with a part square only fits the others when lined up on the

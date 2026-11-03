@@ -41,6 +41,7 @@ static class FloorTilesShots
             Tiles = [new() { Across = 2, Down = 2, Count = 2 }, new() { Across = 2, Down = 1, Count = 2, Plain = PlainSides.One }, new() { Across = 1, Down = 1, Count = 2, Plain = PlainSides.Corner }],
         }, 1);
         Shot("window-floortiles-clips", new TileSpec { BoardAcross = 4, BoardDown = 3, TileAcross = 2, TileDown = 3, Texture = "Floorboards", SizeA = 5.08, SizeB = 60, GrooveMm = 0.5, Join = TileJoin.Clips, BaseLayer = true }, 2);
+        Shot("window-floortiles-base", new TileSpec { BoardAcross = 4, BoardDown = 4, Texture = "Dungeon flagstones", SizeA = 50, GrooveMm = 0.8, BaseLayer = true, PlainBorder = false }, 2);
     }
 
     static IEnumerable<T> GetVisualDescendantsOf<T>(this Avalonia.Visual v) => Avalonia.VisualTree.VisualExtensions.GetVisualDescendants(v).OfType<T>();
