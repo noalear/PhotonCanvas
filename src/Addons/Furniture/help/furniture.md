@@ -73,6 +73,7 @@ settings), so a sci-fi console can stand among medieval furniture.
 | Throne room & bridge | Thrones on a dais, captain's chairs, helm consoles, star maps, long carpets |
 | Prison & crypt | Stocks, cell bunks, coffins, sarcophagi |
 | Lab & infirmary | Sleeper pods, potion cabinets, apothecary drawers, lab consoles |
+| Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar and a notice board, for the city builder |
 
 They're sized for 28 mm figures on 2 mm sheet, and scale with **Figures** like everything else.
 
@@ -112,6 +113,12 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Candle stand or lamp** | *Candelabra*: a baluster stem with knops and an urn, S-scrolled arms with curls under them springing from a quatrefoil medallion, a cup and drip pan under every taper (three candles, or five from 11 mm wide), standing in a stepped, domed foot that crosses it; round bosses glued on both faces of the medallion and the urn make the stem look turned from every side (left off for a push fit). *Lamp* or *Torch*: a profile crossed on a foot. | 10 across, 24 high |
 | **Screen** | A folding screen of two to six **Panels** on working hinges, standing in a zig-zag: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. One panel stands on two feet instead. **Width** and **Depth** are the screen as it stands; the depth sets how far the leaves fold. | 30 wide, 12 deep, 30 high |
 | **Stocks** | Two posts on feet, a board with holes for the head and hands, and a rail. | 22 × 9, 28 high |
+| **Town wall** | A piece of town wall with a wall walk on top: see [Town walls and towers](#town-walls-and-towers). **Piece**: *Straight*, *Corner (parapet outside)*, *Corner (parapet inside)*, *Gatehouse* or *End with a turret*. | 25.4 long, 19 thick, 56 high |
+| **Guard tower** | A tall tower with a fighting roof behind merlons, a door, arrow loops on every side at two levels, quoins up the corners and a flag (a sensor mast for sci-fi). | 46 × 46, 92 high |
+| **Tree** | Two tree profiles halved together in a round base (a planter for sci-fi), bark and leaves etched and sky cut through the crown: see [Town props](#town-props). **Kind**: *Oak*, *Pine*, *Dead tree*, *Palm* or *Giant mushroom*. | 50 × 50, 90 high |
+| **Trough** | A horse trough on a plinth: water inside, a rim round the top and a pump at one end (a feed pipe and pump head for sci-fi). Wooden ones get iron bands. | 32 long, 11 wide, 9 high |
+| **Stage** | A players' stage: a planked deck on skirts with panels on the front, steps up the middle, a painted backdrop (a star map for sci-fi), a proscenium with a crest and pennants, curtains tied back. | 76.2 × 50.8, 60 high |
+| **Stall or notice board** | **Kind**: *Market stall* (crates of produce on the counter under a striped awning with a scalloped valance), *Outdoor bar* (barrel ends on the front, a boarded roof and a sign with a tankard on a bracket) or *Notice board* (notices pinned on a board on two legs under a little roof). | 36 × 20, 40 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
@@ -154,6 +161,62 @@ gable with crockets, a spire and pinnacles. With a push fit, the glued-on pieces
 
 Clocks need room inside for the pendulum: at least four sheets plus 3.2 mm wide, and three sheets
 plus 1.6 mm deep.
+
+### Town walls and towers
+
+Town walls are built the way real ones are. The **outer face** rises into a parapet of merlons with
+arrow loops cut through them. The lower **inner face** carries the **wall walk**, which is one piece
+(an L round a corner). The walk's tabs go through the outer face, and the **string course** glued over
+them hides the tab ends. Corbels hang under the course, and a **plinth** runs along the foot. Short
+**end pieces** under the walk keep each piece square. The parapet's merlons stop halfway at each open
+end, so two pieces side by side make a whole merlon at the join and a run of them reads as one wall.
+
+Each theme builds its own kind of wall:
+
+| Theme | Wall |
+|---|---|
+| Medieval | Stone blocks, square merlons with cross loops, stepped corbels |
+| Dungeon | Great worn blocks, merlons with corners knocked off, plain slits |
+| Cave | A palisade of sharpened logs with a plank walk behind and lashed rails |
+| Sci-fi | Armour plate with chamfered blocks and gun ports, a hazard-striped band, a skirt of plate |
+| Desert | Sandstone with stepped merlons, keyhole loops and beam ends under the walk |
+| Gothic | Cut stone with gabled merlons, pointed loops and a corbel table of little arches |
+
+The pieces line up on a 1 inch (25.4 mm) map grid at 28 mm figures. A straight wall's centre line runs
+along a grid line, with its outside (the parapet side) towards the back. A **corner** turns one
+square each way from the grid point, and its arms count from there; the parapet is on the outside of
+the turn, or on the inside for a corner that turns in. The **gatehouse** is two squares long and
+stands out a little each side of the wall. It's a tower over a gate passage, with the arch cut through
+both faces, a raised portcullis glued in just inside, the doors standing open against the passage
+walls and a carved badge over the arch. An **end** finishes a wall with a turret that has a door onto
+the wall walk. The **guard tower** stands on two squares by two.
+
+With a push fit, the courses, plinth, quoins, portcullis, doors and badge are left off; the walk's
+tab ends then show on the outside.
+
+### Town props
+
+A **tree** is two profiles of the same tree, each drawn on its own so it looks full from every side,
+halved together: one slotted down from the top, the other up from the bottom. Their tabs stand in a
+round base with grass and stones (a planter for sci-fi). An oak forks into heavy limbs under a crown of
+rounded clumps, a pine stands in tiers of needles, a dead tree twists into bare branches with a knot
+hole, a palm spreads its fronds from a ringed trunk, and a giant mushroom has a spotted cap with gills
+under it and little ones at its foot.
+
+A **trough** stands on a plinth with its four walls tabbed into it. The water is a piece resting on two
+baffles inside, a rim is glued round the top, and the pump stands in the plinth at one end.
+
+The **stage** deck sits on its skirts and joists. Each step is a tread on a riser, with the tread's tabs
+through the front skirt. The backdrop stands in slots at the back of the deck, and the proscenium and
+curtains are glued on its front.
+
+A **stall** has two side frames, each a tall back post, a front post, the counter's end and a sloping
+rafter. The counter and the low shelf push through both frames, the front tabs up into the counter, and
+the awning presses onto the rafters' tabs. The valance, produce crates and barrel ends are glued on. A
+**notice board** stands on two crossed feet, with its roof boards glued over the gable.
+
+With a push fit, the glued-on pieces (the trough rim, proscenium, curtains, valance, crates, barrel ends,
+notices and roof boards) are left off.
 
 ### Folding screens
 

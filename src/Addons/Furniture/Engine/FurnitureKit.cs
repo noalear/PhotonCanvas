@@ -36,6 +36,12 @@ public static class FurnitureKit
             case ItemKind.Candlestand: Profiles.Candlestand(m); break;
             case ItemKind.Screen: Profiles.Screen(m); break;
             case ItemKind.Stocks: Profiles.Stocks(m); break;
+            case ItemKind.TownWall: TownWalls.Make(m); break;
+            case ItemKind.Tower: TownWalls.Tower(m); break;
+            case ItemKind.Tree: TownWalls.Tree(m); break;
+            case ItemKind.Trough: TownWalls.Trough(m); break;
+            case ItemKind.Stage: TownWalls.Stage(m); break;
+            case ItemKind.Stall: TownWalls.Stall(m); break;
             default: m.Bad($"{Defaults.Info(item.Kind).Name} isn't made yet."); break;
         }
         return m.Kit();

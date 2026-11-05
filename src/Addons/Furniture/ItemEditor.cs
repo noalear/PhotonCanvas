@@ -199,6 +199,8 @@ public sealed class ItemEditor : StackPanel
             ItemKind.Rug => (it.Rug == RugPattern.Round ? "Across" : "Length", it.Rug == RugPattern.Round ? null : "Width", ""),
             ItemKind.WallHanging => ("Width", null, "Height"),
             ItemKind.Candlestand => ("Spread", "Foot", "Height"),
+            ItemKind.TownWall when it.Wall is WallPiece.OutsideCorner or WallPiece.InsideCorner => ("Each arm", "Thickness", "Height"),
+            ItemKind.TownWall => ("Length", "Thickness", "Height"),
             _ => ("Width", "Depth", "Height"),
         };
         _wLabel.Text = labels.W;
@@ -278,6 +280,9 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),
         ItemKind.Crate => ("Boards", Crates.StyleNames),
+        ItemKind.TownWall => ("Piece", ["Straight", "Corner (parapet outside)", "Corner (parapet inside)", "Gatehouse", "End with a turret"]),
+        ItemKind.Tree => ("Kind", ["Oak", "Pine", "Dead tree", "Palm", "Giant mushroom"]),
+        ItemKind.Stall => ("Kind", ["Market stall", "Outdoor bar", "Notice board"]),
         _ => null,
     };
 
@@ -296,6 +301,9 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Screen => (int)it.ScreenStyle,
         ItemKind.Desk => it.Contents == ShelfContents.Tech ? 1 : 0,
         ItemKind.Crate => it.Bands ? (int)it.CrateStyle + 1 : 0,
+        ItemKind.TownWall => (int)it.Wall,
+        ItemKind.Tree => (int)it.Tree,
+        ItemKind.Stall => (int)it.Stall,
         _ => 0,
     };
 
@@ -314,6 +322,9 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Screen => it with { ScreenStyle = (ScreenStyle)i },
         ItemKind.Desk => it with { Contents = i == 1 ? ShelfContents.Tech : ShelfContents.Books },
         ItemKind.Crate => it with { Bands = i > 0, CrateStyle = (CrateStyle)Math.Max(0, i - 1) },
+        ItemKind.TownWall => it with { Wall = (WallPiece)i },
+        ItemKind.Tree => it with { Tree = (TreeStyle)i },
+        ItemKind.Stall => it with { Stall = (StallStyle)i },
         _ => it,
     };
 }
