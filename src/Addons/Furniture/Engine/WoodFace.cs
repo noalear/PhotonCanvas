@@ -55,7 +55,7 @@ public static class WoodFace
         : Geo.Rect(b.left + from, b.top + at - w / 2, b.left + to, b.top + at + w / 2);
 
     /// <summary>Wavy grain lines between two distances across the bounds, clipped to the region, with a knot now and then.</summary>
-    static List<PathD> Grain(PathsD region, RectD b, bool alongU, double from, double to, Random rnd)
+    internal static List<PathD> Grain(PathsD region, RectD b, bool alongU, double from, double to, Random rnd)
     {
         var lines = new List<PathD>();
         double width = to - from;

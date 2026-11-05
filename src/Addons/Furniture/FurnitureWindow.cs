@@ -48,6 +48,8 @@ public sealed class FurnitureWindow : Window
     readonly CheckBox _backPanel = new() { Content = "A back panel" }, _books = new() { Content = "Books etched on the back" };
     readonly ComboBox _lid = Combo();
     readonly CheckBox _bands = new();
+    readonly TextBox _label = new() { Watermark = "Picked to suit", MaxLength = 24 };
+    Control _labelRow = null!;
     readonly NumericUpDown _foot = Number(1, 500, 0.5m, "0.#"), _mattress = Number(2, 500, 0.5m, "0.#");
     readonly CheckBox _bedding = new() { Content = "A pillow and a blanket etched on" };
     readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch"), _hinge = Combo("On the left", "On the right");
@@ -214,7 +216,8 @@ public sealed class FurnitureWindow : Window
         _rowsRow = Line(_rowsLabel, _rows);
         _hangRow = Field("Hangs at", _hang, tip: "How high its bottom edge is up the wall (mm).");
         _lookRow = Field("Look", _look, tip: "The theme this piece is made in: its doors, handles and ornament. Ready-made pieces keep their own, so a sci-fi console can stand in a medieval list.");
-        _boxRows = Stack(Field("Lid", _lid), _bands);
+        _labelRow = Field("Stencilled", _label, tip: "The words painted on a cargo or military crate's long sides. Left empty, each crate gets some to suit (SUPPLIES, FRAGILE, AMMO, RATIONS…).");
+        _boxRows = Stack(Field("Lid", _lid), _bands, _labelRow);
         _bedRows = Stack(Field("Foot board", _foot, tip: "How high the foot board is (mm)."), Field("Mattress", _mattress, tip: "How high the top of the mattress is (mm)."), _bedding);
         _doorRows = Stack(Field("Doorway", _doorShape, tip: "The doorway's shape, as cut by Walls."), Field("Hinges", _hinge, tip: "Which side of the doorway the door hangs on, seen from the side it opens to."),
             Field("Covers by", _overlap, tip: "How far the door reaches over the wall round the doorway (mm)."));
@@ -309,6 +312,7 @@ public sealed class FurnitureWindow : Window
             c.SelectionChanged += (_, _) => ItemChanged();
         foreach (var c in new[] { _rail, _backPanel, _books, _bands, _bedding })
             c.IsCheckedChanged += (_, _) => ItemChanged();
+        _label.TextChanged += (_, _) => ItemChanged();
         foreach (var n in new[] { _thick, _fit, _seed, _grip }) n.ValueChanged += (_, _) => SheetChanged();
         _joints.SelectionChanged += (_, _) => { _gripRow.IsVisible = _joints.SelectedIndex == 1; SheetChanged(); };
         _detail.SelectionChanged += (_, _) => SheetChanged();
@@ -433,6 +437,9 @@ public sealed class FurnitureWindow : Window
         _lid.SelectedIndex = kind == ItemKind.Crate ? (it.Lid == LidStyle.None ? 1 : 0) : (int)it.Lid;
         _bands.Content = kind == ItemKind.Crate ? "Boards round the edge and a brace etched on" : "Iron bands and a lock plate etched on";
         _bands.IsChecked = it.Bands;
+        _bands.IsVisible = kind != ItemKind.Crate;
+        _label.Text = it.Label ?? "";
+        _labelRow.IsVisible = kind == ItemKind.Crate && it.Bands && it.CrateStyle is (CrateStyle.Cargo or CrateStyle.Military);
         _foot.Value = D(it.FootMm); _mattress.Value = D(it.MattressMm); _bedding.IsChecked = it.Bedding;
         _doorShape.SelectedIndex = (int)it.Shape; _hinge.SelectedIndex = (int)it.Hinge; _overlap.Value = D(it.OverlapMm);
         _wallT.Value = D(it.WallMm); _wallSheet.Value = D(it.WallSheetMm); _slot.Value = D(it.MountSlotMm);
@@ -517,6 +524,7 @@ public sealed class FurnitureWindow : Window
             Shelves = (int)V(_shelves, it.Shelves), BackPanel = _backPanel.IsChecked == true, Books = _books.IsChecked == true,
             Lid = kind == ItemKind.Crate ? (_lid.SelectedIndex == 1 ? LidStyle.None : LidStyle.Flat) : (LidStyle)Math.Max(0, _lid.SelectedIndex),
             Bands = _bands.IsChecked == true,
+            Label = string.IsNullOrWhiteSpace(_label.Text) ? null : _label.Text.Trim(),
             FootMm = V(_foot, it.FootMm), MattressMm = V(_mattress, it.MattressMm), Bedding = _bedding.IsChecked == true,
             Shape = (DoorShape)Math.Max(0, _doorShape.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _hinge.SelectedIndex), OverlapMm = V(_overlap, it.OverlapMm),
             WallMm = V(_wallT, it.WallMm), WallSheetMm = V(_wallSheet, it.WallSheetMm), MountSlotMm = V(_slot, it.MountSlotMm),
@@ -542,6 +550,7 @@ public sealed class FurnitureWindow : Window
         ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),
+        ItemKind.Crate => ("Boards", Crates.StyleNames),
         _ => null,
     };
 
@@ -559,6 +568,7 @@ public sealed class FurnitureWindow : Window
         ItemKind.Candlestand => (int)it.Candle,
         ItemKind.Screen => (int)it.ScreenStyle,
         ItemKind.Desk => it.Contents == ShelfContents.Tech ? 1 : 0,
+        ItemKind.Crate => it.Bands ? (int)it.CrateStyle + 1 : 0,
         _ => 0,
     };
 
@@ -576,6 +586,7 @@ public sealed class FurnitureWindow : Window
         ItemKind.Candlestand => it with { Candle = (CandleStyle)i },
         ItemKind.Screen => it with { ScreenStyle = (ScreenStyle)i },
         ItemKind.Desk => it with { Contents = i == 1 ? ShelfContents.Tech : ShelfContents.Books },
+        ItemKind.Crate => it with { Bands = i > 0, CrateStyle = (CrateStyle)Math.Max(0, i - 1) },
         _ => it,
     };
 

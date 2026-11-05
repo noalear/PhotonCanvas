@@ -118,8 +118,12 @@ public sealed record FurnitureItem
     public bool Books { get; init; } = true;
 
     public LidStyle Lid { get; init; } = LidStyle.Loose;
-    /// <summary>Chests and crates: iron bands and a lock plate etched on.</summary>
+    /// <summary>Chests: iron bands and a lock plate etched on. Crates: boards etched on in <see cref="CrateStyle"/> (off: plain planks).</summary>
     public bool Bands { get; init; } = true;
+    /// <summary>Crates: how the faces are boarded (a braced frame, slats, iron corners, stencilled cargo…).</summary>
+    public CrateStyle CrateStyle { get; init; } = CrateStyle.Braced;
+    /// <summary>Crates: the words stencilled on cargo and military crates; null or empty = some to suit.</summary>
+    public string? Label { get; init; }
 
     /// <summary>Beds: the foot board's height (mm); the head board is <see cref="HeightMm"/>.</summary>
     public double FootMm { get; init; } = 8;
