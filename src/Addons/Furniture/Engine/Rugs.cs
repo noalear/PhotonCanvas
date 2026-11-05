@@ -313,6 +313,50 @@ public static class Rugs
                 grain = false;
                 break;
             }
+            case HangingStyle.FramedMap:
+            {
+                // A map in a heavy frame with blocks proud at its corners, hung by two chains from a ring.
+                double rr = 1.6, ring = H - rr, Hf = Geo.Clamp(H - 2 * rr - Math.Min(W * 0.22, 6), H * 0.6, H - 2 * rr - 2);
+                double fr = Geo.Clamp(Math.Min(W, Hf) * 0.11, 1.0, 2.4), cb = fr * 1.25;
+                var parts = new PathsD { Geo.Rect(0, 0, W, Hf) };
+                // The corner blocks stand a little past the frame.
+                foreach (var (cx, cy) in new[] { (cb / 2 - 0.3, cb / 2 - 0.3), (W - cb / 2 + 0.3, cb / 2 - 0.3), (cb / 2 - 0.3, Hf - cb / 2 + 0.3), (W - cb / 2 + 0.3, Hf - cb / 2 + 0.3) })
+                    parts.Add(Geo.Rect(cx - cb / 2, cy - cb / 2, cx + cb / 2, cy + cb / 2));
+                // The chains, from just in from the top corners up to the ring.
+                PointD top = new(W / 2, ring);
+                var chainFrom = new[] { new PointD(cb * 0.9, Hf - 0.4), new PointD(W - cb * 0.9, Hf - 0.4) };
+                foreach (var a in chainFrom) parts.Add(Geo.Strip(a, top, 1.3));
+                parts.Add(Geo.Circle(W / 2, ring, rr, 0.02));
+                outline = Geo.Subtract(Geo.Union(parts), [Geo.Circle(W / 2, ring, 0.6, 0.02)]);
+                Pictures.Frame(0, 0, W, Hf, fr, etched, lines);
+                foreach (var (cx, cy) in new[] { (cb / 2 - 0.3, cb / 2 - 0.3), (W - cb / 2 + 0.3, cb / 2 - 0.3), (cb / 2 - 0.3, Hf - cb / 2 + 0.3), (W - cb / 2 + 0.3, Hf - cb / 2 + 0.3) })
+                {
+                    lines.Add(Geo.Loop(Geo.Rect(cx - cb / 2 + 0.25, cy - cb / 2 + 0.25, cx + cb / 2 - 0.25, cy + cb / 2 - 0.25)));
+                    // A four-pointed star on each block.
+                    double r = cb * 0.32;
+                    lines.Add([new(cx - r, cy), new(cx + r, cy)]);
+                    lines.Add([new(cx, cy - r), new(cx, cy + r)]);
+                }
+                // The links: an oval scored for every other one, a bar across for the ones between.
+                foreach (var a in chainFrom)
+                {
+                    double dx = top.x - a.x, dy = top.y - a.y, len = Math.Sqrt(dx * dx + dy * dy), ux = dx / len, uy = dy / len;
+                    for (double t = 1.2, k = 0; t < len - rr - 0.6; t += 1.1, k++)
+                    {
+                        double cx = a.x + ux * t, cy = a.y + uy * t;
+                        if (k % 2 == 0)
+                        {
+                            var o = Ellipse(0, 0, 0.75, 0.32);
+                            lines.Add(Geo.Loop([.. o.Select(q => new PointD(cx + q.x * ux - q.y * uy, cy + q.x * uy + q.y * ux))]));
+                        }
+                        else lines.Add([new(cx - uy * 0.45, cy + ux * 0.45), new(cx + uy * 0.45, cy - ux * 0.45)]);
+                    }
+                }
+                if (look == FrontLook.Metal) Pictures.StarMap(fr, fr, W - fr, Hf - fr, rnd, etched, lines);
+                else Pictures.Map(fr, fr, W - fr, Hf - fr, rnd, etched, lines);
+                grain = false;
+                break;
+            }
             case HangingStyle.Monitor:
             {
                 outline = [Fronts.Chamfered(0, 0, W, H, Math.Min(1.2, Math.Min(W, H) * 0.12))];
@@ -393,7 +437,7 @@ public static class Rugs
                 break;
             }
         }
-        m.Add(it.Hanging switch { HangingStyle.Banner => "Banner", HangingStyle.Painting => "Painting", HangingStyle.Shield => "Shield", HangingStyle.Map => "Map", HangingStyle.Monitor => "Screen", _ => "Tapestry" },
+        m.Add(it.Hanging switch { HangingStyle.Banner => "Banner", HangingStyle.Painting => "Painting", HangingStyle.Shield => "Shield", HangingStyle.Map or HangingStyle.FramedMap => "Map", HangingStyle.Monitor => "Screen", _ => "Tapestry" },
             outline, [], [Pose.Front(0, y0, m.T / 2)], grainAlongU: true, face: grain ? null : [], etched: etched, lines: lines);
         m.Note($"Glue it to the wall with its bottom {y0:0.#} mm up.");
     }

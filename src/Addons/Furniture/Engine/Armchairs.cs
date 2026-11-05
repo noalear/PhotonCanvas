@@ -20,8 +20,10 @@ public static class Armchairs
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;
         bool throne = style == SeatStyle.Throne, pew = style == SeatStyle.Pew, command = style == SeatStyle.Command;
         bool settle = style == SeatStyle.Settle, carved = style is SeatStyle.Wooden or SeatStyle.Settle;
-        bool soft = style is SeatStyle.Armchair or SeatStyle.Sofa or SeatStyle.Throne or SeatStyle.Command;
-        string what = style switch { SeatStyle.Throne => "throne", SeatStyle.Sofa => "sofa", SeatStyle.Pew => "pew", SeatStyle.Command or SeatStyle.Wooden => "chair", SeatStyle.Settle => "settle", _ => "armchair" };
+        // A carved wing chair: buttoned like an armchair, with the carved chair's arches, pinnacles and a quatrefoil.
+        bool reading = style == SeatStyle.Reading;
+        bool soft = style is SeatStyle.Armchair or SeatStyle.Sofa or SeatStyle.Throne or SeatStyle.Command or SeatStyle.Reading;
+        string what = style switch { SeatStyle.Throne => "throne", SeatStyle.Sofa => "sofa", SeatStyle.Pew => "pew", SeatStyle.Command or SeatStyle.Wooden or SeatStyle.Reading => "chair", SeatStyle.Settle => "settle", _ => "armchair" };
         // A throne's dais: two steps, the sides' feet go down through them.
         double dais = throne ? 2 * T : 0, step = throne ? Geo.Clamp(Math.Min(W, D) * 0.12, 1.5, 4) : 0;
         double y0 = dais;
@@ -89,7 +91,7 @@ public static class Armchairs
         else Span(seat, sideTop);
         if (backTabs.Count == 0) { m.Bad($"The back has no room for its tabs: make the {(pew ? "ends" : "arms")} higher above the seat."); return; }
         foreach (var (yc, h) in backTabs) holes.Add(Geo.Rect(BackIn - f / 2, yc - (h + f) / 2, BackIn + T + f / 2, yc + (h + f) / 2));
-        if (carved)
+        if (carved || reading)
         {
             // An arcade of little pointed arches pierced through each side under the arm.
             double a0 = BackIn + T + 1.4, a1 = D - 1.2, ya = seat + 1.0, yt = arm - 1.1;
@@ -106,6 +108,12 @@ public static class Armchairs
         if (throne) foreach (var u in feetAt) side.Add(Geo.Rect(u - ftw / 2, 0, u + ftw / 2, y0 + 0.01));
         var etchedS = new PathsD();
         var linesS = new List<PathD>();
+        if (pew && look != FrontLook.Metal)
+        {
+            // A pointed panel carved down the pew's tall end.
+            double endW = Geo.Clamp(D * 0.3, zb + 1.5, D * 0.5), a = zb + 0.5, b = endW - 0.6;
+            if (b - a >= 2 && H - 2.6 - (arm + 0.6) > 4) etchedS.AddRange(Fronts.Outline([Fronts.PointedRect(a, arm + 0.6, b, H - 2.6)], 0.4));
+        }
         if (throne || command)
         {
             double a = zb + 0.6, b = D - 1.2;
@@ -124,7 +132,7 @@ public static class Armchairs
         {
             rise = it.BackTop switch { BackTop.Square => 0, BackTop.Winged => Math.Min(W * 0.35, (H - arm) * 0.4), BackTop.Pointed => Math.Min(W * 0.5, (H - arm) * 0.5), _ => Math.Min(W * 0.3, (H - arm) * 0.45) };
             back.Add(Shapes.Topped(it.BackTop, 0, sideTop - yb - 0.01, W, H - yb, rise));
-            if (carved && rise > 2)
+            if ((carved || reading) && rise > 2)
             {
                 // Pinnacles up the back's corners, each topped with a ball.
                 double pw = Math.Max(1.6, T * 0.8), ptop = H - yb - rise * 0.25;
@@ -149,6 +157,13 @@ public static class Armchairs
         var etchedB = new PathsD();
         var linesB = new List<PathD>();
         double cushionTop = H - yb - (pew ? 0 : Math.Min(3, (H - arm) * 0.3)) - 1;
+        if (reading && rise > 3.5)
+        {
+            // The buttoned back stops under the crest, a quatrefoil pierced through the crest.
+            cushionTop = H - yb - rise - 0.3;
+            double r = Math.Min(Li * 0.1, rise * 0.16);
+            if (r > 0.6) backHoles.AddRange(Geo.Offset(Geo.Offset(Candles.Quatrefoil(W / 2, H - yb - rise * 0.5, r), 0.2, round: true), -0.2, round: true));
+        }
         if (soft && !command) Shapes.Tufted(T + 0.8, seat - yb + 0.5, T + Li - 0.8, cushionTop, buttons: style != SeatStyle.Sofa, etchedB, linesB);
         if (command)
         {
@@ -180,7 +195,15 @@ public static class Armchairs
             double r = Math.Min(W * 0.16, (H - arm) * 0.25);
             Cabinets.Symbol(look, m.Theme, W / 2, H - yb - Math.Min(W * 0.35, (H - arm) * 0.4) * 0.3 - r * 1.3, r, etchedB, linesB);
         }
-        if (style == SeatStyle.Sofa || pew)
+        if (pew && look != FrontLook.Metal)
+        {
+            // An arcade of tall pointed panels carved across the pew's back.
+            double y0b = seat - yb + 0.8, y1b = sideTop - yb - 0.8;
+            int n = Math.Max(2, (int)Math.Round(Li / 5.5));
+            double pw = (Li - 1.2 - (n - 1) * 0.9) / n;
+            if (pw > 1.6 && y1b - y0b > 3) for (int i = 0; i < n; i++) { double x = T + 0.6 + i * (pw + 0.9); etchedB.AddRange(Fronts.Outline([Fronts.PointedRect(x, y0b, x + pw, y1b)], 0.4)); }
+        }
+        else if (style == SeatStyle.Sofa || pew)
         {
             int seats = Geo.Clamp(it.Columns, 1, 8);
             for (int i = 1; i < seats; i++)

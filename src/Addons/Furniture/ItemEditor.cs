@@ -24,6 +24,7 @@ public sealed class ItemEditor : StackPanel
     Control _dRow = null!;
     readonly ComboBox _legs = Combo("Four legs", "Solid ends", "Trestles", "Round, crossed legs");
     readonly CheckBox _rail = new() { Content = "A rail low down between the legs" };
+    readonly CheckBox _toolRack = new() { Content = "A tool rack along the back and a vice (a workbench)" };
     readonly NumericUpDown _legW = Number(0, 50, 0.5m, "0.#");
     readonly ComboBox _top = Combo("Round", "Square");
     readonly NumericUpDown _seat = Number(2, 500, 0.5m, "0.#");
@@ -45,7 +46,7 @@ public sealed class ItemEditor : StackPanel
     readonly TextBlock _styleLabel = Label("Style");
     readonly ComboBox _style = Combo();
     readonly ComboBox _crown = Combo("Flat", "Cornice (two layers)", "Pediment", "Arch");
-    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing");
+    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing", "Tools on pegs");
     readonly ComboBox _backTop = Combo("Square", "Rounded", "Arched", "Pointed", "Winged");
     readonly NumericUpDown _cols = Number(1, 12, 1, "0"), _rows = Number(1, 12, 1, "0"), _arm = Number(2, 500, 0.5m, "0.#"), _hang = Number(0, 500, 0.5m, "0.#");
     readonly TextBlock _colsLabel = Label("Across"), _rowsLabel = Label("Rows");
@@ -65,7 +66,7 @@ public sealed class ItemEditor : StackPanel
     {
         Spacing = 8;
         _legWRow = Field("Leg width", _legW, tip: "How wide the legs are (mm). 0 = to suit the sheet.");
-        _legRows = Stack(Field("Legs", _legs), _rail);
+        _legRows = Stack(Field("Legs", _legs), _rail, _toolRack);
         _topRow = Field("Seat shape", _top);
         _seatRow = Field("Seat height", _seat, tip: "How high the top of the seat is (mm).");
         _backRow = Field("Back", _back);
@@ -101,7 +102,7 @@ public sealed class ItemEditor : StackPanel
         _style.SelectionChanged += (_, _) => { if (!_loading) { Edited(); Load(); } };
         foreach (var c in new[] { _legs, _top, _back, _lid, _doorShape, _hinge, _crown, _contents, _backTop, _look })
             c.SelectionChanged += (_, _) => Edited();
-        foreach (var c in new[] { _rail, _backPanel, _books, _bands, _bedding })
+        foreach (var c in new[] { _rail, _toolRack, _backPanel, _books, _bands, _bedding })
             c.IsCheckedChanged += (_, _) => Edited();
         _label.TextChanged += (_, _) => Edited();
     }
@@ -157,7 +158,7 @@ public sealed class ItemEditor : StackPanel
         _about.Text = info.About;
         _count.Value = Math.Max(1, it.Count);
         _w.Value = D(it.WidthMm); _d.Value = D(it.DepthMm); _h.Value = D(it.HeightMm);
-        _legs.SelectedIndex = (int)it.Legs; _rail.IsChecked = it.Stretcher; _legW.Value = D(it.LegMm);
+        _legs.SelectedIndex = (int)it.Legs; _rail.IsChecked = it.Stretcher; _toolRack.IsChecked = it.ToolRack; _legW.Value = D(it.LegMm);
         _top.SelectedIndex = it.Top == TopShape.Round ? 0 : 1;
         _seat.Value = D(it.SeatMm); _back.SelectedIndex = (int)it.Back;
         _shelves.Value = it.Shelves; _backPanel.IsChecked = it.BackPanel; _books.IsChecked = it.Books;
@@ -215,7 +216,7 @@ public sealed class ItemEditor : StackPanel
         _backRow.IsVisible = kind == ItemKind.Chair;
         _armRow.IsVisible = _backTopRow.IsVisible = kind == ItemKind.Armchair && it.Seat != SeatStyle.Pew;
         _crownRow.IsVisible = kind == ItemKind.Cabinet;
-        _contentsRow.IsVisible = kind == ItemKind.Cabinet && it.Front is CabinetFront.Open or CabinetFront.Glass or CabinetFront.Hutch;
+        _contentsRow.IsVisible = kind == ItemKind.Cabinet && it.Front is CabinetFront.Open or CabinetFront.Glass or CabinetFront.Hutch or CabinetFront.Lattice;
         _shelvesRow.IsVisible = kind == ItemKind.Bookshelf || kind == ItemKind.Cabinet && it.Front is not (CabinetFront.Clock or CabinetFront.Altar or CabinetFront.Drawers);
         (string? cols, string? rows) counts = kind switch
         {
@@ -247,7 +248,7 @@ public sealed class ItemEditor : StackPanel
         {
             Count = _countRow.IsVisible ? (int)V(_count, 1) : it.Count,
             WidthMm = V(_w, it.WidthMm), DepthMm = V(_d, it.DepthMm), HeightMm = V(_h, it.HeightMm),
-            Legs = (LegStyle)Math.Max(0, _legs.SelectedIndex), Stretcher = _rail.IsChecked == true, LegMm = V(_legW, 0),
+            Legs = (LegStyle)Math.Max(0, _legs.SelectedIndex), Stretcher = _rail.IsChecked == true, ToolRack = _toolRack.IsChecked == true, LegMm = V(_legW, 0),
             Top = _top.SelectedIndex == 1 ? TopShape.Square : TopShape.Round,
             SeatMm = V(_seat, it.SeatMm), Back = (BackStyle)Math.Max(0, _back.SelectedIndex),
             Shelves = (int)V(_shelves, it.Shelves), BackPanel = _backPanel.IsChecked == true, Books = _books.IsChecked == true,
@@ -268,14 +269,14 @@ public sealed class ItemEditor : StackPanel
     public static (string Label, string[] Names)? StylesOf(ItemKind k) => k switch
     {
         ItemKind.Cabinet => ("Front", ["Doors", "Drawers", "Drawers over doors", "Glass doors", "Open shelves", "Dresser (shelves over a cupboard)", "Panelled doors", "Lockers", "Machine panels", "Clock", "Lattice doors", "Altar"]),
-        ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa", "Pew", "Command chair", "Carved wooden chair", "Carved settle"]),
+        ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa", "Pew", "Command chair", "Carved wooden chair", "Carved settle", "Carved wing chair"]),
         ItemKind.Bed => ("Kind", ["Plain", "Four-poster", "Bunk beds", "Pallet on sleepers"]),
         ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge"]),
         ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),
         ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand"]),
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
         ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round"]),
-        ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen"]),
+        ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains"]),
         ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),

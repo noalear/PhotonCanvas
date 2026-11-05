@@ -106,6 +106,8 @@ public static class Tables
                 double v = D - si - u;
                 slots.Add(Geo.Rect(xf - sw / 2, v - (tw + f) / 2, xf + sw / 2, v + (tw + f) / 2));
             }
+        // A workbench: a tool rack standing along the back and a vice on the front corner, their tabs down through the top.
+        if (it.ToolRack) Workbench(m, W, D, H, T, e, xf1, xf2, slots);
         m.Add("Top", [Geo.Rect(0, 0, W, D)], slots, [Pose.Up(0, H - T / 2, D)], grainAlongU: true, planks: true, plankMm: 3);
 
         // The rails, their tabs through the frames and flush with the outside.
@@ -125,6 +127,51 @@ public static class Tables
             m.Add("Rail", rail, [], railAt.Select(u => Pose.Front(xf1 + T / 2, ys - rh / 2, si + u)), grainAlongU: true, face: [Geo.Rect(0, 0, L, rh)], etched: re, lines: rl);
         }
         if (!rails && style != LegStyle.Legs) m.Note(m.PushFit ? "Without a rail the ends are held only by the top: add the rail to keep them square." : "Without a rail the ends are held only by the top: glue them square, or add the rail.");
+    }
+
+    /// <summary>
+    /// A workbench's tool rack (a board standing along the back of the top with tools hung on pegs) and a vice on the
+    /// front right (seen from the side: its jaws, screw and tommy bar), each with tabs down through slots added to the top's.
+    /// </summary>
+    static void Workbench(Maker m, double W, double D, double H, double T, double e, double xf1, double xf2, PathsD topSlots)
+    {
+        double f = m.Fit, sw = m.SlotW, tw = 2.4;
+        double zr = T / 2 + Maker.Bridge + 0.3, Hr = Geo.Clamp(H * 0.6, 6, 10), Wr = W - 2 * e;
+        if (Wr >= 10 && D >= T + 2 * Maker.Bridge + 6)
+        {
+            var board = new PathsD { WoodFace.RoundRect(0, 0, Wr, Hr, 0.8), Geo.Rect(0, 0, Wr, Hr - 1) };
+            double[] tabs = [Wr * 0.25, Wr * 0.75];
+            foreach (var u in tabs)
+            {
+                board.Add(Geo.Rect(u - tw / 2, -T, u + tw / 2, 0.01));
+                topSlots.Add(Geo.Rect(e + u - (tw + f) / 2, D - zr - sw / 2, e + u + (tw + f) / 2, D - zr + sw / 2));
+            }
+            var etched = new PathsD();
+            var lines = new List<PathD> { new() { new(0.4, Hr - 1.6), new(Wr - 0.4, Hr - 1.6) } };
+            Contents.Tools(0.8, 0.8, Wr - 0.8, Hr - 2.2, m.Rnd, etched, lines);
+            m.Add("Tool rack", Geo.Solid(board), [], [Pose.Front(e, H, zr)], grainAlongU: true, etched: etched, lines: lines);
+        }
+        // The vice, seen from the right: a fixed jaw on a block, the loose jaw on the screw, the screw out past the front
+        // with a tommy bar through its end.
+        double xc = xf2 - sw - 2.2, z0 = D - 3.6;
+        if (xc - xf1 > 8 && D >= 8)
+        {
+            var v = new PathsD
+            {
+                Geo.Rect(0, 0, 2.4, 1.2),
+                Geo.Rect(0, 0, 1.4, 4.0),
+                Geo.Rect(2.2, 1.0, 3.4, 4.0),
+                Geo.Rect(1.3, 1.8, 5.6, 2.8),
+                Geo.Rect(5.0, -1.4, 6.0, 3.6),
+                Geo.Circle(5.5, 3.6, 0.6, 0.02),
+                Geo.Circle(5.5, -1.4, 0.6, 0.02),
+                Geo.Rect(0.3, -T, 0.3 + 1.9, 0.01),
+            };
+            var vl = new List<PathD> { new() { new(3.4, 2.0), new(5.0, 2.6) }, new() { new(3.4, 2.6), new(5.0, 2.0) }, new() { new(0.2, 3.5), new(1.2, 3.5) }, new() { new(2.4, 3.5), new(3.2, 3.5) } };
+            topSlots.Add(Geo.Rect(xc - sw / 2, D - (z0 + 2.2 + f / 2), xc + sw / 2, D - (z0 + 0.3 - f / 2)));
+            m.Add("Vice", Geo.Solid(v), [], [Pose.Left(xc, H, z0)], grainAlongU: true, face: [], lines: vl);
+        }
+        m.Note("Push the tool rack and the vice into the slots in the top.");
     }
 
     /// <summary>A round or square top on two legs crossed with a halving joint (stools and round tables).</summary>

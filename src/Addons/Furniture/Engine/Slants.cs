@@ -38,8 +38,13 @@ public static class Slants
                 yB = H; yF = H - (zF - zB) * Math.Tan(angle);
                 double yP = Math.Max(4, yF - 7);
                 if (yF < 8) { m.Bad($"The {what} is too low for its depth: make it taller or shallower."); return; }
+                // A pedestal on a stepped foot, a pointed window pierced through it where it's wide enough.
+                if (look != FrontLook.Metal) pw = Geo.Clamp(D * 0.6, 4.2, 6.5);
                 side.Add(WoodFace.RoundRect(0, 0, D, 1.8, 0.7));
+                if (look != FrontLook.Metal) side.Add(WoodFace.RoundRect(zc - pw / 2 - 1.0, 1.0, zc + pw / 2 + 1.0, 2.8, 0.5));
                 side.Add(Geo.Rect(zc - pw / 2, 0, zc + pw / 2, yP + 0.01));
+                double ww = pw - 2 * 1.4, wy0 = Math.Max(2.4, yP * 0.4) + T + 1.2, wy1 = Math.Min(yP + 2.5, yF - 5.5);
+                if (look != FrontLook.Metal && ww >= 1.4 && wy1 - wy0 >= 3) holes.Add(Fronts.PointedRect(zc - ww / 2, wy0, zc + ww / 2, wy1));
                 side.Add([new(zc - pw / 2, yP), new(zc + pw / 2, yP), new(zF, yF - 5), new(zF, yF), new(zB, yB), new(zB, yB - 5)]);
                 // A shelf: a narrow stretcher between the posts.
                 flats.Add(("Shelf", Math.Max(2.4, yP * 0.4), zc - pw / 2, zc + pw / 2));
@@ -130,7 +135,8 @@ public static class Slants
                 MapOn(Li, Lp, look == FrontLook.Metal, rnd, te, tl);
                 break;
             default:
-                OpenBook(Li / 2, Lp * 0.5, Math.Min(Li * 0.85, 8), Math.Min(Lp * 0.75, 5.5), tl, te);
+                // A lectern's book is cut to lie on it (where it's glued); else it's scored on.
+                if (style != SlantStyle.Lectern || m.PushFit || look == FrontLook.Metal) OpenBook(Li / 2, Lp * 0.5, Math.Min(Li * 0.85, 8), Math.Min(Lp * 0.75, 5.5), tl, te);
                 // A ledge along the bottom to stop the book sliding.
                 te.Add(Geo.Rect(0, 0.2, Li, 0.7));
                 break;
@@ -138,6 +144,29 @@ public static class Slants
         var o = At(inset, dd);
         var pose = new Pose(new V3(T, o.y, o.x), V3.UnitX, new V3(0, d.y, d.x));
         m.Add(style == SlantStyle.Console ? "Screen panel" : "Top", top, [], [pose], grainAlongU: true, face: style is SlantStyle.Console or SlantStyle.MapTable ? [] : null, etched: te, lines: tl);
+        if (style == SlantStyle.Lectern && !m.PushFit && look != FrontLook.Metal)
+        {
+            // The open book, glued on the slope: wider than the stand, its pages bowing down to the spine.
+            double bw = Math.Min(W + 2.0, 14), bh = Math.Min(Lp * 0.85, bw * 0.72), by = Lp * 0.08;
+            var book = new PathD();
+            // The top edge dips to the spine; the bottom is straight with the covers showing past the pages.
+            book.Add(new(0, 0.3)); book.Add(new(bw, 0.3));
+            for (int i = 0; i <= 12; i++) { double t = i / 12.0, x = bw * (1 - t); book.Add(new(x, bh - 0.9 * Math.Pow(Math.Abs(2 * t - 1) < 1 ? 1 - Math.Abs(2 * t - 1) : 0, 0.6))); }
+            var bl = new List<PathD> { new() { new(bw / 2, 0.3), new(bw / 2, bh - 0.9) }, new() { new(0.4, 0.7), new(bw - 0.4, 0.7) } };
+            var be = new PathsD();
+            foreach (var sgn in new[] { -1, 1 })
+            {
+                double x0 = bw / 2 + sgn * 0.5, x1 = bw / 2 + sgn * (bw / 2 - 0.6);
+                for (double y = 1.3; y < bh - 1.6; y += 0.55) bl.Add([new(Math.Min(x0, x1), y), new(Math.Max(x0, x1), y)]);
+            }
+            // An illuminated letter at the head of the left page.
+            be.Add(Geo.Rect(0.7, bh - 2.9, 2.0, bh - 1.6));
+            // It lies on the sides' sloping edges (they stand a little proud of the top), glued to them.
+            var bo = At(inset + by, -T / 2);
+            var bpose = new Pose(new V3(W / 2 - bw / 2, bo.y, bo.x), V3.UnitX, new V3(0, d.y, d.x));
+            m.Add("Book", [book], [], [bpose], grainAlongU: true, face: [], etched: be, lines: bl).Glue();
+            m.Note("Glue the book open on the slope.");
+        }
 
         // ---- the flat plates ----
         foreach (var (name, y, z0, z1) in flats)
@@ -289,6 +318,11 @@ public static class Slants
         bool screen = it.Contents == ShelfContents.Tech;
         double mw = Math.Min(Wt * 0.45, 12), mHt = Math.Min(9, Math.Max(5, mw * 0.65)), mz = Math.Max(2.5, D * 0.3), mtw = Geo.Clamp(mw * 0.2, 1.2, 2.5);
         if (screen) slots.Add(Geo.Rect(Wt / 2 - (mtw + f) / 2, Dt - mz - sw / 2, Wt / 2 + (mtw + f) / 2, Dt - mz + sw / 2));
+        // A writing desk's pigeonholes stand along the back of the top, their tabs down through it.
+        double hw = W - 2, hz = T / 2 + Maker.Bridge + 0.4, htw = 2.0;
+        bool holes = !screen && !metal && hw >= 10 && D >= 9;
+        double[] holeTabs = [hw * 0.25, hw * 0.75];
+        if (holes) foreach (var u in holeTabs) slots.Add(Geo.Rect(oh + 1 + u - (htw + f) / 2, Dt - hz - sw / 2, oh + 1 + u + (htw + f) / 2, Dt - hz + sw / 2));
         var te = new PathsD();
         var tl = new List<PathD>();
         if (screen)
@@ -308,6 +342,32 @@ public static class Slants
             if (Wt > 14) te.Add(Geo.Turn([Geo.Rect(-1.6, -1.2, 1.6, 1.2)], 20, Wt * 0.15, Dt * 0.6)[0]);
         }
         m.Add("Top", [Geo.Rect(0, 0, Wt, Dt)], slots, [Pose.Up(-oh, H - T / 2, D + oh)], grainAlongU: true, etched: te, lines: tl);
+        if (holes)
+        {
+            // Two rows of pigeonholes, letters and rolled scrolls in some, under a raised arch with the theme's symbol.
+            double hh = Geo.Clamp(H * 0.42, 4.5, 7), rise = Math.Min(2.4, hh * 0.35);
+            var board = new PathsD { Geo.Rect(0, 0, hw, hh), Shapes.Topped(look == FrontLook.Gothic ? BackTop.Pointed : BackTop.Arched, hw * 0.3, hh - 0.01, hw * 0.7, hh + rise, rise) };
+            foreach (var u in holeTabs) board.Add(Geo.Rect(u - htw / 2, -T, u + htw / 2, 0.01));
+            var he = new PathsD();
+            var hl = new List<PathD> { Geo.Loop(Geo.Rect(0.35, 0.35, hw - 0.35, hh - 0.35)) };
+            int cols = Math.Max(3, (int)Math.Round((hw - 1) / 2.6));
+            double cw = (hw - 1.2 - (cols - 1) * 0.5) / cols, chh = (hh - 1.7) / 2;
+            for (int r = 0; r < 2; r++)
+                for (int c = 0; c < cols; c++)
+                {
+                    double x0 = 0.6 + c * (cw + 0.5), y0 = 0.6 + r * (chh + 0.5);
+                    he.Add(Geo.Rect(x0, y0, x0 + cw, y0 + chh));
+                    // Something in most of them: a rolled scroll end-on, or a stack of letters.
+                    switch (rnd.Next(3))
+                    {
+                        case 0: hl.Add(WoodFace.Dot(x0 + cw / 2, y0 + Math.Min(cw, chh) * 0.4, Math.Min(cw, chh) * 0.3)); break;
+                        case 1: for (double y = y0 + 0.3; y < y0 + chh * 0.5; y += 0.35) hl.Add([new(x0 + 0.25, y), new(x0 + cw - 0.25, y)]); break;
+                    }
+                }
+            double sr = Math.Min(rise * 0.4, hw * 0.08);
+            if (sr >= 0.8) Cabinets.Symbol(look, m.Theme, hw / 2, hh + rise * 0.35, sr, he, hl);
+            m.Add("Pigeonholes", Geo.Solid(board), [], [Pose.Front(1, H, hz)], grainAlongU: true, etched: he, lines: hl);
+        }
         if (screen)
         {
             var mon = new PathsD { Fronts.Chamfered(0, 1.6, mw, mHt, 0.8), Geo.Rect(mw / 2 - 0.8, 0, mw / 2 + 0.8, 1.7), Geo.Rect(mw / 2 - mtw / 2, -T, mw / 2 + mtw / 2, 0.01) };
@@ -316,6 +376,6 @@ public static class Slants
             Screens(mw, mHt - 1.6 - 0.2, rnd, me, ml);
             m.Add("Screen", Geo.Union(mon), [], [Pose.Front(-oh + Wt / 2 - mw / 2, H, mz)], grainAlongU: true, face: [], etched: Geo.Move(me, 0, 1.8), lines: Geo.Map(ml, p => new PointD(p.x, p.y + 1.8)));
         }
-        m.Note("Push the back panel and the drawer rail into one end, put the other end on, then press the top down onto the ends' tabs" + (screen ? " and stand the screen in its slot." : "."));
+        m.Note("Push the back panel and the drawer rail into one end, put the other end on, then press the top down onto the ends' tabs" + (screen ? " and stand the screen in its slot." : holes ? " and stand the pigeonholes in their slots." : "."));
     }
 }
