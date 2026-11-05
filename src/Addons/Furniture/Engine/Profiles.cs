@@ -486,6 +486,7 @@ public static class Profiles
     public static void Stand(Maker m)
     {
         if (m.Item.Stand == StandStyle.Anvil) { Anvil(m); return; }
+        if (m.Item.Stand == StandStyle.Armour) { TownWalls.ArmourSuit(m); return; }
         var it = m.Item;
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = 2.6, xc = W / 2, post = 1.6;
@@ -524,7 +525,7 @@ public static class Profiles
                 lines = Geo.ClipLines(lines, Geo.Solid(shape));
                 break;
             }
-            case StandStyle.Coats:
+            default:
             {
                 name = "Coat stand";
                 shape.AddRange(Bar(xc, footH, xc, H - 1.2, post));
@@ -539,40 +540,6 @@ public static class Profiles
                 var cloak = new PathD { new(cx - 0.6, H - 2.2), new(cx + 0.6, H - 2.2), new(cx + cw / 2, H * 0.3), new(cx - cw / 2 + 0.5, H * 0.28) };
                 shape.Add(cloak);
                 for (double f = -0.3; f <= 0.31; f += 0.3) lines.Add([new(cx + f * 0.6, H - 2.6), new(cx + f * cw, H * 0.31)]);
-                break;
-            }
-            default:
-            {
-                name = "Armour stand";
-                // A post up to the hips, then a suit of armour: tassets, breastplate, pauldrons, gorget and helm.
-                double hip = H * 0.38, chest = H * 0.62, shoulder = H * 0.74, neck = H * 0.8, sh = W / 2;
-                shape.AddRange(Bar(xc, footH, xc, hip + 1, post * 1.4));
-                // Tassets (skirt of plates), wider at the bottom.
-                var skirt = new PathD { new(xc - sh * 0.62, hip - H * 0.1), new(xc + sh * 0.62, hip - H * 0.1), new(xc + sh * 0.5, hip + 0.5), new(xc - sh * 0.5, hip + 0.5) };
-                shape.Add(skirt);
-                // The breastplate: waist to chest, then in to the neck.
-                var torso = new PathD
-                {
-                    new(xc - sh * 0.48, hip), new(xc + sh * 0.48, hip), new(xc + sh * 0.6, chest), new(xc + sh * 0.7, shoulder - 0.5),
-                    new(xc + sh * 0.3, neck), new(xc - sh * 0.3, neck), new(xc - sh * 0.7, shoulder - 0.5), new(xc - sh * 0.6, chest),
-                };
-                shape.Add(torso);
-                // Pauldrons: rounded caps over the shoulders.
-                foreach (var s in new[] { -1, 1 }) shape.Add(Rugs.Ellipse(xc + s * sh * 0.72, shoulder - 0.6, sh * 0.32, H * 0.06));
-                // The helm on its gorget.
-                double hr = Math.Min(W * 0.17, H * 0.085);
-                shape.Add(Geo.Rect(xc - hr * 0.6, neck - 0.3, xc + hr * 0.6, neck + 1.0));
-                var helm = Fronts.ArchedRect(xc - hr, neck + 0.8, xc + hr, Math.Min(H, neck + 0.8 + hr * 2.4));
-                shape.Add(helm);
-                etched.Add(Geo.Rect(xc - hr * 0.75, neck + 0.8 + hr * 1.2, xc + hr * 0.75, neck + 0.8 + hr * 1.2 + 0.35));
-                // Plate lines: the ridge, the belt, the tassets' lames, the pauldrons' rims.
-                lines.Add([new(xc, hip + 0.4), new(xc, neck - 0.4)]);
-                etched.Add(Geo.Rect(xc - sh * 0.5, hip + 0.1, xc + sh * 0.5, hip + 0.6));
-                for (double y = hip - H * 0.1 + 1.0; y < hip; y += 1.0) lines.Add([new(xc - sh * 0.6, y), new(xc + sh * 0.6, y)]);
-                foreach (var s in new[] { -1, 1 }) lines.Add([new(xc + s * sh * 0.45, shoulder - 0.9), new(xc + s * sh * 1.0, shoulder - 1.2)]);
-                if (look == FrontLook.Metal) etched.Add(Geo.Circle(xc, chest, Math.Min(1.2, sh * 0.2), 0.01));
-                else lines.Add(Geo.Loop(Cabinets.Trefoil(xc, chest - 0.5, Math.Min(1.6, sh * 0.3))));
-                lines = Geo.ClipLines(lines, Geo.Solid(shape));
                 break;
             }
         }
@@ -855,6 +822,7 @@ public static class Profiles
 
     public static void WeaponRack(Maker m)
     {
+        if (Fronts.Look(m) != FrontLook.Metal) { TownWalls.Armoury(m); return; }
         var it = m.Item;
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;
         int n = Geo.Clamp(it.Rows, 1, 12);

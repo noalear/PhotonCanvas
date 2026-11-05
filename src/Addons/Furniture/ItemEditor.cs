@@ -294,6 +294,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.TownWall => ("Piece", ["Straight", "Corner (parapet outside)", "Corner (parapet inside)", "Gatehouse", "End with a turret"]),
         ItemKind.Tree => ("Kind", ["Oak", "Pine", "Dead tree", "Palm", "Giant mushroom"]),
         ItemKind.Stall => ("Kind", ["Market stall", "Outdoor bar", "Notice board"]),
+        ItemKind.Ship => ("Kind", ["Cryo pod", "Med bay bed with scanner", "Mess table with fixed stools", "Server rack", "Crew bunks", "Cockpit console", "Rifle rack", "Fuel drums", "Reactor core"]),
         _ => null,
     };
 
@@ -315,6 +316,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.TownWall => (int)it.Wall,
         ItemKind.Tree => (int)it.Tree,
         ItemKind.Stall => (int)it.Stall,
+        ItemKind.Ship => (int)it.Ship,
         _ => 0,
     };
 
@@ -336,6 +338,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.TownWall => it with { Wall = (WallPiece)i },
         ItemKind.Tree => it with { Tree = (TreeStyle)i },
         ItemKind.Stall => it with { Stall = (StallStyle)i },
+        ItemKind.Ship => it.Ship == (ShipStyle)i ? it : TownWalls.ShipSized(it, (ShipStyle)i),
         _ => it,
     };
 }

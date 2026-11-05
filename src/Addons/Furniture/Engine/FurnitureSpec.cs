@@ -11,6 +11,7 @@ public enum ItemKind
     Cabinet, Desk, Armchair, Fireplace, SlantDesk, WeaponRack, Stand, Coffin, Rug, WallHanging, Candlestand, Screen, Stocks,
     TownWall, Tower, Tree, Trough, Stage, Stall,
     Gallows, Fountain,
+    Ship,
 }
 
 /// <summary>How a table's or bench's legs are made.</summary>
@@ -199,6 +200,8 @@ public sealed record FurnitureItem
     public TreeStyle Tree { get; init; } = TreeStyle.Oak;
     /// <summary>Street stalls: a market stall, an outdoor bar or a notice board.</summary>
     public StallStyle Stall { get; init; } = StallStyle.Market;
+    /// <summary>Ship fittings: a cryo pod, a med bay bed, a mess table with fixed stools or a server rack.</summary>
+    public ShipStyle Ship { get; init; } = ShipStyle.CryoPod;
 }
 
 /// <summary>Everything cut from one sheet in one go: the pieces of furniture, the sheet and the detail.</summary>
@@ -271,6 +274,7 @@ public static class Defaults
         new(ItemKind.Tower, "Guard tower", "A tall tower with a fighting roof behind merlons, a door, arrow loops on every side, quoins and a flag."),
         new(ItemKind.Gallows, "Gallows", "A gallows on a braced platform: steps up, railings, a trapdoor, two posts and a beam with knee braces, a noose on its rope (and an iron gibbet cage in the dungeon and gothic themes)."),
         new(ItemKind.Fountain, "Fountain", "A tiered fountain: an eight-sided stone basin full of water, a carved column with two bowls, water falling from each, and a finial on top."),
+        new(ItemKind.Ship, "Ship fitting", "Starship fittings in plated metal: a cryo pod with a sleeper behind its window, a med bay bed under a scanner arch, a mess table with stools fixed to the deck, or a rack of servers."),
     ];
 
     public static KindInfo Info(ItemKind k) => Kinds.First(x => x.Kind == k);
@@ -290,7 +294,7 @@ public static class Defaults
         ItemKind.Desk => new() { Kind = k, WidthMm = 24, DepthMm = 12, HeightMm = 13, Contents = ShelfContents.Books },
         ItemKind.Fireplace => new() { Kind = k, WidthMm = 26, DepthMm = 9, HeightMm = 40, Hearth = HearthStyle.Fireplace },
         ItemKind.SlantDesk => new() { Kind = k, WidthMm = 9, DepthMm = 8, HeightMm = 22, Slant = SlantStyle.Lectern },
-        ItemKind.WeaponRack => new() { Kind = k, WidthMm = 18, DepthMm = 8, HeightMm = 30, Rows = 5 },
+        ItemKind.WeaponRack => new() { Kind = k, WidthMm = 32, DepthMm = 11, HeightMm = 30, Rows = 5 },
         ItemKind.Stand => new() { Kind = k, WidthMm = 14, DepthMm = 10, HeightMm = 32, Stand = StandStyle.Armour },
         ItemKind.Coffin => new() { Kind = k, WidthMm = 34, DepthMm = 11, HeightMm = 6, Coffin = CoffinStyle.Coffin },
         ItemKind.Rug => new() { Kind = k, WidthMm = 36, DepthMm = 24, HeightMm = 1, Rug = RugPattern.Border },
@@ -306,6 +310,7 @@ public static class Defaults
         ItemKind.Stall => new() { Kind = k, WidthMm = 36, DepthMm = 20, HeightMm = 40, Stall = StallStyle.Market },
         ItemKind.Gallows => new() { Kind = k, WidthMm = 46, DepthMm = 38, HeightMm = 60 },
         ItemKind.Fountain => new() { Kind = k, WidthMm = 50.8, DepthMm = 50.8, HeightMm = 46 },
+        ItemKind.Ship => new() { Kind = k, WidthMm = 22, DepthMm = 15, HeightMm = 32, Ship = ShipStyle.CryoPod },
         ItemKind.Armchair => new() { Kind = k, WidthMm = 14, DepthMm = 12, HeightMm = 20, SeatMm = 7.5, ArmMm = 11, Seat = SeatStyle.Armchair, BackTop = BackTop.Rounded, Columns = 1 },
         ItemKind.Cabinet => new() { Kind = k, WidthMm = 22, DepthMm = 11, HeightMm = 34, Front = CabinetFront.Doors, Crown = Crown.Cornice, Columns = 2, Shelves = 2 },
         _ => new() { Kind = k },

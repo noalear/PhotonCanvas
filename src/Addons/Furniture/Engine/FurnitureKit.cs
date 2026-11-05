@@ -44,6 +44,7 @@ public static class FurnitureKit
             case ItemKind.Stall: TownWalls.Stall(m); break;
             case ItemKind.Gallows: TownWalls.Gallows(m); break;
             case ItemKind.Fountain: TownWalls.Fountain(m); break;
+            case ItemKind.Ship: TownWalls.Ship(m); break;
             default: m.Bad($"{Defaults.Info(item.Kind).Name} isn't made yet."); break;
         }
         return m.Kit();

@@ -67,9 +67,15 @@ static class FurnitureShots
         var bridge = FurnitureThemes.Apply(new FurnitureSet { Items = [C("sci-captains-chair"), C("sci-helm-console"), C("sci-lockers"), C("sci-rifle-rack"), C("sci-sleeper-pod")] }, "Sci-fi");
         Shot("window-furniture-console", bridge, 1, 0);
         Shot("window-furniture-lockers", bridge, 2, 0);
+        Shot("window-furniture-cryo-pod", bridge, 4, 0);
+        var ship = FurnitureThemes.Apply(new FurnitureSet { Items = [C("sci-reactor-core"), C("sci-crew-bunks"), C("sci-fuel-drums"), C("sci-medical-bed"), C("sci-mess-table")] }, "Sci-fi");
+        Shot("window-furniture-reactor", ship, 0, 0);
+        Shot("window-furniture-crew-bunks", ship, 1, 0);
+        Shot("window-furniture-med-bay", ship, 3, 0);
         var med = FurnitureThemes.Apply(new FurnitureSet { Items = [C("med-throne"), C("med-weapon-rack"), C("med-armour-stand"), C("med-smithy-forge"), C("med-dresser-with-plates")] }, "Medieval");
         Shot("window-furniture-throne", med, 0, 0);
         Shot("window-furniture-weapon-rack", med, 1, 0);
+        Shot("window-furniture-armour", med, 2, 0);
         Shot("window-furniture-forge", med, 3, 0);
         Shot("window-furniture-dresser", med, 4, 0);
         var crypt = FurnitureThemes.Apply(new FurnitureSet { Items = [C("got-sarcophagus"), C("got-coffin"), C("got-tracery-screen")] }, "Gothic");
