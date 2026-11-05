@@ -54,6 +54,16 @@ public sealed class HistoryPage : UserControl
         var badges = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
         if (h.EndedAt is not null) badges.Children.Add(Badge(h.Finished ? "Finished" : "Stopped", h.Finished ? "Ok" : "Warn"));
         if (h.StartedFromPhone) badges.Children.Add(Badge("Started from phone", "Accent"));
+        // A design the phone loaded, still on the computer: the same again.
+        Button? again = null;
+        if (h.ProjectId is { } id)
+        {
+            again = Btn("Run again");
+            again.MinHeight = 36;
+            again.HorizontalAlignment = HorizontalAlignment.Left;
+            again.Padding = new(14, 4);
+            again.Click += (_, _) => new DesignSheet(_host, _s, new ProjectItem(id, h.Design, "", DateTimeOffset.Now, false)).Open();
+        }
         return new Border
         {
             Classes = { "card" },
@@ -74,6 +84,7 @@ public sealed class HistoryPage : UserControl
                             Text($"{h.StartedAt.ToLocalTime():g}{(h.TookS is { } took ? $" · {Clock(took)}" : " · running")}", "muted"),
                             Text(h.SourceText, "muted").With(t => t.FontSize = 12),
                             badges,
+                            (Control?)again ?? new Panel(),
                         },
                     }.With(p => Grid.SetColumn(p, 1)),
                 },

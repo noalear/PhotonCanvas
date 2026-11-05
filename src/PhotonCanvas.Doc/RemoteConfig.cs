@@ -9,6 +9,28 @@ using PhotonCanvas.Core;
 namespace PhotonCanvas.Doc;
 
 /// <summary>
+/// The server's certificate for encrypted connections (remote\tls.json, written only by the server):
+/// the port and fingerprint go into the QR code, so the phone trusts that certificate and no other.
+/// </summary>
+public sealed record TlsState(int Port, string Fingerprint, string Password)
+{
+    public static string FilePath(string? dir = null) => Path.Combine(dir ?? RemoteConfig.Dir, "tls.json");
+
+    /// <summary>What the server last wrote, or null before it has made its certificate.</summary>
+    public static TlsState? Read(string? dir = null)
+    {
+        try { return File.Exists(FilePath(dir)) ? JsonSerializer.Deserialize<TlsState>(File.ReadAllText(FilePath(dir))) : null; }
+        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return null; }
+    }
+
+    public void Write(string? dir = null)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(FilePath(dir))!);
+        File.WriteAllText(FilePath(dir), JsonSerializer.Serialize(this));
+    }
+}
+
+/// <summary>
 /// The remote server's settings, in the data folder's remote\remote.json (never app.json, which the
 /// desktop app owns). Made on the first start with a new access code. The desktop app's Remote
 /// access window changes them; the server reads them when it starts.
@@ -20,6 +42,9 @@ public sealed class RemoteConfig
     /// <summary>What the phone must send with every request (16 letters and digits, shown in groups of four).</summary>
     public string AccessCode { get; set; } = "";
     public int Port { get; set; } = DefaultPort;
+    /// <summary>The encrypted (HTTPS) port the Android app uses; the plain port stays for the phone page.</summary>
+    public int HttpsPort { get; set; } = DefaultHttpsPort;
+    public const int DefaultHttpsPort = 8741;
     /// <summary>The machine's address; null = the one the desktop app last connected to.</summary>
     public string? MachineIp { get; set; }
     /// <summary>Folders whose designs the phone lists (besides the desktop app's recent files); empty = Documents.</summary>
@@ -48,7 +73,18 @@ public sealed class RemoteConfig
             c.Save();
         }
         if (c.Port is < 1024 or > 65535) c.Port = DefaultPort;
+        if (c.HttpsPort is < 1024 or > 65535 || c.HttpsPort == c.Port) c.HttpsPort = c.Port == DefaultHttpsPort ? DefaultPort : DefaultHttpsPort;
         return c;
+    }
+
+    /// <summary>
+    /// The QR code's text: the phone page's address with the code; for the app also the encrypted port and
+    /// certificate, and the computer's other addresses (it uses whichever answers, at home or away).
+    /// </summary>
+    public string QrText(string address, TlsState? tls, IEnumerable<string>? others = null)
+    {
+        var alt = (others ?? []).Where(a => a != address).ToList();
+        return $"http://{address}:{Port}/#code={AccessCode}" + (tls is null ? "" : $"&tls={tls.Port}&fp={tls.Fingerprint}") + (alt.Count == 0 ? "" : $"&alt={string.Join(',', alt)}");
     }
 
     public void Save()

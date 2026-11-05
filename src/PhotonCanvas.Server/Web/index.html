@@ -236,7 +236,8 @@ function render(s) {
     const frac = j.fraction != null ? j.fraction : (j.estimateS && j.remainingS != null ? 1 - j.remainingS / Math.max(1, j.elapsedS + j.remainingS) : null);
     $("jobBar").style.width = frac != null ? Math.round(Math.min(1, frac) * 100) + "%" : "0";
     $("jobTimes").textContent = loaded ? (j.estimateS ? `About ${clock(j.estimateS)} once started.` : "Waiting to start.")
-      : `Elapsed ${clock(j.elapsedS)}` + (j.remainingS != null ? ` · about ${clock(j.remainingS)} left` : "") + (j.stage === "paused" ? " · paused" : "");
+      : `Elapsed ${clock(j.elapsedS)}` + (j.remainingS != null ? ` · about ${clock(j.remainingS)} left` : "") + (j.stage === "paused" ? " · paused" : "")
+        + (j.remainingS != null && j.stage === "running" ? ` · done about ${new Date(Date.now() + j.remainingS * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "");
     $("btnPause").textContent = j.stage === "paused" ? "Continue" : "Pause";
     $("btnPause").classList.toggle("hidden", loaded);
     $("btnStop").textContent = loaded ? "Cancel job" : "Stop";
