@@ -37,6 +37,7 @@ public static class Profiles
     public static void Candlestand(Maker m)
     {
         var it = m.Item;
+        if (it.Candle == CandleStyle.Candelabra) { Candles.Candelabra(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = Math.Max(2.4, 2 * 1.0 + 0.2), xc = W / 2, stem = 1.3;
         double footW = Math.Max(D, sw + 4);

@@ -13,6 +13,15 @@ public sealed record Part(string Name, PathsD Cut, PathsD Etched, List<PathD> Li
 
     /// <summary>The grip ribs added to <see cref="Cut"/> for a push fit (they squash as the joint goes together).</summary>
     public PathsD Ribs { get; init; } = [];
+
+    /// <summary>
+    /// Glued flat on another piece (a boss, a raised panel, a moulding): it has no tab of its own, so it's
+    /// held by glue, face to face.
+    /// </summary>
+    public bool Glued { get; private set; }
+
+    /// <summary>Marks the piece as glued face to face on another (see <see cref="Glued"/>).</summary>
+    public Part Glue() { Glued = true; return this; }
 }
 
 /// <summary>The pieces of one piece of furniture, and what was found while making them.</summary>

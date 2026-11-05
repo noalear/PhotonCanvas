@@ -64,6 +64,13 @@ public static class Geo
     public static PathsD Offset(PathsD a, double by, bool round = false) =>
         a.Count == 0 || by == 0 ? a : Clipper.InflatePaths(Tidy(a), by, round ? JoinType.Round : JoinType.Miter, EndType.Polygon, 4, Precision);
 
+    /// <summary>The shape with every bit narrower than <paramref name="width"/> taken off (shrunk, then grown back, rounded).</summary>
+    public static PathsD Open(PathsD a, double width)
+    {
+        var o = Offset(Offset(a, -width / 2, round: true), width / 2, round: true);
+        return o.Count > 0 ? o : a;
+    }
+
     public static double Area(PathsD a) => a.Count == 0 ? 0 : Math.Abs(Clipper.Area(Tidy(a)));
 
     /// <summary>The parts of open lines inside the areas.</summary>
