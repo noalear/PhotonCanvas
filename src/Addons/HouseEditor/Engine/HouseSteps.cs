@@ -41,7 +41,7 @@ public static class HouseSteps
         _ => Stage.Furniture,
     };
 
-    static bool IsWayUp(string name) => name is "Stairs" or "Solid stairs" or "Spiral stairs" or "Ladder";
+    static bool IsWayUp(string name) => name is "Stairs" or "Solid stairs" or "Spiral stairs" or "Ladder" or "Hooked ladder";
 
     /// <summary>The wall a piece belongs to ("A" for "Wall A front"), or null.</summary>
     internal static string? WallOf(string name)

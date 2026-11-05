@@ -63,6 +63,8 @@ public sealed class PlanEditor : Control
 
     // Furniture or a way up being dragged: which, and where it was grabbed (squares from its middle).
     int _dragItem = -1, _dragWay = -1;
+    // How the next piece of furniture is turned when none is picked (quarter turns).
+    double _placeTurn;
     (double X, double Y) _grab;
 
     /// <summary>The column picked: the grid point it stands on, or null.</summary>
@@ -360,9 +362,7 @@ public sealed class PlanEditor : Control
                 if (ItemAt(pt.Position) is >= 0 and var item) { SelectItem(item); StartDrag(pt.Position, item, -1); break; }
                 if (ToPlace is not { } what) break;
                 var (x, y) = SnapItem(ToPlan(pt.Position), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
-                // Turned as the last one picked was.
-                int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
-                Commit(Floor with { Furniture = [.. Floor.Furniture, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }] }, "Put in furniture");
+                Commit(Floor with { Furniture = [.. Floor.Furniture, new PlacedItem { X = x, Y = y, Turn = NewTurn, Item = what }] }, "Put in furniture");
                 SelectItem(Floor.Furniture.Count - 1);
                 StartDrag(pt.Position, Floor.Furniture.Count - 1, -1);
                 break;
@@ -567,20 +567,46 @@ public sealed class PlanEditor : Control
         return (Math.Clamp(Math.Round(p.X / step) * step, 0, GridSize), Math.Clamp(Math.Round(p.Y / step) * step, 0, GridSize));
     }
 
-    /// <summary>Turns the furniture or way up picked a quarter turn: +1 anticlockwise (seen from above), −1 clockwise.</summary>
-    public void TurnPicked(int by, bool commit = true)
+    /// <summary>How a new piece of furniture is turned: as the one picked is, or as last turned.</summary>
+    double NewTurn => SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : _placeTurn;
+
+    static double Quarters(double turn) => Math.Round((((turn % 4) + 4) % 4) * 2) / 2 % 4;
+
+    /// <summary>
+    /// The R key: turns the furniture picked (or being put down) 45° clockwise seen from above, or back
+    /// with <paramref name="back"/>. Stairs and ladders only go square to the grid, so they turn a quarter.
+    /// </summary>
+    public void TurnKey(bool back)
+    {
+        double by = back ? 0.5 : -0.5;
+        bool dragging = _dragItem >= 0 || _dragWay >= 0;
+        if (SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count || SelectedWay >= 0 && SelectedWay < Floor.WaysUp.Count) TurnPicked(by, commit: !dragging);
+        else if (Tool == PlanTool.Furnish)
+        {
+            _placeTurn = Quarters(_placeTurn + by);
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>
+    /// Turns the furniture or way up picked: by quarter turns, +1 anticlockwise (seen from above), −1
+    /// clockwise; furniture also by halves (45°), and a way up a whole quarter whichever way it's asked.
+    /// </summary>
+    public void TurnPicked(double by, bool commit = true)
     {
         var level = Floor;
         if (SelectedItem >= 0 && SelectedItem < level.Furniture.Count)
         {
             var list = level.Furniture.ToList();
-            list[SelectedItem] = list[SelectedItem] with { Turn = (((list[SelectedItem].Turn + by) % 4) + 4) % 4 };
+            list[SelectedItem] = list[SelectedItem] with { Turn = Quarters(list[SelectedItem].Turn + by) };
+            _placeTurn = list[SelectedItem].Turn;
             level = level with { Furniture = list };
         }
         else if (SelectedWay >= 0 && SelectedWay < level.WaysUp.Count)
         {
             var list = level.WaysUp.ToList();
-            list[SelectedWay] = list[SelectedWay] with { Turn = (((list[SelectedWay].Turn + by) % 4) + 4) % 4 };
+            int q = by > 0 ? 1 : -1;
+            list[SelectedWay] = list[SelectedWay] with { Turn = (((list[SelectedWay].Turn + q) % 4) + 4) % 4 };
             level = level with { WaysUp = list };
         }
         else return;
@@ -598,8 +624,8 @@ public sealed class PlanEditor : Control
         var (x, y) = ToPlan(p);
         for (int i = Floor.Furniture.Count - 1; i >= 0; i--)
         {
-            var r = HouseKitMaker.ItemArea(_design.Style, Floor.Furniture[i], _design.SquareMm);
-            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return i;
+            var outline = HouseKitMaker.ItemOutline(_design.Style, Floor.Furniture[i], _design.SquareMm);
+            if (Clipper.PointInPolygon(new PointD(x, y), outline) != PointInPolygonResult.IsOutside) return i;
         }
         return -1;
     }
@@ -946,39 +972,110 @@ public sealed class PlanEditor : Control
         0 => (0, 1), 1 => (1, 0), 2 => (0, -1), _ => (-1, 0),
     };
 
+    /// <summary>A piece of furniture's pieces seen from above, ready to draw (mm about its middle, front towards +y), each shaded by how high it stands.</summary>
+    sealed record TopDrawing(List<(Geometry Shape, IBrush Fill)> Parts);
+
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ItemLook, TopDrawing> TopDrawings = [];
+
+    static TopDrawing DrawingOf(ItemLook look)
+    {
+        if (TopDrawings.TryGetValue(look, out var known)) return known;
+        double lowest = look.Parts.Count > 0 ? look.Parts.Min(p => p.Top) : 0, highest = look.Parts.Count > 0 ? look.Parts.Max(p => p.Top) : 1;
+        var parts = new List<(Geometry, IBrush)>();
+        foreach (var part in look.Parts)
+        {
+            var g = new StreamGeometry();
+            using (var c = g.Open())
+            {
+                c.SetFillRule(Avalonia.Media.FillRule.EvenOdd);
+                foreach (var path in part.Shape.Where(q => q.Count >= 3))
+                {
+                    c.BeginFigure(new Point(path[0].x, path[0].y), true);
+                    foreach (var q in path.Skip(1)) c.LineTo(new Point(q.x, q.y));
+                    c.EndFigure(true);
+                }
+            }
+            // Darker low down, lighter higher up, so the tops stand out from what's under them.
+            double t = highest - lowest < 1e-6 ? 1 : (part.Top - lowest) / (highest - lowest);
+            byte L(double lo, double hi) => (byte)Math.Round(lo + (hi - lo) * t);
+            parts.Add((g, new SolidColorBrush(Color.FromArgb(0xB4, L(0x86, 0xE6), L(0x5E, 0xC8), L(0x36, 0x98)))));
+        }
+        var made = new TopDrawing(parts);
+        TopDrawings.AddOrUpdate(look, made);
+        return made;
+    }
+
+    /// <summary>
+    /// One piece of furniture seen from above, as it's turned: the floor it takes, its pieces (the furniture
+    /// maker's, lowest first), its front as a dark edge with a notch pointing out, and its outline.
+    /// </summary>
+    void DrawItem(DrawingContext ctx, PlacedItem p, bool picked, bool ghost)
+    {
+        double sq = _design.SquareMm;
+        var look = HouseKitMaker.Look(_design.Style, p.Item);
+        var outline = HouseKitMaker.ItemOutline(_design.Style, p, sq);
+        var shape = Shape([outline]);
+        double px = _scale / sq;   // screen pixels a millimetre
+        ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(ghost ? (byte)0x50 : (byte)0x70, 0xB8, 0x8A, 0x58)), null, shape);
+        // Its pieces, once there's room to make them out.
+        if (Math.Min(look.W, look.D) * px >= 6 && look.Parts.Count > 0)
+        {
+            double a = HouseKitMaker.TurnDeg(p.Turn) * Math.PI / 180, c = Math.Cos(a), sn = Math.Sin(a);
+            var at = ToScreen(p.X, p.Y);
+            // Plan mm about its middle → screen: turned as on the plan (x c + y s, −x s + y c), scaled, moved.
+            var m = new Matrix(c * px, -sn * px, sn * px, c * px, at.X, at.Y);
+            var line = new Pen(new SolidColorBrush(Color.FromArgb(0xD8, 0x4A, 0x32, 0x1C)), 0.9 / px);
+            using (ctx.PushOpacity(ghost ? 0.55 : 1))
+            using (ctx.PushTransform(m))
+                foreach (var (g, fill) in DrawingOf(look).Parts) ctx.DrawGeometry(fill, line, g);
+        }
+        var edge = picked ? new Pen(Picked, 2.5) : ghost ? new Pen(Picked, 1.5, new DashStyle([3, 2], 0)) : new Pen(new SolidColorBrush(Color.FromRgb(0x5A, 0x3E, 0x22)), 1.2);
+        ctx.DrawGeometry(null, edge, shape);
+        // Its front: the edge from its front left to front right, dark, with a notch pointing out of it.
+        var fl = ToScreen(outline[0].x, outline[0].y);
+        var fr = ToScreen(outline[1].x, outline[1].y);
+        var front = new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)), Math.Max(2.5, _scale * 0.08), lineCap: PenLineCap.Flat);
+        ctx.DrawLine(front, fl, fr);
+        double ex = fr.X - fl.X, ey = fr.Y - fl.Y, len = Math.Sqrt(ex * ex + ey * ey);
+        if (len < 4) return;
+        // Outwards from the front: the front edge's direction turned towards the side away from the middle.
+        double ox = ey / len, oy = -ex / len;
+        var mid = new Point((fl.X + fr.X) / 2, (fl.Y + fr.Y) / 2);
+        var centre = ToScreen(p.X, p.Y);
+        if ((mid.X - centre.X) * ox + (mid.Y - centre.Y) * oy < 0) (ox, oy) = (-ox, -oy);
+        double h = Math.Clamp(_scale * 0.16, 4, 9), w = Math.Min(h, len / 2 - 1);
+        var tri = new StreamGeometry();
+        using (var g = tri.Open())
+        {
+            g.BeginFigure(new Point(mid.X + ex / len * w, mid.Y + ey / len * w), true);
+            g.LineTo(new Point(mid.X + ox * h, mid.Y + oy * h));
+            g.LineTo(new Point(mid.X - ex / len * w, mid.Y - ey / len * w));
+            g.EndFigure(true);
+        }
+        ctx.DrawGeometry(picked ? Picked : new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)), null, tri);
+    }
+
     void DrawFurniture(DrawingContext ctx)
     {
-        var fill = new SolidColorBrush(Color.FromArgb(0xD8, 0xB8, 0x8A, 0x58));
-        var edge = new Pen(new SolidColorBrush(Color.FromRgb(0x5A, 0x3E, 0x22)), 1.2);
-        var front = new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)), Math.Max(2.5, _scale * 0.08), lineCap: PenLineCap.Flat);
-        for (int i = 0; i < Floor.Furniture.Count; i++)
-        {
-            var p = Floor.Furniture[i];
-            var r = HouseKitMaker.ItemArea(_design.Style, p, _design.SquareMm);
-            var box = new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom));
-            ctx.DrawRectangle(fill, i == SelectedItem ? new Pen(Picked, 2.5) : edge, box, 2, 2);
-            // Its front: a dark edge.
-            var (fx, fy) = Facing(p.Turn);
-            var c = box.Center;
-            double hw = box.Width / 2, hh = box.Height / 2;
-            Point a, b;
-            if (fy != 0) { a = new Point(box.Left + 2, c.Y + fy * hh); b = new Point(box.Right - 2, c.Y + fy * hh); }
-            else { a = new Point(c.X + fx * hw, box.Top + 2); b = new Point(c.X + fx * hw, box.Bottom - 2); }
-            ctx.DrawLine(front, a, b);
-            if (_scale >= 18)
-            {
-                var name = HouseKitMaker.ItemName(p.Item);
-                var ft = new FormattedText(name, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), Math.Clamp(_scale * 0.26, 8, 12), new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)));
-                if (ft.Width < box.Width - 4 && ft.Height < box.Height - 2) ctx.DrawText(ft, new Point(c.X - ft.Width / 2, c.Y - ft.Height / 2));
-            }
-        }
+        int hover = _inside && _from is null ? ItemAt(_mouse) : -1;
+        for (int i = 0; i < Floor.Furniture.Count; i++) DrawItem(ctx, Floor.Furniture[i], i == SelectedItem, false);
         // What a click would put down, faintly.
-        if (Tool == PlanTool.Furnish && ToPlace is { } what && _inside && _from is null && _dragItem < 0 && ItemAt(_mouse) < 0)
+        if (Tool == PlanTool.Furnish && ToPlace is { } what && _inside && _from is null && _dragItem < 0 && hover < 0)
         {
             var (x, y) = SnapItem(ToPlan(_mouse), false);
-            int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
-            var r = HouseKitMaker.ItemArea(_design.Style, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }, _design.SquareMm);
-            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x60, 0xB8, 0x8A, 0x58)), new Pen(Picked, 1.5, new DashStyle([3, 2], 0)), new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom)), 2, 2);
+            DrawItem(ctx, new PlacedItem { X = x, Y = y, Turn = NewTurn, Item = what }, false, true);
+        }
+        // The name of the one under the mouse (or the one picked), on a label clear of its pieces.
+        int named = hover >= 0 ? hover : SelectedItem;
+        if (named >= 0 && named < Floor.Furniture.Count && _scale >= 12)
+        {
+            var p = Floor.Furniture[named];
+            var r = HouseKitMaker.ItemArea(_design.Style, p, _design.SquareMm);
+            var ft = new FormattedText(HouseKitMaker.ItemName(p.Item), System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), Math.Clamp(_scale * 0.3, 10, 13), Brushes.White);
+            var top = ToScreen((r.left + r.right) / 2, r.top);
+            var box = new Rect(top.X - ft.Width / 2 - 5, top.Y - ft.Height - 8, ft.Width + 10, ft.Height + 4);
+            ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0xE0, 0x3A, 0x26, 0x12)), null, box, 4, 4);
+            ctx.DrawText(ft, new Point(box.X + 5, box.Y + 2));
         }
     }
 
