@@ -406,6 +406,8 @@ public sealed class CityPlan : Control
                 PropKind.Stall => (Color.FromRgb(0xC8, 0x4C, 0x3C), Color.FromRgb(0xF0, 0xE6, 0xD0)),
                 PropKind.Bar => (Color.FromRgb(0x7A, 0x52, 0x32), Color.FromRgb(0xB0, 0x86, 0x58)),
                 PropKind.NoticeBoard => (Color.FromRgb(0x6E, 0x4D, 0x30), Color.FromRgb(0xF0, 0xE6, 0xD0)),
+                PropKind.Fountain => (Color.FromRgb(0xA4, 0x9C, 0x90), Color.FromRgb(0x4E, 0x86, 0xB6)),
+                PropKind.Gallows => (Color.FromRgb(0x9A, 0x70, 0x48), Color.FromRgb(0x4A, 0x32, 0x1E)),
                 _ => (Color.FromRgb(0x7C, 0x7A, 0x76), Color.FromRgb(0x5A, 0x58, 0x56)),
             };
             using (ctx.PushTransform(Matrix.CreateRotation(p.TurnDeg * Math.PI / 180) * Matrix.CreateTranslation(at.X, at.Y)))
@@ -422,6 +424,15 @@ public sealed class CityPlan : Control
                         break;
                     case PropKind.Bar: ctx.FillRectangle(markBrush, new Rect(box.X, box.Y, w, d * 0.35)); break;
                     case PropKind.NoticeBoard: ctx.FillRectangle(markBrush, box.Deflate(new Thickness(w * 0.15, d * 0.25))); break;
+                    case PropKind.Fountain:
+                        ctx.DrawEllipse(markBrush, null, new Point(0, 0), w * 0.42, d * 0.42);
+                        ctx.DrawEllipse(new SolidColorBrush(body), null, new Point(0, 0), w * 0.12, d * 0.12);
+                        break;
+                    case PropKind.Gallows:
+                        // The beam across the platform, and the steps at the front.
+                        ctx.FillRectangle(markBrush, new Rect(box.X + w * 0.18, box.Y + d * 0.32, w * 0.64, d * 0.1));
+                        ctx.FillRectangle(markBrush, new Rect(box.X + w * 0.18, box.Bottom - d * 0.28, w * 0.26, d * 0.28));
+                        break;
                     case PropKind.GuardTower:
                         ctx.FillRectangle(markBrush, box.Deflate(Math.Min(w, d) * 0.18));
                         for (int i = 0; i < 4; i++)

@@ -15,7 +15,7 @@ public enum FenceKind { Fence, Hedge, StoneWall, CityWall }
 /// Small things dotted about the map, shown in 3D: trees, rocks, a well, carts and so on, and the town's
 /// bigger pieces: horse troughs, a players' stage, market stalls, outdoor bars, notice boards and guard towers.
 /// </summary>
-public enum PropKind { Tree, Pine, Bush, Boulder, Well, Cart, Crates, Lamp, Statue, Trough, Stage, Stall, Bar, NoticeBoard, GuardTower }
+public enum PropKind { Tree, Pine, Bush, Boulder, Well, Cart, Crates, Lamp, Statue, Trough, Stage, Stall, Bar, NoticeBoard, GuardTower, Fountain, Gallows }
 
 /// <summary>
 /// A building on the map: the building editor's design (its plan's top left corner at 0, 0), where its top
@@ -71,6 +71,8 @@ public sealed record Prop
         PropKind.Bar => (1.57, 0.79),
         PropKind.NoticeBoard => (0.94, 0.39),
         PropKind.GuardTower => (1.81, 1.81),
+        PropKind.Fountain => (2, 2),
+        PropKind.Gallows => (1.81, 1.5),
         _ => null,
     };
 

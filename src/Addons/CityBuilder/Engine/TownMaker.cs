@@ -409,11 +409,18 @@ public static class TownMaker
             fields++;
         }
 
-        // The square: a well in the middle, carts, crates and a statue, lamps at its corners.
+        // The square: a fountain (or on a small one a well) in the middle, carts, crates and a statue, lamps at its corners.
         if (o.Square)
         {
             double mx = (square.X0 + square.X1 + 1) / 2.0, my = (square.Y0 + square.Y1 + 1) / 2.0;
-            props.Add(new Prop { Kind = PropKind.Well, X = mx, Y = my });
+            bool fountain = square.X1 - square.X0 >= 3 && square.Y1 - square.Y0 >= 3;
+            if (fountain)
+            {
+                // Two squares by two, on the grid.
+                mx = Math.Floor(mx + 0.5);
+                my = Math.Floor(my + 0.5);
+            }
+            props.Add(new Prop { Kind = fountain ? PropKind.Fountain : PropKind.Well, X = mx, Y = my });
             props.Add(new Prop { Kind = PropKind.Statue, X = square.X0 + 1.5, Y = square.Y0 + 1.5 });
             foreach (var (lx, ly) in new[] { (square.X0 + 0.5, square.Y0 + 0.5), (square.X1 + 0.5, square.Y0 + 0.5), (square.X0 + 0.5, square.Y1 + 0.5), (square.X1 + 0.5, square.Y1 + 0.5) })
                 props.Add(new Prop { Kind = PropKind.Lamp, X = lx, Y = ly });
@@ -457,6 +464,10 @@ public static class TownMaker
             var inside = Enumerable.Range(square.X0 + 1, Math.Max(0, square.X1 - square.X0 - 1)).SelectMany(x => Enumerable.Range(square.Y0 + 1, Math.Max(0, square.Y1 - square.Y0 - 1)).Select(y => (x, y))).OrderBy(_ => rnd.Next()).ToList();
             foreach (var (kind, len) in new[] { (PropKind.Bar, 2), (PropKind.NoticeBoard, 1), (PropKind.Trough, 2) })
                 _ = Stand(kind, 1, len, 90, sides) || Stand(kind, len, 1, 0, ends) || Stand(kind, 1, len, 90, inside) || Stand(kind, len, 1, 0, inside);
+            // The well moves off to the side when the fountain has the middle; a grim town has its gallows.
+            if (fountain) _ = Stand(PropKind.Well, 1, 1, 0, sides) || Stand(PropKind.Well, 1, 1, 0, inside);
+            if (o.Theme is "Dungeon" or "Gothic")
+                _ = Stand(PropKind.Gallows, 2, 2, 0, xs.Select(x => (x - 1, square.Y0))) || Stand(PropKind.Gallows, 2, 2, 0, inside);
             for (int i = 0; i < Math.Max(2, (square.X1 - square.X0) / 3); i++)
                 Stand(i % 2 == 0 ? PropKind.Cart : PropKind.Crates, 1, 1, rnd.Next(4) * 90, inside);
         }
