@@ -128,7 +128,8 @@ Click a building with **Select** and the **Building** tab shows it:
   and the building on the map is changed to match.
 - **Copy it** puts a copy beside it; **Take it away** takes it off the map.
 - **Save as a building to reuse** saves it with the building editor's saved buildings (with its name,
-  type, district and tags), so you can put it down again and again with **Place**.
+  type, district, tags and a picture), so you can put it down again and again with **Place**, and it's
+  in the building editor's saved buildings too.
 
 ## Saved buildings
 

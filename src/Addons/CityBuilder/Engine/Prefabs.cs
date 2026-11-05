@@ -1,4 +1,3 @@
-using System.Text.Json;
 using PhotonCanvas.Addon.HouseEditor;
 
 namespace PhotonCanvas.Addon.CityBuilder;
@@ -23,12 +22,19 @@ public sealed record PrefabInfo
         Name = Name, Type = string.IsNullOrWhiteSpace(Type) ? "House" : Type, District = District, Tags = [.. Tags],
         PrefabId = Id, X = x, Y = y, Turn = ((turn % 4) + 4) % 4, Design = Design,
     };
+
+    /// <summary>One read by the building editor's saved buildings.</summary>
+    public static PrefabInfo From(HousePrefab p, string? thumbnail = null) => new()
+    {
+        Id = p.Id, Name = p.Name, Type = p.Type, District = p.District, Theme = p.Theme, Tags = [.. p.Tags],
+        Design = CityFootprint.Normalised(p.Design), Thumbnail = thumbnail,
+    };
 }
 
 /// <summary>
-/// The buildings saved in the building editor (its data folder's <c>prefabs</c> folder: a JSON file each,
-/// holding the name, type, district, tags and the design). Read leniently, so a file from a newer version
-/// still loads what it can.
+/// The buildings saved in the building editor (its data folder's <c>prefabs</c> folder), read and written with
+/// the building editor's own <see cref="HousePrefabs"/>, so a building saved here shows in its Saved buildings
+/// and the other way round.
 /// </summary>
 public static class PrefabShelf
 {
@@ -40,91 +46,38 @@ public static class PrefabShelf
         return root is null ? null : Path.Combine(root, "houseeditor", "prefabs");
     }
 
+    /// <summary>Every saved building in the folder, by type then name (files that can't be read are passed over).</summary>
     public static List<PrefabInfo> Load(string? folder)
     {
-        var list = new List<PrefabInfo>();
-        if (folder is null || !Directory.Exists(folder)) return list;
-        IEnumerable<string> files;
-        try { files = Directory.EnumerateFiles(folder, "*.json").ToList(); }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return list; }
-        foreach (var f in files)
-        {
-            try
-            {
-                if (Parse(File.ReadAllText(f)) is { } p)
-                {
-                    var png = Path.ChangeExtension(f, ".png");
-                    list.Add(p with { Thumbnail = File.Exists(png) ? png : null });
-                }
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
-        }
-        return [.. list.OrderBy(p => p.Type, StringComparer.CurrentCultureIgnoreCase).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)];
+        if (folder is null) return [];
+        List<HousePrefab> all;
+        try { all = HousePrefabs.Load(folder); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return []; }
+        return [.. all.Select(p => PrefabInfo.From(p, HousePrefabs.PicturePath(folder, p.Id)))
+            .OrderBy(p => p.Type, StringComparer.CurrentCultureIgnoreCase).ThenBy(p => p.Name, StringComparer.CurrentCultureIgnoreCase)];
     }
 
     /// <summary>One prefab from its JSON, or null when it isn't one.</summary>
-    public static PrefabInfo? Parse(string json)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            var root = doc.RootElement;
-            if (root.ValueKind != JsonValueKind.Object || !Get(root, "Design", out var designEl) || designEl.ValueKind != JsonValueKind.Object) return null;
-            if (HouseDesign.FromJson(designEl.GetRawText()) is not { } design || design.Levels.Count == 0) return null;
-            string Str(string name) => Get(root, name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
-            var tags = Get(root, "Tags", out var t) && t.ValueKind == JsonValueKind.Array
-                ? t.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String).Select(x => x.GetString()!).Where(x => x.Length > 0).ToList()
-                : [];
-            Guid id = Get(root, "Id", out var idEl) && idEl.ValueKind == JsonValueKind.String && Guid.TryParse(idEl.GetString(), out var g) ? g : Guid.Empty;
-            return new PrefabInfo
-            {
-                Id = id, Name = Str("Name"), Type = Str("Type"), District = Str("District"), Theme = Str("Theme"), Tags = tags,
-                Design = CityFootprint.Normalised(design),
-            };
-        }
-        catch (JsonException) { return null; }
-    }
+    public static PrefabInfo? Parse(string json) => HousePrefabs.FromJson(json) is { } p ? PrefabInfo.From(p) : null;
 
     /// <summary>
-    /// Saves a building with the building editor's saved buildings, in their format (a JSON file named by its
-    /// id; the building editor works out its footprint and picture again when it next saves it).
+    /// Saves a building with the building editor's saved buildings (its footprint worked out, the time stamped),
+    /// with <paramref name="png"/> as its picture if there is one. Returns the file.
     /// </summary>
-    public static string Save(string folder, PrefabInfo p, string notes = "")
+    public static string Save(string folder, PrefabInfo p, string notes = "", byte[]? png = null)
     {
-        Directory.CreateDirectory(folder);
-        var id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id;
-        var path = Path.Combine(folder, id.ToString("N") + ".json");
-        using var stream = new MemoryStream();
-        using (var w = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        var saved = HousePrefabs.Save(folder, new HousePrefab
         {
-            w.WriteStartObject();
-            w.WriteNumber("Format", 1);
-            w.WriteString("Id", id);
-            w.WriteString("Name", p.Name);
-            w.WriteString("Type", p.Type);
-            w.WriteString("District", p.District);
-            w.WriteStartArray("Tags");
-            foreach (var t in p.Tags) w.WriteStringValue(t);
-            w.WriteEndArray();
-            w.WriteString("Theme", p.Theme);
-            w.WriteString("Notes", notes);
-            var now = DateTime.UtcNow;
-            w.WriteString("Created", now);
-            w.WriteString("Modified", now);
-            w.WritePropertyName("Design");
-            w.WriteRawValue(p.Design.ToJson());
-            w.WriteEndObject();
-        }
-        File.WriteAllBytes(path, stream.ToArray());
-        return path;
-    }
-
-    static bool Get(JsonElement o, string name, out JsonElement value)
-    {
-        foreach (var p in o.EnumerateObject())
-            if (string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) { value = p.Value; return true; }
-        value = default;
-        return false;
+            Id = p.Id == Guid.Empty ? Guid.NewGuid() : p.Id,
+            Name = p.Name,
+            Type = p.Type,
+            District = string.IsNullOrWhiteSpace(p.District) ? "Anywhere" : p.District,
+            Theme = string.IsNullOrWhiteSpace(p.Theme) ? p.Design.Style.Theme : p.Theme,
+            Tags = [.. p.Tags],
+            Notes = notes,
+            Design = p.Design,
+        }, png);
+        return HousePrefabs.PathOf(folder, saved.Id);
     }
 }
 

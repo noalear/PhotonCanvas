@@ -188,7 +188,7 @@ public class CityBuilderTests
             var p = new PrefabInfo { Id = Guid.NewGuid(), Name = "Bakery", Type = "Shop", District = "Market", Tags = ["bread"], Theme = "Medieval", Design = b.Design.Moved(3, 2) };
             PrefabShelf.Save(folder, p);
             // A file as the building editor writes it, with fields the city builder doesn't use.
-            File.WriteAllText(Path.Combine(folder, "other.json"), "{\"Format\":1,\"Name\":\"Shed\",\"Type\":\"Shed\",\"SeenBuilding\":{\"Width\":2},\"Extra\":[1,2],\"Design\":" + Made(0, 0, 2, 2).Design.ToJson() + "}");
+            File.WriteAllText(Path.Combine(folder, "other.json"), "{\"Format\":1,\"Name\":\"Shed\",\"Type\":\"Shed\",\"Footprint\":{\"Width\":2},\"Extra\":[1,2],\"Design\":" + Made(0, 0, 2, 2).Design.ToJson() + "}");
             File.WriteAllText(Path.Combine(folder, "broken.json"), "{\"Name\":\"no design\"}");
             var list = PrefabShelf.Load(folder);
             Assert.Equal(2, list.Count);
@@ -198,6 +198,9 @@ public class CityBuilderTests
             // Moved back to its top left corner.
             Assert.Equal((4, 3), CityFootprint.Extent(bakery.Design));
             Assert.Contains(list, x => x.Name == "Shed");
+            // The building editor reads the one saved here as one of its own, footprint and all.
+            var own = Assert.Single(PhotonCanvas.Addon.HouseEditor.HousePrefabs.Load(folder), x => x.Name == "Bakery");
+            Assert.Equal((p.Id, "Market", 4, 3), (own.Id, own.District, own.Footprint!.Width, own.Footprint.Depth));
         }
         finally { try { Directory.Delete(root, true); } catch (IOException) { } }
     }

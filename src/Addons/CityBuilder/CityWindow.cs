@@ -337,7 +337,7 @@ public sealed class CityWindow : Window
         _bEdit.Click += async (_, _) => await EditBuilding();
         _bCopy.Click += (_, _) => CopyBuilding();
         _bDelete.Click += (_, _) => { if (Picked() is { } b) { _plan.Select(null); Commit(_map.Without(b.Id), "Take a building away"); } };
-        _bSavePrefab.Click += (_, _) => SaveAsPrefab();
+        _bSavePrefab.Click += async (_, _) => await SaveAsPrefab();
 
         foreach (var c in new[] { _vRoofs, _vProps, _vOpenings }) c.IsCheckedChanged += (_, _) => Show3D();
         _makeOne.Click += async (_, _) => { if (Picked() is { } b) await Make([b]); };
@@ -553,18 +553,29 @@ public sealed class CityWindow : Window
         Commit(_map.WithBuilding(now with { Design = changed, PrefabId = null }), "Change a building in the building editor");
     }
 
-    void SaveAsPrefab()
+    async Task SaveAsPrefab()
     {
         if (Picked() is not { } b || PrefabShelf.FolderNextTo(_dataFolder) is not { } folder) return;
+        _bSavePrefab.IsEnabled = false;
+        _status.Text = $"Saving \"{b.Name}\"…";
         try
         {
-            var p = new PrefabInfo { Id = Guid.NewGuid(), Name = b.Name, Type = b.Type, District = b.District, Tags = b.Tags, Theme = _map.Theme, Design = b.Design };
-            PrefabShelf.Save(folder, p);
-            Commit(_map.WithBuilding(b with { PrefabId = p.Id }), "Save a building to reuse");
+            var p = new PrefabInfo { Id = Guid.NewGuid(), Name = b.Name, Type = b.Type, District = b.District, Tags = b.Tags, Theme = b.Design.Style.Theme, Design = b.Design };
+            double longest = Longest;
+            await Task.Run(() =>
+            {
+                // Its picture for the saved buildings, as the building editor makes it.
+                byte[]? png = null;
+                try { png = PrefabPictures.Png(HouseKitMaker.Make(p.Design, longest)); }
+                catch (Exception e) when (e is ArgumentException or InvalidOperationException or ArithmeticException or IndexOutOfRangeException) { AppLog.Error("citybuilder picture", e); }
+                PrefabShelf.Save(folder, p, png: png);
+            });
+            if (_map.Building(b.Id) is { } now) Commit(_map.WithBuilding(now with { PrefabId = p.Id }), "Save a building to reuse");
             LoadPrefabs();
             _status.Text = $"Saved \"{b.Name}\" with the building editor's saved buildings: put it down again with the Place tool.";
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _status.Text = $"Couldn't save it: {e.Message}"; }
+        finally { _bSavePrefab.IsEnabled = Picked() is not null; }
     }
 
     // ---- saved buildings ----
