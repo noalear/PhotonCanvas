@@ -88,17 +88,17 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 
 | Kind | What it is | Sizes (defaults for 28 mm) |
 |---|---|---|
-| **Table** | A top on two leg frames that slot into it. **Legs**: *Four legs* (with a deep apron), *Solid ends*, *Trestles* or *Round, crossed legs* (a round top on two legs crossed in a halving joint). Tick **A rail low down between the legs** for a stretcher. | 30 long, 16 deep, 13 high |
+| **Table** | A top on two leg frames that slot into it. **Legs**: *Four legs* (with a deep apron), *Solid ends*, *Trestles* or *Round, crossed legs* (a round top on two splayed legs, arched between their feet and crossed in a halving joint). Tick **A rail low down between the legs** for a stretcher. | 30 long, 16 deep, 13 high |
 | **Bench** | A plank seat on two solid ends joined by a rail; or any of the table's legs. | 26 × 6, 7.5 high |
-| **Stool** | A **Seat shape** round or square on two crossed legs. | 8 across, 7.5 high |
+| **Stool** | A **Seat shape** round or square on two crossed legs, each with two splayed feet. | 8 across, 7.5 high |
 | **Chair** | A seat slotted between a back (with the back legs) and a front leg frame. **Seat height**, and a **Back** that's *Solid*, *Upright slats* or a *Ladder (rails across)*. | seat 9 × 9 at 7.5, back 17 high |
-| **Bookshelf** | Two sides, **Shelves**, a top and an optional **A back panel**, with **Books etched on the back** showing between the shelves. | 20 wide, 8 deep, 30 high, 3 shelves |
-| **Chest** | A finger-jointed box with iron bands and a lock plate etched on. **Lid**: *Lifts off (a rim under it)*, *Glued on* or *None (open)*. | 16 × 10, 9 high |
+| **Bookshelf** | Two sides, **Shelves**, a top and an optional **A back panel**, with books on the shelves. When the shelves are deep enough, each row of books is cut as its own piece (spines, bands and labels etched) that stands on its shelf, two tabs down into notches at the back; too shallow and they're etched on the back instead. | 20 wide, 8 deep, 30 high, 3 shelves |
+| **Chest** | A finger-jointed box with iron bands and a lock plate etched on. **Lid**: *Lifts off (a rim under it)*, *Domed, lifts off* (two arched ends and two rails stand in the lid board, with banded planks glued over them round the curve), *Glued on* or *None (open)*. | 16 × 10, 9 high |
 | **Crate** | A closed (or open-topped) finger-jointed box with its boards etched on, each board's grain running its own way. **Boards**: *Plain boards*, *Braced (Z)*, *Cross-braced (X)*, *Slatted* (gaps between the slats), *Battened planks*, *Iron-bound* (iron corner brackets with rivets), *Cargo (stencilled)* (words on the sides, "this way up" arrows on the ends) or *Military (rope handles)* (words, a lot number, a star on the lid). **Stencilled** sets the words on cargo and military crates; left empty, each crate gets some to suit. | 12 × 12 × 12 |
-| **Bed** | A **Head board** and **Foot board**, a mattress that slots between them at **Mattress** height, and side rails; **A pillow and a blanket etched on**. | 32 long, 16 wide, head 13, foot 8 |
+| **Bed** | A **Head board** and **Foot board**, a mattress that slots between them at **Mattress** height, and side rails; **Bedding**: one or two pillows cut as their own pieces with a tab down into the mattress, and a blanket with a turned-down sheet and quilting etched on. | 32 long, 16 wide, head 13, foot 8 |
 | **Door for a wall** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | doorway 16 × 28 |
 | **Wall shelf** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | 20 long, 5 deep |
-| **Cabinet** | Two sides, a bottom, shelves and a top slotted together, a back and a front. **Front**: *Doors*, *Drawers*, *Drawers over doors*, *Glass doors*, *Open shelves*, *Dresser (shelves over a cupboard)*, *Panelled doors*, *Lockers*, *Machine panels*, *Clock*, *Lattice doors* or *Altar*. **Top**: *Flat*, *Cornice (two layers)*, *Pediment* or *Arch*. **Across** (doors or drawers side by side), **Drawer rows**, **Shelves** and what's **On the shelves** (books, bottles, jars, plates, scrolls or machines). | 22 wide, 11 deep, 34 high |
+| **Cabinet** | Two sides, a bottom, shelves and a top slotted together, a back and a front. **Front**: *Doors*, *Drawers*, *Drawers over doors*, *Glass doors*, *Open shelves*, *Dresser (shelves over a cupboard)*, *Panelled doors*, *Lockers*, *Machine panels*, *Clock*, *Lattice doors* or *Altar*. **Top**: *Flat*, *Cornice (two layers)*, *Pediment* or *Arch*. **Across** (doors or drawers side by side), **Drawer rows**, **Shelves** and what's **On the shelves** (books, bottles, jars, plates, scrolls or machines). Behind open shelves or glass, deep enough shelves get the books, bottles, jars, plates or scrolls cut as rows that stand on them; machines, and anything on too shallow a shelf, are etched on the back. | 22 wide, 11 deep, 34 high |
 | **Desk** | A top on two solid ends with a back panel and a drawer front. **On top**: papers, a book and ink, or a screen and keyboard. | 24 × 12, 13 high |
 | **Armchair or throne** | Two shaped sides, a tufted seat and a back. **Kind**: *Armchair*, *Throne on a dais*, *Sofa or settle* (**Seats** side by side), *Pew* or *Command chair*. **Seat height**, **Arm height** and the **Back's top** (*Square*, *Rounded*, *Arched*, *Pointed* or *Winged*). | 14 × 12, 20 high |
 | **Bed** (more kinds) | **Kind**: *Plain*, *Four-poster* (a canopy on four posts with a valance), *Bunk beds* (a ladder in the foot board) or *Pallet on sleepers* (with a fur). | as the bed |
@@ -108,14 +108,15 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Armour stand** | Two profiles crossed on a foot: *Armour*, *Training dummy* or *Coat stand*. | 14 × 10, 32 high |
 | **Coffin or sarcophagus** | Layers glued into a solid shape on two keys: *Coffin*, *Sarcophagus* (an effigy on the lid) or *Sleeper pod*. | 34 × 11, 6 high |
 | **Rug** | One flat piece: *Bordered*, *Kilim*, *Damask*, *Hide*, *Deck mat* or *Round*. | 36 × 24 |
-| **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry*, *Banner*, *Painting*, *Shield and swords*, *Map* or *Screen*. | 16 × 22 |
+| **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry*, *Banner*, *Painting* (a carved frame round a portrait when it's tall, or a landscape with a castle when it's wide), *Shield and swords*, *Map* (an island with mountains, forest, a river, towns and a compass rose; a star map in sci-fi) or *Screen*. | 16 × 22 |
 | **Candle stand or lamp** | Two profiles crossed on a foot: *Candelabra*, *Lamp* or *Torch*. | 10 across, 24 high |
 | **Screen** | A folding screen of two to six **Panels** on working hinges, standing in a zig-zag: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. One panel stands on two feet instead. **Width** and **Depth** are the screen as it stands; the depth sets how far the leaves fold. | 30 wide, 12 deep, 30 high |
 | **Stocks** | Two posts on feet, a board with holes for the head and hands, and a rail. | 22 × 9, 28 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
-and symbols. *The list's theme* follows the theme at the top.
+and symbols (a cross in medieval and gothic, a sun in desert, a cog in sci-fi, a skull in dungeon and a
+spiral in cave). *The list's theme* follows the theme at the top.
 
 ![A medieval four-poster bed with its canopy and valance](images/window-furniture-four-poster.png)
 
@@ -208,6 +209,9 @@ stays together without glue and comes apart again. The pieces that were glued ch
 
 - A chest's lid has two **lid rails** under it, whose tabs push up into slots in the lid, in place of
   the glued rim.
+  A domed lid's planks are glued on, so with push fit the chest gets the flat lid.
+- Rows of books, bottles and the rest standing on shelves get a rib in each notch, so they push in
+  and stay.
 - A wall shelf's brackets have a tab that pushes up through a slot in the shelf, and ribs top and
   bottom that press on the wall's mount slot.
 - A door's clips get ribs in the fork that slides onto the wall.

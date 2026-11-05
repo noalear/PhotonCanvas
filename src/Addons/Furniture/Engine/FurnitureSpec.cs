@@ -15,7 +15,8 @@ public enum ItemKind
 public enum LegStyle { Legs, Slab, Trestle, Round }
 public enum TopShape { Square, Round }
 public enum BackStyle { Panel, Slats, Ladder }
-public enum LidStyle { Loose, Flat, None }
+/// <summary>A chest's or crate's lid: lifts off (a rim under it), glued on, none, or (chests) a domed lid of planks that lifts off.</summary>
+public enum LidStyle { Loose, Flat, None, Domed }
 public enum DoorShape { Rectangle, Arched, Pointed }
 public enum HingeSide { Left, Right }
 /// <summary>The wood detail etched and scored on the faces.</summary>

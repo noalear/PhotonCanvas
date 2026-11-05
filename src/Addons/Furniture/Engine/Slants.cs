@@ -127,7 +127,7 @@ public static class Slants
                 Screens(Li, Lp, rnd, te, tl);
                 break;
             case SlantStyle.MapTable:
-                MapOn(Li, Lp, rnd, te, tl);
+                MapOn(Li, Lp, look == FrontLook.Metal, rnd, te, tl);
                 break;
             default:
                 OpenBook(Li / 2, Lp * 0.5, Math.Min(Li * 0.85, 8), Math.Min(Lp * 0.75, 5.5), tl, te);
@@ -228,22 +228,12 @@ public static class Slants
     }
 
     /// <summary>A map on a table: a coast, rivers, a compass rose and a border.</summary>
-    static void MapOn(double W, double H, Random rnd, PathsD etched, List<PathD> lines)
+    /// <summary>A map spread on the table (a star chart on a ship), its edge scored.</summary>
+    static void MapOn(double W, double H, bool stars, Random rnd, PathsD etched, List<PathD> lines)
     {
         lines.Add(Geo.Loop(Geo.Rect(0.6, 0.6, W - 0.6, H - 0.6)));
-        var land = Rugs.Hide(W * 0.45, H * 0.5, W * 0.35, H * 0.38, rnd);
-        lines.Add(Geo.Loop(land));
-        etched.AddRange(Geo.Subtract([Geo.Rect(0.6, 0.6, W - 0.6, H - 0.6)], Geo.Offset([land], 0.6)).Where(p => Math.Abs(Clipper.Area(p)) > 0.1).Take(0));
-        for (int k = 0; k < 2; k++)
-        {
-            var r = new PathD();
-            double x = W * (0.3 + 0.3 * k), y = H * 0.5;
-            for (int i = 0; i < 8; i++) { r.Add(new PointD(x, y)); x += (rnd.NextDouble() - 0.3) * 1.5; y += (rnd.NextDouble() - 0.5) * 1.6; }
-            lines.AddRange(Geo.ClipLines([r], [land]));
-        }
-        double cr = Math.Min(W, H) * 0.12;
-        if (cr > 0.8) lines.Add(Geo.Loop(Fronts.Star(W * 0.85, H * 0.78, cr, cr * 0.3, 4)));
-        for (int i = 0; i < 4; i++) etched.Add(Geo.Circle(W * (0.25 + 0.4 * rnd.NextDouble()), H * (0.3 + 0.4 * rnd.NextDouble()), 0.3, 0.01));
+        if (stars) Pictures.StarMap(0.9, 0.9, W - 0.9, H - 0.9, rnd, etched, lines);
+        else Pictures.Map(0.9, 0.9, W - 0.9, H - 0.9, rnd, etched, lines);
     }
 
     // ---- flat desks ----

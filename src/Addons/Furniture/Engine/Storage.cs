@@ -37,6 +37,12 @@ public static class Storage
         var gaps = new List<(double Y0, double Y1)>();
         for (int i = 0; i < shelfY.Count; i++) gaps.Add((shelfY[i] + T, i + 1 < shelfY.Count ? shelfY[i + 1] : H - T));
 
+        // The books, cut out to stand on the shelves where there's room (drawn on the back otherwise).
+        var rows = new Contents.ShelfRow?[gaps.Count];
+        if (it.Books && Ds >= T + f + Maker.Bridge)
+            for (int i = 0; i < gaps.Count; i++)
+                rows[i] = Contents.Row(ShelfContents.Books, W - 2 * T - 2 * Cabinets.RowEnd, gaps[i].Y1 - gaps[i].Y0 - Cabinets.RowHeadroom, T, m.Rnd);
+
         // Sides.
         var side = new PathsD { Geo.Rect(0, 0, D, H - T), Geo.Rect(D / 2 - sideTw / 2, H - T - 0.01, D / 2 + sideTw / 2, H) };
         var sideHoles = new PathsD { WoodFace.RoundRect(D * 0.25, -3, D * 0.75, kick - 1.2, Math.Min(1, D * 0.25)) };
@@ -59,7 +65,11 @@ public static class Storage
             shelf.Add(Geo.Rect(-T, v - tw / 2, 0.01, v + tw / 2));
             shelf.Add(Geo.Rect(Li - 0.01, v - tw / 2, Li + T, v + tw / 2));
         }
-        m.Add("Shelf", shelf, [], shelfY.Select(y => Pose.Up(T, y + T / 2, D)), grainAlongU: true, face: [Geo.Rect(0, 0, Li, Ds)]);
+        // One shelf piece for all of them when none has books standing on it; otherwise each its own, notched for its row.
+        if (rows.All(r => r is null)) m.Add("Shelf", shelf, [], shelfY.Select(y => Pose.Up(T, y + T / 2, D)), grainAlongU: true, face: [Geo.Rect(0, 0, Li, Ds)]);
+        else
+            for (int i = 0; i < shelfY.Count; i++)
+                m.Add(i == 0 ? "Bottom shelf" : $"Shelf {i}", shelf, Cabinets.RowNotches(rows[i], Ds, T, f), ribs: Cabinets.RowRibs(m, rows[i], Ds), poses: [Pose.Up(T, shelfY[i] + T / 2, D)], grainAlongU: true, face: [Geo.Rect(0, 0, Li, Ds)]);
 
         // The back, books on its face between the shelves.
         if (back)
@@ -73,11 +83,12 @@ public static class Storage
                 double bh = Math.Min((g1 - g0) * 0.5, 5), yc = (g0 + g1) / 2 - y0;
                 bk.Add(Geo.Rect(-T, yc - bh / 2, 0.01, yc + bh / 2));
                 bk.Add(Geo.Rect(Li - 0.01, yc - bh / 2, Li + T, yc + bh / 2));
-                if (it.Books) Books(0, Li, g0 - y0, g1 - y0, m.Rnd, etched, lines);
+                if (it.Books && rows[gaps.IndexOf((g0, g1))] is null) Books(0, Li, g0 - y0, g1 - y0, m.Rnd, etched, lines);
             }
-            m.Add("Back", bk, [], [Pose.Front(T, y0, bi + T / 2)], grainAlongU: false, face: it.Books ? [] : [Geo.Rect(0, 0, Li, Hbk)], etched: etched, lines: lines);
+            m.Add("Back", bk, [], [Pose.Front(T, y0, bi + T / 2)], grainAlongU: false, face: it.Books && rows.All(r => r is null) ? [] : [Geo.Rect(0, 0, Li, Hbk)], etched: etched, lines: lines);
         }
         else m.Note(m.PushFit ? "Without a back panel the shelves hold the sides square only by their slots: add the back for a stiffer bookshelf." : "Without a back panel, glue the shelves in square.");
+        Cabinets.AddRows(m, rows, i => shelfY[i] + T, z0, ShelfContents.Books);
 
         // The top, overhanging at the front and sides.
         double Wt = W + 2 * oh, Dt = D + oh;
@@ -293,7 +304,7 @@ public static class Storage
             m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
                 etched: etched, lines: lines, ribs: p.Ribs);
         }
-        if (chest && it.Lid == LidStyle.Loose)
+        if (chest && it.Lid is LidStyle.Loose or LidStyle.Domed)
         {
             double lo = Math.Clamp(Math.Min(W, D) * 0.04, 0.4, 1), cl = Math.Max(0.15, m.Fit);
             double Wl = W + 2 * lo, Dl = D + 2 * lo;
@@ -310,6 +321,8 @@ public static class Storage
                 foreach (var z in zs)
                     foreach (var x in xs)
                         slots.Add(Geo.Rect(x + lo - tw / 2 - m.Fit / 2, D + lo - z - m.SlotW / 2, x + lo + tw / 2 + m.Fit / 2, D + lo - z + m.SlotW / 2));
+            var dome = it.Lid == LidStyle.Domed ? Dome(m, W, D, H, lo, band) : null;
+            if (dome is not null) slots.AddRange(dome);
             m.Add("Lid", [Geo.Rect(0, 0, Wl, Dl)], slots, [Pose.Up(-lo, H + T / 2, D + lo)], grainAlongU: true, planks: true, plankMm: 2.4, etched: etched, lines: lines);
             if (strips)
             {
@@ -325,6 +338,79 @@ public static class Storage
             }
         }
         m.Note(closed ? $"Fit the sides together at the corners, the bottom in, and the lid on last: every piece goes in straight, its fingers between the others'." : $"Push the {what}'s sides together at the corners, then the bottom in.");
+    }
+
+    /// <summary>
+    /// A domed lid on the chest's lid board: two arched ends over the chest's ends and a rail along the front and
+    /// the back, their tabs down into the board, and planks laid over them round the curve, banded with iron.
+    /// Returns the slots for the board (flat, as on the lid board); null when the chest is too small for a dome.
+    /// </summary>
+    static PathsD? Dome(Maker m, double W, double D, double H, double lo, double band)
+    {
+        var it = m.Item;
+        double T = m.T, f = m.Fit, sw = m.SlotW;
+        double Wl = W + 2 * lo, S = D + 2 * lo, y0 = H + T;
+        // The dome stands in from the board's front and back edges (sheet in front of the slots) and its ends in from its sides.
+        double inset = Maker.Bridge + 0.1, Sd = S - 2 * inset;
+        double hb = Math.Max(1.4, Maker.Bridge + 0.4), rise = Geo.Clamp(Sd * 0.24, 1.5, 5);
+        // The planks are glued on, so push fit keeps the flat lid.
+        if (m.PushFit || Sd < 2 * T + 2.5 || W < 2 * T + 6) return null;
+        // The curve (s from the board's back edge, y up from the board), cut into planks.
+        double rho = (Sd * Sd / 4 + rise * rise) / (2 * rise), cy = rise - rho, half = Math.Asin(Geo.Clamp(Sd / 2 / rho, -1, 1));
+        int n = Geo.Clamp((int)Math.Round(2 * half / (24 * Math.PI / 180)), 3, 7);
+        // Its corners, from the front over to the back, so each plank's outer face points outward.
+        var at = new List<PointD>();
+        for (int i = 0; i <= n; i++)
+        {
+            double a = half - 2 * half * i / n;
+            at.Add(new PointD(inset + Sd / 2 + rho * Math.Sin(a), hb + cy + rho * Math.Cos(a)));
+        }
+        // The ends: between the edge rails, up to the planks' inner faces.
+        double s0 = inset, s1 = inset + Sd;
+        var under = new PathD { new(s1, 0), new(s1, hb) };
+        under.AddRange(at.Skip(1).SkipLast(1));
+        under.AddRange([new(s0, hb), new(s0, 0)]);
+        var end = Geo.Intersect([under], [Geo.Rect(s0 + T, 0, s1 - T, hb + rise + 1)]);
+        double etw = Geo.Clamp((Sd - 2 * T) * 0.2, 1.5, 3);
+        // Two tabs when there is sheet enough between them, else one in the middle.
+        double span = Sd - 2 * T;
+        double[] endTabs = span * 0.4 >= etw + f + 1.2 ? [s0 + T + span * 0.3, s1 - T - span * 0.3] : [s0 + T + span / 2];
+        var endCut = Geo.Solid([.. end, .. endTabs.Select(u => Geo.Rect(u - etw / 2, -T, u + etw / 2, 0.01))]);
+        double ex = Math.Max(T / 2, inset + sw / 2 - lo);
+        double[] endX = [ex, W - ex];
+        // The edge rails along the front and back, the full length of the lid.
+        double rtw = Geo.Clamp(Wl * 0.12, 1.5, 3.5);
+        double[] railTabs = [Wl * 0.3, Wl * 0.7];
+        var rail = new PathsD { Geo.Rect(0, 0, Wl, hb) };
+        foreach (var u in railTabs) rail.Add(Geo.Rect(u - rtw / 2, -T, u + rtw / 2, 0.01));
+        // The board's slots (u = x + lo, v = S - s).
+        var slots = new PathsD();
+        foreach (var x in endX)
+            foreach (var u in endTabs) slots.Add(Geo.Rect(x + lo - sw / 2, S - u - (etw + f) / 2, x + lo + sw / 2, S - u + (etw + f) / 2));
+        foreach (var v in new[] { S - s1 + T / 2, S - s0 - T / 2 })
+            foreach (var u in railTabs) slots.Add(Geo.Rect(u - (rtw + f) / 2, v - sw / 2, u + (rtw + f) / 2, v + sw / 2));
+        double[] bandAt = it.Bands && Wl > 2 * (T + band + lo) + 2 ? [T + band + lo, Wl - T - band - lo] : [];
+        var re = new PathsD();
+        var rl = new List<PathD>();
+        if (bandAt.Length > 0) Bands(bandAt, hb, band, re, rl);
+        m.Add("Lid end", endCut, [], [.. endX.Select(x => Pose.Left(x, y0, -lo))], grainAlongU: true, planks: true, plankMm: 2.4);
+        m.Add("Lid edge", rail, [], [Pose.Front(-lo, y0, -lo + s1 - T / 2), Pose.Back(W + lo, y0, -lo + s0 + T / 2)], grainAlongU: true, face: [Geo.Rect(0, 0, Wl, hb)], etched: re, lines: rl);
+        // The planks, their inner faces on the chords of the curve.
+        for (int i = 0; i < n; i++)
+        {
+            var a = at[i];
+            var b = at[i + 1];
+            double c = Math.Sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y));
+            var v = new V3(0, (b.y - a.y) / c, (b.x - a.x) / c);
+            var nrm = V3.UnitX.Cross(v);
+            var o = new V3(-lo, y0 + a.y, -lo + a.x) + nrm * (T / 2);
+            var pe = new PathsD();
+            var pl = new List<PathD>();
+            if (bandAt.Length > 0) Bands(bandAt, c, band, pe, pl);
+            m.Add($"Lid plank {i + 1}", [Geo.Rect(0, 0, Wl, c)], [], [new Pose(o, V3.UnitX, v)], grainAlongU: true, face: [Geo.Rect(0, 0, Wl, c)], etched: pe, lines: pl);
+        }
+        m.Note("Domed lid: stand the two ends and the two edge rails in the lid board's slots, then glue the planks over them round the curve, front to back.");
+        return slots;
     }
 
     /// <summary>A lock plate with a keyhole, scored.</summary>

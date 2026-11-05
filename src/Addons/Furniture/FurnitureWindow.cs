@@ -433,7 +433,7 @@ public sealed class FurnitureWindow : Window
         _top.SelectedIndex = it.Top == TopShape.Round ? 0 : 1;
         _seat.Value = D(it.SeatMm); _back.SelectedIndex = (int)it.Back;
         _shelves.Value = it.Shelves; _backPanel.IsChecked = it.BackPanel; _books.IsChecked = it.Books;
-        _lid.ItemsSource = kind == ItemKind.Crate ? new List<string> { "Closed (glued on)", "Open top" } : new List<string> { "Lifts off (a rim under it)", "Glued on", "None (open)" };
+        _lid.ItemsSource = kind == ItemKind.Crate ? new List<string> { "Closed (glued on)", "Open top" } : new List<string> { "Lifts off (a rim under it)", "Glued on", "None (open)", "Domed, lifts off" };
         _lid.SelectedIndex = kind == ItemKind.Crate ? (it.Lid == LidStyle.None ? 1 : 0) : (int)it.Lid;
         _bands.Content = kind == ItemKind.Crate ? "Boards round the edge and a brace etched on" : "Iron bands and a lock plate etched on";
         _bands.IsChecked = it.Bands;

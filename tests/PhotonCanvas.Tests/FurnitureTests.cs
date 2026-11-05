@@ -88,8 +88,18 @@ public class FurnitureTests
     /// <summary>Pieces joined to the rest (their boxes overlap another's by nearly a sheet's thickness every way: a tab in a slot).</summary>
     internal static List<string> Unjoined(List<Placed> all, double T)
     {
-        // A loose lid and its rim just sit on top.
-        all = [.. all.Where(p => p.Name is not ("Lid rim" or "Lid rail" or "Lid") || !all.Any(q => q.Name is "Lid rim" or "Lid rail"))];
+        // A loose lid and its rim just sit on top. A domed lid's ends and rails are tabbed into the lid board;
+        // its planks are glued over them.
+        if (!all.Any(q => q.Name is "Lid rim" or "Lid rail")) return Apart(all, T);
+        var lid = all.Where(p => p.Name.StartsWith("Lid") && p.Name is not ("Lid rim" or "Lid rail") && !p.Name.StartsWith("Lid plank")).ToList();
+        var rest = Apart([.. all.Where(p => !p.Name.StartsWith("Lid"))], T);
+        rest.AddRange(Apart([.. lid.OrderByDescending(p => p.Name == "Lid")], T));
+        return rest;
+    }
+
+    /// <summary>The pieces not joined, through others, to the first.</summary>
+    static List<string> Apart(List<Placed> all, double T)
+    {
         if (all.Count < 2) return [];
         bool Joined(Placed a, Placed b)
         {
@@ -270,12 +280,62 @@ public class FurnitureTests
     [Fact]
     public void A_bookshelf_has_the_shelves_asked_and_books_on_its_back()
     {
+        // Deep enough: the books are cut, a row standing on each shelf, their tabs in notches at the back.
         var k = Make(Defaults.For(ItemKind.Bookshelf) with { Shelves = 4, HeightMm = 40 });
-        Assert.Equal(5, Part(k, "Shelf").Copies);
-        var back = Part(k, "Back");
+        Assert.Single(k.Parts, p => p.Name == "Bottom shelf");
+        Assert.Equal(4, k.Parts.Count(p => p.Name.StartsWith("Shelf ")));
+        var rows = k.Parts.Where(p => p.Name.StartsWith("Books ")).ToList();
+        Assert.Equal(5, rows.Count);
+        Assert.All(rows, r => Assert.True(r.Lines.Count > 10, $"{r.Name}: spines"));
+        Assert.All(k.Parts.Where(p => p.Name.Contains("helf")), s => Assert.True(s.Cut.Sum(q => q.Count) > 4, $"{s.Name}: notches"));
+        // Too shallow for cut books: they're drawn on the back.
+        var flat = Make(Defaults.For(ItemKind.Bookshelf) with { Shelves = 4, HeightMm = 40, DepthMm = 6 });
+        Assert.Equal(5, Part(flat, "Shelf").Copies);
+        Assert.DoesNotContain(flat.Parts, p => p.Name.StartsWith("Books "));
+        var back = Part(flat, "Back");
         Assert.True(back.Lines.Count > 20, "books");
         Assert.True(Geo.Area(back.Etched) > 10);
         Assert.False(Make(Defaults.For(ItemKind.Bookshelf) with { Shelves = 12 }).Ok);
+    }
+
+    [Fact]
+    public void A_stool_stands_on_four_splayed_feet_not_a_solid_slab()
+    {
+        var k = Make(Defaults.For(ItemKind.Stool));
+        Assert.True(k.Ok);
+        var leg = Part(k, "Leg (slot at the top)");
+        var b = Geo.Bounds(leg.Cut);
+        // An arch between the feet: the sheet is well under the box it fills.
+        Assert.True(Geo.Area(leg.Cut) < b.Width * b.Height * 0.75, "arched between the feet");
+    }
+
+    [Fact]
+    public void A_bed_has_pillows_tabbed_into_the_mattress_and_a_turned_down_sheet()
+    {
+        var k = Make(Defaults.For(ItemKind.Bed) with { WidthMm = 40, DepthMm = 22, MattressMm = 6 });
+        Assert.True(k.Ok);
+        var pillows = k.Parts.Where(p => p.Name.StartsWith("Pillow")).ToList();
+        Assert.NotEmpty(pillows);
+        Assert.All(pillows, p => Assert.True(p.Lines.Count > 0, "creases"));
+        Assert.DoesNotContain(k.Findings, f => f.Level == Severity.Warn);
+    }
+
+    [Fact]
+    public void A_domed_chest_lid_has_ends_rails_and_planks_and_push_fit_keeps_it_flat()
+    {
+        var it = Defaults.For(ItemKind.Chest) with { WidthMm = 18, DepthMm = 11, HeightMm = 10, Lid = LidStyle.Domed };
+        var k = Make(it);
+        Assert.True(k.Ok);
+        Assert.Equal(2, Part(k, "Lid end").Poses.Count);
+        Assert.Equal(2, Part(k, "Lid edge").Poses.Count);
+        Assert.True(k.Parts.Count(p => p.Name.StartsWith("Lid plank")) >= 3);
+        Assert.DoesNotContain(k.Findings, f => f.Level == Severity.Warn);
+        var all = Assemble(k, 2);
+        Assert.Empty(Clashes(all));
+        Assert.Empty(EmptySlots(all, 2, 0.1));
+        Assert.Empty(Unjoined(all, 2));
+        var push = Make(it, Sheet with { PushFit = true });
+        Assert.DoesNotContain(push.Parts, p => p.Name.StartsWith("Lid plank"));
     }
 
     [Fact]

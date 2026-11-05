@@ -56,7 +56,7 @@ public static class Coffins
             var poses = Enumerable.Range(k, next - k).Select(j => Pose.Up(0, j * T + T / 2, D)).ToList();
             var etched = new PathsD();
             var lines = new List<PathD>();
-            if (top) Lid(style, look, L, D, grows[k], rnd, etched, lines);
+            if (top) Lid(m, style, look, L, D, grows[k], rnd, etched, lines);
             string name = k == 0 ? (style == CoffinStyle.Sarcophagus ? "Plinth" : "Base") : top ? "Lid" : style == CoffinStyle.Sarcophagus && k == n - 2 ? "Lid's lip" : "Layer";
             m.Add(name, [Body(grows[k])], slots, poses, grainAlongU: true, face: top && style != CoffinStyle.Coffin ? [] : top ? null : [], etched: etched, lines: lines, planks: top, plankMm: D / 3);
             k = next;
@@ -66,7 +66,7 @@ public static class Coffins
         m.Note($"Stand the two keys in the base and slide the layers down over them one by one, gluing each{(n > 2 ? "" : "")}; the lid goes on last.");
     }
 
-    static void Lid(CoffinStyle style, FrontLook look, double L, double D, double grow, Random rnd, PathsD etched, List<PathD> lines)
+    static void Lid(Maker m, CoffinStyle style, FrontLook look, double L, double D, double grow, Random rnd, PathsD etched, List<PathD> lines)
     {
         switch (style)
         {
@@ -111,7 +111,7 @@ public static class Coffins
                     };
                     etched.AddRange(Geo.Union(cross));
                 }
-                else Cabinets.Symbol(look, cx, cz, r, etched, lines);
+                else Cabinets.Symbol(look, m.Theme, cx, cz, r, etched, lines);
                 // Handles along the sides.
                 foreach (var x in new[] { L * 0.35, L * 0.65 })
                     foreach (var z in new[] { 0.5, D - 0.5 }) lines.Add([new(x - 0.8, z), new(x + 0.8, z)]);
