@@ -224,21 +224,23 @@ public static partial class HouseKitMaker
         if (w <= 0 || h <= 0) return ([], []);
         var (a, b) = FloorTextures.SizesFor(preset, sq);
         var spec = new TileSpec { Texture = name, SquareMm = sq, SizeA = a, SizeB = b, GrooveMm = preset.UsesGroove ? preset.Groove : 0.5, Seed = seed, Etch = s.Etch, CracksPct = 0, Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
-        var tex = FloorTextures.Make(spec, w, h, seed);
-        PointD Map(PointD p) => new(from.left + p.x, from.top + p.y);
-        var etched = new PathsD();
-        var lines = new List<PathD>();
-        if (s.Etch == EtchStyle.Grooves)
+        // The pattern over the whole rectangle is the slow part, and it only changes when the room's size or the
+        // pattern does: kept, then just cut to the floor's shape (and that kept too, for when the floor's the same).
+        string key = FormattableString.Invariant($"floor|{spec.ToJson()}|{w:R}|{h:R}|{from.left:R}|{from.top:R}");
+        var (areas, loops, scored) = KitCache.Get(key, () =>
         {
-            var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-sq, -sq, w + sq, h + sq)], Geo.Union(tex.Raised)) : [];
-            etched.AddRange(Geo.Intersect(Geo.Tidy(Geo.Map(Geo.Union(mortar, tex.Etched), Map)), region));
-        }
-        else
-        {
-            lines.AddRange(Geo.ClipLines(Geo.Map(tex.Raised.Select(Geo.Loop), Map), region));
-            lines.AddRange(Geo.ClipLines(Geo.Map(tex.Etched.Select(Geo.Loop), Map), region));
-        }
-        lines.AddRange(Geo.ClipLines(Geo.Map(tex.Lines, Map), region));
+            var tex = FloorTextures.Make(spec, w, h, seed);
+            PointD Map(PointD p) => new(from.left + p.x, from.top + p.y);
+            if (s.Etch == EtchStyle.Grooves)
+            {
+                var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-sq, -sq, w + sq, h + sq)], Geo.Union(tex.Raised)) : [];
+                return (Geo.Tidy(Geo.Map(Geo.Union(mortar, tex.Etched), Map)), new List<PathD>(), Geo.Map(tex.Lines, Map));
+            }
+            return (new PathsD(), Geo.Map(tex.Raised.Select(Geo.Loop).Concat(tex.Etched.Select(Geo.Loop)), Map), Geo.Map(tex.Lines, Map));
+        });
+        var etched = new PathsD(KitCache.Intersect(areas, region));
+        var lines = new List<PathD>(KitCache.ClipLines(loops, region));
+        lines.AddRange(KitCache.ClipLines(scored, region));
         return (etched, lines);
     }
 
@@ -295,8 +297,8 @@ public static partial class HouseKitMaker
             string name = cuts.Count == 1 ? "Base" : $"Base, piece {++n}";
             PointD Flip(PointD p) => new(p.x, -p.y);
             var cutF = Geo.Tidy(Geo.Map(cut, Flip));
-            var etchF = Geo.Map(Geo.Intersect(etched, cut), Flip);
-            var linesF = Geo.Map(Geo.ClipLines(lines, cut), Flip);
+            var etchF = Geo.Map(KitCache.Intersect(etched, cut), Flip);
+            var linesF = Geo.Map(KitCache.ClipLines(lines, cut), Flip);
             pieces.Add(new Piece(name, Sheet.Walls, cutF, etchF, linesF, 1));
             var o = world(0, 0, T / 2);
             solids.Add(new HouseSolid(name, cutF, Pose.Up(o.X, o.Y, o.Z), T, Nil(etchF), Nil(linesF), 0, SolidKind.Ground));
