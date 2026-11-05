@@ -6,7 +6,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -34,7 +34,7 @@ static class CityBuilderShots
             }
             foreach (var tc in win.GetLogicalDescendantsOf<TabControl>())
             {
-                if (tc.Items.Count == 4 && tc.Items[0] is TabItem { Header: "Map" }) tc.SelectedIndex = left;
+                if (tc.Items.Count == 5 && tc.Items[0] is TabItem { Header: "Map" }) tc.SelectedIndex = left;
                 if (tc.Items.Count == 2 && tc.Items[0] is TabItem { Header: "Plan" }) tc.SelectedIndex = view;
             }
             settle(1500);
@@ -47,9 +47,20 @@ static class CityBuilderShots
         var village = CityWindow.Sample();
         Shot("window-citybuilder-plan", village, 2, 0);
         Shot("window-citybuilder-3d", village, 0, 1);
-        Shot("window-citybuilder-picked", village, 3, 0, w =>
+        Shot("window-citybuilder-picked", village, 4, 0, w =>
         {
             F<CityPlan>(w, "_plan").Select(village.Buildings[0].Id);
+            return Task.CompletedTask;
+        });
+        Shot("window-citybuilder-several", village, 4, 0, w =>
+        {
+            // A box round the tavern, the well, the cart and the square's crates and lamp.
+            F<CityPlan>(w, "_plan").SetPick(CityEdit.Within(village, 9.5, 7.5, 22, 16.5));
+            return Task.CompletedTask;
+        });
+        Shot("window-citybuilder-town", village, 3, 0, w =>
+        {
+            F<CheckBox>(w, "_byDistrict").IsChecked = true;
             return Task.CompletedTask;
         });
         Shot("window-citybuilder-battlemap", CityMap.Empty(40, 28), 1, 0, async w =>

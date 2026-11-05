@@ -13,7 +13,8 @@ public sealed record CityShow
     public bool Props { get; init; } = true;
     /// <summary>Doors and windows cut in the walls (a little slower on a big map).</summary>
     public bool Openings { get; init; } = true;
-    public Guid? Selected { get; init; }
+    /// <summary>The buildings picked, shown orange.</summary>
+    public HashSet<Guid> Picked { get; init; } = [];
 }
 
 /// <summary>
@@ -77,7 +78,7 @@ public static class CityScene
         scene.Clear();
         double sq = Math.Max(5, map.SquareMm);
         AddGround(scene, map, sq);
-        foreach (var b in map.Buildings) AddBuilding(scene, b, sq, show, b.Id == show.Selected);
+        foreach (var b in map.Buildings) AddBuilding(scene, b, sq, show, show.Picked.Contains(b.Id));
         foreach (var f in map.Fences) AddFence(scene, f, sq);
         if (show.Props)
             foreach (var p in map.Props) AddProp(scene, p, sq);

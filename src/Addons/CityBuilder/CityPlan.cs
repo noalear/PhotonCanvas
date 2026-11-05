@@ -9,15 +9,16 @@ using PhotonCanvas.App;
 namespace PhotonCanvas.Addon.CityBuilder;
 
 /// <summary>What dragging on the map does.</summary>
-public enum CityTool { Select, Ground, Fill, Building, Place, Fence, Prop, Erase }
+public enum CityTool { Select, Ground, Fill, Building, Place, Fence, Prop, Erase, Road, Label }
 
 /// <summary>
 /// The map seen from above, on its grid, over the battle map it was read from (if any): the ground, each
 /// building's walls, doors and roof, fences and the trees and other things. Zoom with the wheel; move it with
 /// the middle button, or Shift and drag. With the tool chosen: pick and drag buildings (R or the wheel while
 /// dragging turns one, Delete takes it away), paint or fill the ground, drag out a new building's footprint,
-/// put down a saved building, draw fences along the grid lines, drop trees and the like, or rub things out.
-/// The right button rubs out with the painting tools.
+/// put down a saved building, draw fences along the grid lines, drop trees and the like, lay roads, write
+/// labels, or rub things out. The right button rubs out with the painting tools. With Select, drag a box to
+/// pick everything in it, Ctrl and click to add to what's picked, and copy, paste, turn and move it all at once.
 /// </summary>
 public sealed class CityPlan : Control
 {
@@ -30,8 +31,8 @@ public sealed class CityPlan : Control
 
     /// <summary>After each change: the map as it now is, and what was done (for undo).</summary>
     public event Action<CityMap, string>? Edited;
-    /// <summary>A building was picked (or none).</summary>
-    public event Action<Guid?>? Picked;
+    /// <summary>What's picked changed.</summary>
+    public event Action? PickChanged;
 
     public CityTool Tool { get; set; } = CityTool.Select;
     public Ground Paint { get; set; } = Ground.Road;
@@ -44,8 +45,24 @@ public sealed class CityPlan : Control
     public int PlaceTurn { get; set; }
     /// <summary>Makes a new building for a footprint dragged out with the Building tool (squares, top left and size).</summary>
     public Func<int, int, int, int, CityBuilding?>? NewBuilding { get; set; }
+    /// <summary>What the Road tool lays and how many squares wide.</summary>
+    public Ground RoadGround { get; set; } = Ground.Road;
+    public int RoadWidth { get; set; } = 2;
+    /// <summary>What the Label tool writes, and how tall (squares).</summary>
+    public string LabelText { get; set; } = "Market Street";
+    public double LabelSize { get; set; } = 0.8;
+    /// <summary>Colour the buildings by their district.</summary>
+    public bool DistrictColours { get => _districts; set { _districts = value; InvalidateVisual(); } }
+    bool _districts;
 
-    public Guid? Selected { get; private set; }
+    /// <summary>What's picked: buildings, trees and things, labels and stretches of fence.</summary>
+    public CityPick Pick { get; private set; } = CityPick.None;
+
+    /// <summary>The one building picked (when that's all that's picked).</summary>
+    public Guid? Selected => Pick.Buildings.Count == 1 && Pick.Props.Count == 0 && Pick.Labels.Count == 0 && Pick.Fences.Count == 0 ? Pick.Buildings.First() : null;
+
+    /// <summary>Things copied, to paste.</summary>
+    public CityClip? Copied { get; private set; }
 
     public CityPlan()
     {
@@ -60,16 +77,29 @@ public sealed class CityPlan : Control
     {
         bool resized = map.Across != _map.Across || map.Down != _map.Down;
         _map = map;
-        if (Selected is { } s && map.Building(s) is null) Select(null);
+        var on = Pick.On(map);
+        if (!on.Holds(Pick)) SetPick(on);
         RedrawGround();
         if (refit || resized) Fit();
         InvalidateVisual();
     }
 
-    public void Select(Guid? id)
+    public void Select(Guid? id) => SetPick(id is { } i ? new CityPick { Buildings = [i] } : CityPick.None);
+
+    public void SetPick(CityPick pick)
     {
-        Selected = id;
-        Picked?.Invoke(id);
+        Pick = pick;
+        PickChanged?.Invoke();
+        InvalidateVisual();
+    }
+
+    /// <summary>Moves the view so a point (squares) is in the middle, zoomed in enough to see it.</summary>
+    public void CentreOn(double x, double y)
+    {
+        _zoom = Math.Max(_zoom, Math.Clamp(Math.Max(_map.Across, _map.Down) / 24.0, 1, 60));
+        _pan = default;
+        var at = At(x, y);
+        _pan = new Vector(Bounds.Width / 2 - at.X, Bounds.Height / 2 - at.Y);
         InvalidateVisual();
     }
 
@@ -172,6 +202,54 @@ public sealed class CityPlan : Control
         return null;
     }
 
+    Prop? PropAt((double X, double Y) p)
+    {
+        for (int i = _map.Props.Count - 1; i >= 0; i--)
+        {
+            var q = _map.Props[i];
+            double r = Math.Max(0.3, 0.4 * q.Size);
+            if ((q.X - p.X) * (q.X - p.X) + (q.Y - p.Y) * (q.Y - p.Y) <= r * r) return q;
+        }
+        return null;
+    }
+
+    CityLabel? LabelAt((double X, double Y) p)
+    {
+        for (int i = _map.Labels.Count - 1; i >= 0; i--)
+        {
+            var l = _map.Labels[i];
+            if (Math.Abs(p.X - l.X) <= l.Width / 2 + 0.1 && Math.Abs(p.Y - l.Y) <= l.Size / 2 + 0.1) return l;
+        }
+        return null;
+    }
+
+    /// <summary>The one thing under the pointer, as a pick: a label, a tree or thing, a building, or a fence's whole run.</summary>
+    CityPick? HitAt((double X, double Y) p)
+    {
+        if (LabelAt(p) is { } l) return CityPick.Of(l);
+        if (PropAt(p) is { } q) return CityPick.Of(q);
+        if (BuildingAt(p) is { } b) return CityPick.Of(b);
+        if (EdgeAt(p) is { } e && _map.Fences.Any(f => f.Edges.Contains(e))) return new CityPick { Fences = CityEdit.Run(_map, e) };
+        return null;
+    }
+
+    static readonly Color[] Palette =
+    [
+        Color.FromRgb(0xE6, 0x7E, 0x22), Color.FromRgb(0x34, 0x98, 0xDB), Color.FromRgb(0x9B, 0x59, 0xB6), Color.FromRgb(0x2E, 0xCC, 0x71),
+        Color.FromRgb(0xE7, 0x4C, 0x3C), Color.FromRgb(0xF1, 0xC4, 0x0F), Color.FromRgb(0x1A, 0xBC, 0x9C), Color.FromRgb(0xD3, 0x54, 0x00),
+        Color.FromRgb(0x8E, 0x44, 0xAD), Color.FromRgb(0x16, 0xA0, 0x85), Color.FromRgb(0xC0, 0x39, 0x2B), Color.FromRgb(0x27, 0x60, 0xA0),
+    ];
+
+    /// <summary>The colour a district is shown in (grey for none), the same every time for the same name.</summary>
+    public static Color DistrictColour(string? district)
+    {
+        var d = (district ?? "").Trim().ToLowerInvariant();
+        if (d.Length == 0) return Color.FromRgb(0x90, 0x90, 0x90);
+        int h = 17;
+        foreach (char c in d) h = unchecked(h * 31 + c);
+        return Palette[(h & 0x7FFFFFFF) % Palette.Length];
+    }
+
     // ---- drawing ----
 
     static readonly IBrush WallBrush = new SolidColorBrush(Color.FromRgb(0x3A, 0x2A, 0x1C));
@@ -227,17 +305,23 @@ public sealed class CityPlan : Control
             var pen = new Pen(new SolidColorBrush(colour), Math.Max(1.5, width), lineCap: PenLineCap.Square);
             foreach (var (ax, ay, bx, by) in CityScene.Runs(f.Edges)) ctx.DrawLine(pen, At(ax, ay), At(bx, by));
         }
+        if (Pick.Fences.Count > 0)
+        {
+            var pen = new Pen(PickBrush, Math.Max(2, k * 0.12), lineCap: PenLineCap.Square);
+            foreach (var (ax, ay, bx, by) in CityScene.Runs(Pick.Fences)) ctx.DrawLine(pen, At(ax, ay), At(bx, by));
+        }
 
         // Buildings: their squares, roofs, walls with the doors and windows in them.
         var overlaps = CityFootprint.Overlaps(_map).SelectMany(p => new[] { p.A.Id, p.B.Id }).ToHashSet();
         foreach (var b in _map.Buildings) DrawBuilding(ctx, b, k, overlaps.Contains(b.Id));
 
-        // Trees and the like.
+        // Trees and the like, and the labels.
         foreach (var p in _map.Props) DrawProp(ctx, p, k);
+        foreach (var l in _map.Labels) DrawLabel(ctx, l, k, Pick.Labels.Contains(l.Id));
 
         // What the pointer is over, and what's being dragged.
         DrawHover(ctx, k);
-        if (_map.Buildings.Count == 0 && _map.Props.Count == 0)
+        if (_map.Buildings.Count == 0 && _map.Props.Count == 0 && _map.Labels.Count == 0)
             Text(ctx, "Read a battle map, or drag out buildings with the Building tool", new Point(Bounds.Width / 2, Bounds.Height - 22), UiKit.Brush("TextMuted"), 11, true);
     }
 
@@ -245,9 +329,10 @@ public sealed class CityPlan : Control
 
     void DrawBuilding(DrawingContext ctx, CityBuilding b, double k, bool overlapping)
     {
-        bool picked = b.Id == Selected;
+        bool picked = Pick.Buildings.Contains(b.Id);
         var cells = CityFootprint.Cells(b);
-        var roofCol = b.Design.Roofs.Count > 0 ? CityScene.RoofColour(b.Design.Roofs[0].Covering) : CityScene.WallColour(b.Design.Style.Texture);
+        var roofCol = _districts ? DistrictColour(b.District)
+            : b.Design.Roofs.Count > 0 ? CityScene.RoofColour(b.Design.Roofs[0].Covering) : CityScene.WallColour(b.Design.Style.Texture);
         var fill = new SolidColorBrush(roofCol, 0.82);
         foreach (var (x, y) in cells) ctx.FillRectangle(overlapping ? OverlapBrush : fill, new Rect(At(x, y), new Size(k + 0.5, k + 0.5)));
         // The ridges, so the roofs read from above.
@@ -319,10 +404,36 @@ public sealed class CityPlan : Control
         if (p.Kind is PropKind.Lamp or PropKind.Statue) r *= 0.5;
         if (p.Kind is PropKind.Cart or PropKind.Crates) ctx.FillRectangle(fill, new Rect(at.X - r * 0.8, at.Y - r * 0.5, r * 1.6, r));
         else ctx.DrawEllipse(fill, k >= 8 ? new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)), 1) : null, at, r, r);
+        if (Pick.Props.Contains(p.Id)) ctx.DrawEllipse(null, new Pen(PickBrush, 2), at, r + 2, r + 2);
+    }
+
+    void DrawLabel(DrawingContext ctx, CityLabel l, double k, bool picked)
+    {
+        double size = Math.Max(4, l.Size * k);
+        var ft = new FormattedText(l.Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), size, Brushes.White);
+        var mid = At(l.X, l.Y);
+        var p = new Point(mid.X - ft.Width / 2, mid.Y - ft.Height / 2);
+        var back = new FormattedText(l.Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default, FontStyle.Normal, FontWeight.SemiBold), size, new SolidColorBrush(Color.FromArgb(0xC0, 0, 0, 0)));
+        foreach (var (dx, dy) in new[] { (1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0) }) ctx.DrawText(back, p + new Point(dx, dy));
+        ctx.DrawText(ft, p);
+        if (picked) ctx.DrawRectangle(null, new Pen(PickBrush, 1.5) { DashStyle = new DashStyle([3, 2], 0) }, new Rect(p.X - 3, p.Y - 2, ft.Width + 6, ft.Height + 4));
     }
 
     void DrawHover(DrawingContext ctx, double k)
     {
+        if (_box is { } box)
+        {
+            var r = new Rect(At(Math.Min(box.A.X, box.B.X), Math.Min(box.A.Y, box.B.Y)), At(Math.Max(box.A.X, box.B.X), Math.Max(box.A.Y, box.B.Y)));
+            ctx.FillRectangle(new SolidColorBrush(Color.FromArgb(0x22, 0xF0, 0x9A, 0x2A)), r);
+            ctx.DrawRectangle(null, new Pen(PickBrush, 1) { DashStyle = new DashStyle([4, 3], 0) }, r);
+            return;
+        }
+        if (_drag is { } rd && Tool == CityTool.Road)
+        {
+            var brush = new SolidColorBrush(CityScene.GroundColour(RoadGround), 0.75);
+            foreach (var (x, y) in RoadCells(rd)) if (_map.In(x, y)) ctx.FillRectangle(brush, new Rect(At(x, y), new Size(k + 0.5, k + 0.5)));
+            return;
+        }
         if (_drag is { } dg && Tool == CityTool.Building)
         {
             int x0 = Math.Min(dg.A.X, dg.B.X), x1 = Math.Max(dg.A.X, dg.B.X), y0 = Math.Min(dg.A.Y, dg.B.Y), y1 = Math.Max(dg.A.Y, dg.B.Y);
@@ -360,6 +471,15 @@ public sealed class CityPlan : Control
             case CityTool.Prop:
                 ctx.DrawEllipse(_right ? RubBrush : HoverBrush, null, At(hp.X, hp.Y), Math.Max(3, k * 0.4), Math.Max(3, k * 0.4));
                 break;
+            case CityTool.Road when CellAt(hp) is { } c:
+            {
+                int n = Math.Max(1, RoadWidth), h0 = (n - 1) / 2;
+                ctx.FillRectangle(HoverBrush, new Rect(At(c.X - h0, c.Y - h0), new Size(k * n, k * n)));
+                break;
+            }
+            case CityTool.Label when !string.IsNullOrWhiteSpace(LabelText):
+                using (ctx.PushOpacity(0.6)) DrawLabel(ctx, new CityLabel { Text = LabelText.Trim(), X = hp.X, Y = hp.Y, Size = LabelSize }, k, false);
+                break;
         }
     }
 
@@ -378,21 +498,33 @@ public sealed class CityPlan : Control
     // ---- editing ----
 
     (double X, double Y)? _hover;
-    bool _down, _right, _changed, _panning;
+    bool _down, _right, _changed, _panning, _ctrl;
     Point _panFrom;
     ((int X, int Y) A, (int X, int Y) B)? _drag;
+    ((double X, double Y) A, (double X, double Y) B)? _box;
+    bool _boxAdd;
     Ground[,]? _ground;
-    CityBuilding? _moving;
-    (double X, double Y) _grab;
+    CityMap? _moveFrom;
+    CityPick _movePick = CityPick.None;
+    (double X, double Y) _grabAt;
     bool? _fenceAdd;
     readonly HashSet<FenceEdge> _stroke = [];
+
+    HashSet<(int X, int Y)> RoadCells(((int X, int Y) A, (int X, int Y) B) d) => CityEdit.Road(d.A.X, d.A.Y, d.B.X, d.B.Y, RoadWidth, _ctrl);
 
     protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
     {
         base.OnPointerWheelChanged(e);
-        if (_moving is { } m && _down)
+        if (_moveFrom is not null && _down)
         {
-            Turn(m, e.Delta.Y > 0 ? 1 : -1);
+            // Turning what's being dragged.
+            (_map, var pick, _) = CityEdit.Turn(_map, Pick, e.Delta.Y > 0 ? 1 : -1);
+            Pick = pick;
+            _moveFrom = _map;
+            _movePick = pick;
+            _grabAt = _hover ?? _grabAt;
+            _changed = true;
+            InvalidateVisual();
             e.Handled = true;
             return;
         }
@@ -428,19 +560,42 @@ public sealed class CityPlan : Control
         if (!props.IsLeftButtonPressed && !props.IsRightButtonPressed) return;
         _down = true;
         _right = props.IsRightButtonPressed;
+        _ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         _changed = false;
         _stroke.Clear();
         _fenceAdd = null;
+        _moveFrom = null;
         e.Pointer.Capture(this);
         var p = ToMap(pt.Position);
         switch (Tool)
         {
             case CityTool.Select:
             {
-                var b = BuildingAt(p);
-                Select(b?.Id);
-                _moving = _right ? null : b;
-                _grab = b is null ? default : (p.X - b.X, p.Y - b.Y);
+                var hit = HitAt(p);
+                if (_right)
+                {
+                    if (hit is not null && !Pick.Holds(hit)) SetPick(hit);
+                    _down = false;
+                }
+                else if (hit is null)
+                {
+                    // A box from here: everything in it is picked.
+                    _box = (p, p);
+                    _boxAdd = _ctrl;
+                    if (!_ctrl) SetPick(CityPick.None);
+                }
+                else if (_ctrl)
+                {
+                    SetPick(Pick.Toggle(hit));
+                    _down = false;
+                }
+                else
+                {
+                    if (!Pick.Holds(hit)) SetPick(hit);
+                    _moveFrom = _map;
+                    _movePick = Pick;
+                    _grabAt = p;
+                }
                 break;
             }
             case CityTool.Ground:
@@ -454,13 +609,16 @@ public sealed class CityPlan : Control
                 if (!_right && CellAt(p) is { } c) _drag = (c, c);
                 else if (_right) EraseAt(p);
                 break;
+            case CityTool.Road:
+                if (CellAt(p) is { } rc) _drag = (rc, rc);
+                break;
             case CityTool.Place:
                 if (_right) { PlaceTurn = (PlaceTurn + 1) % 4; _down = false; }
                 else if (ToPlace is { } prefab)
                 {
                     var b = prefab.Place((int)Math.Floor(p.X), (int)Math.Floor(p.Y), PlaceTurn);
                     _map = _map.WithBuilding(b);
-                    Select(b.Id);
+                    SetPick(CityPick.Of(b));
                     _changed = true;
                 }
                 break;
@@ -472,6 +630,19 @@ public sealed class CityPlan : Control
                 else
                 {
                     _map = _map with { Props = [.. _map.Props, new Prop { Kind = PropKind, X = Math.Round(p.X * 4) / 4, Y = Math.Round(p.Y * 4) / 4, TurnDeg = Random.Shared.Next(360), Size = PropKind is PropKind.Tree or PropKind.Pine ? 1.2 : 1 }] };
+                    _changed = true;
+                }
+                break;
+            case CityTool.Label:
+                if (_right)
+                {
+                    if (LabelAt(p) is { } l) { _map = _map with { Labels = [.. _map.Labels.Where(x => x.Id != l.Id)] }; _changed = true; }
+                }
+                else if (!string.IsNullOrWhiteSpace(LabelText) && _map.In((int)Math.Floor(p.X), (int)Math.Floor(p.Y)))
+                {
+                    var l = new CityLabel { Text = LabelText.Trim(), X = Math.Round(p.X * 4) / 4, Y = Math.Round(p.Y * 4) / 4, Size = LabelSize };
+                    _map = _map with { Labels = [.. _map.Labels, l] };
+                    SetPick(CityPick.Of(l));
                     _changed = true;
                 }
                 break;
@@ -497,26 +668,28 @@ public sealed class CityPlan : Control
         _hover = p;
         if (_down)
         {
+            _ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
             switch (Tool)
             {
-                case CityTool.Select when _moving is { } m:
+                case CityTool.Select when _box is { } bx:
+                    _box = (bx.A, p);
+                    break;
+                case CityTool.Select when _moveFrom is { } from:
                 {
-                    int nx = (int)Math.Round(p.X - _grab.X), ny = (int)Math.Round(p.Y - _grab.Y);
-                    var (w, d) = CityFootprint.Size(m);
-                    nx = Math.Clamp(nx, 0, Math.Max(0, _map.Across - w));
-                    ny = Math.Clamp(ny, 0, Math.Max(0, _map.Down - d));
-                    if (nx != m.X || ny != m.Y)
+                    int dx = (int)Math.Round(p.X - _grabAt.X), dy = (int)Math.Round(p.Y - _grabAt.Y);
+                    var (moved, pick) = CityEdit.Move(from, _movePick, dx, dy);
+                    if (!ReferenceEquals(moved, _map))
                     {
-                        _moving = m with { X = nx, Y = ny };
-                        _map = _map.WithBuilding(_moving);
-                        _changed = true;
+                        _map = moved;
+                        Pick = pick;
+                        _changed = !ReferenceEquals(moved, from) || _changed;
                     }
                     break;
                 }
                 case CityTool.Ground:
                     PaintAt(p);
                     break;
-                case CityTool.Building when _drag is { } dg:
+                case CityTool.Building or CityTool.Road when _drag is { } dg:
                     _drag = (dg.A, ((int)Math.Clamp(Math.Floor(p.X), 0, _map.Across - 1), (int)Math.Clamp(Math.Floor(p.Y), 0, _map.Down - 1)));
                     break;
                 case CityTool.Building when _right:
@@ -537,15 +710,20 @@ public sealed class CityPlan : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        e.Pointer.Capture(null);
         if (_panning)
         {
             _panning = false;
-            e.Pointer.Capture(null);
             return;
         }
         if (!_down) return;
         _down = false;
-        e.Pointer.Capture(null);
+        if (_box is { } bx)
+        {
+            _box = null;
+            var inside = CityEdit.Within(_map, bx.A.X, bx.A.Y, bx.B.X, bx.B.Y);
+            SetPick(_boxAdd ? Pick.With(inside) : inside);
+        }
         if (Tool == CityTool.Building && _drag is { } dg)
         {
             int x0 = Math.Min(dg.A.X, dg.B.X), x1 = Math.Max(dg.A.X, dg.B.X), y0 = Math.Min(dg.A.Y, dg.B.Y), y1 = Math.Max(dg.A.Y, dg.B.Y);
@@ -553,28 +731,43 @@ public sealed class CityPlan : Control
             if (NewBuilding?.Invoke(x0, y0, x1 - x0 + 1, y1 - y0 + 1) is { } b)
             {
                 _map = _map.WithBuilding(b);
-                Select(b.Id);
+                SetPick(CityPick.Of(b));
                 _changed = true;
             }
+        }
+        if (Tool == CityTool.Road && _drag is { } rd)
+        {
+            _drag = null;
+            var g = _map.GroundGrid();
+            var to = _right ? Ground.Grass : RoadGround;
+            foreach (var (x, y) in RoadCells(rd))
+                if (_map.In(x, y) && g[x, y] != to) { g[x, y] = to; _changed = true; }
+            if (_changed) _map = _map.WithGround(g);
         }
         if (Tool == CityTool.Ground && _ground is not null)
         {
             if (_changed) _map = _map.WithGround(_ground);
             _ground = null;
         }
-        _moving = null;
+        if (_moveFrom is not null)
+        {
+            _moveFrom = null;
+            PickChanged?.Invoke();
+        }
         if (_changed)
         {
             RedrawGround();
             Edited?.Invoke(_map, Tool switch
             {
-                CityTool.Select => "Move a building",
+                CityTool.Select => "Move",
                 CityTool.Ground => "Paint the ground",
                 CityTool.Fill => "Fill the ground",
                 CityTool.Building => "Add a building",
                 CityTool.Place => "Put down a building",
                 CityTool.Fence => "Change fences",
                 CityTool.Prop => _right ? "Take away trees" : "Add a tree",
+                CityTool.Road => _right ? "Take a road up" : "Lay a road",
+                CityTool.Label => _right ? "Take a label away" : "Add a label",
                 _ => "Rub out",
             });
         }
@@ -591,43 +784,125 @@ public sealed class CityPlan : Control
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-        if (e.Key is Key.Delete or Key.Back && Selected is { } id && _map.Building(id) is not null)
+        bool ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        switch (e.Key)
         {
-            _map = _map.Without(id);
-            Select(null);
-            Edited?.Invoke(_map, "Take a building away");
-            e.Handled = true;
-        }
-        else if (e.Key is Key.R or Key.OemCloseBrackets or Key.OemOpenBrackets)
-        {
-            int by = e.Key == Key.OemOpenBrackets || e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1;
-            if (Tool == CityTool.Place) { PlaceTurn = ((PlaceTurn + by) % 4 + 4) % 4; InvalidateVisual(); }
-            else if (Selected is { } sid && _map.Building(sid) is { } b)
+            case Key.Delete or Key.Back when !Pick.IsEmpty:
+                DeletePicked();
+                break;
+            case Key.R or Key.OemCloseBrackets or Key.OemOpenBrackets:
             {
-                Turn(b, by);
-                if (!_down) Edited?.Invoke(_map, "Turn a building");
+                int by = e.Key == Key.OemOpenBrackets || e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1;
+                if (Tool == CityTool.Place) { PlaceTurn = ((PlaceTurn + by) % 4 + 4) % 4; InvalidateVisual(); }
+                else if (_down && _moveFrom is not null)
+                {
+                    (_map, var pick, _) = CityEdit.Turn(_map, Pick, by);
+                    Pick = pick;
+                    _moveFrom = _map;
+                    _movePick = pick;
+                    _grabAt = _hover ?? _grabAt;
+                    _changed = true;
+                    InvalidateVisual();
+                }
+                else TurnPicked(by);
+                break;
             }
-            e.Handled = true;
+            case Key.Left or Key.Right or Key.Up or Key.Down when !Pick.IsEmpty && !_down:
+                Nudge(e.Key == Key.Left ? -1 : e.Key == Key.Right ? 1 : 0, e.Key == Key.Up ? -1 : e.Key == Key.Down ? 1 : 0);
+                break;
+            case Key.Escape:
+                _box = null;
+                SetPick(CityPick.None);
+                break;
+            case Key.C when ctrl:
+                CopyPicked();
+                break;
+            case Key.X when ctrl:
+                CutPicked();
+                break;
+            case Key.V when ctrl:
+                PasteClip();
+                break;
+            case Key.D when ctrl:
+                DuplicatePicked();
+                break;
+            case Key.A when ctrl:
+                SetPick(CityEdit.Within(_map, 0, 0, _map.Across, _map.Down));
+                break;
+            case Key.F when !ctrl:
+                Fit();
+                break;
+            default:
+                return;
         }
-        else if (e.Key == Key.F) { Fit(); e.Handled = true; }
+        e.Handled = true;
     }
 
-    /// <summary>Turns a building a quarter turn about its middle (kept on the map).</summary>
-    void Turn(CityBuilding b, int by)
+    // ---- what's picked, all at once ----
+
+    void Apply(CityMap m, CityPick pick, string label)
     {
-        var (w, d) = CityFootprint.Size(b);
-        double cx = b.X + w / 2.0, cy = b.Y + d / 2.0;
-        var t = b with { Turn = ((b.Turn + by) % 4 + 4) % 4 };
-        var (tw, td) = CityFootprint.Size(t);
-        t = t with
-        {
-            X = Math.Clamp((int)Math.Round(cx - tw / 2.0), 0, Math.Max(0, _map.Across - tw)),
-            Y = Math.Clamp((int)Math.Round(cy - td / 2.0), 0, Math.Max(0, _map.Down - td)),
-        };
-        if (_moving?.Id == b.Id) _moving = t;
-        _map = _map.WithBuilding(t);
-        _changed = true;
-        InvalidateVisual();
+        if (ReferenceEquals(m, _map)) return;
+        _map = m;
+        SetPick(pick);
+        Edited?.Invoke(_map, label);
+    }
+
+    CityMap? _turned;
+    (double X, double Y) _pivot;
+
+    /// <summary>Turns what's picked a quarter turn (clockwise; -1 the other way) about its middle: turned again straight away, about the same point.</summary>
+    public void TurnPicked(int by)
+    {
+        if (Pick.IsEmpty) return;
+        var (m, pick, pivot) = CityEdit.Turn(_map, Pick, by, ReferenceEquals(_map, _turned) ? _pivot : null);
+        Apply(m, pick, Pick.Buildings.Count == 1 && pick.Props.Count + pick.Labels.Count + pick.Fences.Count == 0 ? "Turn a building" : "Turn");
+        (_turned, _pivot) = (_map, pivot);
+    }
+
+    public void Nudge(int dx, int dy)
+    {
+        var (m, pick) = CityEdit.Move(_map, Pick, dx, dy);
+        Apply(m, pick, "Move");
+    }
+
+    public void DeletePicked()
+    {
+        if (Pick.IsEmpty) return;
+        Apply(CityEdit.Delete(_map, Pick), CityPick.None, Pick.Buildings.Count == 1 && Pick.Props.Count + Pick.Labels.Count + Pick.Fences.Count == 0 ? "Take a building away" : "Take away");
+    }
+
+    public void CopyPicked()
+    {
+        if (!Pick.IsEmpty) Copied = CityEdit.Copy(_map, Pick);
+    }
+
+    public void CutPicked()
+    {
+        CopyPicked();
+        if (!Pick.IsEmpty) Apply(CityEdit.Delete(_map, Pick), CityPick.None, "Cut");
+    }
+
+    /// <summary>Puts down what was copied: its top left corner on the square under the pointer (or where it came from).</summary>
+    public void PasteClip()
+    {
+        if (Copied is not { IsEmpty: false } clip) return;
+        int x, y;
+        if (_hover is { } h && CellAt(h) is { } c) (x, y) = c;
+        else (x, y) = (Math.Max(0, (_map.Across - clip.Width) / 2), Math.Max(0, (_map.Down - clip.Depth) / 2));
+        var (m, pick) = CityEdit.Paste(_map, clip, x, y);
+        Apply(m, pick, "Paste");
+    }
+
+    /// <summary>A copy of what's picked beside it (to the right, or below when there's no room).</summary>
+    public void DuplicatePicked()
+    {
+        if (Pick.IsEmpty || CityEdit.Bounds(_map, Pick) is not { } bb) return;
+        var clip = CityEdit.Copy(_map, Pick);
+        int x0 = (int)Math.Floor(bb.X0), y0 = (int)Math.Floor(bb.Y0);
+        bool right = x0 + clip.Width + 1 + clip.Width <= _map.Across;
+        var (m, pick) = CityEdit.Paste(_map, clip, right ? x0 + clip.Width + 1 : x0, right ? y0 : y0 + clip.Depth + 1);
+        Apply(m, pick, "Copy");
     }
 
     void PaintAt((double X, double Y) p)
@@ -695,6 +970,12 @@ public sealed class CityPlan : Control
 
     void EraseAt((double X, double Y) p)
     {
+        if (LabelAt(p) is { } l)
+        {
+            _map = _map with { Labels = [.. _map.Labels.Where(x => x.Id != l.Id)] };
+            _changed = true;
+            return;
+        }
         int props = _map.Props.Count;
         RemovePropAt(p);
         if (_map.Props.Count != props) return;
@@ -707,7 +988,7 @@ public sealed class CityPlan : Control
         if (BuildingAt(p) is { } b)
         {
             _map = _map.Without(b.Id);
-            if (Selected == b.Id) Select(null);
+            if (Pick.Buildings.Contains(b.Id)) SetPick(Pick.On(_map));
             _changed = true;
         }
     }

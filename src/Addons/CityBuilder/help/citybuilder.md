@@ -23,9 +23,10 @@ to change its rooms, doors, furniture and roof, and comes out as its laser-cut p
 
 Click **City** on the **Home** tab (in the **Draw** group). The **City builder** window opens with
 the last map you worked on (the first time, a small sample village). Along the top are the tools; on
-the left are four tabs: **Map** (its name, look and size, and your saved maps), **Battle map**
-(reading a picture), **Tools** (what the tools put down) and **Building** (the building picked). On
-the right, **Plan** is the map from above and **3D** shows it put together.
+the left are five tabs: **Map** (its name, look and size, and your saved maps), **Battle map**
+(reading a picture), **Tools** (what the tools put down), **Town** (every building, to find one) and
+**Picked** (what's picked on the plan). On the right, **Plan** is the map from above and **3D** shows
+it put together.
 
 Under them it says how big the map is on the table, how many buildings and trees there are, and
 whether any buildings stand on the same squares (they show red on the plan). The map is saved as you
@@ -41,16 +42,34 @@ enough, and each building's name once it's big enough to read.
 
 | Tool | What it does |
 |---|---|
-| **Select** | Click a building to pick it (its settings show on the **Building** tab) and drag it to move it, a whole square at a time. While dragging, the mouse wheel turns it; `R` turns the picked building a quarter turn (Shift+`R` the other way), and `Delete` takes it away. |
+| **Select** | Click a building, a tree or thing, a label or a fence to pick it (its settings show on the **Picked** tab); Ctrl and click picks more, or takes one out again. Drag a box from an empty spot to pick everything inside it. Drag anything picked to move it all, a whole square at a time (the mouse wheel turns it while you drag). See [Picking several things](#picking-several-things) for the keys. |
 | **Building** | Drag out a rectangle: a new building stands on it, with walls round it, a door towards the nearest road or paving, windows along the walls and a roof (as many floors as **Floors** on the **Tools** tab says). With the right button, click a building to take it away. |
 | **Place** | Put down a saved building (pick it on the **Tools** tab first): click where its top left corner goes. `R`, the right button or Ctrl + the mouse wheel turns it before you click. |
 | **Paint** | Paint the ground with the **Ground** picked on the **Tools** tab, as many squares across as **Brush (squares)**. The right button paints grass. |
 | **Fill** | Click a patch of one ground to fill it all with another (the right button fills it with grass). |
+| **Road** | Drag from one square to another to lay a road there, round one corner; hold Ctrl for a straight line however it slants. What it lays (cobbles, a dirt track, paving, sand, water for a river or grass to take one up) and how many squares wide are under **Roads** on the **Tools** tab. The right button lays grass. |
 | **Fence** | Drag along the grid lines to put up the **Fence** picked on the **Tools** tab: a fence, a hedge, a stone wall or a town wall. Start on one that's there to take it away instead. |
 | **Trees** | Click to put down the **Tree or thing** picked on the **Tools** tab: a tree, a pine tree, a bush, a boulder, a well, a cart, crates and barrels, a lamp or a statue. The right button takes them away. |
-| **Erase** | Drag over trees, fences and buildings to take them away. |
+| **Label** | Click to write the **Text** under **Labels** on the **Tools** tab there: a street's name, a district's, a number for your game master's key. The right button takes one away. |
+| **Erase** | Drag over labels, trees, fences and buildings to take them away. |
 
 **Undo** and **Redo** (`Ctrl+Z`, `Ctrl+Y`) go back and forward a step at a time.
+
+### Picking several things
+
+With **Select**, everything picked shows orange, and these keys work on all of it:
+
+| Key | What it does |
+|---|---|
+| `R` (Shift+`R`) | Turn it a quarter turn about its middle, clockwise (the other way). Four turns bring it back where it was. |
+| Arrow keys | Move it a square. |
+| `Delete` | Take it away. |
+| `Ctrl+C`, `Ctrl+X`, `Ctrl+V` | Copy it, cut it, and put a copy down with its top left corner on the square under the pointer. |
+| `Ctrl+D` | Put a copy beside it. |
+| `Ctrl+A` | Pick everything on the map. |
+| `Esc` | Pick nothing. |
+
+![A box dragged round the tavern and the things on the square: all of it picked, orange on the plan, with the type and district for the building on the Picked tab](images/window-citybuilder-several.png)
 
 ## The map
 
@@ -110,11 +129,11 @@ The settings:
 It's a best guess: paint the ground, move, turn, copy and change the buildings to put right what it
 got wrong.
 
-## The building picked
+## What's picked
 
-![A house picked on the plan and its settings on the Building tab: name, type, district, tags, its roof and covering](images/window-citybuilder-picked.png)
+![A house picked on the plan and its settings on the Picked tab: name, type, district, tags, its roof and covering](images/window-citybuilder-picked.png)
 
-Click a building with **Select** and the **Building** tab shows it:
+Click a building with **Select** and the **Picked** tab shows it:
 
 - **Name**, **Type** (house, shop, tavern, temple…: anything you like), **District** (residential,
   market, docks…) and **Tags** (words to find it by, with commas between). The name shows on the plan.
@@ -130,6 +149,21 @@ Click a building with **Select** and the **Building** tab shows it:
 - **Save as a building to reuse** saves it with the building editor's saved buildings (with its name,
   type, district, tags and a picture), so you can put it down again and again with **Place**, and it's
   in the building editor's saved buildings too.
+
+With several things picked, the **Picked** tab says what they are. Type a **Type** or **District**
+there and every building picked gets it; with only trees and things picked, change what they are and
+their **Size** together. **Turn ⟳**, **Copy beside it** and **Take away** do what `R`, `Ctrl+D` and
+`Delete` do. A label picked on its own shows its **Text** and **Size** to change.
+
+## The town's buildings
+
+![The Town tab listing the sample village's buildings with their type and district, and the plan coloured by district with a key](images/window-citybuilder-town.png)
+
+The **Town** tab lists every building on the map with its type, district and size. Type in the box to
+find one by its name, type, district or a tag, or show just one **Type** or **District**; click one to
+pick it and go to it on the plan. Under the list it counts the buildings of each type.
+**Colour the plan by district** shows each building in its district's colour (the same colour every
+time for the same name), with a key underneath.
 
 ## Saved buildings
 

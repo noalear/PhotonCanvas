@@ -1,6 +1,6 @@
 # Build a town
 <!-- category: Drawing -->
-<!-- summary: Lay out a town on a big map or read one from a battle map picture, change its buildings, see it in 3D and cut a building's pieces. -->
+<!-- summary: Lay out a town on a big map or read one from a battle map picture, lay roads, change and find its buildings, see it in 3D and cut a building's pieces. -->
 <!-- page: citybuilder.md -->
 <!-- order: 79 -->
 The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
@@ -26,6 +26,11 @@ best guess, so check it over.
 Click **Paint**, pick the **Ground** on the **Tools** tab, and drag over the squares it got wrong.
 The right button paints grass.
 
+## Lay a road
+<!-- target: button:Road -->
+Click **Road** and drag from one square to another: a road two squares wide runs there, round one
+corner (hold Ctrl for a straight one). Pick a dirt track or water for a river on the **Tools** tab.
+
 ## Add a building
 <!-- target: button:Building -->
 Click **Building** and drag out a rectangle where a building should stand: it gets walls, a door
@@ -34,7 +39,13 @@ towards the road, windows and a roof.
 ## Change a building
 <!-- target: button:Select -->
 Click **Select**, then click a building: drag it to move it, press `R` to turn it, and change its
-name, type and roof on the **Building** tab.
+name, type, district and roof on the **Picked** tab. Drag a box round several things to move, turn or
+copy them all at once.
+
+## Find a building
+<!-- target: tabitem:Town -->
+The **Town** tab lists every building: type to find one by name, type, district or tag, and click it to
+go to it. Tick **Colour the plan by district** to see the town's parts.
 
 ## Open it in the building editor
 <!-- target: button:Edit in the building editor… -->
