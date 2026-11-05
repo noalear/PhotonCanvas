@@ -62,6 +62,59 @@ public static class Rugs
                 etched.AddRange(Fronts.Outline([Ellipse(cx, cy, rx * 0.62, ry * 0.62)], 0.3));
                 break;
             }
+            case RugPattern.Runner:
+            {
+                // A long runner: a border with a vine waving along it, lilies (or the theme's symbol) in a row down
+                // the dark field, a fringe at each end.
+                outline = [Geo.Rect(0, 0, W, D)];
+                double b = Geo.Clamp(D * 0.12, 0.8, 2.2), c = b * 1.25, amp = b * 0.32;
+                etched.AddRange(Fronts.Outline(b * 0.45, b * 0.45, W - b * 0.45, D - b * 0.45, 0.4));
+                etched.AddRange(Fronts.Outline(b * 2.05, b * 2.05, W - b * 2.05, D - b * 2.05, 0.4));
+                Fringe(W, D, lines);
+                foreach (var (a, e, n) in new[] { (new PointD(c, c), new PointD(W - c, c), new PointD(0, 1)), (new PointD(W - c, c), new PointD(W - c, D - c), new PointD(-1, 0)),
+                                                   (new PointD(W - c, D - c), new PointD(c, D - c), new PointD(0, -1)), (new PointD(c, D - c), new PointD(c, c), new PointD(1, 0)) })
+                {
+                    double len = Math.Sqrt((e.x - a.x) * (e.x - a.x) + (e.y - a.y) * (e.y - a.y));
+                    int waves = Math.Max(1, (int)Math.Round(len / (b * 2.6)));
+                    var vine = new PathD();
+                    for (int i = 0; i <= waves * 16; i++)
+                    {
+                        double t = (double)i / (waves * 16), w = amp * Math.Sin(t * waves * 2 * Math.PI);
+                        vine.Add(new PointD(a.x + (e.x - a.x) * t + n.x * w, a.y + (e.y - a.y) * t + n.y * w));
+                    }
+                    lines.Add(vine);
+                    // A leaf at each crest.
+                    for (int k = 0; k < waves; k++)
+                        foreach (var (tt, sg) in new[] { ((k + 0.25) / waves, 1.0), ((k + 0.75) / waves, -1.0) })
+                            if (amp > 0.25) lines.Add(WoodFace.Dot(a.x + (e.x - a.x) * tt + n.x * amp * sg * 0.4, a.y + (e.y - a.y) * tt + n.y * amp * sg * 0.4, amp * 0.45));
+                }
+                double fx0 = b * 2.4, fx1 = W - b * 2.4, fy0 = b * 2.4, fy1 = D - b * 2.4, fd = fy1 - fy0;
+                if (fd > 2 && fx1 - fx0 > 4)
+                {
+                    var look = Fronts.Look(m);
+                    var marks = new PathsD();
+                    var ml = new List<PathD>();
+                    int n = Math.Max(1, (int)Math.Round((fx1 - fx0) / (fd * 1.3)));
+                    double step = (fx1 - fx0) / n;
+                    for (int i = 0; i < n; i++)
+                    {
+                        double cx = fx0 + step * (i + 0.5), cy = (fy0 + fy1) / 2;
+                        if (m.Theme is PhotonCanvas.Addon.Terrain.TerrainThemes.Medieval or PhotonCanvas.Addon.Terrain.TerrainThemes.Gothic)
+                        {
+                            var lily = new PathsD();
+                            var ll = new List<PathD>();
+                            Pictures.Lily(0, 0, fd * 0.36, lily, ll);
+                            // Pointing along the runner, towards its far end.
+                            marks.AddRange(Geo.Turn(Geo.Union(lily), -90, cx, cy));
+                        }
+                        else Cabinets.Symbol(look, m.Theme, cx, cy, fd * 0.3, marks, ml);
+                    }
+                    // The field burnt dark round them, the lilies left light; a symbol is scored on a light field.
+                    if (ml.Count == 0) etched.AddRange(Geo.Subtract([Geo.Rect(fx0, fy0, fx1, fy1)], Geo.Offset(marks, 0.15)));
+                    else { etched.AddRange(marks); lines.AddRange(ml); }
+                }
+                break;
+            }
             case RugPattern.Hide:
                 outline = [Hide(W / 2, D / 2, W / 2, D / 2, rnd)];
                 // Fur: short strokes all over, and the spine.
@@ -295,7 +348,37 @@ public static class Rugs
                 outline = Geo.Union(Geo.Union(swords), [shield]);
                 etched.AddRange(Fronts.Outline([shield], 0.5));
                 double r = sw * 0.24;
-                if (look == FrontLook.Plank) { lines.Add(WoodFace.Dot(cx, cy, r * 0.8)); etched.Add(Geo.Circle(cx, cy, r * 0.45, 0.01)); }
+                if (m.Theme is PhotonCanvas.Addon.Terrain.TerrainThemes.Medieval or PhotonCanvas.Addon.Terrain.TerrainThemes.Gothic && sw >= 8)
+                {
+                    // Heraldic: parted down the middle, the theme's symbol on the light half and lilies left light on
+                    // the dark one, a ring of rivets inside the rim.
+                    var inner = Geo.Offset([shield], -0.9);
+                    var dark = Geo.Intersect(inner, [Geo.Rect(cx, cy - sh, cx + sw, cy + sh)]);
+                    var lilies = new PathsD();
+                    var ll = new List<PathD>();
+                    double lr = sw * 0.13;
+                    Pictures.Lily(cx + sw * 0.22, cy + sh * 0.2, lr, lilies, ll);
+                    Pictures.Lily(cx + sw * 0.2, cy - sh * 0.14, lr * 0.85, lilies, ll);
+                    etched.AddRange(Geo.Subtract(dark, Geo.Offset(Geo.Union(lilies), 0.12)));
+                    lines.Add([new(cx, cy + sh / 2 - 0.9), new(cx, cy - sh / 2 + 1.2)]);
+                    Cabinets.Symbol(look == FrontLook.Plank ? FrontLook.Gothic : look, m.Theme, cx - sw * 0.2, cy + sh * 0.08, sw * 0.14, etched, lines);
+                    var rim = Geo.Offset([shield], -0.55).FirstOrDefault();
+                    if (rim is not null)
+                    {
+                        double per = 0;
+                        for (int i = 0; i < rim.Count; i++) { var a = rim[i]; var b2 = rim[(i + 1) % rim.Count]; per += Math.Sqrt((b2.x - a.x) * (b2.x - a.x) + (b2.y - a.y) * (b2.y - a.y)); }
+                        int nr = Math.Max(8, (int)(per / 2.2));
+                        double step = per / nr, acc = 0, next = step / 2;
+                        for (int i = 0; i < rim.Count && nr > 0; i++)
+                        {
+                            var a = rim[i]; var b2 = rim[(i + 1) % rim.Count];
+                            double len = Math.Sqrt((b2.x - a.x) * (b2.x - a.x) + (b2.y - a.y) * (b2.y - a.y));
+                            while (next <= acc + len) { double t = (next - acc) / len; lines.Add(WoodFace.Dot(a.x + (b2.x - a.x) * t, a.y + (b2.y - a.y) * t, 0.2)); next += step; }
+                            acc += len;
+                        }
+                    }
+                }
+                else if (look == FrontLook.Plank) { lines.Add(WoodFace.Dot(cx, cy, r * 0.8)); etched.Add(Geo.Circle(cx, cy, r * 0.45, 0.01)); }
                 else Cabinets.Symbol(look, m.Theme, cx, cy, r, etched, lines);
                 break;
             }

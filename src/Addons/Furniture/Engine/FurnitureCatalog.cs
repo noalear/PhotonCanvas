@@ -205,7 +205,7 @@ public static class FurnitureCatalog
         b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound, WidthMm = 14 }, "Planks with iron brackets on the corners.");
         b.Add("Shipping crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Cargo, WidthMm = 16, HeightMm = 12 }, "A framed crate with its contents stencilled on the side.");
         b.Add("Chest", ItemKind.Chest, i => i with { Lid = LidStyle.Domed }, "A chest with iron bands and a domed lid.");
-        b.Add("Shelving", ItemKind.Bookshelf, i => i with { Books = false }, "Plain shelves.");
+        b.Add("Shelving", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Stores, Crown = Crown.Flat, WidthMm = 22, DepthMm = 9, HeightMm = 30, Shelves = 2 }, "Storeroom shelves stacked with sacks, little iron-cornered boxes, pots and small barrels.");
 
         b.Room = Chapel;
         b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth hanging down its front, a budded cross and two candlesticks standing on it.");
@@ -219,8 +219,8 @@ public static class FurnitureCatalog
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 18, HeightMm = 18, HangMm = 14 }, "A shield over two crossed swords.");
 
         b.Room = Throne;
-        b.Add("Throne", ItemKind.Armchair, i => i with { Seat = SeatStyle.Throne, BackTop = BackTop.Arched, WidthMm = 16, DepthMm = 14, HeightMm = 30, SeatMm = 10, ArmMm = 14 }, "A throne on a two-step dais.");
-        b.Add("Long carpet", ItemKind.Rug, i => i with { Rug = RugPattern.Border, WidthMm = 60, DepthMm = 18 }, "A runner up to the throne.");
+        b.Add("Throne", ItemKind.Armchair, i => i with { Seat = SeatStyle.Throne, BackTop = BackTop.Pointed, WidthMm = 16, DepthMm = 14, HeightMm = 34, SeatMm = 10, ArmMm = 16 }, "A throne on a two-step dais: a buttoned back under a pointed crest with a quatrefoil pierced through it, pinnacles at its corners and pointed arches pierced under the arms.");
+        b.Add("Long carpet", ItemKind.Rug, i => i with { Rug = RugPattern.Runner, WidthMm = 60, DepthMm = 18 }, "A runner up to the throne: lilies down a dark field inside a border with a vine waving along it, a fringe at each end.");
         b.Add("Royal tapestry", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Tapestry, WidthMm = 24, HeightMm = 30, HangMm = 12 }, "A large tapestry.");
         b.Add("Tall clock", ItemKind.Cabinet, i => i with { Front = CabinetFront.Clock, Crown = Crown.Pediment, Columns = 1, WidthMm = 12, DepthMm = 9, HeightMm = 42 }, "A long-case clock: a dial sunk in its hood, a real pendulum hanging behind the glazed trunk door.");
 

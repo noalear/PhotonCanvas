@@ -91,7 +91,7 @@ public static class Armchairs
         else Span(seat, sideTop);
         if (backTabs.Count == 0) { m.Bad($"The back has no room for its tabs: make the {(pew ? "ends" : "arms")} higher above the seat."); return; }
         foreach (var (yc, h) in backTabs) holes.Add(Geo.Rect(BackIn - f / 2, yc - (h + f) / 2, BackIn + T + f / 2, yc + (h + f) / 2));
-        if (carved || reading)
+        if (carved || reading || throne && look != FrontLook.Metal && m.Theme != PhotonCanvas.Addon.Terrain.TerrainThemes.Cave)
         {
             // An arcade of little pointed arches pierced through each side under the arm.
             double a0 = BackIn + T + 1.4, a1 = D - 1.2, ya = seat + 1.0, yt = arm - 1.1;
@@ -114,7 +114,17 @@ public static class Armchairs
             double endW = Geo.Clamp(D * 0.3, zb + 1.5, D * 0.5), a = zb + 0.5, b = endW - 0.6;
             if (b - a >= 2 && H - 2.6 - (arm + 0.6) > 4) etchedS.AddRange(Fronts.Outline([Fronts.PointedRect(a, arm + 0.6, b, H - 2.6)], 0.4));
         }
-        if (throne || command)
+        // A wooden throne's sides: an arcade of pointed arches pierced under the seat.
+        // (A cave chief's seat stays rough.)
+        bool regal = throne && look != FrontLook.Metal && m.Theme != PhotonCanvas.Addon.Terrain.TerrainThemes.Cave;
+        if (regal && D - 1.2 - (zb + 0.6) > 5 && yApron - 0.6 - (y0 + 1.2) >= 3.2)
+        {
+            double a0 = zb + 0.8, a1 = D - 1.4, ya = y0 + 1.2, yt = yApron - 0.8;
+            int n = Math.Max(2, (int)Math.Floor((a1 - a0 + 1.1) / 3.1));
+            double aw = (a1 - a0 - (n - 1) * 1.1) / n;
+            for (int i = 0; i < n; i++) { double u = a0 + i * (aw + 1.1); holes.Add(Fronts.PointedRect(u, ya, u + aw, yt)); }
+        }
+        else if (throne || command)
         {
             double a = zb + 0.6, b = D - 1.2;
             if (b - a > 3 && seat - T - y0 > 4) Fronts.Panel(look, a, y0 + 1.2, b, yApron - 0.6, etchedS, linesS);
@@ -132,7 +142,7 @@ public static class Armchairs
         {
             rise = it.BackTop switch { BackTop.Square => 0, BackTop.Winged => Math.Min(W * 0.35, (H - arm) * 0.4), BackTop.Pointed => Math.Min(W * 0.5, (H - arm) * 0.5), _ => Math.Min(W * 0.3, (H - arm) * 0.45) };
             back.Add(Shapes.Topped(it.BackTop, 0, sideTop - yb - 0.01, W, H - yb, rise));
-            if ((carved || reading) && rise > 2)
+            if ((carved || reading || regal) && rise > 2)
             {
                 // Pinnacles up the back's corners, each topped with a ball.
                 double pw = Math.Max(1.6, T * 0.8), ptop = H - yb - rise * 0.25;
@@ -157,12 +167,12 @@ public static class Armchairs
         var etchedB = new PathsD();
         var linesB = new List<PathD>();
         double cushionTop = H - yb - (pew ? 0 : Math.Min(3, (H - arm) * 0.3)) - 1;
-        if (reading && rise > 3.5)
+        if ((reading || regal) && rise > 3.5)
         {
             // The buttoned back stops under the crest, a quatrefoil pierced through the crest.
             cushionTop = H - yb - rise - 0.3;
             double r = Math.Min(Li * 0.1, rise * 0.16);
-            if (r > 0.6) backHoles.AddRange(Geo.Offset(Geo.Offset(Candles.Quatrefoil(W / 2, H - yb - rise * 0.5, r), 0.2, round: true), -0.2, round: true));
+            if (r > 0.6) backHoles.AddRange(Geo.Offset(Geo.Offset(Candles.Quatrefoil(W / 2, H - yb - rise * (regal ? 0.45 : 0.5), r), 0.2, round: true), -0.2, round: true));
         }
         if (soft && !command) Shapes.Tufted(T + 0.8, seat - yb + 0.5, T + Li - 0.8, cushionTop, buttons: style != SeatStyle.Sofa, etchedB, linesB);
         if (command)
@@ -189,7 +199,13 @@ public static class Armchairs
                 if (r > 1) Cabinets.Symbol(look, m.Theme, W / 2, (y0b + y1b) / 2, r, etchedB, linesB);
             }
         }
-        if (throne && H - arm > 6)
+        if (regal && rise > 3.5)
+        {
+            // The crest: a moulding following its pointed top round the pierced quatrefoil.
+            var crest = Shapes.Topped(it.BackTop == BackTop.Square ? BackTop.Pointed : it.BackTop, T + 0.6, H - yb - rise - 0.1, W - T - 0.6, H - yb - 0.9, Math.Max(0.5, rise - 1.2));
+            etchedB.AddRange(Fronts.Outline([crest], 0.4));
+        }
+        else if (throne && H - arm > 6)
         {
             // A crest on the back: a shield, a sun or a cog, high up.
             double r = Math.Min(W * 0.16, (H - arm) * 0.25);

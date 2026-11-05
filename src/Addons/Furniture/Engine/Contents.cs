@@ -13,7 +13,7 @@ public static class Contents
     public sealed record ShelfRow(PathsD Outline, PathsD Etched, List<PathD> Lines, double[] Tabs, double TabW);
 
     /// <summary>Whether <paramref name="what"/> can be cut out as a row to stand on a shelf (machines stay drawn on the back).</summary>
-    public static bool Cuttable(ShelfContents what) => what is ShelfContents.Books or ShelfContents.Bottles or ShelfContents.Jars or ShelfContents.Plates or ShelfContents.Scrolls;
+    public static bool Cuttable(ShelfContents what) => what is ShelfContents.Books or ShelfContents.Bottles or ShelfContents.Jars or ShelfContents.Plates or ShelfContents.Scrolls or ShelfContents.Stores;
 
     /// <summary>
     /// A row of books, bottles, jars, plates or scrolls cut out of the sheet, <paramref name="len"/> long and no
@@ -35,6 +35,7 @@ public static class Contents
             case ShelfContents.Jars: JarRow(len, h, rnd, shapes, etched, lines); break;
             case ShelfContents.Plates: PlateRow(len, h, rnd, shapes, etched, lines); break;
             case ShelfContents.Scrolls: ScrollRow(len, h, rnd, shapes, etched, lines); break;
+            case ShelfContents.Stores: StoreRow(len, h, rnd, shapes, etched, lines); break;
         }
         if (shapes.Count == 0) return null;
         var things = Geo.Solid(shapes);
@@ -113,6 +114,81 @@ public static class Contents
             else if (pick < 0.55 && bh > 3) lines.Add(Geo.Loop(Geo.Rect(x + w * 0.22, bh * 0.45, x + w * 0.78, bh * 0.62)));
             x += w;
             prevH = bh;
+        }
+    }
+
+    /// <summary>A storeroom's shelf: sacks tied at the neck, little iron-cornered boxes, pots with lids and small barrels.</summary>
+    static void StoreRow(double len, double h, Random rnd, PathsD shapes, PathsD etched, List<PathD> lines)
+    {
+        double x = 0.3;
+        int last = -1;
+        while (x < len - 2.4)
+        {
+            int kind = rnd.Next(4);
+            if (kind == last) kind = (kind + 1) % 4;
+            last = kind;
+            double top = Math.Min(h, h * (0.7 + rnd.NextDouble() * 0.25)), bw;
+            switch (kind)
+            {
+                case 0:
+                {
+                    // A sack: a fat bag narrowing to a tied neck with a tuft over it.
+                    bw = Geo.Clamp(top * 0.85, 2.6, 4.2);
+                    if (x + bw > len - 0.3) return;
+                    double cx = x + bw / 2, neck = top * 0.72, nw = Math.Max(1.1, bw * 0.3);
+                    var shape = Geo.Solid([[new(x + 0.1, 0), new(x + bw - 0.1, 0), new(x + bw, neck * 0.45), new(cx + nw / 2, neck), new(cx + nw / 2 + 0.35, top), new(cx - nw / 2 - 0.35, top), new(cx - nw / 2, neck), new(x, neck * 0.45)]]);
+                    shapes.AddRange(shape);
+                    lines.AddRange(shape.Select(Geo.Loop));
+                    lines.Add([new(cx - nw / 2 - 0.05, neck + 0.25), new(cx + nw / 2 + 0.05, neck + 0.25)]);
+                    lines.Add([new(cx - bw * 0.2, neck * 0.2), new(cx - bw * 0.05, neck * 0.7)]);
+                    break;
+                }
+                case 1:
+                {
+                    // A little box: planks, iron corners, a lid line.
+                    bw = Geo.Clamp(top * 0.95, 2.6, 4.4);
+                    double bh = Math.Min(top, bw * 0.8);
+                    if (x + bw > len - 0.3) return;
+                    var box = Geo.Rect(x, 0, x + bw, bh);
+                    shapes.Add(box);
+                    lines.Add(Geo.Loop(box));
+                    lines.Add([new(x, bh * 0.7), new(x + bw, bh * 0.7)]);
+                    lines.Add([new(x, bh * 0.35), new(x + bw, bh * 0.35)]);
+                    foreach (var (cx, cy) in new[] { (x, 0.0), (x + bw, 0.0), (x, bh), (x + bw, bh) })
+                        etched.Add(Geo.Intersect([Geo.Rect(cx - 0.6, cy - 0.6, cx + 0.6, cy + 0.6)], [box]).FirstOrDefault() ?? []);
+                    etched.Add(Geo.Rect(x + bw / 2 - 0.25, bh * 0.45, x + bw / 2 + 0.25, bh * 0.68));
+                    break;
+                }
+                case 2:
+                {
+                    // A pot: a round belly, a short neck and a knobbed lid.
+                    bw = Geo.Clamp(top * 0.8, 2.4, 3.8);
+                    if (x + bw > len - 0.3) return;
+                    double cx = x + bw / 2, r = bw / 2, cy = r * 0.85, mw = bw * 0.55, ph = Math.Min(top, cy + r + 1.2);
+                    var belly = Geo.Intersect([Geo.Circle(cx, cy, r, 0.01)], [Geo.Rect(x - 1, 0, x + bw + 1, cy + r + 1)]);
+                    var shape = Geo.Solid([.. belly, Geo.Rect(cx - mw / 2, cy, cx + mw / 2, ph - 0.6), Geo.Rect(cx - mw / 2 - 0.25, ph - 0.7, cx + mw / 2 + 0.25, ph - 0.3), Geo.Circle(cx, ph - 0.3, 0.5, 0.01)]);
+                    shapes.AddRange(shape);
+                    lines.AddRange(shape.Select(Geo.Loop));
+                    etched.AddRange(Fronts.Outline([Rugs.Ellipse(cx, cy, r * 0.75, r * 0.3)], 0.3));
+                    break;
+                }
+                default:
+                {
+                    // A small barrel: bulging staves and hoops.
+                    bw = Geo.Clamp(top * 0.75, 2.4, 3.6);
+                    double bh = Math.Min(top, bw * 1.25);
+                    if (x + bw > len - 0.3) return;
+                    var barrel = new PathD();
+                    for (int i = 0; i <= 10; i++) { double t = i / 10.0; barrel.Add(new(x + bw * 0.08 * (1 - Math.Sin(Math.PI * t)), bh * t)); }
+                    for (int i = 10; i >= 0; i--) { double t = i / 10.0; barrel.Add(new(x + bw - bw * 0.08 * (1 - Math.Sin(Math.PI * t)), bh * t)); }
+                    shapes.Add(barrel);
+                    lines.Add(Geo.Loop(barrel));
+                    foreach (var f in new[] { 0.2, 0.8 }) etched.Add(Geo.Rect(x + 0.1, bh * f - 0.25, x + bw - 0.1, bh * f + 0.25));
+                    for (double s = x + bw * 0.33; s < x + bw - 0.4; s += bw * 0.33) lines.Add([new(s, 0.1), new(s, bh - 0.1)]);
+                    break;
+                }
+            }
+            x += bw + 0.3 + rnd.NextDouble() * 0.4;
         }
     }
 
@@ -332,6 +408,7 @@ public static class Contents
             case ShelfContents.Plates: Plates(x0, x1, y0, y1, rnd, etched, lines); break;
             case ShelfContents.Scrolls: Scrolls(x0, x1, y0, y1, rnd, etched, lines); break;
             case ShelfContents.Tech: Tech(x0, x1, y0, y1, rnd, etched, lines); break;
+            case ShelfContents.Stores: Bottles(x0, x1, y0, y1, rnd, etched, lines, jars: true); break;
             case ShelfContents.Tools:
                 // Tools hung on pegs on the back.
                 Tools(x0 + 0.3, y0 + 0.4, x1 - 0.3, y1 - 1.0, rnd, etched, lines);
