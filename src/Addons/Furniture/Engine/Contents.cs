@@ -396,6 +396,49 @@ public static class Contents
         }
     }
 
+    /// <summary>
+    /// Weapons hung on pegs along the back, dark against the board: a war axe, a sword hanging point down, a spear,
+    /// a double-bitted axe, in turn.
+    /// </summary>
+    public static void Weapons(double x0, double y0, double x1, double y1, PathsD etched, List<PathD> lines)
+    {
+        double h = y1 - y0, slot = Math.Clamp(h * 0.3, 2.6, 4.4);
+        int n = (int)Math.Floor((x1 - x0) / slot);
+        if (n < 1 || h < 5) return;
+        double gap = (x1 - x0 - n * slot) / n;
+        for (int i = 0; i < n; i++)
+        {
+            double a = x0 + i * (slot + gap) + gap / 2, cx = a + slot / 2, top = y1 - 0.2, bot = y0 + h * 0.06;
+            lines.Add(WoodFace.Dot(cx, y1 + 0.5, 0.25));
+            switch (i % 4)
+            {
+                case 0: // a war axe: a long haft, a bearded blade on one side
+                case 3: // a double-bitted axe: a blade each side
+                {
+                    etched.Add(Geo.Rect(cx - 0.3, bot, cx + 0.3, top));
+                    double bh = Math.Min(h * 0.3, slot * 0.9), by = top - 0.5 - bh;
+                    foreach (var s in i % 4 == 0 ? new[] { 1 } : new[] { -1, 1 })
+                    {
+                        double ex = cx + s * slot * 0.46;
+                        etched.Add(new PathD { new(cx, top - 0.5), new(ex, top - 0.2), new(ex, by), new(cx, by + bh * 0.45) });
+                    }
+                    lines.Add([new(cx - 0.3, bot + h * 0.25), new(cx + 0.3, bot + h * 0.25 + 0.3)]);
+                    break;
+                }
+                case 1: // a sword hanging point down from its cross guard
+                {
+                    var sword = Rugs.Sword(top - bot, Math.Min(1.0, slot * 0.28));
+                    etched.AddRange(Geo.Move(sword, cx, bot));
+                    break;
+                }
+                default: // a spear: a shaft and a leaf-shaped head
+                    etched.Add(Geo.Rect(cx - 0.25, bot, cx + 0.25, top - h * 0.18));
+                    etched.Add(new PathD { new(cx, top), new(cx + slot * 0.2, top - h * 0.1), new(cx, top - h * 0.2), new(cx - slot * 0.2, top - h * 0.1) });
+                    break;
+            }
+        }
+    }
+
     /// <summary>Draws <paramref name="what"/> in the box between x0..x1 and y0..y1 (the shelf at y0).</summary>
     public static void Fill(ShelfContents what, double x0, double x1, double y0, double y1, Random rnd, PathsD etched, List<PathD> lines)
     {
@@ -412,6 +455,9 @@ public static class Contents
             case ShelfContents.Tools:
                 // Tools hung on pegs on the back.
                 Tools(x0 + 0.3, y0 + 0.4, x1 - 0.3, y1 - 1.0, rnd, etched, lines);
+                break;
+            case ShelfContents.Weapons:
+                Weapons(x0 + 0.3, y0 + 0.4, x1 - 0.3, y1 - 1.0, etched, lines);
                 break;
         }
     }

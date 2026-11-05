@@ -39,6 +39,7 @@ public static class Profiles
         var it = m.Item;
         if (it.Candle == CandleStyle.Candelabra) { Candles.Candelabra(m); return; }
         if (it.Candle == CandleStyle.Torch) { Brazier(m); return; }
+        if (it.Candle == CandleStyle.Reactor) { Reactor(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = Math.Max(2.4, 2 * 1.0 + 0.2), xc = W / 2, stem = 1.3;
         double footW = Math.Max(D, sw + 4);
@@ -397,6 +398,67 @@ public static class Profiles
             sl.Add([new(z, 0.3), new(z + (rnd.NextDouble() - 0.5) * 0.3, sh * (0.5 + 0.4 * rnd.NextDouble()))]);
         m.Add("Stump", stump, [], [Pose.Left(xc, 0, 0)], grainAlongU: false, face: [], lines: Geo.ClipLines(sl, stump));
         m.Note("Slide the stump onto the anvil from below, crossing it.");
+    }
+
+    /// <summary>
+    /// A reactor core: a glowing column (burnt dark) between four struts, held in rings, on a stepped base and
+    /// under a stepped cap. Two profiles crossing, slotted halfway into each other: the front one from below,
+    /// the side one from above.
+    /// </summary>
+    static void Reactor(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = Math.Max(it.DepthMm, 6), H = it.HeightMm, sw = m.SlotW;
+        if (H < 14 || W < 7) { m.Bad("Make the reactor core at least 7 mm across and 14 mm high."); return; }
+        double b1 = Geo.Clamp(H * 0.08, 1.4, 3), b2 = b1 + Geo.Clamp(H * 0.06, 1.2, 2.4), c2 = H - b1, c1 = c2 - Geo.Clamp(H * 0.06, 1.2, 2.4);
+        (PathsD Shape, PathsD Etched, List<PathD> Lines) Profile(double w)
+        {
+            double c = w / 2, strut = 1.2, inner = w * 0.86, tube = inner - 2 * strut - 1.2;
+            var s = new PathsD
+            {
+                Fronts.Chamfered(0, 0, w, b1, 0.5),
+                Fronts.Chamfered(c - inner / 2, b1 - 0.01, c + inner / 2, b2, 0.4),
+                Fronts.Chamfered(c - inner / 2, c1, c + inner / 2, c2 + 0.01, 0.4),
+                Fronts.Chamfered(c - w * 0.42, c2, c + w * 0.42, H, 0.5),
+                Geo.Rect(c - inner / 2 + 0.3, b2 - 0.01, c + inner / 2 - 0.3, c1 + 0.01),
+            };
+            var e = new PathsD();
+            var l = new List<PathD>();
+            // The struts down each side, scored.
+            foreach (var sgn in new[] { -1, 1 })
+            {
+                double x = c + sgn * (inner / 2 - 0.3 - strut);
+                l.Add([new(x, b2), new(x, c1)]);
+            }
+            // The glow: the tube burnt dark between the rings, its rings left light.
+            int rings = Math.Max(2, (int)Math.Round((c1 - b2) / 4.5));
+            double ry = (c1 - b2) / (rings + 1);
+            var glow = new PathsD { Geo.Rect(c - tube / 2 + 0.45, b2 + 0.4, c + tube / 2 - 0.45, c1 - 0.4) };
+            var bands = new PathsD();
+            for (int i = 1; i <= rings; i++)
+            {
+                double y = b2 + i * ry;
+                bands.Add(Geo.Rect(c - inner / 2, y - 0.55, c + inner / 2, y + 0.55));
+                foreach (var sgn in new[] { -1, 1 }) l.Add(WoodFace.Dot(c + sgn * (inner / 2 - 0.6), y, 0.2));
+            }
+            s.AddRange(bands);
+            e.AddRange(Geo.Subtract(glow, Geo.Offset(bands, 0.2)));
+            // Light streaks rising up the glow, vents in the base, bolts round the cap.
+            for (double x = c - tube / 2 + 1.0; x < c + tube / 2 - 0.8; x += 1.1) l.Add([new(x, b2 + 0.6), new(x, c1 - 0.6)]);
+            for (double x = 1.2; x < w - 1.4; x += 1.0) l.Add([new(x, b1 * 0.35), new(x + 0.5, b1 * 0.35)]);
+            for (double x = c - w * 0.42 + 0.8; x < c + w * 0.42 - 0.5; x += 1.6) l.Add(WoodFace.Dot(x, (c2 + H) / 2, 0.2));
+            l.Add([new(c - inner / 2, b2 - 0.4), new(c + inner / 2, b2 - 0.4)]);
+            l.Add([new(c - inner / 2, c1 + 0.4), new(c + inner / 2, c1 + 0.4)]);
+            var shape = Geo.Solid(s);
+            return (shape, Geo.Intersect(e, shape), Geo.ClipLines(l, shape));
+        }
+        var (fs, fe, fl) = Profile(W);
+        var front = Geo.Subtract(fs, [Geo.Rect(W / 2 - sw / 2, -1, W / 2 + sw / 2, H / 2)]);
+        m.Add("Reactor core", front, [], [Pose.Front(0, 0, D / 2)], grainAlongU: false, face: [], etched: fe, lines: Geo.ClipLines(fl, front));
+        var (ss, se, sl) = Profile(D);
+        var side = Geo.Subtract(ss, [Geo.Rect(D / 2 - sw / 2, H / 2, D / 2 + sw / 2, H + 1)]);
+        m.Add("Reactor core (crossing)", side, [], [Pose.Left(W / 2, 0, 0)], grainAlongU: false, face: [], etched: Geo.Subtract(se, [Geo.Rect(D / 2 - sw / 2, H / 2, D / 2 + sw / 2, H + 1)]), lines: Geo.ClipLines(sl, side));
+        m.Note("Slide the two halves of the core together, crossing.");
     }
 
     /// <summary>A flame (one tongue, or three on a wide one) standing at x, y.</summary>
@@ -953,5 +1015,41 @@ public static class Profiles
         var railP = new PathsD { Geo.Rect(0, 0, Li, rh), Geo.Rect(-T, rh / 2 - rth / 2, 0.01, rh / 2 + rth / 2), Geo.Rect(Li - 0.01, rh / 2 - rth / 2, Li + T, rh / 2 + rth / 2) };
         m.Add("Rail", railP, [], [Pose.Front(T, yr, zc)], grainAlongU: true);
         m.Note("Push the board and the rail into one post, then put the other post on.");
+        if (m.Theme is "Dungeon" or "Cave" && !m.PushFit)
+        {
+            // A chain hanging in a loop from the board's front, a shackle at each end of it and one hanging free.
+            double sag = Math.Min(yb - yr - rh - 0.8, bh * 1.1), xa = Li * 0.3, xb2 = Li * 0.7, ya = bh * 0.22;
+            var path = new PathD();
+            for (int i = 0; i <= 16; i++)
+            {
+                double t = i / 16.0;
+                path.Add(new PointD(xa + (xb2 - xa) * t, ya - sag * 4 * t * (1 - t)));
+            }
+            var chain = Clipper.InflatePaths([path], 0.6, JoinType.Round, EndType.Round, 2, 4);
+            var cl = new List<PathD>();
+            for (int i = 1; i < 16; i += 1)
+            {
+                var q0 = path[i - 1]; var q1 = path[i + 1];
+                double dx = q1.x - q0.x, dy = q1.y - q0.y, len = Math.Sqrt(dx * dx + dy * dy), nx = -dy / len * 0.55, ny = dx / len * 0.55;
+                var q = path[i];
+                if (i % 2 == 0) cl.Add([new(q.x + nx, q.y + ny), new(q.x - nx, q.y - ny)]);
+                else cl.Add([new(q.x - dx / len * 0.3, q.y - dy / len * 0.3), new(q.x + dx / len * 0.3, q.y + dy / len * 0.3)]);
+            }
+            var cuffs = new PathsD();
+            var ce = new PathsD();
+            foreach (var x in new[] { xa, xb2 })
+            {
+                cuffs.Add(WoodFace.RoundRect(x - 1.1, ya - 0.6, x + 1.1, ya + 1.3, 0.5));
+                cl.Add(WoodFace.Dot(x, ya + 0.35, 0.3));
+            }
+            // A shackle hanging from the bottom of the loop.
+            double bx = (xa + xb2) / 2, by = ya - sag;
+            cuffs.Add(new PathD { new(bx - 0.6, by + 0.1), new(bx + 0.6, by + 0.1), new(bx + 0.6, by - 1.0), new(bx - 0.6, by - 1.0) });
+            cuffs.Add(Geo.Circle(bx, by - 1.9, 1.15, 0.02));
+            ce.Add(Geo.Circle(bx, by - 1.9, 0.5, 0.02));
+            var shape = Geo.Solid([.. chain, .. cuffs]);
+            m.Add("Chain", shape, [], [Pose.Front(T, yb, zc + T)], grainAlongU: true, face: [], etched: ce, lines: Geo.ClipLines(cl, shape)).Glue();
+            m.Note("Glue the chain on the front of the board.");
+        }
     }
 }

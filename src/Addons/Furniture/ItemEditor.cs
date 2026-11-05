@@ -26,7 +26,7 @@ public sealed class ItemEditor : StackPanel
     readonly CheckBox _rail = new() { Content = "A rail low down between the legs" };
     readonly CheckBox _toolRack = new() { Content = "A tool rack along the back and a vice (a workbench)" };
     readonly NumericUpDown _legW = Number(0, 50, 0.5m, "0.#");
-    readonly ComboBox _top = Combo("Round", "Square");
+    readonly ComboBox _top = Combo("Round", "Square", "Tree stump");
     readonly NumericUpDown _seat = Number(2, 500, 0.5m, "0.#");
     readonly ComboBox _back = Combo("Solid", "Upright slats", "Ladder (rails across)");
     readonly NumericUpDown _shelves = Number(0, 30, 1, "0");
@@ -48,7 +48,7 @@ public sealed class ItemEditor : StackPanel
     readonly TextBlock _styleLabel = Label("Style");
     readonly ComboBox _style = Combo();
     readonly ComboBox _crown = Combo("Flat", "Cornice (two layers)", "Pediment", "Arch");
-    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing", "Tools on pegs", "Sacks, boxes and pots");
+    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing", "Tools on pegs", "Sacks, boxes and pots", "Weapons on pegs");
     readonly ComboBox _backTop = Combo("Square", "Rounded", "Arched", "Pointed", "Winged");
     readonly NumericUpDown _cols = Number(1, 12, 1, "0"), _rows = Number(1, 12, 1, "0"), _arm = Number(2, 500, 0.5m, "0.#"), _hang = Number(0, 500, 0.5m, "0.#");
     readonly TextBlock _colsLabel = Label("Across"), _rowsLabel = Label("Rows");
@@ -164,7 +164,7 @@ public sealed class ItemEditor : StackPanel
         _count.Value = Math.Max(1, it.Count);
         _w.Value = D(it.WidthMm); _d.Value = D(it.DepthMm); _h.Value = D(it.HeightMm);
         _legs.SelectedIndex = (int)it.Legs; _rail.IsChecked = it.Stretcher; _toolRack.IsChecked = it.ToolRack; _legW.Value = D(it.LegMm);
-        _top.SelectedIndex = it.Top == TopShape.Round ? 0 : 1;
+        _top.SelectedIndex = it.Kind == ItemKind.Stool && it.Legs == LegStyle.Slab ? 2 : it.Top == TopShape.Round ? 0 : 1;
         _seat.Value = D(it.SeatMm); _back.SelectedIndex = (int)it.Back;
         _shelves.Value = it.Shelves; _backPanel.IsChecked = it.BackPanel; _books.IsChecked = it.Books;
         _lid.ItemsSource = kind == ItemKind.Crate ? new List<string> { "Closed (glued on)", "Open top" } : new List<string> { "Lifts off (a rim under it)", "Glued on", "None (open)", "Domed, lifts off", "Thrown open" };
@@ -257,7 +257,7 @@ public sealed class ItemEditor : StackPanel
         {
             Count = _countRow.IsVisible ? (int)V(_count, 1) : it.Count,
             WidthMm = V(_w, it.WidthMm), DepthMm = V(_d, it.DepthMm), HeightMm = V(_h, it.HeightMm),
-            Legs = (LegStyle)Math.Max(0, _legs.SelectedIndex), Stretcher = _rail.IsChecked == true, ToolRack = _toolRack.IsChecked == true, LegMm = V(_legW, 0),
+            Legs = kind == ItemKind.Stool ? (_top.SelectedIndex == 2 ? LegStyle.Slab : LegStyle.Legs) : (LegStyle)Math.Max(0, _legs.SelectedIndex), Stretcher = _rail.IsChecked == true, ToolRack = _toolRack.IsChecked == true, LegMm = V(_legW, 0),
             Top = _top.SelectedIndex == 1 ? TopShape.Square : TopShape.Round,
             SeatMm = V(_seat, it.SeatMm), Back = (BackStyle)Math.Max(0, _back.SelectedIndex),
             Shelves = (int)V(_shelves, it.Shelves), BackPanel = _backPanel.IsChecked == true, Books = _books.IsChecked == true,
@@ -287,7 +287,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
         ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round", "Long runner"]),
         ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains", "Torch in a wall bracket"]),
-        ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
+        ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch", "Reactor core"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),
         ItemKind.Crate => ("Boards", Crates.StyleNames),
