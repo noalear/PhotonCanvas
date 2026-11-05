@@ -23,7 +23,8 @@ it: bunks, lockers and a glowing reactor core for a sci-fi ship, a cook fire wit
 match (metal panels for sci-fi).
 
 The ready-made **Town** pieces dress the square outside the tavern: the theme's town wall, a guard
-tower, trees, a horse trough, a players' stage, a market stall, an outdoor bar and a notice board.
+tower, trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a
+tiered fountain with water falling from its bowls, and a gallows with a noose over its trapdoor.
 
 ## Add furniture to the list
 <!-- target: button:Add -->

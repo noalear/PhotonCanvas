@@ -10,6 +10,7 @@ public enum ItemKind
     Table, Bench, Stool, Chair, Bookshelf, Chest, Crate, Bed, WallDoor, WallShelf,
     Cabinet, Desk, Armchair, Fireplace, SlantDesk, WeaponRack, Stand, Coffin, Rug, WallHanging, Candlestand, Screen, Stocks,
     TownWall, Tower, Tree, Trough, Stage, Stall,
+    Gallows, Fountain,
 }
 
 /// <summary>How a table's or bench's legs are made.</summary>
@@ -268,6 +269,8 @@ public static class Defaults
         new(ItemKind.Stage, "Stage", "A players' stage: a planked deck with steps up the front, a painted backdrop behind a proscenium, curtains tied back."),
         new(ItemKind.Stall, "Stall or notice board", "A market stall under a striped awning, an outdoor bar with barrels and a hanging sign, or a notice board under a little roof."),
         new(ItemKind.Tower, "Guard tower", "A tall tower with a fighting roof behind merlons, a door, arrow loops on every side, quoins and a flag."),
+        new(ItemKind.Gallows, "Gallows", "A gallows on a braced platform: steps up, railings, a trapdoor, two posts and a beam with knee braces, a noose on its rope (and an iron gibbet cage in the dungeon and gothic themes)."),
+        new(ItemKind.Fountain, "Fountain", "A tiered fountain: an eight-sided stone basin full of water, a carved column with two bowls, water falling from each, and a finial on top."),
     ];
 
     public static KindInfo Info(ItemKind k) => Kinds.First(x => x.Kind == k);
@@ -301,6 +304,8 @@ public static class Defaults
         ItemKind.Trough => new() { Kind = k, WidthMm = 32, DepthMm = 11, HeightMm = 9 },
         ItemKind.Stage => new() { Kind = k, WidthMm = 76.2, DepthMm = 50.8, HeightMm = 60 },
         ItemKind.Stall => new() { Kind = k, WidthMm = 36, DepthMm = 20, HeightMm = 40, Stall = StallStyle.Market },
+        ItemKind.Gallows => new() { Kind = k, WidthMm = 46, DepthMm = 38, HeightMm = 60 },
+        ItemKind.Fountain => new() { Kind = k, WidthMm = 50.8, DepthMm = 50.8, HeightMm = 46 },
         ItemKind.Armchair => new() { Kind = k, WidthMm = 14, DepthMm = 12, HeightMm = 20, SeatMm = 7.5, ArmMm = 11, Seat = SeatStyle.Armchair, BackTop = BackTop.Rounded, Columns = 1 },
         ItemKind.Cabinet => new() { Kind = k, WidthMm = 22, DepthMm = 11, HeightMm = 34, Front = CabinetFront.Doors, Crown = Crown.Cornice, Columns = 2, Shelves = 2 },
         _ => new() { Kind = k },

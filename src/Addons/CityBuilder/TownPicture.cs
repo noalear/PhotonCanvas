@@ -103,7 +103,7 @@ public static class TownPicture
         {
             // The town's bigger pieces: a guard tower's long shadow, a stage's or a stall's shorter one.
             var (fw, fd) = Prop.Footprint(p.Kind)!.Value;
-            float w = (float)(fw * p.Size), d = (float)(fd * p.Size), off = p.Kind switch { PropKind.GuardTower => 0.9f, PropKind.Stage or PropKind.Stall or PropKind.Bar => 0.3f, _ => 0.12f };
+            float w = (float)(fw * p.Size), d = (float)(fd * p.Size), off = p.Kind switch { PropKind.GuardTower => 0.9f, PropKind.Stage or PropKind.Stall or PropKind.Bar or PropKind.Fountain => 0.3f, PropKind.Gallows => 0.7f, _ => 0.12f };
             c.Save();
             c.Translate((float)p.X + off * 0.7f, (float)p.Y + off);
             c.RotateDegrees((float)p.TurnDeg);
@@ -776,6 +776,80 @@ public static class TownPicture
                 line.Color = new SKColor(0x3A, 0x36, 0x30);
                 line.StrokeWidth = 0.03f;
                 c.DrawRect(-w / 2, -w / 2, w, w, line);
+                break;
+            }
+            case PropKind.Fountain:
+            {
+                // An eight-sided basin of water, the two bowls on the column and the finial in the middle.
+                float rr = (float)p.Size;
+                using (var oct = new SKPath())
+                using (var water = new SKPath())
+                {
+                    for (int i = 0; i < 8; i++)
+                    {
+                        double a = Math.PI / 8 + i * Math.PI / 4;
+                        float ro = (float)(0.95 / Math.Cos(Math.PI / 8)) * rr, ri = (float)(0.8 / Math.Cos(Math.PI / 8)) * rr;
+                        if (i == 0) { oct.MoveTo((float)Math.Cos(a) * ro, (float)Math.Sin(a) * ro); water.MoveTo((float)Math.Cos(a) * ri, (float)Math.Sin(a) * ri); }
+                        else { oct.LineTo((float)Math.Cos(a) * ro, (float)Math.Sin(a) * ro); water.LineTo((float)Math.Cos(a) * ri, (float)Math.Sin(a) * ri); }
+                    }
+                    oct.Close();
+                    water.Close();
+                    fill.Color = new SKColor(0xA4, 0x9C, 0x90);
+                    c.DrawPath(oct, fill);
+                    fill.Color = new SKColor(0x3C, 0x6E, 0x98);
+                    c.DrawPath(water, fill);
+                    line.Color = new SKColor(0x4A, 0x46, 0x40);
+                    line.StrokeWidth = 0.025f;
+                    c.DrawPath(oct, line);
+                    c.DrawPath(water, line);
+                }
+                line.Color = new SKColor(0xFF, 0xFF, 0xFF, 0x60);
+                line.StrokeWidth = 0.015f;
+                c.DrawCircle(0, 0, 0.62f * rr, line);
+                fill.Color = new SKColor(0xB4, 0xAC, 0xA0);
+                c.DrawCircle(0, 0, 0.48f * rr, fill);
+                fill.Color = new SKColor(0x4E, 0x86, 0xB6);
+                c.DrawCircle(0, 0, 0.42f * rr, fill);
+                fill.Color = new SKColor(0xC4, 0xBC, 0xB0);
+                c.DrawCircle(0, 0, 0.27f * rr, fill);
+                fill.Color = new SKColor(0x5E, 0x96, 0xC6);
+                c.DrawCircle(0, 0, 0.21f * rr, fill);
+                fill.Color = new SKColor(0xD4, 0xCC, 0xC0);
+                c.DrawCircle(0, 0, 0.08f * rr, fill);
+                line.Color = new SKColor(0x4A, 0x46, 0x40);
+                line.StrokeWidth = 0.02f;
+                c.DrawCircle(0, 0, 0.48f * rr, line);
+                c.DrawCircle(0, 0, 0.27f * rr, line);
+                break;
+            }
+            case PropKind.Gallows:
+            {
+                // The planked platform, steps up the front, railings round it and the beam with its noose.
+                float s = (float)p.Size, w = 1.81f * s, d = 1.5f * s, pd = 1.14f * s;
+                fill.Color = new SKColor(0xA6, 0x7C, 0x50);
+                c.DrawRect(-w / 2, -d / 2, w, pd, fill);
+                line.Color = new SKColor(0x6A, 0x4A, 0x2C);
+                line.StrokeWidth = 0.015f;
+                for (float xx = -w / 2 + 0.13f * s; xx < w / 2; xx += 0.13f * s) c.DrawLine(xx, -d / 2, xx, -d / 2 + pd, line);
+                fill.Color = new SKColor(0x8A, 0x62, 0x3E);
+                c.DrawRect(-w / 2 + 0.3f * s, -d / 2 + pd, 0.47f * s, d - pd, fill);
+                c.DrawRect(-w / 2 + 0.3f * s, -d / 2 + pd, 0.47f * s, d - pd, line);
+                line.Color = new SKColor(0x4A, 0x32, 0x1E);
+                line.StrokeWidth = 0.035f;
+                float m = 0.25f * s;
+                c.DrawLine(-w / 2 + m, -d / 2 + m * 0.6f, w / 2 - m, -d / 2 + m * 0.6f, line);
+                c.DrawLine(-w / 2 + m, -d / 2 + m * 0.6f, -w / 2 + m, -d / 2 + pd - m * 0.6f, line);
+                c.DrawLine(w / 2 - m, -d / 2 + m * 0.6f, w / 2 - m, -d / 2 + pd - m * 0.6f, line);
+                fill.Color = new SKColor(0x5A, 0x3E, 0x26);
+                float by = -d / 2 + pd * 0.45f;
+                c.DrawRect(-w * 0.32f, by - 0.06f * s, w * 0.64f, 0.12f * s, fill);
+                c.DrawRect(-w * 0.34f, by - 0.08f * s, 0.14f * s, 0.16f * s, fill);
+                c.DrawRect(w * 0.34f - 0.14f * s, by - 0.08f * s, 0.14f * s, 0.16f * s, fill);
+                line.Color = new SKColor(0xD8, 0xC0, 0x8A);
+                line.StrokeWidth = 0.02f;
+                c.DrawCircle(-w * 0.06f, by + 0.1f * s, 0.07f * s, line);
+                line.Color = new SKColor(0x3A, 0x2A, 0x1C);
+                c.DrawRect(-w / 2, -d / 2, w, pd, line);
                 break;
             }
             case PropKind.Statue:

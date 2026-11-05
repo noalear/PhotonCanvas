@@ -442,6 +442,37 @@ public static class CityScene
                 Slab(Box(0.8 * k, 0.05 * k), 0.4 * k, 0.85 * k, Color.FromRgb(0xE8, 0xDC, 0xC4));
                 Slab(Box(0.94 * k, 0.39 * k), 0.95 * k, 1.0 * k, Color.FromRgb(0x7A, 0x52, 0x32));
                 break;
+            case PropKind.Fountain:
+            {
+                var stone = Color.FromRgb(0xA4, 0x9C, 0x90);
+                Slab(Ring(1.0 * k, 8), 0, 0.08 * k, stone);
+                var basin = Ring(0.92 * k, 8);
+                basin.AddRange(Ring(0.8 * k, 8).Select(r => { var q = new PathD(r); q.Reverse(); return q; }));
+                Slab(basin, 0.08 * k, 0.36 * k, stone);
+                Slab(Ring(0.8 * k, 8), 0.08 * k, 0.26 * k, Color.FromRgb(0x4E, 0x86, 0xB6));
+                Slab(Ring(0.1 * k, 8), 0.26 * k, 0.9 * k, stone);
+                Slab(Ring(0.48 * k, 16), 0.82 * k, 0.9 * k, stone);
+                Slab(Ring(0.42 * k, 16), 0.9 * k, 0.92 * k, Color.FromRgb(0x4E, 0x86, 0xB6));
+                Slab(Ring(0.08 * k, 8), 0.92 * k, 1.3 * k, stone);
+                Slab(Ring(0.27 * k, 16), 1.22 * k, 1.3 * k, stone);
+                Slab(Ring(0.21 * k, 16), 1.3 * k, 1.32 * k, Color.FromRgb(0x5E, 0x96, 0xC6));
+                Slab(Ring(0.06 * k, 8), 1.32 * k, 1.8 * k, Color.FromRgb(0xC4, 0xBC, 0xB0));
+                break;
+            }
+            case PropKind.Gallows:
+            {
+                var wood = Color.FromRgb(0x9A, 0x70, 0x48);
+                Slab(BoxAt(0, 0.18 * k, 1.81 * k, 1.14 * k), 0, 0.52 * k, wood);
+                Slab(BoxAt(-0.43 * k, -0.57 * k, 0.47 * k, 0.36 * k), 0, 0.26 * k, Color.FromRgb(0x8A, 0x62, 0x3E));
+                foreach (double side in new[] { -1.0, 1.0 })
+                {
+                    Slab(BoxAt(side * 0.55 * k, 0.2 * k, 0.11 * k, 0.08 * k), 0.52 * k, 2.36 * k, trunk);
+                    Slab(BoxAt(side * 0.8 * k, 0.18 * k, 0.05 * k, 1.0 * k), 0.52 * k, 0.84 * k, trunk);
+                }
+                Slab(BoxAt(0, 0.2 * k, 1.3 * k, 0.11 * k), 2.25 * k, 2.36 * k, trunk);
+                Slab(BoxAt(-0.08 * k, 0.2 * k, 0.03 * k, 0.03 * k), 1.45 * k, 2.25 * k, Color.FromRgb(0xD8, 0xC0, 0x8A));
+                break;
+            }
             case PropKind.GuardTower:
                 Slab(Box(1.81 * k, 1.81 * k), 0, 3.4 * k, Color.FromRgb(0xA4, 0x9C, 0x90));
                 Slab(Frame(1.81 * k, 1.81 * k, 0.18 * k), 3.4 * k, 3.65 * k, Color.FromRgb(0xB4, 0xAC, 0xA0));

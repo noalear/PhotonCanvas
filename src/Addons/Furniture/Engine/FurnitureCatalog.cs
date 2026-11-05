@@ -236,6 +236,8 @@ public static class FurnitureCatalog
             "A market stall under a striped awning, crates of produce on the counter.",
             "An outdoor tavern bar: barrels along the front, a shelf below the counter and a hanging tankard sign.",
             "The town notice board under its little shingled roof, notices pinned up.");
+        b.Add("Gallows", ItemKind.Gallows, i => i, "A town gallows on a braced platform: steps up the front, railings, a trapdoor under the drop and a noose hanging from the beam.", "gallows");
+        b.Add("Market fountain", ItemKind.Fountain, i => i, "An eight-sided stone basin full of water, a carved column with two bowls, water falling from spouts under each, and a pine-cone finial.", "fountain");
         TownWalls(b, "Town wall", "stone town wall with a wall walk, merlons with cross loops and a corbelled course");
         return b.Entries;
     }
@@ -308,6 +310,8 @@ public static class FurnitureCatalog
             "A black-market stall with a ragged awning and crates of dubious goods.",
             "A rough drinking bar of barrels and planks with a hanging sign.",
             "A board of bounties and wanted notices under a little roof.");
+        b.Add("Gallows", ItemKind.Gallows, i => i, "A gallows for the dungeon yard: a braced platform, railings and a trapdoor, a noose and an iron gibbet cage hanging from the beam on a chain.", "gallows");
+        b.Add("Dungeon fountain", ItemKind.Fountain, i => i, "A grim stone fountain: a basin of worn blocks with carved panels, two bowls on a column and water falling from each.", "fountain");
         TownWalls(b, "Fortress wall", "grim fortress wall of great worn blocks, its merlons knocked about");
         return b.Entries;
     }
@@ -356,6 +360,8 @@ public static class FurnitureCatalog
             "A trader's stall under a hide awning, crates on the counter.",
             "A plank-and-barrel bar with a hanging tankard sign.",
             "A notice board for the cave settlement under a little plank roof.");
+        b.Add("Gallows", ItemKind.Gallows, i => i, "A rough plank gallows on braced legs, steps up the front, a noose hanging from the beam.", "gallows");
+        b.Add("Spring basin", ItemKind.Fountain, i => i, "A spring bubbling up through a column of stacked stones into two bowls and a rough stone basin.", "fountain");
         TownWalls(b, "Palisade", "log palisade, every log sharpened, with a plank walk behind and lashed rails");
         return b.Entries;
     }
@@ -425,6 +431,7 @@ public static class FurnitureCatalog
             "A street vendor's stall under a panelled canopy, crates of goods on the counter.",
             "A street bar under a plated canopy with a hanging sign.",
             "A bulletin board on legs under a little canopy.");
+        b.Add("Water purifier", ItemKind.Fountain, i => i, "A plated purifier tank with a column of two bowls, water falling from spouts under each, and an antenna on top.", "fountain");
         TownWalls(b, "Defence wall", "armoured defence wall with gun ports, a hazard-striped band and a skirt of plate");
         return b.Entries;
     }
@@ -480,6 +487,8 @@ public static class FurnitureCatalog
             "A bazaar stall under a striped awning, crates of goods on the counter.",
             "A street drinks bar under an awning with a hanging sign.",
             "A notice board for the caravan town under a little roof.");
+        b.Add("Gallows", ItemKind.Gallows, i => i, "A sandstone-town gallows on a braced platform, steps up the front, a noose hanging from the beam.", "gallows");
+        b.Add("Courtyard fountain", ItemKind.Fountain, i => i, "A sandstone fountain with a basin of carved panels, two bowls on a column and an onion-dome finial.", "fountain");
         TownWalls(b, "Sandstone wall", "sandstone wall with stepped merlons, keyhole loops and beam ends under the walk");
         return b.Entries;
     }
@@ -547,6 +556,8 @@ public static class FurnitureCatalog
             "A market stall under a striped awning, crates on the counter.",
             "An outdoor bar with barrels along the front and a hanging sign.",
             "A parish notice board under its little roof.");
+        b.Add("Gallows", ItemKind.Gallows, i => i, "A gothic gallows: a braced platform, railings, a trapdoor, a noose and an iron gibbet cage hanging on a chain.", "gallows");
+        b.Add("Square fountain", ItemKind.Fountain, i => i, "A carved stone fountain: an eight-sided basin with sunk panels, two bowls on a column, water falling from each, and a spire on top.", "fountain");
         TownWalls(b, "City wall", "cut-stone city wall with gabled merlons, pointed loops and a corbel table of little arches");
         return b.Entries;
     }

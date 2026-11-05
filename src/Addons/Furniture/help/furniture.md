@@ -73,7 +73,7 @@ settings), so a sci-fi console can stand among medieval furniture.
 | Throne room & bridge | Thrones on a dais, captain's chairs, helm consoles, star maps, long carpets |
 | Prison & crypt | Stocks, cell bunks, coffins, sarcophagi |
 | Lab & infirmary | Sleeper pods, potion cabinets, apothecary drawers, lab consoles |
-| Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar and a notice board, for the city builder |
+| Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a tiered fountain and a gallows (not sci-fi), for the city builder |
 
 They're sized for 28 mm figures on 2 mm sheet, and scale with **Figures** like everything else.
 
@@ -119,6 +119,8 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Trough** | A horse trough on a plinth: water inside, a rim round the top and a pump at one end (a feed pipe and pump head for sci-fi). Wooden ones get iron bands. | 32 long, 11 wide, 9 high |
 | **Stage** | A players' stage: a planked deck on skirts with panels on the front, steps up the middle, a painted backdrop (a star map for sci-fi), a proscenium with a crest and pennants, curtains tied back. | 76.2 × 50.8, 60 high |
 | **Stall or notice board** | **Kind**: *Market stall* (crates of produce on the counter under a striped awning with a scalloped valance), *Outdoor bar* (barrel ends on the front, a boarded roof and a sign with a tankard on a bracket) or *Notice board* (notices pinned on a board on two legs under a little roof). | 36 × 20, 40 high |
+| **Gallows** | A gallows on a braced platform: steps up the front, railings, a trapdoor, two posts and a beam with knee braces, and a noose on its rope; dungeon and gothic ones also hang an iron gibbet cage on a chain. See [Town props](#town-props). | 46 × 38, 60 high |
+| **Fountain** | A tiered fountain: an eight-sided basin of water on a plinth, a column with two bowls, water falling from spouts under each, and a finial (a pine cone, a spire, an onion dome in the desert, a stone in a cave, an antenna for sci-fi). It's as wide as the smaller of **Width** and **Depth**. See [Town props](#town-props). | 50.8 × 50.8, 46 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
@@ -215,8 +217,26 @@ rafter. The counter and the low shelf push through both frames, the front tabs u
 the awning presses onto the rafters' tabs. The valance, produce crates and barrel ends are glued on. A
 **notice board** stands on two crossed feet, with its roof boards glued over the gable.
 
+The **gallows** platform sits on skirts built like a real one: legs, a sill along the ground and a
+diagonal brace in each bay, boarded behind the steps, with joists under the planks. The steps are treads
+on risers like the stage's, coming up at the front left. Railings stand in slots round the sides and the
+back and along the front past the steps. The frame is one piece standing in two slots: two posts, a
+beam with chamfered ends, knee braces, and the rope and noose (with the coils of its knot) hanging in the
+middle, over a trapdoor etched on the platform in two leaves with strap hinges. In the dungeon and
+gothic themes the noose moves over and an iron gibbet cage hangs beside it on a chain, its bars cut
+through.
+
+A **fountain**'s basin is eight carved sides, each with a sunk panel (every other one with the theme's
+symbol), tabbed down into the plinth and up into the coping; the water is a floor inside it with tabs
+through four of the sides. The column is three stages, each two profiles halved together like a tree,
+turned 45° from the stage under it so their slots never meet: the lower stage stands in the plinth
+through the water and holds up the lower bowl, the upper stage stands on that bowl and holds up the
+upper bowl, and the finial stands on top. A spout under each bowl's rim drops a stream of water whose
+tab goes into the water (or the bowl) below. It needs to be about 46 mm across or more for the bowls
+to fit round the joints.
+
 With a push fit, the glued-on pieces (the trough rim, proscenium, curtains, valance, crates, barrel ends,
-notices and roof boards) are left off.
+notices, roof boards and the fountain's bowl lips) are left off.
 
 ### Folding screens
 

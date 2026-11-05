@@ -132,6 +132,36 @@ public class CityBuilderTownPiecesTests
         Assert.True(FurnitureKit.Make(TownPieces.TownPropSet(m)!).Ok);
     }
 
+    [Theory]
+    [InlineData("Medieval", false)]
+    [InlineData("Dungeon", true)]
+    public void A_made_towns_square_has_a_fountain_in_the_middle_and_a_grim_town_a_gallows(string theme, bool gallows)
+    {
+        var (m, _) = TownMaker.Make(new TownOptions { Across = 64, Down = 48, Layout = TownLayout.Crossroads, Seed = 3, Theme = theme });
+        var fountain = Assert.Single(m.Props, p => p.Kind == PropKind.Fountain);
+        // Two squares by two on the grid, all of it on the paving; the well's moved off to the side.
+        Assert.Equal((Math.Round(fountain.X), Math.Round(fountain.Y)), (fountain.X, fountain.Y));
+        for (double x = fountain.X - 0.95; x < fountain.X + 1; x += 0.3)
+            for (double y = fountain.Y - 0.95; y < fountain.Y + 1; y += 0.3)
+                Assert.Equal(Ground.Paving, m.GroundAt((int)Math.Floor(x), (int)Math.Floor(y)));
+        Assert.Contains(m.Props, p => p.Kind == PropKind.Well);
+        Assert.Equal(gallows, m.Props.Any(p => p.Kind == PropKind.Gallows));
+        // Cut from the furniture maker's pieces for the theme.
+        var set = TownPieces.TownPropSet(m)!;
+        Assert.Contains(set.Items, i => i.Kind == ItemKind.Fountain);
+        Assert.Equal(gallows, set.Items.Any(i => i.Kind == ItemKind.Gallows));
+        Assert.True(FurnitureKit.Make(set).Ok);
+    }
+
+    [Fact]
+    public void A_sci_fi_maps_gallows_is_the_medieval_one()
+    {
+        var m = CityMap.Empty(8, 8) with { Theme = "Sci-fi", Props = [new Prop { Kind = PropKind.Gallows, X = 3, Y = 3 }, new Prop { Kind = PropKind.Fountain, X = 6, Y = 6 }] };
+        var set = TownPieces.TownPropSet(m)!;
+        Assert.Equal([ItemKind.Fountain, ItemKind.Gallows], set.Items.Select(i => i.Kind));
+        Assert.Equal("Medieval", set.Items[1].Theme);
+    }
+
     [Fact]
     public void The_town_pieces_are_picked_by_their_footprint()
     {

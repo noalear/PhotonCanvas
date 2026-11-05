@@ -83,7 +83,7 @@ nested onto the bed, a page per bed.
 On the **Cut** tab, press **Put the ground in the design** for the ground as tiles that lock together,
 each square etched with its ground, **Put the bridges in the design** for a bridge wherever a road
 crosses water, **Put the town walls in the design** for the wall with its gatehouses and guard towers,
-**Put the trees in the design**, and **Put the scenery in the design** for the wells, carts, stalls,
+**Put the trees in the design**, and **Put the scenery in the design** for the wells, carts, stalls, fountains,
 stages and fences.
 
 ## Save it as a picture
