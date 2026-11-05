@@ -136,16 +136,28 @@ As of October 2026 (check again when you get there):
   - Does the app collect or share user data? **No.** (The computer's address and access code are
     stored on the phone only and sent only to the user's own computer; nothing goes to the developer
     or third parties.)
-  - Is data encrypted in transit? Not on the home network (plain HTTP to the user's own computer);
-    over Tailscale, yes. Since nothing is collected, Play doesn't ask.
+  - Is data encrypted in transit? Yes when the server has its certificate (it makes one on its first
+    start): HTTPS, pinned to that certificate. With a server without one, plain HTTP on the home
+    network; over Tailscale, Tailscale encrypts it either way. Since nothing is collected, Play
+    doesn't ask.
   - Can users delete their data? It's only on the phone: **⋯ → Change computer** forgets it, and
     uninstalling removes it.
-- **Permissions:** Internet and vibrate only. QR scanning uses Google's code scanner, which needs no
-  camera permission.
+- **Permissions:** Internet, vibrate, notifications, and a foreground service. QR scanning uses
+  Google Play services' code scanner, which needs no camera permission. It is a Google component
+  that works under Google's terms and may communicate with Google (the privacy policy says so).
+- **Foreground service declaration** (Play Console → App content → Foreground service permissions):
+  type *connected device*. What to write: "While a laser job runs on the user's machine (an xTool F2
+  Ultra controlled by PhotonCanvas on their computer, over the network), the app keeps a connection to
+  it so the user sees the job's progress, can pause it from the notification, and is alerted at once
+  when the machine reports a possible flame or the job ends. The user chooses this in Settings and can
+  turn it off; it stops by itself after the job." Play asks for a short video: record the ongoing
+  notification during a demo job (the demo machine doesn't start the watcher, so record a real job,
+  or a demo of the notification). `CHANGE_NETWORK_STATE` is declared because Android requires one
+  network permission for connected-device services.
 
 ## What's next for the app
 
-- Notifications while the app is in the background (a job finished, an alarm): needs a foreground
-  service (Play asks for a declaration and a video for those).
-- HTTPS between phone and server, with the certificate's fingerprint in the QR code.
 - More than one saved computer.
+- Reaching the computer from anywhere without Tailscale would need a relay on the internet (a server
+  both sides connect out to). Possible, but it costs money to run, and puts a path to the laser on the
+  internet; Tailscale gives the same without either.
