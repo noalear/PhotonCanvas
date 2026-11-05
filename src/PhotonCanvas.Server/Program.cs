@@ -15,7 +15,22 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = ar
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 // --local: this computer only (for trying it out); otherwise every network (the phone needs that).
 bool localOnly = args.Contains("--local");
-builder.WebHost.UseUrls(localOnly ? $"http://localhost:{config.Port}" : $"http://*:{config.Port}");
+// Plain HTTP for the phone page and the app download; HTTPS with the server's own certificate for the app.
+TlsState? tls = null;
+System.Security.Cryptography.X509Certificates.X509Certificate2? certificate = null;
+try { (certificate, tls) = TlsCertificate.LoadOrCreate(config.HttpsPort); }
+catch (Exception e) when (e is System.Security.Cryptography.CryptographicException or IOException or UnauthorizedAccessException)
+{
+    ServerLog.Write("tls", $"No encrypted connection this time: {e.Message}");
+}
+builder.WebHost.ConfigureKestrel(k =>
+{
+    if (localOnly) k.ListenLocalhost(config.Port);
+    else k.ListenAnyIP(config.Port);
+    if (certificate is null) return;
+    if (localOnly) k.ListenLocalhost(config.HttpsPort, l => l.UseHttps(certificate));
+    else k.ListenAnyIP(config.HttpsPort, l => l.UseHttps(certificate));
+});
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<Broadcaster>();
 builder.Services.AddSingleton(_ => new JobLog());
@@ -51,6 +66,9 @@ app.Use(async (ctx, next) =>
 app.MapGet("/", () => Api.Embedded("index.html", "text/html; charset=utf-8"));
 app.MapGet("/manifest.webmanifest", () => Api.Embedded("manifest.webmanifest", "application/manifest+json"));
 app.MapGet("/icon.svg", () => Api.Embedded("icon.svg", "image/svg+xml"));
+// Where the encrypted connection is and its certificate's fingerprint (no access code: a phone that was given
+// only the address asks this once, then talks HTTPS to that certificate alone).
+app.MapGet(Routes.Tls, () => tls is null ? Results.NotFound() : Results.Json(new TlsInfo(tls.Port, tls.Fingerprint)));
 // The Android app, for phones to install before it's in the Play store (no access code: it's only the app).
 app.MapGet(RemoteConfig.AndroidAppPath, () => RemoteConfig.FindAndroidApp() is { } apk
     ? Results.File(apk, "application/vnd.android.package-archive", "PhotonCanvasRemote.apk")
@@ -59,7 +77,8 @@ app.MapGet(RemoteConfig.AndroidAppPath, () => RemoteConfig.FindAndroidApp() is {
 // ---- status ----------------------------------------------------------------------------------
 app.MapGet("/api/info", (MachineLink m) => new ServerInfo(AppIdentity.ProductName, typeof(Api).Assembly.GetName().Version?.ToString(3), m.Status().Name,
     "The machine blanks its cameras while a job runs: pictures come out black until it ends.",
-    AndroidApp: RemoteConfig.FindAndroidApp() is null ? null : RemoteConfig.AndroidAppPath));
+    AndroidApp: RemoteConfig.FindAndroidApp() is null ? null : RemoteConfig.AndroidAppPath,
+    Addresses: [.. RemoteConfig.Addresses().Select(a => a.Address)]));
 app.MapGet("/api/status", (MachineLink m) => m.Status());
 app.MapGet("/api/events", Api.Events);
 
@@ -114,7 +133,9 @@ foreach (var action in new[] { "pause", "resume", "stop" })
 app.MapGet("/api/history", (int? max, JobLog log) => log.Newest(Math.Clamp(max ?? 50, 1, 300)).Select(r => new HistoryItem(
     r.Id, r.Design, r.Source, MachineLink.SourceText(r.Source), r.LoadedAt, r.StartedAt, r.EndedAt, r.Finished, r.StartedFromPhone, r.EstimateS, r.TookS,
     r.HasBefore ? $"/api/history/{r.Id}/before.jpg" : null,
-    r.HasAfter ? $"/api/history/{r.Id}/after.jpg" : null)).ToList());
+    r.HasAfter ? $"/api/history/{r.Id}/after.jpg" : null,
+    // Jobs loaded from the phone can be run again while their design is still there.
+    log.Sent(r.TaskId) is { } s && File.Exists(s.Path) ? Projects.IdOf(Path.GetFullPath(s.Path)) : null)).ToList());
 app.MapGet("/api/history/{id}/{name}", (string id, string name, int? width, JobLog log) =>
     log.ReadPicture(id, name) is { } jpg
         ? Results.Bytes(width is { } w ? PictureStore.Scaled(jpg, w) : jpg, "image/jpeg")
@@ -125,6 +146,7 @@ Console.WriteLine($"{AppIdentity.ProductName} remote server on port {config.Port
 foreach (var (address, tailscale) in localOnly ? [("localhost", false)] : RemoteConfig.Addresses())
     Console.WriteLine($"  http://{address}:{config.Port}{(tailscale ? "   (Tailscale: works away from home)" : "")}");
 Console.WriteLine($"Access code: {config.AccessCode}");
+if (tls is not null) Console.WriteLine($"Encrypted connection for the Android app on port {tls.Port} (certificate {tls.Fingerprint[..12]}…).");
 ServerLog.Write("server", $"Started on port {config.Port} (data in {AppIdentity.DataDir}).");
 try
 {
@@ -175,7 +197,9 @@ static class Api
         var text = JobChecks.Text(b.Review);
         if (loaded is not null) text += $"ⓘ {loaded}\n";
         if (b.PhoneNote is { } note) text += $"ⓘ {note}\n";
-        text += "\nAfter loading, the machine waits. Nothing moves or fires until you start it: from the phone (after a look at the bed) or with its button.";
+        text += PhoneStart.IsAllowed()
+            ? "\nAfter loading, the machine waits. Nothing moves or fires until you start it: from the phone (after a look at the bed) or with its button."
+            : "\nAfter loading, the machine waits. Nothing moves or fires until you press its button (starting from the phone is turned off on the computer).";
         return new CheckResult(b.Project.Id, b.Design, b.Job.EstimateS, TimeText.Duration(b.Job.EstimateS),
             Math.Round(b.Job.Bounds.Width, 1), Math.Round(b.Job.Bounds.Height, 1), b.Review.Refusal, b.Review.NotInJob,
             [.. b.Review.Lines.Where(l => l.Length > 0)], b.Review.Warnings, loaded, b.PhoneNote, text, Routes.Preview(b.Project.Id));

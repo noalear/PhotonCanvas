@@ -45,7 +45,7 @@ public sealed class DemoRemote : IRemote
         _images["demo:history/1/before"] = before;
         _images["demo:history/1/after"] = after;
         _history.Add(new HistoryItem("1", past.Item.Name, "computer", "sent from the desktop app", now.AddHours(-1).AddMinutes(-1), now.AddHours(-1), now.AddHours(-1).AddSeconds(past.EstimateS * 1.6),
-            true, false, past.EstimateS, past.EstimateS * 1.6, "demo:history/1/before", "demo:history/1/after"));
+            true, false, past.EstimateS, past.EstimateS * 1.6, "demo:history/1/before", "demo:history/1/after", past.Item.Id));
     }
 
     public string Name => "Demo machine";
@@ -223,7 +223,7 @@ public sealed class DemoRemote : IRemote
         _images[$"demo:history/{id}/before"] = Bed(null, 0);
         _images[$"demo:history/{id}/after"] = Bed(d, finished ? 1 : _elapsed / d.EstimateS);
         _history.Add(new HistoryItem(id, d.Item.Name, "phone", "loaded from the phone", _loadedAt, _startedAt ?? DateTimeOffset.Now, DateTimeOffset.Now,
-            finished, _fromPhone, d.EstimateS, _elapsed, $"demo:history/{id}/before", $"demo:history/{id}/after"));
+            finished, _fromPhone, d.EstimateS, _elapsed, $"demo:history/{id}/before", $"demo:history/{id}/after", d.Item.Id));
         _mode = finished ? "P_WORK_DONE" : "P_IDLE";
         Publish(new JobChanged(new JobEvent(finished ? "finished" : "stopped", id, d.Item.Name, "phone", _fromPhone, _elapsed,
             finished ? $"\"{d.Item.Name}\" finished in {_elapsed:0} s." : $"\"{d.Item.Name}\" stopped after {_elapsed:0} s.")));

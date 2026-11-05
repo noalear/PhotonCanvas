@@ -14,12 +14,21 @@ are only ever sent to the computer you connected it to. **⋯ → Change compute
 does uninstalling the app.
 
 **What it sends to your computer:** the requests you make (status, pictures, designs, starting and
-stopping jobs) and the access code with each one. Pictures from the laser's cameras and your designs
-come from your computer to the app and are not stored after you leave the screen.
+stopping jobs) and the access code with each one. When your computer's server has its certificate
+(it makes one the first time it starts), the app connects over HTTPS, encrypted and pinned to that
+certificate alone. With a server that has no certificate, the app falls back to plain, unencrypted
+HTTP on your home network; over Tailscale the connection is encrypted by Tailscale either way.
+Pictures from the laser's cameras and your designs come from your computer to the app and are not
+stored after you leave the screen.
 
-**The camera:** scanning the QR code uses Google Play services' code scanner. The camera picture is
-handled on your phone by Google Play services; the app only receives the text of the code, and does
-not have permission to use the camera itself.
+**Notifications:** if you allow them, the app keeps a connection to your computer while a job runs
+(or always, if you choose) and shows the job's progress, its end and the machine's alarms as
+notifications on your phone. That connection is only between your phone and your computer.
+
+**The camera:** scanning the QR code uses Google Play services' code scanner. It is a Google
+component: it runs inside Google Play services on your phone, under Google's own terms and privacy
+policy, and may communicate with Google. The app only receives the text of the code, and does not
+have permission to use the camera itself.
 
 **Children:** the app is for adults operating a laser; it is not directed at children.
 

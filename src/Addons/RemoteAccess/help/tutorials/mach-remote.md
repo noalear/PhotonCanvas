@@ -27,7 +27,14 @@ connected. Add it to the home screen to open it like an app.
 The phone lists your recent designs. Click **Add folder…** to add a folder whose designs it should
 list too.
 
+## Decide whether the phone may start jobs
+<!-- target: button:Allow starting jobs from the phone -->
+Starting jobs from the phone is off at first: the phone can load a job and you press the machine's
+button. To start from the phone too, tick **Allow starting jobs from the phone** and read the warning
+before you accept it.
+
 ## Start a job from the phone
 <!-- target: window:Remote access -->
 On the phone, tap a design under **Designs**, check it, and tap **Load onto machine**. Look at the
-picture of the bed it takes, then tap **Start job**. The laser fires, so look properly first.
+picture of the bed it takes. Then press the machine's button, or, if you allowed it, tap **Start
+job**. The laser fires, so look properly first.
