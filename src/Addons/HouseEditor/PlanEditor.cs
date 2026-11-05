@@ -9,7 +9,7 @@ using PhotonCanvas.Addon.Furniture;
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>What dragging on the plan does.</summary>
-public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof, Furnish, Stairs }
+public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof, Furnish, Stairs, Place }
 
 /// <summary>
 /// The floor plan, seen from above on a grid of squares: draw walls along the grid lines (or corner to
@@ -102,6 +102,47 @@ public sealed class PlanEditor : Control
     public event Action<HouseDesign, string>? Changed;
     /// <summary>A different door or window was picked (or none).</summary>
     public event Action? SelectionChanged;
+
+    /// <summary>Escape pressed while putting in a saved building.</summary>
+    public event Action? PlacingStopped;
+
+    // A saved building to put in with Place: as saved (its top-left at 0, 0), and turned.
+    HouseDesign? _stampBase, _stamp;
+    int _stampTurn;
+
+    /// <summary>What a click with <see cref="PlanTool.Place"/> puts in (a saved building), and its name to show; null for nothing.</summary>
+    public void SetStamp(HouseDesign? design, string? name = null)
+    {
+        _stampBase = design?.AtOrigin();
+        _stampTurn = 0;
+        _stamp = _stampBase;
+        StampName = name;
+        InvalidateVisual();
+    }
+
+    public string? StampName { get; private set; }
+
+    /// <summary>The saved building being put in, as turned.</summary>
+    public HouseDesign? Stamp => _stamp;
+
+    /// <summary>Turns the saved building being put in a quarter turn (1 anticlockwise, −1 clockwise, seen from above).</summary>
+    public void TurnStamp(int by)
+    {
+        if (_stampBase is null) return;
+        _stampTurn = ((_stampTurn + by) % 4 + 4) % 4;
+        _stamp = _stampBase.Turned(_stampTurn);
+        SelectionChanged?.Invoke();
+        InvalidateVisual();
+    }
+
+    /// <summary>Where the saved building would go with the pointer at <paramref name="p"/>: how far it's moved (squares), its middle on the pointer, kept on the grid.</summary>
+    (int Dx, int Dy) StampAt(HouseDesign stamp, Point p)
+    {
+        var (_, _, w, h) = stamp.GridBounds();
+        var (x, y) = ToPlan(p);
+        int dx = (int)Math.Round(x - w / 2.0), dy = (int)Math.Round(y - h / 2.0);
+        return (Math.Clamp(dx, 0, Math.Max(0, GridSize - w)), Math.Clamp(dy, 0, Math.Max(0, GridSize - h)));
+    }
 
     public PlanEditor()
     {
@@ -377,6 +418,15 @@ public sealed class PlanEditor : Control
                 Commit(Floor with { WaysUp = [.. Floor.WaysUp, new PlacedWay { X = x, Y = y, Turn = turn, Kind = WayToPlace }] }, "Put in a way up");
                 SelectWay(Floor.WaysUp.Count - 1);
                 StartDrag(pt.Position, -1, Floor.WaysUp.Count - 1);
+                break;
+            }
+            case PlanTool.Place:
+            {
+                if (_stamp is not { } stamp) break;
+                var (dx, dy) = StampAt(stamp, pt.Position);
+                var placed = _design.With(stamp, dx, dy, _level);
+                Changed?.Invoke(placed, "Put in a saved building");
+                Show(placed, _level);
                 break;
             }
             case PlanTool.Floor:
@@ -746,9 +796,19 @@ public sealed class PlanEditor : Control
             Commit(Floor with { WaysUp = [.. Floor.WaysUp.Where((_, j) => j != i)] }, "Take away a way up");
             e.Handled = true;
         }
-        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && (SelectedItem >= 0 || SelectedWay >= 0))
+        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && Tool != PlanTool.Place && (SelectedItem >= 0 || SelectedWay >= 0))
         {
             TurnPicked(e.Key is Key.OemOpenBrackets or Key.OemComma ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && Tool == PlanTool.Place && _stamp is not null)
+        {
+            TurnStamp(e.Key is Key.OemOpenBrackets or Key.OemComma ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && Tool == PlanTool.Place)
+        {
+            PlacingStopped?.Invoke();
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
@@ -952,6 +1012,7 @@ public sealed class PlanEditor : Control
                 var ghost = Tool == PlanTool.Door ? Opening.NewDoor(s, at.X, at.Y) : Tool == PlanTool.Doorway ? Opening.NewDoorway(s, at.X, at.Y) : Opening.NewWindow(s, at.X, at.Y);
                 DrawOpening(ctx, ghost, false, wallPx, 0x80);
             }
+            else if (Tool == PlanTool.Place && _stamp is { } stamp) DrawStamp(ctx, stamp, wallPx);
         }
 
         if (Floor.Walls.Count == 0 && _from is null)
@@ -965,6 +1026,30 @@ public sealed class PlanEditor : Control
     }
 
     static readonly Color RoofColour = Color.FromRgb(0x9A, 0x4E, 0x36);
+
+    /// <summary>The saved building where a click would put it: its ground floor's floor and walls on this floor, its floors above dashed, its name and size.</summary>
+    void DrawStamp(DrawingContext ctx, HouseDesign stamp, double wallPx)
+    {
+        var (dx, dy) = StampAt(stamp, _mouse);
+        var moved = stamp.Moved(dx, dy);
+        var ground = moved.Levels[0];
+        var area = HouseKitMaker.FloorArea(ground, null, ground.Shape());
+        if (area.Count > 0) ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0x50, 0x30, 0x80, 0xD0)), null, Shape(area));
+        var pen = new Pen(new SolidColorBrush(Color.FromArgb(0xC0, 0x30, 0x80, 0xD0)), wallPx, lineCap: PenLineCap.Square);
+        foreach (var w in ground.Walls) ctx.DrawLine(pen, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        var upper = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x30, 0x80, 0xD0)), Math.Max(1.5, wallPx / 3), new DashStyle([3, 2], 0), PenLineCap.Flat);
+        foreach (var l in moved.Levels.Skip(1))
+            foreach (var w in l.Walls) ctx.DrawLine(upper, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        foreach (var o in ground.Openings) DrawOpening(ctx, o, false, wallPx, 0x90);
+        var (_, _, w0, h0) = stamp.GridBounds();
+        int floors = stamp.Levels.Count;
+        // Under it, kept inside the plan.
+        string text = $"{StampName ?? "Saved building"}: {w0} × {h0} squares, {floors} floor{(floors == 1 ? "" : "s")} ([ and ] turn it)";
+        var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 12, Brushes.White);
+        var at = ToScreen(dx, dy + h0) + new Point(4, 10);
+        at = new Point(Math.Clamp(at.X, 6, Math.Max(6, Bounds.Width - ft.Width - 8)), Math.Clamp(at.Y, 4, Math.Max(4, Bounds.Height - ft.Height - 6)));
+        Label(ctx, at, text);
+    }
 
     static readonly IBrush Picked = new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0));
 
