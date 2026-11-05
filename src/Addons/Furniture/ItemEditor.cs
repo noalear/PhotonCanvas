@@ -287,7 +287,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
         ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round", "Long runner"]),
         ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains", "Torch in a wall bracket"]),
-        ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
+        ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch", "Reactor core"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),
         ItemKind.Crate => ("Boards", Crates.StyleNames),

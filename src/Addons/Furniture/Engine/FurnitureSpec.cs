@@ -83,7 +83,7 @@ public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round, Runner }
 
 public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor, FramedMap, Torch }
 
-public enum CandleStyle { Candelabra, Lamp, Torch }
+public enum CandleStyle { Candelabra, Lamp, Torch, Reactor }
 
 public enum ScreenStyle { Lattice, Tracery, Panels, Barrier }
 

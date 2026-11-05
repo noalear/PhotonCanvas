@@ -396,6 +396,7 @@ public static class FurnitureCatalog
         b.Add("Ammo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Military, WidthMm = 18, DepthMm = 12, HeightMm = 10 }, "A long, low crate with a stencilled label, latches and handles.");
         b.Add("Storage racks", ItemKind.Bookshelf, i => i with { Books = false }, "Plain racks.");
         b.Add("Tech cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Tech, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cabinet of machines.");
+        b.Add("Reactor core", ItemKind.Candlestand, i => i with { Candle = CandleStyle.Reactor, WidthMm = 11, DepthMm = 11, HeightMm = 24 }, "A glowing reactor column held in rings between four struts, on a stepped base under a stepped cap.");
 
         b.Room = Armoury;
         b.Add("Rifle rack", ItemKind.WeaponRack, i => i with { Rows = 4, HeightMm = 26 }, "Rifles standing in a rack.");

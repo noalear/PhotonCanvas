@@ -177,9 +177,24 @@ public static class Armchairs
         if (soft && !command) Shapes.Tufted(T + 0.8, seat - yb + 0.5, T + Li - 0.8, cushionTop, buttons: style != SeatStyle.Sofa, etchedB, linesB);
         if (command)
         {
-            // A padded headrest and ribs.
-            double a = T + Li * 0.15, b = T + Li * 0.85;
-            for (double y = seat - yb + 1.5; y < cushionTop - 1; y += 1.4) linesB.Add([new(a, y), new(b, y)]);
+            // Padded: ribbed side bolsters either side of a ribbed middle, and a headrest standing above the
+            // shoulders.
+            double hh = Math.Min(4.5, (H - arm) * 0.32), top = H - yb;
+            bool head = hh >= 2.5 && Li >= 9;
+            if (head)
+            {
+                double hw = Math.Max(Li * 0.5, 5);
+                back = Geo.Subtract(Geo.Solid(back), [Geo.Rect(-1, top - hh, W / 2 - hw / 2, top + 1), Geo.Rect(W / 2 + hw / 2, top - hh, W + 1, top + 1)]);
+                back = Geo.Union(back, [Fronts.Chamfered(W / 2 - hw / 2, top - hh - 0.5, W / 2 + hw / 2, top, 0.9)]);
+                linesB.Add(Geo.Loop(Fronts.Chamfered(W / 2 - hw / 2 + 0.6, top - hh + 0.2, W / 2 + hw / 2 - 0.6, top - 0.6, 0.6)));
+                for (double y = top - hh + 1.0; y < top - 1.0; y += 0.9) linesB.Add([new(W / 2 - hw / 2 + 1.0, y), new(W / 2 + hw / 2 - 1.0, y)]);
+                cushionTop = Math.Min(cushionTop, top - hh - 1.2);
+            }
+            double a = T + Li * 0.15, b = T + Li * 0.85, y0c = seat - yb + 1.0;
+            foreach (var x in new[] { a, b }) linesB.Add([new(x, y0c), new(x, cushionTop)]);
+            linesB.Add(Geo.Loop(Fronts.Chamfered(T + 0.6, y0c - 0.4, T + Li - 0.6, cushionTop + 0.4, 0.8)));
+            for (double y = y0c + 0.7; y < cushionTop - 0.3; y += 1.2) linesB.Add([new(a, y), new(b, y)]);
+            for (double y = y0c + 1.2; y < cushionTop - 0.3; y += 2.4) foreach (var x in new[] { (T + 0.6 + a) / 2, (b + T + Li - 0.6) / 2 }) linesB.Add([new(x - 0.5, y), new(x + 0.5, y)]);
         }
         if (carved)
         {

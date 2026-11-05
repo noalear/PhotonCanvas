@@ -39,6 +39,7 @@ public static class Profiles
         var it = m.Item;
         if (it.Candle == CandleStyle.Candelabra) { Candles.Candelabra(m); return; }
         if (it.Candle == CandleStyle.Torch) { Brazier(m); return; }
+        if (it.Candle == CandleStyle.Reactor) { Reactor(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = Math.Max(2.4, 2 * 1.0 + 0.2), xc = W / 2, stem = 1.3;
         double footW = Math.Max(D, sw + 4);
@@ -397,6 +398,67 @@ public static class Profiles
             sl.Add([new(z, 0.3), new(z + (rnd.NextDouble() - 0.5) * 0.3, sh * (0.5 + 0.4 * rnd.NextDouble()))]);
         m.Add("Stump", stump, [], [Pose.Left(xc, 0, 0)], grainAlongU: false, face: [], lines: Geo.ClipLines(sl, stump));
         m.Note("Slide the stump onto the anvil from below, crossing it.");
+    }
+
+    /// <summary>
+    /// A reactor core: a glowing column (burnt dark) between four struts, held in rings, on a stepped base and
+    /// under a stepped cap. Two profiles crossing, slotted halfway into each other: the front one from below,
+    /// the side one from above.
+    /// </summary>
+    static void Reactor(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = Math.Max(it.DepthMm, 6), H = it.HeightMm, sw = m.SlotW;
+        if (H < 14 || W < 7) { m.Bad("Make the reactor core at least 7 mm across and 14 mm high."); return; }
+        double b1 = Geo.Clamp(H * 0.08, 1.4, 3), b2 = b1 + Geo.Clamp(H * 0.06, 1.2, 2.4), c2 = H - b1, c1 = c2 - Geo.Clamp(H * 0.06, 1.2, 2.4);
+        (PathsD Shape, PathsD Etched, List<PathD> Lines) Profile(double w)
+        {
+            double c = w / 2, strut = 1.2, inner = w * 0.86, tube = inner - 2 * strut - 1.2;
+            var s = new PathsD
+            {
+                Fronts.Chamfered(0, 0, w, b1, 0.5),
+                Fronts.Chamfered(c - inner / 2, b1 - 0.01, c + inner / 2, b2, 0.4),
+                Fronts.Chamfered(c - inner / 2, c1, c + inner / 2, c2 + 0.01, 0.4),
+                Fronts.Chamfered(c - w * 0.42, c2, c + w * 0.42, H, 0.5),
+                Geo.Rect(c - inner / 2 + 0.3, b2 - 0.01, c + inner / 2 - 0.3, c1 + 0.01),
+            };
+            var e = new PathsD();
+            var l = new List<PathD>();
+            // The struts down each side, scored.
+            foreach (var sgn in new[] { -1, 1 })
+            {
+                double x = c + sgn * (inner / 2 - 0.3 - strut);
+                l.Add([new(x, b2), new(x, c1)]);
+            }
+            // The glow: the tube burnt dark between the rings, its rings left light.
+            int rings = Math.Max(2, (int)Math.Round((c1 - b2) / 4.5));
+            double ry = (c1 - b2) / (rings + 1);
+            var glow = new PathsD { Geo.Rect(c - tube / 2 + 0.45, b2 + 0.4, c + tube / 2 - 0.45, c1 - 0.4) };
+            var bands = new PathsD();
+            for (int i = 1; i <= rings; i++)
+            {
+                double y = b2 + i * ry;
+                bands.Add(Geo.Rect(c - inner / 2, y - 0.55, c + inner / 2, y + 0.55));
+                foreach (var sgn in new[] { -1, 1 }) l.Add(WoodFace.Dot(c + sgn * (inner / 2 - 0.6), y, 0.2));
+            }
+            s.AddRange(bands);
+            e.AddRange(Geo.Subtract(glow, Geo.Offset(bands, 0.2)));
+            // Light streaks rising up the glow, vents in the base, bolts round the cap.
+            for (double x = c - tube / 2 + 1.0; x < c + tube / 2 - 0.8; x += 1.1) l.Add([new(x, b2 + 0.6), new(x, c1 - 0.6)]);
+            for (double x = 1.2; x < w - 1.4; x += 1.0) l.Add([new(x, b1 * 0.35), new(x + 0.5, b1 * 0.35)]);
+            for (double x = c - w * 0.42 + 0.8; x < c + w * 0.42 - 0.5; x += 1.6) l.Add(WoodFace.Dot(x, (c2 + H) / 2, 0.2));
+            l.Add([new(c - inner / 2, b2 - 0.4), new(c + inner / 2, b2 - 0.4)]);
+            l.Add([new(c - inner / 2, c1 + 0.4), new(c + inner / 2, c1 + 0.4)]);
+            var shape = Geo.Solid(s);
+            return (shape, Geo.Intersect(e, shape), Geo.ClipLines(l, shape));
+        }
+        var (fs, fe, fl) = Profile(W);
+        var front = Geo.Subtract(fs, [Geo.Rect(W / 2 - sw / 2, -1, W / 2 + sw / 2, H / 2)]);
+        m.Add("Reactor core", front, [], [Pose.Front(0, 0, D / 2)], grainAlongU: false, face: [], etched: fe, lines: Geo.ClipLines(fl, front));
+        var (ss, se, sl) = Profile(D);
+        var side = Geo.Subtract(ss, [Geo.Rect(D / 2 - sw / 2, H / 2, D / 2 + sw / 2, H + 1)]);
+        m.Add("Reactor core (crossing)", side, [], [Pose.Left(W / 2, 0, 0)], grainAlongU: false, face: [], etched: Geo.Subtract(se, [Geo.Rect(D / 2 - sw / 2, H / 2, D / 2 + sw / 2, H + 1)]), lines: Geo.ClipLines(sl, side));
+        m.Note("Slide the two halves of the core together, crossing.");
     }
 
     /// <summary>A flame (one tongue, or three on a wide one) standing at x, y.</summary>

@@ -176,4 +176,20 @@ public class FurnitureDungeonTests
         var stool = FurnitureKit.Make(Defaults.For(ItemKind.Stool) with { Legs = LegStyle.Slab, WidthMm = 9, DepthMm = 9 }, Sheet("Cave"));
         Assert.NotEmpty(stool.Parts.Single(p => p.Name == "Seat").Lines);
     }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void Reactor_core_and_padded_command_chair_fit_in_every_theme(string theme)
+    {
+        var reactor = Defaults.For(ItemKind.Candlestand) with { Candle = CandleStyle.Reactor, WidthMm = 11, DepthMm = 11, HeightMm = 24 };
+        var chair = Defaults.For(ItemKind.Armchair) with { Seat = SeatStyle.Command, BackTop = BackTop.Square, WidthMm = 16, DepthMm = 14, HeightMm = 24 };
+        foreach (var it in new[] { reactor, chair })
+        {
+            Assert.Equal("", FurnitureCatalogTests.Check(it with { Theme = theme }, Sheet(theme)));
+            Assert.Equal("", FurnitureCatalogTests.Check(FurnitureCatalog.Sized(it with { Theme = theme }, 54), Sheet(theme, 3)));
+        }
+        var k = FurnitureKit.Make(reactor with { Theme = theme }, Sheet(theme));
+        Assert.Equal(2, k.Parts.Count);
+        Assert.All(k.Parts, p => Assert.NotEmpty(p.Etched));
+    }
 }
