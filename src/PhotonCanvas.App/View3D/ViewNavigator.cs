@@ -55,7 +55,14 @@ public sealed class ViewNavigator
     readonly INavigable _view;
     readonly DispatcherTimer _settle = new() { Interval = TimeSpan.FromMilliseconds(220) };
     Point? _turning, _moving;
+    // Where the left button went down, and whether it has moved off it since (a drag, not a click).
+    Point _pressedAt;
+    bool _dragged;
+    KeyModifiers _pressedWith;
     Cursor? _cursor;
+
+    /// <summary>How far the pointer can move with the button down and still be a click, not a drag (screen units).</summary>
+    const double ClickSlop = 4;
 
     /// <summary>
     /// Hooks <paramref name="host"/>'s mouse and keys up to <paramref name="view"/>. The host puts <see cref="Buttons"/> in itself
@@ -133,7 +140,12 @@ public sealed class ViewNavigator
             _cursor = _host.Cursor;
             _host.Cursor = new Cursor(StandardCursorType.Hand);
         }
-        else if (props.IsLeftButtonPressed) _turning = point.Position;
+        else if (props.IsLeftButtonPressed)
+        {
+            _turning = _pressedAt = point.Position;
+            _dragged = false;
+            _pressedWith = e.KeyModifiers;
+        }
         else return;
         e.Pointer.Capture(_host);
         e.Handled = true;
@@ -149,6 +161,9 @@ public sealed class ViewNavigator
         }
         else if (_turning is { } start)
         {
+            // A click that wobbles a little doesn't turn it.
+            if (!_dragged && Math.Abs(at.X - _pressedAt.X) <= ClickSlop && Math.Abs(at.Y - _pressedAt.Y) <= ClickSlop) return;
+            _dragged = true;
             _turning = at;
             _view.Turn(at.X - start.X, at.Y - start.Y);
         }
@@ -157,9 +172,14 @@ public sealed class ViewNavigator
     void Released(object? sender, PointerReleasedEventArgs e)
     {
         if (_turning is null && _moving is null) return;
+        bool click = _turning is not null && !_dragged && e.InitialPressMouseButton == MouseButton.Left;
         e.Pointer.Capture(null);
         Stop();
+        if (click) Click?.Invoke(_pressedAt, _pressedWith);
     }
+
+    /// <summary>A click with the left button (pressed and let go without dragging): where, and the keys held.</summary>
+    public Action<Point, KeyModifiers>? Click { get; set; }
 
     void Stop()
     {

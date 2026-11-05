@@ -95,6 +95,8 @@ public sealed class Scene3D
     internal sealed record Face(Vec3[][] Loops, Vec3 Normal, Color Colour, int Group, Surface? Look = null)
     {
         public bool Ghost => Colour.A < 255;
+        /// <summary>What the face is part of, for the view to say what was clicked (<see cref="Model3DPainter.HitAt"/>).</summary>
+        public object? Tag { get; init; }
     }
 
     internal sealed record Fill(int Face, Vec3[][] Loops, Color Colour);
@@ -124,13 +126,16 @@ public sealed class Scene3D
     /// over what's behind it, and never hiding anything. Returns the face's number, for what goes on it.
     /// </summary>
     /// <para><paramref name="surface"/> says what it's made of, for the realistic look; without it, that look paints it <paramref name="colour"/>.</para>
-    public int AddFace(IEnumerable<Vec3[]> loops, Vec3 normal, Color colour, int group = 0, Surface? surface = null)
+    public int AddFace(IEnumerable<Vec3[]> loops, Vec3 normal, Color colour, int group = 0, object? tag = null, Surface? surface = null)
     {
         var ls = loops.Where(l => l.Length >= 3).ToArray();
-        Faces.Add(new Face(ls, normal.Unit, colour, group, colour.A < 255 ? null : surface));
+        Faces.Add(new Face(ls, normal.Unit, colour, group, colour.A < 255 ? null : surface) { Tag = tag });
         Version++;
         return Faces.Count - 1;
     }
+
+    /// <summary>What a face was added for (the <c>tag</c> given with it), or null.</summary>
+    public object? TagOf(int face) => face >= 0 && face < Faces.Count ? Faces[face].Tag : null;
 
     /// <summary>A filled area drawn on a face (an engraving): shows only where that face does.</summary>
     public void AddFill(int face, IEnumerable<Vec3[]> loops, Color colour)
@@ -167,9 +172,10 @@ public sealed class Scene3D
     /// <paramref name="faces"/> and <paramref name="sides"/> leave out its two faces or its edges. With
     /// <paramref name="etchDepth"/> above 0 what's etched is sunk that deep into the piece, with the sides of the
     /// grooves lit as they face, so you can see how the engraving will stand out; otherwise it's painted on.
+    /// Every face of it carries <paramref name="tag"/>, so a click on it can say which piece it was.
     /// </summary>
     public void AddSlab(PathsD outline, Frame3 frame, double w0, double w1, SlabStyle style, PathsD? etched = null, IEnumerable<PathD>? scored = null,
-        int group = 0, bool faces = true, bool sides = true, double etchDepth = 0, PathsD? backEtched = null, IEnumerable<PathD>? backScored = null)
+        int group = 0, bool faces = true, bool sides = true, double etchDepth = 0, PathsD? backEtched = null, IEnumerable<PathD>? backScored = null, object? tag = null)
     {
         var loops = outline.Where(c => c.Count >= 3).ToList();
         if (loops.Count == 0) return;
@@ -198,8 +204,8 @@ public sealed class Scene3D
                 double floor = w - Math.Sign(outward.Dot(n)) * depth;
                 var grooves = Clipper.Union(Clipper.SimplifyPaths(new PathsD(art.Where(c => c.Count >= 3)), 0.08), Clipper2Lib.FillRule.NonZero)
                     .Where(c => c.Count >= 3 && Math.Abs(Clipper.Area(c)) > 0.01).ToList();
-                face = AddFace(loops.Concat(grooves).Select(c => c.Select(p => At(p, w)).ToArray()), outward, style.Paint(outward, false), group, grain);
-                AddFace(grooves.Select(c => c.Select(p => At(p, floor)).ToArray()), outward, Shade(style.Etched, 0.92), group, burnt);
+                face = AddFace(loops.Concat(grooves).Select(c => c.Select(p => At(p, w)).ToArray()), outward, style.Paint(outward, false), group, tag, grain);
+                AddFace(grooves.Select(c => c.Select(p => At(p, floor)).ToArray()), outward, Shade(style.Etched, 0.92), group, tag, burnt);
                 foreach (var c in grooves)
                 {
                     // Outer edges of an etched area run anticlockwise, the edges of islands in it clockwise: the
@@ -211,13 +217,13 @@ public sealed class Scene3D
                         double dx = b.x - a.x, dy = b.y - a.y, len = Math.Sqrt(dx * dx + dy * dy);
                         if (len < 1e-6) continue;
                         var into = (frame.U * (-dy / len) + frame.V * (dx / len)).Unit;
-                        AddFace([[At(a, w), At(a, floor), At(b, floor), At(b, w)]], into, Shade(style.Paint(into, true), 0.9), group, burnt with { Albedo = Shade(style.Etched, 0.8) });
+                        AddFace([[At(a, w), At(a, floor), At(b, floor), At(b, w)]], into, Shade(style.Paint(into, true), 0.9), group, tag, burnt with { Albedo = Shade(style.Etched, 0.8) });
                     }
                 }
             }
             else
             {
-                face = AddFace(loops.Select(c => c.Select(p => At(p, w)).ToArray()), outward, style.Paint(outward, false), group, grain);
+                face = AddFace(loops.Select(c => c.Select(p => At(p, w)).ToArray()), outward, style.Paint(outward, false), group, tag, grain);
                 if (art is { Count: > 0 }) AddFill(face, art.Where(c => c.Count >= 3).Select(c => c.Select(p => At(p, w)).ToArray()), style.Etched);
             }
             if (lines is not null)
@@ -251,7 +257,7 @@ public sealed class Scene3D
                 dir[i] = (dx / len, dy / len);
                 // Outward: to the right of the edge, as outlines run anticlockwise and holes clockwise.
                 var outward = (frame.U * (dy / len) + frame.V * (-dx / len)).Unit;
-                sideFace[i] = sides ? AddFace([[At(a, w1), At(b, w1), At(b, w0), At(a, w0)]], outward, style.Paint(outward, true), group, CutEdge(At(a, w0), At(b, w0))) : -1;
+                sideFace[i] = sides ? AddFace([[At(a, w1), At(b, w1), At(b, w0), At(a, w0)]], outward, style.Paint(outward, true), group, tag, CutEdge(At(a, w0), At(b, w0))) : -1;
             }
             if (!edged) continue;
             for (int i = 0; i < m; i++)
