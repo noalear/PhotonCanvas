@@ -11,8 +11,11 @@ public enum Ground { Grass, Dirt, Road, Paving, Sand, Water, Rock, Field, Floor 
 /// <summary>What a fence or wall along the grid lines is.</summary>
 public enum FenceKind { Fence, Hedge, StoneWall, CityWall }
 
-/// <summary>Small things dotted about the map, shown in 3D: trees, rocks, a well, carts and so on.</summary>
-public enum PropKind { Tree, Pine, Bush, Boulder, Well, Cart, Crates, Lamp, Statue }
+/// <summary>
+/// Small things dotted about the map, shown in 3D: trees, rocks, a well, carts and so on, and the town's
+/// bigger pieces: horse troughs, a players' stage, market stalls, outdoor bars, notice boards and guard towers.
+/// </summary>
+public enum PropKind { Tree, Pine, Bush, Boulder, Well, Cart, Crates, Lamp, Statue, Trough, Stage, Stall, Bar, NoticeBoard, GuardTower }
 
 /// <summary>
 /// A building on the map: the building editor's design (its plan's top left corner at 0, 0), where its top
@@ -55,6 +58,34 @@ public sealed record Prop
     public double Y { get; init; }
     public double Size { get; init; } = 1;
     public double TurnDeg { get; init; }
+
+    /// <summary>
+    /// How big a rectangular thing is (squares, at size 1, before it's turned: across, then front to back),
+    /// the furniture maker's town pieces' sizes; null for the round ones (a tree, a well).
+    /// </summary>
+    public static (double W, double D)? Footprint(PropKind k) => k switch
+    {
+        PropKind.Trough => (1.26, 0.43),
+        PropKind.Stage => (3, 2),
+        PropKind.Stall => (1.42, 0.79),
+        PropKind.Bar => (1.57, 0.79),
+        PropKind.NoticeBoard => (0.94, 0.39),
+        PropKind.GuardTower => (1.81, 1.81),
+        _ => null,
+    };
+
+    /// <summary>How far from its middle it reaches (squares), for picking it.</summary>
+    [JsonIgnore]
+    public double Reach => Footprint(Kind) is { } f ? Math.Max(0.3, Math.Max(f.W, f.D) / 2 * Size) : Math.Max(0.3, 0.4 * Size);
+
+    /// <summary>Whether a point (squares) is on it.</summary>
+    public bool Hit(double x, double y)
+    {
+        if (Footprint(Kind) is not { } f) return (X - x) * (X - x) + (Y - y) * (Y - y) <= Reach * Reach;
+        double a = -TurnDeg * Math.PI / 180, dx = x - X, dy = y - Y;
+        double u = dx * Math.Cos(a) - dy * Math.Sin(a), v = dx * Math.Sin(a) + dy * Math.Cos(a);
+        return Math.Abs(u) <= f.W * Size / 2 + 0.05 && Math.Abs(v) <= f.D * Size / 2 + 0.05;
+    }
 }
 
 /// <summary>Words written on the map (a street's or a district's name, a number for the game master's key): the middle of the text (squares) and how tall it is (squares).</summary>
@@ -120,7 +151,12 @@ public sealed record CityMap
         _ => g.ToString(),
     };
 
-    public static string Label(PropKind k) => k switch { PropKind.Pine => "Pine tree", PropKind.Crates => "Crates and barrels", _ => k.ToString() };
+    public static string Label(PropKind k) => k switch
+    {
+        PropKind.Pine => "Pine tree", PropKind.Crates => "Crates and barrels", PropKind.Trough => "Horse trough", PropKind.Stage => "Players' stage",
+        PropKind.Stall => "Market stall", PropKind.Bar => "Outdoor bar", PropKind.NoticeBoard => "Notice board", PropKind.GuardTower => "Guard tower",
+        _ => k.ToString(),
+    };
 
     public static string Label(FenceKind k) => k switch { FenceKind.StoneWall => "Stone wall", FenceKind.CityWall => "Town wall", _ => k.ToString() };
 

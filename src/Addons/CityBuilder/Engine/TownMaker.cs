@@ -328,6 +328,7 @@ public static class TownMaker
         var buildings = new List<CityBuilding>();
         var taken = new HashSet<(int X, int Y)>();
         var notes = new List<string>();
+        var towers = new List<Prop>();
         int gates = 0;
         if (o.Walls)
         {
@@ -348,6 +349,26 @@ public static class TownMaker
             }
             foreach (int y in new[] { wall.Y0, wall.Y1 }) Side(Enumerable.Range(wall.X0, wall.X1 - wall.X0).Select(x => new FenceEdge(x, y, true)));
             foreach (int x in new[] { wall.X0, wall.X1 }) Side(Enumerable.Range(wall.Y0, wall.Y1 - wall.Y0).Select(y => new FenceEdge(x, y, false)));
+            // Guard towers astride the wall every dozen squares or so, clear of the corners, gates and river:
+            // each on the 2 × 2 squares round a grid point on the wall, the wall either side meeting it.
+            bool Clear(int px, int py) => Enumerable.Range(px - 3, 6).All(x => Enumerable.Range(py - 3, 6).All(y => At(x, y) is not (Ground.Road or Ground.Water)));
+            foreach (bool across in new[] { true, false })
+                foreach (int line in across ? new[] { wall.Y0, wall.Y1 } : new[] { wall.X0, wall.X1 })
+                {
+                    int from = across ? wall.X0 : wall.Y0, to = across ? wall.X1 : wall.Y1, length = to - from;
+                    int n = length / 13;
+                    for (int i = 1; i <= n; i++)
+                    {
+                        int at = from + (int)Math.Round(length * i / (n + 1.0));
+                        var (px, py) = across ? (at, line) : (line, at);
+                        if (at - from < 5 || to - at < 5 || !Clear(px, py)) continue;
+                        var under = across ? new[] { new FenceEdge(px - 1, py, true), new FenceEdge(px, py, true) } : [new FenceEdge(px, py - 1, false), new FenceEdge(px, py, false)];
+                        if (!under.All(edges.Contains)) continue;
+                        edges.RemoveAll(under.Contains);
+                        towers.Add(new Prop { Kind = PropKind.GuardTower, X = px, Y = py });
+                        foreach (var c in Cells(px - 1, py - 1, 2, 2)) taken.Add(c);
+                    }
+                }
             fences.Add(new Fence { Kind = FenceKind.CityWall, Edges = edges });
             // Towers in the corners, inside the wall.
             foreach (var (tx, ty) in new[] { (wall.X0, wall.Y0), (wall.X1 - 3, wall.Y0), (wall.X0, wall.Y1 - 3), (wall.X1 - 3, wall.Y1 - 3) })
@@ -369,7 +390,7 @@ public static class TownMaker
         }, OnSquare, Inside, firstOnSquare: o.Square ? ["Temple", "Hall", "Tavern"] : []);
 
         // Farms' fields outside the walls (or round the edge of an open town), with hedges.
-        var props = new List<Prop>();
+        var props = new List<Prop>(towers);
         int fields = 0;
         for (int tries = 0; tries < (w * d) / 60 && fields < (w * d) / 300 + 2; tries++)
         {
@@ -396,8 +417,48 @@ public static class TownMaker
             props.Add(new Prop { Kind = PropKind.Statue, X = square.X0 + 1.5, Y = square.Y0 + 1.5 });
             foreach (var (lx, ly) in new[] { (square.X0 + 0.5, square.Y0 + 0.5), (square.X1 + 0.5, square.Y0 + 0.5), (square.X0 + 0.5, square.Y1 + 0.5), (square.X1 + 0.5, square.Y1 + 0.5) })
                 props.Add(new Prop { Kind = PropKind.Lamp, X = lx, Y = ly });
+            // What's on it stands clear of the well, the statue, the lamps and the ways through it (the rows and
+            // columns where a road comes in): a players' stage, market stalls, an outdoor bar, a notice board
+            // and a horse trough along its sides, carts and crates about it.
+            var used = new HashSet<(int X, int Y)>
+            {
+                ((int)Math.Floor(mx - 0.5), (int)Math.Floor(my - 0.5)), ((int)Math.Floor(mx), (int)Math.Floor(my - 0.5)),
+                ((int)Math.Floor(mx - 0.5), (int)Math.Floor(my)), ((int)Math.Floor(mx), (int)Math.Floor(my)),
+                (square.X0 + 1, square.Y0 + 1), (square.X0, square.Y0), (square.X1, square.Y0), (square.X0, square.Y1), (square.X1, square.Y1),
+            };
+            bool Way(int x, int y) => Enumerable.Range(square.X0, square.X1 - square.X0 + 1).Any(xx => xx == x && (IsRoad(xx, square.Y0 - 1) || IsRoad(xx, square.Y1 + 1)))
+                || Enumerable.Range(square.Y0, square.Y1 - square.Y0 + 1).Any(yy => yy == y && (IsRoad(square.X0 - 1, yy) || IsRoad(square.X1 + 1, yy)));
+            bool IsRoad(int x, int y) => x >= 0 && y >= 0 && x < w && y < d && g[x, y] == Ground.Road;
+            bool Fits(int x0, int y0, int cw, int cd) => Enumerable.Range(x0, cw).All(x => Enumerable.Range(y0, cd).All(y =>
+                OnSquare(x, y) && g[x, y] == Ground.Paving && !used.Contains((x, y)) && !Way(x, y)));
+            bool Stand(PropKind kind, int cw, int cd, double turn, IEnumerable<(int X, int Y)> spots)
+            {
+                foreach (var (x0, y0) in spots)
+                {
+                    if (!Fits(x0, y0, cw, cd)) continue;
+                    foreach (var c in Cells(x0, y0, cw, cd)) used.Add(c);
+                    props.Add(new Prop { Kind = kind, X = x0 + cw / 2.0, Y = y0 + cd / 2.0, TurnDeg = turn });
+                    return true;
+                }
+                return false;
+            }
+            var xs = Enumerable.Range(square.X0, square.X1 - square.X0 + 1).OrderBy(x => Math.Abs(x + 0.5 - mx)).ToList();
+            // The stage along the top (its backdrop behind it), or else the bottom.
+            if (!Stand(PropKind.Stage, 3, 2, 0, xs.Select(x => (x, square.Y0))))
+                Stand(PropKind.Stage, 3, 2, 180, xs.Select(x => (x, square.Y1 - 1)));
+            // Stalls along the bottom and the top, facing in.
+            int stalls = Math.Clamp((square.X1 - square.X0) / 3, 2, 5);
+            for (int i = 0; i < stalls; i++)
+                if (!Stand(PropKind.Stall, 2, 1, 180, xs.Select(x => (x - 1, square.Y1))))
+                    Stand(PropKind.Stall, 2, 1, 0, xs.Select(x => (x - 1, square.Y0)));
+            // A bar, a notice board and a trough along its left or right side, or else its top or bottom, or else inside it.
+            var sides = Enumerable.Range(square.Y0 + 1, Math.Max(0, square.Y1 - square.Y0 - 1)).SelectMany(y => new[] { (square.X0, y), (square.X1, y) }).OrderBy(_ => rnd.Next()).ToList();
+            var ends = Enumerable.Range(square.X0 + 1, Math.Max(0, square.X1 - square.X0 - 1)).SelectMany(x => new[] { (x, square.Y0), (x, square.Y1) }).OrderBy(_ => rnd.Next()).ToList();
+            var inside = Enumerable.Range(square.X0 + 1, Math.Max(0, square.X1 - square.X0 - 1)).SelectMany(x => Enumerable.Range(square.Y0 + 1, Math.Max(0, square.Y1 - square.Y0 - 1)).Select(y => (x, y))).OrderBy(_ => rnd.Next()).ToList();
+            foreach (var (kind, len) in new[] { (PropKind.Bar, 2), (PropKind.NoticeBoard, 1), (PropKind.Trough, 2) })
+                _ = Stand(kind, 1, len, 90, sides) || Stand(kind, len, 1, 0, ends) || Stand(kind, 1, len, 90, inside) || Stand(kind, len, 1, 0, inside);
             for (int i = 0; i < Math.Max(2, (square.X1 - square.X0) / 3); i++)
-                props.Add(new Prop { Kind = i % 2 == 0 ? PropKind.Cart : PropKind.Crates, X = square.X0 + 1 + rnd.NextDouble() * (square.X1 - square.X0 - 1), Y = square.Y0 + 1 + rnd.NextDouble() * (square.Y1 - square.Y0 - 1), TurnDeg = rnd.Next(4) * 90 });
+                Stand(i % 2 == 0 ? PropKind.Cart : PropKind.Crates, 1, 1, rnd.Next(4) * 90, inside);
         }
         // Lamps along the main roads.
         foreach (var r in roads.Where(r => r.Main))
@@ -454,7 +515,7 @@ public static class TownMaker
 
         int fromSaved = buildings.Count(b => b.PrefabId is not null);
         notes.Add($"{buildings.Count} buildings" + (fromSaved > 0 ? $" ({fromSaved} of them your saved buildings)" : "") + $", {roads.Count} roads, {props.Count(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.Bush)} trees.");
-        if (o.Walls) notes.Add($"A town wall with {gates} gate{(gates == 1 ? "" : "s")} and a tower in each corner.");
+        if (o.Walls) notes.Add($"A town wall with {gates} gate{(gates == 1 ? "" : "s")}, a tower in each corner" + (towers.Count > 0 ? $" and {towers.Count} guard tower{(towers.Count == 1 ? "" : "s")} along it." : "."));
         if (fields > 0) notes.Add($"{fields} field{(fields == 1 ? "" : "s")} with hedges and fences.");
         notes.Add("By district: " + string.Join(", ", buildings.GroupBy(b => b.District).OrderByDescending(x => x.Count()).Select(x => $"{x.Count()} {x.Key.ToLowerInvariant()}")) + ".");
         return (map, notes);

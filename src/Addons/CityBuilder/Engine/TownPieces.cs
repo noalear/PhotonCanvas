@@ -1,6 +1,9 @@
 using PhotonCanvas.Addon.Bridges;
+using PhotonCanvas.Addon.Furniture;
 using PhotonCanvas.Addon.Scatter;
 using ScatterDefaults = PhotonCanvas.Addon.Scatter.Defaults;
+using FItemKind = PhotonCanvas.Addon.Furniture.ItemKind;
+using SItemKind = PhotonCanvas.Addon.Scatter.ItemKind;
 
 namespace PhotonCanvas.Addon.CityBuilder;
 
@@ -11,9 +14,19 @@ public sealed record BridgeSite(HashSet<(int X, int Y)> Cells, bool Across, int 
 }
 
 /// <summary>
+/// What a town wall is cut as: sections two squares long and one, corners (the parapet round the outside of
+/// the turn, or the inside), gatehouses over the roads through it, ends with a turret, and guard towers.
+/// </summary>
+public sealed record WallCut(int Two, int One, int CornersOut, int CornersIn, int Gates, int Ends, int Towers)
+{
+    public int Count => Two + One + CornersOut + CornersIn + Gates + Ends + Towers;
+}
+
+/// <summary>
 /// The rest of a town's pieces besides the buildings and the ground: a bridge from the bridge maker wherever
-/// a road crosses water (stone arches for a cobbled road, planks for a track), and the scenery maker's
-/// wells, carts, barrels, boulders and fences for the map's own.
+/// a road crosses water (stone arches for a cobbled road, planks for a track), the scenery maker's wells,
+/// carts, barrels, boulders and fences for the map's own, and the furniture maker's detailed town pieces in
+/// the map's look: the town wall and its guard towers, trees, horse troughs, stages, stalls, bars and notice boards.
 /// </summary>
 public static class TownPieces
 {
@@ -123,16 +136,16 @@ public static class TownPieces
         var props = m.Props.Where(p => In(p.X, p.Y)).ToList();
         double k = m.SquareMm / 25.4;
         var items = new List<ScatterItem>();
-        void Add(ItemKind kind, int count, Func<ScatterItem, ScatterItem>? change = null)
+        void Add(SItemKind kind, int count, Func<ScatterItem, ScatterItem>? change = null)
         {
             if (count <= 0) return;
             var it = ScatterDefaults.Scaled(ScatterDefaults.For(kind), k) with { Count = count };
             items.Add(change is null ? it : change(it));
         }
-        Add(ItemKind.Well, props.Count(p => p.Kind == PropKind.Well));
-        Add(ItemKind.Cart, props.Count(p => p.Kind == PropKind.Cart));
-        Add(ItemKind.Barrel, props.Count(p => p.Kind == PropKind.Crates) * 3, it => it with { Cluster = 1 });
-        Add(ItemKind.Boulder, props.Count(p => p.Kind == PropKind.Boulder));
+        Add(SItemKind.Well, props.Count(p => p.Kind == PropKind.Well));
+        Add(SItemKind.Cart, props.Count(p => p.Kind == PropKind.Cart));
+        Add(SItemKind.Barrel, props.Count(p => p.Kind == PropKind.Crates) * 3, it => it with { Cluster = 1 });
+        Add(SItemKind.Boulder, props.Count(p => p.Kind == PropKind.Boulder));
         // Fences: each straight run in sections of up to four squares, the same lengths together.
         var sections = new Dictionary<int, int>();
         foreach (var f in m.Fences.Where(f => f.Kind == FenceKind.Fence))
@@ -148,8 +161,160 @@ public static class TownPieces
                 }
             }
         foreach (var (len, count) in sections.OrderByDescending(s => s.Key))
-            Add(ItemKind.Fence, count, it => it with { WidthMm = Math.Round(len * m.SquareMm - 1, 1), Style = FenceStyle.PostAndRail });
+            Add(SItemKind.Fence, count, it => it with { WidthMm = Math.Round(len * m.SquareMm - 1, 1), Style = FenceStyle.PostAndRail });
         if (items.Count == 0) return null;
         return new ScatterSet { Items = items, Theme = theme, ScaleMm = Math.Round(28 * k, 1) };
+    }
+
+    // ---- the furniture maker's town pieces ----
+
+    /// <summary>The furniture maker's town piece for a look whose id ends "-<paramref name="end"/>" (the medieval one if the look has none).</summary>
+    public static CatalogEntry? Piece(string theme, string end) =>
+        FurnitureCatalog.For(theme, FurnitureCatalog.Town).FirstOrDefault(e => e.Id.EndsWith("-" + end, StringComparison.Ordinal))
+        ?? FurnitureCatalog.For("Medieval", FurnitureCatalog.Town).FirstOrDefault(e => e.Id.EndsWith("-" + end, StringComparison.Ordinal));
+
+    /// <summary>A set of the furniture maker's pieces in the map's look, from a 2 mm sheet; null if it's empty.</summary>
+    static FurnitureSet? Set(string theme, List<FurnitureItem> items) =>
+        items.Count == 0 ? null : FurnitureThemes.Apply(new FurnitureSet { Items = items, ThicknessMm = 2, FitMm = 0.1, ScaleMm = 28 }, theme);
+
+    /// <summary>A catalog piece sized for the map's squares (its town pieces are made for 25.4 mm squares) times <paramref name="size"/>.</summary>
+    static FurnitureItem Sized(CatalogEntry e, double squareMm, double size = 1, int count = 1)
+    {
+        double k = squareMm / 25.4 * size;
+        var it = Math.Abs(k - 1) < 1e-9 ? e.Item : FurnitureCatalog.Scale(e.Item, k);
+        return it with { Count = count };
+    }
+
+    static bool InBox((int X0, int Y0, int X1, int Y1)? box, double x, double y) => box is not { } b || x >= b.X0 && y >= b.Y0 && x < b.X1 && y < b.Y1;
+
+    /// <summary>
+    /// How the town wall (inside the box) is cut: a corner piece where it turns (an outside one where the turn
+    /// goes round the town, an inside one where it goes in), a gatehouse over each road through a gap two
+    /// squares wide, a turret at each other end, nothing under a guard tower, and the straight runs in
+    /// sections of two squares and one.
+    /// </summary>
+    public static WallCut Walls(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
+    {
+        static (int X, int Y) End(FenceEdge e) => e.Across ? (e.X + 1, e.Y) : (e.X, e.Y + 1);
+        var towers = m.Props.Where(p => p.Kind == PropKind.GuardTower && InBox(box, p.X, p.Y)).ToList();
+        bool UnderTower(double x, double y, double margin) => towers.Any(t => Math.Abs(t.X - x) < 0.9 * t.Size + margin && Math.Abs(t.Y - y) < 0.9 * t.Size + margin);
+        var edges = m.Fences.Where(f => f.Kind == FenceKind.CityWall).SelectMany(f => f.Edges)
+            .Where(e => { var (mx, my) = e.Across ? (e.X + 0.5, (double)e.Y) : (e.X, e.Y + 0.5); return InBox(box, mx, my) && !UnderTower(mx, my, 0); })
+            .ToHashSet();
+        if (edges.Count == 0) return new(0, 0, 0, 0, 0, 0, towers.Count);
+        // The edge leaving a grid point each way.
+        (int X, int Y)[] dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+        static FenceEdge Toward((int X, int Y) p, (int X, int Y) d) => d switch
+        {
+            (1, 0) => new(p.X, p.Y, true), (-1, 0) => new(p.X - 1, p.Y, true),
+            (0, 1) => new(p.X, p.Y, false), _ => new(p.X, p.Y - 1, false),
+        };
+        var points = edges.SelectMany(e => new[] { (e.X, e.Y), End(e) }).Distinct().ToList();
+        List<(int X, int Y)> Arms((int X, int Y) p) => [.. dirs.Where(d => edges.Contains(Toward(p, d)))];
+        double cx = edges.Average(e => e.Across ? e.X + 0.5 : e.X), cy = edges.Average(e => e.Across ? e.Y : e.Y + 0.5);
+        var used = new HashSet<FenceEdge>();
+        int cornersOut = 0, cornersIn = 0, gates = 0, ends = 0;
+        foreach (var p in points.OrderBy(p => p.Y).ThenBy(p => p.X))
+        {
+            var arms = Arms(p);
+            if (arms.Count != 2 || arms[0].X * arms[1].X + arms[0].Y * arms[1].Y != 0) continue;
+            var (a, b) = (Toward(p, arms[0]), Toward(p, arms[1]));
+            if (used.Contains(a) || used.Contains(b)) continue;
+            used.Add(a);
+            used.Add(b);
+            // The turn goes round the town if the corner's inside faces the wall's middle.
+            double dot = (arms[0].X + arms[1].X) * (cx - p.X) + (arms[0].Y + arms[1].Y) * (cy - p.Y);
+            if (dot > 0) cornersOut++; else cornersIn++;
+        }
+        var gated = new HashSet<(int X, int Y)>();
+        bool Road(int x, int y) => m.In(x, y) && m.GroundAt(x, y) is Ground.Road or Ground.Paving or Ground.Dirt;
+        foreach (var p in points.OrderBy(p => p.Y).ThenBy(p => p.X))
+        {
+            var arms = Arms(p);
+            if (arms.Count != 1 || gated.Contains(p)) continue;
+            // A gap two squares wide the other way, the wall going on beyond it and a road through it: a gatehouse.
+            var away = (X: -arms[0].X, Y: -arms[0].Y);
+            var q = (X: p.X + 2 * away.X, Y: p.Y + 2 * away.Y);
+            if (gated.Contains(q) || !Arms(q).Contains(away)) continue;
+            if (edges.Contains(Toward(p, away)) || edges.Contains(Toward((p.X + away.X, p.Y + away.Y), away)) || UnderTower(p.X + away.X, p.Y + away.Y, 0)) continue;
+            // The squares either side of the gap.
+            bool road = Enumerable.Range(0, 2).Any(i =>
+            {
+                int gx = p.X + away.X * i + (away.X < 0 ? -1 : 0), gy = p.Y + away.Y * i + (away.Y < 0 ? -1 : 0);
+                return away.Y == 0 ? Road(gx, gy) || Road(gx, gy - 1) : Road(gx, gy) || Road(gx - 1, gy);
+            });
+            if (!road) continue;
+            gated.Add(p);
+            gated.Add(q);
+            gates++;
+        }
+        foreach (var p in points)
+        {
+            var arms = Arms(p);
+            if (arms.Count != 1 || gated.Contains(p) || UnderTower(p.X, p.Y, 0.15)) continue;
+            // An end at the edge of the box goes on outside it: no turret.
+            if (box is { } bx && (p.X <= bx.X0 || p.Y <= bx.Y0 || p.X >= bx.X1 || p.Y >= bx.Y1)) continue;
+            var e = Toward(p, arms[0]);
+            if (used.Add(e)) ends++;
+        }
+        int two = 0, one = 0;
+        foreach (var line in edges.Where(e => !used.Contains(e)).GroupBy(e => (e.Across, e.Across ? e.Y : e.X)))
+        {
+            var at = line.Select(e => e.Across ? e.X : e.Y).OrderBy(v => v).ToList();
+            int run = 1;
+            for (int i = 1; i <= at.Count; i++)
+            {
+                if (i < at.Count && at[i] == at[i - 1] + 1) { run++; continue; }
+                two += run / 2;
+                one += run % 2;
+                run = 1;
+            }
+        }
+        return new(two, one, cornersOut, cornersIn, gates, ends, towers.Count);
+    }
+
+    /// <summary>The town wall's pieces and guard towers (inside the box) from the furniture maker, in the map's look; null if there are none.</summary>
+    public static FurnitureSet? WallSet(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
+    {
+        var cut = Walls(m, box);
+        var items = new List<FurnitureItem>();
+        foreach (var (end, count) in new[] { ("wall-2", cut.Two), ("wall-1", cut.One), ("wall-corner-out", cut.CornersOut), ("wall-corner-in", cut.CornersIn), ("wall-gate", cut.Gates), ("wall-end", cut.Ends), ("guard-tower", cut.Towers) })
+            if (count > 0 && Piece(m.Theme, end) is { } e) items.Add(Sized(e, m.SquareMm, 1, count));
+        return Set(m.Theme, items);
+    }
+
+    /// <summary>
+    /// The map's trees (inside the box) as the furniture maker's, in the map's look (an oak, a palm, a giant
+    /// mushroom or a dead tree; a pine where there's one), as big as on the map to the nearest quarter: the
+    /// same sizes together. Bushes aren't among them. Null if there are none.
+    /// </summary>
+    public static FurnitureSet? TreeSet(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
+    {
+        var trees = FurnitureCatalog.For(m.Theme, FurnitureCatalog.Town).Where(e => e.Item.Kind == FItemKind.Tree).ToList();
+        if (trees.Count == 0) trees = [.. FurnitureCatalog.For("Medieval", FurnitureCatalog.Town).Where(e => e.Item.Kind == FItemKind.Tree)];
+        if (trees.Count == 0) return null;
+        var broad = trees.FirstOrDefault(e => e.Item.Tree != TreeStyle.Pine) ?? trees[0];
+        var pine = trees.FirstOrDefault(e => e.Item.Tree == TreeStyle.Pine) ?? broad;
+        var items = m.Props.Where(p => p.Kind is PropKind.Tree or PropKind.Pine && InBox(box, p.X, p.Y))
+            .GroupBy(p => (p.Kind, Size: Math.Max(0.75, Math.Round(p.Size * 4) / 4)))
+            .OrderBy(g => g.Key.Kind).ThenBy(g => g.Key.Size)
+            .Select(g =>
+            {
+                var e = g.Key.Kind == PropKind.Pine ? pine : broad;
+                // As wide as its crown on the map: an oak's about 1.1 squares across at size 1, a pine's 0.85.
+                double across = (g.Key.Kind == PropKind.Pine ? 0.85 : 1.1) * g.Key.Size * 25.4;
+                return Sized(e, m.SquareMm, Math.Max(0.6, across / e.Item.WidthMm), g.Count()) with { Name = $"{e.Name} ({g.Key.Size:0.##} squares)" };
+            }).ToList();
+        return Set(m.Theme, items);
+    }
+
+    /// <summary>The map's horse troughs, stages, market stalls, outdoor bars and notice boards (inside the box) from the furniture maker; null if there are none.</summary>
+    public static FurnitureSet? TownPropSet(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
+    {
+        var items = new List<FurnitureItem>();
+        foreach (var (kind, end) in new[] { (PropKind.Stage, "stage"), (PropKind.Stall, "market-stall"), (PropKind.Bar, "bar"), (PropKind.Trough, "horse-trough"), (PropKind.NoticeBoard, "notice-board") })
+            foreach (var g in m.Props.Where(p => p.Kind == kind && InBox(box, p.X, p.Y)).GroupBy(p => Math.Round(p.Size * 4) / 4).OrderBy(g => g.Key))
+                if (Piece(m.Theme, end) is { } e) items.Add(Sized(e, m.SquareMm, g.Key, g.Count()));
+        return Set(m.Theme, items);
     }
 }

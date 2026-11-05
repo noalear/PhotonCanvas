@@ -99,6 +99,17 @@ public static class TownPicture
             float r = (float)(Radius(p) * (p.Kind == PropKind.Statue ? 0.5 : 1));
             c.DrawCircle((float)p.X + r * 0.35f, (float)p.Y + r * 0.5f, r, shadow);
         }
+        foreach (var p in m.Props.Where(p => Prop.Footprint(p.Kind) is not null && In(p.X, p.Y)))
+        {
+            // The town's bigger pieces: a guard tower's long shadow, a stage's or a stall's shorter one.
+            var (fw, fd) = Prop.Footprint(p.Kind)!.Value;
+            float w = (float)(fw * p.Size), d = (float)(fd * p.Size), off = p.Kind switch { PropKind.GuardTower => 0.9f, PropKind.Stage or PropKind.Stall or PropKind.Bar => 0.3f, _ => 0.12f };
+            c.Save();
+            c.Translate((float)p.X + off * 0.7f, (float)p.Y + off);
+            c.RotateDegrees((float)p.TurnDeg);
+            c.DrawRect(-w / 2, -d / 2, w, d, shadow);
+            c.Restore();
+        }
 
         // Fences, hedges and walls.
         foreach (var f in m.Fences) DrawFence(c, f, fill, line);
@@ -111,7 +122,7 @@ public static class TownPicture
         }
 
         // Trees and things.
-        foreach (var p in m.Props.Where(p => In(p.X, p.Y)).OrderBy(p => p.Kind is PropKind.Tree or PropKind.Pine ? 1 : 0).ThenBy(p => p.Y))
+        foreach (var p in m.Props.Where(p => In(p.X, p.Y)).OrderBy(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.GuardTower ? 1 : 0).ThenBy(p => p.Y))
             DrawProp(c, p, fill, line);
 
         // The grid.
@@ -636,6 +647,135 @@ public static class TownPicture
                 c.DrawCircle(0, 0, 0.07f, fill);
                 fill.Color = new SKColor(0xFF, 0xE0, 0x90);
                 c.DrawCircle(0, 0, 0.04f, fill);
+                break;
+            }
+            case PropKind.Trough:
+            {
+                // A stone trough with water in it.
+                float w = 1.26f * (float)p.Size, d = 0.43f * (float)p.Size, t = 0.07f * (float)p.Size;
+                fill.Color = new SKColor(0x9C, 0x96, 0x8C);
+                c.DrawRect(-w / 2, -d / 2, w, d, fill);
+                fill.Color = new SKColor(0x3C, 0x6E, 0x98);
+                c.DrawRect(-w / 2 + t, -d / 2 + t, w - 2 * t, d - 2 * t, fill);
+                fill.Color = new SKColor(0xFF, 0xFF, 0xFF, 0x50);
+                c.DrawRect(-w / 2 + t, -d / 2 + t, w - 2 * t, (d - 2 * t) * 0.3f, fill);
+                line.Color = new SKColor(0x4A, 0x46, 0x40);
+                line.StrokeWidth = 0.02f;
+                c.DrawRect(-w / 2, -d / 2, w, d, line);
+                break;
+            }
+            case PropKind.Stage:
+            {
+                // A planked deck, steps at the front, the backdrop and curtains along the back.
+                float w = 3f * (float)p.Size, d = 2f * (float)p.Size;
+                fill.Color = new SKColor(0xA6, 0x7C, 0x50);
+                c.DrawRect(-w / 2, -d / 2, w, d, fill);
+                line.Color = new SKColor(0x6A, 0x4A, 0x2C);
+                line.StrokeWidth = 0.02f;
+                for (float yy = -d / 2 + 0.16f; yy < d / 2; yy += 0.16f) c.DrawLine(-w / 2, yy, w / 2, yy, line);
+                fill.Color = new SKColor(0x8A, 0x62, 0x3E);
+                c.DrawRect(-0.5f * (float)p.Size, d / 2, 1f * (float)p.Size, 0.18f * (float)p.Size, fill);
+                c.DrawRect(-0.5f * (float)p.Size, d / 2, 1f * (float)p.Size, 0.18f * (float)p.Size, line);
+                fill.Color = new SKColor(0x8E, 0x24, 0x28);
+                c.DrawRect(-w / 2, -d / 2, w, 0.2f * (float)p.Size, fill);
+                fill.Color = new SKColor(0xB0, 0x34, 0x34);
+                c.DrawRect(-w / 2, -d / 2 + 0.2f * (float)p.Size, 0.35f * (float)p.Size, 0.3f * (float)p.Size, fill);
+                c.DrawRect(w / 2 - 0.35f * (float)p.Size, -d / 2 + 0.2f * (float)p.Size, 0.35f * (float)p.Size, 0.3f * (float)p.Size, fill);
+                line.Color = new SKColor(0x3A, 0x2A, 0x1C);
+                line.StrokeWidth = 0.025f;
+                c.DrawRect(-w / 2, -d / 2, w, d, line);
+                break;
+            }
+            case PropKind.Stall:
+            case PropKind.Bar:
+            {
+                // A striped awning (a stall), or a counter with barrels behind it (a bar).
+                float w = (p.Kind == PropKind.Stall ? 1.42f : 1.57f) * (float)p.Size, d = 0.79f * (float)p.Size;
+                if (p.Kind == PropKind.Stall)
+                {
+                    int n = 6;
+                    for (int i = 0; i < n; i++)
+                    {
+                        fill.Color = i % 2 == 0 ? new SKColor(0xC0, 0x3C, 0x34) : new SKColor(0xF0, 0xE6, 0xD0);
+                        c.DrawRect(-w / 2 + w * i / n, -d / 2, w / n, d, fill);
+                    }
+                    fill.Color = new SKColor(0, 0, 0, 0x30);
+                    c.DrawRect(-w / 2, 0, w, d / 2, fill);
+                }
+                else
+                {
+                    fill.Color = new SKColor(0x5A, 0x3E, 0x26);
+                    c.DrawRect(-w / 2, -d / 2, w, d * 0.42f, fill);
+                    fill.Color = new SKColor(0x9A, 0x70, 0x48);
+                    c.DrawRect(-w / 2, d / 2 - d * 0.42f, w, d * 0.42f, fill);
+                    line.Color = new SKColor(0x3A, 0x2A, 0x1C);
+                    line.StrokeWidth = 0.02f;
+                    foreach (float bx in new[] { -0.5f, 0f, 0.5f })
+                    {
+                        fill.Color = new SKColor(0x7A, 0x52, 0x30);
+                        c.DrawCircle(bx * (float)p.Size, -d * 0.22f, 0.12f * (float)p.Size, fill);
+                        c.DrawCircle(bx * (float)p.Size, -d * 0.22f, 0.12f * (float)p.Size, line);
+                    }
+                }
+                line.Color = new SKColor(0x3A, 0x2A, 0x1C);
+                line.StrokeWidth = 0.02f;
+                c.DrawRect(-w / 2, -d / 2, w, d, line);
+                break;
+            }
+            case PropKind.NoticeBoard:
+            {
+                float w = 0.94f * (float)p.Size, d = 0.39f * (float)p.Size;
+                fill.Color = new SKColor(0x7A, 0x52, 0x32);
+                c.DrawRect(-w / 2, -d / 2, w, d, fill);
+                line.Color = new SKColor(0x4A, 0x32, 0x1E);
+                line.StrokeWidth = 0.02f;
+                c.DrawLine(-w / 2, 0, w / 2, 0, line);
+                c.DrawRect(-w / 2, -d / 2, w, d, line);
+                fill.Color = new SKColor(0xF0, 0xE6, 0xD0);
+                c.DrawRect(-w * 0.3f, d * 0.12f, w * 0.18f, d * 0.3f, fill);
+                c.DrawRect(w * 0.08f, d * 0.08f, w * 0.2f, d * 0.34f, fill);
+                break;
+            }
+            case PropKind.GuardTower:
+            {
+                // The fighting roof from above: flagstones inside the merlons, a hatch and a flag.
+                float w = 1.81f * (float)p.Size, t = 0.2f * (float)p.Size;
+                fill.Color = new SKColor(0x9A, 0x94, 0x8A);
+                c.DrawRect(-w / 2, -w / 2, w, w, fill);
+                fill.Color = new SKColor(0x7E, 0x78, 0x70);
+                c.DrawRect(-w / 2 + t, -w / 2 + t, w - 2 * t, w - 2 * t, fill);
+                line.Color = new SKColor(0x5A, 0x56, 0x50);
+                line.StrokeWidth = 0.015f;
+                for (float g = -w / 2 + t + 0.25f; g < w / 2 - t; g += 0.25f)
+                {
+                    c.DrawLine(g, -w / 2 + t, g, w / 2 - t, line);
+                    c.DrawLine(-w / 2 + t, g, w / 2 - t, g, line);
+                }
+                // Merlons round the top, lighter where the light falls.
+                fill.Color = new SKColor(0xC4, 0xBE, 0xB4);
+                int n = 5;
+                for (int i = 0; i < n; i++)
+                {
+                    float a = -w / 2 + (w - t) * i / (n - 1);
+                    c.DrawRect(a, -w / 2, t, t, fill);
+                    c.DrawRect(-w / 2, a, t, t, fill);
+                    c.DrawRect(a, w / 2 - t, t, t, fill);
+                    c.DrawRect(w / 2 - t, a, t, t, fill);
+                }
+                fill.Color = new SKColor(0x5A, 0x3E, 0x26);
+                c.DrawRect(w * 0.12f, w * 0.12f, w * 0.18f, w * 0.18f, fill);
+                fill.Color = new SKColor(0xB0, 0x2A, 0x2A);
+                using (var flag = new SKPath())
+                {
+                    flag.MoveTo(-w * 0.15f, -w * 0.15f);
+                    flag.LineTo(w * 0.12f, -w * 0.08f);
+                    flag.LineTo(-w * 0.15f, 0);
+                    flag.Close();
+                    c.DrawPath(flag, fill);
+                }
+                line.Color = new SKColor(0x3A, 0x36, 0x30);
+                line.StrokeWidth = 0.03f;
+                c.DrawRect(-w / 2, -w / 2, w, w, line);
                 break;
             }
             case PropKind.Statue:

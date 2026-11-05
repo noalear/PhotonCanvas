@@ -1,10 +1,11 @@
 # City builder
 
 An add-on (Settings → Add-ons → **City builder**): on when PhotonCanvas is installed, and can be
-turned off. It needs the **Building editor** and **Map to terrain** add-ons (and the makers they use),
-the **Floor tile maker**, the **Miniature bridge maker** and the **Scatter terrain maker**: every
-building on the map is a building editor building, the battle map reader finds a picture's grid the
-way Map to terrain does, and the ground, bridges and scenery are cut by the other three. Its button is **Home → Draw → City**.
+turned off. It needs the **Building editor** and **Map to terrain** add-ons (and the makers they use, the
+**Mini furniture maker** among them), the **Floor tile maker**, the **Miniature bridge maker** and the
+**Scatter terrain maker**: every building on the map is a building editor building, the battle map
+reader finds a picture's grid the way Map to terrain does, and the ground, bridges, walls, trees and
+scenery are cut by the others. Its button is **Home → Draw → City**.
 
 **City** lays out a whole town, village or city on one big map: the ground of every square (grass,
 roads, paving, water, fields…), the buildings standing on it, fences, hedges and town walls along the
@@ -51,7 +52,7 @@ enough, and each building's name once it's big enough to read.
 | **Fill** | Click a patch of one ground to fill it all with another (the right button fills it with grass). |
 | **Road** | Drag from one square to another to lay a road there, round one corner; hold Ctrl for a straight line however it slants. What it lays (cobbles, a dirt track, paving, sand, water for a river or grass to take one up) and how many squares wide are under **Roads** on the **Tools** tab. The right button lays grass. |
 | **Fence** | Drag along the grid lines to put up the **Fence** picked on the **Tools** tab: a fence, a hedge, a stone wall or a town wall. Start on one that's there to take it away instead. |
-| **Trees** | Click to put down the **Tree or thing** picked on the **Tools** tab: a tree, a pine tree, a bush, a boulder, a well, a cart, crates and barrels, a lamp or a statue. The right button takes them away. |
+| **Trees** | Click to put down the **Tree or thing** picked on the **Tools** tab: a tree, a pine tree, a bush, a boulder, a well, a cart, crates and barrels, a lamp or a statue, or one of the town's bigger pieces: a horse trough, a players' stage (three squares by two), a market stall, an outdoor bar, a notice board or a guard tower (two squares by two: put it on a grid point of a town wall and it stands astride the wall). The right button takes them away. |
 | **Label** | Click to write the **Text** under **Labels** on the **Tools** tab there: a street's name, a district's, a number for your game master's key. The right button takes one away. |
 | **Erase** | Drag over labels, trees, fences and buildings to take them away. |
 
@@ -91,7 +92,7 @@ On the **Map** tab:
 
 ## Making a town for you
 
-![A walled town made by the city builder: main roads meeting at a market square with its temple and hall, lanes lined with houses, a river with bridges, gates in the wall, towers at its corners and fields outside](images/window-citybuilder-made.png)
+![A walled town made by the city builder: main roads meeting at a market square with its temple and hall, lanes lined with houses, a river with bridges, gates in the wall, towers at its corners and guard towers along it, and fields outside](images/window-citybuilder-made.png)
 
 On the **Map** tab, **Make a town for me** makes a whole town the size of **Squares across** and
 **Squares down** (up to 300 each way, in a few seconds), in the map's **Look**:
@@ -103,11 +104,13 @@ On the **Map** tab, **Make a town for me** makes a whole town the size of **Squa
   bottom with a paved quay, a main road along the town, lanes down to the water and back streets.
 - **How full**: further left, a house here and there; further right, buildings packed side by side.
 - **A town wall with gates**: a town wall round it, with a gate wherever a road goes through, a tower
-  in each corner, guardhouses by the gates and farms with fields outside.
+  in each corner, guard towers astride the wall every dozen squares or so, guardhouses by the gates and
+  farms with fields outside.
 - **A river through it**: a river down one side, a bridge wherever a road crosses it, warehouses
   along it.
 - **A market square**: a paved square where the main roads meet, with a temple, a town hall and a
-  tavern facing it, and a well, carts, crates, a statue and lamps on it.
+  tavern facing it, and on it a well, a players' stage, market stalls, an outdoor bar, a notice board,
+  a horse trough, carts, crates, a statue and lamps, clear of the roads through it.
 - **Use my saved buildings where they suit**: a plot gets one of your saved buildings when its
   district (and type) suits, turned to face the road.
 
@@ -119,7 +122,9 @@ farms. Each has a name (*The Golden Goose*, *Ashford Manor*, *Baker's shop*), th
 named, and there are lamps along them, trees in the gardens and woods outside. Under the button it
 says what was made. Then change anything you like: it's an ordinary map.
 
-![The same town in 3D: the wall and its corner towers, the houses with their roofs, the bridges over the river and the woods outside](images/window-citybuilder-made-3d.png)
+![The same town in 3D: the wall with its corner towers and guard towers, the houses with their roofs, the bridges over the river and the woods outside](images/window-citybuilder-made-3d.png)
+
+![Closer in on the market square in 3D: market stalls under their awnings, the outdoor bar with its barrels, a notice board, carts and the players' stage with its backdrop round the well, the houses close round it](images/window-citybuilder-square-3d.png)
 
 ### Filling the roads with buildings
 
@@ -131,7 +136,7 @@ with **Road**, then fill each part of town with its own district.
 
 ## Saving it as a battle map picture
 
-![A part of a town saved as a battle map picture: cobbled streets round a paved market square with its well, carts and lamps, tiled, thatched and slate roofs lit from one side, the river with its ripples, and the street names](images/citybuilder-picture.png)
+![A part of a town saved as a battle map picture: cobbled streets round a paved market square with its stage, market stalls, well, trough, carts and lamps, tiled, thatched and slate roofs lit from one side, the river with its ripples, and the street names](images/citybuilder-picture.png)
 
 On the **Map** tab, **Save as a picture…** saves the map drawn from above as a battle map, for a
 virtual table or to print: textured ground (cobbles, flagstones, grass, water with its banks, fields),
@@ -252,9 +257,9 @@ be better to do a few buildings at a time.
 Each building is made at its own grid square: open it in the building editor to change its sheet,
 walls (box or flat), textures and sizes before cutting.
 
-## Cutting the ground, bridges and scenery
+## Cutting the ground, bridges, walls, trees and scenery
 
-![The Cut tab for a walled town: the ground in tiles four squares across with jigsaw edges, three bridges where roads cross the river, and the wells, carts, barrels and boulders](images/window-citybuilder-cut.png)
+![The Cut tab for a walled town: the ground in tiles four squares across with jigsaw edges, the bridges where roads cross the river, the town wall's sections, corners, gatehouses and guard towers, the trees, and the market square's scenery](images/window-citybuilder-cut.png)
 
 The **Cut** tab puts the rest of the town in the design. Tick **Only the last box dragged with
 Select** to cut just the part of the map in the box you last dragged with **Select**; otherwise it's
@@ -283,6 +288,25 @@ crosses water: stone arches for a cobbled or paved road (flagstones on a paved o
 track, as wide as the road and reaching half a square onto each bank, in the map's look. Each goes on
 pages of its own.
 
+**Put the town walls in the design** makes the town wall and its guard towers with the
+[furniture maker](furniture.md)'s town pieces, in the map's look (a stone wall with a wall walk and
+merlons, a fortress wall, a log palisade, an armoured defence wall, a sandstone wall or a gothic city
+wall): a corner piece wherever the wall turns (the parapet round the outside of the turn, or the
+inside where it turns in), a gatehouse over each road through a gap two squares wide, an end with a
+turret wherever else it stops (at a river, say), and the rest in sections two squares and one square
+long. The wall isn't cut under a guard tower: the sections either side meet it. Under the tab it says
+how many of each that is.
+
+**Put the trees in the design** makes the map's trees as the furniture maker's: two profiles halved
+together in a round base, bark and leaves etched, in the map's look (oaks and pines, dead trees,
+palms, giant mushrooms, or trees in planters), each as big as it is on the map (to the nearest quarter
+square, so trees of a size are cut together). At most 150 at once: a big town's woods are cut a box
+at a time. Bushes aren't cut.
+
 **Put the scenery in the design** makes the [scenery maker](scatter.md)'s pieces for the map's wells,
 carts, boulders, crates (as barrels) and fences (each run of fence in sections of up to four
-squares). Trees, lamps, statues, hedges and walls aren't among them yet.
+squares), and the furniture maker's horse troughs, players' stages, market stalls, outdoor bars and
+notice boards. Lamps, statues, hedges and stone walls aren't cut.
+
+Each set goes in the design with its settings, like anything the furniture maker makes: right-click
+one of its pieces and choose **Edit furniture…** to change its sheet or sizes.
