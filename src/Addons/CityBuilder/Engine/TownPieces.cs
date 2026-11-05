@@ -308,11 +308,11 @@ public static class TownPieces
         return Set(m.Theme, items);
     }
 
-    /// <summary>The map's horse troughs, stages, market stalls, outdoor bars, notice boards, fountains and gallows (inside the box) from the furniture maker; null if there are none.</summary>
+    /// <summary>The map's horse troughs, stages, market stalls, outdoor bars, notice boards, fountains, gallows, street lamps and statues (inside the box) from the furniture maker; null if there are none.</summary>
     public static FurnitureSet? TownPropSet(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
     {
         var items = new List<FurnitureItem>();
-        foreach (var (kind, end) in new[] { (PropKind.Stage, "stage"), (PropKind.Stall, "market-stall"), (PropKind.Bar, "bar"), (PropKind.Trough, "horse-trough"), (PropKind.NoticeBoard, "notice-board"), (PropKind.Fountain, "fountain"), (PropKind.Gallows, "gallows") })
+        foreach (var (kind, end) in new[] { (PropKind.Stage, "stage"), (PropKind.Stall, "market-stall"), (PropKind.Bar, "bar"), (PropKind.Trough, "horse-trough"), (PropKind.NoticeBoard, "notice-board"), (PropKind.Fountain, "fountain"), (PropKind.Gallows, "gallows"), (PropKind.Lamp, "street-lamp"), (PropKind.Statue, "statue") })
             foreach (var g in m.Props.Where(p => p.Kind == kind && InBox(box, p.X, p.Y)).GroupBy(p => Math.Round(p.Size * 4) / 4).OrderBy(g => g.Key))
                 if (Piece(m.Theme, end) is { } e) items.Add(Sized(e, m.SquareMm, g.Key, g.Count()));
         return Set(m.Theme, items);

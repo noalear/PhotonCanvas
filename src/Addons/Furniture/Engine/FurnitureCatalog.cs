@@ -140,6 +140,18 @@ public static class FurnitureCatalog
         b.Add("Notice board", ItemKind.Stall, i => i with { Stall = StallStyle.NoticeBoard, WidthMm = 24, DepthMm = 10, HeightMm = 36 }, board, "notice-board");
     }
 
+    /// <summary>
+    /// The street pieces every theme gets, with ids the city builder looks for: "{key}-street-lamp", "-statue",
+    /// "-signpost", "-market-cross" and "-watchtower".
+    /// </summary>
+    static void StreetPieces(Book b, (string Name, string About) lamp, (string Name, string About) statue, (string Name, string About) sign,
+        (string Name, string About) cross, (string Name, string About) tower)
+    {
+        b.Room = Town;
+        foreach (var (p, style, id) in new[] { (lamp, StreetStyle.Lamp, "street-lamp"), (statue, StreetStyle.Statue, "statue"), (sign, StreetStyle.Signpost, "signpost"), (cross, StreetStyle.MarketCross, "market-cross"), (tower, StreetStyle.Watchtower, "watchtower") })
+            b.Add(p.Name, ItemKind.Street, i => global::PhotonCanvas.Addon.Furniture.TownWalls.StreetSized(i, style), p.About, id);
+    }
+
     static IReadOnlyList<CatalogEntry> Build()
     {
         var list = new List<CatalogEntry>();
@@ -238,6 +250,11 @@ public static class FurnitureCatalog
             "The town notice board under its little shingled roof, notices pinned up.");
         b.Add("Gallows", ItemKind.Gallows, i => i, "A town gallows on a braced platform: steps up the front, railings, a trapdoor under the drop and a noose hanging from the beam.", "gallows");
         b.Add("Market fountain", ItemKind.Fountain, i => i, "An eight-sided stone basin full of water, a carved column with two bowls, water falling from spouts under each, and a pine-cone finial.", "fountain");
+        StreetPieces(b, ("Street lamp", "A lantern on a post: a pyramid roof and a ball on top, scrolled brackets, a bar for the lamplighter's ladder and a moulded plinth on paving."),
+            ("Knight statue", "A knight leaning on his sword, a kite shield with the house's symbol on his arm and a crest on his helm, on a panelled pedestal with an inscription."),
+            ("Signpost", "A crossroads signpost: four lettered arrow boards nailed on pointing four ways under a little cap with a ball on top."),
+            ("Market cross", "A wheel-head stone cross on a shaft with a knop, standing on three octagonal steps."),
+            ("Watchtower", "A square timber watchtower: braced leg frames with a ladder up the front, a planked platform with a trapdoor, a boarded parapet, an alarm bell under a shingled gable roof."));
         TownWalls(b, "Town wall", "stone town wall with a wall walk, merlons with cross loops and a corbelled course");
         return b.Entries;
     }
@@ -312,6 +329,11 @@ public static class FurnitureCatalog
             "A board of bounties and wanted notices under a little roof.");
         b.Add("Gallows", ItemKind.Gallows, i => i, "A gallows for the dungeon yard: a braced platform, railings and a trapdoor, a noose and an iron gibbet cage hanging from the beam on a chain.", "gallows");
         b.Add("Dungeon fountain", ItemKind.Fountain, i => i, "A grim stone fountain: a basin of worn blocks with carved panels, two bowls on a column and water falling from each.", "fountain");
+        StreetPieces(b, ("Brazier post", "An iron brazier of flames on a twisted post, spikes round its rim."),
+            ("Warlord statue", "A horned warlord in a cloak with a great axe, a skull on his breastplate, on a panelled pedestal."),
+            ("Signpost", "A gaol-yard signpost: lettered arrow boards and a skull on a spike on top."),
+            ("Broken cross", "A snapped stone cross on three worn steps, a chain and shackle hanging from its arm."),
+            ("Watchtower", "A dark timber watchtower: braced legs, a ladder, a planked platform and parapet, an alarm bell under a plank roof with spikes on the ridge."));
         TownWalls(b, "Fortress wall", "grim fortress wall of great worn blocks, its merlons knocked about");
         return b.Entries;
     }
@@ -362,6 +384,11 @@ public static class FurnitureCatalog
             "A notice board for the cave settlement under a little plank roof.");
         b.Add("Gallows", ItemKind.Gallows, i => i, "A rough plank gallows on braced legs, steps up the front, a noose hanging from the beam.", "gallows");
         b.Add("Spring basin", ItemKind.Fountain, i => i, "A spring bubbling up through a column of stacked stones into two bowls and a rough stone basin.", "fountain");
+        StreetPieces(b, ("Torch post", "A burning torch bound with rags on a log post."),
+            ("Stone idol", "A squat horned idol with a big belly and folded arms, a spiral carved on it, on a rough stone pedestal."),
+            ("Signpost", "A log signpost with arrow boards and a horned skull on top."),
+            ("Totem", "A totem of three carved faces under spreading horns, on three stone steps."),
+            ("Lookout tower", "A rough timber lookout: braced legs, a ladder, a platform and parapet, a bell under a thatched roof."));
         TownWalls(b, "Palisade", "log palisade, every log sharpened, with a plank walk behind and lashed rails");
         return b.Entries;
     }
@@ -434,6 +461,11 @@ public static class FurnitureCatalog
             "A street bar under a plated canopy with a hanging sign.",
             "A bulletin board on legs under a little canopy.");
         b.Add("Water purifier", ItemKind.Fountain, i => i, "A plated purifier tank with a column of two bowls, water falling from spouts under each, and an antenna on top.", "fountain");
+        StreetPieces(b, ("Light pylon", "A light pylon: a glowing light bar on a tapered neck, an antenna and a beacon on top, hazard stripes round its foot."),
+            ("Trooper statue", "A trooper in power armour with a rifle across his chest, on a plated pedestal with a glowing plaque."),
+            ("Holo signpost", "A signpost of glowing holo boards with chevrons pointing the way, an antenna on top."),
+            ("Beacon", "A beacon spire through a glowing ring, a light at its tip, on three plated steps."),
+            ("Sentry tower", "A plated sentry tower: braced legs, a ladder, a platform and parapet with hazard stripes, a searchlight under a ribbed metal roof."));
         TownWalls(b, "Defence wall", "armoured defence wall with gun ports, a hazard-striped band and a skirt of plate");
         return b.Entries;
     }
@@ -492,6 +524,11 @@ public static class FurnitureCatalog
             "A notice board for the caravan town under a little roof.");
         b.Add("Gallows", ItemKind.Gallows, i => i, "A sandstone-town gallows on a braced platform, steps up the front, a noose hanging from the beam.", "gallows");
         b.Add("Courtyard fountain", ItemKind.Fountain, i => i, "A sandstone fountain with a basin of carved panels, two bowls on a column and an onion-dome finial.", "fountain");
+        StreetPieces(b, ("Lantern post", "A pierced brass lantern swelling under an onion dome, on a moulded post."),
+            ("Spearman statue", "A robed spearman in a turban, a round shield on his arm, on a carved pedestal."),
+            ("Signpost", "A signpost of lettered arrow boards under an onion knob."),
+            ("Market pillar", "A pillar topped by a little kiosk with keyhole arches under an onion dome, on three octagonal steps."),
+            ("Watchtower", "A timber watchtower: braced legs, a ladder, a planked platform and parapet, an alarm bell under a palm-thatch roof."));
         TownWalls(b, "Sandstone wall", "sandstone wall with stepped merlons, keyhole loops and beam ends under the walk");
         return b.Entries;
     }
@@ -564,6 +601,11 @@ public static class FurnitureCatalog
             "A parish notice board under its little roof.");
         b.Add("Gallows", ItemKind.Gallows, i => i, "A gothic gallows: a braced platform, railings, a trapdoor, a noose and an iron gibbet cage hanging on a chain.", "gallows");
         b.Add("Square fountain", ItemKind.Fountain, i => i, "A carved stone fountain: an eight-sided basin with sunk panels, two bowls on a column, water falling from each, and a spire on top.", "fountain");
+        StreetPieces(b, ("Lantern post", "A pointed lantern under a spire with pinnacles and a cross, on fluted brackets."),
+            ("Angel statue", "A winged angel with a halo, a sword point-down at her side, on a panelled pedestal."),
+            ("Signpost", "A crooked signpost of lettered arrow boards with a crow perched on top."),
+            ("Churchyard cross", "A tabernacle of pointed niches under a pinnacled spire and a cross, on three octagonal steps."),
+            ("Watchtower", "A dark timber watchtower: braced legs, a ladder, a planked platform and parapet, an alarm bell under a slate roof with spikes on the ridge."));
         TownWalls(b, "City wall", "cut-stone city wall with gabled merlons, pointed loops and a corbel table of little arches");
         return b.Entries;
     }

@@ -24,7 +24,9 @@ match (metal panels for sci-fi).
 
 The ready-made **Town** pieces dress the square outside the tavern: the theme's town wall, a guard
 tower, trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a
-tiered fountain with water falling from its bowls, and a gallows with a noose over its trapdoor.
+tiered fountain with water falling from its bowls, a gallows with a noose over its trapdoor, street
+lamps, a statue on its pedestal, a signpost, a market cross on its steps and a wooden watchtower with
+an alarm bell under its roof.
 
 ## Add furniture to the list
 <!-- target: button:Add -->

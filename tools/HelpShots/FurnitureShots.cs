@@ -78,6 +78,10 @@ static class FurnitureShots
         Shot("window-furniture-armour", med, 2, 0);
         Shot("window-furniture-forge", med, 3, 0);
         Shot("window-furniture-dresser", med, 4, 0);
+        var street = FurnitureThemes.Apply(new FurnitureSet { Items = [C("med-watchtower"), C("med-statue"), C("med-street-lamp"), C("med-market-cross"), C("got-statue")] }, "Medieval");
+        Shot("window-furniture-watchtower", street, 0, 0);
+        Shot("window-furniture-statue", street, 1, 0);
+        Shot("window-furniture-angel", street, 4, 0);
         var crypt = FurnitureThemes.Apply(new FurnitureSet { Items = [C("got-sarcophagus"), C("got-coffin"), C("got-tracery-screen")] }, "Gothic");
         Shot("window-furniture-sarcophagus", crypt, 0, 0);
         Shot("window-furniture-screen", crypt, 2, 0);
