@@ -761,6 +761,57 @@ public static class Crates
                 }
                 break;
             }
+            case CrateLoad.Treasure:
+            {
+                // A heap of gold coins mounding up over the rim, a crown sitting on it and a goblet standing at
+                // one side, gems glinting in the heap.
+                double xc = (x0 + x1) / 2, ry = Geo.Clamp(w * 0.2, 1.6, 3.6), cr = Geo.Clamp(w * 0.045, 0.55, 0.9);
+                var mound = new PathsD { Geo.Intersect([Rugs.Ellipse(xc, rim - 0.6, w / 2 - cr, ry + 0.6)], [Geo.Rect(x0, rim - 1.2, x1, rim + ry + 1)])[0] };
+                // The heap's edge lumpy with coins.
+                for (double t = 0.04; t < 0.97; t += 0.07)
+                {
+                    double a = Math.PI * t, cx = xc + (w / 2 - cr) * Math.Cos(a), cy = rim - 0.6 + (ry + 0.6) * Math.Sin(a);
+                    if (cy < rim - 0.2) continue;
+                    mound.Add(Geo.Circle(cx, cy, cr, 0.01));
+                }
+                var heap = Geo.Solid(mound);
+                front.Add(heap);
+                for (int i = 0; i < (int)(w * 1.4); i++)
+                {
+                    double px = x0 + cr + rnd.NextDouble() * (w - 2 * cr), py = rim - 0.8 + rnd.NextDouble() * ry;
+                    if (!OutlineHas(heap, px, py, cr)) continue;
+                    lines.Add(WoodFace.Dot(px, py, cr * 0.55));
+                }
+                foreach (var (gx, gy) in new[] { (xc - w * 0.18, rim + ry * 0.3), (xc + w * 0.22, rim + ry * 0.15) })
+                    if (OutlineHas(heap, gx, gy, 0.6)) etched.Add(new PathD { new(gx, gy - 0.5), new(gx + 0.4, gy), new(gx, gy + 0.5), new(gx - 0.4, gy) });
+                // The crown, behind on top of the heap: a band with three points, each with a pearl.
+                double kw = Geo.Clamp(w * 0.32, 2.8, 5), kx = xc - w * 0.05, ky = rim + ry * 0.75, kb = Math.Max(1.0, kw * 0.26);
+                var crown = new PathsD { Geo.Rect(kx - kw / 2, ky, kx + kw / 2, ky + kb) };
+                var pearls = new List<PathD>();
+                foreach (var f in new[] { -0.5, 0.0, 0.5 })
+                {
+                    double px = kx + f * (kw - 1.6), ph = Math.Max(1.4, kb * (f == 0 ? 1.6 : 1.2));
+                    crown.Add(new PathD { new(px - 0.9, ky + kb - 0.01), new(px + 0.9, ky + kb - 0.01), new(px, ky + kb + ph) });
+                    pearls.Add(WoodFace.Dot(px, ky + kb + ph - 0.75, 0.25));
+                }
+                var crownS = Geo.Offset(Geo.Offset(Geo.Solid(crown), -0.5), 0.5, round: true);
+                backLines.AddRange(pearls);
+                back.Add(crownS);
+                backLines.Add([new(kx - kw / 2, ky + kb * 0.5), new(kx + kw / 2, ky + kb * 0.5)]);
+                foreach (var f in new[] { -0.3, 0.0, 0.3 }) etched.Add(Geo.Circle(kx + f * kw, ky + kb * 0.5, 0.3, 0.01));
+                // A goblet standing at the side.
+                double gx0 = x1 - Math.Max(1.6, w * 0.12), gt = rim + ry * 0.6 + 1.6;
+                if (w >= 9)
+                {
+                    var gob = Geo.Solid([
+                        new PathD { new(gx0 - 1.3, gt), new(gx0 + 1.3, gt), new(gx0 + 0.9, gt - 1.6), new(gx0 - 0.9, gt - 1.6) },
+                        Geo.Rect(gx0 - 0.55, rim - 0.5, gx0 + 0.55, gt - 1.4),
+                        WoodFace.RoundRect(gx0 - 1.0, rim - 0.6, gx0 + 1.0, rim + 0.1, 0.3) ]);
+                    back.Add(gob);
+                    backLines.Add([new(gx0 - 1.15, gt - 0.5), new(gx0 + 1.15, gt - 0.5)]);
+                }
+                break;
+            }
             case CrateLoad.Rocks:
             {
                 double rr = Geo.Clamp(w / 6, 1.2, 2.2);
@@ -781,6 +832,9 @@ public static class Crates
         outlines.AddRange(Geo.ClipLines(lines, shape));
         return (shape, Geo.Intersect(Geo.Union(etched), shape), outlines);
     }
+
+    /// <summary>Whether a circle of radius r at (x, y) lies inside the area.</summary>
+    static bool OutlineHas(PathsD area, double x, double y, double r) => Geo.Area(Geo.Subtract([Geo.Circle(x, y, r, 0.05)], area)) < 1e-3;
 
     /// <summary>A rock: a lumpy polygon with a facet line or two across it.</summary>
     static PathsD Rock(double cx, double cy, double r, Random rnd, List<PathD> lines)

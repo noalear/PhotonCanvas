@@ -307,6 +307,7 @@ public static class Rugs
         var it = m.Item;
         double W = it.WidthMm, H = it.HeightMm, y0 = Math.Max(0, it.HangMm);
         if (W < 4 || H < 4) { m.Bad("Make it at least 4 by 4 mm."); return; }
+        if (it.Hanging == HangingStyle.Torch) { Profiles.WallTorch(m); return; }
         var look = Fronts.Look(m);
         var rnd = m.Rnd;
         var etched = new PathsD();
@@ -408,6 +409,33 @@ public static class Rugs
                             acc += len;
                         }
                     }
+                }
+                else if (look == FrontLook.Plank && m.Theme is "Dungeon" or "Cave" && sw >= 8)
+                {
+                    // A round shield of boards in an iron rim studded with rivets, an iron boss in the middle, and a
+                    // chevron painted dark down the boards.
+                    double R = sw / 2, rim = Geo.Clamp(R * 0.12, 0.7, 1.4), ri = R - 0.5 - rim;
+                    var face = new PathsD { Geo.Circle(cx, cy, ri, 0.01) };
+                    double pw = Geo.Clamp(sw / 5, 1.6, 3);
+                    for (double x = cx - ri + pw; x < cx + ri - 0.3; x += pw)
+                    {
+                        double hh = Math.Sqrt(Math.Max(0, ri * ri - (x - cx) * (x - cx)));
+                        lines.Add([new(x, cy - hh), new(x, cy + hh)]);
+                    }
+                    lines.Add(Geo.Loop(Geo.Circle(cx, cy, ri, 0.01)));
+                    double rr = R - 0.5 - rim / 2;
+                    int nr = Math.Max(8, (int)(2 * Math.PI * rr / 2.4));
+                    for (int i = 0; i < nr; i++) lines.Add(WoodFace.Dot(cx + rr * Math.Cos(2 * Math.PI * i / nr), cy + rr * Math.Sin(2 * Math.PI * i / nr), 0.22));
+                    // The chevron: two dark bands meeting in a point above the boss.
+                    double bw = Geo.Clamp(ri * 0.22, 1.0, 2.4), boss = Geo.Clamp(ri * 0.3, 1.4, 3.2);
+                    var chev = new PathsD();
+                    foreach (var sgn in new[] { -1, 1 })
+                        chev.Add(Geo.Strip(new PointD(cx, cy + ri * 0.6), new PointD(cx + sgn * ri * 0.95, cy - ri * 0.7), bw));
+                    etched.AddRange(Geo.Subtract(Geo.Intersect(Geo.Union(chev), Geo.Offset(face, -0.4)), [Geo.Circle(cx, cy, boss + 0.4, 0.01)]));
+                    lines.Add(Geo.Loop(Geo.Circle(cx, cy, boss, 0.01)));
+                    lines.Add(WoodFace.Dot(cx, cy, boss * 0.55));
+                    lines.Add(WoodFace.Dot(cx - boss * 0.25, cy + boss * 0.25, 0.25));
+                    lines = Geo.ClipLines(lines, Geo.Solid(Geo.Union(outline, [shield])));
                 }
                 else if (look == FrontLook.Plank) { lines.Add(WoodFace.Dot(cx, cy, r * 0.8)); etched.Add(Geo.Circle(cx, cy, r * 0.45, 0.01)); }
                 else Cabinets.Symbol(look, m.Theme, cx, cy, r, etched, lines);

@@ -35,7 +35,7 @@ public sealed class ItemEditor : StackPanel
     readonly CheckBox _bands = new();
     readonly TextBox _label = new() { Watermark = "Picked to suit", MaxLength = 24 };
     Control _labelRow = null!, _loadRow = null!;
-    readonly ComboBox _load = Combo("Nothing", "Apples", "Sacks", "Rocks");
+    readonly ComboBox _load = Combo("Nothing", "Apples", "Sacks", "Rocks", "Treasure");
     readonly CheckBox _handles = new() { Content = "Rope handles on the ends" };
     readonly NumericUpDown _foot = Number(1, 500, 0.5m, "0.#"), _mattress = Number(2, 500, 0.5m, "0.#");
     readonly CheckBox _bedding = new() { Content = "A pillow and a blanket etched on" };
@@ -84,7 +84,7 @@ public sealed class ItemEditor : StackPanel
         _hangRow = Field("Hangs at", _hang, tip: "How high its bottom edge is up the wall (mm).");
         _lookRow = Field("Look", _look, tip: "The theme this piece is made in: its doors, handles and ornament. Ready-made pieces keep their own, so a sci-fi console can stand in a medieval list.");
         _labelRow = Field("Stencilled", _label, tip: "The words painted on a cargo or military crate's long sides. Left empty, each crate gets some to suit (SUPPLIES, FRAGILE, AMMO, RATIONS…).");
-        _loadRow = Field("Filled with", _load, tip: "What's heaped in an open crate, standing up over the rim (a board of it stands in the middle, its tabs down through the bottom).");
+        _loadRow = Field("Filled with", _load, tip: "What's heaped in an open crate or chest, standing up over the rim (a board of it stands in the middle, its tabs down through the bottom).");
         _boxRows = Stack(Field("Lid", _lid), _bands, _labelRow, _loadRow, _handles);
         _bedRows = Stack(Field("Foot board", _foot, tip: "How high the foot board is (mm)."), Field("Mattress", _mattress, tip: "How high the top of the mattress is (mm)."), _bedding);
         _doorRows = Stack(Field("Doorway", _doorShape, tip: "The doorway's shape, as cut by Walls."), Field("Hinges", _hinge, tip: "Which side of the doorway the door hangs on, seen from the side it opens to."),
@@ -167,7 +167,7 @@ public sealed class ItemEditor : StackPanel
         _top.SelectedIndex = it.Top == TopShape.Round ? 0 : 1;
         _seat.Value = D(it.SeatMm); _back.SelectedIndex = (int)it.Back;
         _shelves.Value = it.Shelves; _backPanel.IsChecked = it.BackPanel; _books.IsChecked = it.Books;
-        _lid.ItemsSource = kind == ItemKind.Crate ? new List<string> { "Closed (glued on)", "Open top" } : new List<string> { "Lifts off (a rim under it)", "Glued on", "None (open)", "Domed, lifts off" };
+        _lid.ItemsSource = kind == ItemKind.Crate ? new List<string> { "Closed (glued on)", "Open top" } : new List<string> { "Lifts off (a rim under it)", "Glued on", "None (open)", "Domed, lifts off", "Thrown open" };
         _lid.SelectedIndex = kind == ItemKind.Crate ? (it.Lid == LidStyle.None ? 1 : 0) : (int)it.Lid;
         _bands.Content = kind == ItemKind.Crate ? "Boards round the edge and a brace etched on" : "Iron bands and a lock plate etched on";
         _bands.IsChecked = it.Bands;
@@ -175,7 +175,7 @@ public sealed class ItemEditor : StackPanel
         _label.Text = it.Label ?? "";
         _labelRow.IsVisible = kind == ItemKind.Crate && it.Bands && it.CrateStyle is (CrateStyle.Cargo or CrateStyle.Military);
         _load.SelectedIndex = (int)it.Load;
-        _loadRow.IsVisible = kind == ItemKind.Crate && it.Lid == LidStyle.None;
+        _loadRow.IsVisible = (kind == ItemKind.Crate && it.Lid == LidStyle.None) || (kind == ItemKind.Chest && it.Lid is LidStyle.None or LidStyle.Open);
         _handles.IsChecked = it.Handles;
         _handles.IsVisible = kind == ItemKind.Crate && it.Bands && it.CrateStyle != CrateStyle.Military;
         _foot.Value = D(it.FootMm); _mattress.Value = D(it.MattressMm); _bedding.IsChecked = it.Bedding;
@@ -283,10 +283,10 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Bed => ("Kind", ["Plain", "Four-poster", "Bunk beds", "Pallet on sleepers"]),
         ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge", "Cook fire on a spit"]),
         ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),
-        ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand"]),
+        ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand", "Anvil on a stump"]),
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
         ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round", "Long runner"]),
-        ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains"]),
+        ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains", "Torch in a wall bracket"]),
         ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
         ItemKind.Desk => ("On top", ["Papers, a book and ink", "A screen and keyboard"]),

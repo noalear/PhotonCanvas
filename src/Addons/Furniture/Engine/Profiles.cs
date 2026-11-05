@@ -187,6 +187,218 @@ public static class Profiles
         _ = T;
     }
 
+    /// <summary>
+    /// A straw man on a post: a fat bundle of straw for a body, bound at the neck, chest and waist, a tuft
+    /// for a head, a bundle across for arms with frayed ends, the straw flaring out below the bottom
+    /// binding, and sword cuts hacked into it (burnt dark).
+    /// </summary>
+    static void StrawDummy(double xc, double footH, double W, double H, double post, Random rnd, PathsD shape, PathsD etched, List<PathD> lines)
+    {
+        double bw = W * 0.6, b0 = H * 0.3, b1 = H * 0.85, shoulder = H * 0.74, aw = Geo.Clamp(H * 0.09, 1.6, 3.2);
+        shape.AddRange(Bar(xc, footH, xc, b0 + 1, post * 1.3));
+        shape.Add(WoodFace.RoundRect(xc - bw / 2, b0 + 1.5, xc + bw / 2, b1, bw * 0.3));
+        // The skirt of straw flaring below the waist binding, its bottom ragged.
+        var skirt = new PathD { new(xc - bw * 0.42, b0 + 2.4), new(xc + bw * 0.42, b0 + 2.4) };
+        int ns = Math.Max(4, (int)(bw * 0.7 / 0.9));
+        for (int i = 0; i <= ns; i++)
+        {
+            double x = xc + bw * 0.6 - bw * 1.2 * i / ns;
+            skirt.Add(new PointD(x, b0 + (i % 2 == 0 ? 0 : 0.7) + rnd.NextDouble() * 0.2));
+        }
+        shape.AddRange(Geo.Offset(Geo.Offset(Geo.Solid([skirt]), -0.55), 0.55, round: true));
+        // The arms: a bundle across, frayed at each end.
+        shape.Add(WoodFace.RoundRect(xc - W / 2 + 0.8, shoulder - aw / 2, xc + W / 2 - 0.8, shoulder + aw / 2, aw * 0.4));
+        foreach (var sgn in new[] { -1, 1 })
+        {
+            double ex = xc + sgn * (W / 2 - 0.9);
+            var fray = new PathD { new(ex - sgn * 0.5, shoulder - aw * 0.5), new(ex + sgn * 1.2, shoulder - aw * 0.85), new(ex + sgn * 0.8, shoulder), new(ex + sgn * 1.2, shoulder + aw * 0.85), new(ex - sgn * 0.5, shoulder + aw * 0.5) };
+            shape.AddRange(Geo.Offset(Geo.Offset(Geo.Solid([fray]), -0.55), 0.55, round: true));
+            lines.Add([new(ex - sgn * 1.0, shoulder - aw / 2), new(ex - sgn * 1.0, shoulder + aw / 2)]);
+            lines.Add([new(ex - sgn * 1.4, shoulder - aw / 2), new(ex - sgn * 1.4, shoulder + aw / 2)]);
+            for (double y = shoulder - aw * 0.3; y <= shoulder + aw * 0.31; y += aw * 0.3) lines.Add([new(ex - sgn * 1.4, y), new(ex - sgn * (W / 2 - bw / 2 - 0.2) , y + (rnd.NextDouble() - 0.5) * 0.2)]);
+        }
+        // The head: a tuft bound at the neck, its top splayed.
+        double hb = b1 - 0.6, ht = H, hw = bw * 0.6;
+        var tuft = new PathD { new(xc - hw * 0.35, hb), new(xc + hw * 0.35, hb), new(xc + hw * 0.5, ht - 1.4) };
+        int nt = 4;
+        for (int i = 0; i <= nt; i++)
+        {
+            double x = xc + hw * 0.6 - hw * 1.2 * i / nt;
+            tuft.Add(new PointD(x, ht - (i % 2 == 0 ? 0 : 0.9)));
+        }
+        tuft.Add(new PointD(xc - hw * 0.5, ht - 1.4));
+        shape.AddRange(Geo.Offset(Geo.Offset(Geo.Solid([tuft]), -0.55), 0.55, round: true));
+        // The bindings: a band of cord at the neck, the chest and the waist.
+        foreach (var y in new[] { hb + 0.5, b1 - (b1 - b0) * 0.42, b0 + 2.4 })
+        {
+            lines.Add([new(xc - bw, y - 0.3), new(xc + bw, y - 0.3)]);
+            lines.Add([new(xc - bw, y + 0.3), new(xc + bw, y + 0.3)]);
+            for (double x = xc - bw / 2 + 0.4; x < xc + bw / 2; x += 0.6) lines.Add([new(x, y - 0.3), new(x + 0.3, y + 0.3)]);
+        }
+        // Straw: short strokes down the body and the tuft.
+        for (double y = b0 + 3; y < ht - 0.5; y += 1.6)
+            for (double x = xc - bw / 2 + 0.6; x < xc + bw / 2 - 0.3; x += 0.9)
+            {
+                double ox = (rnd.NextDouble() - 0.5) * 0.4;
+                lines.Add([new(x + ox, y), new(x + ox + (rnd.NextDouble() - 0.5) * 0.3, y + 1.0)]);
+            }
+        // Sword cuts hacked across the chest: dark slashes, wider in the middle.
+        double cy = b1 - (b1 - b0) * 0.25;
+        for (int k = 0; k < 3; k++)
+        {
+            double len = bw * 0.28, rise = len * 0.9, y = cy - k * 1.5 - rise / 2, x0 = xc - len * 1.1 + k * 0.5;
+            var cut = new PathD();
+            for (int i = 0; i <= 6; i++) { double t = i / 6.0; cut.Add(new PointD(x0 + 2 * len * t, y + rise * t + 0.28 * Math.Sin(Math.PI * t))); }
+            for (int i = 6; i >= 0; i--) { double t = i / 6.0; cut.Add(new PointD(x0 + 2 * len * t, y + rise * t - 0.28 * Math.Sin(Math.PI * t))); }
+            etched.Add(cut);
+        }
+    }
+
+    /// <summary>
+    /// A torch in a wall bracket: a plank post on the wall with an iron plate, an iron arm out from it on a
+    /// strut, and the torch standing in the arm's end, its fire basket of bars and its flames. The arm is a
+    /// piece edge-on to the wall, its tab through a slot in the post; the torch crosses the arm's end, the
+    /// two slotted halfway into each other through the basket.
+    /// </summary>
+    public static void WallTorch(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, H = it.HeightMm, T = m.T, sw = m.SlotW, f = m.Fit, y0 = Math.Max(0, it.HangMm);
+        double bw = Math.Max(W, sw + 4.6), xc = bw / 2;
+        if (H < 12) { m.Bad("Make the wall torch at least 12 mm high."); return; }
+        double flameH = Geo.Clamp(H * 0.24, 2.5, 6), bh = Geo.Clamp(H * 0.2, 2.6, 5);
+        double bTop = H - flameH * 0.75, b0 = bTop - bh, ym = b0 + 1.2, yA = ym + 0.75, arm = 1.4;
+        double tb = Math.Max(0.5, b0 - Geo.Clamp(H * 0.3, 3, 8));
+        double zt = T + 3.6 + bw / 2, pw = Math.Max(4, sw + 2.6);
+        // ---- the basket and flames, seen from the front (u = x) or the side (u = z) about c ----
+        PathsD Basket(double c, bool collar)
+        {
+            var b = new PathsD { new PathD { new(c - bw * 0.32, b0), new(c + bw * 0.32, b0), new(c + bw / 2, bTop), new(c - bw / 2, bTop) } };
+            if (collar) b.Add(Rugs.Ellipse(c, b0, Math.Min(1.4, bw * 0.25), 0.7));
+            return b;
+        }
+        void Marks(double c, PathsD etched, List<PathD> lines)
+        {
+            int bars = Math.Max(3, (int)Math.Round(bw / 1.3));
+            for (int i = 0; i < bars - 1; i++)
+            {
+                double t0 = (i + 0.3) / (bars - 1) - 0.5, t1 = (i + 0.7) / (bars - 1) - 0.5;
+                etched.Add(new PathD { new(c + t0 * bw * 0.6, b0 + 0.5), new(c + t1 * bw * 0.6, b0 + 0.5), new(c + t1 * bw * 0.9, bTop - 0.7), new(c + t0 * bw * 0.9, bTop - 0.7) });
+            }
+            lines.Add([new(c - bw / 2, bTop - 0.35), new(c + bw / 2, bTop - 0.35)]);
+        }
+
+        // ---- the post on the wall (u = x, v = y), a slot for the arm's tab ----
+        double px = xc - pw / 2, hb = Math.Max(yA + arm / 2 + 2.6, H * 0.78);
+        double ya = yA - 4.2, tl = yA + 0.4 - ya;
+        if (ya < 1.2) { m.Bad("Make the wall torch taller: there's no room under the arm for its strut."); return; }
+        var postE = new PathsD();
+        var postL = new List<PathD>();
+        // An iron plate round the slot, riveted, and a strap across the top and the bottom.
+        var plate = Fronts.Chamfered(xc - pw / 2 + 0.4, ya - 1.4, xc + pw / 2 - 0.4, ya + tl + 1.4, 0.6);
+        postL.Add(Geo.Loop(plate));
+        foreach (var y in new[] { ya - 0.8, ya + tl + 0.8 }) foreach (var sx in new[] { -1, 1 }) postL.Add(WoodFace.Dot(xc + sx * (pw / 2 - 1.0), y, 0.22));
+        foreach (var y in new[] { 1.2, hb - 1.2 })
+        {
+            postE.Add(Geo.Rect(px - 1, y - 0.35, px + pw + 1, y + 0.35));
+            postL.Add(WoodFace.Dot(xc, y, 0.2));
+        }
+        var postCut = new PathsD { WoodFace.RoundRect(px, 0, px + pw, hb, 0.4) };
+        var slot = Geo.Rect(xc - sw / 2, ya - f / 2, xc + sw / 2, ya + tl + f / 2);
+        m.Add("Torch post", postCut, [slot], [Pose.Front(0, y0, T / 2)], grainAlongU: false, etched: Geo.Intersect(postE, postCut), lines: postL);
+
+        // ---- the arm, edge-on to the wall (u = z, v = y) ----
+        var bracket = new PathsD
+        {
+            Geo.Rect(T - 0.01, ya - 0.4, T + 1.1, yA + arm / 2),
+            Geo.Rect(T - 0.01, yA - arm / 2, zt, yA + arm / 2),
+            Geo.Strip(new PointD(T + 0.55, ya + 0.2), new PointD(zt - bw * 0.5 - 0.6, yA - arm / 2 + 0.3), 1.2),
+            Geo.Rect(0, ya, T + 0.01, ya + tl),
+        };
+        bracket.AddRange(Basket(zt, false));
+        var flS = Flames(zt, bTop - 0.3, bw * 0.85, H - bTop + 0.3);
+        bracket.AddRange(flS);
+        var brE = new PathsD();
+        var brL = new List<PathD>();
+        Marks(zt, brE, brL);
+        brE.AddRange(Geo.Intersect(Flames(zt, bTop - 0.3, bw * 0.45, (H - bTop) * 0.6), flS));
+        // A curl of iron under the arm's end.
+        brL.Add([.. Geo.Arc(zt - bw * 0.3 - 0.6, yA - arm / 2 - 0.6, 0.6, 0, Math.PI * 1.5)]);
+        var brCut = Geo.Subtract(Geo.Solid(bracket), [Geo.Rect(zt - sw / 2, b0 - 2, zt + sw / 2, ym)]);
+        m.Add("Torch arm", brCut, [], [Pose.Left(xc, y0, 0)], grainAlongU: false, face: [], etched: brE, lines: brL);
+
+        // ---- the torch across the arm's end (u = x, v = y): handle, basket, flames ----
+        var torch = new PathsD { WoodFace.RoundRect(xc - 0.75, tb, xc + 0.75, b0 + 0.3, 0.5), Geo.Circle(xc, tb + 0.3, 0.85) };
+        torch.AddRange(Basket(xc, true));
+        var fl = Flames(xc, bTop - 0.3, bw * 0.85, H - bTop + 0.3);
+        torch.AddRange(fl);
+        var tE = new PathsD();
+        var tL = new List<PathD>();
+        Marks(xc, tE, tL);
+        tE.AddRange(Geo.Intersect(Flames(xc, bTop - 0.3, bw * 0.45, (H - bTop) * 0.6), fl));
+        // The handle wrapped in rag near the top, bound with cord.
+        for (double y = b0 - 2.2; y < b0 - 0.2; y += 0.5) tL.Add([new(xc - 0.75, y), new(xc + 0.75, y + 0.3)]);
+        var tCut = Geo.Subtract(Geo.Solid(torch), [Geo.Rect(xc - sw / 2, ym, xc + sw / 2, H + 1)]);
+        m.Add("Torch", tCut, [], [Pose.Front(0, y0, zt)], grainAlongU: false, face: [], etched: tE, lines: tL);
+        m.Note($"Glue the post to the wall with its bottom {y0:0.#} mm up, push the arm's tab into its slot, and slide the torch down onto the arm's end, crossing it.");
+    }
+
+    /// <summary>
+    /// A smith's anvil on a tree stump: the anvil seen side on (a horn tapering to a point, the flat face, a
+    /// stepped heel, the waist narrowing to a spreading base) standing on the stump, which crosses it, the two
+    /// slotted halfway into each other through the stump.
+    /// </summary>
+    static void Anvil(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW, xc = W / 2;
+        double stumpW = Math.Max(W * 0.48, sw + 3), stumpD = Math.Max(D * 0.85, sw + 3);
+        if (W < 8 || H < 7) { m.Bad("Make the anvil at least 8 mm wide and 7 mm high."); return; }
+        double sh = H * 0.5, ah = H - sh, y1 = sh + ah * 0.3, y2 = sh + ah * 0.62, hx = xc - W * 0.14, heel = xc + W * 0.38;
+        var rnd = m.Rnd;
+        var shape = new PathsD
+        {
+            WoodFace.RoundRect(xc - stumpW / 2, 0, xc + stumpW / 2, sh + 0.01, 0.4),
+            // The base, spreading at its feet, the waist above it, and the face with its heel.
+            Geo.Rect(Math.Max(xc - W * 0.25, xc - stumpW / 2), sh - 0.01, Math.Min(xc + W * 0.27, xc + stumpW / 2), sh + 0.9),
+            new PathD { new(Math.Max(xc - W * 0.25, xc - stumpW / 2), sh + 0.8), new(Math.Min(xc + W * 0.27, xc + stumpW / 2), sh + 0.8), new(xc + W * 0.17, y1), new(xc - W * 0.15, y1) },
+            new PathD { new(xc - W * 0.15, y1 - 0.01), new(xc + W * 0.17, y1 - 0.01), new(xc + W * 0.13, y2 + 0.01), new(xc - W * 0.1, y2 + 0.01) },
+            Geo.Rect(hx, y2, heel, H),
+            // The horn, its underside curving up to the point.
+        };
+        var horn = new PathD { new(hx + 0.01, H), new(hx + 0.01, y2) };
+        for (int i = 1; i <= 8; i++)
+        {
+            double t = i / 8.0;
+            horn.Add(new PointD(hx - (hx - W * 0.04) * t, y2 + (H - 0.5 - y2) * Math.Pow(t, 1.8)));
+        }
+        horn.Add(new PointD(W * 0.04, H - 0.3));
+        shape.AddRange(Geo.Offset(Geo.Offset(Geo.Solid([horn]), -0.55), 0.55, round: true));
+        var etched = new PathsD();
+        var lines = new List<PathD>
+        {
+            new() { new(hx, H - 0.45), new(heel, H - 0.45) },
+            new() { new(xc - W * 0.15, y1), new(xc + W * 0.17, y1) },
+            new() { new(hx, y2), new(heel, y2) },
+        };
+        // The step down to the table by the horn, and the hardy hole seen through the heel.
+        lines.Add([new(hx + W * 0.08, y2), new(hx + W * 0.08, H)]);
+        etched.Add(Geo.Rect(heel - W * 0.08, H - 1.0, heel - W * 0.08 + 0.6, H - 0.45));
+        // The stump's bark: long lines down it, a cut ring at its top.
+        for (double x = xc - stumpW / 2 + 0.5; x < xc + stumpW / 2 - 0.3; x += 0.9)
+            lines.Add([new(x, 0.3), new(x + (rnd.NextDouble() - 0.5) * 0.3, sh * (0.5 + 0.4 * rnd.NextDouble()))]);
+        lines.Add([new(xc - stumpW / 2, sh - 0.5), new(xc + stumpW / 2, sh - 0.5)]);
+        var cut = Geo.Subtract(Geo.Solid(shape), [Geo.Rect(xc - sw / 2, -1, xc + sw / 2, sh / 2)]);
+        m.Add("Anvil", cut, [], [Pose.Front(0, 0, D / 2)], grainAlongU: true, face: [], etched: etched, lines: Geo.ClipLines(lines, cut));
+        // The stump across it, seen from the end: the bark round it, the anvil's base sitting on its top.
+        var stump = Geo.Subtract([WoodFace.RoundRect(D / 2 - stumpD / 2, 0, D / 2 + stumpD / 2, sh, 0.4)], [Geo.Rect(D / 2 - sw / 2, sh / 2, D / 2 + sw / 2, sh + 1)]);
+        var sl = new List<PathD>();
+        for (double z = D / 2 - stumpD / 2 + 0.5; z < D / 2 + stumpD / 2 - 0.3; z += 0.9)
+            sl.Add([new(z, 0.3), new(z + (rnd.NextDouble() - 0.5) * 0.3, sh * (0.5 + 0.4 * rnd.NextDouble()))]);
+        m.Add("Stump", stump, [], [Pose.Left(xc, 0, 0)], grainAlongU: false, face: [], lines: Geo.ClipLines(sl, stump));
+        m.Note("Slide the stump onto the anvil from below, crossing it.");
+    }
+
     /// <summary>A flame (one tongue, or three on a wide one) standing at x, y.</summary>
     public static PathsD Flames(double x, double y, double w, double h)
     {
@@ -211,6 +423,7 @@ public static class Profiles
 
     public static void Stand(Maker m)
     {
+        if (m.Item.Stand == StandStyle.Anvil) { Anvil(m); return; }
         var it = m.Item;
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = 2.6, xc = W / 2, post = 1.6;
@@ -224,6 +437,13 @@ public static class Profiles
         string name;
         switch (it.Stand)
         {
+            case StandStyle.Dummy when m.Theme is "Dungeon" or "Cave" && W >= 9 && H >= 18:
+            {
+                name = "Training dummy";
+                StrawDummy(xc, footH, W, H, post, m.Rnd, shape, etched, lines);
+                lines = Geo.ClipLines(lines, Geo.Solid(shape));
+                break;
+            }
             case StandStyle.Dummy:
             {
                 name = "Training dummy";

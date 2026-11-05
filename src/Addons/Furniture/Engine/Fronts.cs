@@ -299,4 +299,35 @@ public static class Fronts
         // Keep only whole-enough holes: slivers at the edge would leave bars too thin.
         return [.. Geo.Tidy(inside).Where(p => Math.Abs(Clipper.Area(p)) > half * half * 0.9)];
     }
+
+    /// <summary>
+    /// Iron bars: tall slots cut between upright bars, broken by a flat cross band (or two on a tall door),
+    /// with rivets where the bars cross a band. Returns the slots (holes); the rivets go on <paramref name="lines"/>.
+    /// </summary>
+    public static PathsD Bars(double x0, double y0, double x1, double y1, double gap, double bar, List<PathD> lines)
+    {
+        double w = x1 - x0, h = y1 - y0;
+        int n = (int)Math.Floor((w + bar) / (gap + bar));
+        if (n < 1 || h < 3) return [];
+        double g = (w - (n - 1) * bar) / n;
+        int bands = h > 22 ? 2 : 1;
+        double bh = 1.2, seg = (h - bands * bh) / (bands + 1);
+        if (seg < 1.5) { bands = 0; seg = h; }
+        var holes = new PathsD();
+        for (int i = 0; i < n; i++)
+        {
+            double a = x0 + i * (g + bar);
+            for (int k = 0; k <= bands; k++)
+            {
+                double b0 = y0 + k * (seg + bh);
+                holes.Add(WoodFace.RoundRect(a, b0, a + g, b0 + seg, Math.Min(0.25, g * 0.3)));
+            }
+        }
+        for (int k = 1; k <= bands; k++)
+        {
+            double yb = y0 + k * seg + (k - 0.5) * bh;
+            for (int i = 1; i < n; i++) lines.Add(WoodFace.Dot(x0 + i * (g + bar) - bar / 2, yb, 0.2));
+        }
+        return holes;
+    }
 }
