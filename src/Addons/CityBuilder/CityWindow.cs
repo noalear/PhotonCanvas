@@ -318,7 +318,7 @@ public sealed class CityWindow : Window
                 _cWallsInfo, _cWalls),
             Explained("Trees", "The furniture maker's trees in the map's look (oaks and pines, dead trees, palms or giant mushrooms), each as big as on the map. Bushes aren't cut.",
                 _cTreesInfo, _cTrees),
-            Explained("Scenery", "The scenery maker's wells, carts, crates (as barrels), boulders and fences, and the furniture maker's horse troughs, stages, market stalls, outdoor bars and notice boards.",
+            Explained("Scenery", "The scenery maker's wells, carts, crates (as barrels), boulders and fences, and the furniture maker's horse troughs, stages, market stalls, outdoor bars, notice boards, fountains, gallows, street lamps and statues.",
                 _cSceneryInfo, _cScenery),
             Hint("The buildings are cut with Put this building in the design and Put every building in the design, below."));
     }
@@ -1016,7 +1016,7 @@ public sealed class CityWindow : Window
         var town = TownPieces.TownPropSet(_map, box);
         var what = (set?.Items.Select(i => $"{i.Count} × {PhotonCanvas.Addon.Scatter.Defaults.Info(i.Kind).Name.ToLowerInvariant()}" + (i.Kind == PhotonCanvas.Addon.Scatter.ItemKind.Fence ? $" ({i.WidthMm / _map.SquareMm:0.#} squares)" : "")) ?? [])
             .Concat(town?.Items.Select(i => $"{i.Count} × {(i.Name ?? "").ToLowerInvariant()}") ?? []).ToList();
-        _cSceneryInfo.Text = what.Count == 0 ? "No wells, carts, crates, boulders, fences, troughs, stages, stalls, bars or notice boards" + (box is null ? "." : " in the box.") : string.Join(", ", what) + ".";
+        _cSceneryInfo.Text = what.Count == 0 ? "No wells, carts, crates, boulders, fences, troughs, stages, stalls, bars, notice boards, fountains, gallows, lamps or statues" + (box is null ? "." : " in the box.") : string.Join(", ", what) + ".";
         _cScenery.IsEnabled = what.Count > 0;
         var walls = TownPieces.Walls(_map, box);
         _cWallsInfo.Text = walls.Count == 0 ? "No town wall or guard towers" + (box is null ? "." : " in the box.")

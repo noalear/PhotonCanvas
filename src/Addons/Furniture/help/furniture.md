@@ -73,7 +73,7 @@ settings), so a sci-fi console can stand among medieval furniture.
 | Throne room & bridge | Thrones on a dais, captain's chairs, helm consoles, star maps, long carpets |
 | Prison & crypt | Stocks, cell bunks, coffins, sarcophagi |
 | Lab & infirmary | Cryo pods, med bay beds, potion cabinets, apothecary drawers, lab consoles |
-| Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a tiered fountain and a gallows (not sci-fi), for the city builder |
+| Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a tiered fountain, a gallows (not sci-fi), a street lamp, a statue, a signpost, a market cross and a watchtower, for the city builder |
 
 They're sized for 28 mm figures on 2 mm sheet, and scale with **Figures** like everything else.
 
@@ -122,6 +122,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Gallows** | A gallows on a braced platform: steps up the front, railings, a trapdoor, two posts and a beam with knee braces, and a noose on its rope; dungeon and gothic ones also hang an iron gibbet cage on a chain. See [Town props](#town-props). | 46 × 38, 60 high |
 | **Fountain** | A tiered fountain: an eight-sided basin of water on a plinth, a column with two bowls, water falling from spouts under each, and a finial (a pine cone, a spire, an onion dome in the desert, a stone in a cave, an antenna for sci-fi). It's as wide as the smaller of **Width** and **Depth**. See [Town props](#town-props). | 50.8 × 50.8, 46 high |
 | **Ship fitting** | Starship fittings in plated metal, each starting at its own size. **Kind**: *Cryo pod* (a sleeper etched behind a tall window in the canopy, frost round it, a control panel, light strips and vents on the sides, a hood bulging over the front with a fan on top and coolant tubes glued up the sides), *Med bay bed with scanner* (a bed on a panelled pedestal with a red cross, a scanner arch over it with a glowing lens, a monitor on a post showing a heartbeat, a mattress and pillow), *Mess table with fixed stools* (a table on a spine of arches and two end legs, a lit strip down the top, pedestal stools on arms of the deck plate), *Server rack* (vented sides on feet, a hazard-striped plinth, fans on top, shelves through the sides holding drive bays, switches and readouts), *Crew bunks* (two bunks between end frames, a ladder cut up one end, a rail, a locker of drawers underneath, mattresses and pillows), *Cockpit console* (a desk on two pedestals, a keyboard and rows of buttons, a radar screen in the middle and a readout and a graph angled in either side), *Rifle rack* (a row of rifles with scopes, grips and magazines held by a clamp bar on a shelf, an ammo drawer below, a lit header), *Fuel drums* (three ribbed drums on a skid, glued up from rings; with a push fit, two halved profiles each with a label band) or *Reactor core* (a glowing core ringed by collars in a cage of four struts, an eight-sided base with a hazard ring and a fan housing on the cap). | 22 × 15, 32 high |
+| **Street piece** | Pieces for the town's streets and squares, each starting at its own size: see [Street pieces](#street-pieces). **Kind**: *Street lamp*, *Statue*, *Signpost*, *Market cross* or *Watchtower*. | 13 × 13, 46 high (a lamp) |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
@@ -151,6 +152,12 @@ spiral in cave). *The list's theme* follows the theme at the top.
 ![A reactor core in its cage of struts](images/window-furniture-reactor.png)
 
 ![Crew bunks over a locker of drawers, a ladder up the end](images/window-furniture-crew-bunks.png)
+
+![A square wooden watchtower: braced legs, a ladder, a platform with a parapet and a bell under a shingled roof](images/window-furniture-watchtower.png)
+
+![A knight statue leaning on his sword on a panelled pedestal](images/window-furniture-statue.png)
+
+![A winged angel statue with a halo](images/window-furniture-angel.png)
 
 ![A med bay bed under its scanner arch](images/window-furniture-med-bay.png)
 
@@ -248,6 +255,45 @@ to fit round the joints.
 
 With a push fit, the glued-on pieces (the trough rim, proscenium, curtains, valance, crates, barrel ends,
 notices, roof boards and the fountain's bowl lips) are left off.
+
+### Street pieces
+
+A **street lamp**, **signpost** and **market cross** are each a post of two profiles halved together
+like a tree, so they look whole from every side; the one slotted down from the top stops flat where
+its halves are still wide enough to stand, and the finial goes on the other. A lamp stands in a paved
+octagonal base (round and grassy in a cave) on a moulded plinth, its head in the theme's look: a
+lantern under a pyramid roof on scrolled brackets with a bar for the lamplighter's ladder (medieval),
+a pointed lantern under a spire with pinnacles and a cross (gothic), a pierced brass lantern under an
+onion dome (desert), an iron brazier of flames with spikes round its rim (dungeon), a torch bound in
+rags on a log post (cave) or a light pylon with a glowing light bar and an antenna (sci-fi).
+
+A **signpost** stands in a mound with four lettered arrow boards pointing four ways at different
+heights (glowing holo boards with chevrons in sci-fi), a cap on top and a finial: a ball, a crow, a
+skull on a spike, a horned skull, an onion knob or an antenna.
+
+A **market cross** has three octagonal steps threaded over the shaft's foot, each with a cross-shaped
+hole, the shaft's socle resting on the top one and a knop halfway up. Its head is a wheel-head cross,
+a tabernacle of pointed niches under a pinnacled spire, a little kiosk with keyhole arches under an
+onion dome, a broken cross with a chain and shackle hanging from its arm, a totem of three carved
+faces under horns, or a beacon spire through a glowing ring.
+
+A **statue** stands on a pedestal: a plinth, four sides with sunk panels (an inscription on the front,
+the theme's symbol on the sides) and a slab on top. The figure is a front profile slotted up between
+its legs and a side profile slotted down to the hips that stops at the shoulders; glued pieces in front
+of and behind the head make it whole. It's a knight leaning on his sword with a kite shield, a winged
+angel with a halo and a sword, a robed spearman in a turban with a round shield, a horned warlord with
+a great axe, a squat horned stone idol, or a trooper in power armour with a rifle across his chest.
+
+A **watchtower** stands on four leg frames: legs, three girts and cross braces, with a ladder of rungs
+cut up the middle of the front one. A brace ring halfway up pushes through all four, and they tab up
+into a planked platform with a trapdoor behind the ladder. On the platform a boarded parapet runs
+round, and the gable ends front and back carry corner posts, a tie beam and the gable; an alarm bell
+hangs from the front tie beam (a searchlight in sci-fi). The two roof slopes press onto tabs on the
+gables' rafters: shingles, slates, thatch, planks or ribbed metal to suit the theme, with a ridge board
+glued along the top (spiked at its ends in the dungeon and gothic themes).
+
+With a push fit, the glued pieces (the bases' steps, the pedestal's moulding, the statue's face and
+back of the head, the ridge board) are left off.
 
 ### Folding screens
 

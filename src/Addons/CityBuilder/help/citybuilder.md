@@ -307,7 +307,9 @@ at a time. Bushes aren't cut.
 **Put the scenery in the design** makes the [scenery maker](scatter.md)'s pieces for the map's wells,
 carts, boulders, crates (as barrels) and fences (each run of fence in sections of up to four
 squares), and the furniture maker's horse troughs, players' stages, market stalls, outdoor bars,
-notice boards, fountains and gallows (there's no sci-fi gallows, so a sci-fi map gets the medieval one). Lamps, statues, hedges and stone walls aren't cut.
+notice boards, fountains, gallows (there's no sci-fi gallows, so a sci-fi map gets the medieval one), street
+lamps and statues, each in the map's look: a lantern post, a brazier, a torch or a light pylon, and a knight, an angel,
+a warlord, an idol, a spearman or a trooper on a pedestal. Hedges and stone walls aren't cut.
 
 Each set goes in the design with its settings, like anything the furniture maker makes: right-click
 one of its pieces and choose **Edit furniture…** to change its sheet or sizes.
