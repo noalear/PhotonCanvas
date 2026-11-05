@@ -12,8 +12,8 @@ namespace PhotonCanvas.Remote;
 public sealed class RemoteError(int status, string message, Exception? inner = null) : Exception(message, inner)
 {
     public int Status { get; } = status;
-    /// <summary>The access code was wrong (or the phone is locked out for a while).</summary>
-    public bool NeedsCode => Status is 401 or 429;
+    /// <summary>The access code was wrong (or the phone is locked out for a while), or the computer's certificate changed: scan again.</summary>
+    public bool NeedsCode => Status is 401 or 429 or 495;
     public bool Unreachable => Status == 0;
 }
 
@@ -29,7 +29,7 @@ public sealed record TakenPicture(byte[] Jpeg, string? Id, DateTimeOffset TakenA
 /// <summary>Everything the phone can ask of the machine, through a server (or the demo).</summary>
 public interface IRemote : IDisposable
 {
-    /// <summary>Where it is, for the screen ("192.168.50.247", "Demo machine").</summary>
+    /// <summary>Where it is, for the screen ("192.168.1.50", "Demo machine").</summary>
     string Name { get; }
     bool IsDemo { get; }
     Task<ServerInfo> InfoAsync(CancellationToken ct = default);
@@ -59,7 +59,7 @@ public sealed class HttpRemote : IRemote
     public HttpRemote(ConnectionInfo connection, HttpMessageHandler? handler = null)
     {
         _connection = connection;
-        _http = handler is null ? new HttpClient() : new HttpClient(handler);
+        _http = new HttpClient(handler ?? Handler(connection.Fingerprint));
         _http.BaseAddress = connection.BaseUri;
         _http.Timeout = Timeout.InfiniteTimeSpan; // each call sets its own
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", connection.Code);
@@ -67,6 +67,83 @@ public sealed class HttpRemote : IRemote
 
     public string Name => _connection.Display;
     public bool IsDemo => false;
+    /// <summary>Encrypted to the computer's own certificate.</summary>
+    public bool Secure => _connection.Secure;
+
+    /// <summary>
+    /// The connection handler: with a fingerprint, HTTPS accepts that one certificate and nothing else
+    /// (it's the computer's own, made by the server, so no certificate authority vouches for it).
+    /// </summary>
+    static SocketsHttpHandler Handler(string? fingerprint)
+    {
+        var h = new SocketsHttpHandler { ConnectTimeout = TimeSpan.FromSeconds(10) };
+        if (fingerprint is not null)
+            h.SslOptions.RemoteCertificateValidationCallback = (_, cert, _, _) => cert is not null && Fingerprints.Of(cert.GetRawCertData()) == fingerprint;
+        return h;
+    }
+
+    /// <summary>
+    /// The computer at whichever of its addresses answers (home network or Tailscale): all are tried at once,
+    /// and the one it was last reached at wins if it answers. Null when none does.
+    /// </summary>
+    public static async Task<ConnectionInfo?> ReachAsync(ConnectionInfo c, CancellationToken ct = default)
+    {
+        var addresses = c.AllAddresses.ToList();
+        if (addresses.Count == 1) return c;
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        limit.CancelAfter(TimeSpan.FromSeconds(6));
+        var tries = addresses.Select(async a =>
+        {
+            using var r = new HttpRemote(c.Using(a));
+            try
+            {
+                await r.InfoAsync(limit.Token).ConfigureAwait(false);
+                return a;
+            }
+            catch (RemoteError) { return null; }
+            catch (OperationCanceledException) { return null; }
+        }).ToList();
+        var answered = new List<string>();
+        while (tries.Count > 0)
+        {
+            var done = await Task.WhenAny(tries).ConfigureAwait(false);
+            tries.Remove(done);
+            if (await done.ConfigureAwait(false) is not { } a) continue;
+            if (a == c.Address) return c;
+            answered.Add(a);
+            // Give the usual address a moment to answer too before switching.
+            if (tries.Count > 0) await Task.WhenAny(Task.WhenAll(tries), Task.Delay(400, ct)).ConfigureAwait(false);
+            foreach (var t in tries.Where(t => t.IsCompletedSuccessfully)) if (t.Result == c.Address) return c;
+            return c.Using(answered[0]);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The same connection, encrypted if the server can (asked once over plain HTTP, without the code: trust on
+    /// first use). A scanned QR code already carries the certificate; an older server has none.
+    /// </summary>
+    public static async Task<ConnectionInfo> SecureAsync(ConnectionInfo c, HttpMessageHandler? handler = null, CancellationToken ct = default)
+    {
+        if (c.Secure) return c;
+        try
+        {
+            using var http = new HttpClient(handler ?? Handler(null)) { Timeout = TimeSpan.FromSeconds(8) };
+            using var res = await http.GetAsync(new Uri(c.PlainUri, Routes.Tls), ct).ConfigureAwait(false);
+            if (!res.IsSuccessStatusCode) return c;
+            var tls = JsonSerializer.Deserialize(await res.Content.ReadAsStringAsync(ct).ConfigureAwait(false), RemoteJson.Default.TlsInfo);
+            if (tls is not { Port: > 0, Fingerprint.Length: >= 40 }) return c;
+            var secure = c with { TlsPort = tls.Port, Fingerprint = tls.Fingerprint };
+            // Only once the encrypted port answers with that certificate (a firewall may let one port through and not the other).
+            using var check = new HttpClient(handler ?? Handler(secure.Fingerprint)) { Timeout = TimeSpan.FromSeconds(8) };
+            using var ok = await check.GetAsync(new Uri(secure.BaseUri, Routes.Tls), ct).ConfigureAwait(false);
+            return ok.IsSuccessStatusCode ? secure : c;
+        }
+        catch (Exception e) when (e is HttpRequestException or TaskCanceledException or JsonException)
+        {
+            return c;
+        }
+    }
 
     static readonly TimeSpan Quick = TimeSpan.FromSeconds(15), Slow = TimeSpan.FromMinutes(4);
 
@@ -83,6 +160,10 @@ public sealed class HttpRemote : IRemote
         catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
         {
             throw new RemoteError(0, $"The computer at {Name} didn't answer in time. Is it on, and the server running?", e);
+        }
+        catch (HttpRequestException e) when (e.InnerException is System.Security.Authentication.AuthenticationException)
+        {
+            throw new RemoteError(495, $"The computer at {Name} has a different security certificate than the one this phone knows. If PhotonCanvas was reinstalled or its remote settings reset, scan the QR code in Remote access again.", e);
         }
         catch (HttpRequestException e)
         {
@@ -197,6 +278,12 @@ public sealed class HttpRemote : IRemote
     static StringContent JsonContent(StartRequest r) => new(JsonSerializer.Serialize(r, RemoteJson.Default.StartRequest), Encoding.UTF8, "application/json");
 
     public void Dispose() => _http.Dispose();
+}
+
+/// <summary>Certificate fingerprints as the QR code carries them: SHA-256 of the certificate, base64url (43 characters).</summary>
+public static class Fingerprints
+{
+    public static string Of(byte[] certificate) => System.Buffers.Text.Base64Url.EncodeToString(System.Security.Cryptography.SHA256.HashData(certificate));
 }
 
 /// <summary>Reads server-sent events: "event:" and "data:" lines, a blank line ends each, ":" lines are comments.</summary>

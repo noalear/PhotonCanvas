@@ -12,10 +12,11 @@ It works in any phone browser, so nothing needs installing: add the page to the 
 opens like an app. On Android there's also an app, **PhotonCanvas Remote** (see
 [The Android app](#the-android-app)).
 
-> **Safety:** Starting a job from the phone fires the laser, maybe with nobody at the machine. Before
-> it starts, the phone makes you look at a fresh picture of the bed (see
-> [Starting a job from the phone](#starting-a-job-from-the-phone)). Look at it properly. The machine's
-> own flame alarm stays on, and the phone shows its alarms.
+> **Safety:** Starting a job from the phone fires the laser, maybe with nobody at the machine, so it's
+> **off until you turn it on** (**Allow starting jobs from the phone**, under
+> [Safety](#safety)). Even then, the phone makes you look at a fresh picture of the bed before it
+> starts (see [Starting a job from the phone](#starting-a-job-from-the-phone)). Look at it properly.
+> The machine's own flame alarm stays on, and the phone shows its alarms.
 
 ## Setting it up
 
@@ -66,6 +67,15 @@ folder is searched.
 
 - **Add folder…** adds a folder.
 - **Remove** takes the selected folder off the list (the designs stay where they are).
+
+### Safety
+
+- **Allow starting jobs from the phone** (off at first): while it's off, the phone can load a job,
+  watch, take pictures, pause and stop, but only the machine's button starts a job. Turning it on
+  shows a full warning first: the laser fires with maybe nobody at the machine, the cameras are blank
+  while it runs, and anyone with the access code could start a job. Click **I understand, allow it**
+  only if you accept that; **Keep it off** leaves it off. Turning it off takes effect at once, even
+  for a phone that's connected.
 
 ## On the phone
 
@@ -123,13 +133,37 @@ from the phone also go into PhotonCanvas's own job history.
   for learning it, or showing someone.
 - It remembers the computer. **⋯ → Change computer** forgets it; **⋯ → About and privacy** says what it
   does with your data (nothing leaves the phone except to your own computer).
+- **Encrypted:** the app talks HTTPS to the computer's own certificate, which the QR code carries (the
+  server makes it the first time it starts and keeps it). A typed address learns it on the first
+  connection. If the computer's certificate ever changes (PhotonCanvas reinstalled, its remote settings
+  reset), the app refuses it and asks you to scan the QR code again.
+- **Notifications** (**⋯ → Settings**), even with the app closed:
+  - **While a job is on the machine** (the standard setting): a notification with the job's progress,
+    the time left and when it'll be done, and a **Pause** button (stopping is in the app, which asks
+    first); a notification when it ends, with the picture of the result; the machine's alarms (a
+    possible flame, the machine moved), loud; and a warning if the phone loses the computer during a
+    job. It stops by itself after the job.
+  - **Always**: the same, also for jobs started at the machine or in PhotonCanvas, and alarms between
+    jobs. It keeps a connection open, so it uses a little more battery.
+  - **Only while the app is open**: none.
+
+  **Send a test notification** checks they arrive. Newer Android asks once whether the app may notify.
+  If notifications stop while the phone sleeps, set the app's battery use to *Unrestricted* in
+  Android's settings.
+- **Live** on the camera card shows pictures one after another (a few a second) while nothing runs.
+- **Run again** in **History** opens a design the phone loaded before (while its file is still there).
+- The job card says when it'll be done (*done about 4:15 AM*); so does the phone page.
 
 Install it from **Remote access** (the *Android app* QR code), or, once it's published, from the
 Play store.
 
 ## Starting a job from the phone
 
-**Start job** only works on a picture of the bed that the server took **less than 2 minutes ago,
+This is off until you turn on **Allow starting jobs from the phone** in **Remote access** (see
+[Safety](#safety)). While it's off, **Start job** says so and nothing starts: press the machine's
+button instead.
+
+When it's on, **Start job** only works on a picture of the bed that the server took **less than 2 minutes ago,
 with that job loaded**. So:
 
 1. Load the design (or use a job that's already loaded, sent from PhotonCanvas).
@@ -143,9 +177,15 @@ machine doesn't start, the phone says what the machine reports; press its button
 ## Away from home
 
 The phone reaches this computer on your home Wi-Fi. To use it from anywhere, install
-Tailscale (free, from tailscale.com) on this computer and on the phone, sign in to the same
-account on both, and choose the Tailscale address in **Remote access** (it starts with 100.).
-Tailscale connects the two privately and encrypted.
+Tailscale (free, from tailscale.com) on this computer and on the phone, and sign in to the same
+account on both. Tailscale connects the two privately and encrypted, wherever the phone is.
+
+- **The Android app switches by itself.** It knows all the computer's addresses (the QR code carries
+  them, and the computer tells it again each time it connects, so it learns the Tailscale address the
+  next time you're home) and uses whichever answers: home Wi-Fi when you're in, Tailscale when you're
+  out. Keep Tailscale switched on, on the phone.
+- **The phone page:** choose the Tailscale address in **Remote access** (it starts with 100.) and open
+  that one away from home.
 
 > **Warning:** Don't open a port on your router for the server. The access code is the only lock on
 > it, and the laser is on the other side.

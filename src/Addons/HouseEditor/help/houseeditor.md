@@ -25,8 +25,8 @@ go into slotted columns, floors that lie on the walls, and jigsaw floor tiles to
 ![A two-storey house in the building editor: the ground floor's plan on the left, the house in 3D with the near walls cut away in the middle](images/window-houseeditor-ground.png)
 
 Click **Build** on the **Home** tab (in the **Draw** group). The **Building editor** opens on the
-last building you drew (a small two-room house the first time). Along the top are the tools and the
-floors; on the left is the **Plan**, the floor you're on seen from above on a grid of squares; in the
+last building you drew (a small two-room house the first time). Along the top are the tools, the
+floors, and **Save…** and **Saved buildings…** ([Saved buildings](#saved-buildings)); on the left is the **Plan**, the floor you're on seen from above on a grid of squares; in the
 middle, **Put together** shows the whole building in 3D and **Pieces** shows every piece flat; down
 the right, **Picked** shows the door, window, room or roof picked on the plan and **Look** the walls'
 look and sizes. Under them are the number of pieces and notes: how it goes together, a red ✕ that has to be
@@ -305,6 +305,51 @@ whether the floor's texture is etched on the steps. Left alone, these suit the b
 are numbered ("Stairs 1", "Stairs 2"). Its pieces are the stairs maker's ([Stairs and floors](stairs.md)).
 Stairs on the top floor, stairs running into a wall, an opening coming up into a wall above or past the
 edge of the floor above, and two ways up that cross get a yellow !.
+
+## Saved buildings
+<!-- windows: SaveBuildingWindow, SavedBuildingsWindow -->
+
+A building you've drawn can be kept to use again: as it is, as the starting point of another, or as a
+ready-made part dropped into a bigger building (a row of shops, a tavern with a stable beside it). The
+city builder lays saved buildings out on a map.
+
+**Save…** (along the top) keeps the building in **Saved buildings** with:
+
+| Detail | What it's for |
+|---|---|
+| **Name** | What it's called: *The Prancing Pony*, *Corner shop*. The building booklet takes its name too. |
+| **Type** | What kind of building it is: house, cottage, shop, tavern, inn, smithy, temple, tower, keep, barn, ruin, bunker and more. The city builder picks buildings by type. |
+| **Theme** | The look it's for (medieval, sci-fi, dungeon…): the building's own theme when it's first saved. |
+| **Goes in** | Where in a town it belongs: anywhere, homes, the market, the docks, the temple quarter, the noble quarter, the barracks, farms, the slums… |
+| **Tags** | Words to find it by, a comma between each: *corner*, *ruined*, *two doors*. |
+| **Notes** | Anything to remember about it. |
+
+A picture of it put together is saved with it, and its size: how many squares across and deep, its
+floors and height, the squares it stands on and which way its doors face out. A building opened from
+**Saved buildings** is saved over the old one; tick **Save as a new building** to keep both. The
+editor remembers which saved building it was on when you come back to it.
+
+![Saved buildings: three saved buildings with their pictures on the left, the picked inn's size, doors and details on the right](images/window-houseeditor-saved.png)
+
+**Saved buildings…** lists them with their pictures. Find one by name, tag or note, or by its type,
+theme and where it goes. Pick one to see its size and its doors, change its details (**Save
+details**), **Make a copy** or **Delete** it (press twice: it can't be undone). Then:
+
+- **Open to change** opens it in the editor, in place of the building you were drawing (**Undo** brings
+  that back).
+- **Put into this building** drops it into the building you're drawing, on the floor you're on. Its
+  outline follows the pointer, its floor shaded blue and its floors above dashed. Click to put it
+  there, and click again for another. **[** and **]** (or **Turn left** and **Turn right** on the
+  **Picked** tab) turn it a quarter turn. Walls it shares with your building are kept once, its walls
+  keep their own texture and wear where they differ from yours, and its floors above go on the floors
+  above yours (added as needed, up to six). Your building's sizes win: wall thickness, sheet and storey
+  height. Press **Escape** or **Done putting it in** when you've finished.
+
+![A saved inn being put in beside a cottage: its outline in blue on the plan, sharing the cottage's end wall](images/window-houseeditor-place.png)
+
+**Save as a file…** writes one to a file to keep or share, and **Add from a file…** brings one in
+(a building editor *last.json* works too). They're kept one file each in the add-on's data folder,
+*addon-data/houseeditor/prefabs*.
 
 ## Piece numbers and the building booklet
 

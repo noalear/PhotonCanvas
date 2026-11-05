@@ -1,5 +1,6 @@
 using Android.App;
 using Android.Content;
+using Android.Content.PM;
 using Android.Gms.Tasks;
 using Android.OS;
 using PhotonCanvas.Remote.App;
@@ -8,8 +9,8 @@ using Xamarin.Google.MLKit.Vision.CodeScanner;
 
 namespace PhotonCanvas.Remote.Android;
 
-/// <summary>What the Android phone does for the app: its storage, the QR scanner, buzzing, the browser.</summary>
-sealed class AndroidPhone(Activity activity) : IPhone
+/// <summary>What the Android phone does for the app: its storage, the QR scanner, buzzing, the browser, notifications and the background watcher.</summary>
+sealed class AndroidPhone(MainActivity activity) : IPhone
 {
     public string DataFolder => activity.FilesDir!.AbsolutePath;
 
@@ -52,6 +53,50 @@ sealed class AndroidPhone(Activity activity) : IPhone
         var intent = new Intent(Intent.ActionView, global::Android.Net.Uri.Parse(url));
         intent.AddFlags(ActivityFlags.NewTask);
         activity.StartActivity(intent);
+    }
+
+    // ---- notifications and the watcher ----
+
+    public bool CanWatch => true;
+
+    public System.Threading.Tasks.Task<bool> AllowNotificationsAsync()
+    {
+        if (Build.VERSION.SdkInt < BuildVersionCodes.Tiramisu) return System.Threading.Tasks.Task.FromResult(true);
+        if (activity.CheckSelfPermission(global::Android.Manifest.Permission.PostNotifications) == Permission.Granted) return System.Threading.Tasks.Task.FromResult(true);
+        return activity.AskAsync(global::Android.Manifest.Permission.PostNotifications);
+    }
+
+    DateTimeOffset _startedAt = DateTimeOffset.MinValue;
+    WatchMode _mode = WatchMode.Off;
+
+    public void Watch(WatchMode mode, bool jobOnMachine)
+    {
+        var intent = new Intent(activity, typeof(WatchService)).SetAction(WatchService.ActionWatch);
+        bool changed = mode != _mode;
+        _mode = mode;
+        if (mode == WatchMode.Off)
+        {
+            if (changed) activity.StopService(intent);
+            return;
+        }
+        if (mode == WatchMode.DuringJobs && !jobOnMachine) return; // it stops itself after its job
+        // Android only lets an app start this while it's on screen; once a minute is plenty (it keeps running).
+        if (!activity.IsOnScreen || (!changed && DateTimeOffset.Now - _startedAt < TimeSpan.FromMinutes(1))) return;
+        try
+        {
+            activity.StartForegroundService(intent);
+            _startedAt = DateTimeOffset.Now;
+        }
+        catch (Java.Lang.Exception) { }
+    }
+
+    public void TestNotification()
+    {
+        Notices.EnsureChannels(activity);
+        Notices.Post(activity, Notices.TestId, Notices.Builder(activity, Notices.Jobs)
+            .SetContentTitle("Notifications work")
+            .SetContentText("You'll hear when a job finishes or stops, and when the machine raises an alarm.")
+            .SetAutoCancel(true).Build());
     }
 
     /// <summary>One listener for success, cancel and failure: the scanner's result (or nothing).</summary>

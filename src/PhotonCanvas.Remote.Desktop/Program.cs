@@ -2,6 +2,7 @@
 // paste the address and code from Remote access).
 using System.Diagnostics;
 using Avalonia;
+using PhotonCanvas.Remote;
 using PhotonCanvas.Remote.App;
 
 RemoteApp.Phone = new DesktopPhone();
@@ -15,4 +16,8 @@ sealed class DesktopPhone : IPhone
     public Task<string?> ScanQrAsync() => Task.FromResult<string?>(null);
     public void Vibrate(bool alarm) { }
     public void OpenWeb(string url) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true })?.Dispose();
+    public bool CanWatch => false;
+    public Task<bool> AllowNotificationsAsync() => Task.FromResult(false);
+    public void Watch(WatchMode mode, bool jobOnMachine) { }
+    public void TestNotification() { }
 }

@@ -49,6 +49,13 @@ Click **Furniture**, pick a table, a bed or a chest on the right and click in a 
 there. Drag it about and turn it with the mouse wheel as you drag. Click **Stairs** and click in a
 room for a way up to the floor above: an opening is cut in that floor over it.
 
+## Save it to reuse
+<!-- target: button:Save… -->
+Click **Save…**, give the building a name, pick its **Type** (house, tavern, shop, tower…), where it
+**Goes in** a town and some tags. Click **Saved buildings…** to open it again, or pick one and click
+**Put into this building** to drop it into the one you're drawing: click the plan where it goes, and
+**[** and **]** turn it.
+
 ## Look inside
 <!-- target: tabitem:Put together -->
 **Put together** shows it in 3D. Pick **Walls cut away** under **Show** to see into the rooms, and
