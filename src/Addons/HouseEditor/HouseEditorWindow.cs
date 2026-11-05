@@ -34,6 +34,8 @@ public sealed class HouseEditorWindow : Window
     readonly MaterialLibrary? _library;
     readonly string? _dataFolder;
     (Guid Id, HouseDesign Design)? _editing;
+    /// <summary>The saved building this one was opened from (or last saved as): Save saves over it.</summary>
+    HousePrefab? _prefab;
     HouseDesign _design;
     readonly List<HouseDesign> _undo = [], _redo = [];
 
@@ -45,7 +47,13 @@ public sealed class HouseEditorWindow : Window
     readonly Button _addLevel = UiKit.Button("Add a floor above", tip: "A new, empty floor on top. Draw its walls over the faint plan of the floor below; its rooms get a floor under them."),
         _copyUp = UiKit.Button("Copy walls up", tip: "Draws the floor below's walls on this floor too (doors and windows aren't copied)."),
         _removeLevel = UiKit.Button("Remove this floor"),
-        _undoButton = UiKit.Button("Undo"), _redoButton = UiKit.Button("Redo");
+        _undoButton = UiKit.Button("Undo"), _redoButton = UiKit.Button("Redo"),
+        _saveButton = UiKit.Button("Save…", tip: "Keeps this building in Saved buildings, with a name, a type (tavern, shop, tower…), its theme, where it goes in a town and tags: to open again, to drop into other buildings, or for the city builder."),
+        _savedButton = UiKit.Button("Saved buildings…", tip: "The buildings you've saved: open one to change it, or put one into this building as a ready-made part.");
+    // A saved building being put in.
+    readonly StackPanel _stampPanel = new() { Spacing = 8 };
+    readonly TextBlock _stampInfo = Hint();
+    readonly Button _sLeft = UiKit.Button("⟲ Turn left"), _sRight = UiKit.Button("⟳ Turn right"), _sStop = UiKit.Button("Done putting it in");
     readonly ComboBox _walls = Combo("Everything, roofs on", "Everything, but the roof off", "Walls cut away", "Walls down"), _upTo = Combo("Every floor");
     static readonly double[] Depths = [0.3, 0.6, 1, 1.5];
     readonly CheckBox _realEtch = new() { Content = "Realistic engraving", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
@@ -175,6 +183,8 @@ public sealed class HouseEditorWindow : Window
         _dataFolder = dataFolder;
         _editing = editing;
         _design = editing?.Design ?? LoadLast() ?? HouseDesign.Starter();
+        // Opened on the last building drawn: still the saved one it came from, if it did.
+        if (editing is null) _prefab = LastPrefab();
         if (_design.Levels.Count == 0) _design = _design with { Levels = [new()] };
         Title = "Building editor";
         Width = 1320;
@@ -225,6 +235,8 @@ public sealed class HouseEditorWindow : Window
         foreach (var b in new[] { _addLevel, _copyUp, _removeLevel }) { b.Margin = new Thickness(0, 0, 4, 4); bar.Children.Add(b); }
         bar.Children.Add(Gap());
         foreach (var b in new[] { _undoButton, _redoButton }) { b.Margin = new Thickness(0, 0, 4, 4); bar.Children.Add(b); }
+        bar.Children.Add(Gap());
+        foreach (var b in new[] { _saveButton, _savedButton }) { b.Margin = new Thickness(0, 0, 4, 4); bar.Children.Add(b); }
         ToolTip.SetTip(_undoButton, "Ctrl+Z");
         ToolTip.SetTip(_redoButton, "Ctrl+Y");
 
@@ -373,7 +385,9 @@ public sealed class HouseEditorWindow : Window
         _wayPanel.Children.Add(Explained("Way up", "It climbs to the floor above, through an opening cut in that floor. Drag it to move it; R or the buttons turn it. Its own settings are the stairs maker's.",
             _wInfoWay, Field("Kind", _wayKind), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _wLeft, _wRight } },
             _wRiseRows, _wStairRows, _wSpiralRows, _wLadderRows, _wTreads, _wSuit, _wRemove));
-        return Stack(_placePanel, _wayPlacePanel, _pickedNone, _picked, _roofPanel, _roomPanel, _wallPanel, _railPanel, _columnPanel, _itemPanel, _wayPanel);
+        _stampPanel.Children.Add(Explained("Saved building to put in", "Click on the plan to put it there, on this floor (its floors above go on the floors above). Walls it shares with this building are kept once, and its walls keep their own look. Click again to put in another; Escape or Done when you've finished.",
+            _stampInfo, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _sLeft, _sRight } }, _sStop));
+        return Stack(_stampPanel, _placePanel, _wayPlacePanel, _pickedNone, _picked, _roofPanel, _roomPanel, _wallPanel, _railPanel, _columnPanel, _itemPanel, _wayPanel);
     }
 
     Control LookTab()
@@ -446,7 +460,19 @@ public sealed class HouseEditorWindow : Window
 
     void Hook()
     {
-        _plan.Changed += (d, what) => Apply(d, what, fromPlan: true);
+        _plan.Changed += (d, what) =>
+        {
+            int floors = _design.Levels.Count;
+            Apply(d, what, fromPlan: true);
+            // A saved building put in can bring floors of its own.
+            if (d.Levels.Count != floors) ShowLevel(_plan.Level);
+        };
+        _plan.PlacingStopped += () => PickTool(PlanTool.Select);
+        _saveButton.Click += (_, _) => _ = SavePrefab();
+        _savedButton.Click += (_, _) => _ = OpenSaved();
+        _sLeft.Click += (_, _) => _plan.TurnStamp(1);
+        _sRight.Click += (_, _) => _plan.TurnStamp(-1);
+        _sStop.Click += (_, _) => PickTool(PlanTool.Select);
         _plan.SelectionChanged += ShowPicked;
         _roofIt.Click += (_, _) => RoofIt();
         _yard.SelectionChanged += (_, _) =>
@@ -615,6 +641,7 @@ public sealed class HouseEditorWindow : Window
 
     void PickTool(PlanTool t)
     {
+        if (t != PlanTool.Place) _plan.SetStamp(null);
         _plan.Tool = t;
         foreach (var (k, b) in _tools) b.IsChecked = k == t;
         ShowPicked();
@@ -744,8 +771,10 @@ public sealed class HouseEditorWindow : Window
         _wayPanel.IsVisible = way is not null;
         _placePanel.IsVisible = _plan.Tool == PlanTool.Furnish;
         _wayPlacePanel.IsVisible = _plan.Tool == PlanTool.Stairs;
+        _stampPanel.IsVisible = _plan.Tool == PlanTool.Place;
+        if (_stampPanel.IsVisible) ShowStamp();
         _pickedNone.IsVisible = o is null && roof is null && room is null && wall is null && rail is null && column is null && item is null && way is null
-            && _plan.Tool is not (PlanTool.Furnish or PlanTool.Stairs);
+            && _plan.Tool is not (PlanTool.Furnish or PlanTool.Stairs or PlanTool.Place);
         if (item is not null) ShowItem(item);
         if (way is not null) ShowWay(way);
         if (column is { } cp) ShowColumn(cp);
@@ -1305,6 +1334,96 @@ public sealed class HouseEditorWindow : Window
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
+    // ---- saved buildings ----
+
+    string PrefabFolder => _dataFolder is null ? HousePrefabs.DefaultFolder : Path.Combine(_dataFolder, "prefabs");
+
+    string? LastPrefabFile => _dataFolder is null ? null : Path.Combine(_dataFolder, "last-prefab.txt");
+
+    HousePrefab? LastPrefab()
+    {
+        try
+        {
+            return LastPrefabFile is { } f && File.Exists(f) && Guid.TryParse(File.ReadAllText(f).Trim(), out var id) ? HousePrefabs.Find(PrefabFolder, id) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
+
+    void SaveLastPrefab()
+    {
+        try
+        {
+            if (LastPrefabFile is not { } f) return;
+            if (_prefab is null) { if (File.Exists(f)) File.Delete(f); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(f)!);
+            File.WriteAllText(f, _prefab.Id.ToString("N"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>Saves the building to the saved buildings, with its details and a picture of it put together.</summary>
+    async Task SavePrefab()
+    {
+        var design = _design;
+        var start = _prefab is { } was
+            ? was with { Design = design }
+            : new HousePrefab { Name = "", Theme = design.Style.Theme, Type = design.Levels.Count >= 3 && design.Levels[0].Shape().Rooms.Count <= 1 ? "Tower" : "House", Design = design };
+        if (await new SaveBuildingWindow(start, _prefab is not null).ShowDialog<HousePrefab?>(this) is not { } details) return;
+        _status.Text = "Saving the building…";
+        try
+        {
+            double longest = Math.Min(Longest, Math.Min(_machine.FieldW, _machine.FieldH) - 4);
+            var built = _kit is not null && _kitFrom == design.ToJson() ? _kit : null;
+            string folder = PrefabFolder;
+            var saved = await Task.Run(() =>
+            {
+                byte[]? png = null;
+                try { png = PrefabPictures.Png(built ?? HouseKitMaker.Make(design, longest)); }
+                catch (Exception e) when (e is ArgumentException or InvalidOperationException or ArithmeticException or IndexOutOfRangeException) { AppLog.Error("houseeditor picture", e); }
+                return HousePrefabs.Save(folder, details with { Design = design }, png);
+            });
+            _prefab = saved;
+            SaveLastPrefab();
+            _status.Text = $"Saved \"{saved.Name}\" ({saved.Type}, {saved.Footprint!.Width} × {saved.Footprint.Depth} squares) in Saved buildings.";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { _status.Text = $"Couldn't save the building: {e.Message}"; }
+    }
+
+    /// <summary>The saved buildings: one opened here to change, or put into this building.</summary>
+    async Task OpenSaved()
+    {
+        if (await new SavedBuildingsWindow(PrefabFolder, _prefab?.Id).ShowDialog<(PrefabUse Use, HousePrefab Prefab)?>(this) is not { } picked) return;
+        var p = picked.Prefab;
+        if (picked.Use == PrefabUse.Place)
+        {
+            PickTool(PlanTool.Place);
+            _plan.SetStamp(p.Design, p.Name);
+            ShowStamp();
+            _status.Text = $"Click on the plan to put \"{p.Name}\" in; [ and ] turn it.";
+            return;
+        }
+        // In the middle of the grid.
+        var d = p.Design.AtOrigin();
+        var (_, _, w, h) = d.GridBounds();
+        d = d.Moved(Math.Max(0, (PlanEditor.GridSize - w) / 2), Math.Max(0, (PlanEditor.GridSize - h) / 2));
+        if (d.Levels.Count == 0) return;
+        _prefab = p;
+        SaveLastPrefab();
+        _plan.Select(-1);
+        Apply(d, "Open a saved building");
+        Reload();
+        _plan.FitAll();
+        _status.Text = $"Opened \"{p.Name}\". Save… saves your changes over it (or as a new building).";
+    }
+
+    void ShowStamp()
+    {
+        if (_plan.Stamp is not { } s) { _stampInfo.Text = ""; return; }
+        var (_, _, w, h) = s.GridBounds();
+        _stampInfo.Text = $"{_plan.StampName}: {w} × {h} squares, {s.Levels.Count} floor{(s.Levels.Count == 1 ? "" : "s")}." +
+            (Math.Abs(s.SquareMm - _design.SquareMm) > 0.01 ? $" It was drawn on {s.SquareMm:0.#} mm squares; here they're {_design.SquareMm:0.#} mm." : "");
+    }
+
     // ---- making the pieces ----
 
     double Longest => Math.Max(Math.Max(_machine.FieldW, _machine.FieldH), 50) - 4;
@@ -1409,8 +1528,8 @@ public sealed class HouseEditorWindow : Window
 
     bool _bookleting;
 
-    /// <summary>What the building's called: its design's file name, when it's saved.</summary>
-    string BuildingName() => _doc.FilePath is { } saved && Path.GetFileNameWithoutExtension(saved) is { Length: > 0 } n ? n : "Building";
+    /// <summary>What the building's called: the saved building's name, or else its design's file name, when it's saved.</summary>
+    string BuildingName() => _prefab is { Name.Length: > 0 } p ? p.Name : _doc.FilePath is { } saved && Path.GetFileNameWithoutExtension(saved) is { Length: > 0 } n ? n : "Building";
 
     /// <summary>Where the booklet goes: beside the design when it's saved, else in the data folder's Booklets.</summary>
     string BookletPath()
