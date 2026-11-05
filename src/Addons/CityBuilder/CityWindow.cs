@@ -51,6 +51,21 @@ public sealed class CityWindow : Window
     readonly TextBlock _tNotes = Hint();
     int _seed = Environment.TickCount & 0xFFFF;
 
+    // Saving a picture
+    readonly NumericUpDown _pPx = Number(20, 300, 10, "0");
+    readonly CheckBox _pGrid = new() { Content = "The grid", IsChecked = true }, _pLabels = new() { Content = "Street names and labels", IsChecked = true },
+        _pNames = new() { Content = "Building names" }, _pBox = new() { Content = "Only the last box dragged with Select" };
+    readonly Button _pSave = UiKit.Button("Save as a picture…");
+    readonly TextBlock _pInfo = Hint();
+
+    // Cutting the ground, bridges and scenery
+    readonly NumericUpDown _cTile = Number(1, 10, 1, "0"), _cThick = Number(1, 10, 0.5m, "0.##");
+    readonly ComboBox _cJoin = Combo("Jigsaw edges", "Clips", "Magnets", "Plain edges");
+    readonly CheckBox _cGrid = new() { Content = "Score the grid", IsChecked = true }, _cOutlines = new() { Content = "Score where the buildings stand", IsChecked = true },
+        _cBox = new() { Content = "Only the last box dragged with Select" };
+    readonly Button _cGround = UiKit.Button("Put the ground in the design"), _cBridges = UiKit.Button("Put the bridges in the design"), _cScenery = UiKit.Button("Put the scenery in the design");
+    readonly TextBlock _cGroundInfo = Hint(), _cBridgesInfo = Hint(), _cSceneryInfo = Hint();
+
     // Battle map
     readonly Button _openPic = UiKit.Button("Open a picture…"), _usePic = UiKit.Button("Use the selected picture"), _samplePic = UiKit.Button("Try a sample battle map"), _findGrid = UiKit.Button("Find the grid");
     readonly Button _read = new() { Content = "Read the map", Classes = { "primary" } };
@@ -169,16 +184,19 @@ public sealed class CityWindow : Window
         ToolTip.SetTip(_redoButton, "Ctrl+Y");
 
         // The left-hand side: the map, the battle map, the tools' settings and the building picked.
-        var left = _left = new TabControl { Width = 360, Margin = new Thickness(14, 0, 0, 0) };
+        var left = _left = new TabControl { Width = 384, Margin = new Thickness(14, 0, 0, 0) };
         left.Items.Add(Tab("Map", MapTab()));
         left.Items.Add(Tab("Battle map", PictureTab()));
         left.Items.Add(Tab("Tools", ToolsTab()));
         left.Items.Add(Tab("Town", TownTab()));
         left.Items.Add(Tab("Picked", PickedTab()));
+        left.Items.Add(Tab("Cut", CutTab()));
+        left.SelectionChanged += (_, _) => { if (left.SelectedIndex == CutTabIndex) RefreshCut(); };
         _plan.PickChanged += () =>
         {
             if (!_plan.Pick.IsEmpty && !_fromList && left.SelectedIndex != PickedTabIndex && _plan.Tool is CityTool.Select or CityTool.Label) left.SelectedIndex = PickedTabIndex;
             ShowPicked();
+            RefreshPictureInfo();
         };
 
         // The plan and the 3D view.
@@ -236,6 +254,9 @@ public sealed class CityWindow : Window
                 _resize),
             Explained("Maps", "Your maps are kept in the city builder's folder; the last one opens again next time.",
                 new WrapPanel { Children = { _newMap.With(b => b.Margin = new(0, 0, 4, 4)), _openMap.With(b => b.Margin = new(0, 0, 4, 4)), _saveMap.With(b => b.Margin = new(0, 0, 4, 4)), _sample.With(b => b.Margin = new(0, 0, 4, 4)) } }),
+            Explained("Save as a picture", "The map drawn from above as a battle map, for a virtual table or to print: textured ground, roofs, trees, walls, the grid. PNG, JPEG or WebP.",
+                Field("Pixels per square", _pPx, tip: "70 to 140 suits most virtual tables; to print, 100 pixels to a square printed an inch across is 100 dots to the inch."),
+                _pGrid, _pLabels, _pNames, _pBox, _pInfo, _pSave),
             Explained("Make a town for me", "A whole town the size above: roads, a market square, districts, buildings of the right kind for each (your saved buildings where they suit a plot), fields, trees and street names. Press it again for another; undo puts your map back.",
                 Field("Streets", _tLayout),
                 Field("How full", _tDensity, tip: "Left, a house here and there; right, packed side by side."),
@@ -269,7 +290,7 @@ public sealed class CityWindow : Window
             Explained("Seeing it", "", _showPic, Field("Ground colours", _opacity, tip: "How strongly the ground read from the picture is painted over it.")));
     }
 
-    const int PickedTabIndex = 4;
+    const int PickedTabIndex = 4, CutTabIndex = 5;
 
     Control ToolsTab()
     {
@@ -282,6 +303,19 @@ public sealed class CityWindow : Window
                 Field("Type", _typeFilter), _prefabList, _prefabNote, _refreshPrefabs),
             Explained("Fences and trees", "What the Fence and Trees tools put down.", Field("Fence", _fence), Field("Tree or thing", _prop)),
             Explained("Labels", "What the Label tool writes on the map, and how tall (squares).", Field("Text", _labelText), Field("Size (squares)", _labelSize)));
+    }
+
+    Control CutTab()
+    {
+        ToolTip.SetTip(_cTile, "The biggest tile, in squares each way: each must fit on the bed.");
+        return Stack(
+            Explained("The ground", "The map's ground as floor tiles that lock together: cobbles etched on the roads, flagstones on paving, grass, dirt, water and fields each their own way. Squares under the buildings are left plain (each building stands on its own floor).",
+                Field("Tile size (squares)", _cTile), Field("Sheet (mm)", _cThick), Field("Edges", _cJoin), _cGrid, _cOutlines, _cBox, _cGroundInfo, _cGround),
+            Explained("Bridges", "A bridge wherever a road crosses water, from the bridge maker: stone arches for a cobbled road, planks for a track, as wide as the road and reaching onto the banks.",
+                _cBridgesInfo, _cBridges),
+            Explained("Scenery", "The scenery maker's pieces for the map's wells, carts, crates (as barrels), boulders and fences.",
+                _cSceneryInfo, _cScenery),
+            Hint("The buildings are cut with Put this building in the design and Put every building in the design, below."));
     }
 
     Control TownTab()
@@ -369,6 +403,18 @@ public sealed class CityWindow : Window
         _sample.Click += (_, _) => { _file = null; Commit(Sample(), "Sample village", refit: true); };
         _openMap.Click += async (_, _) => await OpenMap();
         _saveMap.Click += async (_, _) => await SaveMapAs();
+
+        _pPx.Value = 100;
+        _pSave.Click += async (_, _) => await SavePicture();
+        foreach (var n in new[] { _pPx }) n.ValueChanged += (_, _) => RefreshPictureInfo();
+        _pBox.IsCheckedChanged += (_, _) => RefreshPictureInfo();
+        _cTile.Value = 4;
+        _cThick.Value = 3;
+        _cBox.IsCheckedChanged += (_, _) => RefreshCut();
+        _cTile.ValueChanged += (_, _) => RefreshCut();
+        _cGround.Click += async (_, _) => await CutGround();
+        _cBridges.Click += async (_, _) => await CutBridges();
+        _cScenery.Click += async (_, _) => await CutScenery();
 
         _tMake.Click += async (_, _) => await MakeTown();
         _fill.Click += async (_, _) => await FillWithBuildings();
@@ -545,6 +591,8 @@ public sealed class CityWindow : Window
         _makeAll.IsEnabled = _map.Buildings.Count > 0;
         RefreshTown();
         ShowPicked();
+        RefreshPictureInfo();
+        if (_left.SelectedIndex == CutTabIndex) RefreshCut();
         _viewStale = true;
         if (_views.SelectedIndex == 1) Show3D();
     }
@@ -894,6 +942,174 @@ public sealed class CityWindow : Window
             _status.Text = $"Put up {added} building{(added == 1 ? "" : "s")} along the roads{(box is null ? "" : " in the box")} ({district.ToLowerInvariant()}).";
         }
         finally { _fill.IsEnabled = true; }
+    }
+
+    // ---- saving a picture ----
+
+    (int X0, int Y0, int X1, int Y1)? BoxIf(CheckBox c) => c.IsChecked == true ? _plan.LastBox : null;
+
+    void RefreshPictureInfo()
+    {
+        var (x0, y0, x1, y1) = BoxIf(_pBox) ?? (0, 0, _map.Across, _map.Down);
+        int want = (int)(_pPx.Value ?? 100), px = TownPicture.FitPx(x1 - x0, y1 - y0, want);
+        _pInfo.Text = $"{x1 - x0} × {y1 - y0} squares: {(x1 - x0) * px} × {(y1 - y0) * px} pixels"
+            + (px < want ? $" (at most {px} pixels to a square for a map this big)." : ".")
+            + (_pBox.IsChecked == true && _plan.LastBox is null ? " No box is dragged: the whole map." : "");
+    }
+
+    async Task SavePicture()
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save the map as a picture",
+            SuggestedStartLocation = await Start(),
+            SuggestedFileName = string.Concat(_map.Name.Split(Path.GetInvalidFileNameChars())) + ".png",
+            DefaultExtension = "png",
+            FileTypeChoices = [new FilePickerFileType("PNG picture") { Patterns = ["*.png"] }, new FilePickerFileType("JPEG picture") { Patterns = ["*.jpg", "*.jpeg"] }, new FilePickerFileType("WebP picture") { Patterns = ["*.webp"] }],
+        });
+        if (file?.TryGetLocalPath() is not { } path) return;
+        var map = _map;
+        var o = new TownPictureOptions { PxPerSquare = (int)(_pPx.Value ?? 100), Grid = _pGrid.IsChecked == true, Labels = _pLabels.IsChecked == true, Names = _pNames.IsChecked == true, Box = BoxIf(_pBox) };
+        _pSave.IsEnabled = false;
+        _status.Text = "Drawing the picture…";
+        try
+        {
+            var bytes = await Task.Run(() => TownPicture.Encode(map, o, path));
+            await File.WriteAllBytesAsync(path, bytes);
+            _status.Text = $"Saved {Path.GetFileName(path)} ({bytes.Length / 1048576.0:0.#} MB).";
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException or OutOfMemoryException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't save the picture: {e.Message}";
+        }
+        finally { _pSave.IsEnabled = true; }
+    }
+
+    // ---- cutting the ground, bridges and scenery ----
+
+    /// <summary>The most ground tiles made at once: a big town's ground is cut a part at a time.</summary>
+    const int MaxGroundTiles = 400;
+
+    void RefreshCut()
+    {
+        var box = BoxIf(_cBox);
+        var (x0, y0, x1, y1) = box ?? (0, 0, _map.Across, _map.Down);
+        int t = (int)(_cTile.Value ?? 4), tiles = (int)Math.Ceiling((x1 - x0) / (double)t) * (int)Math.Ceiling((y1 - y0) / (double)t);
+        _cGroundInfo.Text = $"{x1 - x0} × {y1 - y0} squares ({(x1 - x0) * _map.SquareMm / 1000:0.##} × {(y1 - y0) * _map.SquareMm / 1000:0.##} m) in about {tiles} tiles."
+            + (_cBox.IsChecked == true && _plan.LastBox is null ? " No box is dragged: the whole map." : "")
+            + (tiles > MaxGroundTiles ? $" That's too many at once (at most {MaxGroundTiles}): drag a box round a part with Select and tick the box below." : "");
+        _cGround.IsEnabled = tiles <= MaxGroundTiles;
+        var sites = TownPieces.Bridges(_map, box);
+        _cBridgesInfo.Text = sites.Count == 0 ? "No road crosses water" + (box is null ? "." : " in the box.") : $"{sites.Count} {Plural("place", sites.Count)} where a road crosses water.";
+        _cBridges.IsEnabled = sites.Count > 0;
+        var set = TownPieces.Scenery(_map, _map.Theme, box);
+        _cSceneryInfo.Text = set is null ? "No wells, carts, crates, boulders or fences" + (box is null ? "." : " in the box.")
+            : string.Join(", ", set.Items.Select(i => $"{i.Count} × {PhotonCanvas.Addon.Scatter.Defaults.Info(i.Kind).Name.ToLowerInvariant()}" + (i.Kind == PhotonCanvas.Addon.Scatter.ItemKind.Fence ? $" ({i.WidthMm / _map.SquareMm:0.#} squares)" : ""))) + ".";
+        _cScenery.IsEnabled = set is not null;
+    }
+
+    async Task CutGround()
+    {
+        var before = _doc.State;
+        var map = _map;
+        var o = new GroundOptions
+        {
+            TileSquares = (int)(_cTile.Value ?? 4),
+            ThicknessMm = (double)(_cThick.Value ?? 3),
+            Join = (PhotonCanvas.Addon.FloorTiles.TileJoin)Math.Max(0, _cJoin.SelectedIndex),
+            Grid = _cGrid.IsChecked == true,
+            Outlines = _cOutlines.IsChecked == true,
+            Box = BoxIf(_cBox),
+        };
+        _cGround.IsEnabled = false;
+        _status.Text = "Making the ground's tiles…";
+        try
+        {
+            var (state, kit, id, why) = await Task.Run(() =>
+            {
+                var (spec, kit) = GroundBoards.Make(map, o);
+                if (!kit.Ok) return (before, kit, Guid.Empty, kit.Findings.First(f => f.Level == PhotonCanvas.Addon.Walls.Severity.Bad).Text);
+                var big = PhotonCanvas.Addon.FloorTiles.TilePlacement.TooBig(kit, _machine).FirstOrDefault();
+                if (big is not null) return (before, kit, Guid.Empty, big.Text);
+                var (s, _, id) = PhotonCanvas.Addon.FloorTiles.TilePlacement.Place(before, kit, spec, _machine, new PhotonCanvas.Addon.FloorTiles.TilePlaceOptions());
+                return (s, kit, id, (string?)null);
+            });
+            if (why is not null) { _status.Text = $"Couldn't make the ground's tiles: {why}"; return; }
+            if (!ReferenceEquals(_doc.State, before)) { _status.Text = "The design changed meanwhile: press it again."; return; }
+            _doc.Commit("City ground", state, PhotonCanvas.Addon.FloorTiles.TilePlacement.ShapesOf(state, id));
+            _status.Text = $"Put the ground in the design: {kit.Tiles.Count()} {Plural("tile", kit.Tiles.Count())} ({kit.PieceCount} pieces), nested onto the bed.";
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't make the ground's tiles: {e.Message}";
+        }
+        finally { RefreshCut(); }
+    }
+
+    async Task CutBridges()
+    {
+        var map = _map;
+        var sites = TownPieces.Bridges(map, BoxIf(_cBox));
+        if (sites.Count == 0) return;
+        _cBridges.IsEnabled = false;
+        int done = 0;
+        var problems = new List<string>();
+        try
+        {
+            for (int i = 0; i < sites.Count; i++)
+            {
+                var site = sites[i];
+                _status.Text = $"Making bridge {i + 1} of {sites.Count}…";
+                var before = _doc.State;
+                var made = await Task.Run(() =>
+                {
+                    if (TownPieces.Bridge(site, map.Theme, map.SquareMm) is not { } b) return ((DocState, Guid)?)null;
+                    var (s, _, id) = PhotonCanvas.Addon.Bridges.Placement.Place(before, b.Kit, b.Spec, _machine, new PhotonCanvas.Addon.Bridges.PlaceOptions());
+                    return (s, id);
+                });
+                var (mx, my) = site.Middle;
+                if (made is not { } r) { problems.Add($"the one at {mx:0}, {my:0} (no bridge suits it)"); continue; }
+                if (!ReferenceEquals(_doc.State, before)) { problems.Add($"the one at {mx:0}, {my:0} (the design changed meanwhile)"); continue; }
+                _doc.Commit("City bridge", r.Item1, PhotonCanvas.Addon.Bridges.Placement.ShapesOf(r.Item1, r.Item2));
+                done++;
+            }
+            _status.Text = $"Put {done} {Plural("bridge", done)} in the design, each on pages of its own." + (problems.Count > 0 ? " Not made: " + string.Join("; ", problems) + "." : "");
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't make the bridges: {e.Message}";
+        }
+        finally { _cBridges.IsEnabled = true; }
+    }
+
+    async Task CutScenery()
+    {
+        if (TownPieces.Scenery(_map, _map.Theme, BoxIf(_cBox)) is not { } set) return;
+        var before = _doc.State;
+        _cScenery.IsEnabled = false;
+        try
+        {
+            var (state, kit, id, why) = await Task.Run(() =>
+            {
+                var kit = PhotonCanvas.Addon.Scatter.ScatterKit.Make(set);
+                if (!kit.Ok) return (before, kit, Guid.Empty, kit.Items.SelectMany(i => i.Findings).First(f => f.Level == PhotonCanvas.Addon.Scatter.Severity.Bad).Text);
+                var (s, _, id) = PhotonCanvas.Addon.Scatter.Placement.Place(before, kit, set, _machine, new PhotonCanvas.Addon.Scatter.PlaceOptions());
+                return (s, kit, id, (string?)null);
+            });
+            if (why is not null) { _status.Text = $"Couldn't make the scenery: {why}"; return; }
+            if (!ReferenceEquals(_doc.State, before)) { _status.Text = "The design changed meanwhile: press it again."; return; }
+            _doc.Commit("City scenery", state, PhotonCanvas.Addon.Scatter.Placement.ShapesOf(state, id));
+            _status.Text = $"Put the scenery in the design: {kit.PieceCount} pieces.";
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't make the scenery: {e.Message}";
+        }
+        finally { _cScenery.IsEnabled = true; }
     }
 
     // ---- the battle map ----

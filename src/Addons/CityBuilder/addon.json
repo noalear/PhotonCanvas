@@ -5,6 +5,6 @@
   "description": "Lay out a whole town on a big map: paint roads, water and fields, put buildings down (your saved buildings, or footprints you drag out), add walls, fences and trees, and see it all in a light, quick 3D view. Read a 2D battle map picture to get a best guess of the town from above, then change what it got wrong. Each building opens in the building editor and comes out as its laser-cut pieces.",
   "category": "Make",
   "apiVersion": 1,
-  "requires": ["walls", "furniture", "floortiles", "stairs", "roofs", "buildings", "houseeditor", "mapterrain"],
+  "requires": ["walls", "furniture", "floortiles", "stairs", "roofs", "buildings", "houseeditor", "mapterrain", "bridges", "scatter"],
   "onByDefault": true
 }

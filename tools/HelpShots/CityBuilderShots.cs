@@ -5,8 +5,9 @@ using PhotonCanvas.Addon.CityBuilder;
 using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
+using SkiaSharp;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, a town made for you, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, a town made for you, its Cut tab, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -34,7 +35,7 @@ static class CityBuilderShots
             }
             foreach (var tc in win.GetLogicalDescendantsOf<TabControl>())
             {
-                if (tc.Items.Count == 5 && tc.Items[0] is TabItem { Header: "Map" }) tc.SelectedIndex = left;
+                if (tc.Items.Count == 6 && tc.Items[0] is TabItem { Header: "Map" }) tc.SelectedIndex = left;
                 if (tc.Items.Count == 2 && tc.Items[0] is TabItem { Header: "Plan" }) tc.SelectedIndex = view;
             }
             settle(1500);
@@ -77,6 +78,14 @@ static class CityBuilderShots
         }
         Shot("window-citybuilder-made", village, 0, 0, MakeOne);
         Shot("window-citybuilder-made-3d", village, 0, 1, MakeOne);
+        Shot("window-citybuilder-cut", village, 5, 0, MakeOne);
+        // A town like it saved as a battle map picture (a part of it), and the ground by the river cut as tiles.
+        var (town, _) = TownMaker.Make(new TownOptions { Name = "New town", Across = 64, Down = 48, Layout = TownLayout.Crossroads, Walls = true, River = true, Seed = 7, Theme = "Medieval" });
+        File.WriteAllBytes(Path.Combine(folder, "citybuilder-picture.png"), TownPicture.Encode(town, new TownPictureOptions { PxPerSquare = 36, Box = (18, 16, 54, 38) }, "town.png"));
+        Console.WriteLine("citybuilder: citybuilder-picture.png");
+        var (_, ground) = GroundBoards.Make(town, new GroundOptions { TileSquares = 4, Box = (40, 18, 56, 30) });
+        File.WriteAllBytes(Path.Combine(folder, "citybuilder-ground.png"), TilesPicture(ground.Board, 3, 1.5));
+        Console.WriteLine("citybuilder: citybuilder-ground.png");
         Shot("window-citybuilder-battlemap", CityMap.Empty(40, 28), 1, 0, async w =>
         {
             await w.UsePicture(SampleBattleMap.Make(), null);
@@ -87,6 +96,59 @@ static class CityBuilderShots
             await w.UsePicture(SampleBattleMap.Make(), null);
             await w.ReadPicture();
         });
+    }
+
+    /// <summary>Floor tiles drawn as cut: light wood, the etching darker, scored lines dark, each a little apart from the next.</summary>
+    static byte[] TilesPicture(List<PhotonCanvas.Addon.FloorTiles.BoardSpot> board, double pxPerMm, double gapMm)
+    {
+        double tw = board.Max(b => b.W), th = board.Max(b => b.H);
+        int Col(PhotonCanvas.Addon.FloorTiles.BoardSpot b) => (int)Math.Round(b.X / tw);
+        int Row(PhotonCanvas.Addon.FloorTiles.BoardSpot b) => (int)Math.Round(b.Y / th);
+        double maxX = board.Max(b => b.X + b.W + Col(b) * gapMm), maxY = board.Max(b => b.Y + b.H + Row(b) * gapMm), margin = 6;
+        int W = (int)Math.Ceiling((maxX + 2 * margin) * pxPerMm), H = (int)Math.Ceiling((maxY + 2 * margin) * pxPerMm);
+        using var bmp = new SKBitmap(W, H);
+        using var c = new SKCanvas(bmp);
+        c.Clear(new SKColor(0x2b, 0x2d, 0x31));
+        SKPoint At(double x, double y) => new((float)(x * pxPerMm), (float)(H - y * pxPerMm));
+        SKPath Area(Clipper2Lib.PathsD paths, double ox, double oy)
+        {
+            var p = new SKPath { FillType = SKPathFillType.EvenOdd };
+            foreach (var path in paths.Where(q => q.Count > 2))
+            {
+                p.MoveTo(At(ox + path[0].x, oy + path[0].y));
+                for (int i = 1; i < path.Count; i++) p.LineTo(At(ox + path[i].x, oy + path[i].y));
+                p.Close();
+            }
+            return p;
+        }
+        using var wood = new SKPaint { Color = new SKColor(0xe2, 0xc4, 0x96), IsAntialias = true };
+        using var burnt = new SKPaint { Color = new SKColor(0x8a, 0x5a, 0x2e), IsAntialias = true };
+        using var line = new SKPaint { Color = new SKColor(0x5a, 0x38, 0x1c), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = (float)Math.Max(1, 0.35 * pxPerMm), StrokeCap = SKStrokeCap.Round };
+        using var edge = new SKPaint { Color = new SKColor(0x3c, 0x24, 0x10), IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeWidth = 1.5f };
+        using var shadow = new SKPaint { Color = new SKColor(0, 0, 0, 110), IsAntialias = true, MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, (float)(1.5 * pxPerMm)) };
+        foreach (var b in board)
+        {
+            double ox = margin + b.X + Col(b) * gapMm, oy = margin + b.Y + Row(b) * gapMm;
+            using var cut = Area(b.Tile.Cut, ox, oy);
+            c.Save();
+            c.Translate((float)(1.2 * pxPerMm), (float)(1.2 * pxPerMm));
+            c.DrawPath(cut, shadow);
+            c.Restore();
+            c.DrawPath(cut, wood);
+            using var etched = Area(b.Tile.Etched, ox, oy);
+            c.DrawPath(etched, burnt);
+            using var lines = new SKPath();
+            foreach (var l in b.Tile.Lines.Where(q => q.Count > 1))
+            {
+                lines.MoveTo(At(ox + l[0].x, oy + l[0].y));
+                for (int i = 1; i < l.Count; i++) lines.LineTo(At(ox + l[i].x, oy + l[i].y));
+            }
+            c.DrawPath(lines, line);
+            c.DrawPath(cut, edge);
+        }
+        using var img = SKImage.FromBitmap(bmp);
+        using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+        return data.ToArray();
     }
 
     static IEnumerable<T> GetLogicalDescendantsOf<T>(this Control c) => Avalonia.LogicalTree.LogicalExtensions.GetLogicalDescendants(c).OfType<T>();
