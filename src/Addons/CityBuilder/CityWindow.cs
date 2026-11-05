@@ -63,7 +63,35 @@ public sealed class CityWindow : Window
     readonly Button _refreshPrefabs = UiKit.Button("Look again");
     readonly TextBlock _prefabNote = Hint();
     readonly NumericUpDown _storeysNew = Number(1, HouseKitMaker.MaxLevels, 1, "0");
+    readonly ComboBox _roadGround = Combo([.. RoadGrounds.Select(CityMap.Label)]);
+    readonly NumericUpDown _roadWidth = Number(1, 9, 1, "0");
+    readonly TextBox _labelText = new() { Text = "Market Street" };
+    readonly NumericUpDown _labelSize = Number(0.2m, 10, 0.1m, "0.#");
     List<PrefabInfo> _prefabs = [];
+
+    /// <summary>What the Road tool can lay.</summary>
+    static readonly Ground[] RoadGrounds = [Ground.Road, Ground.Dirt, Ground.Paving, Ground.Sand, Ground.Water, Ground.Grass];
+
+    // The town's buildings
+    readonly TextBox _find = new() { Watermark = "Find by name, type, district or tag" };
+    readonly ComboBox _findType = Combo("Every type"), _findDistrict = Combo("Every district");
+    readonly ListBox _townList = new() { Height = 300 };
+    readonly TextBlock _townCounts = Hint();
+    readonly CheckBox _byDistrict = new() { Content = "Colour the plan by district" };
+    readonly StackPanel _legend = new() { Spacing = 3 };
+    bool _fromList;
+
+    // Several things picked, or a label
+    readonly TextBlock _gInfo = Hint();
+    readonly TextBox _gType = new() { Watermark = "Leave empty to keep each one's" }, _gDistrict = new() { Watermark = "Leave empty to keep each one's" };
+    readonly ComboBox _gProp = Combo([.. Enum.GetValues<PropKind>().Select(CityMap.Label)]);
+    readonly NumericUpDown _gPropSize = Number(0.2m, 6, 0.1m, "0.#");
+    readonly Button _gTurn = UiKit.Button("Turn ⟳"), _gCopy = UiKit.Button("Copy beside it"), _gDelete = UiKit.Button("Take away");
+    Control _groupBuildings = null!, _groupProps = null!, _groupPanel = null!, _labelPanel = null!;
+    readonly TextBox _lText = new();
+    readonly NumericUpDown _lSize = Number(0.2m, 10, 0.1m, "0.#");
+    readonly Button _lDelete = UiKit.Button("Take it away");
+    TabControl _left = null!;
 
     // The building picked
     readonly TextBox _bName = new(), _bType = new(), _bDistrict = new(), _bTags = new();
@@ -113,14 +141,16 @@ public sealed class CityWindow : Window
             _tools[t] = b;
             bar.Children.Add(b);
         }
-        Tool(CityTool.Select, "Select", "Click a building to change it (on the left), drag it to move it; R or the mouse wheel while dragging turns it, Delete takes it away.");
+        Tool(CityTool.Select, "Select", "Click a building, tree, label or fence to pick it (Ctrl and click to pick more), or drag a box round things. Drag to move what's picked; R turns it, Delete takes it away, Ctrl+C and Ctrl+V copy and paste it, Ctrl+D copies it beside itself.");
         Tool(CityTool.Building, "Building", "Drag out a building's footprint: walls go round it, with a door towards the road, windows and a roof. The right button takes a building away.");
         Tool(CityTool.Place, "Place", "Pick a saved building on the left, then click the map to put it down. R, the right button or Ctrl + the wheel turns it first.");
         bar.Children.Add(Gap());
         Tool(CityTool.Ground, "Paint", "Paint the ground (pick what on the left, and the brush size). The right button paints grass.");
         Tool(CityTool.Fill, "Fill", "Click to fill a patch of one ground with another.");
+        Tool(CityTool.Road, "Road", "Drag from one square to another to lay a road (round one corner; hold Ctrl for a straight line however it slants). Pick what and how wide on the Tools tab. The right button lays grass.");
         Tool(CityTool.Fence, "Fence", "Drag along the grid lines for a fence, hedge, wall or town wall (pick which on the left); drag over one to take it away.");
         Tool(CityTool.Prop, "Trees", "Click to put down a tree (or a rock, a well, a cart… pick which on the left). The right button takes them away.");
+        Tool(CityTool.Label, "Label", "Click to write a label on the map (type it on the Tools tab): a street's name, a district's, a number for your key. The right button takes one away.");
         Tool(CityTool.Erase, "Erase", "Drag over trees, fences and buildings to take them away.");
         bar.Children.Add(Gap());
         foreach (var b in new[] { _undoButton, _redoButton }) { b.Margin = new Thickness(0, 0, 4, 4); bar.Children.Add(b); }
@@ -128,12 +158,17 @@ public sealed class CityWindow : Window
         ToolTip.SetTip(_redoButton, "Ctrl+Y");
 
         // The left-hand side: the map, the battle map, the tools' settings and the building picked.
-        var left = new TabControl { Width = 340, Margin = new Thickness(14, 0, 0, 0) };
+        var left = _left = new TabControl { Width = 360, Margin = new Thickness(14, 0, 0, 0) };
         left.Items.Add(Tab("Map", MapTab()));
         left.Items.Add(Tab("Battle map", PictureTab()));
         left.Items.Add(Tab("Tools", ToolsTab()));
-        left.Items.Add(Tab("Building", BuildingTab()));
-        _plan.Picked += _ => { if (_plan.Selected is not null && left.SelectedIndex != 3 && _plan.Tool == CityTool.Select) left.SelectedIndex = 3; ShowBuilding(); };
+        left.Items.Add(Tab("Town", TownTab()));
+        left.Items.Add(Tab("Picked", PickedTab()));
+        _plan.PickChanged += () =>
+        {
+            if (!_plan.Pick.IsEmpty && !_fromList && left.SelectedIndex != PickedTabIndex && _plan.Tool is CityTool.Select or CityTool.Label) left.SelectedIndex = PickedTabIndex;
+            ShowPicked();
+        };
 
         // The plan and the 3D view.
         var showRow = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
@@ -217,20 +252,48 @@ public sealed class CityWindow : Window
             Explained("Seeing it", "", _showPic, Field("Ground colours", _opacity, tip: "How strongly the ground read from the picture is painted over it.")));
     }
 
+    const int PickedTabIndex = 4;
+
     Control ToolsTab()
     {
         _prefabList.SelectionMode = SelectionMode.Single;
         return Stack(
             Explained("Paint and fill", "What the Paint and Fill tools lay down.", Field("Ground", _paint), Field("Brush (squares)", _brush)),
+            Explained("Roads", "What the Road tool lays from one square to another, and how wide.", Field("Lay", _roadGround), Field("Width (squares)", _roadWidth)),
             Explained("New buildings", "A footprint dragged out with the Building tool gets walls, a door towards the road, windows and a roof.", Field("Floors", _storeysNew)),
             Explained("Saved buildings", "Buildings saved in the building editor (with \"Save as a building to reuse\"), to put down with the Place tool as many times as you like.",
                 Field("Type", _typeFilter), _prefabList, _prefabNote, _refreshPrefabs),
-            Explained("Fences and trees", "What the Fence and Trees tools put down.", Field("Fence", _fence), Field("Tree or thing", _prop)));
+            Explained("Fences and trees", "What the Fence and Trees tools put down.", Field("Fence", _fence), Field("Tree or thing", _prop)),
+            Explained("Labels", "What the Label tool writes on the map, and how tall (squares).", Field("Text", _labelText), Field("Size (squares)", _labelSize)));
+    }
+
+    Control TownTab()
+    {
+        _townList.SelectionMode = SelectionMode.Single;
+        return Stack(
+            Explained("The buildings", "Every building on the map. Click one to pick it and go to it on the plan.",
+                _find, Field("Type", _findType), Field("District", _findDistrict), _townList, _townCounts),
+            Explained("Districts", "The part of town each building is in: set it on the Picked tab, for several buildings at once too.", _byDistrict, _legend));
+    }
+
+    Control PickedTab()
+    {
+        var none = Hint("Click a building, tree, label or fence on the plan with the Select tool, or drag a box round several, to change them here.");
+        var building = BuildingTab();
+        _groupBuildings = Stack(Field("Type", _gType, tip: "Typed here, every building picked gets it."), Field("District", _gDistrict, tip: "Typed here, every building picked gets it."));
+        _groupProps = Stack(Field("Tree or thing", _gProp), Field("Size", _gPropSize, tip: "1 is about a square across."));
+        _groupPanel = Stack(
+            Explained("What's picked", "Drag any of it on the plan to move it all; Ctrl+C and Ctrl+V copy and paste it (where the pointer is), R turns it, Delete takes it away.",
+                _gInfo, _groupBuildings, _groupProps,
+                new WrapPanel { Children = { _gTurn.With(b => b.Margin = new(0, 0, 4, 4)), _gCopy.With(b => b.Margin = new(0, 0, 4, 4)), _gDelete.With(b => b.Margin = new(0, 0, 4, 4)) } }));
+        _labelPanel = Stack(
+            Explained("The label", "Drag it on the plan to move it.", Field("Text", _lText), Field("Size (squares)", _lSize), _lDelete));
+        _noBuilding = none;
+        return new StackPanel { Children = { none, building, _groupPanel, _labelPanel } };
     }
 
     Control BuildingTab()
     {
-        _noBuilding = Hint("Click a building on the plan with the Select tool to change it here.");
         _bTags.Watermark = "Words to find it by, with commas between";
         _bDistrict.Watermark = "Residential, market, docks…";
         _buildingPanel = Stack(
@@ -241,7 +304,7 @@ public sealed class CityWindow : Window
                 Field("Roof", _bRoof), Field("Covering", _bCovering), _bRoofIt,
                 _bEdit),
             Explained("More", "", new WrapPanel { Children = { _bCopy.With(b => b.Margin = new(0, 0, 4, 4)), _bDelete.With(b => b.Margin = new(0, 0, 4, 4)), _bSavePrefab.With(b => b.Margin = new(0, 0, 4, 4)) } }));
-        return new StackPanel { Children = { _noBuilding, _buildingPanel } };
+        return _buildingPanel;
     }
 
     static Control Gap() => new Border { Width = 14 };
@@ -316,6 +379,38 @@ public sealed class CityWindow : Window
         _fence.SelectionChanged += (_, _) => _plan.FenceKind = (FenceKind)Math.Max(0, _fence.SelectedIndex);
         _prop.SelectionChanged += (_, _) => _plan.PropKind = (PropKind)Math.Max(0, _prop.SelectedIndex);
         _storeysNew.Value = 1;
+        _roadGround.SelectionChanged += (_, _) => _plan.RoadGround = RoadGrounds[Math.Clamp(_roadGround.SelectedIndex, 0, RoadGrounds.Length - 1)];
+        _roadWidth.ValueChanged += (_, _) => _plan.RoadWidth = (int)(_roadWidth.Value ?? 2);
+        _roadWidth.Value = 2;
+        _labelText.TextChanged += (_, _) => { _plan.LabelText = _labelText.Text ?? ""; _plan.InvalidateVisual(); };
+        _labelSize.ValueChanged += (_, _) => _plan.LabelSize = (double)(_labelSize.Value ?? 0.8m);
+        _labelSize.Value = 0.8m;
+
+        _find.TextChanged += (_, _) => FillTownList();
+        _findType.SelectionChanged += (_, _) => FillTownList();
+        _findDistrict.SelectionChanged += (_, _) => FillTownList();
+        _townList.SelectionChanged += (_, _) =>
+        {
+            if (_townList.SelectedItem is not TownRow r || _map.Building(r.Building.Id) is not { } b || _plan.Selected == b.Id) return;
+            _fromList = true;
+            _plan.SetPick(CityPick.Of(b));
+            _fromList = false;
+            var (w, d) = CityFootprint.Size(b);
+            _plan.CentreOn(b.X + w / 2.0, b.Y + d / 2.0);
+            _views.SelectedIndex = 0;
+        };
+        _byDistrict.IsCheckedChanged += (_, _) => _plan.DistrictColours = _byDistrict.IsChecked == true;
+
+        _gType.LostFocus += (_, _) => ChangePicked(b => b with { Type = _gType.Text!.Trim() }, string.IsNullOrWhiteSpace(_gType.Text), "Change the buildings' type");
+        _gDistrict.LostFocus += (_, _) => ChangePicked(b => b with { District = _gDistrict.Text!.Trim() }, string.IsNullOrWhiteSpace(_gDistrict.Text), "Change the buildings' district");
+        _gProp.SelectionChanged += (_, _) => ChangeProps(p => p with { Kind = (PropKind)Math.Max(0, _gProp.SelectedIndex) }, "Change trees and things");
+        _gPropSize.ValueChanged += (_, _) => ChangeProps(p => p with { Size = (double)(_gPropSize.Value ?? 1) }, "Resize trees and things");
+        _gTurn.Click += (_, _) => _plan.TurnPicked(1);
+        _gCopy.Click += (_, _) => _plan.DuplicatePicked();
+        _gDelete.Click += (_, _) => _plan.DeletePicked();
+        _lText.LostFocus += (_, _) => ChangeLabel(l => l with { Text = string.IsNullOrWhiteSpace(_lText.Text) ? l.Text : _lText.Text.Trim() }, "Change a label");
+        _lSize.ValueChanged += (_, _) => ChangeLabel(l => l with { Size = (double)(_lSize.Value ?? 0.8m) }, "Resize a label");
+        _lDelete.Click += (_, _) => _plan.DeletePicked();
         _typeFilter.SelectionChanged += (_, _) => FillPrefabList();
         _prefabList.SelectionChanged += (_, _) =>
         {
@@ -328,7 +423,7 @@ public sealed class CityWindow : Window
         _bType.LostFocus += (_, _) => ChangeBuilding(b => b with { Type = (_bType.Text ?? "").Trim() }, "Change a building's type");
         _bDistrict.LostFocus += (_, _) => ChangeBuilding(b => b with { District = (_bDistrict.Text ?? "").Trim() }, "Change a building's district");
         _bTags.LostFocus += (_, _) => ChangeBuilding(b => b with { Tags = Tags(_bTags.Text) }, "Change a building's tags");
-        _bTurn.Click += (_, _) => ChangeBuilding(b => Turned(b, 1), "Turn a building");
+        _bTurn.Click += (_, _) => _plan.TurnPicked(1);
         _bUp.Click += (_, _) => ChangeBuilding(b => b with { Design = AddFloor(b.Design) }, "Add a floor");
         _bDownLevel.Click += (_, _) => ChangeBuilding(b => b with { Design = TakeFloor(b.Design) }, "Take a floor off");
         _bRoof.SelectionChanged += (_, _) => ChangeBuilding(b => b with { Design = b.Design with { Roofs = [.. b.Design.Roofs.Select(r => r with { Kind = (RoofKind)Math.Max(0, _bRoof.SelectedIndex) })] } }, "Change a roof");
@@ -336,11 +431,11 @@ public sealed class CityWindow : Window
         _bRoofIt.Click += (_, _) => ChangeBuilding(b => b with { Design = RoofAgain(b.Design) }, "Roof a building again");
         _bEdit.Click += async (_, _) => await EditBuilding();
         _bCopy.Click += (_, _) => CopyBuilding();
-        _bDelete.Click += (_, _) => { if (Picked() is { } b) { _plan.Select(null); Commit(_map.Without(b.Id), "Take a building away"); } };
+        _bDelete.Click += (_, _) => _plan.DeletePicked();
         _bSavePrefab.Click += async (_, _) => await SaveAsPrefab();
 
         foreach (var c in new[] { _vRoofs, _vProps, _vOpenings }) c.IsCheckedChanged += (_, _) => Show3D();
-        _makeOne.Click += async (_, _) => { if (Picked() is { } b) await Make([b]); };
+        _makeOne.Click += async (_, _) => await Make([.. _map.Buildings.Where(b => _plan.Pick.Buildings.Contains(b.Id))]);
         _makeAll.Click += async (_, _) => await Make(_map.Buildings);
     }
 
@@ -427,7 +522,8 @@ public sealed class CityWindow : Window
         _summary.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things."
             + (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "");
         _makeAll.IsEnabled = _map.Buildings.Count > 0;
-        ShowBuilding();
+        RefreshTown();
+        ShowPicked();
         _viewStale = true;
         if (_views.SelectedIndex == 1) Show3D();
     }
@@ -435,19 +531,53 @@ public sealed class CityWindow : Window
     void Show3D()
     {
         _viewStale = false;
-        _view.Show(_map, new CityShow { Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true, Selected = _plan.Selected });
+        _view.Show(_map, new CityShow { Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true, Picked = [.. _plan.Pick.Buildings] });
     }
 
     // ---- the building picked ----
 
     CityBuilding? Picked() => _plan.Selected is { } id ? _map.Building(id) : null;
 
-    void ShowBuilding()
+    void ShowPicked()
     {
+        var pick = _plan.Pick;
         var b = Picked();
-        _noBuilding.IsVisible = b is null;
+        var label = pick.Labels.Count == 1 && pick.Buildings.Count + pick.Props.Count + pick.Fences.Count == 0 ? _map.Labels.FirstOrDefault(l => l.Id == pick.Labels.First()) : null;
+        _noBuilding.IsVisible = pick.IsEmpty;
         _buildingPanel.IsVisible = b is not null;
-        _makeOne.IsEnabled = b is not null;
+        _labelPanel.IsVisible = label is not null;
+        _groupPanel.IsVisible = !pick.IsEmpty && b is null && label is null;
+        int many = pick.Buildings.Count;
+        _makeOne.IsEnabled = many > 0;
+        _makeOne.Content = many > 1 ? $"Put the {many} picked buildings in the design" : "Put this building in the design";
+        if (_views.SelectedIndex == 1 && !_view.Shown.Picked.SetEquals(pick.Buildings)) Show3D();
+        _loadingBuilding = true;
+        if (label is not null)
+        {
+            _lText.Text = label.Text;
+            _lSize.Value = (decimal)label.Size;
+        }
+        if (_groupPanel.IsVisible)
+        {
+            var bs = _map.Buildings.Where(x => pick.Buildings.Contains(x.Id)).ToList();
+            var ps = _map.Props.Where(x => pick.Props.Contains(x.Id)).ToList();
+            var parts = new List<string>();
+            if (bs.Count > 0) parts.Add($"{bs.Count} building{(bs.Count == 1 ? "" : "s")}");
+            if (ps.Count > 0) parts.Add($"{ps.Count} tree{(ps.Count == 1 ? "" : "s")} and thing{(ps.Count == 1 ? "" : "s")}");
+            if (pick.Labels.Count > 0) parts.Add($"{pick.Labels.Count} label{(pick.Labels.Count == 1 ? "" : "s")}");
+            if (pick.Fences.Count > 0) parts.Add($"{pick.Fences.Count} square{(pick.Fences.Count == 1 ? "" : "s")} of fence");
+            _gInfo.Text = "Picked: " + string.Join(", ", parts) + ".";
+            _groupBuildings.IsVisible = bs.Count > 0;
+            _gType.Text = bs.Select(x => x.Type).Distinct().Count() == 1 ? bs[0].Type : "";
+            _gDistrict.Text = bs.Select(x => x.District).Distinct().Count() == 1 ? bs[0].District : "";
+            _groupProps.IsVisible = ps.Count > 0 && bs.Count == 0;
+            if (ps.Count > 0)
+            {
+                _gProp.SelectedIndex = ps.Select(x => x.Kind).Distinct().Count() == 1 ? (int)ps[0].Kind : -1;
+                _gPropSize.Value = (decimal)Math.Round(ps[0].Size, 1);
+            }
+        }
+        _loadingBuilding = false;
         if (b is null) return;
         _loadingBuilding = true;
         _bName.Text = b.Name;
@@ -467,7 +597,95 @@ public sealed class CityWindow : Window
         _bDownLevel.IsEnabled = floors > 1;
         _bUp.IsEnabled = floors < HouseKitMaker.MaxLevels;
         _loadingBuilding = false;
-        if (_views.SelectedIndex == 1 && _view.Shown.Selected != b.Id) Show3D();
+    }
+
+    /// <summary>Every picked building changed (unless <paramref name="skip"/>).</summary>
+    void ChangePicked(Func<CityBuilding, CityBuilding> change, bool skip, string label)
+    {
+        if (_loadingBuilding || skip) return;
+        var ids = _plan.Pick.Buildings;
+        var m = _map with { Buildings = [.. _map.Buildings.Select(b => ids.Contains(b.Id) ? change(b) : b)] };
+        if (m.Buildings.Zip(_map.Buildings).All(p => p.First.ToJsonEqual(p.Second))) return;
+        Commit(m, label);
+    }
+
+    void ChangeProps(Func<Prop, Prop> change, string label)
+    {
+        if (_loadingBuilding) return;
+        var ids = _plan.Pick.Props;
+        if (ids.Count == 0) return;
+        var m = _map with { Props = [.. _map.Props.Select(p => ids.Contains(p.Id) ? change(p) : p)] };
+        if (m.Props.SequenceEqual(_map.Props)) return;
+        Commit(m, label);
+    }
+
+    void ChangeLabel(Func<CityLabel, CityLabel> change, string label)
+    {
+        if (_loadingBuilding || _plan.Pick.Labels.Count != 1) return;
+        var id = _plan.Pick.Labels.First();
+        var m = _map with { Labels = [.. _map.Labels.Select(l => l.Id == id ? change(l) : l)] };
+        if (m.Labels.SequenceEqual(_map.Labels)) return;
+        Commit(m, label);
+    }
+
+    // ---- the town's buildings ----
+
+    sealed record TownRow(CityBuilding Building)
+    {
+        public override string ToString()
+        {
+            var (w, d) = CityFootprint.Size(Building);
+            var what = string.Join(", ", new[] { Building.Type, Building.District }.Where(x => !string.IsNullOrWhiteSpace(x)));
+            return $"{Building.Name}  ({(what.Length > 0 ? what + ", " : "")}{w} × {d})";
+        }
+    }
+
+    void RefreshTown()
+    {
+        static List<string> Choices(string all, IEnumerable<string> values) =>
+            [all, .. values.Where(v => !string.IsNullOrWhiteSpace(v)).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(v => v, StringComparer.CurrentCultureIgnoreCase)];
+        void Set(ComboBox c, List<string> items)
+        {
+            var was = c.SelectedItem as string;
+            if (c.ItemsSource is List<string> old && old.SequenceEqual(items)) return;
+            c.ItemsSource = items;
+            c.SelectedItem = was is not null && items.Contains(was) ? was : items[0];
+        }
+        Set(_findType, Choices("Every type", _map.Buildings.Select(b => b.Type)));
+        Set(_findDistrict, Choices("Every district", _map.Buildings.Select(b => b.District)));
+        FillTownList();
+        var byType = _map.Buildings.GroupBy(b => string.IsNullOrWhiteSpace(b.Type) ? "Other" : b.Type, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count()).ThenBy(g => g.Key).Select(g => $"{g.Count()} {Plural(g.Key.ToLowerInvariant(), g.Count())}");
+        _townCounts.Text = _map.Buildings.Count == 0 ? "No buildings yet." : $"{_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}: {string.Join(", ", byType)}.";
+        _legend.Children.Clear();
+        foreach (var g in _map.Buildings.GroupBy(b => b.District.Trim(), StringComparer.OrdinalIgnoreCase).OrderBy(g => g.Key.Length == 0).ThenBy(g => g.Key))
+        {
+            var swatch = new Border { Width = 14, Height = 14, CornerRadius = new(3), Background = new SolidColorBrush(CityPlan.DistrictColour(g.Key)), Margin = new(0, 0, 8, 0) };
+            _legend.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { swatch, new TextBlock { Text = $"{(g.Key.Length == 0 ? "No district" : g.Key)} ({g.Count()})" } } });
+        }
+    }
+
+    /// <summary>A kind of building, more than one of them: houses, smithies, inns.</summary>
+    static string Plural(string word, int n)
+    {
+        if (n == 1 || word.Length == 0) return word;
+        if (word.EndsWith('y') && word.Length > 1 && !"aeiou".Contains(word[^2])) return word[..^1] + "ies";
+        if (word.EndsWith('s') || word.EndsWith('x') || word.EndsWith("sh") || word.EndsWith("ch")) return word + "es";
+        return word + "s";
+    }
+
+    void FillTownList()
+    {
+        string find = (_find.Text ?? "").Trim();
+        string? type = _findType.SelectedIndex > 0 ? _findType.SelectedItem as string : null;
+        string? district = _findDistrict.SelectedIndex > 0 ? _findDistrict.SelectedItem as string : null;
+        bool Has(string? s) => s?.Contains(find, StringComparison.CurrentCultureIgnoreCase) == true;
+        _townList.ItemsSource = _map.Buildings
+            .Where(b => type is null || string.Equals(b.Type, type, StringComparison.OrdinalIgnoreCase))
+            .Where(b => district is null || string.Equals(b.District, district, StringComparison.OrdinalIgnoreCase))
+            .Where(b => find.Length == 0 || Has(b.Name) || Has(b.Type) || Has(b.District) || b.Tags.Any(Has))
+            .OrderBy(b => b.Name, StringComparer.CurrentCultureIgnoreCase)
+            .Select(b => new TownRow(b)).ToList();
     }
 
     void ChangeBuilding(Func<CityBuilding, CityBuilding> change, string label)
@@ -476,14 +694,6 @@ public sealed class CityWindow : Window
         var nb = change(b);
         if (nb.ToJsonEqual(b)) return;
         Commit(_map.WithBuilding(nb), label);
-    }
-
-    static CityBuilding Turned(CityBuilding b, int by)
-    {
-        var (w, d) = CityFootprint.Size(b);
-        var t = b with { Turn = ((b.Turn + by) % 4 + 4) % 4 };
-        var (tw, td) = CityFootprint.Size(t);
-        return t with { X = Math.Max(0, b.X + (int)Math.Round((w - tw) / 2.0)), Y = Math.Max(0, b.Y + (int)Math.Round((d - td) / 2.0)) };
     }
 
     /// <summary>A floor more on top: the top floor's walls, doors and windows again, the roofs moved up onto it.</summary>
@@ -753,7 +963,7 @@ public sealed class CityWindow : Window
         {
             _making = false;
             _makeAll.IsEnabled = _map.Buildings.Count > 0;
-            _makeOne.IsEnabled = Picked() is not null;
+            _makeOne.IsEnabled = _plan.Pick.Buildings.Count > 0;
         }
     }
 
@@ -843,7 +1053,7 @@ public sealed class CityWindow : Window
         for (int y = 2; y <= 8; y++) for (int x = 26; x <= 34; x++) g[x, y] = Ground.Field;
         m = m.WithGround(g);
         var list = new List<CityBuilding>();
-        void Add(int x, int y, int w, int d, int storeys, string type, string name, string? covering = null)
+        void Add(int x, int y, int w, int d, int storeys, string type, string name, string district, string? covering = null)
         {
             var cells = new HashSet<(int X, int Y)>();
             for (int j = y; j < y + d; j++) for (int i = x; i < x + w; i++) cells.Add((i, j));
@@ -853,14 +1063,14 @@ public sealed class CityWindow : Window
                     if (!cells.Contains(n) && m.GroundAt(n.Item1, n.Item2) is Ground.Road or Ground.Paving) towards.Add(n);
             var f = new SeenBuilding { Cells = cells, Storeys = storeys, Type = type, Covering = covering, DoorTowards = towards };
             if (BuildingGuess.Make(f, m.Theme, m.SquareMm) is { } made)
-                list.Add(new CityBuilding { Name = name, Type = type, District = "Village", X = made.X, Y = made.Y, Design = made.Design });
+                list.Add(new CityBuilding { Name = name, Type = type, District = district, X = made.X, Y = made.Y, Design = made.Design });
         }
-        Add(10, 8, 5, 4, 2, "Tavern", "The Crossed Keys", "Clay tiles");
-        Add(21, 8, 4, 3, 1, "House", "Miller's house", "Thatch");
-        Add(10, 15, 4, 3, 1, "House", "Weaver's house", "Thatch");
-        Add(21, 15, 3, 3, 3, "Tower", "Watchtower", "Slate");
-        Add(25, 15, 4, 3, 1, "Smithy", "Smithy", "Wooden shingles");
-        Add(2, 8, 4, 3, 1, "House", "Cottage", "Thatch");
+        Add(10, 8, 5, 4, 2, "Tavern", "The Crossed Keys", "Market", "Clay tiles");
+        Add(21, 8, 4, 3, 1, "House", "Miller's house", "Farm", "Thatch");
+        Add(10, 15, 4, 3, 1, "House", "Weaver's house", "Residential", "Thatch");
+        Add(21, 15, 3, 3, 3, "Tower", "Watchtower", "Military", "Slate");
+        Add(25, 15, 4, 3, 1, "Smithy", "Smithy", "Market", "Wooden shingles");
+        Add(2, 8, 4, 3, 1, "House", "Cottage", "Residential", "Thatch");
         var fence = new Fence { Kind = FenceKind.Fence, Edges = [.. Enumerable.Range(26, 9).Select(x => new FenceEdge(x, 9, true)), .. Enumerable.Range(2, 7).Select(y => new FenceEdge(26, y, false))] };
         var hedge = new Fence { Kind = FenceKind.Hedge, Edges = [.. Enumerable.Range(0, 10).Select(x => new FenceEdge(x, 17, true))] };
         var rnd = new Random(7);
@@ -876,7 +1086,13 @@ public sealed class CityWindow : Window
         props.Add(new Prop { Kind = PropKind.Lamp, X = 16.2, Y = 14.6 });
         props.Add(new Prop { Kind = PropKind.Bush, X = 11, Y = 19 });
         props.Add(new Prop { Kind = PropKind.Boulder, X = 31, Y = 21 });
-        return m with { Buildings = list, Fences = [fence, hedge], Props = props };
+        var labels = new List<CityLabel>
+        {
+            new() { Text = "King's Road", X = 6, Y = 13 },
+            new() { Text = "Mill Lane", X = 18, Y = 4 },
+            new() { Text = "Duck pond", X = 6, Y = 24.5, Size = 0.7 },
+        };
+        return m with { Buildings = list, Fences = [fence, hedge], Props = props, Labels = labels };
     }
 }
 
