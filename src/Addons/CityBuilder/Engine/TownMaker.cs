@@ -158,9 +158,18 @@ public static class TownMaker
         void Road(int ax, int ay, int bx, int by, int width, bool main)
         {
             var cells = CityEdit.Road(ax, ay, bx, by, width, straight: false).Where(c => c.X >= 0 && c.Y >= 0 && c.X < w && c.Y < d).ToHashSet();
+            // A lane running the way the river does stops at its bank instead of running down it (and isn't
+            // laid at all if it starts in it); lanes across it cross it, and get a bridge.
+            bool across = Math.Abs(bx - ax) >= Math.Abs(by - ay);
+            if (!main && water.Count > 0 && across == riverside)
+            {
+                var wet = cells.Where(water.Contains).Select(c => Math.Abs(c.X - ax) + Math.Abs(c.Y - ay)).DefaultIfEmpty(int.MaxValue).Min();
+                cells = cells.Where(c => Math.Abs(c.X - ax) + Math.Abs(c.Y - ay) < wet).ToHashSet();
+                if (cells.Count < 3) return;
+            }
             if (cells.Count == 0) return;
             foreach (var (x, y) in cells) g[x, y] = Ground.Road;
-            roads.Add((cells, main, Math.Abs(bx - ax) >= Math.Abs(by - ay)));
+            roads.Add((cells, main, across));
         }
         int t0x = Math.Max(1, wall.X0 + 2), t1x = Math.Min(w - 2, wall.X1 - 3), t0y = Math.Max(1, wall.Y0 + 2), t1y = Math.Min(d - 2, wall.Y1 - 3);
         int Between(int a, int b) => a >= b ? a : rnd.Next(a, b + 1);

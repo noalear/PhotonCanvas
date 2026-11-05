@@ -1,9 +1,10 @@
 # City builder
 
 An add-on (Settings → Add-ons → **City builder**): on when PhotonCanvas is installed, and can be
-turned off. It needs the **Building editor** and **Map to terrain** add-ons (and the makers they use):
-every building on the map is a building editor building, and the battle map reader finds a picture's
-grid the way Map to terrain does. Its button is **Home → Draw → City**.
+turned off. It needs the **Building editor** and **Map to terrain** add-ons (and the makers they use),
+the **Floor tile maker**, the **Miniature bridge maker** and the **Scatter terrain maker**: every
+building on the map is a building editor building, the battle map reader finds a picture's grid the
+way Map to terrain does, and the ground, bridges and scenery are cut by the other three. Its button is **Home → Draw → City**.
 
 **City** lays out a whole town, village or city on one big map: the ground of every square (grass,
 roads, paving, water, fields…), the buildings standing on it, fences, hedges and town walls along the
@@ -23,9 +24,10 @@ to change its rooms, doors, furniture and roof, and comes out as its laser-cut p
 
 Click **City** on the **Home** tab (in the **Draw** group). The **City builder** window opens with
 the last map you worked on (the first time, a small sample village). Along the top are the tools; on
-the left are five tabs: **Map** (its name, look and size, and your saved maps), **Battle map**
-(reading a picture), **Tools** (what the tools put down), **Town** (every building, to find one) and
-**Picked** (what's picked on the plan). On the right, **Plan** is the map from above and **3D** shows
+the left are six tabs: **Map** (its name, look and size, your saved maps, saving it as a picture and
+making a town for you), **Battle map** (reading a picture), **Tools** (what the tools put down),
+**Town** (every building, to find one), **Picked** (what's picked on the plan) and **Cut** (the
+ground, bridges and scenery to cut). On the right, **Plan** is the map from above and **3D** shows
 it put together.
 
 Under them it says how big the map is on the table, how many buildings and trees there are, and
@@ -126,6 +128,22 @@ facing the road, as full as **How full** says, of the kinds for the **District**
 buildings where they suit, if that's ticked. With **Select**, drag a box first to fill only inside it
 (it stays dashed on the plan until you click again); otherwise it fills the whole map. Lay out roads
 with **Road**, then fill each part of town with its own district.
+
+## Saving it as a battle map picture
+
+![A part of a town saved as a battle map picture: cobbled streets round a paved market square with its well, carts and lamps, tiled, thatched and slate roofs lit from one side, the river with its ripples, and the street names](images/citybuilder-picture.png)
+
+On the **Map** tab, **Save as a picture…** saves the map drawn from above as a battle map, for a
+virtual table or to print: textured ground (cobbles, flagstones, grass, water with its banks, fields),
+every roof with its tiles, thatch or slates lit from one side, shadows, trees, wells and carts,
+fences, hedges and town walls, and the grid. Pick PNG, JPEG or WebP when you save it.
+
+- **Pixels per square**: 70 to 140 suits most virtual tables. To print it, 100 pixels to a square
+  printed an inch across is 100 dots to the inch. A very big map is drawn at fewer pixels to a square
+  (at most 16,000 pixels each way); it says so under the settings.
+- **The grid**, **Street names and labels**, **Building names**: what's drawn over it.
+- **Only the last box dragged with Select**: just that part of the map (drag a box with **Select**
+  first), say one street for tonight's game.
 
 ## Reading a battle map
 <!-- windows: CityWindow -->
@@ -232,5 +250,39 @@ the map, one after the other, each on pages of its own; a big town is a great ma
 be better to do a few buildings at a time.
 
 Each building is made at its own grid square: open it in the building editor to change its sheet,
-walls (box or flat), textures and sizes before cutting. The ground, fences and trees are only shown in
-3D; they aren't cut.
+walls (box or flat), textures and sizes before cutting.
+
+## Cutting the ground, bridges and scenery
+
+![The Cut tab for a walled town: the ground in tiles four squares across with jigsaw edges, three bridges where roads cross the river, and the wells, carts, barrels and boulders](images/window-citybuilder-cut.png)
+
+The **Cut** tab puts the rest of the town in the design. Tick **Only the last box dragged with
+Select** to cut just the part of the map in the box you last dragged with **Select**; otherwise it's
+the whole map.
+
+**Put the ground in the design** cuts the map's ground as floor tiles that lock together, the
+[floor tile maker](floortiles.md)'s way, each square etched with its own ground: cobbles on the roads,
+flagstones on paving, sand, rock, tufts of grass, pebbles on dirt tracks, ripples on water and furrows
+in the fields. Squares under the buildings are left plain (each building stands on its own floor),
+with the building's outline scored round them.
+
+![The ground by the river cut as tiles: the cobbled road crossing the river, ripples on the water, tufts of grass, plain squares where buildings stand, the grid scored and jigsaw edges between the tiles](images/citybuilder-ground.png)
+
+- **Tile size (squares)**: the biggest tile, in squares each way; each must fit on the bed.
+- **Sheet (mm)**: how thick the sheet is.
+- **Edges**: how the tiles join: **Jigsaw edges**, **Clips**, **Magnets** or **Plain edges**. The
+  edges round the outside of the map (or the box) are plain.
+- **Score the grid** and **Score where the buildings stand**: the grid lines, and each building's
+  outline, scored on.
+
+Under them it says how many tiles that is. A big town is a great many tiles, so at most 400 are made
+at once: drag a box round a part with **Select** and cut it a part at a time.
+
+**Put the bridges in the design** makes a bridge with the [bridge maker](bridges.md) wherever a road
+crosses water: stone arches for a cobbled or paved road (flagstones on a paved one), planks for a dirt
+track, as wide as the road and reaching half a square onto each bank, in the map's look. Each goes on
+pages of its own.
+
+**Put the scenery in the design** makes the [scenery maker](scatter.md)'s pieces for the map's wells,
+carts, boulders, crates (as barrels) and fences (each run of fence in sections of up to four
+squares). Trees, lamps, statues, hedges and walls aren't among them yet.
