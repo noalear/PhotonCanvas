@@ -24,8 +24,9 @@ public sealed class MachinePage : UserControl
     readonly Image _pic = PictureBox(360);
     readonly TextBlock _picLine = Text("No picture yet.", "muted");
     readonly TextBlock _picBlank = Text("The machine blanks its cameras while a job runs, so pictures come out black until it ends. You'll get a picture of the result when it finishes.", "muted");
-    readonly Button _take;
+    readonly Button _take, _live;
     readonly Button _overview, _closeup;
+    bool _liveOn;
     readonly DispatcherTimer _tick = new() { Interval = TimeSpan.FromSeconds(5) };
     string _camera = "overview";
     ShownPicture? _cameraPic;
@@ -39,6 +40,7 @@ public sealed class MachinePage : UserControl
         _pause = Btn("Pause", null, async () => await Control(_s.Status?.Job?.Stage == "paused" ? "resume" : "pause"));
         _stop = Btn("Stop", "danger", async () => await Stop());
         _take = Btn("Take picture", "primary", async () => await TakePicture());
+        _live = Btn("Live", null, ToggleLive);
         _overview = Btn("Overview", "seg", () => Camera("overview"));
         _closeup = Btn("Close-up", "seg", () => Camera("closeup"));
         _overview.Classes.Add("on");
@@ -63,13 +65,17 @@ public sealed class MachinePage : UserControl
                     _jobCard,
                     Card("Camera",
                         new Border { Background = Brush("Bg2"), CornerRadius = new(10), Padding = new(3), Child = Row(_overview, _closeup) },
-                        _pic, _picLine, _picBlank, _take),
+                        _pic, _picLine, _picBlank, Row(_take, _live)),
                 },
             },
         };
         _tick.Tick += (_, _) => UpdateStart();
         AttachedToVisualTree += (_, _) => _tick.Start();
-        DetachedFromVisualTree += (_, _) => _tick.Stop();
+        DetachedFromVisualTree += (_, _) =>
+        {
+            _tick.Stop();
+            SetLive(false);
+        };
         Update();
     }
 
@@ -94,7 +100,8 @@ public sealed class MachinePage : UserControl
         _bar.Value = j.Fraction ?? (j.RemainingS is { } r && j.ElapsedS + r > 0 ? j.ElapsedS / (j.ElapsedS + r) : 0);
         _times.Text = loaded
             ? j.EstimateS is { } est ? $"About {Clock(est)} once started." : "Waiting to start."
-            : $"Elapsed {Clock(j.ElapsedS)}" + (j.RemainingS is { } left ? $" · about {Clock(left)} left" : "") + (j.Stage == "paused" ? " · paused" : "");
+            : $"Elapsed {Clock(j.ElapsedS)}" + (j.RemainingS is { } left ? $" · about {Clock(left)} left" : "") + (j.Stage == "paused" ? " · paused" : "")
+              + (JobTimes.FinishText(j, DateTimeOffset.Now) is { } done ? $" · {done}" : "");
         _pause.Content = j.Stage == "paused" ? "Continue" : "Pause";
         _pause.IsVisible = !loaded;
         _stop.Content = loaded ? "Cancel job" : "Stop";
@@ -165,6 +172,49 @@ public sealed class MachinePage : UserControl
         _camera = camera;
         _overview.Classes.Set("on", camera == "overview");
         _closeup.Classes.Set("on", camera == "closeup");
+    }
+
+    void ToggleLive() => SetLive(!_liveOn);
+
+    void SetLive(bool on)
+    {
+        if (on == _liveOn) return;
+        _liveOn = on;
+        _live.Classes.Set("primary", on);
+        _live.Content = on ? "Stop live" : "Live";
+        _take.IsVisible = !on;
+        if (on) _ = LiveAsync();
+    }
+
+    /// <summary>Pictures one after another (a few a second) while Live is on and the page is showing.</summary>
+    async Task LiveAsync()
+    {
+        while (_liveOn)
+        {
+            if (_s.Status?.Mode == "P_WORKING")
+            {
+                // Blanked while the laser runs: no point asking.
+                _picBlank.IsVisible = true;
+                _picLine.Text = "Live view waits while the job runs (the machine blanks its cameras).";
+                await Task.Delay(2000);
+                continue;
+            }
+            try
+            {
+                var p = _cameraPic = await _s.TakePictureAsync(_camera, 960);
+                if (!_liveOn) break;
+                _pic.Source = Picture(p.Image);
+                _pic.IsVisible = true;
+                _picLine.Text = $"Live · {(_camera == "overview" ? "overview" : "close-up")} · {p.TakenAt.ToLocalTime():T}";
+                _picBlank.IsVisible = p.Blanked;
+                UpdateStart();
+                await Task.Delay(150);
+            }
+            catch (RemoteError)
+            {
+                await Task.Delay(1500);
+            }
+        }
     }
 
     async Task TakePicture()

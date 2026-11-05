@@ -17,7 +17,16 @@ phone ──HTTP──▶ PhotonCanvas.Server (on the PC) ──WebSocket──�
 - It builds jobs exactly as the desktop's **Ship It** (`JobSettings.From(app.json)` + `JobBuilder` +
   `JobChecks`), and uploads them with `autoStart: 0`.
 - It never writes `app.json`: the desktop app keeps that file in memory and would overwrite it.
-- Port **8740** (`remote.json` → `Port`), all interfaces; `--local` binds to localhost only (testing).
+- Port **8740** (`remote.json` → `Port`), plain HTTP, all interfaces: the phone page and the app
+  download. Port **8741** (`HttpsPort`): the same API over HTTPS with the server's own certificate
+  (ECDSA P-256, made on the first start, kept in `remote\tls.pfx`; port and fingerprint in
+  `remote\tls.json`). `--local` binds both to localhost only (testing).
+- The QR code: `http://<address>:8740/#code=<code>&tls=8741&fp=<fingerprint>&alt=<other addresses>`.
+  The fingerprint is SHA-256 of the certificate, base64url; the app accepts that certificate and no
+  other (no certificate authority is involved). `alt` lists the computer's other addresses (home
+  network, Tailscale): the app tries all of them and uses whichever answers.
+- `GET /tls` (no access code) → `{port, fingerprint}`: for a phone given only the address, which then
+  talks HTTPS to that certificate from then on (trust on first use).
 
 ## Access
 
@@ -35,16 +44,17 @@ Plain HTTP: on the home network, or over Tailscale (encrypted). Never expose the
 
 ## Errors
 
-Any error is `{"error": "<plain words for the user>"}` with a status: `404` unknown thing, `409`
+Any error is `{"error": "<plain words for the user>"}` with a status: `403` starting from the phone
+is turned off on the computer, `404` unknown thing, `409`
 can't be done now (machine busy, the start safeguard, a refused job), `422` the design can't be
 built, `502` the machine refused or didn't do it, `503` the server isn't connected to the machine.
 Show the text as it is.
 
 ## Status
 
-`GET /api/info` → `{product, version, machine, cameraNote, api, androidApp}`. Use it to check the
-address and code. `api` is the API's version (1); `androidApp` is where the server offers the Android
-app for download, or null.
+`GET /api/info` → `{product, version, machine, cameraNote, api, androidApp, addresses}`. Use it to
+check the address and code. `api` is the API's version (1); `androidApp` is where the server offers
+the Android app for download, or null; `addresses` are the computer's addresses (the app keeps them).
 
 `GET /app/PhotonCanvasRemote.apk` (no access code): the Android app, when the server has it (beside
 the server in `app\`, or the newest build in the source tree).
@@ -56,7 +66,7 @@ the Android app.
 
 ```json
 {
-  "connected": true, "ip": "192.168.50.48", "name": "xTool_F2 Ultra(Single)_v2_31fe62",
+  "connected": true, "ip": "192.168.1.60", "name": "xTool_F2 Ultra_v2_000000",
   "firmware": "40.54.021.00.ht6", "mode": "P_WORKING", "state": "Running a job",
   "focusDistanceMm": 21.3, "problem": null, "cameraBlanked": true, "at": "2026-10-23T02:02:31-07:00",
   "job": {
@@ -121,8 +131,11 @@ replaces it. `phoneNote` = something the phone does differently (serial numbers 
 ## The job
 
 `POST /api/job/start` with `{"pictureId": "<id>"}` → `{mode, state}`. Starts the loaded job: **the
-laser fires**. Only on a picture the server took **less than 2 minutes ago, while this very job was
-loaded** (`StartGuard`); otherwise `409` with what to do. If the machine doesn't start, `502`.
+laser fires**. Starting from the phone is **off by default**: until the user turns on *Allow starting
+jobs from the phone* in the desktop app's Remote access window (after a full warning; saved in
+`remote\phone-start.json`, read at every start), the server answers `403` with what to do and nothing
+starts. When it's on, only on a picture the server took **less than 2 minutes ago, while this very job
+was loaded** (`StartGuard`); otherwise `409` with what to do. If the machine doesn't start, `502`.
 
 `POST /api/job/pause`, `/api/job/resume`, `/api/job/stop` → `{mode, state}`. Stop also cancels a
 loaded job that hasn't started.
@@ -130,7 +143,8 @@ loaded job that hasn't started.
 ## History
 
 `GET /api/history?max=` (1–300, default 50), newest first → `[{id, design, source, sourceText,
-loadedAt, startedAt, endedAt, finished, startedFromPhone, estimateS, tookS, before, after}]`.
+loadedAt, startedAt, endedAt, finished, startedFromPhone, estimateS, tookS, before, after, projectId}]`.
+`projectId` is set for jobs loaded from the phone whose design file is still there ("Run again").
 `before` and `after` are picture URLs or null: a picture when the job was loaded, and one taken 3 s
 after it ended (the camera works again then). Every job the machine runs while the server is on is
 here, whoever started it.
@@ -139,6 +153,5 @@ here, whoever started it.
 
 ## Still to verify on the machine
 
-- That `PUT /v1/processing/state?action=start` starts a job waiting for the button (`P_WORK`). The
-  stock app has the request but never uses it; its batch mode starts jobs with `autoStart: 1` instead.
-  If `action=start` doesn't work, the server will re-upload the job with `autoStart: 1`.
+- That `PUT /v1/processing/state?action=start` starts a job waiting for the button (`P_WORK`). If it
+  doesn't, the server will re-upload the job with `autoStart: 1`.

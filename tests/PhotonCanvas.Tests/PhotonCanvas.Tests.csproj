@@ -28,6 +28,7 @@
     <ProjectReference Include="..\..\src\PhotonCanvas.Doc\PhotonCanvas.Doc.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Server\PhotonCanvas.Server.csproj" />
     <ProjectReference Include="..\..\src\PhotonCanvas.Remote\PhotonCanvas.Remote.csproj" />
+    <ProjectReference Include="..\..\src\PhotonCanvas.Remote.App\PhotonCanvas.Remote.App.csproj" />
     <!-- Every add-on, found by folder, so a new add-on never edits this file. -->
     <ProjectReference Include="..\..\src\Addons\*\*.csproj" />
   </ItemGroup>
