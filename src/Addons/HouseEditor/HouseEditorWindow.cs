@@ -179,6 +179,9 @@ public sealed class HouseEditorWindow : Window
     HouseKit? _kit;
     string? _kitFrom;
 
+    /// <summary>The building as it now is (for a window that opened the editor on one of its own buildings, to take it back).</summary>
+    public HouseDesign Design => _design;
+
     public HouseEditorWindow(Document doc, MachineProfile machine, MaterialLibrary? library, string? dataFolder, (Guid Id, HouseDesign Design)? editing)
     {
         _doc = doc;
