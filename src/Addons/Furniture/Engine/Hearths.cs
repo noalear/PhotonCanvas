@@ -80,18 +80,20 @@ public static class Hearths
         var fe = new PathsD();
         var fl = new List<PathD>();
         Masonry(m, look, 0, 0, W, Hf, rnd, fe, fl, oven);
+        // A fireplace's arch built of wedge bricks, light against the coursing (stone looks); else a keystone.
+        bool archRing = !oven && !forge && look != FrontLook.Metal && oh + 2.4 < Hf;
         // A keystone over the opening, and a lintel line on a fireplace.
-        if (!oven && look != FrontLook.Metal && oh + 2.2 < Hf)
+        if (!oven && !archRing && look != FrontLook.Metal && oh + 2.2 < Hf)
         {
             double ky = oh + 0.2;
             fe = Geo.Subtract(fe, [Geo.Rect(W / 2 - 1.2, ky, W / 2 + 1.2, ky + 2.0)]);
             fl.Add(Geo.Loop([new(W / 2 - 0.8, ky), new(W / 2 + 0.8, ky), new(W / 2 + 1.1, ky + 1.9), new(W / 2 - 1.1, ky + 1.9)]));
         }
         fe = Geo.Subtract(Geo.Union(fe), Geo.Offset(fHoles, 0.4));
-        if (oven && look != FrontLook.Metal)
+        if ((oven && look != FrontLook.Metal) || archRing)
         {
-            // A ring of wedge-shaped bricks round the oven door, left light against the coursed brick.
-            var door = new PathsD { Shapes.Topped(BackTop.Arched, j, oy0, W - j, oy0 + oh, Math.Min(ow / 2, oh * 0.6)) };
+            // A ring of wedge-shaped bricks round the oven door (or the fireplace's arch), left light against the coursing.
+            var door = new PathsD { oven ? Shapes.Topped(BackTop.Arched, j, oy0, W - j, oy0 + oh, Math.Min(ow / 2, oh * 0.6)) : Opening(j, -0.01, W - j, oh) };
             var ring = Geo.Intersect(Geo.Subtract(Geo.Offset(door, 1.8), Geo.Offset(door, 0.3)), [Geo.Rect(0, oy0, W, Hf)]);
             fe = Geo.Subtract(fe, Geo.Offset(ring, 0.15));
             fl.AddRange(Geo.ClipLines([Geo.Loop(Geo.Offset(door, 1.8).FirstOrDefault() ?? door[0])], [Geo.Rect(0, oy0, W, Hf)]));
@@ -223,13 +225,25 @@ public static class Hearths
         else
         {
             var breast = new PathsD();
+            // A stone fireplace's breast is a hood sloping in to a stack; the forge's a plain taper.
+            bool hood = !forge && look != FrontLook.Metal && Hb > 10 && Wb > 10;
             if (forge) breast.Add([new(0, 0), new(Wb, 0), new(Wb * 0.72, Hb), new(Wb * 0.28, Hb)]);
+            else if (hood) breast.Add([new(0, 0), new(Wb, 0), new(Wb, Hb * 0.12), new(Wb * 0.8, Hb * 0.55), new(Wb * 0.8, Hb), new(Wb * 0.2, Hb), new(Wb * 0.2, Hb * 0.55), new(0, Hb * 0.12)]);
             else breast.Add(Geo.Rect(0, 0, Wb, Hb));
             foreach (var u in breastTabs) breast.Add(Geo.Rect(u - btw / 2, -T, u + btw / 2, 0.01));
             var bre = new PathsD();
             var brl = new List<PathD>();
             Masonry(m, look, 0, 0, Wb, Hb, rnd, bre, brl, false);
-            if (!forge && Hb > 8 && Wb > 8) Cabinets.Symbol(look, m.Theme, Wb / 2, Hb * 0.45, Math.Min(Wb * 0.18, Hb * 0.2), bre, brl);
+            if (hood)
+            {
+                // A carved shield on the hood, the theme's symbol on it.
+                double sh = Math.Min(Wb * 0.3, Hb * 0.32), sw2 = sh * 0.85, sy = Hb * 0.3;
+                var shield = Rugs.Heater(Wb / 2 - sw2 / 2, sy - sh / 2, sw2, sh);
+                bre = Geo.Subtract(Geo.Union(bre), Geo.Offset([shield], 0.3));
+                bre.AddRange(Fronts.Outline([shield], 0.45));
+                Cabinets.Symbol(look, m.Theme, Wb / 2, sy + sh * 0.08, sh * 0.28, bre, brl);
+            }
+            else if (!forge && Hb > 8 && Wb > 8) Cabinets.Symbol(look, m.Theme, Wb / 2, Hb * 0.45, Math.Min(Wb * 0.18, Hb * 0.2), bre, brl);
             if (forge) for (double y = 1.5; y < Hb - 0.5; y += 2.2) brl.Add([new(0, y), new(Wb, y)]);
             var shapeB = Geo.Union(breast);
             m.Add(forge ? "Hood" : "Chimney breast", shapeB, [], [Pose.Front(xb, Hs + T, zbr)], grainAlongU: true, face: [], etched: Geo.Intersect(Geo.Union(bre), shapeB), lines: Geo.ClipLines(brl, shapeB));
@@ -240,6 +254,16 @@ public static class Hearths
                 foreach (var u in flTabs) flp.Add(Geo.Rect(u - fltw / 2, -T, u + fltw / 2, 0.01));
                 m.Add("Flames", Geo.Solid(flp), [], [Pose.Front(W / 2 - wfl / 2, Hs + T, zfl)], grainAlongU: true, face: [], etched: Geo.Intersect(Profiles.Flames(wfl / 2, 0, wfl * 0.55, Math.Min(4, Hb * 0.3) * 0.55), fls));
             }
+        }
+        if (!oven && !forge && look != FrontLook.Metal && !m.PushFit && j >= 3.4 && Hf >= 8)
+        {
+            // Corbels under the mantel's ends, glued on the front: stepped brackets with a scroll scored on.
+            double cw2 = Math.Min(2.6, j - 0.8), chh = Math.Min(4, Hf * 0.3);
+            double bw = Math.Max(1.2, cw2 * 0.45);
+            var corbel = new PathsD { new PathD { new(0, chh), new(0, chh * 0.55), new((cw2 - bw) / 2, 0), new((cw2 + bw) / 2, 0), new(cw2, chh * 0.55), new(cw2, chh) } };
+            var cl = new List<PathD> { new PathD { new(0.3, chh - 0.6), new(cw2 - 0.3, chh - 0.6) }, new PathD(Geo.Arc(cw2 / 2, chh * 0.45, Math.Min(cw2, chh) * 0.2, 0, Math.PI * 1.6, 0.02)) };
+            m.Add("Corbel", corbel, [], [Pose.Front(0.4, T + Hf - chh, D + T / 2), Pose.Front(W - 0.4 - cw2, T + Hf - chh, D + T / 2)], grainAlongU: false, face: [], lines: cl).Glue();
+            m.Note("Glue the corbels on the front under the mantel's ends.");
         }
         m.Note("Stand the front, the cheeks (the fire back between them) and the " + (oven ? "firewood" : "logs") + " in the hearth, then press the " +
                (oven ? "roof's tabs into the dome." : forge ? "fire bed on and stand the hood and flames in it." : "mantel on and stand the chimney breast in it."));

@@ -245,8 +245,29 @@ public static class Rugs
                 else { cloth.Add(new PointD(x0 + cw, 0)); cloth.Add(new PointD(x0 + cw / 2, tail)); cloth.Add(new PointD(x0, 0)); }
                 outline = Geo.Union([cloth, Geo.Rect(0, H - pole, W, H), Geo.Circle(0.6, H - pole / 2, 0.75), Geo.Circle(W - 0.6, H - pole / 2, 0.75)]);
                 etched.AddRange(Fronts.Outline([Geo.Rect(x0 + 0.7, tail + 0.4, x0 + cw - 0.7, H - pole - 0.7)], 0.35));
-                double r = Math.Min(cw * 0.3, (H - tail - pole) * 0.22);
-                Cabinets.Symbol(look, m.Theme, W / 2, tail + (H - tail - pole) * 0.55, r, etched, lines);
+                double sw = cw * 0.72, sh = sw * 1.15, scy = tail + (H - tail - pole) * 0.55;
+                if (look != FrontLook.Metal && sw >= 7 && tail + sh * 0.5 < scy && scy + sh / 2 < H - pole - 1.2)
+                {
+                    // A quartered shield: two quarters dark with the symbol left light in them, two light with it carved.
+                    var shield = Heater(W / 2 - sw / 2, scy - sh / 2, sw, sh);
+                    etched.AddRange(Fronts.Outline([shield], 0.45));
+                    var inside = Geo.Offset([shield], -0.5);
+                    double qr = sw * 0.17;
+                    foreach (var (qx, qy, dark) in new[] { (-1, 1, true), (1, 1, false), (-1, -1, false), (1, -1, true) })
+                    {
+                        var quarter = Geo.Intersect(inside, [Geo.Rect(W / 2 + Math.Min(0, qx) * sw + (qx > 0 ? 0.2 : 0), scy + Math.Min(0, qy) * sh + (qy > 0 ? 0.2 : 0), W / 2 + Math.Max(0, qx) * sw - (qx < 0 ? 0.2 : 0), scy + Math.Max(0, qy) * sh - (qy < 0 ? 0.2 : 0))]);
+                        var se = new PathsD();
+                        var sl = new List<PathD>();
+                        Cabinets.Symbol(look, m.Theme, W / 2 + qx * sw * 0.24, scy + qy * sh * 0.2 + (qy < 0 ? sh * 0.05 : 0), qr, se, sl);
+                        if (dark) etched.AddRange(Geo.Subtract(quarter, Geo.Offset(Geo.Union(se), 0.25)));
+                        else { etched.AddRange(Geo.Intersect(Geo.Union(se), quarter)); lines.AddRange(Geo.ClipLines(sl, quarter)); }
+                    }
+                }
+                else
+                {
+                    double r = Math.Min(cw * 0.3, (H - tail - pole) * 0.22);
+                    Cabinets.Symbol(look, m.Theme, W / 2, scy, r, etched, lines);
+                }
                 break;
             }
             case HangingStyle.Painting:

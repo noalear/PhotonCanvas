@@ -50,8 +50,9 @@ public class HouseBookletTests
             if (p.Etched.Count == 0 || Length(Geo.ClipLines(p.Marks, Geo.Union(p.Etched))) < 0.05 * Length(p.Marks)) clear++;
             else Assert.Fail($"{p.Name}'s number runs over its texture: {Length(Geo.ClipLines(p.Marks, Geo.Union(p.Etched))):0.##} of {Length(p.Marks):0.##} mm");
         }
-        // Thin pieces (window frames, linings, legs) have no room for even the smallest number.
-        Assert.True(marked >= kit.Pieces.Count * 0.75, $"only {marked} of {kit.Pieces.Count} pieces are marked");
+        // Thin pieces (window frames, linings, legs, the furniture's small glued-on carvings and handles) have no room
+        // for even the smallest number, and three-figure numbers need more room still.
+        Assert.True(marked >= kit.Pieces.Count * 0.7, $"only {marked} of {kit.Pieces.Count} pieces are marked");
         Assert.All(kit.Pieces.Where(p => p.Marks.Count == 0), p => Assert.True(Narrow(p.Cut), $"{p.Name} is big enough for its number"));
         Assert.Equal(marked, clear);
     }

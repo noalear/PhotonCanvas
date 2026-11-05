@@ -60,7 +60,7 @@ public enum Crown { Flat, Cornice, Pediment, Arch }
 public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty }
 
 /// <summary>Seats with arms and a back.</summary>
-public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command }
+public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle }
 
 /// <summary>The top of a seat's back.</summary>
 public enum BackTop { Square, Rounded, Arched, Pointed, Winged }
