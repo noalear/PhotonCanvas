@@ -300,7 +300,7 @@ public enum BaseKind { Tiles, Plate }
 /// height, figures); its own width, depth, storeys, windows and furniture aren't used. Saved on the
 /// shapes it makes, so it can be opened and changed.
 /// </summary>
-public sealed record HouseDesign
+public sealed partial record HouseDesign
 {
     public BuildingSpec Style { get; init; } = DefaultStyle();
     /// <summary>The grid's square (mm): walls run along its lines.</summary>
