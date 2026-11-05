@@ -279,9 +279,22 @@ public static class Storage
         double min = 3 * T + 2;
         if (W < min || D < min || H < min) { m.Bad($"The {what} is too small for a {T:0.##} mm sheet: make each side at least {min:0.#} mm."); return; }
         bool closed = it.Lid == LidStyle.Flat;
+        // The frame, braces, rims and handles glued on proud of a crate's faces (left etched on under push fit):
+        // the box is made smaller by them, so the crate keeps its outside size.
+        bool raise = !chest && it.Bands && !m.PushFit && m.Detail != WoodDetail.Stone && (it.CrateStyle != CrateStyle.Ironbound || m.IsMetal || it.Handles)
+                     && Math.Min(W, D) - 2 * T >= min && H - (closed ? T : 0) >= min;
+        if (raise)
+        {
+            W -= 2 * T;
+            D -= 2 * T;
+            if (closed) H -= T;
+        }
         var panels = Box([W, H, D], T, [true, true, true, closed, true, true], m.PushFit ? m.Grip / 2 : 0);
         double band = Math.Clamp(Math.Min(W, D) * 0.07, 0.6, 1.2);
         var arcade = chest ? Arcade(m, W, H, T, it.Bands ? T + 1.5 * band + 0.3 : T + 0.4) : null;
+        // An open crate's load stands on the bottom, its tabs down through it.
+        var heapSlots = !chest && !closed && it.Load != CrateLoad.None ? CrateHeap(m, W, D, H) : [];
+        bool trimmed = false;
         foreach (var p in panels)
         {
             var etched = new PathsD();
@@ -299,15 +312,35 @@ public static class Storage
             {
                 // A crate's sides and lid are drawn board by board (each board's grain its own way).
                 var faceOf = p.Name == "Lid" ? Crates.Side.Lid : p.Name is "Left end" or "Right end" ? Crates.Side.End : Crates.Side.Long;
-                var (ce, cl) = Crates.Face(it.CrateStyle, m.Detail, faceOf, p.Lu, p.Lv, T, it.Label, m.Rnd);
-                m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [], etched: ce, lines: cl, ribs: p.Ribs);
+                // With the boards raised, each face is laid out at the crate's outside size: a long side's boards
+                // reach over the ends' to close the corners, and the sides' over the lid's.
+                double off = raise && faceOf == Crates.Side.Long ? T : 0, lu = p.Lu + 2 * off, lv = p.Lv + (raise && closed && faceOf != Crates.Side.Lid ? T : 0);
+                var (ce, cl, up) = Crates.Face(it.CrateStyle, m.Detail, faceOf, lu, lv, T, it.Label, m.Rnd, m.Theme, raise, it.Handles);
+                PointD Back(PointD q) => new(q.x - off, q.y);
+                m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [], etched: Geo.Map(ce, Back), lines: Geo.Map(cl, Back), ribs: p.Ribs);
+                if (up is not null)
+                {
+                    // Stood on the outside of the panel: its pose moved out by the sheet.
+                    var on = new Pose(p.Pose.O + p.Pose.N * T, p.Pose.U, p.Pose.V);
+                    var upEtched = Geo.Map(up.Etched, Back);
+                    var upLines = Geo.Map(up.Lines, Back);
+                    int k = 0;
+                    foreach (var piece in up.Pieces)
+                    {
+                        k++;
+                        m.Add(up.Pieces.Count == 1 ? $"{p.Name} {up.What}" : $"{p.Name} {up.What} {k}", Geo.Map(piece, Back), [], [on], grainAlongU: true, face: [],
+                            etched: upEtched, lines: upLines).Glue();
+                    }
+                    trimmed = true;
+                }
                 continue;
             }
             bool planks = side || p.Name == "Lid";
-            m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
+            m.Add(p.Name, p.Cut, p.Name == "Bottom" ? heapSlots : [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
                 etched: etched, lines: lines, ribs: p.Ribs);
         }
         if (arcade is not null) m.Note("Glue the arcade on the front and a handle on each end.");
+        if (trimmed) m.Note("Glue the boards, iron and handles on over the crate's sides and lid, each where its face's etching leaves a plain patch for it.");
         if (chest && it.Lid is LidStyle.Loose or LidStyle.Domed)
         {
             double lo = Math.Clamp(Math.Min(W, D) * 0.04, 0.4, 1), cl = Math.Max(0.15, m.Fit);
@@ -342,6 +375,35 @@ public static class Storage
             }
         }
         m.Note(closed ? $"Fit the sides together at the corners, the bottom in, and the lid on last: every piece goes in straight, its fingers between the others'." : $"Push the {what}'s sides together at the corners, then the bottom in.");
+    }
+
+    /// <summary>
+    /// The load heaped in an open crate (<see cref="FurnitureItem.Load"/>): a board standing across the middle,
+    /// on the bottom, with apples, sacks or rocks along its top standing up over the rim. Returns the slots
+    /// for its two tabs in the bottom (flat, as on the bottom panel).
+    /// </summary>
+    static PathsD CrateHeap(Maker m, double W, double D, double H)
+    {
+        double T = m.T, cl = 0.3, x0 = T + cl, x1 = W - T - cl, zc = D / 2;
+        var (shape, etched, lines) = Crates.Heap(m.Item.Load, x0, x1, H, m.Rnd);
+        if (shape.Count == 0 || x1 - x0 < 4) return [];
+        string name = m.Item.Load switch { CrateLoad.Apples => "Apples", CrateLoad.Sacks => "Sacks", _ => "Rocks" };
+        // Too narrow a bottom for slots (they'd leave it a thin strip by the fingers): glued on it instead.
+        if (zc - m.SlotW / 2 - T < Maker.Bridge)
+        {
+            m.Add(name, Geo.Union(shape, [Geo.Rect(x0, T, x1, H)]), [], [Pose.Front(0, 0, zc)], grainAlongU: true, face: [], etched: etched, lines: lines).Glue();
+            m.Note($"Glue the {name.ToLowerInvariant()} standing across the middle of the crate's bottom before the sides go on.");
+            return [];
+        }
+        double tw = Geo.Clamp((x1 - x0) * 0.18, 1.5, 3);
+        // Two tabs, each slot kept a bridge clear of the bottom's fingers (one in the middle if they'd crowd).
+        double lo = T + Maker.Bridge * 1.1 + tw / 2 + m.Fit / 2;
+        double[] xs = [Math.Max(lo, x0 + (x1 - x0) * 0.25), Math.Min(W - lo, x0 + (x1 - x0) * 0.75)];
+        if (xs[1] - xs[0] < tw + m.Fit + Maker.Bridge * 1.1) xs = [W / 2];
+        var outline = Geo.Union(shape, [Geo.Rect(x0, T, x1, H), .. xs.Select(x => Geo.Rect(x - tw / 2, 0, x + tw / 2, T + 0.01))]);
+        m.Add(name, outline, [], [Pose.Front(0, 0, zc)], grainAlongU: true, face: [], etched: etched, lines: lines);
+        m.Note($"Push the {name.ToLowerInvariant()}' tabs down into the slots in the crate's bottom before the sides go on.");
+        return [.. xs.Select(x => Geo.Rect(x - tw / 2 - m.Fit / 2, zc - m.SlotW / 2, x + tw / 2 + m.Fit / 2, zc + m.SlotW / 2))];
     }
 
     /// <summary>

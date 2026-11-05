@@ -59,6 +59,9 @@ public enum Crown { Flat, Cornice, Pediment, Arch }
 /// <summary>What stands on open shelves, seen from the front.</summary>
 public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools, Stores }
 
+/// <summary>What fills an open crate, heaped up over its rim.</summary>
+public enum CrateLoad { None, Apples, Sacks, Rocks }
+
 /// <summary>Seats with arms and a back.</summary>
 public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle, Reading }
 
@@ -127,6 +130,10 @@ public sealed record FurnitureItem
     public CrateStyle CrateStyle { get; init; } = CrateStyle.Braced;
     /// <summary>Crates: the words stencilled on cargo and military crates; null or empty = some to suit.</summary>
     public string? Label { get; init; }
+    /// <summary>Crates: rope handles on the ends (military crates always have them).</summary>
+    public bool Handles { get; init; }
+    /// <summary>Open crates: what's heaped in it, standing up over the rim.</summary>
+    public CrateLoad Load { get; init; }
 
     /// <summary>Beds: the foot board's height (mm); the head board is <see cref="HeightMm"/>.</summary>
     public double FootMm { get; init; } = 8;

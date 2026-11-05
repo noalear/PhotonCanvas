@@ -376,7 +376,8 @@ public class FurnitureTests
     [Fact]
     public void Box_corners_interlock_with_fingers_on_every_edge()
     {
-        var k = Make(Defaults.For(ItemKind.Crate) with { WidthMm = 20, DepthMm = 14, HeightMm = 12, Lid = LidStyle.Flat });
+        // (Plain boards: nothing glued on, so the box is the crate's whole size.)
+        var k = Make(Defaults.For(ItemKind.Crate) with { WidthMm = 20, DepthMm = 14, HeightMm = 12, Lid = LidStyle.Flat, Bands = false });
         Assert.Equal(6, k.Parts.Count);
         // Six panels as big as their faces, less the fingers of the others: together they're the box's volume of sheet.
         double T = 2, volume = k.Parts.Sum(p => Geo.Area(p.Cut) * T);

@@ -201,8 +201,8 @@ public static class FurnitureCatalog
 
         b.Room = Storage;
         b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
-        b.Add("Fruit crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Slatted, WidthMm = 14, DepthMm = 10, HeightMm = 8, Lid = LidStyle.None }, "An open crate of slats with gaps between them.");
-        b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound, WidthMm = 14 }, "Planks with iron brackets on the corners.");
+        b.Add("Fruit crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Slatted, WidthMm = 16, DepthMm = 13, HeightMm = 9, Lid = LidStyle.None, Load = CrateLoad.Apples }, "An open crate of slats heaped with apples.");
+        b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound, WidthMm = 16 }, "Planks with iron brackets on the corners and a strap with a ring.");
         b.Add("Shipping crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Cargo, WidthMm = 16, HeightMm = 12 }, "A framed crate with its contents stencilled on the side.");
         b.Add("Chest", ItemKind.Chest, i => i with { Lid = LidStyle.Domed }, "A chest with iron bands and a domed lid.");
         b.Add("Shelving", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Stores, Crown = Crown.Flat, WidthMm = 22, DepthMm = 9, HeightMm = 30, Shelves = 2 }, "Storeroom shelves stacked with sacks, little iron-cornered boxes, pots and small barrels.");
@@ -268,8 +268,8 @@ public static class FurnitureCatalog
 
         b.Room = Storage;
         b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
-        b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound }, "Planks with iron brackets on the corners.");
-        b.Add("Supply crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.CrossBraced, WidthMm = 14 }, "A crate with a cross brace on every side.");
+        b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound, WidthMm = 14 }, "Planks with iron brackets on the corners and a skull on the front.");
+        b.Add("Supply crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.CrossBraced, WidthMm = 14, Handles = true }, "A cross-braced crate with rope handles on the ends.");
         b.Add("Treasure chest", ItemKind.Chest, i => i with { WidthMm = 18, DepthMm = 11, HeightMm = 10, Lid = LidStyle.Domed }, "A big banded chest with a domed lid.");
         b.Add("Rack of shelves", ItemKind.Bookshelf, i => i with { Books = false, Shelves = 3 }, "Plain shelves.");
         b.Add("Barred cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cupboard with a lattice front.");
@@ -332,7 +332,7 @@ public static class FurnitureCatalog
         b.Add("Work slab", ItemKind.Table, i => i with { Legs = LegStyle.Slab, WidthMm = 28, DepthMm = 12, HeightMm = 12 }, "A low work table.");
 
         b.Room = Storage;
-        b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
+        b.Add("Crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Lashed, Lid = LidStyle.None, Load = CrateLoad.Rocks, WidthMm = 14, DepthMm = 13, HeightMm = 9 }, "A crude crate of poles lashed together, heaped with rocks.");
         b.Add("Battened crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Battened }, "Upright planks held by battens.");
         b.Add("Chest", ItemKind.Chest, i => i, "A banded chest.");
 
@@ -388,8 +388,8 @@ public static class FurnitureCatalog
         b.Add("Work table", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Top = TopShape.Square, WidthMm = 30, DepthMm = 12, HeightMm = 14 }, "A metal work table.");
 
         b.Room = Storage;
-        b.Add("Cargo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Cargo, WidthMm = 16, HeightMm = 12 }, "A metal cargo crate with its contents stencilled on the side.");
-        b.Add("Ammo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Military, WidthMm = 16, DepthMm = 9, HeightMm = 8 }, "A long, low crate with a stencilled label and rope handles.");
+        b.Add("Cargo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Cargo, Label = "C-742", WidthMm = 16, HeightMm = 12 }, "A metal cargo crate with its contents stencilled on the side.");
+        b.Add("Ammo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Military, WidthMm = 18, DepthMm = 12, HeightMm = 10 }, "A long, low crate with a stencilled label, latches and handles.");
         b.Add("Storage racks", ItemKind.Bookshelf, i => i with { Books = false }, "Plain racks.");
         b.Add("Tech cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Tech, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cabinet of machines.");
 
@@ -452,8 +452,8 @@ public static class FurnitureCatalog
         b.Add("Writing desk", ItemKind.Desk, i => i, "A desk with papers.");
 
         b.Room = Storage;
-        b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
-        b.Add("Spice crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Cargo, Label = "SPICES", WidthMm = 14 }, "A framed crate stencilled SPICES.");
+        b.Add("Crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Carved, WidthMm = 14 }, "A framed crate carved with a lattice of stars.");
+        b.Add("Spice crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Carved, Lid = LidStyle.None, Load = CrateLoad.Sacks, WidthMm = 14, DepthMm = 13, HeightMm = 8 }, "An open carved crate heaped with tied sacks of spice.");
         b.Add("Slatted crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Slatted }, "A crate of slats with gaps between them.");
         b.Add("Wall shelf", ItemKind.WallShelf, i => i, "A shelf on two brackets.");
 
@@ -512,7 +512,7 @@ public static class FurnitureCatalog
 
         b.Room = Storage;
         b.Add("Chest", ItemKind.Chest, i => i with { Lid = LidStyle.Domed }, "A banded chest with a domed lid.");
-        b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
+        b.Add("Crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Arched, WidthMm = 14 }, "A framed crate with an arcade of pointed arches, a lily in the middle and iron corners.");
         b.Add("Cross-braced crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.CrossBraced }, "A crate with an X brace on every side.");
 
         b.Room = Chapel;
