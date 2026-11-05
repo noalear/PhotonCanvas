@@ -28,6 +28,10 @@ public sealed record HouseSolid(string Name, PathsD Outline, Pose Pose, double T
     public Pose? Open { get; init; }
     /// <summary>The number of the piece it is (<see cref="HouseNumbers"/>), 0 if it hasn't one.</summary>
     public int Number { get; init; }
+    /// <summary>What's etched on its −N face (the back of a single-panel wall), in its own outline's coordinates; null for nothing.</summary>
+    public PathsD? BackEtched { get; init; }
+    /// <summary>Lines scored on its −N face, as <see cref="BackEtched"/>.</summary>
+    public List<PathD>? BackLines { get; init; }
 }
 
 /// <summary>A straight wall as made: which floor, its letter, its two ends on the plan (squares) and what it was made from.</summary>
@@ -41,7 +45,12 @@ public sealed record HouseKit(List<Piece> Pieces, List<HouseSolid> Solids, List<
     public int Count(Sheet s) => Pieces.Where(p => p.Sheet == s).Sum(p => p.Copies);
     /// <summary>The plan point (squares) that's the middle of the building in the 3D view.</summary>
     public (double X, double Y) Origin { get; init; }
+    /// <summary>Things shown in the 3D view that aren't cut: bananas for scale.</summary>
+    public List<HouseProp> Props { get; init; } = [];
 }
+
+/// <summary>Something shown in the 3D view but not cut (a banana for scale): where it lies on its floor, turned <see cref="TurnDeg"/> about the upright.</summary>
+public sealed record HouseProp(string Name, int Level, V3 At, double TurnDeg);
 
 /// <summary>
 /// Makes a building drawn in the editor from the wall maker's pieces: every straight run of wall
@@ -91,6 +100,8 @@ public static partial class HouseKitMaker
         if (Math.Abs(H - s.StoreyHeightMm) > 0.05)
             findings.Add(new(Severity.Note, $"Each storey is {H:0.#} mm high: a whole number of {T:0.##} mm layers, so the columns come out as tall as the walls."));
 
+        // The floor tiles don't depend on anything else: they're started now, alongside the walls.
+        if (TileSpecOf(d, s, sq) is { } tileSpec) _ = Task.Run(() => { try { TileKitOf(tileSpec); } catch (Exception) { /* Tiles says what went wrong. */ } });
         var plans = d.Levels.Take(levels).Select(l => l.Shape()).ToList();
         // The plan's middle (squares): the middle of everything drawn, so the building sits on the origin.
         var allPts = d.Levels.Take(levels).SelectMany(l => l.Walls.SelectMany(e => new[] { e.A, e.B }).Concat(l.Floor.SelectMany(f => new[] { f, f + new GridPt(1, 1) }))).ToList();
@@ -113,12 +124,17 @@ public static partial class HouseKitMaker
             // Walls that come out the same are cut together: their pieces once, with copies for each.
             var groups = new Dictionary<string, (List<Walls.Part> Parts, WallSpec Spec, List<string> Letters)>();
             int letter = 0;
-            foreach (var (run, openings) in runs)
+            // Every wall's settings, then the walls made side by side (or found from last time).
+            var specs = runs.Select(r => Looked(WallFor(s, k, Length(r.Run, sq), r.Openings), s, d, level.LookOf(WallEdge.Of(r.Run.Points[0], r.Run.Points[1])))).ToList();
+            var kits = new WallKit[specs.Count];
+            Parallel.For(0, specs.Count, i => kits[i] = WallKitOf(specs[i]));
+            for (int ri = 0; ri < runs.Count; ri++)
             {
+                var (run, openings) = runs[ri];
                 string name = Letter(letter++);
                 double L = Length(run, sq);
-                var spec = Looked(WallFor(s, k, L, openings), s, d, level.LookOf(WallEdge.Of(run.Points[0], run.Points[1])));
-                var kit = WallKitMaker.Make(spec);
+                var spec = specs[ri];
+                var kit = kits[ri];
                 string what = $"{(levels == 1 ? "Wall" : $"Floor {k + 1} wall")} {name}";
                 foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
                     findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"{what}: {f.Text}"));
@@ -144,7 +160,18 @@ public static partial class HouseKitMaker
                 }
                 else
                 {
-                    solids.Add(new HouseSolid($"Wall {name}", panel.Cut, pose, Wt, Nil(panel.Etched), Nil(panel.Lines), k, SolidKind.Wall) { Facing = normal, Middle = middle });
+                    // Its other side: engraved after turning it over, or (two panels back to back) the back panel's face, seen through from the front.
+                    var (backE, backL) = (panel.BackEtched, panel.BackLines);
+                    if (kit.Parts.FirstOrDefault(p => p.Name == "Wall back") is { } back)
+                    {
+                        double len = kit.PanelLengthMm;
+                        PointD Mirror(PointD q) => new(len - q.x, q.y);
+                        (backE, backL) = (Geo.Map(back.Etched, Mirror), Geo.Map(back.Lines, Mirror));
+                    }
+                    solids.Add(new HouseSolid($"Wall {name}", panel.Cut, pose, Wt, Nil(panel.Etched), Nil(panel.Lines), k, SolidKind.Wall)
+                    {
+                        Facing = normal, Middle = middle, BackEtched = backE is null ? null : Nil(backE), BackLines = backL is null ? null : Nil(backL),
+                    });
                     if (kit.Parts.FirstOrDefault(p => p.Name is "Door" or "Portcullis") is { } leaf && leaf.Poses.Count > 0)
                         solids.Add(new HouseSolid($"Wall {name} door", leaf.Cut, pose with { O = pose.At(leaf.Poses[0].O.X, 0) }, Wt, Nil(leaf.Etched), Nil(leaf.Lines), k, SolidKind.Furniture) { Facing = normal, Middle = middle });
                     // A door that swings: on clips beside its doorway, made with the others once every wall is.
@@ -216,7 +243,7 @@ public static partial class HouseKitMaker
                 string label = Cap($"{floorName}{kind}{(texture is not null && boxed ? $" ({texture.ToLowerInvariant()})" : "")}{(flush || levels == 1 ? "" : ", top")}");
                 if (s.BoxWalls || boxed)
                 {
-                    var parts = BoxColumns.Columns(spec, rel, label, at.Count, at, out var problem);
+                    var (parts, problem) = BoxColumnsOf(spec, rel, label, at);
                     if (problem is not null) { findings.Add(new(Severity.Bad, $"{Cap(kind)}s: {problem}")); continue; }
                     foreach (var p in parts)
                     {
@@ -247,12 +274,16 @@ public static partial class HouseKitMaker
         else findings.Add(new(Severity.Note, $"Stack each column's layers on a {BuildingKitMaker.PinMm:0.#} mm pin (a cocktail stick) and glue them."));
 
         var ways = WaysUp(d, s, plans, plates, sq, ox, oy, pieces, solids, findings);
-        for (int k = 1; k < levels; k++)
+        // Each upper floor (its railings, then the floor), made side by side and put in in order.
+        var upper = Enumerable.Range(1, Math.Max(0, levels - 1)).Select(_ => (Pieces: new List<Piece>(), Solids: new List<HouseSolid>(), Findings: new List<Finding>())).ToArray();
+        Parallel.For(1, Math.Max(1, levels), k =>
         {
-            var slots = Railings(d, s, plans, k, sq, World, pieces, solids, findings);
+            var (p, so, f) = upper[k - 1];
+            var slots = Railings(d, s, plans, k, sq, World, p, so, f);
             var hatches = new PathsD(ways.Where(w => w.Level + 1 == k).SelectMany(w => w.Hatch));
-            Floor(d, s, plans, hatches.Count > 0 ? Geo.Subtract(plates[k], hatches) : plates[k], k, sq, longestMm, World, slots, pieces, solids, findings);
-        }
+            Floor(d, s, plans, hatches.Count > 0 ? Geo.Subtract(plates[k], hatches) : plates[k], k, sq, longestMm, World, slots, p, so, f);
+        });
+        foreach (var (p, so, f) in upper) { pieces.AddRange(p); solids.AddRange(so); findings.AddRange(f); }
         RoomFloors(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
         Roofs(d, s, plans, plates, sq, World, pieces, solids, findings);
         // A floor kept to its yard leaves the rest of the rooms below it open: they want a roof of their own.
@@ -270,7 +301,8 @@ public static partial class HouseKitMaker
         Tiles(d, s, sq, ox, oy, pieces, solids, findings);
         BasePlate(d, s, plans[0], sq, longestMm, World, pieces, solids, findings);
         HangDoors(s, swung, pieces, solids, findings);
-        Furnish(d, s, plans, plates, sq, World, ways, pieces, solids, findings);
+        var props = new List<HouseProp>();
+        Furnish(d, s, plans, plates, sq, World, ways, pieces, solids, props, findings);
 
         double tallest = solids.Count == 0 ? 0 : solids.Max(x => x.Pose.O.Y + x.Thickness);
         var outline = new PathsD(solids.Where(x => x.Kind is SolidKind.Wall or SolidKind.Column).Select(x => Geo.Rect(x.Pose.O.X - 1, x.Pose.O.Z - 1, x.Pose.O.X + 1, x.Pose.O.Z + 1)));
@@ -278,7 +310,7 @@ public static partial class HouseKitMaker
         if (outline.Count > 0)
             findings.Add(new(Severity.Note, $"The building is about {box.right - box.left + C:0} × {box.bottom - box.top + C:0} mm on the ground, {levels} floor{(levels == 1 ? "" : "s")} high."));
         // Every piece numbered in the order it's put together, and (if asked) its number scored on it.
-        var numbered = HouseNumbers.Numbered(new(pieces, solids, findings, made) { Origin = (ox, oy) });
+        var numbered = HouseNumbers.Numbered(new(pieces, solids, findings, made) { Origin = (ox, oy), Props = props });
         return d.NumberPieces ? numbered with { Pieces = HouseNumbers.Marked(numbered.Pieces, HouseNumbers.HeightMm * Math.Clamp(K(s), 0.6, 2)) } : numbered;
     }
 
@@ -615,8 +647,8 @@ public static partial class HouseKitMaker
             // Slots for the railings' tabs.
             var cut = slots.Count > 0 ? Geo.Subtract(whole, slots) : whole;
             string name = cuts.Count == 1 ? $"Floor {k + 1}" : $"Floor {k + 1}, piece {++n}";
-            var e2 = Geo.Intersect(etched, cut);
-            var l2 = Geo.ClipLines(lines, cut);
+            var e2 = KitCache.Intersect(etched, cut);
+            var l2 = KitCache.ClipLines(lines, cut);
             // Turned over onto the plate's own (x, −y) so its etched face is up (Pose.Up: u along X, v away from you).
             PointD Flip(PointD p) => new(p.x, -p.y);
             var cutF = Geo.Map(cut, Flip);
@@ -708,11 +740,10 @@ public static partial class HouseKitMaker
     /// <summary>The floor tile maker's tiles under the ground floor, as big as its walls' outside.</summary>
     static void Tiles(HouseDesign d, BuildingSpec s, double sq, double ox, double oy, List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
     {
-        if (!s.FloorTiles || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0 || d.Base != BaseKind.Tiles) return;
+        if (TileSpecOf(d, s, sq) is not { } spec) return;
         var pts = d.Levels[0].Walls.SelectMany(e => new[] { e.A, e.B }).ToList();
         double x0 = pts.Min(p => p.X), x1 = pts.Max(p => p.X), y0 = pts.Min(p => p.Y), y1 = pts.Max(p => p.Y);
-        var spec = BuildingKitMaker.TileSpecFor(s with { WidthMm = (x1 - x0) * sq, DepthMm = (y1 - y0) * sq, YardMm = TileYardMm(d, s, sq) }) with { Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
-        var kit = TileKitMaker.Make(spec);
+        var kit = TileKitOf(spec);
         foreach (var f in kit.Findings.Where(f => f.Level != Walls.Severity.Note))
             findings.Add(new(f.Level == Walls.Severity.Bad ? Severity.Bad : Severity.Warn, $"Floor tiles: {f.Text}"));
         if (!kit.Ok) return;
@@ -725,6 +756,30 @@ public static partial class HouseKitMaker
             solids.Add(new HouseSolid("Floor tile", spot.Tile.Cut, Pose.Up(bx + spot.X, s.WallSheetMm / 2, bz - spot.Y), s.WallSheetMm, Nil(spot.Tile.Etched), Nil(spot.Tile.Lines), 0, SolidKind.Ground));
         findings.Add(new(Severity.Note, $"The building stands on {kit.Board.Count} floor tiles ({spec.BoardAcross:0.#} × {spec.BoardDown:0.#} squares of {spec.SquareMm:0.#} mm) that lock together with jigsaw edges."));
     }
+
+    /// <summary>The floor tile maker's settings for the tiles under the ground floor; null when it stands on none.</summary>
+    static TileSpec? TileSpecOf(HouseDesign d, BuildingSpec s, double sq)
+    {
+        if (!s.FloorTiles || d.Levels.Count == 0 || d.Levels[0].Walls.Count == 0 || d.Base != BaseKind.Tiles) return null;
+        var pts = d.Levels[0].Walls.SelectMany(e => new[] { e.A, e.B }).ToList();
+        double x0 = pts.Min(p => p.X), x1 = pts.Max(p => p.X), y0 = pts.Min(p => p.Y), y1 = pts.Max(p => p.Y);
+        return BuildingKitMaker.TileSpecFor(s with { WidthMm = (x1 - x0) * sq, DepthMm = (y1 - y0) * sq, YardMm = TileYardMm(d, s, sq) }) with { Wear = Math.Clamp(d.Wear, 0, 1), DetailMm = Math.Max(0, d.DetailMm) };
+    }
+
+    /// <summary>The floor tiles (made, or the same ones as last time).</summary>
+    static TileKit TileKitOf(TileSpec spec) => KitCache.Get("tiles|" + spec.ToJson(), () => TileKitMaker.Make(spec));
+
+    /// <summary>Boxed columns (made, or the same ones as last time), and what's wrong with them if they can't be.</summary>
+    static (List<Walls.Part> Parts, string? Problem) BoxColumnsOf(WallSpec spec, double[] rel, string label, List<(Walls.Model.V3, double)> at)
+    {
+        var h = new KitCache.Hash();
+        foreach (var r in rel) h.Add(r);
+        foreach (var (c, yaw) in at) h.Add(c.X).Add(c.Y).Add(c.Z).Add(yaw);
+        return KitCache.Get($"columns|{spec.ToJson()}|{label}|{h}", () => (BoxColumns.Columns(spec, rel, label, at.Count, at, out var problem), problem));
+    }
+
+    /// <summary>A wall (made, or the same one as last time).</summary>
+    static WallKit WallKitOf(WallSpec spec) => KitCache.Get("wall|" + spec.ToJson(), () => WallKitMaker.Make(spec));
 
     static V3 Unit(V3 v) => v * (1 / Math.Max(1e-9, v.Length));
 

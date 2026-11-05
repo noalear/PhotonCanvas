@@ -48,7 +48,11 @@ public static class HouseNumbers
     }
 
     /// <summary>What a piece is, to tell it from others: its outline and etching, to a tenth of a millimetre.</summary>
-    static string Key(PathsD cut, PathsD etched)
+    static string Key(PathsD cut, PathsD etched) =>
+        // Working out the etched area is slow on a big floor: kept, by the shapes themselves.
+        KitCache.Get($"key|{KitCache.Hash.Of(cut)}|{KitCache.Hash.Of(etched)}", () => MakeKey(cut, etched));
+
+    static string MakeKey(PathsD cut, PathsD etched)
     {
         var tidy = Geo.Tidy(cut);
         var b = Geo.Bounds(tidy);
@@ -68,7 +72,15 @@ public static class HouseNumbers
     /// </summary>
     public static List<Piece> Marked(IEnumerable<Piece> pieces, double heightMm = HeightMm)
     {
-        return [.. pieces.Select(p => p.Number > 0 ? Mark(p, heightMm) : p)];
+        return [.. pieces.Select(p => p.Number > 0 ? MarkKept(p, heightMm) : p)];
+    }
+
+    /// <summary>As <see cref="Mark"/>, the same piece marked last time taken from <see cref="KitCache"/> (finding a spot clear of a big texture is slow).</summary>
+    static Piece MarkKept(Piece p, double heightMm)
+    {
+        var h = new KitCache.Hash().Add(p.Cut).Add(p.Etched).Add(p.Lines).Add(heightMm).Add((ulong)p.Number);
+        var (etched, lines, marks) = KitCache.Get($"mark|{h}", () => { var m = Mark(p, heightMm); return (m.Etched, m.Lines, m.Marks); });
+        return p with { Etched = etched, Lines = lines, Marks = marks };
     }
 
     /// <summary>One piece with its number scored on it (clear of its texture, or on a patch left plain for it).</summary>

@@ -58,6 +58,8 @@ public sealed class PlanEditor : Control
     public int SelectedWay { get; private set; } = -1;
     /// <summary>What a click with Furniture puts down (null: nothing chosen yet).</summary>
     public FurnitureItem? ToPlace { get; set; }
+    /// <summary>A click with Furniture puts down a banana for scale (instead of <see cref="ToPlace"/>).</summary>
+    public bool BananaToPlace { get; set; }
     /// <summary>What a click with Stairs puts down.</summary>
     public WayKind WayToPlace { get; set; } = WayKind.Stairs;
 
@@ -398,11 +400,11 @@ public sealed class PlanEditor : Control
             case PlanTool.Furnish:
             {
                 if (ItemAt(pt.Position) is >= 0 and var item) { SelectItem(item); StartDrag(pt.Position, item, -1); break; }
-                if (ToPlace is not { } what) break;
+                if (Placing() is not { } placing) break;
                 var (x, y) = SnapItem(ToPlan(pt.Position), e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 // Turned as the last one picked was.
                 int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
-                Commit(Floor with { Furniture = [.. Floor.Furniture, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }] }, "Put in furniture");
+                Commit(Floor with { Furniture = [.. Floor.Furniture, placing with { X = x, Y = y, Turn = turn }] }, placing.Banana ? "Put down a banana for scale" : "Put in furniture");
                 SelectItem(Floor.Furniture.Count - 1);
                 StartDrag(pt.Position, Floor.Furniture.Count - 1, -1);
                 break;
@@ -1033,6 +1035,7 @@ public sealed class PlanEditor : Control
     void DrawFurniture(DrawingContext ctx)
     {
         var fill = new SolidColorBrush(Color.FromArgb(0xD8, 0xB8, 0x8A, 0x58));
+        var banana = new SolidColorBrush(Color.FromArgb(0xE0, 0xF2, 0xD2, 0x3C));
         var edge = new Pen(new SolidColorBrush(Color.FromRgb(0x5A, 0x3E, 0x22)), 1.2);
         var front = new Pen(new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)), Math.Max(2.5, _scale * 0.08), lineCap: PenLineCap.Flat);
         for (int i = 0; i < Floor.Furniture.Count; i++)
@@ -1040,7 +1043,7 @@ public sealed class PlanEditor : Control
             var p = Floor.Furniture[i];
             var r = HouseKitMaker.ItemArea(_design.Style, p, _design.SquareMm);
             var box = new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom));
-            ctx.DrawRectangle(fill, i == SelectedItem ? new Pen(Picked, 2.5) : edge, box, 2, 2);
+            ctx.DrawRectangle(p.Banana ? banana : fill, i == SelectedItem ? new Pen(Picked, 2.5) : edge, box, p.Banana ? Math.Min(box.Width, box.Height) / 2 : 2, p.Banana ? Math.Min(box.Width, box.Height) / 2 : 2);
             // Its front: a dark edge.
             var (fx, fy) = Facing(p.Turn);
             var c = box.Center;
@@ -1048,23 +1051,26 @@ public sealed class PlanEditor : Control
             Point a, b;
             if (fy != 0) { a = new Point(box.Left + 2, c.Y + fy * hh); b = new Point(box.Right - 2, c.Y + fy * hh); }
             else { a = new Point(c.X + fx * hw, box.Top + 2); b = new Point(c.X + fx * hw, box.Bottom - 2); }
-            ctx.DrawLine(front, a, b);
+            if (!p.Banana) ctx.DrawLine(front, a, b);
             if (_scale >= 18)
             {
-                var name = HouseKitMaker.ItemName(p.Item);
+                var name = HouseKitMaker.PlacedName(p);
                 var ft = new FormattedText(name, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), Math.Clamp(_scale * 0.26, 8, 12), new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12)));
                 if (ft.Width < box.Width - 4 && ft.Height < box.Height - 2) ctx.DrawText(ft, new Point(c.X - ft.Width / 2, c.Y - ft.Height / 2));
             }
         }
         // What a click would put down, faintly.
-        if (Tool == PlanTool.Furnish && ToPlace is { } what && _inside && _from is null && _dragItem < 0 && ItemAt(_mouse) < 0)
+        if (Tool == PlanTool.Furnish && Placing() is { } what && _inside && _from is null && _dragItem < 0 && ItemAt(_mouse) < 0)
         {
             var (x, y) = SnapItem(ToPlan(_mouse), false);
             int turn = SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem].Turn : 0;
-            var r = HouseKitMaker.ItemArea(_design.Style, new PlacedItem { X = x, Y = y, Turn = turn, Item = what }, _design.SquareMm);
+            var r = HouseKitMaker.ItemArea(_design.Style, what with { X = x, Y = y, Turn = turn }, _design.SquareMm);
             ctx.DrawRectangle(new SolidColorBrush(Color.FromArgb(0x60, 0xB8, 0x8A, 0x58)), new Pen(Picked, 1.5, new DashStyle([3, 2], 0)), new Rect(ToScreen(r.left, r.top), ToScreen(r.right, r.bottom)), 2, 2);
         }
     }
+
+    /// <summary>What a click with Furniture puts down (where and turned still to set), or null when nothing's chosen.</summary>
+    PlacedItem? Placing() => BananaToPlace ? new PlacedItem { Banana = true } : ToPlace is { } what ? new PlacedItem { Item = what } : null;
 
     void DrawWays(DrawingContext ctx)
     {

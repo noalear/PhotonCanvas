@@ -61,10 +61,16 @@ public static partial class HouseKitMaker
         return size;
     }
 
+    /// <summary>A banana for scale: about as long and as curved as a real one (mm, across its front and front to back as it lies).</summary>
+    public const double BananaLongMm = 172, BananaDeepMm = 68;
+
+    /// <summary>What a placed thing is called.</summary>
+    public static string PlacedName(PlacedItem p) => p.Banana ? "Banana for scale" : ItemName(p.Item);
+
     /// <summary>The floor a placed piece takes on the plan (squares): a rectangle turned as it's turned.</summary>
     public static RectD ItemArea(BuildingSpec s, PlacedItem p, double sq)
     {
-        var (w, d) = Footprint(s, p.Item);
+        var (w, d) = p.Banana ? (BananaLongMm, BananaDeepMm) : Footprint(s, p.Item);
         if (((p.Turn % 2) + 2) % 2 == 1) (w, d) = (d, w);
         return new RectD(p.X - w / 2 / sq, p.Y - d / 2 / sq, p.X + w / 2 / sq, p.Y + d / 2 / sq);
     }
@@ -83,17 +89,23 @@ public static partial class HouseKitMaker
     /// a column, a way up or another piece, or off the edge of its floor.
     /// </summary>
     static void Furnish(HouseDesign d, BuildingSpec s, List<PlanShape> plans, List<PathsD> plates, double sq, Func<double, double, double, V3> world,
-        List<MadeWay> ways, List<Piece> pieces, List<HouseSolid> solids, List<Finding> findings)
+        List<MadeWay> ways, List<Piece> pieces, List<HouseSolid> solids, List<HouseProp> props, List<Finding> findings)
     {
         var all = new List<(int Level, PlacedItem Placed)>();
         for (int k = 0; k < plans.Count; k++)
-            foreach (var p in d.Levels[k].Furniture) all.Add((k, p));
+            foreach (var p in d.Levels[k].Furniture)
+            {
+                // A banana isn't made: it just lies on the floor in the 3D view.
+                if (p.Banana) props.Add(new HouseProp(PlacedName(p), k, world(p.X, p.Y, FloorTop(d, s, plans[0], k, p.X, p.Y)), (((p.Turn % 4) + 4) % 4) * 90));
+                else all.Add((k, p));
+            }
         if (all.Count == 0) return;
         // Each different piece made once.
         var keys = all.Select(a => JsonSerializer.Serialize(a.Placed.Item with { Count = 1 })).ToList();
         var distinct = keys.Distinct().ToList();
         var items = distinct.Select(k => JsonSerializer.Deserialize<FurnitureItem>(k)!).ToList();
-        var kit = FurnitureKit.Make(SetFor(s, items));
+        var set = SetFor(s, items);
+        var kit = KitCache.Get("furniture|" + set.ToJson(), () => FurnitureKit.Make(set));
         double T = kit.ThicknessMm;
         // Names: the kind's name, numbered where different pieces of the same kind are made.
         var names = new string[items.Count];

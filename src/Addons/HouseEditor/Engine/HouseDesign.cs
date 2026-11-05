@@ -162,6 +162,8 @@ public sealed record PlacedItem
     public double Y { get; init; }
     public int Turn { get; init; }
     public FurnitureItem Item { get; init; } = Defaults.For(ItemKind.Table);
+    /// <summary>A banana for scale, as big as a real one: shown in the 3D view, not cut (<see cref="Item"/> is ignored).</summary>
+    public bool Banana { get; init; }
 }
 
 /// <summary>What climbs to the floor above: open stairs, solid stairs (stacked layers), spiral stairs or a leaning ladder.</summary>
