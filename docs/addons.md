@@ -258,6 +258,15 @@ put an engraving on its other face too (in the same u, v, as seen through the pi
 wall's back). A face colour that isn't fully opaque makes a see-through ghost (the stairs
 maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building, map-to-terrain and roof makers all use it.
 
+Every `Model3DView` has a bulb button beside the camera buttons that switches all 3D views to the
+realistic look (`Look3D.Realistic`, remembered in the data folder's view3d.json): each slab is drawn
+as what it's made of (`Surface`: wood grain on its faces along the piece's u, charred laser-cut edges
+with plies, burnt engraving), lit by a sun over the viewer's left shoulder with soft shadows from a
+shadow map (onto the table too), a sky light, and ambient occlusion in corners. `AddSlab` sets the
+surfaces itself; the sheet's colour is `SlabStyle.Sheet`, or, unset, the brightest colour `Paint`
+gives (a `Lit` style's own colour). Views get it for nothing: don't light faces yourself for it.
+`Model3DPainter.Picture(..., realistic: true)` draws one for a file.
+
 ## Checks
 
 `tests/PhotonCanvas.Tests/HelpTests.Addons.cs` runs for every folder under `src/Addons` with an

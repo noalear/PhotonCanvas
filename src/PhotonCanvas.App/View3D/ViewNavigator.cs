@@ -88,6 +88,12 @@ public sealed class ViewNavigator
     /// <summary>The buttons, for the bottom-right corner of the view.</summary>
     public Control Buttons { get; }
 
+    /// <summary>Puts a button of the view's own at the start of the row of <see cref="Buttons"/> (26 × 26, not taking the keyboard).</summary>
+    public void AddButton(Control button)
+    {
+        if (Buttons is Border { Child: Panel row }) row.Children.Insert(0, button);
+    }
+
     /// <summary>
     /// Being turned, moved or zoomed just now: draw quickly (roughly), and properly once it's still. The view is drawn
     /// again by itself when it settles.

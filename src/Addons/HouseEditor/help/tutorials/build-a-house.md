@@ -59,8 +59,9 @@ Click **Save…**, give the building a name, pick its **Type** (house, tavern, s
 ## Look inside
 <!-- target: tabitem:Put together -->
 **Put together** shows it in 3D. Pick **Walls cut away** under **Show** to see into the rooms, and
-drag to turn it round. **Engraving** shows the textures sunk in as deep as you'll etch them, and
-**Doors open** swings the doors that open out on their hinges.
+drag to turn it round. **Realistic engraving** shows the textures sunk in as deep as you'll etch them,
+**Doors open** swings the doors that open out on their hinges, and **Realistic look** shows it in wood,
+sunlight and shadow, the way the cut kit will look.
 
 ## Cut it
 <!-- target: button:Put in the design -->
