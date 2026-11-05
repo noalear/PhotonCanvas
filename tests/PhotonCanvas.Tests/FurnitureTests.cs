@@ -15,7 +15,7 @@ public class FurnitureTests
     public static IEnumerable<object[]> Kinds() => Defaults.Kinds.Select(k => new object[] { k.Kind });
 
     /// <summary>Every piece where it sits once put together, with its outline shrunk a hair so touching faces don't count.</summary>
-    internal sealed record Placed(string Name, Pose Pose, PathsD Shrunk, PathsD Cut, double T)
+    internal sealed record Placed(string Name, Pose Pose, PathsD Shrunk, PathsD Cut, double T, bool Glued = false)
     {
         public bool Inside(V3 p, double eps = 0.03)
         {
@@ -39,7 +39,7 @@ public class FurnitureTests
     static bool In(PathsD area, double u, double v) => OutlineGrid.In(area, u, v);
 
     internal static List<Placed> Assemble(ItemKit k, double T) =>
-        [.. k.Parts.SelectMany(p => p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(p.Cut, -0.03), p.Cut, T)))];
+        [.. k.Parts.SelectMany(p => p.Poses.Select(pose => new Placed(p.Name, pose, Geo.Offset(p.Cut, -0.03), p.Cut, T, p.Glued)))];
 
     /// <summary>Places where two pieces would be in the same space once put together (sampled every 0.1 mm where their boxes meet).</summary>
     internal static List<string> Clashes(List<Placed> all)
@@ -106,7 +106,11 @@ public class FurnitureTests
             var (a0, a1) = a.Box();
             var (b0, b1) = b.Box();
             double dx = Math.Min(a1.X, b1.X) - Math.Max(a0.X, b0.X), dy = Math.Min(a1.Y, b1.Y) - Math.Max(a0.Y, b0.Y), dz = Math.Min(a1.Z, b1.Z) - Math.Max(a0.Z, b0.Z);
-            return Math.Min(dx, Math.Min(dy, dz)) > T * 0.4;
+            if (Math.Min(dx, Math.Min(dy, dz)) > T * 0.4) return true;
+            // A piece glued flat on another: face to face (touching one way), overlapping well the other two.
+            if (!a.Glued && !b.Glued) return false;
+            var d = new[] { dx, dy, dz }.OrderBy(v => v).ToArray();
+            return d[0] > -0.02 && d[1] > T * 0.4;
         }
         var seen = new HashSet<int> { 0 };
         var queue = new Queue<int>([0]);

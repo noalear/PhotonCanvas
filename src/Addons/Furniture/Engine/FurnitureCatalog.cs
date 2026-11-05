@@ -174,7 +174,7 @@ public static class FurnitureCatalog
         b.Room = Chapel;
         b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth over it.");
         b.Add("Pew", ItemKind.Armchair, i => i with { Seat = SeatStyle.Pew, Columns = 3, WidthMm = 30, DepthMm = 10, HeightMm = 16, SeatMm = 7.5 }, "A pew with tall ends.");
-        b.Add("Altar candles", ItemKind.Candlestand, i => i with { WidthMm = 12, HeightMm = 26 }, "A five-branch candelabra.");
+        b.Add("Altar candles", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");
 
         b.Room = Armoury;
         b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a sword, an axe and a halberd in a rack.");
@@ -186,7 +186,7 @@ public static class FurnitureCatalog
         b.Add("Throne", ItemKind.Armchair, i => i with { Seat = SeatStyle.Throne, BackTop = BackTop.Arched, WidthMm = 16, DepthMm = 14, HeightMm = 30, SeatMm = 10, ArmMm = 14 }, "A throne on a two-step dais.");
         b.Add("Long carpet", ItemKind.Rug, i => i with { Rug = RugPattern.Border, WidthMm = 60, DepthMm = 18 }, "A runner up to the throne.");
         b.Add("Royal tapestry", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Tapestry, WidthMm = 24, HeightMm = 30, HangMm = 12 }, "A large tapestry.");
-        b.Add("Tall clock", ItemKind.Cabinet, i => i with { Front = CabinetFront.Clock, Crown = Crown.Pediment, Columns = 1, WidthMm = 10, DepthMm = 8, HeightMm = 40 }, "A long-case clock with a pendulum.");
+        b.Add("Tall clock", ItemKind.Cabinet, i => i with { Front = CabinetFront.Clock, Crown = Crown.Pediment, Columns = 1, WidthMm = 12, DepthMm = 9, HeightMm = 42 }, "A long-case clock: a dial sunk in its hood, a real pendulum hanging behind the glazed trunk door.");
 
         b.Room = Prison;
         b.Add("Stocks", ItemKind.Stocks, i => i, "Stocks for the village green or the gaol.");
@@ -415,7 +415,7 @@ public static class FurnitureCatalog
         b.Add("Dresser", ItemKind.Cabinet, i => i with { Front = CabinetFront.DrawersOverDoors, Crown = Crown.Cornice, WidthMm = 22, DepthMm = 10, HeightMm = 20 }, "Drawers over doors.");
         b.Add("Damask rug", ItemKind.Rug, i => i with { Rug = RugPattern.Damask, WidthMm = 32, DepthMm = 22 }, "A rug with a damask pattern.");
         b.Add("Portrait", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Painting, WidthMm = 16, HeightMm = 20, HangMm = 14 }, "A framed painting.");
-        b.Add("Candelabra", ItemKind.Candlestand, i => i with { WidthMm = 12, HeightMm = 26 }, "A five-branch candelabra.");
+        b.Add("Candelabra", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");
         b.Add("Tracery screen", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Tracery, WidthMm = 30, HeightMm = 30 }, "A screen of pointed arches.");
 
         b.Room = Kitchen;
@@ -428,7 +428,7 @@ public static class FurnitureCatalog
         b.Add("High-backed chair", ItemKind.Chair, i => i with { Back = BackStyle.Ladder, HeightMm = 22 }, "A tall ladder-back chair.");
         b.Add("Wing chair", ItemKind.Armchair, i => i with { BackTop = BackTop.Winged, HeightMm = 22 }, "A wing chair.");
         b.Add("Sofa", ItemKind.Armchair, i => i with { Seat = SeatStyle.Sofa, Columns = 2, WidthMm = 24, BackTop = BackTop.Arched }, "A two-seat sofa.");
-        b.Add("Grandfather clock", ItemKind.Cabinet, i => i with { Front = CabinetFront.Clock, Crown = Crown.Arch, Columns = 1, WidthMm = 10, DepthMm = 8, HeightMm = 40 }, "A long-case clock.");
+        b.Add("Grandfather clock", ItemKind.Cabinet, i => i with { Front = CabinetFront.Clock, Crown = Crown.Arch, Columns = 1, WidthMm = 12, DepthMm = 9, HeightMm = 42 }, "A long-case clock with a pointed hood and pinnacles, a real pendulum hanging behind the glazed trunk door.");
         b.Add("Hall portrait", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Painting, WidthMm = 22, HeightMm = 26, HangMm = 14 }, "A large framed painting.");
 
         b.Room = Study;
@@ -446,7 +446,7 @@ public static class FurnitureCatalog
         b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Pediment, WidthMm = 26, DepthMm = 12, HeightMm = 24 }, "An altar with a cloth, under a pediment.");
         b.Add("Pew", ItemKind.Armchair, i => i with { Seat = SeatStyle.Pew, Columns = 3, WidthMm = 30, DepthMm = 10, HeightMm = 17, SeatMm = 7.5 }, "A pew with tall ends.");
         b.Add("Lectern", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Lectern, WidthMm = 10 }, "A book stand.");
-        b.Add("Candelabra", ItemKind.Candlestand, i => i with { WidthMm = 12, HeightMm = 26 }, "A five-branch candelabra.");
+        b.Add("Candelabra", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");
         b.Add("Rood screen", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Tracery, WidthMm = 36, HeightMm = 32, Columns = 4 }, "A screen of pointed arches.");
 
         b.Room = Throne;

@@ -35,7 +35,8 @@ the preview follows.
 ## Look at it put together
 <!-- target: tabitem:Put together -->
 **Put together** shows the furniture picked in 3D: drag it round to check it from every side.
-**Pieces** shows what will be cut.
+**Pieces** shows what will be cut. Some pieces are cut to glue on, so they stand proud the way real
+ones do: a cupboard's doors and drawer fronts, the bosses on a candelabra, a clock's bezel and trunk door.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

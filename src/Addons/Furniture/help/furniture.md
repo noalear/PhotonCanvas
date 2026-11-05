@@ -98,7 +98,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Bed** | A **Head board** and **Foot board**, a mattress that slots between them at **Mattress** height, and side rails; **Bedding**: one or two pillows cut as their own pieces with a tab down into the mattress, and a blanket with a turned-down sheet and quilting etched on. | 32 long, 16 wide, head 13, foot 8 |
 | **Door for a wall** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | doorway 16 × 28 |
 | **Wall shelf** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | 20 long, 5 deep |
-| **Cabinet** | Two sides, a bottom, shelves and a top slotted together, a back and a front. **Front**: *Doors*, *Drawers*, *Drawers over doors*, *Glass doors*, *Open shelves*, *Dresser (shelves over a cupboard)*, *Panelled doors*, *Lockers* (vents cut through each door), *Machine panels*, *Clock* (a dial with the hours, a pendulum window and finials on its crown), *Lattice doors* or *Altar*. **Top**: *Flat*, *Cornice (two layers)*, *Pediment* or *Arch*. **Across** (doors or drawers side by side), **Drawer rows**, **Shelves** and what's **On the shelves** (books, bottles, jars, plates, scrolls or machines). Behind open shelves or glass, deep enough shelves get the books, bottles, jars, plates or scrolls cut as rows that stand on them; machines, and anything on too shallow a shelf, are etched on the back. | 22 wide, 11 deep, 34 high |
+| **Cabinet** | Two sides, a bottom, shelves and a top slotted together, a back and a front. **Front**: *Doors*, *Drawers*, *Drawers over doors*, *Glass doors*, *Open shelves*, *Dresser (shelves over a cupboard)*, *Panelled doors*, *Lockers* (vents cut through each door), *Machine panels*, *Clock* (built as a real long-case clock: see **Clocks** below), *Lattice doors* or *Altar*. **Top**: *Flat*, *Cornice (two layers)*, *Pediment* or *Arch*. **Across** (doors or drawers side by side), **Drawer rows**, **Shelves** and what's **On the shelves** (books, bottles, jars, plates, scrolls or machines). Behind open shelves or glass, deep enough shelves get the books, bottles, jars, plates or scrolls cut as rows that stand on them; machines, and anything on too shallow a shelf, are etched on the back. Doors, drawer fronts and panels are cut as their own pieces and glued on the front so they stand proud of it: a door or panel big enough is a frame with an opening (a pointed arch, a round arch or a chamfered window, to suit the theme), with strap hinges and a ring pull on its stiles, and the front behind shows through as a sunk panel carved with a lily, a star or vents. Dungeon and cave doors stay solid boards with strap hinges. With a push fit nothing is glued, so the doors and drawers are etched on the front instead. | 22 wide, 11 deep, 34 high |
 | **Desk** | A top on two solid ends with a back panel and a drawer front. **On top**: papers, a book and ink, or a screen and keyboard. | 24 × 12, 13 high |
 | **Armchair or throne** | Two shaped sides, a tufted seat and a back. **Kind**: *Armchair*, *Throne on a dais*, *Sofa or settle* (**Seats** side by side), *Pew* or *Command chair*. **Seat height**, **Arm height** and the **Back's top** (*Square*, *Rounded*, *Arched*, *Pointed* or *Winged*). | 14 × 12, 20 high |
 | **Bed** (more kinds) | **Kind**: *Plain*, *Four-poster* (a canopy on four posts with a valance, finials on the posts, and curtains tied back at each corner, cut in one with the canopy rails), *Bunk beds* (a ladder in the foot board) or *Pallet on sleepers* (with a fur). | as the bed |
@@ -109,7 +109,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Coffin or sarcophagus** | Layers glued into a solid shape on two keys: *Coffin*, *Sarcophagus* (an effigy on the lid) or *Sleeper pod*. | 34 × 11, 6 high |
 | **Rug** | One flat piece: *Bordered*, *Kilim*, *Damask*, *Hide*, *Deck mat* or *Round*. | 36 × 24 |
 | **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry* (fleurs-de-lis round a shield, on a rod with knobbed ends), *Banner*, *Painting* (a carved frame round a portrait when it's tall, or a landscape with a castle when it's wide), *Shield and swords*, *Map* (an island with mountains, forest, a river, towns and a compass rose; a star map in sci-fi) or *Screen*. | 16 × 22 |
-| **Candle stand or lamp** | Two profiles crossed on a foot: *Candelabra* (tapers in drip pans on curved arms, their flames burnt dark), *Lamp* or *Torch*. | 10 across, 24 high |
+| **Candle stand or lamp** | *Candelabra*: a baluster stem with knops and an urn, S-scrolled arms with curls under them springing from a quatrefoil medallion, a cup and drip pan under every taper (three candles, or five from 11 mm wide), standing in a stepped, domed foot that crosses it; round bosses glued on both faces of the medallion and the urn make the stem look turned from every side (left off for a push fit). *Lamp* or *Torch*: a profile crossed on a foot. | 10 across, 24 high |
 | **Screen** | A folding screen of two to six **Panels** on working hinges, standing in a zig-zag: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. One panel stands on two feet instead. **Width** and **Depth** are the screen as it stands; the depth sets how far the leaves fold. | 30 wide, 12 deep, 30 high |
 | **Stocks** | Two posts on feet, a board with holes for the head and hands, and a rail. | 22 × 9, 28 high |
 
@@ -139,6 +139,21 @@ spiral in cave). *The list's theme* follows the theme at the top.
 ![A sarcophagus with an effigy on its lid](images/window-furniture-sarcophagus.png)
 
 ![A gothic tracery screen folded into a zig-zag on its hinges](images/window-furniture-screen.png)
+
+### Clocks
+
+A clock is built like a real long-case clock. The front and back carry its shape: a wide base on
+bracket feet, a narrower trunk and a wide hood. Two sides slot between them, and the bottom and a
+**seat board** slot through the sides. The **pendulum** is its own piece: its hanger rests on the
+seat board with the rod down through a slot, so it really hangs, free to swing, its bob showing
+through the glazed trunk door. Hang it before the cap goes on. Glued on the front are the dial's
+**bezel** (with columns up each side, the dial sunk behind it), the trunk's **door** round the glass
+and a raised **base panel**; the hood's and base's sides are glued over the sides. The **cap** on top
+takes the sides' tabs and the crown's: a pediment or an arch with ball finials, or (gothic) a pointed
+gable with crockets, a spire and pinnacles. With a push fit, the glued-on pieces are left out.
+
+Clocks need room inside for the pendulum: at least four sheets plus 3.2 mm wide, and three sheets
+plus 1.6 mm deep.
 
 ### Folding screens
 
@@ -215,6 +230,8 @@ stays together without glue and comes apart again. The pieces that were glued ch
 - A wall shelf's brackets have a tab that pushes up through a slot in the shelf, and ribs top and
   bottom that press on the wall's mount slot.
 - A door's clips get ribs in the fork that slides onto the wall.
+- A cabinet's doors, drawer fronts and panels, and the glued-on parts of clocks and candelabras,
+  are left off: the doors and drawers are etched on the front instead.
 
 ![The Sheet tab with Joints set to push fit, and the chest's pieces with its two lid rails](images/window-furniture-push-fit.png)
 

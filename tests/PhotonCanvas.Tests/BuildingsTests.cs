@@ -462,7 +462,8 @@ public class BuildingsTests
         Assert.Contains(loose.Pieces, p => p.Name == "Front door");
         Assert.DoesNotContain(loose.Pieces, p => p.Name == "Front wall: door head");
         var open = BuildingKitMaker.Make(BuildingSpec.Preset(BuildingKind.Cottage) with { Door = DoorStyle.Open });
-        Assert.DoesNotContain(open.Pieces, p => p.Name.Contains("door", StringComparison.OrdinalIgnoreCase) && !p.Name.Contains("Floor", StringComparison.Ordinal));
+        // (Furniture has doors of its own: a cupboard's are cut to glue on.)
+        Assert.DoesNotContain(open.Pieces, p => p.Sheet != Sheet.Furniture && p.Name.Contains("door", StringComparison.OrdinalIgnoreCase) && !p.Name.Contains("Floor", StringComparison.Ordinal));
     }
 
     [Fact]

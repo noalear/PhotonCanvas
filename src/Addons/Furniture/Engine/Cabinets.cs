@@ -20,6 +20,7 @@ public static class Cabinets
     public static void Make(Maker m)
     {
         var it = m.Item;
+        if (it.Front == CabinetFront.Clock) { Clocks.Make(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;
         var front = it.Front;
         var look = Fronts.Look(m);
@@ -179,7 +180,6 @@ public static class Cabinets
                 if (shows && rows[i] is null) Contents.Fill(it.Contents, 0, Li, g0 - y0, g1 - y0, rnd, etched, lines);
             }
             if (bk.Count == 1) { m.Bad($"The shelves are too close together for the back to lock in: have fewer shelves or make the {what} taller."); return; }
-            if (clock) Pendulum(Li, Hb, PendulumWindow(Li, bodyTop, kick), y0, lines, etched);
             m.Add("Back", bk, [], [Pose.Front(T, y0, BackIn + T / 2)], grainAlongU: false, face: seeThrough && rows.All(r => r is null) ? [] : [Geo.Rect(0, 0, Li, Hb)], etched: etched, lines: lines);
         }
         else if (!hasFront) m.Note("With neither a back nor a front, glue the shelves in square.");
@@ -198,7 +198,9 @@ public static class Cabinets
             if (feet) holes.Add(WoodFace.RoundRect(Li * 0.14, -3, Li * 0.86, kick - 1.2, Math.Min(1.4, Li * 0.1)));
             var etched = new PathsD();
             var lines = new List<PathD>();
-            Face(m, look, front, Li, kick, frontTop, holes, etched, lines);
+            var leaves = Relief.Use(m) ? new List<Leaf>() : null;
+            Face(m, look, front, Li, kick, frontTop, holes, etched, lines, leaves);
+            if (leaves is { Count: > 0 }) Relief.Add(m, look, leaves, new V3(T, 0, Dl - FrontIn), etched, lines);
             m.Add("Front", fr, holes, [Pose.Front(T, 0, Dl - FrontIn - T / 2)], grainAlongU: false, face: metal ? [] : [Geo.Rect(0, 0, Li, frontTop)], etched: etched, lines: lines);
         }
 
@@ -362,7 +364,7 @@ public static class Cabinets
     }
 
     /// <summary>The front's face: doors, drawers and the rest in the area over the kick (y from kick to top).</summary>
-    static void Face(Maker m, FrontLook look, CabinetFront front, double W, double kick, double top, PathsD holes, PathsD etched, List<PathD> lines)
+    static void Face(Maker m, FrontLook look, CabinetFront front, double W, double kick, double top, PathsD holes, PathsD etched, List<PathD> lines, List<Leaf>? leaves = null)
     {
         var it = m.Item;
         var rnd = m.Rnd;
@@ -373,14 +375,14 @@ public static class Cabinets
         switch (front)
         {
             case CabinetFront.Drawers:
-                DrawerGrid(look, x0, y0, x1, y1, rows, cols, etched, lines);
+                DrawerGrid(look, x0, y0, x1, y1, rows, cols, etched, lines, leaves);
                 break;
             case CabinetFront.DrawersOverDoors:
             case CabinetFront.Hutch:
             {
                 double dh = Geo.Clamp((y1 - y0) * 0.24, 2.2, 5);
-                DrawerGrid(look, x0, y1 - dh, x1, y1, 1, cols, etched, lines);
-                Doors(look, x0, y0, x1, y1 - dh - g, cols, rnd, etched, lines);
+                DrawerGrid(look, x0, y1 - dh, x1, y1, 1, cols, etched, lines, leaves);
+                Doors(look, x0, y0, x1, y1 - dh - g, cols, rnd, etched, lines, leaves: leaves);
                 break;
             }
             case CabinetFront.Glass:
@@ -399,7 +401,9 @@ public static class Cabinets
             case CabinetFront.Panelled:
             {
                 double pw = (x1 - x0) / cols;
-                for (int c = 0; c < cols; c++) Fronts.Panel(look, x0 + c * pw + 0.2, y0, x0 + (c + 1) * pw - 0.2, y1, etched, lines);
+                for (int c = 0; c < cols; c++)
+                    if (leaves is not null) leaves.Add(new Leaf(x0 + c * pw + 0.2, y0, x0 + (c + 1) * pw - 0.2, y1, LeafKind.Panel, Handle: false));
+                    else Fronts.Panel(look, x0 + c * pw + 0.2, y0, x0 + (c + 1) * pw - 0.2, y1, etched, lines);
                 break;
             }
             case CabinetFront.Locker:
@@ -436,9 +440,6 @@ public static class Cabinets
                 }
                 break;
             }
-            case CabinetFront.Clock:
-                ClockFace(look, W, kick, top, holes, etched, lines);
-                break;
             case CabinetFront.Altar:
             {
                 double pw = (x1 - x0) / Math.Max(3, cols | 1);
@@ -447,18 +448,19 @@ public static class Cabinets
                 {
                     double a = x0 + c * pw + 0.2, b = x0 + (c + 1) * pw - 0.2;
                     if (c == n / 2) { etched.AddRange(Fronts.Outline(a, y0, b, y1)); Symbol(look, m.Theme, (a + b) / 2, (y0 + y1) / 2, Math.Min(b - a, y1 - y0) * 0.36, etched, lines); }
+                    else if (leaves is not null) leaves.Add(new Leaf(a, y0, b, y1, LeafKind.Panel, Handle: false));
                     else Fronts.Panel(look, a, y0, b, y1, etched, lines);
                 }
                 break;
             }
             default:
-                Doors(look, x0, y0, x1, y1, cols, rnd, etched, lines);
+                Doors(look, x0, y0, x1, y1, cols, rnd, etched, lines, leaves: leaves);
                 break;
         }
     }
 
     /// <summary><paramref name="cols"/> doors side by side, hung from the outer edges (a pair meets in the middle).</summary>
-    static void Doors(FrontLook look, double x0, double y0, double x1, double y1, int cols, Random rnd, PathsD etched, List<PathD> lines, bool handles = true, bool glass = false)
+    static void Doors(FrontLook look, double x0, double y0, double x1, double y1, int cols, Random rnd, PathsD etched, List<PathD> lines, bool handles = true, bool glass = false, List<Leaf>? leaves = null)
     {
         double dw = (x1 - x0) / cols;
         for (int c = 0; c < cols; c++)
@@ -472,12 +474,13 @@ public static class Cabinets
                 double hx = hingeLeft ? b - Math.Min(0.8, (b - a) * 0.12) : a + Math.Min(0.8, (b - a) * 0.12);
                 if (handles) lines.Add(WoodFace.Dot(hx, (y0 + y1) / 2, 0.3));
             }
+            else if (leaves is not null) leaves.Add(new Leaf(a, y0, b, y1, LeafKind.Door, hingeLeft, handles));
             else Fronts.Door(look, a, y0, b, y1, hingeLeft, rnd, etched, lines, handles);
         }
     }
 
     /// <summary>Rows of drawers, deeper towards the bottom, in columns.</summary>
-    static void DrawerGrid(FrontLook look, double x0, double y0, double x1, double y1, int rows, int cols, PathsD etched, List<PathD> lines)
+    static void DrawerGrid(FrontLook look, double x0, double y0, double x1, double y1, int rows, int cols, PathsD etched, List<PathD> lines, List<Leaf>? leaves = null)
     {
         // Each row a little deeper than the one above it.
         var weights = Enumerable.Range(0, rows).Select(i => 1 + 0.12 * (rows - 1 - i)).ToArray();
@@ -485,80 +488,11 @@ public static class Cabinets
         for (int r = 0; r < rows; r++)
         {
             double h = (y1 - y0) * weights[r] / sum;
-            for (int c = 0; c < cols; c++) Fronts.Drawer(look, x0 + c * dw + 0.15, y + 0.15, x0 + (c + 1) * dw - 0.15, y + h - 0.15, etched, lines);
+            for (int c = 0; c < cols; c++)
+                if (leaves is not null) leaves.Add(new Leaf(x0 + c * dw + 0.15, y + 0.15, x0 + (c + 1) * dw - 0.15, y + h - 0.15, LeafKind.Drawer));
+                else Fronts.Drawer(look, x0 + c * dw + 0.15, y + 0.15, x0 + (c + 1) * dw - 0.15, y + h - 0.15, etched, lines);
             y += h;
         }
-    }
-
-    /// <summary>Where the clock's pendulum window is on the front (flat).</summary>
-    static RectD PendulumWindow(double W, double top, double kick)
-    {
-        double hood = Math.Min(top * 0.3, W * 1.25), baseH = Math.Max(kick + 2, top * 0.2);
-        double ww = Math.Max(1.5, W * 0.36), y0 = baseH + 1.5, y1 = top - hood - 1.5;
-        return new RectD(W / 2 - ww / 2, y0, W / 2 + ww / 2, y1);
-    }
-
-    /// <summary>A case clock's front: a hood with the dial, a trunk with the pendulum window cut through, a base.</summary>
-    static void ClockFace(FrontLook look, double W, double kick, double top, PathsD holes, PathsD etched, List<PathD> lines)
-    {
-        double hood = Math.Min(top * 0.3, W * 1.25), baseH = Math.Max(kick + 2, top * 0.2);
-        // The trunk is a door; the hood and base are panels.
-        etched.Add(Geo.Rect(-1, top - hood - Fronts.Groove / 2, W + 1, top - hood + Fronts.Groove / 2));
-        etched.Add(Geo.Rect(-1, baseH - Fronts.Groove / 2, W + 1, baseH + Fronts.Groove / 2));
-        var win = PendulumWindow(W, top, kick);
-        if (win.bottom - win.top > 4 && win.right - win.left >= 1.5)
-        {
-            var shape = look == FrontLook.Gothic ? Fronts.PointedRect(win.left, win.top, win.right, win.bottom) : Fronts.ArchedRect(win.left, win.top, win.right, win.bottom);
-            holes.Add(shape);
-        }
-        // The dial: a ring of hour marks, the hands at ten past ten.
-        double r = Math.Min(W * 0.42, hood * 0.4), cx = W / 2, cy = top - hood / 2;
-        if (r > 1)
-        {
-            // A dark chapter ring with the hours left light in it, a bezel round it, the hands at ten past ten.
-            lines.Add(WoodFace.Dot(cx, cy, r + 0.25));
-            var ring = Geo.Subtract([Geo.Circle(cx, cy, r, 0.01)], [Geo.Circle(cx, cy, r * 0.7, 0.01)]);
-            var marks = new PathsD();
-            for (int h = 0; h < 12; h++)
-            {
-                double a = Math.PI / 2 - h * Math.PI / 6, mw = h % 3 == 0 ? 0.32 : 0.18;
-                var (c, sn) = (Math.Cos(a), Math.Sin(a));
-                PointD P(double rad, double side) => new(cx + c * rad - sn * side, cy + sn * rad + c * side);
-                marks.Add([P(r * 0.76, -mw / 2), P(r * 0.94, -mw / 2), P(r * 0.94, mw / 2), P(r * 0.76, mw / 2)]);
-            }
-            etched.AddRange(Geo.Subtract(ring, Geo.Solid(marks)));
-            double ah = Math.PI / 2 - 10.2 * Math.PI / 6, am = Math.PI / 2 - 2 * Math.PI / 12 * 1;
-            etched.AddRange(Clipper.InflatePaths(new PathsD { new PathD { new(cx, cy), new(cx + Math.Cos(ah) * r * 0.42, cy + Math.Sin(ah) * r * 0.42) } }, 0.12, JoinType.Round, EndType.Round, 2, 4));
-            etched.AddRange(Clipper.InflatePaths(new PathsD { new PathD { new(cx, cy), new(cx + Math.Cos(am) * r * 0.62, cy + Math.Sin(am) * r * 0.62) } }, 0.08, JoinType.Round, EndType.Round, 2, 4));
-            etched.Add(Geo.Circle(cx, cy, Math.Max(0.2, r * 0.1), 0.01));
-            // Spandrels: a fan in each corner of the hood round the dial.
-            double hy0 = top - hood + 0.4, hy1 = top - 0.4;
-            foreach (var (sx, sy) in new[] { (0.4, hy0), (W - 0.4, hy0), (0.4, hy1), (W - 0.4, hy1) })
-            {
-                double ang = Math.Atan2(cy - sy, cx - sx), fr = Math.Min(1.4, Math.Abs(cx - sx) * 0.4);
-                if (fr > 0.6) lines.Add([.. Geo.Arc(sx, sy, fr, ang - 0.7, ang + 0.7, 0.02)]);
-            }
-        }
-        // Panels on the base.
-        if (baseH - kick > 3 && W > 4) Fronts.Panel(look, 0.8, kick + 0.6, W - 0.8, baseH - 0.6, etched, lines);
-    }
-
-    /// <summary>The pendulum and weights, drawn on the back where the window shows them.</summary>
-    static void Pendulum(double W, double Hb, RectD win, double y0, List<PathD> lines, PathsD etched)
-    {
-        double cx = W / 2, top = win.bottom - y0, bot = win.top - y0;
-        if (top - bot < 4) return;
-        double bob = Math.Min(win.right - win.left, 3) * 0.4;
-        lines.Add([new(cx, top + 1), new(cx, bot + bob * 2.2)]);
-        etched.Add(Geo.Circle(cx, bot + bob * 1.4, bob, 0.01));
-        // Two weights on chains.
-        foreach (var dx in new[] { -bob * 1.3, bob * 1.3 })
-        {
-            double wx = cx + dx, wy = top - (top - bot) * 0.35;
-            lines.Add([new(wx, top + 1), new(wx, wy)]);
-            lines.Add(Geo.Loop(Geo.Rect(wx - 0.3, wy - 2.2, wx + 0.3, wy)));
-        }
-        _ = Hb;
     }
 
     /// <summary>An altar cloth: a band across the top, hanging over the front, with a fringe.</summary>
