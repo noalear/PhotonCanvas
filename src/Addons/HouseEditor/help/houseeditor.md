@@ -47,14 +47,14 @@ Pick a tool along the top (or press its letter), then use it on the plan:
 | Tool | Key | What it does |
 |---|---|---|
 | **Select** | S, or right-click | Click anything on the plan (or in the 3D view) to change it on the **Picked** tab: a door or window (drag it along its wall; **Delete** takes it away), a wall, a column, a railing, a roof, a piece of furniture or a way up, or inside a room to give it a floor of its own. Where a roof covers a room, click again to swap between the roof and the room. |
-| **Room** | R | Drag from one grid point to another: four walls round the rectangle at once. Drag a room against another and they share the wall between them. |
+| **Room** | | Drag from one grid point to another: four walls round the rectangle at once. Drag a room against another and they share the wall between them. |
 | **Wall** | W | Drag from one grid point to another: a wall straight along, straight across or corner to corner (diagonal). It snaps to the nearest of those as you drag, and shows how long it is. |
 | **Erase** | E | Drag along walls to take them away, click one square of wall, or click a door or window. |
 | **Door** | D | Click a wall to put a door in it. Keep the button down and drag to slide it along the wall. Tick **Opens on hinges** to make it swing. |
 | **Doorway** | O | An open doorway with nothing in it, between two rooms, say. |
 | **Window** | N | Click a wall to put a window in it, and drag it along. |
 | **Floor** | L | Drag over squares to lay floor outside the rooms: a balcony, a landing, the floor of a walkway. Start a drag on a laid square to take floor up. |
-| **Furniture** | U | Pick a piece on the right (a table, bed, chest, bookshelf…), then click in a room to stand it there. Drag it about, and turn it with the mouse wheel as you drag, or **[** and **]**. **Delete** takes it away. |
+| **Furniture** | U | Pick a piece on the right (a table, bed, chest, bookshelf…), then click in a room to stand it there. Drag it about; **R** turns it 45° (**Shift+R** back), and the mouse wheel as you drag, or **[** and **]**, turn it a quarter. **Delete** takes it away. |
 | **Stairs** | A | Click to put a way up to the floor above: open stairs, solid stairs, spiral stairs or a ladder. An opening is cut in the floor above over it. Drag and turn it like furniture. |
 | **Roof** | T | Drag a rectangle over rooms for a roof on top of this floor's walls; click a roof to change it on the **Picked** tab. **Delete** takes the picked roof away. |
 
@@ -282,12 +282,17 @@ maker's ready-made pieces for them (a four-poster and a wardrobe for a medieval 
 lockers for a ship's quarters, a sarcophagus for a gothic crypt…), with a line about the one you
 click. *Plain pieces* lists one of every kind the furniture maker makes. The theme starts as the
 building's own, but any theme's pieces can go in any building and keep their look. Click one, then click in a room to stand
-it there; the next click puts down another the same way round. Its dark edge on the plan is its front.
-Drag it about (it snaps to an eighth of a square; hold **Shift** to place it to the millimetre), and
-turn it a quarter at a time with the mouse wheel while dragging, or **[** and **]**.
+it there; the next click puts down another the same way round. The plan draws each piece as its own
+pieces seen from above (a bed's head board and pillow, a chair's back, a bookshelf's sides and shelves),
+darker low down and lighter higher up, so you can see which way it faces. Its dark edge, with a notch
+pointing out, is its front, and its name shows over it when the pointer is on it.
+Drag it about (it snaps to an eighth of a square; hold **Shift** to place it to the millimetre). **R**
+turns it 45° clockwise, **Shift+R** back, so it can stand across a corner; the mouse wheel while dragging,
+or **[** and **]**, turn it a quarter. With nothing picked, **R** turns the next piece you put down.
 
-Click a piece (with **Furniture** or **Select**) to change it on the **Picked** tab: turn it, change its
-**Width**, **Depth** and **Height**, **Copy** it, **Put down more like it**, or **Take it away**. Each piece is made
+Click a piece (with **Furniture** or **Select**) to change it on the **Picked** tab: turn it, change
+anything the furniture maker can (its style or kind of front, its sizes, legs, back, shelves, lid,
+bedding, top, theme and the rest, as suits the piece), **Copy** it, **Put down more like it**, or **Take it away**. Each piece is made
 by the furniture maker ([Mini furniture](furniture.md)) from the furniture's own sheet, so it slots and
 glues together the same way; pieces that come out the same are cut together ("Table: top", ×3). A piece
 standing in a wall or column, off the edge of its floor, in the way of the stairs or over their opening,
@@ -303,8 +308,13 @@ isn't cut.
 Pick **Stairs** (A), choose what to **Put in** (open stairs with a handrail, solid stairs of stacked
 layers, spiral stairs or a ladder) and click on the plan: it climbs from this floor to the one above,
 and an opening is cut in that floor over it (shown dashed, with an arrow the way it climbs; the floor
-above shows the opening dark). Drag and turn it like furniture; on the **Picked** tab change its
-**Kind**, turn it, or take it away. Its pieces are the stairs maker's ([Stairs and floors](stairs.md)).
+above shows the opening dark). Drag and turn it like furniture (stairs only turn a quarter at a time); on the **Picked** tab change its
+**Kind** (a hooked ladder hangs from the opening's edge), turn it, or take it away, and change the stairs
+maker's settings for it: step height and depth, width and handrail for stairs, radius, turn per step,
+centre, pin and which way it turns for spiral stairs, width, rung spacing and lean for ladders, and
+whether the floor's texture is etched on the steps. Left alone, these suit the building's figures;
+**Size them to suit the figures** puts them back. Ways up made the same are cut together; different ones
+are numbered ("Stairs 1", "Stairs 2"). Its pieces are the stairs maker's ([Stairs and floors](stairs.md)).
 Stairs on the top floor, stairs running into a wall, an opening coming up into a wall above or past the
 edge of the floor above, and two ways up that cross get a yellow !.
 
