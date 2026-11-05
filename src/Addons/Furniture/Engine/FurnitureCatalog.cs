@@ -77,6 +77,7 @@ public static class FurnitureCatalog
     {
         ItemKind.Rug => FurnitureSpot.Floor,
         ItemKind.WallHanging or ItemKind.WallShelf or ItemKind.WallDoor => FurnitureSpot.OnWall,
+        ItemKind.Fireplace when it.Hearth == HearthStyle.Spit => FurnitureSpot.Free,
         ItemKind.Cabinet or ItemKind.Bookshelf or ItemKind.Fireplace or ItemKind.Bed or ItemKind.WeaponRack or ItemKind.Desk => FurnitureSpot.Wall,
         ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew or SeatStyle.Settle => FurnitureSpot.Free,
         ItemKind.SlantDesk when it.Slant == SlantStyle.Console => FurnitureSpot.Wall,
@@ -242,21 +243,21 @@ public static class FurnitureCatalog
     {
         var b = new Book(TerrainThemes.Dungeon, "dun");
         b.Room = Bedroom;
-        b.Add("Straw pallet", ItemKind.Bed, i => i with { BedStyle = BedStyle.Pallet, WidthMm = 30, DepthMm = 14, MattressMm = 5 }, "A mattress on two sleepers, with a fur on it.");
+        b.Add("Straw pallet", ItemKind.Bed, i => i with { BedStyle = BedStyle.Plain, WidthMm = 30, DepthMm = 15, HeightMm = 12, FootMm = 9, MattressMm = 6 }, "A rough plank bed with a straw mattress, a pillow and a patched blanket.");
         b.Add("Guard's bunk", ItemKind.Bed, i => i with { BedStyle = BedStyle.Bunk, WidthMm = 32, DepthMm = 15, HeightMm = 30, MattressMm = 6, FootMm = 11 }, "Two bunks, one over the other.");
-        b.Add("Footlocker", ItemKind.Chest, i => i with { WidthMm = 14, DepthMm = 9, HeightMm = 8 }, "A small banded chest.");
+        b.Add("Footlocker", ItemKind.Chest, i => i with { WidthMm = 16, DepthMm = 10, HeightMm = 9, Lid = LidStyle.Domed }, "An iron-bound footlocker with a domed lid.");
         b.Add("Fur rug", ItemKind.Rug, i => i with { Rug = RugPattern.Hide, WidthMm = 26, DepthMm = 18 }, "An animal hide.");
 
         b.Room = Kitchen;
-        b.Add("Cook fire", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 24, DepthMm = 14, HeightMm = 30 }, "A stone hearth with a hood.");
+        b.Add("Cook fire", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Spit, WidthMm = 26, DepthMm = 14, HeightMm = 18 }, "A ring of stones round a fire, a roast on a spit over it and a cauldron hanging beside.");
         b.Add("Rough table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, WidthMm = 30, DepthMm = 14 }, "A table on trestles.");
-        b.Add("Stool", ItemKind.Stool, i => i with { Top = TopShape.Square }, "A square stool.");
+        b.Add("Stool", ItemKind.Stool, i => i with { Top = TopShape.Round }, "A crude round stool on splayed legs.");
 
         b.Room = Hall;
         b.Add("Long table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, WidthMm = 40, DepthMm = 14 }, "A long trestle table.");
         b.Add("Bench", ItemKind.Bench, i => i with { WidthMm = 32 }, "A plank bench.");
         b.Add("Torch stand", ItemKind.Candlestand, i => i with { Candle = CandleStyle.Torch, WidthMm = 8, HeightMm = 24 }, "A burning torch on a stand.");
-        b.Add("Banner", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Banner, WidthMm = 10, HeightMm = 24, HangMm = 14 }, "A war banner.");
+        b.Add("Banner", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Banner, WidthMm = 12, HeightMm = 26, HangMm = 14 }, "A tattered war banner hung on chains from a spear: burnt dark, a great skull left light, torn through.");
 
         b.Room = Study;
         b.Add("Scroll shelves", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Scrolls, Crown = Crown.Flat, WidthMm = 20, DepthMm = 8, HeightMm = 30, Shelves = 3 }, "Shelves of rolled scrolls.");

@@ -488,7 +488,8 @@ public static class Storage
     static (PathsD Etched, List<PathD> Lines)? Arcade(Maker m, double W, double H, double T, double side)
     {
         var look = Fronts.Look(m);
-        if (m.PushFit || look == FrontLook.Metal) return null;
+        // (A dungeon's or a cave's chest is plain iron-bound, its lock on the front.)
+        if (m.PushFit || look == FrontLook.Metal || m.Theme is PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon or PhotonCanvas.Addon.Terrain.TerrainThemes.Cave) return null;
         double x0 = side, x1 = W - side, y0 = T + 0.4, y1 = H - 0.6, gap = 1.2, rail = Math.Max(1.4, Math.Min(3.2, (y1 - y0) * 0.22));
         int n = Geo.Clamp((int)Math.Round((x1 - x0) / 7.5), 2, 5);
         double aw = (x1 - x0 - (n + 1) * gap) / n, ay0 = y0 + gap, ay1 = y1 - rail;

@@ -38,6 +38,7 @@ public static class Profiles
     {
         var it = m.Item;
         if (it.Candle == CandleStyle.Candelabra) { Candles.Candelabra(m); return; }
+        if (it.Candle == CandleStyle.Torch) { Brazier(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = Math.Max(2.4, 2 * 1.0 + 0.2), xc = W / 2, stem = 1.3;
         double footW = Math.Max(D, sw + 4);
@@ -122,6 +123,68 @@ public static class Profiles
         }
         OnFeet(m, it.Candle switch { CandleStyle.Lamp => "Lamp", CandleStyle.Torch => "Torch stand", _ => "Candelabra" }, Geo.Solid(shape), [], etched, lines, [xc], footW, footH);
         m.Note("Slide the foot onto the bottom of the stand, crossing it.");
+    }
+
+    /// <summary>
+    /// A standing torch: an iron fire basket of bars and bands on a post, flames rising out of it, the post
+    /// on four splayed legs (two pieces crossing, each a pair of legs, slotted halfway into each other),
+    /// bound with a ring where they spring from the post.
+    /// </summary>
+    static void Brazier(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW, T = m.T;
+        if (H < 12 || W < 5) { m.Bad("Make the torch at least 12 mm high and 5 mm wide."); return; }
+        double xc = W / 2, post = 1.4, legTop = Geo.Clamp(H * 0.32, 4, 10), spread = Math.Max(W, D) / 2 - 0.4;
+        double bw = Geo.Clamp(W * 0.85, 3.6, 7), bh = Geo.Clamp(H * 0.15, 2.4, 4.5), flameH = Geo.Clamp(H * 0.2, 2.5, 6);
+        double bTop = H - flameH * 0.75, b0 = bTop - bh;
+        PathsD Legs(double c, double half)
+        {
+            var legs = new PathsD();
+            foreach (var sgn in new[] { -1, 1 })
+            {
+                legs.Add(Geo.Strip(new PointD(c, legTop), new PointD(c + sgn * (half - 0.7), 0.6), 1.3));
+                // A pad of a foot on the floor.
+                legs.Add(WoodFace.RoundRect(c + sgn * (half - 0.7) - 0.9, 0, c + sgn * (half - 0.7) + 0.9, 1.1, 0.3));
+            }
+            legs.Add(Rugs.Ellipse(c, legTop, 1.5, 0.9));
+            legs.Add(Geo.Rect(c - post / 2, 0, c + post / 2, legTop + 0.5));
+            return legs;
+        }
+        var shape = Legs(xc, spread);
+        shape.Add(Geo.Rect(xc - post / 2, legTop, xc + post / 2, b0 + 0.3));
+        // The basket: wider at the top, on a collar.
+        shape.Add(new PathD { new(xc - bw * 0.32, b0), new(xc + bw * 0.32, b0), new(xc + bw / 2, bTop), new(xc - bw / 2, bTop) });
+        shape.Add(Rugs.Ellipse(xc, b0, 1.2, 0.7));
+        var fl = Flames(xc, bTop - 0.3, bw * 0.85, H - bTop + 0.3);
+        shape.AddRange(fl);
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        // Between the basket's bars, the fire showing (burnt dark); a band round its rim and middle.
+        int bars = Math.Max(3, (int)Math.Round(bw / 1.3));
+        for (int i = 0; i < bars - 1; i++)
+        {
+            double t0 = (i + 0.3) / (bars - 1) - 0.5, t1 = (i + 0.7) / (bars - 1) - 0.5;
+            if (t1 - t0 <= 0) continue;
+            etched.Add(new PathD { new(xc + t0 * bw * 0.6, b0 + 0.5), new(xc + t1 * bw * 0.6, b0 + 0.5), new(xc + t1 * bw * 0.9, bTop - 0.7), new(xc + t0 * bw * 0.9, bTop - 0.7) });
+        }
+        lines.Add([new(xc - bw / 2, bTop - 0.35), new(xc + bw / 2, bTop - 0.35)]);
+        etched.AddRange(Geo.Intersect(Flames(xc, bTop - 0.3, bw * 0.45, (H - bTop) * 0.6), fl));
+        // The binding ring where the legs spring.
+        lines.Add([new(xc - 1.3, legTop + 0.3), new(xc + 1.3, legTop + 0.3)]);
+        lines.Add([new(xc - 1.3, legTop - 0.3), new(xc + 1.3, legTop - 0.3)]);
+        // The two pieces cross at the post: this one slotted from the bottom, the other from the top.
+        var front = Geo.Subtract(Geo.Solid(shape), [Geo.Rect(xc - sw / 2, -1, xc + sw / 2, legTop / 2)]);
+        m.Add("Torch stand", front, [], [Pose.Front(0, 0, D / 2)], grainAlongU: false, face: [], etched: etched, lines: lines);
+        double half = D / 2;
+        // Its middle is a hub wide enough to keep both legs joined beside the slot and under it; the stand's
+        // own post stops where this hub takes over.
+        var hub = Legs(half, spread);
+        hub.Add(Geo.Rect(half - sw / 2 - 1.2, legTop * 0.12, half + sw / 2 + 1.2, legTop + 0.5));
+        var cross = Geo.Subtract(Geo.Intersect(Geo.Solid(hub), [Geo.Rect(-spread - 2, 0, 2 * spread + 4, legTop + 0.9)]), [Geo.Rect(half - sw / 2, legTop / 2, half + sw / 2, legTop + 2)]);
+        m.Add("Legs", Geo.Union(cross), [], [Pose.Left(xc, 0, 0)], grainAlongU: false, face: []);
+        m.Note("Slide the legs onto the bottom of the stand, crossing it.");
+        _ = T;
     }
 
     /// <summary>A flame (one tongue, or three on a wide one) standing at x, y.</summary>

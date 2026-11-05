@@ -281,7 +281,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Cabinet => ("Front", ["Doors", "Drawers", "Drawers over doors", "Glass doors", "Open shelves", "Dresser (shelves over a cupboard)", "Panelled doors", "Lockers", "Machine panels", "Clock", "Lattice doors", "Altar"]),
         ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa", "Pew", "Command chair", "Carved wooden chair", "Carved settle", "Carved wing chair"]),
         ItemKind.Bed => ("Kind", ["Plain", "Four-poster", "Bunk beds", "Pallet on sleepers"]),
-        ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge"]),
+        ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge", "Cook fire on a spit"]),
         ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),
         ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand"]),
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
