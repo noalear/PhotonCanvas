@@ -209,9 +209,7 @@ public sealed class CityPlan : Control
     {
         for (int i = _map.Props.Count - 1; i >= 0; i--)
         {
-            var q = _map.Props[i];
-            double r = Math.Max(0.3, 0.4 * q.Size);
-            if ((q.X - p.X) * (q.X - p.X) + (q.Y - p.Y) * (q.Y - p.Y) <= r * r) return q;
+            if (_map.Props[i].Hit(p.X, p.Y)) return _map.Props[i];
         }
         return null;
     }
@@ -397,6 +395,48 @@ public sealed class CityPlan : Control
     void DrawProp(DrawingContext ctx, Prop p, double k)
     {
         var at = At(p.X, p.Y);
+        if (Prop.Footprint(p.Kind) is { } f)
+        {
+            // The town's bigger pieces: their footprint, turned, with a mark of what each is.
+            double w = Math.Max(3, f.W * p.Size * k), d = Math.Max(2, f.D * p.Size * k);
+            var (body, mark) = p.Kind switch
+            {
+                PropKind.Trough => (Color.FromRgb(0x8C, 0x88, 0x82), Color.FromRgb(0x4E, 0x86, 0xB6)),
+                PropKind.Stage => (Color.FromRgb(0x9A, 0x70, 0x48), Color.FromRgb(0x9E, 0x2E, 0x2E)),
+                PropKind.Stall => (Color.FromRgb(0xC8, 0x4C, 0x3C), Color.FromRgb(0xF0, 0xE6, 0xD0)),
+                PropKind.Bar => (Color.FromRgb(0x7A, 0x52, 0x32), Color.FromRgb(0xB0, 0x86, 0x58)),
+                PropKind.NoticeBoard => (Color.FromRgb(0x6E, 0x4D, 0x30), Color.FromRgb(0xF0, 0xE6, 0xD0)),
+                _ => (Color.FromRgb(0x7C, 0x7A, 0x76), Color.FromRgb(0x5A, 0x58, 0x56)),
+            };
+            using (ctx.PushTransform(Matrix.CreateRotation(p.TurnDeg * Math.PI / 180) * Matrix.CreateTranslation(at.X, at.Y)))
+            {
+                var box = new Rect(-w / 2, -d / 2, w, d);
+                ctx.FillRectangle(new SolidColorBrush(body), box);
+                var markBrush = new SolidColorBrush(mark);
+                switch (p.Kind)
+                {
+                    case PropKind.Trough: ctx.FillRectangle(markBrush, box.Deflate(Math.Min(w, d) * 0.22)); break;
+                    case PropKind.Stage: ctx.FillRectangle(markBrush, new Rect(box.X, box.Y, w, d * 0.18)); break;
+                    case PropKind.Stall:
+                        for (int i = 1; i < 6; i += 2) ctx.FillRectangle(markBrush, new Rect(box.X + w * i / 6, box.Y, w / 6, d));
+                        break;
+                    case PropKind.Bar: ctx.FillRectangle(markBrush, new Rect(box.X, box.Y, w, d * 0.35)); break;
+                    case PropKind.NoticeBoard: ctx.FillRectangle(markBrush, box.Deflate(new Thickness(w * 0.15, d * 0.25))); break;
+                    case PropKind.GuardTower:
+                        ctx.FillRectangle(markBrush, box.Deflate(Math.Min(w, d) * 0.18));
+                        for (int i = 0; i < 4; i++)
+                        {
+                            double c = w * (0.1 + 0.27 * i);
+                            ctx.FillRectangle(new SolidColorBrush(body), new Rect(box.X + c, box.Y + d * 0.02, w * 0.08, d * 0.12));
+                            ctx.FillRectangle(new SolidColorBrush(body), new Rect(box.X + c, box.Bottom - d * 0.14, w * 0.08, d * 0.12));
+                        }
+                        break;
+                }
+                if (k >= 8) ctx.DrawRectangle(new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)), 1), box);
+                if (Pick.Props.Contains(p.Id)) ctx.DrawRectangle(new Pen(PickBrush, 2), box.Inflate(2));
+            }
+            return;
+        }
         double r = Math.Max(1.5, k * 0.36 * p.Size);
         IBrush fill = p.Kind switch
         {
@@ -637,7 +677,7 @@ public sealed class CityPlan : Control
                 if (_right) RemovePropAt(p);
                 else
                 {
-                    _map = _map with { Props = [.. _map.Props, new Prop { Kind = PropKind, X = Math.Round(p.X * 4) / 4, Y = Math.Round(p.Y * 4) / 4, TurnDeg = Random.Shared.Next(360), Size = PropKind is PropKind.Tree or PropKind.Pine ? 1.2 : 1 }] };
+                    _map = _map with { Props = [.. _map.Props, new Prop { Kind = PropKind, X = Math.Round(p.X * 4) / 4, Y = Math.Round(p.Y * 4) / 4, TurnDeg = Prop.Footprint(PropKind) is null ? Random.Shared.Next(360) : 0, Size = PropKind is PropKind.Tree or PropKind.Pine ? 1.2 : 1 }] };
                     _changed = true;
                 }
                 break;
@@ -971,9 +1011,8 @@ public sealed class CityPlan : Control
 
     void RemovePropAt((double X, double Y) p)
     {
-        double r = 0.5;
         int before = _map.Props.Count;
-        var left = _map.Props.Where(q => (q.X - p.X) * (q.X - p.X) + (q.Y - p.Y) * (q.Y - p.Y) > r * r).ToList();
+        var left = _map.Props.Where(q => Prop.Footprint(q.Kind) is null ? (q.X - p.X) * (q.X - p.X) + (q.Y - p.Y) * (q.Y - p.Y) > 0.25 : !q.Hit(p.X, p.Y)).ToList();
         if (left.Count == before) return;
         _map = _map with { Props = left };
         _changed = true;
