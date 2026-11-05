@@ -64,7 +64,7 @@ public sealed class HouseEditorWindow : Window
     // What's picked on the plan.
     readonly StackPanel _picked = new() { Spacing = 8 };
     readonly TextBlock _pickedNone = Hint("Pick Select and click a door or window on the plan to change it (or drop one in a wall with Door, Doorway or Window), click a wall, a column or a railing, a roof, or inside a room (click a roofed room again to swap between the roof and the room).");
-    readonly ComboBox _oKind = Combo("Door that opens", "Doorway (left open)", "Window");
+    readonly ComboBox _oKind = Combo("Door", "Doorway (left open)", "Window");
     readonly ComboBox _oShape = Combo("Square", "Round arch", "Pointed arch", "Round", "Arrow slit", "Angled corners (sci-fi)", "Rough (cave)");
     readonly NumericUpDown _oW = Number(2, 300, 0.5m, "0.#"), _oH = Number(2, 300, 0.5m, "0.#"), _oSill = Number(1, 300, 0.5m, "0.#");
     readonly ComboBox _oLook = Combo("Planks", "Planks with iron studs", "Metal blast door", "Bars (a portcullis)", "Stone slab"), _oHinge = Combo("Left (seen from outside)", "Right (seen from outside)");
@@ -225,7 +225,7 @@ public sealed class HouseEditorWindow : Window
         Tool(PlanTool.Wall, "Wall", "Drag from one grid point to another: straight along, across or corner to corner.");
         Tool(PlanTool.Erase, "Erase", "Drag along walls to take them away, or click one square of wall, or a door or window.");
         bar.Children.Add(Gap());
-        Tool(PlanTool.Door, "Door", "Click a wall to put a door in it, and drag it along the wall. Tick Opens on hinges (on the right) to make it swing, and pick its hinge side.");
+        Tool(PlanTool.Door, "Door", "Click a wall to put a door in it, and drag it along the wall. It swings on hinges: pick its hinge side on the right, or untick Opens on hinges to glue it in.");
         Tool(PlanTool.Doorway, "Doorway", "Click a wall for an open doorway, with nothing in it: between rooms, say.");
         Tool(PlanTool.Window, "Window", "Click a wall to put a window in it. Drag it along the wall.");
         bar.Children.Add(Gap());
@@ -531,7 +531,12 @@ public sealed class HouseEditorWindow : Window
         _sLeft.Click += (_, _) => _plan.TurnStamp(1);
         _sRight.Click += (_, _) => _plan.TurnStamp(-1);
         _sStop.Click += (_, _) => PickTool(PlanTool.Select);
-        _plan.SelectionChanged += ShowPicked;
+        _plan.SelectionChanged += () =>
+        {
+            // A door or window just dropped in (or picked) shows what it is, with its hinges, even from the Look tab.
+            if (Picked is not null) _side.SelectedIndex = 0;
+            ShowPicked();
+        };
         foreach (var b in new[] { _oCopy, _iCopy, _wCopy }) b.Click += (_, _) => CopyPicked();
         _view.Picked += PickedIn3D;
         _roofIt.Click += (_, _) => RoofIt();
@@ -913,6 +918,8 @@ public sealed class HouseEditorWindow : Window
             Look = (DoorLook)Math.Max(0, _oLook.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _oHinge.SelectedIndex), Opens = _oOpens.IsChecked == true,
             Bars = (WindowBars)Math.Max(0, _oBars.SelectedIndex), Fill = (WindowFill)Math.Max(0, _oFill.SelectedIndex),
         };
+        // One just made into a door swings, as a new door does.
+        if (kind == OpeningKind.Door && o.Kind != OpeningKind.Door) next = next with { Opens = true };
         // A window made into a door (or back) takes the usual size for one.
         if (kind != o.Kind && (kind == OpeningKind.Window) != (o.Kind == OpeningKind.Window))
         {
