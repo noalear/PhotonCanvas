@@ -128,7 +128,7 @@ public static class Armchairs
         {
             // A crest on the back: a shield, a sun or a cog, high up.
             double r = Math.Min(W * 0.16, (H - arm) * 0.25);
-            Cabinets.Symbol(look, W / 2, H - yb - Math.Min(W * 0.35, (H - arm) * 0.4) * 0.3 - r * 1.3, r, etchedB, linesB);
+            Cabinets.Symbol(look, m.Theme, W / 2, H - yb - Math.Min(W * 0.35, (H - arm) * 0.4) * 0.3 - r * 1.3, r, etchedB, linesB);
         }
         if (style == SeatStyle.Sofa || pew)
         {

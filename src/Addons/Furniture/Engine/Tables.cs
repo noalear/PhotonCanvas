@@ -123,9 +123,14 @@ public static class Tables
         bool four = a - tw / 2 >= sw / 2 + Maker.Bridge && a + (tw + f) / 2 <= reach - Maker.Bridge;
         if (!four) tw = Math.Max(T, Math.Min(Sl * 0.35, Sl - 2));
         double fw = Math.Max(Sl * 0.4, sw + 2), fh = Math.Min(Hf * 0.3, Hf / 2 - 1.5);
+        // Each crossed piece is two legs, splayed a little, and a rail under the top: the arch between the legs
+        // goes up to the rail, and the halving joint is in the rail. Too small for that: a slab with a notch.
+        double lw = Geo.Clamp(Sl * 0.17, 1.5, 3.2), rail = Geo.Clamp(Hf * 0.28, 2.3, 4);
+        double splay = Math.Min(lw * 0.45, Math.Max(0, ((round ? S * 0.92 : S) - Sl) / 2));
+        bool legged = Hf - rail >= 1.8 && Sl - 2 * lw >= sw + 0.6 && rail / 2 >= Maker.Bridge + f;
         PathsD Leg(bool fromTop)
         {
-            var o = new PathsD { Geo.Rect(0, 0, Sl, Hf) };
+            var o = new PathsD { legged ? [new(-splay, 0), new(Sl + splay, 0), new(Sl, Hf), new(0, Hf)] : Geo.Rect(0, 0, Sl, Hf) };
             if (four) foreach (var s in new[] { -1, 1 }) o.Add(Geo.Rect(Sl / 2 + s * a - tw / 2, Hf - 0.01, Sl / 2 + s * a + tw / 2, Hf + T));
             else if (!fromTop) o.Add(Geo.Rect(Sl / 2 - tw / 2, Hf - 0.01, Sl / 2 + tw / 2, Hf + T));
             return o;
@@ -133,6 +138,18 @@ public static class Tables
         PathsD LegHoles(bool fromTop)
         {
             var h = new PathsD();
+            if (legged)
+            {
+                // The arch between the legs (its inner edges parallel to the outer ones), corners rounded.
+                double top = Hf - rail;
+                double In(double y) => lw - splay * (1 - y / Hf);
+                var arch = new PathsD { new PathD { new(In(-3), -3), new(Sl - In(-3), -3), new(Sl - In(top), top), new(In(top), top) } };
+                double rr = Math.Min(0.8, (Sl - 2 * lw) / 3);
+                h.AddRange(Geo.Offset(Geo.Offset(arch, -rr), rr, round: true));
+                // The halving joint, in the rail: from the top down to its middle, or from the arch up to it.
+                h.Add(fromTop ? Geo.Rect(Sl / 2 - sw / 2, Hf - rail / 2, Sl / 2 + sw / 2, Hf + T + 1) : Geo.Rect(Sl / 2 - sw / 2, top - 0.5, Sl / 2 + sw / 2, Hf - rail / 2));
+                return h;
+            }
             if (fh > 0.8) h.Add(WoodFace.RoundRect(Sl / 2 - fw / 2, -3, Sl / 2 + fw / 2, fh, fw / 2));
             h.Add(fromTop ? Geo.Rect(Sl / 2 - sw / 2, Hf / 2, Sl / 2 + sw / 2, Hf + T + 1) : Geo.Rect(Sl / 2 - sw / 2, -1, Sl / 2 + sw / 2, Hf / 2));
             return h;
