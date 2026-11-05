@@ -53,7 +53,7 @@ public sealed class ConnectPage : UserControl
                     Card("No laser to hand?",
                         Text("Try everything on a pretend machine. Nothing real moves or fires.", "muted"),
                         Btn("Try the demo machine", null, () => _host.Connect(new DemoRemote()))),
-                    Text("The phone and the computer need to be on the same Wi-Fi, or both on Tailscale to use it from anywhere.", "muted"),
+                    Text("The phone and the computer need to be on the same Wi-Fi. To use it from anywhere, put Tailscale (free) on both: the app then switches between home Wi-Fi and Tailscale by itself.", "muted"),
                 },
             },
         };
@@ -84,18 +84,24 @@ public sealed class ConnectPage : UserControl
         }
         _connect.IsEnabled = _scan.IsEnabled = false;
         _connect.Content = "Connecting…";
-        var remote = new HttpRemote(c);
+        HttpRemote? remote = null;
         try
         {
+            // Whichever of its addresses answers (scanned away from home, only the Tailscale one may), then
+            // encrypted: the QR code carries the certificate; a typed address asks for it once.
+            c = await HttpRemote.ReachAsync(c) ?? c;
+            c = await HttpRemote.SecureAsync(c);
+            remote = new HttpRemote(c);
             var info = await remote.InfoAsync();
             if (info.Api > ServerInfo.CurrentApi)
                 Show("PhotonCanvas on the computer is newer than this app. Update the app; most things should still work.");
+            if (info.Addresses is { Length: > 0 } all) c = c.Using(c.Address, all.Append(c.Address));
             _host.Remember(c);
-            _host.Connect(remote);
+            _host.Connect(remote, c);
         }
         catch (RemoteError e)
         {
-            remote.Dispose();
+            remote?.Dispose();
             Show(e.Message);
         }
         finally

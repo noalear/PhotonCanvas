@@ -33,6 +33,30 @@ public class Model3DPainterTests
     }
 
     [Fact]
+    public void A_click_says_which_piece_is_nearest_there_and_where_on_it()
+    {
+        // A card standing on a floor: a click on the card is the card (not the floor behind it), a click on the
+        // floor is the floor, and each says the point of the model it landed on.
+        var scene = new Scene3D();
+        scene.AddSlab(Rect(-50, -50, 50, 50), new Frame3(new(0, 0, 0), new(1, 0, 0), new(0, 0, -1)), -1, 0, Plain(Blue), tag: "floor");
+        scene.AddSlab(Rect(-5, 0, 5, 20), new Frame3(new(0, 0, 10), new(1, 0, 0), new(0, 1, 0)), -0.5, 0.5, Plain(Red), tag: "card");
+        var painter = new Model3DPainter();
+        Assert.NotNull(painter.Picture(scene, Camera3D.YUp(0, 30), W, H, Bg));
+        var card = painter.HitAt(scene, painter.ToView(new(0, 10, 10.5)));
+        Assert.Equal("card", card?.Tag);
+        Assert.Equal(10.5, card!.Value.Point.Z, 1);
+        Assert.Equal(10, card.Value.Point.Y, 0);
+        var floor = painter.HitAt(scene, painter.ToView(new(30, 0, -30)));
+        Assert.Equal("floor", floor?.Tag);
+        Assert.Equal(0, floor!.Value.Point.Y, 1);
+        Assert.Equal(30, floor.Value.Point.X, 0);
+        // Off the model: nothing; and nothing once the scene has changed since it was drawn.
+        Assert.Null(painter.HitAt(scene, new Avalonia.Point(2, 2)));
+        scene.AddSlab(Rect(0, 0, 1, 1), new Frame3(new(0, 30, 0), new(1, 0, 0), new(0, 1, 0)), -0.5, 0.5, Plain(Green));
+        Assert.Null(painter.HitAt(scene, painter.ToView(new(30, 0, -30))));
+    }
+
+    [Fact]
     public void A_small_piece_standing_at_the_back_of_a_long_one_shows_in_front_of_it()
     {
         // A big floor, and a small card standing on it near the back. Sorted by their middles, the floor is

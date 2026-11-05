@@ -112,7 +112,7 @@ public sealed class MainView : UserControl
         _root.Children.Add(_navBar.With(n => Grid.SetRow(n, 2)));
         Content = new Panel { Children = { _root, _alert, _toast, _overlays } };
 
-        if (_store.Load() is { } saved) Connect(new HttpRemote(saved));
+        if (_store.Load() is { } saved) Connect(new HttpRemote(saved), saved);
         else ShowConnect();
         if (CrashLog.TakeLast(phone.DataFolder) is { } report)
             Dispatcher.UIThread.Post(() => ShowReport("The app closed unexpectedly last time", report));
@@ -149,6 +149,7 @@ public sealed class MainView : UserControl
 
     public void ShowConnect(string? error = null)
     {
+        _phone.Watch(WatchMode.Off, false);
         _session?.Dispose();
         _session = null;
         _machinePage = null;
@@ -163,11 +164,16 @@ public sealed class MainView : UserControl
     }
 
     /// <summary>Use this server (or the demo) from now on.</summary>
-    public void Connect(IRemote remote)
+    public void Connect(IRemote remote, ConnectionInfo? connection = null)
     {
         _session?.Dispose();
-        var s = _session = new Session(remote);
-        s.Changed += () => UpdateHeader();
+        var s = _session = new Session(remote, connection, c => _store.Save(c));
+        s.Changed += () =>
+        {
+            UpdateHeader();
+            // The background watcher follows the saved computer (never the demo).
+            if (!s.Remote.IsDemo) _phone.Watch(Settings.Watch, s.Status?.Job is not null);
+        };
         s.CodeRefused += message => { _store.Forget(); ShowConnect(message); };
         s.JobEvent += OnJob;
         s.Alarm += a => ShowAlarm(a.Text);
@@ -178,10 +184,33 @@ public sealed class MainView : UserControl
         _navBar.IsVisible = true;
         UpdateHeader();
         Show("Machine");
+        if (!remote.IsDemo) _ = AskForNotificationsOnce();
     }
 
     /// <summary>Remember this computer for next time.</summary>
     public void Remember(ConnectionInfo c) => _store.Save(c);
+
+    PhoneSettings? _settings;
+
+    /// <summary>The phone app's settings (when to watch in the background).</summary>
+    public PhoneSettings Settings
+    {
+        get => _settings ??= PhoneSettings.Load(_phone.DataFolder);
+        set
+        {
+            _settings = value;
+            value.Save(_phone.DataFolder);
+            if (_session is { Remote.IsDemo: false } s) _phone.Watch(value.Watch, s.Status?.Job is not null);
+        }
+    }
+
+    /// <summary>The first time a real computer is connected: may the app notify (newer Android asks)?</summary>
+    async Task AskForNotificationsOnce()
+    {
+        if (!_phone.CanWatch || Settings.AskedForNotifications) return;
+        Settings = Settings with { AskedForNotifications = true };
+        await _phone.AllowNotificationsAsync();
+    }
 
     void UpdateHeader()
     {
@@ -291,6 +320,7 @@ public sealed class MainView : UserControl
             Children =
             {
                 Text(_session is { } s ? $"Connected to {s.Remote.Name}." : "", "muted"),
+                Btn("Settings", null, () => { sheet!.Close(); ShowSheet(SettingsPage.Build(this, _phone, _session), "Settings"); }),
                 Btn("Change computer", null, () => { sheet!.Close(); _store.Forget(); ShowConnect(); }),
                 Btn("About and privacy", null, () => { sheet!.Close(); ShowSheet(AboutPage.Build(_phone), "About"); }),
             },
