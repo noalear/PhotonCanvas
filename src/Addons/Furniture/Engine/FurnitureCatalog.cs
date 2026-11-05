@@ -41,9 +41,11 @@ public static class FurnitureCatalog
     public const string Throne = "Throne room & bridge";
     public const string Prison = "Prison & crypt";
     public const string Lab = "Lab & infirmary";
+    /// <summary>Outdoor pieces for the city builder: town walls, gates, towers and the street.</summary>
+    public const string Town = "Town";
 
     /// <summary>The rooms, in the order to show them.</summary>
-    public static IReadOnlyList<string> Rooms { get; } = [Bedroom, Kitchen, Hall, Study, Workshop, Storage, Chapel, Armoury, Throne, Prison, Lab];
+    public static IReadOnlyList<string> Rooms { get; } = [Bedroom, Kitchen, Hall, Study, Workshop, Storage, Chapel, Armoury, Throne, Prison, Lab, Town];
 
     public static IReadOnlyList<string> Themes => TerrainThemes.Names;
 
@@ -88,10 +90,10 @@ public static class FurnitureCatalog
         public readonly List<CatalogEntry> Entries = [];
         public string Room = Bedroom;
 
-        public void Add(string name, ItemKind kind, Func<FurnitureItem, FurnitureItem> edit, string about)
+        public void Add(string name, ItemKind kind, Func<FurnitureItem, FurnitureItem> edit, string about, string? slug = null)
         {
             var it = edit(Defaults.For(kind)) with { Theme = theme, Name = name };
-            string id = key + "-" + Slug(name);
+            string id = key + "-" + (slug ?? Slug(name));
             if (Entries.Any(e => e.Id == id)) id += "-" + Slug(Room);
             Entries.Add(new(id, name, theme, Room, it, about));
         }
@@ -101,6 +103,40 @@ public static class FurnitureCatalog
             s = s.Replace("'", "").ToLowerInvariant();
             return string.Join("-", s.Split(s.Where(c => !char.IsLetterOrDigit(c)).Distinct().ToArray(), StringSplitOptions.RemoveEmptyEntries));
         }
+    }
+
+    /// <summary>
+    /// The town wall pieces and guard tower every theme gets, with ids the city builder looks for:
+    /// "{key}-wall-1", "-wall-2", "-wall-corner-out", "-wall-corner-in", "-wall-gate", "-wall-end", "-guard-tower".
+    /// </summary>
+    static void TownWalls(Book b, string wall, string about)
+    {
+        b.Room = Town;
+        double sq = Furniture.TownWalls.Square, d = 19, H = 56;
+        b.Add($"{wall} (1 square)", ItemKind.TownWall, i => i with { Wall = WallPiece.Straight, WidthMm = sq, DepthMm = d, HeightMm = H }, $"One square of {about}.", "wall-1");
+        b.Add($"{wall} (2 squares)", ItemKind.TownWall, i => i with { Wall = WallPiece.Straight, WidthMm = 2 * sq, DepthMm = d, HeightMm = H }, $"Two squares of {about}.", "wall-2");
+        b.Add($"{wall} corner (outside)", ItemKind.TownWall, i => i with { Wall = WallPiece.OutsideCorner, WidthMm = sq + d / 2, DepthMm = d, HeightMm = H }, "A corner turning one square each way, the parapet on the outside of the turn.", "wall-corner-out");
+        b.Add($"{wall} corner (inside)", ItemKind.TownWall, i => i with { Wall = WallPiece.InsideCorner, WidthMm = sq + d / 2, DepthMm = d, HeightMm = H }, "A corner turning one square each way, the parapet on the inside of the turn.", "wall-corner-in");
+        b.Add("Gatehouse", ItemKind.TownWall, i => i with { Wall = WallPiece.Gate, WidthMm = 2 * sq, DepthMm = d + 8, HeightMm = H }, "Two squares: a tower over the gate passage, its portcullis raised and the doors open.", "wall-gate");
+        b.Add($"{wall} end", ItemKind.TownWall, i => i with { Wall = WallPiece.End, WidthMm = sq, DepthMm = d + 8, HeightMm = H }, "One square of wall ending in a turret, with a door onto the wall walk.", "wall-end");
+        b.Add("Guard tower", ItemKind.Tower, i => i with { WidthMm = 2 * sq - 4, DepthMm = 2 * sq - 4, HeightMm = 92 }, "A tall tower on two squares by two: a door, arrow loops on every side, merlons and a flag.", "guard-tower");
+    }
+
+    /// <summary>
+    /// The town props every theme gets, with ids the city builder looks for: "{key}-tree-{style}" for each tree given,
+    /// "-horse-trough", "-stage", "-market-stall", "-bar" and "-notice-board".
+    /// </summary>
+    static void TownProps(Book b, (string Name, TreeStyle Style, string About)[] trees,
+        string trough, string stage, string market, string bar, string board)
+    {
+        b.Room = Town;
+        foreach (var (name, style, about) in trees)
+            b.Add(name, ItemKind.Tree, i => i with { Tree = style }, about, "tree-" + style.ToString().ToLowerInvariant());
+        b.Add("Horse trough", ItemKind.Trough, i => i, trough, "horse-trough");
+        b.Add("Players' stage", ItemKind.Stage, i => i, stage, "stage");
+        b.Add("Market stall", ItemKind.Stall, i => i with { Stall = StallStyle.Market }, market, "market-stall");
+        b.Add("Outdoor bar", ItemKind.Stall, i => i with { Stall = StallStyle.Bar, WidthMm = 40 }, bar, "bar");
+        b.Add("Notice board", ItemKind.Stall, i => i with { Stall = StallStyle.NoticeBoard, WidthMm = 24, DepthMm = 10, HeightMm = 36 }, board, "notice-board");
     }
 
     static IReadOnlyList<CatalogEntry> Build()
@@ -191,6 +227,14 @@ public static class FurnitureCatalog
         b.Room = Prison;
         b.Add("Stocks", ItemKind.Stocks, i => i, "Stocks for the village green or the gaol.");
         b.Add("Coffin", ItemKind.Coffin, i => i, "A plank coffin with a cross on the lid.");
+        TownProps(b, [("Oak tree", TreeStyle.Oak, "A spreading oak, its trunk forking into heavy boughs, leaves etched and light showing through the crown."),
+                      ("Pine tree", TreeStyle.Pine, "A tall pine in stacked tiers of needles on a straight trunk.")],
+            "A stone horse trough on a plinth, water in it, an iron pump at one end.",
+            "A players' stage for the market square: planked deck, steps up the front, a painted backdrop and curtains tied back.",
+            "A market stall under a striped awning, crates of produce on the counter.",
+            "An outdoor tavern bar: barrels along the front, a shelf below the counter and a hanging tankard sign.",
+            "The town notice board under its little shingled roof, notices pinned up.");
+        TownWalls(b, "Town wall", "stone town wall with a wall walk, merlons with cross loops and a corbelled course");
         return b.Entries;
     }
 
@@ -254,6 +298,13 @@ public static class FurnitureCatalog
         b.Room = Lab;
         b.Add("Potion shelves", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Jars, Crown = Crown.Flat, WidthMm = 20, DepthMm = 8, HeightMm = 28, Shelves = 3 }, "Shelves of jars.");
         b.Add("Torturer's table", ItemKind.Table, i => i with { Legs = LegStyle.Slab, WidthMm = 30, DepthMm = 13, HeightMm = 12 }, "A heavy slab table.");
+        TownProps(b, [("Dead tree", TreeStyle.Dead, "A gnarled dead tree, bare twisted branches clawing at the sky.")],
+            "A worn stone trough on a heavy plinth, a pump at one end.",
+            "A grim stage for proclamations and punishments, its backdrop and curtains faded.",
+            "A black-market stall with a ragged awning and crates of dubious goods.",
+            "A rough drinking bar of barrels and planks with a hanging sign.",
+            "A board of bounties and wanted notices under a little roof.");
+        TownWalls(b, "Fortress wall", "grim fortress wall of great worn blocks, its merlons knocked about");
         return b.Entries;
     }
 
@@ -294,6 +345,14 @@ public static class FurnitureCatalog
 
         b.Room = Prison;
         b.Add("Burial slab", ItemKind.Coffin, i => i with { Coffin = CoffinStyle.Sarcophagus, WidthMm = 34, DepthMm = 13, HeightMm = 8, Detail = WoodDetail.Stone }, "A stone tomb.");
+        TownProps(b, [("Giant mushroom", TreeStyle.Mushroom, "A giant cave mushroom on a thick stalk, gills under its cap and spots on top."),
+                      ("Dead tree", TreeStyle.Dead, "A pale dead tree grown in the dark, bare twisted branches.")],
+            "A trough hewn from planks and bound with iron, water inside and a pump at one end.",
+            "A rough plank stage for storytellers, with a painted backdrop and curtains.",
+            "A trader's stall under a hide awning, crates on the counter.",
+            "A plank-and-barrel bar with a hanging tankard sign.",
+            "A notice board for the cave settlement under a little plank roof.");
+        TownWalls(b, "Palisade", "log palisade, every log sharpened, with a plank walk behind and lashed rails");
         return b.Entries;
     }
 
@@ -355,6 +414,13 @@ public static class FurnitureCatalog
         b.Add("Sample cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Glass, Contents = ShelfContents.Jars, Crown = Crown.Flat, WidthMm = 18, DepthMm = 9, HeightMm = 30 }, "Glass doors over jars.");
         b.Add("Lab console", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Console, WidthMm = 20, DepthMm = 14, HeightMm = 16 }, "A console.");
         b.Add("Medical bed", ItemKind.Bed, i => i with { FootMm = 13 }, "A bed.");
+        TownProps(b, [("Planter tree", TreeStyle.Oak, "A colony tree grown in a chamfered planter, its crown etched and cut through.")],
+            "A water trough with a feed pipe along one end and a pump head.",
+            "A broadcast stage: plated deck, steps up the front and a star-map backdrop.",
+            "A street vendor's stall under a panelled canopy, crates of goods on the counter.",
+            "A street bar under a plated canopy with a hanging sign.",
+            "A bulletin board on legs under a little canopy.");
+        TownWalls(b, "Defence wall", "armoured defence wall with gun ports, a hazard-striped band and a skirt of plate");
         return b.Entries;
     }
 
@@ -403,6 +469,13 @@ public static class FurnitureCatalog
 
         b.Room = Prison;
         b.Add("Sarcophagus", ItemKind.Coffin, i => i with { Coffin = CoffinStyle.Sarcophagus, WidthMm = 36, DepthMm = 14, HeightMm = 10, Detail = WoodDetail.Stone }, "A tomb with an effigy.");
+        TownProps(b, [("Palm tree", TreeStyle.Palm, "A date palm, its ringed trunk leaning a little, fronds spreading from the crown.")],
+            "A sandstone trough for camels and horses, water inside and a pump at one end.",
+            "A stage for dancers and storytellers in the bazaar, curtains tied back.",
+            "A bazaar stall under a striped awning, crates of goods on the counter.",
+            "A street drinks bar under an awning with a hanging sign.",
+            "A notice board for the caravan town under a little roof.");
+        TownWalls(b, "Sandstone wall", "sandstone wall with stepped merlons, keyhole loops and beam ends under the walk");
         return b.Entries;
     }
 
@@ -462,6 +535,14 @@ public static class FurnitureCatalog
         b.Add("Apothecary drawers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Drawers, Crown = Crown.Cornice, Rows = 5, Columns = 4, WidthMm = 22, DepthMm = 9, HeightMm = 30 }, "A wall of small drawers.");
         b.Add("Potion cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Glass, Contents = ShelfContents.Bottles, Crown = Crown.Cornice, WidthMm = 18, DepthMm = 9, HeightMm = 30 }, "Bottles behind glass.");
         b.Add("Laboratory table", ItemKind.Table, i => i with { Legs = LegStyle.Legs, Stretcher = true, WidthMm = 30, DepthMm = 14 }, "A table with stretchers.");
+        TownProps(b, [("Dead tree", TreeStyle.Dead, "A blasted churchyard tree, bare twisted branches against the moon."),
+                      ("Pine tree", TreeStyle.Pine, "A dark pine in stacked tiers on a straight trunk.")],
+            "A carved stone trough on a plinth, a pump at one end.",
+            "A theatre stage with a painted backdrop, a crest over the arch and heavy curtains tied back.",
+            "A market stall under a striped awning, crates on the counter.",
+            "An outdoor bar with barrels along the front and a hanging sign.",
+            "A parish notice board under its little roof.");
+        TownWalls(b, "City wall", "cut-stone city wall with gabled merlons, pointed loops and a corbel table of little arches");
         return b.Entries;
     }
 }

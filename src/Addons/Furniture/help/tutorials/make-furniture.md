@@ -22,6 +22,9 @@ Pick a **Theme** at the top and press **Start the list from this theme** for a r
 it: bunks and lockers for a sci-fi ship, a trestle table and chests for a dungeon. The faces change to
 match (metal panels for sci-fi).
 
+The ready-made **Town** pieces dress the square outside the tavern: the theme's town wall, a guard
+tower, trees, a horse trough, a players' stage, a market stall, an outdoor bar and a notice board.
+
 ## Add furniture to the list
 <!-- target: button:Add -->
 Back on the **Furniture** tab, pick a **Chair** under the list and press **Add**. Add a **Bench** and

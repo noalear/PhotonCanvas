@@ -9,6 +9,7 @@ public enum ItemKind
 {
     Table, Bench, Stool, Chair, Bookshelf, Chest, Crate, Bed, WallDoor, WallShelf,
     Cabinet, Desk, Armchair, Fireplace, SlantDesk, WeaponRack, Stand, Coffin, Rug, WallHanging, Candlestand, Screen, Stocks,
+    TownWall, Tower, Tree, Trough, Stage, Stall,
 }
 
 /// <summary>How a table's or bench's legs are made.</summary>
@@ -182,6 +183,12 @@ public sealed record FurnitureItem
     public ScreenStyle ScreenStyle { get; init; } = ScreenStyle.Lattice;
     /// <summary>Wall hangings: how high the bottom edge is off the floor (mm).</summary>
     public double HangMm { get; init; } = 10;
+    /// <summary>Town walls: which piece (a straight run, a corner, a gatehouse, an end).</summary>
+    public WallPiece Wall { get; init; } = WallPiece.Straight;
+    /// <summary>Trees: an oak, a pine, a dead tree, a palm or a giant mushroom.</summary>
+    public TreeStyle Tree { get; init; } = TreeStyle.Oak;
+    /// <summary>Street stalls: a market stall, an outdoor bar or a notice board.</summary>
+    public StallStyle Stall { get; init; } = StallStyle.Market;
 }
 
 /// <summary>Everything cut from one sheet in one go: the pieces of furniture, the sheet and the detail.</summary>
@@ -246,6 +253,12 @@ public static class Defaults
         new(ItemKind.Candlestand, "Candle stand or lamp", "Two profiles crossed on a round foot: a candelabra, a floor lamp or a torch stand."),
         new(ItemKind.Screen, "Screen", "A folding screen of hinged leaves standing in a zig-zag (or one panel on two feet): a lattice, tracery, plain panels or a barrier."),
         new(ItemKind.Stocks, "Stocks", "Two posts on feet and a board with holes for the head and hands."),
+        new(ItemKind.TownWall, "Town wall", "A town wall a square or two long, a corner, a gatehouse or an end, with a wall walk, a crenellated parapet, arrow loops and moulded courses, lining up on the map's grid."),
+        new(ItemKind.Tree, "Tree", "Two tree profiles halved together in a round base, bark and leaves etched and gaps cut through the canopy: an oak, a pine, a dead tree, a palm or a giant mushroom."),
+        new(ItemKind.Trough, "Trough", "A horse trough on a plinth with water inside, a rim round the top and a pump at one end."),
+        new(ItemKind.Stage, "Stage", "A players' stage: a planked deck with steps up the front, a painted backdrop behind a proscenium, curtains tied back."),
+        new(ItemKind.Stall, "Stall or notice board", "A market stall under a striped awning, an outdoor bar with barrels and a hanging sign, or a notice board under a little roof."),
+        new(ItemKind.Tower, "Guard tower", "A tall tower with a fighting roof behind merlons, a door, arrow loops on every side, quoins and a flag."),
     ];
 
     public static KindInfo Info(ItemKind k) => Kinds.First(x => x.Kind == k);
@@ -273,6 +286,12 @@ public static class Defaults
         ItemKind.Candlestand => new() { Kind = k, WidthMm = 10, DepthMm = 7, HeightMm = 24, Candle = CandleStyle.Candelabra },
         ItemKind.Screen => new() { Kind = k, WidthMm = 30, DepthMm = 12, HeightMm = 30, Columns = 3, ScreenStyle = ScreenStyle.Lattice },
         ItemKind.Stocks => new() { Kind = k, WidthMm = 22, DepthMm = 9, HeightMm = 28 },
+        ItemKind.TownWall => new() { Kind = k, WidthMm = TownWalls.Square, DepthMm = 19, HeightMm = 56, Wall = WallPiece.Straight },
+        ItemKind.Tower => new() { Kind = k, WidthMm = 46, DepthMm = 46, HeightMm = 92 },
+        ItemKind.Tree => new() { Kind = k, WidthMm = 50, DepthMm = 50, HeightMm = 90, Tree = TreeStyle.Oak },
+        ItemKind.Trough => new() { Kind = k, WidthMm = 32, DepthMm = 11, HeightMm = 9 },
+        ItemKind.Stage => new() { Kind = k, WidthMm = 76.2, DepthMm = 50.8, HeightMm = 60 },
+        ItemKind.Stall => new() { Kind = k, WidthMm = 36, DepthMm = 20, HeightMm = 40, Stall = StallStyle.Market },
         ItemKind.Armchair => new() { Kind = k, WidthMm = 14, DepthMm = 12, HeightMm = 20, SeatMm = 7.5, ArmMm = 11, Seat = SeatStyle.Armchair, BackTop = BackTop.Rounded, Columns = 1 },
         ItemKind.Cabinet => new() { Kind = k, WidthMm = 22, DepthMm = 11, HeightMm = 34, Front = CabinetFront.Doors, Crown = Crown.Cornice, Columns = 2, Shelves = 2 },
         _ => new() { Kind = k },
