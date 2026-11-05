@@ -110,7 +110,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Rug** | One flat piece: *Bordered*, *Kilim*, *Damask*, *Hide*, *Deck mat* or *Round*. | 36 × 24 |
 | **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry*, *Banner*, *Painting*, *Shield and swords*, *Map* or *Screen*. | 16 × 22 |
 | **Candle stand or lamp** | Two profiles crossed on a foot: *Candelabra*, *Lamp* or *Torch*. | 10 across, 24 high |
-| **Screen** | A standing screen of **Panels** on two feet: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. | 30 wide, 30 high |
+| **Screen** | A folding screen of two to six **Panels** on working hinges, standing in a zig-zag: *Lattice*, *Tracery*, *Plain panels* or *Barrier*. One panel stands on two feet instead. **Width** and **Depth** are the screen as it stands; the depth sets how far the leaves fold. | 30 wide, 12 deep, 30 high |
 | **Stocks** | Two posts on feet, a board with holes for the head and hands, and a rail. | 22 × 9, 28 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
@@ -137,7 +137,21 @@ and symbols. *The list's theme* follows the theme at the top.
 
 ![A sarcophagus with an effigy on its lid](images/window-furniture-sarcophagus.png)
 
-![A gothic tracery screen](images/window-furniture-screen.png)
+![A gothic tracery screen folded into a zig-zag on its hinges](images/window-furniture-screen.png)
+
+### Folding screens
+
+A screen of two or more panels is cut as separate leaves joined by hinges that really turn. At each
+hinge, four small **knuckles** (flat plates with a hole at the hinge) stand out of the two leaves' ends,
+taking turns up the hinge: two from each leaf, each sitting in a notch in its own leaf's end, with the
+other leaf notched round it so it can turn. A **hinge pin**, a strip cut from the sheet, drops down
+through all four holes to the floor. The top knuckle's hole is square, so it holds the pin; the other
+leaf turns round it in the round holes.
+
+To put it together, glue each knuckle into its notch, round end out, with the square-holed one at the
+top (with **Push fit** they press in and hold without glue). Line up each hinge's holes, drop the pin in
+from the top, and stand the screen in its zig-zag. The list under the preview says about what angle
+the depth you asked for makes between each pair of leaves.
 
 If a size is too small for the sheet (a slot that would cut a piece in two, a tab with nothing round
 it), the list under the preview says what to change and the furniture can't go in until it's fixed.

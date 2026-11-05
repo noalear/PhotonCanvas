@@ -330,7 +330,7 @@ public static class FurnitureCatalog
         b.Room = Armoury;
         b.Add("Rifle rack", ItemKind.WeaponRack, i => i with { Rows = 4, HeightMm = 26 }, "Rifles standing in a rack.");
         b.Add("Weapon lockers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Locker, Crown = Crown.Flat, Columns = 3, WidthMm = 24, DepthMm = 10, HeightMm = 34 }, "Three lockers.");
-        b.Add("Barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, HeightMm = 14 }, "A barricade with chevrons and a grille.");
+        b.Add("Barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, DepthMm = 7, HeightMm = 14 }, "A barricade with chevrons and a grille.");
         b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "Armour on a stand.");
 
         b.Room = Throne;
@@ -341,7 +341,7 @@ public static class FurnitureCatalog
 
         b.Room = Prison;
         b.Add("Cell bunk", ItemKind.Bed, i => i with { FootMm = 13, Bedding = false }, "A bare bunk.");
-        b.Add("Cell barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, HeightMm = 14 }, "A barrier.");
+        b.Add("Cell barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, DepthMm = 7, HeightMm = 14 }, "A barrier.");
 
         b.Room = Lab;
         b.Add("Sleeper pod", ItemKind.Coffin, i => i with { Coffin = CoffinStyle.Pod, WidthMm = 36, DepthMm = 14, HeightMm = 8 }, "A sleeper pod with a window.");

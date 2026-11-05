@@ -4,8 +4,8 @@ namespace PhotonCanvas.Addon.Furniture;
 
 /// <summary>
 /// Things cut as one flat shape seen from the front, standing on feet that cross them (halving joints):
-/// candle stands and lamps, armour stands, training dummies and coat stands, and standing screens. Also
-/// a weapon rack (weapons standing through a holder between two ends) and stocks (a board between two posts).
+/// candle stands and lamps, armour stands, training dummies and coat stands, and one-panel screens. Also
+/// folding screens (separate leaves on working hinges, standing in a zig-zag), a weapon rack (weapons standing through a holder between two ends) and stocks (a board between two posts).
 /// </summary>
 public static class Profiles
 {
@@ -221,64 +221,266 @@ public static class Profiles
 
     // ---- standing screens ----
 
+    /// <summary>
+    /// A standing screen. One panel stands on two feet that cross it; two or more are separate leaves
+    /// joined by working hinges, standing on their own in a zig-zag (see <see cref="HingedScreen"/>).
+    /// </summary>
     public static void Screen(Maker m)
     {
         var it = m.Item;
+        if (it.WidthMm < 10 || it.HeightMm < 10) { m.Bad("Make the screen at least 10 mm wide and 10 mm high."); return; }
+        if (Geo.Clamp(it.Columns, 1, 6) >= 2) { HingedScreen(m); return; }
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, sw = m.SlotW;
         double footH = 2.6, rail = footH + 1.2, stile = 1.2;
-        if (W < 10 || H < 10) { m.Bad("Make the screen at least 10 mm wide and 10 mm high."); return; }
-        int leaves = Geo.Clamp(it.Columns, 1, 6);
-        double lw = (W - (leaves + 1) * stile) / leaves;
-        if (lw < 3) { m.Bad("The screen's panels are too narrow: make it wider or have fewer panels."); return; }
+        double lw = W - 2 * stile;
+        if (lw < 3) { m.Bad("The screen's panel is too narrow: make it wider."); return; }
         var look = Fronts.Look(m);
         var style = it.ScreenStyle;
-        var outline = new PathsD { Geo.Rect(0, 0, W, rail + 0.5) };
+        double x0 = stile / 2, x1 = W - stile / 2, rise = Math.Min((x1 - x0) * 0.45, H * 0.25);
+        var outline = new PathsD { Geo.Rect(0, 0, W, rail + 0.5), LeafShape(style, x0, x1, H, rise) };
         var holes = new PathsD();
         var etched = new PathsD();
         var lines = new List<PathD>();
-        var top = style switch { ScreenStyle.Lattice => BackTop.Arched, ScreenStyle.Tracery => BackTop.Pointed, ScreenStyle.Barrier => BackTop.Square, _ => BackTop.Rounded };
-        for (int i = 0; i < leaves; i++)
-        {
-            double x0 = stile / 2 + i * (lw + stile), x1 = x0 + lw + stile;
-            outline.Add(style == ScreenStyle.Barrier ? Fronts.Chamfered(x0, 0, x1, H, 1.2) : Shapes.Topped(top, x0, 0, x1, H, Math.Min((x1 - x0) * 0.45, H * 0.25)));
-            double a = x0 + stile, b = x1 - stile, ya = rail + 0.6, yb = H - stile - (style == ScreenStyle.Barrier ? 0.6 : Math.Min((x1 - x0) * 0.45, H * 0.25) * 0.6);
-            if (b - a < 1.5 || yb - ya < 2) continue;
-            etched.AddRange(Fronts.Outline(x0 + 0.1, 0.1, x1 - 0.1, H, 0.2));
-            switch (style)
-            {
-                case ScreenStyle.Lattice:
-                    holes.AddRange(Fronts.Lattice(a, ya, b, yb, 3.0, 1.0));
-                    break;
-                case ScreenStyle.Tracery:
-                {
-                    double wy = yb - (b - a) * 0.9;
-                    holes.Add(Fronts.PointedRect(a + 0.2, ya, b - 0.2, wy));
-                    double r = (b - a) * 0.36;
-                    // The trefoil's cusps rounded, so no sharp sliver of sheet points into it.
-                    if (r > 0.9 && wy + 1.4 + r * 2 < H - 1.2)
-                        holes.AddRange(Geo.Offset(Geo.Offset([Cabinets.Trefoil((a + b) / 2, wy + 1.3 + r, r)], 0.45, round: true), -0.45, round: true));
-                    break;
-                }
-                case ScreenStyle.Barrier:
-                {
-                    // Chevrons, a light strip along the top and a grille of slots.
-                    var chev = new PathsD();
-                    for (double y = ya; y < ya + (yb - ya) * 0.45; y += 1.6)
-                        chev.AddRange(Bar([new(a, y), new((a + b) / 2, y + 0.9), new(b, y)], 0.6));
-                    etched.AddRange(Geo.Intersect(Geo.Union(chev), [Geo.Rect(a, ya, b, yb)]));
-                    for (double y = ya + (yb - ya) * 0.55; y + 0.6 < yb - 1.6; y += 1.6) holes.Add(Geo.Rect(a + 0.4, y, b - 0.4, y + 0.6));
-                    etched.Add(Geo.Rect(a, yb - 0.9, b, yb));
-                    break;
-                }
-                default:
-                    Fronts.Panel(look, a, ya, b, yb, etched, lines);
-                    break;
-            }
-        }
-        // The panels' holes must keep the sheet whole: drop any too near the slots for the feet.
-        double[] feetAt = leaves == 1 ? [W * 0.2, W * 0.8] : [stile / 2 + lw / 2 + stile / 2, W - stile / 2 - lw / 2 - stile / 2];
-        OnFeet(m, "Screen", Geo.Solid(outline), holes, etched, lines, feetAt, Math.Max(D, sw + 4), footH, face: style == ScreenStyle.Barrier ? [] : null);
+        etched.AddRange(Fronts.Outline(x0 + 0.1, 0.1, x1 - 0.1, H, 0.2));
+        LeafFace(style, look, x0 + stile, x1 - stile, rail + 0.6, LeafTop(style, H, rise, stile), H, holes, etched, lines);
+        OnFeet(m, "Screen", Geo.Solid(outline), holes, etched, lines, [W * 0.2, W * 0.8], Math.Max(D, sw + 4), footH, face: style == ScreenStyle.Barrier ? [] : null);
         m.Note("Slide the two feet onto the screen's bottom edge, crossing it.");
+    }
+
+    /// <summary>One leaf's outline, x0..x1 wide and <paramref name="H"/> high, its top shaped for the style.</summary>
+    static PathD LeafShape(ScreenStyle style, double x0, double x1, double H, double rise) => style switch
+    {
+        ScreenStyle.Barrier => Fronts.Chamfered(x0, 0, x1, H, 1.2),
+        ScreenStyle.Lattice => Shapes.Topped(BackTop.Arched, x0, 0, x1, H, rise),
+        ScreenStyle.Tracery => Shapes.Topped(BackTop.Pointed, x0, 0, x1, H, rise),
+        _ => Shapes.Topped(BackTop.Rounded, x0, 0, x1, H, rise),
+    };
+
+    /// <summary>Where a leaf's straight sides end and its shaped top begins.</summary>
+    static double LeafShoulder(ScreenStyle style, double H, double rise) => style == ScreenStyle.Barrier ? H - 1.2 : H - rise;
+
+    /// <summary>The top of the area inside a leaf's frame (its lattice, window or panel).</summary>
+    static double LeafTop(ScreenStyle style, double H, double rise, double stile) => H - stile - (style == ScreenStyle.Barrier ? 0.6 : rise * 0.6);
+
+    /// <summary>What's inside one leaf's frame a..b, ya..yb: a lattice or tracery cut through it, a barrier's chevrons and grille, or a plain panel.</summary>
+    static void LeafFace(ScreenStyle style, FrontLook look, double a, double b, double ya, double yb, double H, PathsD holes, PathsD etched, List<PathD> lines)
+    {
+        if (b - a < 1.5 || yb - ya < 2) return;
+        switch (style)
+        {
+            case ScreenStyle.Lattice:
+                holes.AddRange(Fronts.Lattice(a, ya, b, yb, 3.0, 1.0));
+                break;
+            case ScreenStyle.Tracery:
+            {
+                double wy = yb - (b - a) * 0.9;
+                if (wy - ya < 2) wy = ya + 2;
+                holes.Add(Fronts.PointedRect(a + 0.2, ya, b - 0.2, wy));
+                double r = (b - a) * 0.36;
+                // The trefoil's cusps rounded, so no sharp sliver of sheet points into it.
+                if (r > 0.9 && wy + 1.4 + r * 2 < H - 1.2)
+                    holes.AddRange(Geo.Offset(Geo.Offset([Cabinets.Trefoil((a + b) / 2, wy + 1.3 + r, r)], 0.45, round: true), -0.45, round: true));
+                break;
+            }
+            case ScreenStyle.Barrier:
+            {
+                // Chevrons, a light strip along the top and a grille of slots.
+                var chev = new PathsD();
+                for (double y = ya; y < ya + (yb - ya) * 0.45; y += 1.6)
+                    chev.AddRange(Bar([new(a, y), new((a + b) / 2, y + 0.9), new(b, y)], 0.6));
+                etched.AddRange(Geo.Intersect(Geo.Union(chev), [Geo.Rect(a, ya, b, yb)]));
+                for (double y = ya + (yb - ya) * 0.55; y + 0.6 < yb - 1.6; y += 1.6) holes.Add(Geo.Rect(a + 0.4, y, b - 0.4, y + 0.6));
+                etched.Add(Geo.Rect(a, yb - 0.9, b, yb));
+                break;
+            }
+            default:
+                Fronts.Panel(look, a, ya, b, yb, etched, lines);
+                break;
+        }
+    }
+
+    /// <summary>How a hinged screen's hinges are sized for a sheet and a fit (all mm).</summary>
+    public readonly record struct ScreenHinge(double T, double Fit)
+    {
+        /// <summary>The pin's width: a strip of the sheet, about square, never narrower than a bridge.</summary>
+        public double PinW => Math.Max(Maker.Bridge * 1.2, T * 0.75);
+        /// <summary>Half the pin's diagonal: how far its corners reach from the hinge's axis as it turns.</summary>
+        public double PinReach => Math.Sqrt(PinW * PinW + T * T) / 2;
+        /// <summary>The round hole in a knuckle the pin turns in.</summary>
+        public double HoleR => PinReach + Math.Max(0, Fit) / 2 + 0.12;
+        /// <summary>A knuckle's round end, a bridge and a bit round the hole.</summary>
+        public double KnuckleR => HoleR + Maker.Bridge + 0.15;
+        /// <summary>How far each leaf's end stands back from the axis, clear of the pin's corners.</summary>
+        public double Gap => PinReach + 0.35;
+        /// <summary>Space left round the other leaf's knuckles.</summary>
+        public const double Clear = 0.25;
+        /// <summary>How deep the notch is that the other leaf's knuckle turns in.</summary>
+        public double ClearDepth => KnuckleR + Clear - Gap;
+        /// <summary>How far a knuckle goes into its own leaf's notch.</summary>
+        public double Grip => Math.Max(1.3, ClearDepth);
+        /// <summary>The leaf's frame at a hinged end: wide enough to take the notches and keep a bridge inside them.</summary>
+        public double Side => Grip + Maker.Bridge;
+        /// <summary>Between two knuckles on one hinge, one above the other.</summary>
+        public double Stack => Maker.Bridge + Clear + Math.Max(0, Fit) + 0.1;
+        /// <summary>The bottom knuckle's height off the floor.</summary>
+        public double Low => Maker.Bridge + Clear + 0.15;
+    }
+
+    /// <summary>The fold between leaves that the most and least zig-zag allow (degrees off straight, each way).</summary>
+    public const double MinFoldDeg = 12, MaxFoldDeg = 40;
+
+    /// <summary>
+    /// The leaves' width and how far each turns off straight (radians) for a screen <paramref name="W"/>
+    /// wide and <paramref name="Dz"/> deep (its leaves' middles, front to back) in <paramref name="n"/>
+    /// leaves with <paramref name="gap"/> from each leaf's end to its hinge's axis.
+    /// </summary>
+    public static (double Leaf, double Turn) ZigZag(int n, double W, double Dz, double gap)
+    {
+        (double Leaf, double Depth) At(double b)
+        {
+            double c = Math.Cos(b), s = Math.Sin(b);
+            if (n == 2)
+            {
+                double leaf = W / (2 * c) - gap;
+                return (leaf, (leaf + gap) * s);
+            }
+            double l = (W / c - 2 * (n - 1) * gap) / n;
+            return (l, (l + 2 * gap) * s);
+        }
+        double lo = MinFoldDeg * Math.PI / 180, hi = MaxFoldDeg * Math.PI / 180;
+        if (At(lo).Depth >= Dz) return (At(lo).Leaf, lo);
+        if (At(hi).Depth <= Dz) return (At(hi).Leaf, hi);
+        for (int i = 0; i < 50; i++)
+        {
+            double mid = (lo + hi) / 2;
+            if (At(mid).Depth < Dz) lo = mid; else hi = mid;
+        }
+        return (At((lo + hi) / 2).Leaf, (lo + hi) / 2);
+    }
+
+    /// <summary>
+    /// A folding screen: two to six separate leaves that stand in a zig-zag, joined by working hinges.
+    /// At each hinge four knuckles (small flat plates with a hole at the hinge's axis) stand out of the
+    /// two leaves' ends, two from each, taking turns up the hinge: each sits in a notch in its own leaf,
+    /// and the other leaf is notched round it so it can turn. A pin cut from the sheet drops through all
+    /// four to the floor; the top knuckle's hole is square, so it holds the pin, and the other leaf turns
+    /// round it. <see cref="FurnitureItem.WidthMm"/> and <see cref="FurnitureItem.DepthMm"/> are the screen
+    /// as it stands: they set how wide the leaves are and how far they fold.
+    /// </summary>
+    static void HingedScreen(Maker m)
+    {
+        var it = m.Item;
+        double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;
+        int n = Geo.Clamp(it.Columns, 2, 6);
+        var hg = new ScreenHinge(T, f);
+        double gap = hg.Gap, side = hg.Side, kr = hg.KnuckleR, c = ScreenHinge.Clear;
+        // The depth asked for is to the knuckles' round ends, which stand out round the hinges at the front and back.
+        var (lw, turn) = ZigZag(n, W, Math.Max(0, D - 2 * kr), gap);
+        if (lw - 2 * side < 1.5) { m.Bad($"The screen's leaves are too narrow for their hinges: make it at least {MinWidth(n, gap, side + side + 1.5):0.#} mm wide, or have fewer panels."); return; }
+        var style = it.ScreenStyle;
+        var look = Fronts.Look(m);
+        double rise = Math.Min(lw * 0.45, H * 0.25), shoulder = LeafShoulder(style, H, rise);
+        // The knuckles, bottom to top: the left leaf's, the right leaf's; then higher up the right leaf's and the left leaf's.
+        double h1 = hg.Low, h2 = h1 + T + hg.Stack;
+        double h4 = shoulder - Maker.Bridge - c - T, h3 = h4 - T - hg.Stack;
+        double between = (h3 - c) - (h2 + T + c);
+        if (between < Maker.Bridge + 0.5)
+        {
+            m.Bad($"The screen is too low for its hinges: make it at least {H + Maker.Bridge + 0.5 - between:0.#} mm high.");
+            return;
+        }
+        double[] leftOwn = [h1, h4], rightOwn = [h2, h3];
+
+        // ---- the leaves ----
+        // Each leaf's end: notches its own knuckles sit in, and deeper-set ones the other leaf's turn in.
+        PathsD EndNotches(double end, int dir, double[] own, double[] other)
+        {
+            var cuts = new PathsD();
+            foreach (var h in own) cuts.Add(dir > 0 ? Geo.Rect(end - hg.Grip, h, end + 1, h + sw) : Geo.Rect(end - 1, h, end + hg.Grip, h + sw));
+            foreach (var h in other)
+                cuts.Add(dir > 0 ? Geo.Rect(end - hg.ClearDepth, h - c, end + 1, h + T + c) : Geo.Rect(end - 1, h - c, end + hg.ClearDepth, h + T + c));
+            return cuts;
+        }
+        double ya = 3.2, yb = LeafTop(style, H, rise, 1.2);
+        (PathsD Shape, PathsD Holes, PathsD Etched, List<PathD> Lines) Leaf(bool hingeLeft, bool hingeRight)
+        {
+            var holes = new PathsD();
+            var etched = new PathsD();
+            var lines = new List<PathD>();
+            // The same frame at both sides, hinged or not, so every leaf looks alike.
+            LeafFace(style, look, side, lw - side, ya, yb, H, holes, etched, lines);
+            // A leaf's left end is the right-hand leaf of the hinge to its left, and the other way round.
+            if (hingeLeft) holes.AddRange(EndNotches(0, -1, rightOwn, leftOwn));
+            if (hingeRight) holes.AddRange(EndNotches(lw, 1, leftOwn, rightOwn));
+            return ([LeafShape(style, 0, lw, H, rise)], holes, etched, lines);
+        }
+
+        // Where each leaf stands: turned alternately back and forward by the fold, end to end along the hinges.
+        double cs = Math.Cos(turn), sn = Math.Sin(turn);
+        var dirs = Enumerable.Range(0, n).Select(i => new V3(cs, 0, i % 2 == 0 ? -sn : sn)).ToArray();
+        var starts = new V3[n];
+        var axes = new V3[n - 1];
+        var at = new V3(0, 0, 0);
+        for (int i = 0; i < n; i++)
+        {
+            if (i > 0) at += dirs[i] * gap;
+            starts[i] = at;
+            at += dirs[i] * lw;
+            if (i < n - 1) { at += dirs[i] * gap; axes[i] = at; }
+        }
+        // Moved so the screen stands from x = 0 and z = 0 back to front.
+        double zMin = starts.Min(p => p.Z);
+        for (int i = 0; i < n; i++) zMin = Math.Min(zMin, (starts[i] + dirs[i] * lw).Z);
+        var shift = new V3(0, 0, -zMin + T / 2);
+        Pose LeafPose(int i) => new(starts[i] + shift, dirs[i], V3.UnitY);
+        bool face = style != ScreenStyle.Barrier;
+        void AddLeaf(string name, bool l, bool r, IEnumerable<int> which)
+        {
+            var (shape, holes, etched, lines) = Leaf(l, r);
+            m.Add(name, shape, holes, which.Select(LeafPose), grainAlongU: false, face: face ? null : [], etched: etched, lines: lines);
+        }
+        AddLeaf("Left leaf", false, true, [0]);
+        if (n > 2) AddLeaf("Leaf", true, true, Enumerable.Range(1, n - 2));
+        AddLeaf("Right leaf", true, false, [n - 1]);
+
+        // ---- the knuckles and pins ----
+        // A knuckle, flat: its round end on the axis at (0, 0), its arm back along −u into its own leaf's notch.
+        double arm = gap + hg.Grip;
+        var knuckle = new PathsD { Geo.Rect(-arm, -kr, 0, kr), Geo.Circle(0, 0, kr, 0.01) };
+        double pw = hg.PinW;
+        // A knuckle lies flat with its u along the arm's direction away from its leaf; it's centred on its height.
+        static Pose Flat(V3 o, V3 u) => new(o, u, V3.UnitY.Cross(u));
+        var round = new List<Pose>();
+        var top = new List<Pose>();
+        var pins = new List<Pose>();
+        for (int i = 0; i < n - 1; i++)
+        {
+            var axis = axes[i] + shift;
+            V3 L = dirs[i], R = -dirs[i + 1];
+            round.Add(Flat(axis + V3.UnitY * (h1 + T / 2), L));
+            round.Add(Flat(axis + V3.UnitY * (h2 + T / 2), R));
+            round.Add(Flat(axis + V3.UnitY * (h3 + T / 2), R));
+            top.Add(Flat(axis + V3.UnitY * (h4 + T / 2), L));
+            // The pin's flat side along the left leaf, as the top knuckle's square hole holds it.
+            pins.Add(new Pose(axis, L, V3.UnitY));
+        }
+        m.Add("Knuckle", knuckle, [Geo.Circle(0, 0, hg.HoleR, 0.01)], round, grainAlongU: true, face: []);
+        m.Add("Top knuckle", knuckle, [Geo.Rect(-(pw + f) / 2, -sw / 2, (pw + f) / 2, sw / 2)], top, grainAlongU: true, face: []);
+        double pinTop = h4 + T + 1.2;
+        m.Add("Hinge pin", [Shapes.Topped(BackTop.Rounded, -pw / 2, 0, pw / 2, pinTop, pw / 2)], [], pins, grainAlongU: false, face: []);
+
+        double fold = 180 - 2 * turn * 180 / Math.PI;
+        m.Note(m.PushFit
+            ? $"Push each knuckle into its notch in the leaf's end, round end out. Line up each hinge's four holes, push a pin down through them from the top until it stands on the floor: the top knuckle grips it and the other leaf turns on it."
+            : $"Glue each knuckle into its notch in the leaf's end, round end out, the square-holed one at the top. Line up each hinge's four holes and drop a pin down through them to the floor; a dab of glue in the top knuckle's square hole holds it, and the other leaf turns on it.");
+        m.Note($"Stand the leaves in a zig-zag, about {fold:0}° between each pair.");
+    }
+
+    /// <summary>How wide a screen of <paramref name="n"/> leaves must be for each leaf to be at least <paramref name="leaf"/> wide, folded as little as it goes.</summary>
+    static double MinWidth(int n, double gap, double leaf)
+    {
+        double c = Math.Cos(MinFoldDeg * Math.PI / 180);
+        return n == 2 ? 2 * (leaf + gap) * c : (n * leaf + 2 * (n - 1) * gap) * c;
     }
 
     // ---- weapon racks ----
