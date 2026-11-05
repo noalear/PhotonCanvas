@@ -239,7 +239,7 @@ public static class Defaults
         new(ItemKind.Rug, "Rug", "One flat piece with a pattern etched on it: a bordered rug, a kilim, damask, a hide, a deck mat or a round rug."),
         new(ItemKind.WallHanging, "Wall hanging", "A tapestry, banner, painting, shield, map or screen to glue on a wall."),
         new(ItemKind.Candlestand, "Candle stand or lamp", "Two profiles crossed on a round foot: a candelabra, a floor lamp or a torch stand."),
-        new(ItemKind.Screen, "Screen", "A standing screen on two feet: a lattice, tracery, plain panels or a barrier."),
+        new(ItemKind.Screen, "Screen", "A folding screen of hinged leaves standing in a zig-zag (or one panel on two feet): a lattice, tracery, plain panels or a barrier."),
         new(ItemKind.Stocks, "Stocks", "Two posts on feet and a board with holes for the head and hands."),
     ];
 
@@ -266,7 +266,7 @@ public static class Defaults
         ItemKind.Rug => new() { Kind = k, WidthMm = 36, DepthMm = 24, HeightMm = 1, Rug = RugPattern.Border },
         ItemKind.WallHanging => new() { Kind = k, WidthMm = 16, DepthMm = 0, HeightMm = 22, HangMm = 10, Hanging = HangingStyle.Tapestry },
         ItemKind.Candlestand => new() { Kind = k, WidthMm = 10, DepthMm = 7, HeightMm = 24, Candle = CandleStyle.Candelabra },
-        ItemKind.Screen => new() { Kind = k, WidthMm = 30, DepthMm = 7, HeightMm = 30, Columns = 3, ScreenStyle = ScreenStyle.Lattice },
+        ItemKind.Screen => new() { Kind = k, WidthMm = 30, DepthMm = 12, HeightMm = 30, Columns = 3, ScreenStyle = ScreenStyle.Lattice },
         ItemKind.Stocks => new() { Kind = k, WidthMm = 22, DepthMm = 9, HeightMm = 28 },
         ItemKind.Armchair => new() { Kind = k, WidthMm = 14, DepthMm = 12, HeightMm = 20, SeatMm = 7.5, ArmMm = 11, Seat = SeatStyle.Armchair, BackTop = BackTop.Rounded, Columns = 1 },
         ItemKind.Cabinet => new() { Kind = k, WidthMm = 22, DepthMm = 11, HeightMm = 34, Front = CabinetFront.Doors, Crown = Crown.Cornice, Columns = 2, Shelves = 2 },
