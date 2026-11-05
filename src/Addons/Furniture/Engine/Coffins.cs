@@ -61,10 +61,29 @@ public static class Coffins
             m.Add(name, [Body(grows[k])], slots, poses, grainAlongU: true, face: top && style != CoffinStyle.Coffin ? [] : top ? null : [], etched: etched, lines: lines, planks: top, plankMm: D / 3);
             k = next;
         }
+        if (RaisedCross(m, style, look))
+        {
+            // A cross glued on the lid, standing proud of it, lying along it with its head towards the wide end.
+            double bar = Geo.Clamp(D * 0.13, 1.4, 2.4), cl = L * 0.6, x0 = L * 0.16, cz = D / 2, arm = Math.Min(D * 0.62, cl * 0.5), ax = x0 + cl * 0.3;
+            var cross = new PathsD
+            {
+                Geo.Rect(x0, cz - bar / 2, x0 + cl, cz + bar / 2),
+                Geo.Rect(ax - bar / 2, cz - arm / 2, ax + bar / 2, cz + arm / 2),
+            };
+            // Flared ends.
+            foreach (var (x, z, along) in new[] { (x0, cz, true), (x0 + cl, cz, true), (ax, cz - arm / 2, false), (ax, cz + arm / 2, false) })
+                cross.Add(along ? Geo.Rect(x - bar * 0.35, z - bar * 0.85, x + bar * 0.35, z + bar * 0.85) : Geo.Rect(x - bar * 0.85, z - bar * 0.35, x + bar * 0.85, z + bar * 0.35));
+            var cl2 = new List<PathD> { Geo.Loop(Rugs.Ellipse(ax, cz, bar * 0.32, bar * 0.32)) };
+            m.Add("Lid cross", Geo.Solid(cross), [], [Pose.Up(0, n * T + T / 2, D)], grainAlongU: true, face: [], lines: cl2).Glue();
+            m.Note("Glue the cross along the lid.");
+        }
         var key = new PathsD { Geo.Rect(0, 0, kw, Hk) };
         m.Add("Key", key, [], [.. keys.Select(x => Pose.Front(x - kw / 2, 0, D / 2))], grainAlongU: false, face: []);
         m.Note($"Stand the two keys in the base and slide the layers down over them one by one, gluing each{(n > 2 ? "" : "")}; the lid goes on last.");
     }
+
+    /// <summary>Whether a plank coffin gets a cross cut to glue on its lid (else it's etched on).</summary>
+    static bool RaisedCross(Maker m, CoffinStyle style, FrontLook look) => style == CoffinStyle.Coffin && look == FrontLook.Plank && !m.PushFit && m.Item.DepthMm >= 8;
 
     static void Lid(Maker m, CoffinStyle style, FrontLook look, double L, double D, double grow, Random rnd, PathsD etched, List<PathD> lines)
     {
@@ -101,7 +120,8 @@ public static class Coffins
             {
                 double r = Math.Min(D * 0.3, L * 0.12);
                 double cx = L * 0.32, cz = D / 2;
-                if (look == FrontLook.Plank)
+                if (RaisedCross(m, style, look)) { }
+                else if (look == FrontLook.Plank)
                 {
                     // A cross on the lid, lying along it.
                     var cross = new PathsD

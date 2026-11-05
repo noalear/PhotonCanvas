@@ -245,7 +245,7 @@ public static class Cabinets
         if (front == CabinetFront.Altar && !metal && !m.PushFit) AltarCloth(m, look, W, T, bodyTop, kick, Dl);
 
         // ---- open shelves: a band of tracery glued across the front under the top ----
-        if (open && !hutch && !metal && !m.PushFit && m.Theme != TerrainThemes.Cave) Tracery(m, look, W, T, bodyTop, Dl);
+        if (open && !hutch && !metal && !m.PushFit && m.Theme != TerrainThemes.Cave && it.Contents is ShelfContents.Books or ShelfContents.Scrolls) Tracery(m, look, W, T, bodyTop, Dl);
 
         // ---- a pediment or an arch on top, its tabs down through the top ----
         if (hc > 0)

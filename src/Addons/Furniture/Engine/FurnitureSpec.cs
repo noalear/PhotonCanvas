@@ -57,7 +57,7 @@ public enum CabinetFront
 public enum Crown { Flat, Cornice, Pediment, Arch }
 
 /// <summary>What stands on open shelves, seen from the front.</summary>
-public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools }
+public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools, Stores }
 
 /// <summary>Seats with arms and a back.</summary>
 public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle, Reading }
@@ -76,7 +76,7 @@ public enum StandStyle { Armour, Dummy, Coats }
 
 public enum CoffinStyle { Coffin, Sarcophagus, Pod }
 
-public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round }
+public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round, Runner }
 
 public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor, FramedMap }
 

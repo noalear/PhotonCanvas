@@ -46,7 +46,7 @@ public sealed class ItemEditor : StackPanel
     readonly TextBlock _styleLabel = Label("Style");
     readonly ComboBox _style = Combo();
     readonly ComboBox _crown = Combo("Flat", "Cornice (two layers)", "Pediment", "Arch");
-    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing", "Tools on pegs");
+    readonly ComboBox _contents = Combo("Books", "Bottles", "Jars", "Plates", "Scrolls", "Machines", "Nothing", "Tools on pegs", "Sacks, boxes and pots");
     readonly ComboBox _backTop = Combo("Square", "Rounded", "Arched", "Pointed", "Winged");
     readonly NumericUpDown _cols = Number(1, 12, 1, "0"), _rows = Number(1, 12, 1, "0"), _arm = Number(2, 500, 0.5m, "0.#"), _hang = Number(0, 500, 0.5m, "0.#");
     readonly TextBlock _colsLabel = Label("Across"), _rowsLabel = Label("Rows");
@@ -275,7 +275,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),
         ItemKind.Stand => ("Kind", ["Armour", "Training dummy", "Coat stand"]),
         ItemKind.Coffin => ("Kind", ["Coffin", "Sarcophagus", "Sleeper pod"]),
-        ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round"]),
+        ItemKind.Rug => ("Pattern", ["Bordered", "Kilim", "Damask", "Hide", "Deck mat", "Round", "Long runner"]),
         ItemKind.WallHanging => ("Kind", ["Tapestry", "Banner", "Painting", "Shield and swords", "Map", "Screen", "Framed map on chains"]),
         ItemKind.Candlestand => ("Kind", ["Candelabra", "Lamp", "Torch"]),
         ItemKind.Screen => ("Kind", ["Lattice", "Tracery", "Plain panels", "Barrier"]),
