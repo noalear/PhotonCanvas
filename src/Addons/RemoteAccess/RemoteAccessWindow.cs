@@ -114,6 +114,7 @@ public sealed class RemoteAccessWindow : Window
     readonly Button _start = Button("Start server", "IcSend", "Start the server. It keeps running when PhotonCanvas is closed.");
     readonly Button _stop = Button("Stop server", "IcStop", "Stop the server: phones can't connect until it's started again.");
     readonly CheckBox _withWindows = new() { Content = "Start the server when Windows starts" };
+    readonly CheckBox _phoneStart = new() { Content = "Allow starting jobs from the phone" };
     readonly ComboBox _address = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly Image _qr = new() { Width = 200, Height = 200, Stretch = Stretch.Uniform };
     readonly TextBlock _url = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
@@ -140,6 +141,9 @@ public sealed class RemoteAccessWindow : Window
         _withWindows.IsVisible = OperatingSystem.IsWindows();
         _withWindows.IsCheckedChanged += (_, _) => RemoteServer.SetStartsWithWindows(_withWindows.IsChecked == true);
         ToolTip.SetTip(_withWindows, "Then the phone works whenever this computer is on, even before you open PhotonCanvas.");
+        _phoneStart.IsChecked = PhoneStart.IsAllowed();
+        _phoneStart.IsCheckedChanged += async (_, _) => await SetPhoneStart();
+        ToolTip.SetTip(_phoneStart, "Off: the phone can load, watch, pause and stop, but only the machine's button starts a job.");
         _address.SelectionChanged += (_, _) => ShowQr();
         _code.Text = _config.AccessCode;
 
@@ -180,7 +184,7 @@ public sealed class RemoteAccessWindow : Window
                                 Labelled("Address", _address),
                                 // A white margin of about four modules round the code, as scanners expect.
                                 new Border { Background = Brushes.White, Padding = new(24), CornerRadius = new(8), HorizontalAlignment = HorizontalAlignment.Center, Child = _qr },
-                                Hint("Scan the code with the phone's camera: the page opens and connects. Or open the address in the phone's browser and type the access code. Add the page to the home screen to open it like an app."),
+                                Hint("Scan the code with the phone's camera (or in the Android app): the page opens and connects. Or open the address in the phone's browser and type the access code. Add the page to the home screen to open it like an app. The Android app connects encrypted, to this computer's own certificate."),
                                 _url,
                                 Labelled("Access code", _code),
                                 Row(newCode, new Panel())),
@@ -190,10 +194,12 @@ public sealed class RemoteAccessWindow : Window
                                 _folders,
                                 Row(addFolder, removeFolder)),
                             Card("Safety",
+                                _phoneStart,
+                                Hint("Off by default: the phone can load a job, watch, pause and stop, and you start it with the machine's button. Turned on, the phone can start a loaded job too."),
                                 Hint("Starting a job from the phone fires the laser, with nobody at the machine unless you are. The phone only starts a job after a picture of the bed less than 2 minutes old, taken with that job loaded, so look at it properly: material in place, nothing in the way, the lid as you want it."),
                                 Hint("The machine blanks its cameras while a job runs, so you can't watch the job itself. Its flame alarm still works, and the phone shows the machine's alarms. Stop works from the phone at any time.")),
                             Card("Away from home",
-                                Hint("The phone reaches this computer on your home Wi-Fi. To use it from anywhere, install Tailscale (free) on this computer and on the phone, sign in to both, and use the Tailscale address above. Don't open a port on your router for it.")),
+                                Hint("The phone reaches this computer on your home Wi-Fi. To use it from anywhere, install Tailscale (free, tailscale.com) on this computer and on the phone, and sign in to the same account on both. The Android app then switches by itself: home Wi-Fi when you're in, Tailscale when you're out (it learns the Tailscale address the next time it connects at home). For the phone page, use the Tailscale address above. Don't open a port on your router for it.")),
                         },
                     },
                 },
@@ -211,6 +217,7 @@ public sealed class RemoteAccessWindow : Window
     {
         if (_busy) return;
         bool running = await RemoteServer.IsRunningAsync(_config);
+        // Started (maybe for the first time, making its certificate): the QR code changes.
         if (running != _running) ShowAddresses();
         _running = running;
         bool found = RemoteServer.Find() is not null;
@@ -252,6 +259,28 @@ public sealed class RemoteAccessWindow : Window
         for (int i = 0; i < 20 && !await RemoteServer.IsRunningAsync(_config); i++) await Task.Delay(500);
         _busy = false;
         await Refresh();
+    }
+
+    bool _settingPhoneStart;
+
+    async Task SetPhoneStart()
+    {
+        if (_settingPhoneStart || _phoneStart.IsChecked is not bool on) return;
+        if (on && !await Dialogs.Confirm(this, "Allow starting jobs from the phone?", PhoneStart.Warning, "I understand, allow it", "Keep it off"))
+        {
+            _settingPhoneStart = true;
+            _phoneStart.IsChecked = false;
+            _settingPhoneStart = false;
+            return;
+        }
+        try { PhoneStart.Set(on); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            _settingPhoneStart = true;
+            _phoneStart.IsChecked = PhoneStart.IsAllowed();
+            _settingPhoneStart = false;
+            await Dialogs.Message(this, "Couldn't save the setting", e.Message);
+        }
     }
 
     async Task NewCode()
@@ -308,7 +337,8 @@ public sealed class RemoteAccessWindow : Window
         }
         string site = $"http://{_addresses[_address.SelectedIndex].Address}:{_config.Port}";
         _url.Text = $"Address: {site}";
-        _qr.Source = Qr($"{site}/#code={_config.AccessCode}");
+        // With the server's certificate (once it has made one), so the app connects encrypted to it alone.
+        _qr.Source = Qr(_config.QrText(_addresses[_address.SelectedIndex].Address, TlsState.Read(), _addresses.Select(a => a.Address)));
         _appQr.Source = Qr(site + RemoteConfig.AndroidAppPath);
     }
 

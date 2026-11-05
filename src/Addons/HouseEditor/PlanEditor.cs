@@ -9,7 +9,7 @@ using PhotonCanvas.Addon.Furniture;
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>What dragging on the plan does.</summary>
-public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof, Furnish, Stairs }
+public enum PlanTool { Select, Wall, Room, Erase, Door, Doorway, Window, Floor, Roof, Furnish, Stairs, Place }
 
 /// <summary>
 /// The floor plan, seen from above on a grid of squares: draw walls along the grid lines (or corner to
@@ -103,6 +103,47 @@ public sealed class PlanEditor : Control
     /// <summary>A different door or window was picked (or none).</summary>
     public event Action? SelectionChanged;
 
+    /// <summary>Escape pressed while putting in a saved building.</summary>
+    public event Action? PlacingStopped;
+
+    // A saved building to put in with Place: as saved (its top-left at 0, 0), and turned.
+    HouseDesign? _stampBase, _stamp;
+    int _stampTurn;
+
+    /// <summary>What a click with <see cref="PlanTool.Place"/> puts in (a saved building), and its name to show; null for nothing.</summary>
+    public void SetStamp(HouseDesign? design, string? name = null)
+    {
+        _stampBase = design?.AtOrigin();
+        _stampTurn = 0;
+        _stamp = _stampBase;
+        StampName = name;
+        InvalidateVisual();
+    }
+
+    public string? StampName { get; private set; }
+
+    /// <summary>The saved building being put in, as turned.</summary>
+    public HouseDesign? Stamp => _stamp;
+
+    /// <summary>Turns the saved building being put in a quarter turn (1 anticlockwise, −1 clockwise, seen from above).</summary>
+    public void TurnStamp(int by)
+    {
+        if (_stampBase is null) return;
+        _stampTurn = ((_stampTurn + by) % 4 + 4) % 4;
+        _stamp = _stampBase.Turned(_stampTurn);
+        SelectionChanged?.Invoke();
+        InvalidateVisual();
+    }
+
+    /// <summary>Where the saved building would go with the pointer at <paramref name="p"/>: how far it's moved (squares), its middle on the pointer, kept on the grid.</summary>
+    (int Dx, int Dy) StampAt(HouseDesign stamp, Point p)
+    {
+        var (_, _, w, h) = stamp.GridBounds();
+        var (x, y) = ToPlan(p);
+        int dx = (int)Math.Round(x - w / 2.0), dy = (int)Math.Round(y - h / 2.0);
+        return (Math.Clamp(dx, 0, Math.Max(0, GridSize - w)), Math.Clamp(dy, 0, Math.Max(0, GridSize - h)));
+    }
+
     public PlanEditor()
     {
         ClipToBounds = true;
@@ -173,6 +214,169 @@ public sealed class PlanEditor : Control
     }
 
     Level Floor => _design.Levels[_level];
+
+    /// <summary>What's picked, as one thing on one floor (null: nothing).</summary>
+    public PlanPick? CurrentPick =>
+        Selected >= 0 ? new PlanPick(_level, PickKind.Opening, Selected)
+        : SelectedRoof >= 0 ? new PlanPick(_level, PickKind.Roof, SelectedRoof)
+        : SelectedWall is { } w ? new PlanPick(_level, PickKind.Wall, Edge: w)
+        : SelectedRailing is { } r ? new PlanPick(_level, PickKind.Railing, Edge: r)
+        : SelectedColumn is { } c ? new PlanPick(_level, PickKind.Column, At: c)
+        : SelectedItem >= 0 ? new PlanPick(_level, PickKind.Item, SelectedItem)
+        : SelectedWay >= 0 ? new PlanPick(_level, PickKind.Way, SelectedWay)
+        : SelectedRoom is { } m ? new PlanPick(_level, PickKind.Room, Point: m)
+        : null;
+
+    /// <summary>Picks one thing on the floor shown (null: nothing), as a click on it with Select would (the 3D view's clicks).</summary>
+    public void PickThing(PlanPick? p)
+    {
+        switch (p)
+        {
+            case null: Pick(-1, -1, null, null, null, null); break;
+            case { Kind: PickKind.Opening }: Select(p.Index); break;
+            case { Kind: PickKind.Roof }: SelectRoof(p.Index); break;
+            case { Kind: PickKind.Wall }: SelectWall(p.Edge); break;
+            case { Kind: PickKind.Railing }: SelectRailing(p.Edge); break;
+            case { Kind: PickKind.Column }: SelectColumn(p.At); break;
+            case { Kind: PickKind.Item }: SelectItem(p.Index); break;
+            case { Kind: PickKind.Way }: SelectWay(p.Index); break;
+            case { Kind: PickKind.Room }: SelectRoom(p.Point); break;
+        }
+        InvalidateVisual();
+    }
+
+    // ---- copy and paste ----
+
+    /// <summary>What was copied (furniture, a way up, a door or window): kept while the editor's open, for any floor.</summary>
+    static object? _copied;
+
+    /// <summary>The furniture, way up, or door or window picked, which can be copied; null if what's picked can't be.</summary>
+    object? Copyable =>
+        SelectedItem >= 0 && SelectedItem < Floor.Furniture.Count ? Floor.Furniture[SelectedItem]
+        : SelectedWay >= 0 && SelectedWay < Floor.WaysUp.Count ? Floor.WaysUp[SelectedWay]
+        : Selected >= 0 && Selected < Floor.Openings.Count ? Floor.Openings[Selected]
+        : null;
+
+    /// <summary>What's picked can be copied (it's furniture, a way up, or a door or window).</summary>
+    public bool CanCopy => Copyable is not null;
+
+    /// <summary>Something has been copied, to paste.</summary>
+    public bool HasCopy => _copied is not null;
+
+    /// <summary>Copies what's picked, to paste (Ctrl+C); false if it's nothing that can be copied.</summary>
+    public bool CopyPicked()
+    {
+        if (Copyable is not { } c) return false;
+        _copied = c;
+        return true;
+    }
+
+    /// <summary>A copy of what's picked put down beside it, and picked (the Copy button, Ctrl+D); false if it can't be.</summary>
+    public bool Duplicate() => Copyable is { } c && Put(c, atPointer: false);
+
+    /// <summary>
+    /// What was copied put down on this floor (Ctrl+V): at the pointer when it's over the plan (on a wall, for a door or
+    /// window), otherwise beside the one copied; the copy is picked. False when there's nothing copied or no room for it.
+    /// </summary>
+    public bool Paste() => _copied is { } c && Put(c, atPointer: true);
+
+    bool Put(object what, bool atPointer)
+    {
+        double sq = Math.Max(5, _design.SquareMm);
+        bool pointer = atPointer && _inside;
+        switch (what)
+        {
+            case PlacedItem it:
+            {
+                var (x, y) = pointer ? SnapItem(ToPlan(_mouse), false)
+                    : Beside(it.X, it.Y, (x, y) => [HouseKitMaker.ItemArea(_design.Style, it with { X = x, Y = y }, sq)]);
+                Commit(Floor with { Furniture = [.. Floor.Furniture, it with { X = x, Y = y }] }, "Copy furniture");
+                SelectItem(Floor.Furniture.Count - 1);
+                return true;
+            }
+            case PlacedWay w:
+            {
+                var (x, y) = pointer ? SnapItem(ToPlan(_mouse), false) : Beside(w.X, w.Y, (x, y) =>
+                {
+                    var (hatch, foot) = HouseKitMaker.WayArea(_design.Style, w with { X = x, Y = y }, sq);
+                    var b = Clipper.GetBounds(new PathsD(hatch.Concat(foot)));
+                    return [new RectD(b.left / sq, b.top / sq, b.right / sq, b.bottom / sq)];
+                });
+                Commit(Floor with { WaysUp = [.. Floor.WaysUp, w with { X = x, Y = y }] }, "Copy a way up");
+                SelectWay(Floor.WaysUp.Count - 1);
+                return true;
+            }
+            case Opening o:
+            {
+                var at = pointer ? OnWall(_mouse) : AlongWall(o, sq);
+                if (at is not { } spot) return false;
+                Commit(Floor with { Openings = [.. Floor.Openings, o with { X = spot.X, Y = spot.Y }] }, $"Copy a {(o.Kind == OpeningKind.Window ? "window" : o.Kind == OpeningKind.Door ? "door" : "doorway")}");
+                Select(Floor.Openings.Count - 1);
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Where a copy of a piece at (<paramref name="x"/>, <paramref name="y"/>) goes: just clear of it to its right, left,
+    /// front or back, the first of those that stays in the same room clear of the furniture there (or just in the room;
+    /// or, if there's no room for it, half a square off it). <paramref name="area"/> is the floor it would take there (squares).
+    /// </summary>
+    (double X, double Y) Beside(double x, double y, Func<double, double, List<RectD>> area)
+    {
+        var here = area(x, y);
+        double l = here.Min(r => Math.Min(r.left, r.right)), t = here.Min(r => Math.Min(r.top, r.bottom));
+        double w = here.Max(r => Math.Max(r.left, r.right)) - l, h = here.Max(r => Math.Max(r.top, r.bottom)) - t;
+        double sx = Math.Ceiling((w + 0.125) * 8) / 8, sy = Math.Ceiling((h + 0.125) * 8) / 8;
+        int room = _plan.RoomAt(x, y);
+        var taken = Floor.Furniture.Select(f => HouseKitMaker.ItemArea(_design.Style, f, Math.Max(5, _design.SquareMm))).ToList();
+        bool Free((double X, double Y) at, bool clearOfFurniture)
+        {
+            var rs = area(at.X, at.Y);
+            foreach (var r in rs)
+            {
+                double x0 = Math.Min(r.left, r.right) + 0.02, x1 = Math.Max(r.left, r.right) - 0.02, y0 = Math.Min(r.top, r.bottom) + 0.02, y1 = Math.Max(r.top, r.bottom) - 0.02;
+                if (x0 < 0 || y0 < 0 || x1 > GridSize || y1 > GridSize) return false;
+                // Inside the room it was in (or out of every room, as it was), corner to corner.
+                foreach (var (cx, cy) in new[] { (x0, y0), (x1, y0), (x0, y1), (x1, y1), ((x0 + x1) / 2, (y0 + y1) / 2) })
+                    if (_plan.RoomAt(cx, cy) != room) return false;
+                if (clearOfFurniture && taken.Any(o => Math.Min(o.left, o.right) < x1 && Math.Max(o.left, o.right) > x0 && Math.Min(o.top, o.bottom) < y1 && Math.Max(o.top, o.bottom) > y0)) return false;
+            }
+            return true;
+        }
+        var tries = new[] { (x + sx, y), (x - sx, y), (x, y + sy), (x, y - sy) }.Select(p => SnapItem(p, false)).ToList();
+        // Clear of the other furniture if it can be; else just in the room; else nearly on top of it, to drag away.
+        foreach (bool clear in new[] { true, false })
+            foreach (var p in tries)
+                if (Free(p, clear)) return p;
+        return SnapItem((x + 0.5, y + 0.5), false);
+    }
+
+    /// <summary>A spot further along the same wall for a copy of a door or window (either way), clear of the others; null if there's no room.</summary>
+    (double X, double Y)? AlongWall(Opening o, double sq)
+    {
+        foreach (var run in _plan.Runs)
+        {
+            double ax = run.A.X, ay = run.A.Y, dx = run.B.X - ax, dy = run.B.Y - ay, len2 = dx * dx + dy * dy;
+            if (run.Steps < 1 || len2 < 1e-9) continue;
+            double t = ((o.X - ax) * dx + (o.Y - ay) * dy) / len2;
+            double off = Math.Abs((o.X - ax) * dy - (o.Y - ay) * dx) / Math.Sqrt(len2);
+            if (off > 0.05 || t < -0.01 || t > 1.01) continue;
+            double here = t * run.Steps, need = Math.Max(1, Math.Ceiling((o.WidthMm / sq + 0.25) * 4) / 4);
+            for (int n = 1; n <= run.Steps * 2; n++)
+                foreach (int side in new[] { 1, -1 })
+                {
+                    double steps = here + side * need * n;
+                    if (steps < 0.5 || steps > run.Steps - 0.5) continue;
+                    double px = ax + dx * steps / run.Steps, py = ay + dy * steps / run.Steps;
+                    bool clear = Floor.Openings.All(q => Math.Sqrt((q.X - px) * (q.X - px) + (q.Y - py) * (q.Y - py)) * sq >= (q.WidthMm + o.WidthMm) / 2 + 1);
+                    if (clear) return (px, py);
+                }
+        }
+        return null;
+    }
 
     void CommitDesign(HouseDesign design, string what)
     {
@@ -377,6 +581,15 @@ public sealed class PlanEditor : Control
                 Commit(Floor with { WaysUp = [.. Floor.WaysUp, new PlacedWay { X = x, Y = y, Turn = turn, Kind = WayToPlace }] }, "Put in a way up");
                 SelectWay(Floor.WaysUp.Count - 1);
                 StartDrag(pt.Position, -1, Floor.WaysUp.Count - 1);
+                break;
+            }
+            case PlanTool.Place:
+            {
+                if (_stamp is not { } stamp) break;
+                var (dx, dy) = StampAt(stamp, pt.Position);
+                var placed = _design.With(stamp, dx, dy, _level);
+                Changed?.Invoke(placed, "Put in a saved building");
+                Show(placed, _level);
                 break;
             }
             case PlanTool.Floor:
@@ -746,9 +959,19 @@ public sealed class PlanEditor : Control
             Commit(Floor with { WaysUp = [.. Floor.WaysUp.Where((_, j) => j != i)] }, "Take away a way up");
             e.Handled = true;
         }
-        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && (SelectedItem >= 0 || SelectedWay >= 0))
+        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && Tool != PlanTool.Place && (SelectedItem >= 0 || SelectedWay >= 0))
         {
             TurnPicked(e.Key is Key.OemOpenBrackets or Key.OemComma ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (e.Key is Key.OemOpenBrackets or Key.OemCloseBrackets or Key.OemComma or Key.OemPeriod && Tool == PlanTool.Place && _stamp is not null)
+        {
+            TurnStamp(e.Key is Key.OemOpenBrackets or Key.OemComma ? 1 : -1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape && Tool == PlanTool.Place)
+        {
+            PlacingStopped?.Invoke();
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
@@ -952,6 +1175,7 @@ public sealed class PlanEditor : Control
                 var ghost = Tool == PlanTool.Door ? Opening.NewDoor(s, at.X, at.Y) : Tool == PlanTool.Doorway ? Opening.NewDoorway(s, at.X, at.Y) : Opening.NewWindow(s, at.X, at.Y);
                 DrawOpening(ctx, ghost, false, wallPx, 0x80);
             }
+            else if (Tool == PlanTool.Place && _stamp is { } stamp) DrawStamp(ctx, stamp, wallPx);
         }
 
         if (Floor.Walls.Count == 0 && _from is null)
@@ -965,6 +1189,30 @@ public sealed class PlanEditor : Control
     }
 
     static readonly Color RoofColour = Color.FromRgb(0x9A, 0x4E, 0x36);
+
+    /// <summary>The saved building where a click would put it: its ground floor's floor and walls on this floor, its floors above dashed, its name and size.</summary>
+    void DrawStamp(DrawingContext ctx, HouseDesign stamp, double wallPx)
+    {
+        var (dx, dy) = StampAt(stamp, _mouse);
+        var moved = stamp.Moved(dx, dy);
+        var ground = moved.Levels[0];
+        var area = HouseKitMaker.FloorArea(ground, null, ground.Shape());
+        if (area.Count > 0) ctx.DrawGeometry(new SolidColorBrush(Color.FromArgb(0x50, 0x30, 0x80, 0xD0)), null, Shape(area));
+        var pen = new Pen(new SolidColorBrush(Color.FromArgb(0xC0, 0x30, 0x80, 0xD0)), wallPx, lineCap: PenLineCap.Square);
+        foreach (var w in ground.Walls) ctx.DrawLine(pen, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        var upper = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x30, 0x80, 0xD0)), Math.Max(1.5, wallPx / 3), new DashStyle([3, 2], 0), PenLineCap.Flat);
+        foreach (var l in moved.Levels.Skip(1))
+            foreach (var w in l.Walls) ctx.DrawLine(upper, ToScreen(w.A.X, w.A.Y), ToScreen(w.B.X, w.B.Y));
+        foreach (var o in ground.Openings) DrawOpening(ctx, o, false, wallPx, 0x90);
+        var (_, _, w0, h0) = stamp.GridBounds();
+        int floors = stamp.Levels.Count;
+        // Under it, kept inside the plan.
+        string text = $"{StampName ?? "Saved building"}: {w0} × {h0} squares, {floors} floor{(floors == 1 ? "" : "s")} ([ and ] turn it)";
+        var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface(FontFamily.Default), 12, Brushes.White);
+        var at = ToScreen(dx, dy + h0) + new Point(4, 10);
+        at = new Point(Math.Clamp(at.X, 6, Math.Max(6, Bounds.Width - ft.Width - 8)), Math.Clamp(at.Y, 4, Math.Max(4, Bounds.Height - ft.Height - 6)));
+        Label(ctx, at, text);
+    }
 
     static readonly IBrush Picked = new SolidColorBrush(Color.FromRgb(0x30, 0x80, 0xD0));
 

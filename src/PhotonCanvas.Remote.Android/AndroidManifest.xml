@@ -4,6 +4,13 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <!-- A buzz when a job ends, a long one for the machine's alarms. -->
   <uses-permission android:name="android.permission.VIBRATE" />
+  <!-- Notifications: a job's progress and end, and the machine's alarms (newer Android asks the user). -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+  <!-- Watching the machine with the app closed: a "connected device" foreground service (the laser, through the
+       computer, over the network). Android needs one of the network permissions below for that kind of service. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
   <!-- No backup: the computer's access code stays on this phone. -->
   <application
       android:label="PhotonCanvas Remote"

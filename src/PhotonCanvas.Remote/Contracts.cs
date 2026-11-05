@@ -9,7 +9,8 @@ namespace PhotonCanvas.Remote;
 /// <summary>GET /api/info.</summary>
 /// <param name="Api">The API's version: the phone can tell an older server.</param>
 /// <param name="AndroidApp">Where the server offers the Android app for download, if it has it.</param>
-public sealed record ServerInfo(string Product, string? Version, string? Machine, string CameraNote, int Api = ServerInfo.CurrentApi, string? AndroidApp = null)
+/// <param name="Addresses">The computer's addresses (home network, Tailscale): the phone keeps them and uses whichever answers, at home or away.</param>
+public sealed record ServerInfo(string Product, string? Version, string? Machine, string CameraNote, int Api = ServerInfo.CurrentApi, string? AndroidApp = null, string[]? Addresses = null)
 {
     public const int CurrentApi = 1;
 }
@@ -57,9 +58,13 @@ public sealed record StartRequest(string? PictureId);
 public sealed record ModeResult(string Mode, string State);
 
 /// <summary>A job the server saw run (GET /api/history), with picture URLs (or null).</summary>
+/// <param name="ProjectId">The design it came from, when the phone loaded it and the file is still there ("Run again").</param>
 public sealed record HistoryItem(
     string Id, string Design, string Source, string SourceText, DateTimeOffset? LoadedAt, DateTimeOffset StartedAt, DateTimeOffset? EndedAt,
-    bool Finished, bool StartedFromPhone, double? EstimateS, double? TookS, string? Before, string? After);
+    bool Finished, bool StartedFromPhone, double? EstimateS, double? TookS, string? Before, string? After, string? ProjectId = null);
+
+/// <summary>GET /tls (no access code): where the encrypted connection is, and its certificate's fingerprint.</summary>
+public sealed record TlsInfo(int Port, string Fingerprint);
 
 /// <summary>A "job" event.</summary>
 /// <param name="Kind">"started", "finished", "stopped", or "picture" (the after picture is saved).</param>
@@ -81,6 +86,7 @@ public static class Routes
     public const string Projects = "/api/projects";
     public const string History = "/api/history";
     public const string Start = "/api/job/start";
+    public const string Tls = "/tls";
     public static string Camera(string camera) => $"/api/camera/{camera}";
     public static string Picture(string id) => $"/api/pictures/{id}";
     public static string Check(string id) => $"/api/projects/{id}/check";
@@ -103,4 +109,6 @@ public static class Routes
 [JsonSerializable(typeof(AlertEvent))]
 [JsonSerializable(typeof(ErrorBody))]
 [JsonSerializable(typeof(ConnectionInfo))]
+[JsonSerializable(typeof(TlsInfo))]
+[JsonSerializable(typeof(PhoneSettings))]
 public sealed partial class RemoteJson : JsonSerializerContext;
