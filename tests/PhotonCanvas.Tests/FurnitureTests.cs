@@ -339,6 +339,37 @@ public class FurnitureTests
     }
 
     [Fact]
+    public void A_four_poster_has_finials_and_curtains_and_keeps_its_height()
+    {
+        var it = Defaults.For(ItemKind.Bed) with { BedStyle = BedStyle.FourPoster, WidthMm = 34, DepthMm = 20, HeightMm = 34 };
+        var k = Make(it);
+        Assert.True(k.Ok);
+        Assert.DoesNotContain(k.Findings, f => f.Level == Severity.Warn);
+        var all = Assemble(k, 2);
+        // The finials stand over the canopy, to the height asked plus the canopy's sheet.
+        var canopy = all.First(p => p.Name == "Canopy");
+        Assert.True(all.Where(p => p.Name == "Head board").Max(p => p.Box().Max.Y) > canopy.Box().Max.Y + 2, "finials");
+        Assert.Equal(34 + 2, all.Max(p => p.Box().Max.Y), 1);
+        // The curtains hang from the canopy rails' ends, well down below them.
+        var rail = Part(k, "Canopy rail");
+        Assert.True(Geo.Bounds(rail.Cut).Height > 10, "curtains");
+        Assert.Empty(Clashes(all));
+        Assert.Empty(Unjoined(all, 2));
+    }
+
+    [Fact]
+    public void A_candelabra_has_a_flame_burnt_on_each_candle_and_lockers_have_vents()
+    {
+        var c = Make(Defaults.For(ItemKind.Candlestand) with { WidthMm = 12, HeightMm = 26 });
+        Assert.True(c.Ok);
+        Assert.DoesNotContain(c.Findings, f => f.Level == Severity.Warn);
+        Assert.True(Geo.Pieces(Part(c, "Candelabra").Etched) >= 5, "five flames");
+        var l = Make(Defaults.For(ItemKind.Cabinet) with { Front = CabinetFront.Locker, Theme = "Sci-fi", WidthMm = 24, DepthMm = 10, HeightMm = 34, Columns = 3 });
+        Assert.True(l.Ok);
+        Assert.True(Part(l, "Front").Cut.Count >= 1 + 3 * 5, "vents cut through");
+    }
+
+    [Fact]
     public void Box_corners_interlock_with_fingers_on_every_edge()
     {
         var k = Make(Defaults.For(ItemKind.Crate) with { WidthMm = 20, DepthMm = 14, HeightMm = 12, Lid = LidStyle.Flat });

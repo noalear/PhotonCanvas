@@ -181,6 +181,9 @@ public static class Beds
         var look = Fronts.Look(m);
         double L = it.WidthMm, D = it.DepthMm, T = m.T, f = m.Fit, sw = m.SlotW, H = it.HeightMm;
         double si = 1.0, legs = Math.Max(it.LegMm > 0 ? it.LegMm : Math.Max(2.5, T + 0.5), fourPoster ? sw + 2.3 : 0);
+        // A four-poster's posts end in finials over the canopy: the canopy comes down to keep the height asked.
+        double finR = legs * 0.25, fin = fourPoster ? 1.2 + 1.9 * finR + Math.Max(0.55, finR * 0.5) : 0;
+        H -= fin;
         double rh = Geo.Clamp((it.MattressMm - T) * 0.35, 2.2, 3.5), th = Math.Max(1.2, rh - 1);
         // Mattress tops: one, or the bunk's two (the upper one high enough to sit up under).
         var levels = new List<double> { it.MattressMm };
@@ -208,7 +211,17 @@ public static class Beds
             var o = new PathsD { Geo.Rect(0, 0, legs, H), Geo.Rect(D - legs, 0, D, H) };
             o.Add(Shapes.Topped(look == FrontLook.Gothic ? BackTop.Pointed : BackTop.Arched, legs - 0.01, 0, D - legs + 0.01, panel, Math.Min(Db * 0.25, panel * 0.3)));
             // The posts' tabs up into the canopy.
-            foreach (var u in new[] { legs / 2, D - legs / 2 }) o.Add(Geo.Rect(u - legs * 0.25, H - 0.01, u + legs * 0.25, H + T));
+            foreach (var u in new[] { legs / 2, D - legs / 2 })
+            {
+                o.Add(Geo.Rect(u - legs * 0.25, H - 0.01, u + legs * 0.25, H + T));
+                // A finial on it, no wider than the tab so it goes up through the canopy's slot: a collar, a ball, a knob.
+                double y = H + T;
+                o.Add(Geo.Rect(u - finR, y - 0.01, u + finR, y + 0.5));
+                o.Add(Geo.Rect(u - Math.Max(0.6, finR * 0.55), y + 0.4, u + Math.Max(0.6, finR * 0.55), y + 1.0));
+                double bc = y + 0.9 + finR * 0.9;
+                o.Add(Geo.Circle(u, bc, finR, 0.02));
+                o.Add(Geo.Circle(u, bc + finR + 0.3, Math.Max(0.55, finR * 0.5), 0.02));
+            }
             return o;
         }
         var holes = new PathsD { WoodFace.RoundRect(legs, -3, D - legs, levels[0] - T - rh - 1.2, Math.Min(1, (D - 2 * legs) / 2)) };
@@ -236,8 +249,8 @@ public static class Beds
             for (double y = ya; y + 1.8 <= yb; y += 3.0) footHoles.Add(Geo.Rect(z0, y, z1, y + 2.0));
         }
         var (he, hl) = BoardDetail(look, m.Theme, D, legs, headPanel, fourPoster);
-        m.Add("Head board", Board(headPanel), holes, [Pose.Left(T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3, etched: he, lines: hl);
-        m.Add("Foot board", Board(footPanel), footHoles, [Pose.Left(L - T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3);
+        m.Add("Head board", Geo.Solid(Board(headPanel)), holes, [Pose.Left(T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3, etched: he, lines: hl);
+        m.Add("Foot board", Geo.Solid(Board(footPanel)), footHoles, [Pose.Left(L - T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3);
 
         // ---- mattresses and their rails ----
         for (int i = 0; i < levels.Count; i++)
@@ -291,9 +304,36 @@ public static class Beds
         };
         foreach (var u in rtAt) crail.Add(Geo.Rect(u - rtw / 2, crh - 0.01, u + rtw / 2, crh + T));
         var vl = new List<PathD>();
+        var ve = new PathsD();
         // The valance: a scalloped hem scored along the rail.
         for (double x = 0; x < Lb - 0.5; x += 2.5) vl.Add([.. Geo.Arc(x + 1.25, 1.2, 1.25, Math.PI, Math.PI * 2, 0.02)]);
-        m.Add("Canopy rail", crail, [], [Pose.Front(T, H - crh, legs / 2), Pose.Front(T, H - crh, D - legs / 2)], grainAlongU: true, face: [], lines: vl);
+        // Curtains hanging from the rail's ends, tied back against the posts, clear of the pillows on the mattress.
+        double drop = H - crh - (levels[0] + 4.5), cw = Geo.Clamp(Lb * 0.17, 3.5, 6.5);
+        bool curtains = drop >= 8 && Lb >= 4 * cw;
+        if (curtains)
+        {
+            double vt = -drop * 0.62, vb = -drop, wt = Math.Max(1.6, cw * 0.32), wb = cw * 0.62;
+            var drape = new PathD { new(0, 0.01), new(cw, 0.01) };
+            for (int i = 1; i <= 10; i++) { double t = i / 10.0; drape.Add(new PointD(wt + (cw - wt) * (1 - t) * (1 - t), vt * t)); }
+            for (int i = 1; i <= 8; i++) { double t = i / 8.0; drape.Add(new PointD(wt + (wb - wt) * Math.Sin(t * Math.PI / 2), vt + (vb - vt) * t)); }
+            drape.Add(new PointD(0, vb));
+            PathD Flip(PathD q) => [.. q.Select(p => new PointD(Lb - p.x, p.y)).Reverse()];
+            crail.Add(drape);
+            crail.Add(Flip(drape));
+            foreach (var side in new[] { false, true })
+            {
+                PointD At(double u, double v) => side ? new PointD(Lb - u, v) : new PointD(u, v);
+                // Folds gathered into the tie, and spreading below it; the tie itself.
+                foreach (var k in new[] { 0.3, 0.55, 0.8 })
+                {
+                    vl.Add([At(cw * k, -0.3), At(wt * (0.2 + k * 0.6), vt + 0.6)]);
+                    vl.Add([At(wt * (0.2 + k * 0.6), vt - 0.6), At(wb * k, vb + 0.3)]);
+                }
+                var tie = new PathD { At(0, vt - 0.35), At(wt + 0.2, vt - 0.35), At(wt + 0.2, vt + 0.35), At(0, vt + 0.35) };
+                ve.AddRange(Geo.Intersect([tie], [side ? Flip(drape) : drape]));
+            }
+        }
+        m.Add("Canopy rail", Geo.Solid(crail), [], [Pose.Front(T, H - crh, legs / 2), Pose.Front(T, H - crh, D - legs / 2)], grainAlongU: true, face: [], etched: ve, lines: vl);
         double o = 1.2, Lc = L + 2 * o, Dc = D + 2 * o;
         var cslots = new PathsD();
         foreach (var xs in new[] { T / 2, L - T / 2 })

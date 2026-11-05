@@ -73,34 +73,49 @@ public static class Profiles
             }
             default:
             {
-                // A stem, curved arms out to candles: three, or five on a wide one.
-                double cupY = H - 4.2, armY = cupY - Math.Min(4, H * 0.18);
-                shape.AddRange(Bar(xc, footH, xc, cupY, stem));
+                // A stem with knops, arms curving out and up to drip pans, a taper in each with its flame: three
+                // candles, or five on a wide one, the middle one standing highest.
+                double flameH = Geo.Clamp(H * 0.075, 1.5, 2.2), taper = Geo.Clamp(H * 0.11, 2.2, 3.4);
+                double topY = H - flameH - taper;                  // the middle pan's top
                 int each = W >= 12 ? 2 : 1;
-                var tips = new List<double> { xc };
+                double step = (W / 2 - 1.4) / each, pan = Math.Min(1.25, step * 0.45 + 0.15), sideY = topY - Math.Min(1.4, H * 0.05);
+                double armY = sideY - Math.Min(4.5, H * 0.2);
+                shape.AddRange(Bar(xc, footH, xc, topY, stem));
+                // Knops: one low on the stem, one where the arms spring from it.
+                shape.Add(Rugs.Ellipse(xc, footH + (armY - footH) * 0.45, 1.25, 0.8));
+                shape.Add(Rugs.Ellipse(xc, armY - 0.2, 1.15, 0.75));
+                var cups = new List<(double X, double Y)> { (xc, topY) };
                 for (int k = 1; k <= each; k++)
                 {
-                    double reach = (W / 2 - 1.0) * k / each;
+                    double reach = step * k, y0 = armY - (k - 1) * 1.4;
                     foreach (var s in new[] { -1, 1 })
                     {
                         var arm = new PathD();
-                        double y0 = armY - (k - 1) * 1.6;
-                        for (int i = 0; i <= 12; i++)
+                        for (int i = 0; i <= 14; i++)
                         {
-                            double t = i / 12.0;
-                            arm.Add(new PointD(xc + s * reach * Math.Sin(t * Math.PI / 2), y0 + (cupY - y0) * (1 - Math.Cos(t * Math.PI / 2))));
+                            double t = i / 14.0;
+                            arm.Add(new PointD(xc + s * reach * Math.Sin(t * Math.PI / 2), y0 + (sideY - 0.5 - y0) * (1 - Math.Cos(t * Math.PI / 2))));
                         }
                         shape.AddRange(Bar(arm, 1.05));
-                        tips.Add(xc + s * reach);
+                        cups.Add((xc + s * reach, sideY));
                     }
                 }
-                foreach (var x in tips)
+                foreach (var (x, y) in cups)
                 {
-                    shape.Add(WoodFace.RoundRect(x - 1.0, cupY - 0.5, x + 1.0, cupY + 0.7, 0.4));
-                    shape.Add(Geo.Rect(x - 0.5, cupY + 0.5, x + 0.5, cupY + 2.4));
-                    shape.AddRange(Flames(x, cupY + 2.3, 1.0, 1.7));
-                    lines.Add([new(x - 0.5, cupY + 2.35), new(x + 0.5, cupY + 2.35)]);
+                    // A cup under a wide, thin drip pan; the taper; its flame.
+                    shape.Add(new PathD { new(x - 0.6, y - 1.3), new(x + 0.6, y - 1.3), new(x + 0.9, y - 0.5), new(x - 0.9, y - 0.5) });
+                    shape.Add(WoodFace.RoundRect(x - pan, y - 0.6, x + pan, y + 0.35, 0.3));
+                    shape.Add(Geo.Rect(x - 0.55, y, x + 0.55, y + taper));
+                    var flame = Flames(x, y + taper - 0.5, 1.35, flameH + 0.5);
+                    shape.AddRange(flame);
+                    // The flame burnt dark, so it shows against the taper.
+                    etched.AddRange(Geo.Intersect(Geo.Offset(flame, -0.18), [Geo.Rect(x - 2, y + taper + 0.05, x + 2, H + 1)]));
+                    lines.Add([new(x - pan + 0.2, y - 0.12), new(x + pan - 0.2, y - 0.12)]);
+                    // Wax run down the taper, and where the flame meets it.
+                    lines.Add([new(x - 0.2, y + taper - 0.2), new(x - 0.2, y + taper * 0.55)]);
+                    lines.Add([new(x - 0.5, y + taper - 0.05), new(x + 0.5, y + taper - 0.05)]);
                 }
+                lines.Add([new(xc - 0.5, footH + (armY - footH) * 0.45), new(xc + 0.5, footH + (armY - footH) * 0.45)]);
                 break;
             }
         }

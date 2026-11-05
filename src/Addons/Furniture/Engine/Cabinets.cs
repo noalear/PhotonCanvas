@@ -36,8 +36,10 @@ public static class Cabinets
         // The top: one layer, or two stepped out for a cornice; a pediment or an arch above it.
         var crown = clock ? (it.Crown == Crown.Pediment ? Crown.Pediment : Crown.Arch) : it.Crown;
         int layers = crown == Crown.Cornice ? 2 : 1;
-        double hc = crown is Crown.Pediment or Crown.Arch ? Geo.Clamp(W * (crown == Crown.Arch ? 0.28 : 0.2), 2.5, 8) : 0;
-        double bodyTop = H - hc - layers * T;
+        double hc = crown is Crown.Pediment or Crown.Arch ? Geo.Clamp(W * (clock ? 0.42 : crown == Crown.Arch ? 0.28 : 0.2), clock ? 3.2 : 2.5, 8) : 0;
+        // A clock's crown carries finials: a ball on the top and one on each end.
+        double finR = clock && hc > 0 ? Geo.Clamp(W * 0.06, 0.55, 0.8) : 0, finH = finR > 0 ? 0.6 + 2 * finR : 0;
+        double bodyTop = H - hc - finH - layers * T;
         double Dl = D, Dup = hutch ? Geo.Clamp(D * 0.5, 2 * T + 3.5, D - 2) : D;
         double Hl = hutch ? Geo.Clamp(H * 0.45, kick + 2 * T + 6, bodyTop - T - 7) : 0;
 
@@ -245,6 +247,19 @@ public static class Cabinets
                 shape.Add(Geo.Tidy([arc]).FirstOrDefault() ?? arc);
             }
             foreach (var x in crownTabs) shape.Add(Geo.Rect(x - crownTw / 2, -layers * T, x + crownTw / 2, 0.01));
+            if (finR > 0)
+            {
+                // Finials: on a neck at the top, and on a little block at each end.
+                double neck = Math.Max(1.0, finR * 1.3);
+                shape.Add(Geo.Rect(Wc / 2 - neck / 2, hc - 0.6, Wc / 2 + neck / 2, hc + 0.7));
+                shape.Add(Geo.Circle(Wc / 2, hc + 0.6 + finR, finR, 0.02));
+                foreach (var x in new[] { finR + 0.15, Wc - finR - 0.15 })
+                {
+                    shape.Add(Geo.Rect(x - finR, hb - 0.01, x + finR, hb + 0.7));
+                    shape.Add(Geo.Circle(x, hb + 0.6 + finR * 0.85, finR * 0.85, 0.02));
+                }
+                shape = Geo.Solid(shape);
+            }
             var etched = new PathsD();
             var lines = new List<PathD>();
             // A moulding line and something in the middle: a disc, a clock's finial, a star.
@@ -394,11 +409,18 @@ public static class Cabinets
                 {
                     double a = x0 + c * dw + 0.2, b = x0 + (c + 1) * dw - 0.2;
                     Fronts.Door(FrontLook.Metal, a, y0, b, y1, hingeLeft: true, rnd, etched, lines);
-                    // Vents top and bottom, and a name plate.
+                    // Vents top and bottom, cut through where there's room (bars between them a laser can leave), and a name plate.
                     double vw = (b - a) * 0.6, cx = (a + b) / 2;
-                    foreach (var vy in new[] { y1 - Math.Min(4, (y1 - y0) * 0.15), y0 + Math.Min(2.5, (y1 - y0) * 0.1) })
-                        for (int k = 0; k < 3; k++) etched.Add(Geo.Rect(cx - vw / 2, vy + k * 0.7, cx + vw / 2, vy + k * 0.7 + 0.3));
-                    double ny = y1 - Math.Min(6, (y1 - y0) * 0.24);
+                    if (Math.Abs(vw - m.SlotW) < 0.15) vw -= 0.3;
+                    bool cutVents = b - a >= 3.5 && y1 - y0 >= 16;
+                    double vTop = cutVents ? y1 - 1.5 - 2 * 1.6 - 0.6 : y1 - Math.Min(4, (y1 - y0) * 0.15), vBot = cutVents ? y0 + 1.5 : y0 + Math.Min(2.5, (y1 - y0) * 0.1);
+                    foreach (var (vy, n) in new[] { (vTop, 3), (vBot, 2) })
+                        for (int k = 0; k < n; k++)
+                        {
+                            if (cutVents) holes.Add(WoodFace.RoundRect(cx - vw / 2, vy + k * 1.6, cx + vw / 2, vy + k * 1.6 + 0.6, 0.29));
+                            else etched.Add(Geo.Rect(cx - vw / 2, vy + k * 0.7, cx + vw / 2, vy + k * 0.7 + 0.3));
+                        }
+                    double ny = cutVents ? vTop - 1.8 : y1 - Math.Min(6, (y1 - y0) * 0.24);
                     if (b - a > 4) lines.Add(Geo.Loop(Geo.Rect(cx - vw / 2, ny, cx + vw / 2, ny + 1.0)));
                 }
                 break;
@@ -490,20 +512,32 @@ public static class Cabinets
             holes.Add(shape);
         }
         // The dial: a ring of hour marks, the hands at ten past ten.
-        double r = Math.Min(W * 0.36, hood * 0.36), cx = W / 2, cy = top - hood / 2;
+        double r = Math.Min(W * 0.42, hood * 0.4), cx = W / 2, cy = top - hood / 2;
         if (r > 1)
         {
-            lines.Add(WoodFace.Dot(cx, cy, r));
-            lines.Add(WoodFace.Dot(cx, cy, r * 0.72));
+            // A dark chapter ring with the hours left light in it, a bezel round it, the hands at ten past ten.
+            lines.Add(WoodFace.Dot(cx, cy, r + 0.25));
+            var ring = Geo.Subtract([Geo.Circle(cx, cy, r, 0.01)], [Geo.Circle(cx, cy, r * 0.7, 0.01)]);
+            var marks = new PathsD();
             for (int h = 0; h < 12; h++)
             {
-                double a = Math.PI / 2 - h * Math.PI / 6;
-                lines.Add([new(cx + Math.Cos(a) * r * 0.78, cy + Math.Sin(a) * r * 0.78), new(cx + Math.Cos(a) * r * 0.94, cy + Math.Sin(a) * r * 0.94)]);
+                double a = Math.PI / 2 - h * Math.PI / 6, mw = h % 3 == 0 ? 0.32 : 0.18;
+                var (c, sn) = (Math.Cos(a), Math.Sin(a));
+                PointD P(double rad, double side) => new(cx + c * rad - sn * side, cy + sn * rad + c * side);
+                marks.Add([P(r * 0.76, -mw / 2), P(r * 0.94, -mw / 2), P(r * 0.94, mw / 2), P(r * 0.76, mw / 2)]);
             }
+            etched.AddRange(Geo.Subtract(ring, Geo.Solid(marks)));
             double ah = Math.PI / 2 - 10.2 * Math.PI / 6, am = Math.PI / 2 - 2 * Math.PI / 12 * 1;
-            lines.Add([new(cx, cy), new(cx + Math.Cos(ah) * r * 0.45, cy + Math.Sin(ah) * r * 0.45)]);
-            lines.Add([new(cx, cy), new(cx + Math.Cos(am) * r * 0.65, cy + Math.Sin(am) * r * 0.65)]);
-            etched.Add(Geo.Circle(cx, cy, Math.Max(0.15, r * 0.08), 0.01));
+            etched.AddRange(Clipper.InflatePaths(new PathsD { new PathD { new(cx, cy), new(cx + Math.Cos(ah) * r * 0.42, cy + Math.Sin(ah) * r * 0.42) } }, 0.12, JoinType.Round, EndType.Round, 2, 4));
+            etched.AddRange(Clipper.InflatePaths(new PathsD { new PathD { new(cx, cy), new(cx + Math.Cos(am) * r * 0.62, cy + Math.Sin(am) * r * 0.62) } }, 0.08, JoinType.Round, EndType.Round, 2, 4));
+            etched.Add(Geo.Circle(cx, cy, Math.Max(0.2, r * 0.1), 0.01));
+            // Spandrels: a fan in each corner of the hood round the dial.
+            double hy0 = top - hood + 0.4, hy1 = top - 0.4;
+            foreach (var (sx, sy) in new[] { (0.4, hy0), (W - 0.4, hy0), (0.4, hy1), (W - 0.4, hy1) })
+            {
+                double ang = Math.Atan2(cy - sy, cx - sx), fr = Math.Min(1.4, Math.Abs(cx - sx) * 0.4);
+                if (fr > 0.6) lines.Add([.. Geo.Arc(sx, sy, fr, ang - 0.7, ang + 0.7, 0.02)]);
+            }
         }
         // Panels on the base.
         if (baseH - kick > 3 && W > 4) Fronts.Panel(look, 0.8, kick + 0.6, W - 0.8, baseH - 0.6, etched, lines);
