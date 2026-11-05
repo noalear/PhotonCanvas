@@ -40,6 +40,17 @@ public sealed class CityWindow : Window
     readonly NumericUpDown _across = Number(1, CityMap.MaxSide, 1, "0"), _down = Number(1, CityMap.MaxSide, 1, "0"), _square = Number(10, 150, 0.5m, "0.##");
     readonly Button _resize = UiKit.Button("Make it this size"), _newMap = UiKit.Button("New map"), _openMap = UiKit.Button("Open…"), _saveMap = UiKit.Button("Save as…"), _sample = UiKit.Button("Sample village");
 
+    // Making a town
+    readonly ComboBox _tLayout = Combo("Crossroads", "Main street", "Grid of streets", "Winding road", "Riverside");
+    readonly Slider _tDensity = new() { Minimum = 0, Maximum = 1, Value = 0.6 };
+    readonly CheckBox _tWalls = new() { Content = "A town wall with gates" }, _tRiver = new() { Content = "A river through it" },
+        _tSquare = new() { Content = "A market square", IsChecked = true }, _tSaved = new() { Content = "Use my saved buildings where they suit", IsChecked = true };
+    readonly Button _tMake = new() { Content = "Make a town", Classes = { "primary" } };
+    readonly ComboBox _fDistrict = Combo([.. HousePrefabs.Districts.Where(d => d != "Anywhere")]);
+    readonly Button _fill = UiKit.Button("Fill with buildings");
+    readonly TextBlock _tNotes = Hint();
+    int _seed = Environment.TickCount & 0xFFFF;
+
     // Battle map
     readonly Button _openPic = UiKit.Button("Open a picture…"), _usePic = UiKit.Button("Use the selected picture"), _samplePic = UiKit.Button("Try a sample battle map"), _findGrid = UiKit.Button("Find the grid");
     readonly Button _read = new() { Content = "Read the map", Classes = { "primary" } };
@@ -224,7 +235,13 @@ public sealed class CityWindow : Window
                 Field("Square (mm)", _square, tip: "One square of the grid on the table: 25.4 mm is an inch, the usual battle map square."),
                 _resize),
             Explained("Maps", "Your maps are kept in the city builder's folder; the last one opens again next time.",
-                new WrapPanel { Children = { _newMap.With(b => b.Margin = new(0, 0, 4, 4)), _openMap.With(b => b.Margin = new(0, 0, 4, 4)), _saveMap.With(b => b.Margin = new(0, 0, 4, 4)), _sample.With(b => b.Margin = new(0, 0, 4, 4)) } }));
+                new WrapPanel { Children = { _newMap.With(b => b.Margin = new(0, 0, 4, 4)), _openMap.With(b => b.Margin = new(0, 0, 4, 4)), _saveMap.With(b => b.Margin = new(0, 0, 4, 4)), _sample.With(b => b.Margin = new(0, 0, 4, 4)) } }),
+            Explained("Make a town for me", "A whole town the size above: roads, a market square, districts, buildings of the right kind for each (your saved buildings where they suit a plot), fields, trees and street names. Press it again for another; undo puts your map back.",
+                Field("Streets", _tLayout),
+                Field("How full", _tDensity, tip: "Left, a house here and there; right, packed side by side."),
+                _tWalls, _tRiver, _tSquare, _tSaved, _tMake, _tNotes),
+            Explained("Fill with buildings", "Buildings along the roads wherever there's free grass: in the last box you dragged with Select, or all over the map.",
+                Field("District", _fDistrict, tip: "What part of town they're in, which says what kinds of building they are."), _fill));
     }
 
     Control PictureTab()
@@ -352,6 +369,10 @@ public sealed class CityWindow : Window
         _sample.Click += (_, _) => { _file = null; Commit(Sample(), "Sample village", refit: true); };
         _openMap.Click += async (_, _) => await OpenMap();
         _saveMap.Click += async (_, _) => await SaveMapAs();
+
+        _tMake.Click += async (_, _) => await MakeTown();
+        _fill.Click += async (_, _) => await FillWithBuildings();
+        _fDistrict.SelectedItem = "Residential";
 
         _openPic.Click += async (_, _) => await OpenPicture();
         _usePic.Click += (_, _) => UseSelectedPicture();
@@ -817,6 +838,62 @@ public sealed class CityWindow : Window
     {
         string? type = _typeFilter.SelectedIndex > 0 ? _typeFilter.SelectedItem as string : null;
         _prefabList.ItemsSource = _prefabs.Where(p => type is null || string.Equals(p.Type, type, StringComparison.OrdinalIgnoreCase)).Select(p => new PrefabRow(p)).ToList();
+    }
+
+    // ---- making a town ----
+
+    async Task MakeTown()
+    {
+        _tMake.IsEnabled = false;
+        _status.Text = "Making a town…";
+        try
+        {
+            var o = new TownOptions
+            {
+                Name = "New town",
+                Across = (int)(_across.Value ?? 48),
+                Down = (int)(_down.Value ?? 36),
+                Theme = _map.Theme,
+                SquareMm = _map.SquareMm,
+                Layout = (TownLayout)Math.Max(0, _tLayout.SelectedIndex),
+                Density = _tDensity.Value,
+                Walls = _tWalls.IsChecked == true,
+                River = _tRiver.IsChecked == true,
+                Square = _tSquare.IsChecked == true,
+                Seed = _seed++,
+                Prefabs = _tSaved.IsChecked == true ? _prefabs : [],
+            };
+            var (map, notes) = await Task.Run(() => TownMaker.Make(o));
+            _file = null;
+            _picture = null;
+            _plan.SetPicture(null, 0, 0);
+            Commit(map, "Make a town", refit: true);
+            _tNotes.Text = string.Join("\n", notes.Select(n => "• " + n));
+            _status.Text = "Made a town. Press Make a town again for another, or change anything you like.";
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't make a town: {e.Message}";
+        }
+        finally { _tMake.IsEnabled = true; }
+    }
+
+    async Task FillWithBuildings()
+    {
+        var district = _fDistrict.SelectedItem as string ?? "Residential";
+        var box = _plan.LastBox;
+        var (before, density, seed, prefabs) = (_map, _tDensity.Value, _seed++, _tSaved.IsChecked == true ? _prefabs : []);
+        _fill.IsEnabled = false;
+        try
+        {
+            var (m, added) = await Task.Run(() => TownMaker.Fill(before, district, density, seed, prefabs, box));
+            if (added == 0) { _status.Text = "No room for buildings along the roads " + (box is null ? "on the map." : "in the box."); return; }
+            if (!ReferenceEquals(before, _map)) { _status.Text = "The map changed while filling it: press Fill with buildings again."; return; }
+            Commit(m, "Fill with buildings");
+            _status.Text = $"Put up {added} building{(added == 1 ? "" : "s")} along the roads{(box is null ? "" : " in the box")} ({district.ToLowerInvariant()}).";
+        }
+        finally { _fill.IsEnabled = true; }
     }
 
     // ---- the battle map ----

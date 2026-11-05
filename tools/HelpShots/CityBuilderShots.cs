@@ -6,7 +6,7 @@ using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, a town made for you, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -63,6 +63,20 @@ static class CityBuilderShots
             F<CheckBox>(w, "_byDistrict").IsChecked = true;
             return Task.CompletedTask;
         });
+        // A town made for you: a walled crossroads town with a river.
+        async Task MakeOne(CityWindow w)
+        {
+            F<NumericUpDown>(w, "_across").Value = 64;
+            F<NumericUpDown>(w, "_down").Value = 48;
+            F<ComboBox>(w, "_tLayout").SelectedIndex = 0;
+            F<CheckBox>(w, "_tWalls").IsChecked = true;
+            F<CheckBox>(w, "_tRiver").IsChecked = true;
+            w.GetType().GetField("_seed", Any)!.SetValue(w, 7);
+            await (Task)w.GetType().GetMethod("MakeTown", Any)!.Invoke(w, null)!;
+            F<Button>(w, "_tMake").BringIntoView();
+        }
+        Shot("window-citybuilder-made", village, 0, 0, MakeOne);
+        Shot("window-citybuilder-made-3d", village, 0, 1, MakeOne);
         Shot("window-citybuilder-battlemap", CityMap.Empty(40, 28), 1, 0, async w =>
         {
             await w.UsePicture(SampleBattleMap.Make(), null);

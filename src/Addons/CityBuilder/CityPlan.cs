@@ -61,6 +61,9 @@ public sealed class CityPlan : Control
     /// <summary>The one building picked (when that's all that's picked).</summary>
     public Guid? Selected => Pick.Buildings.Count == 1 && Pick.Props.Count == 0 && Pick.Labels.Count == 0 && Pick.Fences.Count == 0 ? Pick.Buildings.First() : null;
 
+    /// <summary>The last box dragged with Select (squares, its far sides just outside it), for filling with buildings.</summary>
+    public (int X0, int Y0, int X1, int Y1)? LastBox { get; private set; }
+
     /// <summary>Things copied, to paste.</summary>
     public CityClip? Copied { get; private set; }
 
@@ -319,6 +322,10 @@ public sealed class CityPlan : Control
         foreach (var p in _map.Props) DrawProp(ctx, p, k);
         foreach (var l in _map.Labels) DrawLabel(ctx, l, k, Pick.Labels.Contains(l.Id));
 
+        // The last box dragged, to fill with buildings.
+        if (LastBox is { } lb && Tool == CityTool.Select && _box is null)
+            ctx.DrawRectangle(null, new Pen(PickBrush, 1) { DashStyle = new DashStyle([4, 3], 0) }, new Rect(At(lb.X0, lb.Y0), At(lb.X1, lb.Y1)));
+
         // What the pointer is over, and what's being dragged.
         DrawHover(ctx, k);
         if (_map.Buildings.Count == 0 && _map.Props.Count == 0 && _map.Labels.Count == 0)
@@ -572,6 +579,7 @@ public sealed class CityPlan : Control
             case CityTool.Select:
             {
                 var hit = HitAt(p);
+                LastBox = null;
                 if (_right)
                 {
                     if (hit is not null && !Pick.Holds(hit)) SetPick(hit);
@@ -721,6 +729,9 @@ public sealed class CityPlan : Control
         if (_box is { } bx)
         {
             _box = null;
+            int x0 = (int)Math.Floor(Math.Min(bx.A.X, bx.B.X)), x1 = (int)Math.Ceiling(Math.Max(bx.A.X, bx.B.X));
+            int y0 = (int)Math.Floor(Math.Min(bx.A.Y, bx.B.Y)), y1 = (int)Math.Ceiling(Math.Max(bx.A.Y, bx.B.Y));
+            LastBox = x1 - x0 >= 2 && y1 - y0 >= 2 ? (Math.Max(0, x0), Math.Max(0, y0), Math.Min(_map.Across, x1), Math.Min(_map.Down, y1)) : null;
             var inside = CityEdit.Within(_map, bx.A.X, bx.A.Y, bx.B.X, bx.B.Y);
             SetPick(_boxAdd ? Pick.With(inside) : inside);
         }
