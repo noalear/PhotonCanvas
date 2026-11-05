@@ -220,7 +220,7 @@ public sealed class ItemEditor : StackPanel
         (string? cols, string? rows) counts = kind switch
         {
             ItemKind.Cabinet => (it.Front is CabinetFront.Clock or CabinetFront.Altar or CabinetFront.Open ? null : "Across", it.Front is CabinetFront.Drawers or CabinetFront.DrawersOverDoors ? "Drawer rows" : null),
-            ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew => ("Seats", null),
+            ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew or SeatStyle.Settle => ("Seats", null),
             ItemKind.Screen => ("Panels", null),
             ItemKind.WeaponRack => (null, "Weapons"),
             _ => (null, null),
@@ -268,7 +268,7 @@ public sealed class ItemEditor : StackPanel
     public static (string Label, string[] Names)? StylesOf(ItemKind k) => k switch
     {
         ItemKind.Cabinet => ("Front", ["Doors", "Drawers", "Drawers over doors", "Glass doors", "Open shelves", "Dresser (shelves over a cupboard)", "Panelled doors", "Lockers", "Machine panels", "Clock", "Lattice doors", "Altar"]),
-        ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa or settle", "Pew", "Command chair"]),
+        ItemKind.Armchair => ("Kind", ["Armchair", "Throne on a dais", "Sofa", "Pew", "Command chair", "Carved wooden chair", "Carved settle"]),
         ItemKind.Bed => ("Kind", ["Plain", "Four-poster", "Bunk beds", "Pallet on sleepers"]),
         ItemKind.Fireplace => ("Kind", ["Fireplace", "Bread oven", "Forge"]),
         ItemKind.SlantDesk => ("Kind", ["Lectern", "Writing desk (scriptorium)", "Control console", "Map table"]),

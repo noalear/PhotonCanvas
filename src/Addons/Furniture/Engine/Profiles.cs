@@ -291,6 +291,13 @@ public static class Profiles
             {
                 double wy = yb - (b - a) * 0.9;
                 if (wy - ya < 2) wy = ya + 2;
+                // A carved panel low down when the leaf is tall enough, the pierced window above it.
+                double py = ya + (wy - ya) * 0.4;
+                if (py - ya >= 3 && wy - py >= 4.4)
+                {
+                    Fronts.Panel(look, a, ya, b, py, etched, lines);
+                    ya = py + 1.2;
+                }
                 holes.Add(Fronts.PointedRect(a + 0.2, ya, b - 0.2, wy));
                 double r = (b - a) * 0.36;
                 // The trefoil's cusps rounded, so no sharp sliver of sheet points into it.

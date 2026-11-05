@@ -19,7 +19,7 @@ On the **Sheet** tab, type your sheet's **Thickness** (2 mm suits 28 mm figures)
 ## Or start from a theme
 <!-- target: button:Start the list from this theme -->
 Pick a **Theme** at the top and press **Start the list from this theme** for a room's worth that suits
-it: bunks and lockers for a sci-fi ship, a trestle table and chests for a dungeon. The faces change to
+it: bunks and lockers for a sci-fi ship, a trestle table and chests for a dungeon, a carved settle and a hooded great fireplace for a medieval hall. The faces change to
 match (metal panels for sci-fi).
 
 The ready-made **Town** pieces dress the square outside the tavern: the theme's town wall, a guard
@@ -39,7 +39,9 @@ the preview follows.
 <!-- target: tabitem:Put together -->
 **Put together** shows the furniture picked in 3D: drag it round to check it from every side.
 **Pieces** shows what will be cut. Some pieces are cut to glue on, so they stand proud the way real
-ones do: a cupboard's doors and drawer fronts, the bosses on a candelabra, a clock's bezel and trunk door.
+ones do: a cupboard's doors and drawer fronts, the bosses on a candelabra, a clock's bezel and trunk door,
+the arcade of arches across a wooden chest and the handles on its ends, the corbels under a stone
+fireplace's mantel.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

@@ -69,11 +69,30 @@ public static class Tables
                 break;
             }
             default:
-                // A trestle: a bar under the top, a post, and a foot with a gap under its middle.
-                holes.Add(Geo.Rect(-1, foot, Df / 2 - post / 2, Hf - apron));
-                holes.Add(Geo.Rect(Df / 2 + post / 2, foot, Df + 1, Hf - apron));
+            {
+                // A trestle: a bar under the top, a post, and a foot with a gap under its middle. Curved
+                // brackets join the post to the bar and flare it into the foot, and the bar's ends are cut back.
+                double px0 = Df / 2 - post / 2, px1 = Df / 2 + post / 2, gy0 = foot, gy1 = Hf - apron;
+                double rb = Math.Min(Math.Min(post * 0.9, (gy1 - gy0) * 0.3), px0 * 0.6);
+                foreach (var left in new[] { true, false })
+                {
+                    var hole = new PathsD { left ? Geo.Rect(-1, gy0, px0, gy1) : Geo.Rect(px1, gy0, Df + 1, gy1) };
+                    if (rb > 0.6)
+                    {
+                        double cx = left ? px0 - rb : px1 + rb, x0 = Math.Min(cx, left ? px0 : px1), x1 = Math.Max(cx, left ? px0 : px1);
+                        foreach (var (y0, y1, cy) in new[] { (gy0, gy0 + rb, gy0 + rb), (gy1 - rb, gy1, gy1 - rb) })
+                            hole = Geo.Subtract(hole, Geo.Subtract([Geo.Rect(x0, y0, x1, y1)], [Geo.Circle(cx, cy, rb, 0.02)]));
+                        // The bar's ends and the foot's toes sloped off.
+                        double ex = left ? 0 : Df, s = left ? 1 : -1, c = Math.Min(apron * 0.5, rb);
+                        hole.Add(new PathD { new(ex - s, gy1 - 0.01), new(ex + s * c, gy1 - 0.01), new(ex - s, gy1 + c) });
+                        double ct = Math.Min(foot * 0.45, rb);
+                        hole.Add(new PathD { new(ex - s, gy0 + 0.01), new(ex + s * ct * 1.6, gy0 + 0.01), new(ex - s, gy0 - ct) });
+                    }
+                    holes.AddRange(Geo.Solid(hole));
+                }
                 holes.Add(Geo.Rect(Df * 0.3, -1, Df * 0.7, Math.Min(0.6, foot / 3)));
                 break;
+            }
         }
         foreach (var u in railAt) holes.Add(Geo.Rect(u - sw / 2, ys - (th + f) / 2, u + sw / 2, ys + (th + f) / 2));
         m.Add(style == LegStyle.Legs ? "Leg frame" : "End", outline, holes,
@@ -99,7 +118,11 @@ public static class Tables
                 Geo.Rect(-T, (rh - th) / 2, 0.01, (rh + th) / 2),
                 Geo.Rect(L - 0.01, (rh - th) / 2, L + T, (rh + th) / 2),
             };
-            m.Add("Rail", rail, [], railAt.Select(u => Pose.Front(xf1 + T / 2, ys - rh / 2, si + u)), grainAlongU: true, face: [Geo.Rect(0, 0, L, rh)]);
+            // A trestle's stretcher carries the theme's symbol in the middle.
+            var re = new PathsD();
+            var rl = new List<PathD>();
+            if (style == LegStyle.Trestle && rh * 0.4 > 0.9 && Fronts.Look(m) != FrontLook.Metal) Cabinets.Symbol(Fronts.Look(m), m.Theme, L / 2, rh / 2, rh * 0.4, re, rl);
+            m.Add("Rail", rail, [], railAt.Select(u => Pose.Front(xf1 + T / 2, ys - rh / 2, si + u)), grainAlongU: true, face: [Geo.Rect(0, 0, L, rh)], etched: re, lines: rl);
         }
         if (!rails && style != LegStyle.Legs) m.Note(m.PushFit ? "Without a rail the ends are held only by the top: add the rail to keep them square." : "Without a rail the ends are held only by the top: glue them square, or add the rail.");
     }

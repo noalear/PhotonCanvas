@@ -78,7 +78,7 @@ public static class FurnitureCatalog
         ItemKind.Rug => FurnitureSpot.Floor,
         ItemKind.WallHanging or ItemKind.WallShelf or ItemKind.WallDoor => FurnitureSpot.OnWall,
         ItemKind.Cabinet or ItemKind.Bookshelf or ItemKind.Fireplace or ItemKind.Bed or ItemKind.WeaponRack or ItemKind.Desk => FurnitureSpot.Wall,
-        ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew => FurnitureSpot.Free,
+        ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew or SeatStyle.Settle => FurnitureSpot.Free,
         ItemKind.SlantDesk when it.Slant == SlantStyle.Console => FurnitureSpot.Wall,
         _ => FurnitureSpot.Free,
     };
@@ -158,33 +158,33 @@ public static class FurnitureCatalog
         var b = new Book(TerrainThemes.Medieval, "med");
         b.Room = Bedroom;
         b.Add("Four-poster bed", ItemKind.Bed, i => i with { BedStyle = BedStyle.FourPoster, WidthMm = 34, DepthMm = 20, HeightMm = 34, FootMm = 10 }, "A lord's bed with a canopy on four posts and a scalloped valance.");
-        b.Add("Plain bed", ItemKind.Bed, i => i, "A simple bed with head and foot boards and a blanket.");
+        b.Add("Plain bed", ItemKind.Bed, i => i with { FootMm = 12 }, "A wooden bed: corner posts with turned knobs, an arched head board carved with the theme's symbol, a panelled foot board and a quilted blanket.");
         b.Add("Wardrobe", ItemKind.Cabinet, i => i with { Front = CabinetFront.Panelled, Crown = Crown.Cornice, WidthMm = 22, DepthMm = 11, HeightMm = 36 }, "Two panelled doors under a cornice.");
         b.Add("Chest of drawers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Drawers, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 18, Rows = 3, Columns = 2 }, "Three rows of drawers, waist high.");
-        b.Add("Blanket chest", ItemKind.Chest, i => i, "A banded chest for the foot of the bed.");
+        b.Add("Blanket chest", ItemKind.Chest, i => i with { WidthMm = 26, DepthMm = 12, HeightMm = 11 }, "A banded chest for the foot of the bed: an arcade of arches across its front with lilies carved behind them, and a handle on each end.");
         b.Add("Bedside candles", ItemKind.Candlestand, i => i with { WidthMm = 10, HeightMm = 22 }, "A three-branch candelabra.");
-        b.Add("Bedroom rug", ItemKind.Rug, i => i with { Rug = RugPattern.Border, WidthMm = 30, DepthMm = 20 }, "A rug with a patterned border.");
+        b.Add("Bedroom rug", ItemKind.Rug, i => i with { Rug = RugPattern.Round, WidthMm = 32, DepthMm = 20 }, "An oval rug: a fringe, a scrolling vine round its border and the theme's symbol in the middle.");
         b.Add("Tapestry", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Tapestry, WidthMm = 18, HeightMm = 24 }, "A tapestry on a rail, with a shield worked into it.");
-        b.Add("Dressing screen", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Panels, WidthMm = 28, HeightMm = 28 }, "A three-leaf folding screen.");
+        b.Add("Dressing screen", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Tracery, WidthMm = 28, HeightMm = 28 }, "A three-leaf folding screen: pointed arches pierced through each leaf over a carved panel.");
 
         b.Room = Kitchen;
         b.Add("Dresser with plates", ItemKind.Cabinet, i => i with { Front = CabinetFront.Hutch, Contents = ShelfContents.Plates, Crown = Crown.Cornice, WidthMm = 24, DepthMm = 12, HeightMm = 36 }, "A cupboard with open shelves of plates above.");
         b.Add("Bread oven", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Oven, WidthMm = 26, DepthMm = 16, HeightMm = 24 }, "A domed brick oven with a wood store under it.");
-        b.Add("Kitchen table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, WidthMm = 34, DepthMm = 14 }, "A long scrubbed table on trestles.");
+        b.Add("Kitchen table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, Stretcher = true, WidthMm = 34, DepthMm = 14 }, "A long scrubbed table on shaped trestles, a carved stretcher between them.");
         b.Add("Larder cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Doors, Crown = Crown.Flat, WidthMm = 18, DepthMm = 10, HeightMm = 30, Columns = 2 }, "A tall cupboard for the stores.");
         b.Add("Spice shelf", ItemKind.WallShelf, i => i, "A shelf on two brackets.");
         b.Add("Stool", ItemKind.Stool, i => i, "A round stool.");
 
         b.Room = Hall;
         b.Add("Great fireplace", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Fireplace, WidthMm = 30, DepthMm = 11, HeightMm = 42 }, "A brick fireplace with a mantel and a chimney breast.");
-        b.Add("Long table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, WidthMm = 44, DepthMm = 16 }, "A feasting table on trestles.");
+        b.Add("Long table", ItemKind.Table, i => i with { Legs = LegStyle.Trestle, Stretcher = true, WidthMm = 44, DepthMm = 16 }, "A feasting table on shaped trestles, a carved stretcher between them.");
         b.Add("Bench", ItemKind.Bench, i => i with { WidthMm = 36 }, "A plank bench.");
         b.Add("Bar counter", ItemKind.Cabinet, i => i with { Front = CabinetFront.Panelled, Crown = Crown.Flat, WidthMm = 40, DepthMm = 12, HeightMm = 16, Columns = 4 }, "A long panelled counter.");
         b.Add("Bottle shelves", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Bottles, Crown = Crown.Cornice, WidthMm = 24, DepthMm = 8, HeightMm = 32, Shelves = 3 }, "Open shelves of bottles behind the bar.");
-        b.Add("Armchair", ItemKind.Armchair, i => i with { BackTop = BackTop.Rounded }, "A high-backed armchair with a tufted seat.");
-        b.Add("Settle", ItemKind.Armchair, i => i with { Seat = SeatStyle.Sofa, Columns = 2, WidthMm = 24, BackTop = BackTop.Square }, "A two-seat settle for by the fire.");
+        b.Add("Armchair", ItemKind.Armchair, i => i with { Seat = SeatStyle.Wooden, BackTop = BackTop.Pointed, HeightMm = 22 }, "A carved wooden armchair: a pointed back between pinnacles, a trefoil pierced through it over the theme's symbol, little arches under the arms.");
+        b.Add("Settle", ItemKind.Armchair, i => i with { Seat = SeatStyle.Settle, Columns = 2, WidthMm = 24, BackTop = BackTop.Square }, "A two-seat settle for by the fire: an arcade carved across its back, little arches under the arms and quatrefoils pierced through its front.");
         b.Add("Hall rug", ItemKind.Rug, i => i with { Rug = RugPattern.Kilim, WidthMm = 40, DepthMm = 24 }, "A woven rug with stepped diamonds.");
-        b.Add("Banner", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Banner, WidthMm = 10, HeightMm = 26, HangMm = 14 }, "A swallow-tailed banner.");
+        b.Add("Banner", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Banner, WidthMm = 14, HeightMm = 26, HangMm = 14 }, "A swallow-tailed heraldic banner: a quartered shield with the theme's symbol in each quarter.");
 
         b.Room = Study;
         b.Add("Bookcase", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Books, Crown = Crown.Cornice, WidthMm = 22, DepthMm = 8, HeightMm = 34, Shelves = 3 }, "Open shelves of books under a cornice.");
