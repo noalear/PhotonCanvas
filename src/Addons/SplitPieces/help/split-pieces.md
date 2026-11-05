@@ -38,6 +38,11 @@ A page for each piece, after the page you split from (which is left as it was): 
   - On an **Engrave** layer, the part of its area on the piece.
   - On a **Cut** or **Score** layer, the stretch of its line on the piece (an open line, so a circle
     across the corner of four boards becomes four arcs).
+  - An **Engrave** [sub-layer](layers.md#sub-layers) of a Cut or Score layer keeps its fill, with its
+    own settings: it gets the part of each shape's area on the piece, even where the shape's line
+    never touches that piece (a big outline round it). On that page it shows as a normal layer of its
+    own, because its parent now holds open lines, which can't be filled. A Score sub-layer stays a
+    sub-layer and follows the lines.
   - A picture gets the piece as its image mask, and only that part is
     engraved; the rest may hang outside the work area.
 - **Everything else**, greyed on a layer called **Other pieces** that's never sent: the other
