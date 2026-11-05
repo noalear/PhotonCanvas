@@ -242,7 +242,9 @@ another way (the puzzle box, the stacked slices, the curved surface) implements 
 `ViewNavigator` (adding its `Buttons` to its children) to get the same controls.
 
 A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
-what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs
+what's etched and scored. `etchDepth` sinks what's etched into the piece; `backEtched` and `backScored`
+put an engraving on its other face too (in the same u, v, as seen through the piece: a single-panel
+wall's back). A face colour that isn't fully opaque makes a see-through ghost (the stairs
 maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building, map-to-terrain and roof makers all use it.
 
 ## Checks
