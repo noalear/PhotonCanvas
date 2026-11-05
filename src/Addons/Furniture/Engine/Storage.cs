@@ -281,7 +281,14 @@ public static class Storage
                 if (p.Lu > 2 * inset + 2) Bands([inset, p.Lu - inset], p.Lv, band, etched, lines);
                 if (p.Name == "Front") lines.AddRange(Lock(p.Lu / 2, p.Lv - Math.Min(p.Lv * 0.3, 3.5), Math.Min(p.Lu * 0.16, 2.6)));
             }
-            if (!chest && it.Bands && p.Name != "Bottom") Braced(p.Lu, p.Lv, T, etched);
+            if (!chest && it.Bands && p.Name != "Bottom")
+            {
+                // A crate's sides and lid are drawn board by board (each board's grain its own way).
+                var faceOf = p.Name == "Lid" ? Crates.Side.Lid : p.Name is "Left end" or "Right end" ? Crates.Side.End : Crates.Side.Long;
+                var (ce, cl) = Crates.Face(it.CrateStyle, m.Detail, faceOf, p.Lu, p.Lv, T, it.Label, m.Rnd);
+                m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [], etched: ce, lines: cl, ribs: p.Ribs);
+                continue;
+            }
             bool planks = side || p.Name == "Lid";
             m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
                 etched: etched, lines: lines, ribs: p.Ribs);
@@ -327,23 +334,5 @@ public static class Storage
         yield return Geo.Loop(WoodFace.RoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, w * 0.15));
         yield return WoodFace.Dot(cx, cy + h * 0.1, w * 0.12);
         yield return [new(cx, cy - h * 0.02), new(cx, cy - h * 0.3)];
-    }
-
-    /// <summary>A crate's face: boards round the edge and a brace corner to corner, as etched grooves.</summary>
-    static void Braced(double Lu, double Lv, double T, PathsD etched)
-    {
-        double fb = Math.Clamp(Math.Min(Lu, Lv) * 0.16, 1.2, 3), g = WoodFace.GrooveMm;
-        double x0 = T * 0.5 + fb, y0 = T * 0.5 + fb, x1 = Lu - T * 0.5 - fb, y1 = Lv - T * 0.5 - fb;
-        if (x1 - x0 < 2 || y1 - y0 < 2) return;
-        var inner = new PathsD { Geo.Rect(x0, y0, x1, y1) };
-        etched.AddRange(Geo.Subtract(Geo.Offset(inner, g / 2), Geo.Offset(inner, -g / 2)));
-        // The brace: two grooves, a board's width apart, from corner to corner.
-        double ang = Math.Atan2(y1 - y0, x1 - x0);
-        foreach (var off in new[] { -fb / 2, fb / 2 })
-        {
-            double nx = -Math.Sin(ang) * off, ny = Math.Cos(ang) * off;
-            var strip = Geo.Strip(new PointD(x0 + nx, y0 + ny), new PointD(x1 + nx, y1 + ny), g);
-            etched.AddRange(Geo.Intersect([strip], inner));
-        }
     }
 }

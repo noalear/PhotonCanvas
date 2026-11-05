@@ -94,7 +94,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Chair** | A seat slotted between a back (with the back legs) and a front leg frame. **Seat height**, and a **Back** that's *Solid*, *Upright slats* or a *Ladder (rails across)*. | seat 9 × 9 at 7.5, back 17 high |
 | **Bookshelf** | Two sides, **Shelves**, a top and an optional **A back panel**, with **Books etched on the back** showing between the shelves. | 20 wide, 8 deep, 30 high, 3 shelves |
 | **Chest** | A finger-jointed box with iron bands and a lock plate etched on. **Lid**: *Lifts off (a rim under it)*, *Glued on* or *None (open)*. | 16 × 10, 9 high |
-| **Crate** | A closed (or open-topped) finger-jointed box with boards and a brace etched on: scatter for any table. | 12 × 12 × 12 |
+| **Crate** | A closed (or open-topped) finger-jointed box with its boards etched on, each board's grain running its own way. **Boards**: *Plain boards*, *Braced (Z)*, *Cross-braced (X)*, *Slatted* (gaps between the slats), *Battened planks*, *Iron-bound* (iron corner brackets with rivets), *Cargo (stencilled)* (words on the sides, "this way up" arrows on the ends) or *Military (rope handles)* (words, a lot number, a star on the lid). **Stencilled** sets the words on cargo and military crates; left empty, each crate gets some to suit. | 12 × 12 × 12 |
 | **Bed** | A **Head board** and **Foot board**, a mattress that slots between them at **Mattress** height, and side rails; **A pillow and a blanket etched on**. | 32 long, 16 wide, head 13, foot 8 |
 | **Door for a wall** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | doorway 16 × 28 |
 | **Wall shelf** | See [Doors and shelves for walls](#doors-and-shelves-for-walls). | 20 long, 5 deep |
