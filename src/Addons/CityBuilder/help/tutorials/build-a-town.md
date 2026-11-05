@@ -1,0 +1,57 @@
+# Build a town
+<!-- category: Drawing -->
+<!-- summary: Lay out a town on a big map or read one from a battle map picture, change its buildings, see it in 3D and cut a building's pieces. -->
+<!-- page: citybuilder.md -->
+<!-- order: 79 -->
+The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
+view, each building a building editor building to cut.
+
+## Open the city builder
+<!-- target: ribbon:Home/City -->
+<!-- wait: window:City builder -->
+Click **City** on the **Home** tab. It opens with the last map (the first time, a sample village).
+
+## Read a battle map
+<!-- target: tabitem:Battle map -->
+On the **Battle map** tab, press **Open a picture…** and pick a top-down town map (or **Try a sample
+battle map**). Its grid is found by itself.
+
+## Make the town from it
+<!-- target: button:Read the map -->
+Press **Read the map**: the ground, the buildings and the trees are read from the picture. It's a
+best guess, so check it over.
+
+## Paint the ground
+<!-- target: button:Paint -->
+Click **Paint**, pick the **Ground** on the **Tools** tab, and drag over the squares it got wrong.
+The right button paints grass.
+
+## Add a building
+<!-- target: button:Building -->
+Click **Building** and drag out a rectangle where a building should stand: it gets walls, a door
+towards the road, windows and a roof.
+
+## Change a building
+<!-- target: button:Select -->
+Click **Select**, then click a building: drag it to move it, press `R` to turn it, and change its
+name, type and roof on the **Building** tab.
+
+## Open it in the building editor
+<!-- target: button:Edit in the building editor… -->
+Press **Edit in the building editor…** to change its rooms, doors, furniture and roof. Close the
+editor and the building on the map changes to match.
+
+## Save it to use again
+<!-- target: button:Save as a building to reuse -->
+Press **Save as a building to reuse**. It's then on the **Tools** tab under **Saved buildings**:
+click it and click the map to put down another.
+
+## See it in 3D
+<!-- target: tabitem:3D -->
+Click **3D** to see the town put together. Drag to turn it round and scroll to zoom in; untick
+**Roofs** to look inside.
+
+## Cut a building
+<!-- target: button:Put this building in the design -->
+With a building picked, press **Put this building in the design**: its pieces go into the design,
+nested onto the bed, a page per bed.
