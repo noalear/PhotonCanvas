@@ -168,7 +168,7 @@ public static partial class TownWalls
             }
         }
         b.Finish();
-        m.Note("Push the sides, back and canopy down into the base and the hood onto their tabs" + (b.Glue ? "; glue the fan housing on the hood and the coolant tubes up the sides." : ".") + " For glass, glue clear plastic behind the window before the canopy goes in.");
+        m.Note("Push the sides, back and canopy down into the base and the hood onto their tabs" + (b.Glue ? "; glue the fan housing on the hood and the coolant tubes up the sides." : ".") + " For glass, fit a piece of clear plastic behind the window before the canopy goes in.");
     }
 
     /// <summary>A sleeper lying in the pod, seen from the front: head, shoulders, arms crossed, frost round the edge.</summary>
