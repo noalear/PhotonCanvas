@@ -242,8 +242,10 @@ another way (the puzzle box, the stacked slices, the curved surface) implements 
 `ViewNavigator` (adding its `Buttons` to its children) to get the same controls.
 
 A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
-what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs
-maker's walls).
+what's etched and scored. `etchDepth` sinks what's etched into the piece; `backEtched` and `backScored`
+put an engraving on its other face too (in the same u, v, as seen through the piece: a single-panel
+wall's back). A face colour that isn't fully opaque makes a see-through ghost (the stairs
+maker's walls). The wall, bridge, stairs, furniture, scatter, game kit, building, map-to-terrain and roof makers all use it.
 
 Every `Model3DView` has a bulb button beside the camera buttons that switches all 3D views to the
 realistic look (`Look3D.Realistic`, remembered in the data folder's view3d.json): each slab is drawn
@@ -252,7 +254,7 @@ with plies, burnt engraving), lit by a sun over the viewer's left shoulder with 
 shadow map (onto the table too), a sky light, and ambient occlusion in corners. `AddSlab` sets the
 surfaces itself; the sheet's colour is `SlabStyle.Sheet`, or, unset, the brightest colour `Paint`
 gives (a `Lit` style's own colour). Views get it for nothing: don't light faces yourself for it.
-`Model3DPainter.Picture(..., realistic: true)` draws one for a file. The wall, bridge, stairs, furniture, scatter, game kit, building, map-to-terrain and roof makers all use it.
+`Model3DPainter.Picture(..., realistic: true)` draws one for a file.
 
 ## Checks
 
