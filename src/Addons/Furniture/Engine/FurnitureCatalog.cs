@@ -215,8 +215,8 @@ public static class FurnitureCatalog
         b.Add("Altar candles", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");
 
         b.Room = Armoury;
-        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a sword, an axe and a halberd in a rack.");
-        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of armour on a stand.");
+        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a halberd and a battle axe standing through a holder, swords point-down in a rest in front, iron-banded posts with finials.");
+        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of plate armour on a plinth: a combed helm, pauldrons, a breastplate with the house's symbol, tassets, knee cops and sabatons, standing round.");
         b.Add("Training dummy", ItemKind.Stand, i => i with { Stand = StandStyle.Dummy }, "A dummy with a target on it.");
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 18, HeightMm = 18, HangMm = 14 }, "A shield over two crossed swords.");
 
@@ -285,8 +285,8 @@ public static class FurnitureCatalog
         b.Add("Wall torch", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Torch, WidthMm = 7, DepthMm = 12, HeightMm = 16, HangMm = 14 }, "A burning torch in an iron bracket on a plank post: an iron arm on a strut, the fire basket at its end.");
 
         b.Room = Armoury;
-        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a sword, an axe and a halberd in a rack.");
-        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of armour on a stand.");
+        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a halberd and a battle axe standing through a holder, swords point-down in a rest in front, iron-banded posts with finials.");
+        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A gaoler's suit of plate on a plinth: a horned helm, pauldrons, a breastplate with a skull, tassets and sabatons, standing round.");
         b.Add("Training dummy", ItemKind.Stand, i => i with { Stand = StandStyle.Dummy }, "A straw man on a post, bound with cord, its chest hacked with sword cuts.");
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 18, HeightMm = 18, HangMm = 14 }, "A shield over crossed swords.");
         b.Add("Weapons cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Contents = ShelfContents.Weapons, Shelves = 1, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 30 }, "A tall cupboard with iron-barred doors, axes, a sword and a spear hung on pegs inside.");
@@ -345,7 +345,7 @@ public static class FurnitureCatalog
         b.Add("Chest", ItemKind.Chest, i => i, "A banded chest.");
 
         b.Room = Armoury;
-        b.Add("Spear rack", ItemKind.WeaponRack, i => i, "Spears and axes in a rack.");
+        b.Add("Spear rack", ItemKind.WeaponRack, i => i, "Spears, a halberd and a battle axe standing through a holder between log posts, swords point-down in a rest in front.");
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 16, HeightMm = 16, HangMm = 14 }, "A shield over crossed swords.");
 
         b.Room = Chapel;
@@ -370,7 +370,7 @@ public static class FurnitureCatalog
     {
         var b = new Book(TerrainThemes.SciFi, "sci");
         b.Room = Bedroom;
-        b.Add("Crew bunks", ItemKind.Bed, i => i with { BedStyle = BedStyle.Bunk, WidthMm = 32, DepthMm = 15, HeightMm = 30, MattressMm = 6, FootMm = 11 }, "Two bunks, one over the other.");
+        b.Add("Crew bunks", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.Bunks), "Two crew bunks between plated end frames: drawers in a locker under the lower one, a rail along the upper one and a ladder up the end.");
         b.Add("Officer's bed", ItemKind.Bed, i => i with { FootMm = 13 }, "A single bed.");
         b.Add("Lockers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Locker, Crown = Crown.Flat, Columns = 3, WidthMm = 24, DepthMm = 10, HeightMm = 34 }, "A row of three lockers.");
         b.Add("Deck mat", ItemKind.Rug, i => i with { Rug = RugPattern.Mat, WidthMm = 30, DepthMm = 18 }, "A ribbed mat with hazard ends.");
@@ -379,7 +379,7 @@ public static class FurnitureCatalog
 
         b.Room = Kitchen;
         b.Add("Galley units", ItemKind.Cabinet, i => i with { Front = CabinetFront.DrawersOverDoors, Crown = Crown.Flat, WidthMm = 26, DepthMm = 11, HeightMm = 16, Columns = 2 }, "Counter units with drawers over doors.");
-        b.Add("Mess table", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Top = TopShape.Square, WidthMm = 30, DepthMm = 14 }, "A table on solid ends.");
+        b.Add("Mess table", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.MessTable), "A crew mess table with a lit strip down the middle, standing on a deck plate with four stools fixed to it on arms.");
         b.Add("Mess chair", ItemKind.Chair, i => i with { Back = BackStyle.Panel }, "A chair with a panel back.");
         b.Add("Heater unit", ItemKind.Fireplace, i => i with { WidthMm = 22, DepthMm = 10, HeightMm = 30 }, "A heater with glowing fins.");
 
@@ -390,6 +390,7 @@ public static class FurnitureCatalog
 
         b.Room = Study;
         b.Add("Data shelves", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Tech, Crown = Crown.Flat, WidthMm = 22, DepthMm = 9, HeightMm = 32, Shelves = 3 }, "Racks of machines and drives.");
+        b.Add("Server rack", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.ServerRack), "A rack of servers on a hazard-striped plinth: drive bays, switch ports and readouts behind each faceplate, fans on top.");
         b.Add("Terminal desk", ItemKind.Desk, i => i with { Contents = ShelfContents.Tech }, "A desk with a screen and a keyboard.");
 
         b.Room = Workshop;
@@ -402,17 +403,18 @@ public static class FurnitureCatalog
         b.Add("Ammo crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Military, WidthMm = 18, DepthMm = 12, HeightMm = 10 }, "A long, low crate with a stencilled label, latches and handles.");
         b.Add("Storage racks", ItemKind.Bookshelf, i => i with { Books = false }, "Plain racks.");
         b.Add("Tech cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Tech, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cabinet of machines.");
-        b.Add("Reactor core", ItemKind.Candlestand, i => i with { Candle = CandleStyle.Reactor, WidthMm = 11, DepthMm = 11, HeightMm = 24 }, "A glowing reactor column held in rings between four struts, on a stepped base under a stepped cap.");
+        b.Add("Reactor core", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.Reactor), "A glowing core ringed with collars inside a cage of four struts, on an eight-sided base with a hazard ring, a fan housing on the cap.");
+        b.Add("Fuel drums", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.FuelDrums), "Three ribbed fuel drums on a skid, two in front and one behind, each lid with its bungs and a flame sign.");
 
         b.Room = Armoury;
-        b.Add("Rifle rack", ItemKind.WeaponRack, i => i with { Rows = 4, HeightMm = 26 }, "Rifles standing in a rack.");
+        b.Add("Rifle rack", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.RifleRack), "A row of rifles (scopes, magazines, grips) standing on a shelf under a clamp bar, an ammo drawer below and a lit header on top.");
         b.Add("Weapon lockers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Locker, Crown = Crown.Flat, Columns = 3, WidthMm = 24, DepthMm = 10, HeightMm = 34 }, "Three lockers.");
         b.Add("Barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, DepthMm = 7, HeightMm = 14 }, "A barricade with chevrons and a grille.");
-        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "Armour on a stand.");
+        b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of power armour on a hazard-striped plinth: a round helmet with a visor band, square shoulder plates and a glowing core in the chest.");
 
         b.Room = Throne;
         b.Add("Captain's chair", ItemKind.Armchair, i => i with { Seat = SeatStyle.Command, BackTop = BackTop.Square, WidthMm = 16, DepthMm = 14, HeightMm = 24 }, "A command chair with angled arms.");
-        b.Add("Helm console", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Console, WidthMm = 24, DepthMm = 14, HeightMm = 16 }, "A console with screens and buttons.");
+        b.Add("Helm console", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.Console), "A cockpit console with three screens (a radar in the middle, a readout and a graph angled in either side), a keyboard and rows of buttons.");
         b.Add("Star map table", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.MapTable, WidthMm = 24, DepthMm = 16, HeightMm = 14 }, "A sloped table with a map.");
         b.Add("Main screen", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Monitor, WidthMm = 26, HeightMm = 16, HangMm = 16 }, "A big screen.");
 
@@ -421,10 +423,10 @@ public static class FurnitureCatalog
         b.Add("Cell barrier", ItemKind.Screen, i => i with { ScreenStyle = ScreenStyle.Barrier, Columns = 1, WidthMm = 24, DepthMm = 7, HeightMm = 14 }, "A barrier.");
 
         b.Room = Lab;
-        b.Add("Sleeper pod", ItemKind.Coffin, i => i with { Coffin = CoffinStyle.Pod, WidthMm = 36, DepthMm = 14, HeightMm = 8 }, "A sleeper pod with a window.");
+        b.Add("Cryo pod", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.CryoPod), "An upright cryo pod: a sleeper behind a tall frosted window, a control panel under it, light strips and coolant tubes up the sides and a fan in the hood.", "sleeper-pod");
         b.Add("Sample cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Glass, Contents = ShelfContents.Jars, Crown = Crown.Flat, WidthMm = 18, DepthMm = 9, HeightMm = 30 }, "Glass doors over jars.");
         b.Add("Lab console", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Console, WidthMm = 20, DepthMm = 14, HeightMm = 16 }, "A console.");
-        b.Add("Medical bed", ItemKind.Bed, i => i with { FootMm = 13 }, "A bed.");
+        b.Add("Medical bed", ItemKind.Ship, i => global::PhotonCanvas.Addon.Furniture.TownWalls.ShipSized(i, ShipStyle.MedBed), "A med bay bed on a pedestal under a scanner arch with a glowing lens, a monitor on a post beside it showing a heartbeat.");
         TownProps(b, [("Planter tree", TreeStyle.Oak, "A colony tree grown in a chamfered planter, its crown etched and cut through.")],
             "A water trough with a feed pipe along one end and a pump head.",
             "A broadcast stage: plated deck, steps up the front and a star-map backdrop.",
@@ -473,7 +475,8 @@ public static class FurnitureCatalog
         b.Add("Shrine", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Arch, WidthMm = 24, DepthMm = 12, HeightMm = 22 }, "An altar under an arch.");
 
         b.Room = Armoury;
-        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears and swords in a rack.");
+        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a halberd and a battle axe standing through a holder between posts with onion domes, scimitars point-down in a rest in front.");
+        b.Add("Suit of armour", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A desert warrior's armour on a plinth: a spiked dome helm, pauldrons, a breastplate with a star, tassets and sabatons.", "armour-stand");
 
         b.Room = Throne;
         b.Add("Sultan's seat", ItemKind.Armchair, i => i with { Seat = SeatStyle.Throne, BackTop = BackTop.Pointed, WidthMm = 16, DepthMm = 14, HeightMm = 28, SeatMm = 10, ArmMm = 14 }, "A throne on a dais.");
@@ -549,6 +552,9 @@ public static class FurnitureCatalog
         b.Add("Apothecary drawers", ItemKind.Cabinet, i => i with { Front = CabinetFront.Drawers, Crown = Crown.Cornice, Rows = 5, Columns = 4, WidthMm = 22, DepthMm = 9, HeightMm = 30 }, "A wall of small drawers.");
         b.Add("Potion cabinet", ItemKind.Cabinet, i => i with { Front = CabinetFront.Glass, Contents = ShelfContents.Bottles, Crown = Crown.Cornice, WidthMm = 18, DepthMm = 9, HeightMm = 30 }, "Bottles behind glass.");
         b.Add("Laboratory table", ItemKind.Table, i => i with { Legs = LegStyle.Legs, Stretcher = true, WidthMm = 30, DepthMm = 14 }, "A table with stretchers.");
+        b.Room = Armoury;
+        b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a halberd and a battle axe standing through a holder, swords point-down in a rest in front, iron-banded posts topped with spires.");
+        b.Add("Suit of armour", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of gothic plate on a plinth, a pointed helm over a breastplate carved with the house's symbol.", "armour-stand");
         TownProps(b, [("Dead tree", TreeStyle.Dead, "A blasted churchyard tree, bare twisted branches against the moon."),
                       ("Pine tree", TreeStyle.Pine, "A dark pine in stacked tiers on a straight trunk.")],
             "A carved stone trough on a plinth, a pump at one end.",

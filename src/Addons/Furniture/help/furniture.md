@@ -67,12 +67,12 @@ settings), so a sci-fi console can stand among medieval furniture.
 | Hall & tavern | Great fireplaces, long tables, settles and sofas, bar counters, bottle shelves, banners |
 | Study & library | Bookcases, glass bookcases, scroll shelves, writing desks, lecterns, map tables, terminals |
 | Workshop & forge | Forges, workbenches, tool cupboards and lockers, work consoles |
-| Storage | Crates, chests, shelving, barred and machine cabinets |
+| Storage | Crates, chests, shelving, barred and machine cabinets, fuel drums, a reactor core |
 | Chapel & temple | Altars, pews, candelabras, rood screens, shrines |
-| Armoury & guardroom | Weapon and rifle racks, armour stands, training dummies, shields, barriers |
+| Armoury & guardroom | Weapon and rifle racks, suits of armour, training dummies, shields, barriers |
 | Throne room & bridge | Thrones on a dais, captain's chairs, helm consoles, star maps, long carpets |
 | Prison & crypt | Stocks, cell bunks, coffins, sarcophagi |
-| Lab & infirmary | Sleeper pods, potion cabinets, apothecary drawers, lab consoles |
+| Lab & infirmary | Cryo pods, med bay beds, potion cabinets, apothecary drawers, lab consoles |
 | Town | Town walls (one or two squares, corners, a gatehouse, an end with a turret), a guard tower, the theme's trees, a horse trough, a players' stage, a market stall, an outdoor bar, a notice board, a tiered fountain and a gallows (not sci-fi), for the city builder |
 
 They're sized for 28 mm figures on 2 mm sheet, and scale with **Figures** like everything else.
@@ -105,8 +105,8 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Bed** (more kinds) | **Kind**: *Plain*, *Four-poster* (a canopy on four posts with a valance, finials on the posts, and curtains tied back at each corner, cut in one with the canopy rails), *Bunk beds* (a ladder in the foot board) or *Pallet on sleepers* (with a fur). | as the bed |
 | **Fireplace or oven** | A front, cheeks, a fire back with logs and flames, a hearth and a mantel. **Kind**: *Fireplace* (with a chimney breast; a stone one gets an arch of wedge bricks, corbels glued under the mantel's ends, and a hood sloping in to the stack with a carved shield), *Bread oven* (a domed brick front with a little chimney stack, a ring of wedge bricks round the door, a wood store below) *Forge* (a hood over the fire bed; a skull on a dungeon one's hood) or *Cook fire on a spit* (a free-standing camp fire: logs and flames in a ring of stones on a hearth stone, two A-frames slotted into it holding a spit with a crank, a roast and a cauldron hanging over the fire; the stones, roast and cauldron are glued on, so they're left off for a push fit). | 26 wide, 9 deep, 40 high |
 | **Lectern or console** | A sloping top between two shaped sides. **Kind**: *Lectern* (on a pedestal with a pointed window pierced through it and a stepped foot, an open book glued on its slope, wider than the stand; in a dungeon the book is chained, a padlock hanging under it and a star drawn on its page), *Writing desk (scriptorium)*, *Control console* or *Map table*. | 9 × 8, 22 high |
-| **Weapon rack** | Two ends, a holder and a base, with **Weapons** standing in two rows: spears, swords, axes and halberds, or rifles in sci-fi. | 18 × 8, 30 high |
-| **Armour stand** | Two profiles crossed on a foot: *Armour*, *Training dummy* (in a dungeon or cave, a straw man bound with cord, frayed straw arms and a tufted head, sword cuts hacked into its chest), *Coat stand* or *Anvil on a stump* (a smith's anvil side on, horn, face, heel and spreading base, standing on a tree stump that crosses it). | 14 × 10, 32 high |
+| **Weapon rack** | Two posts on sled feet with iron bands round the joints and the theme's finial on top (a pyramid cap, a spire, an onion dome, an iron spike or a rough log end), a holder between them and a base. **Weapons** polearms (spears with leaf blades, halberds with a blade and a back spike, double-bladed battle axes) stand at the back through notches in the holder, their tabs down in the base; when it's deep enough, swords stand point-down in a rest in front, their crossguards on it (swept-down guards in the desert). With metal faces the weapons are rifles in two rows instead. | 32 × 11, 30 high |
+| **Armour stand** | *Armour*: a suit of plate on a plinth (two layers with a snug fit), a front profile and a side profile halved together at the chest so it stands round: the helm (a combed armet, a gothic pointed helm, a horned dungeon helm, a spiked desert dome or a round sci-fi helmet with a visor band), pauldrons, arms with elbow and knee cops, a belted breastplate with the theme's symbol (a glowing core for sci-fi), tassets and sabatons; glued, a visor and a back plate stand out of the helm. The others are two profiles crossed on a foot: *Training dummy* (in a dungeon or cave, a straw man bound with cord, frayed straw arms and a tufted head, sword cuts hacked into its chest), *Coat stand* or *Anvil on a stump* (a smith's anvil side on, horn, face, heel and spreading base, standing on a tree stump that crosses it). | 14 × 10, 32 high |
 | **Coffin or sarcophagus** | Layers glued into a solid shape on two keys: *Coffin* (a wooden one gets a cross cut to glue on its lid), *Sarcophagus* (an effigy on the lid) or *Sleeper pod*. | 34 × 11, 6 high |
 | **Rug** | One flat piece: *Bordered*, *Kilim*, *Damask*, *Hide* (a shaggy edge all round and a dark saddle down the back; a dungeon one pieced from skins with cross-stitched seams), *Deck mat*, *Round* (an oval with a fringe, a scrolling vine round its border and the theme's symbol in the middle) or *Long runner* (lilies down a dark field, or the theme's symbol, inside a border with a vine waving along it, a fringe at each end). | 36 × 24 |
 | **Wall hanging** | One flat piece to glue on a wall **Hangs at** a height: *Tapestry* (fleurs-de-lis round a shield, hung by loops from a rod with knobbed ends, a dagged hem), *Banner* (a quartered shield on a wide enough one; in a dungeon a tattered war banner hung on two chains from a spear, burnt dark with a great skull left light and a tear or two cut through it), *Painting* (a carved frame round a portrait when it's tall, or a landscape with a castle when it's wide), *Shield and swords* (a medieval or gothic one is heraldic: parted down the middle, the symbol on one half and lilies on the other, rivets round the rim), *Map* (an island with mountains, forest, a river, towns and a compass rose; a star map in sci-fi), *Screen*, *Framed map on chains* (the map in a heavy frame with carved blocks at its corners, hung by two chains from a ring) or *Torch in a wall bracket* (a plank post with an iron plate glued on the wall, an iron arm on a strut pushed into it, and the torch with its fire basket and flames slotted across the arm's end; **Depth** isn't used). A dungeon or cave *Shield and swords* is a round shield of boards in a riveted iron rim with an iron boss and a dark chevron. | 16 × 22 |
@@ -121,6 +121,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Stall or notice board** | **Kind**: *Market stall* (crates of produce on the counter under a striped awning with a scalloped valance), *Outdoor bar* (barrel ends on the front, a boarded roof and a sign with a tankard on a bracket) or *Notice board* (notices pinned on a board on two legs under a little roof). | 36 × 20, 40 high |
 | **Gallows** | A gallows on a braced platform: steps up the front, railings, a trapdoor, two posts and a beam with knee braces, and a noose on its rope; dungeon and gothic ones also hang an iron gibbet cage on a chain. See [Town props](#town-props). | 46 × 38, 60 high |
 | **Fountain** | A tiered fountain: an eight-sided basin of water on a plinth, a column with two bowls, water falling from spouts under each, and a finial (a pine cone, a spire, an onion dome in the desert, a stone in a cave, an antenna for sci-fi). It's as wide as the smaller of **Width** and **Depth**. See [Town props](#town-props). | 50.8 × 50.8, 46 high |
+| **Ship fitting** | Starship fittings in plated metal, each starting at its own size. **Kind**: *Cryo pod* (a sleeper etched behind a tall window in the canopy, frost round it, a control panel, light strips and vents on the sides, a hood bulging over the front with a fan on top and coolant tubes glued up the sides), *Med bay bed with scanner* (a bed on a panelled pedestal with a red cross, a scanner arch over it with a glowing lens, a monitor on a post showing a heartbeat, a mattress and pillow), *Mess table with fixed stools* (a table on a spine of arches and two end legs, a lit strip down the top, pedestal stools on arms of the deck plate), *Server rack* (vented sides on feet, a hazard-striped plinth, fans on top, shelves through the sides holding drive bays, switches and readouts), *Crew bunks* (two bunks between end frames, a ladder cut up one end, a rail, a locker of drawers underneath, mattresses and pillows), *Cockpit console* (a desk on two pedestals, a keyboard and rows of buttons, a radar screen in the middle and a readout and a graph angled in either side), *Rifle rack* (a row of rifles with scopes, grips and magazines held by a clamp bar on a shelf, an ammo drawer below, a lit header), *Fuel drums* (three ribbed drums on a skid, glued up from rings; with a push fit, two halved profiles each with a label band) or *Reactor core* (a glowing core ringed by collars in a cage of four struts, an eight-sided base with a hazard ring and a fan housing on the cap). | 22 × 15, 32 high |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
@@ -135,13 +136,23 @@ spiral in cave). *The list's theme* follows the theme at the top.
 
 ![A dresser with plates on its shelves](images/window-furniture-dresser.png)
 
-![A weapon rack with spears, a sword, an axe and a halberd](images/window-furniture-weapon-rack.png)
+![A weapon rack with spears, halberds and a battle axe, swords point-down in front](images/window-furniture-weapon-rack.png)
+
+![A suit of plate armour standing on its plinth](images/window-furniture-armour.png)
 
 ![A forge with its hood and flames](images/window-furniture-forge.png)
 
 ![A sci-fi helm console with screens and buttons](images/window-furniture-console.png)
 
 ![Three sci-fi lockers](images/window-furniture-lockers.png)
+
+![A sci-fi cryo pod with a sleeper behind its window](images/window-furniture-cryo-pod.png)
+
+![A reactor core in its cage of struts](images/window-furniture-reactor.png)
+
+![Crew bunks over a locker of drawers, a ladder up the end](images/window-furniture-crew-bunks.png)
+
+![A med bay bed under its scanner arch](images/window-furniture-med-bay.png)
 
 ![A gothic grandfather clock](images/window-furniture-clock.png)
 
