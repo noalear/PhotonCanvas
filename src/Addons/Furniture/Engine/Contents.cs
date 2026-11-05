@@ -275,6 +275,51 @@ public static class Contents
         }
     }
 
+    /// <summary>Tools hung on pegs along a rack: hammers, a saw, pliers, chisels, a mallet, a square, dark against the board.</summary>
+    public static void Tools(double x0, double y0, double x1, double y1, Random rnd, PathsD etched, List<PathD> lines)
+    {
+        double h = y1 - y0, slot = Math.Clamp(h * 0.42, 2.6, 4.2);
+        int n = (int)Math.Floor((x1 - x0) / slot);
+        if (n < 1 || h < 3) return;
+        double gap = (x1 - x0 - n * slot) / n;
+        for (int i = 0; i < n; i++)
+        {
+            double a = x0 + i * (slot + gap) + gap / 2, cx = a + slot / 2, top = y1 - 0.2;
+            lines.Add(WoodFace.Dot(cx, y1 + 0.5, 0.25));
+            switch (i % 6)
+            {
+                case 0: // a hammer: head across the top, handle down
+                    etched.Add(Geo.Rect(cx - slot * 0.38, top - 1.0, cx + slot * 0.38, top));
+                    etched.Add(Geo.Rect(cx - 0.3, y0 + h * 0.15, cx + 0.3, top - 0.9));
+                    break;
+                case 1: // a saw: a tapering blade under a handle with a hole in it
+                    etched.Add(new PathD { new(cx - slot * 0.4, top - 1.6), new(cx + slot * 0.4, top - 1.6), new(cx + slot * 0.4, y0 + h * 0.1), new(cx - slot * 0.1, y0 + h * 0.1) });
+                    lines.Add(Geo.Loop(WoodFace.RoundRect(cx - slot * 0.3, top - 1.5, cx + slot * 0.3, top, 0.4)));
+                    for (double y = y0 + h * 0.14; y < top - 1.8; y += 0.5) lines.Add([new(cx - slot * 0.1 - (y - y0 - h * 0.1) / (top - 1.6 - y0 - h * 0.1) * slot * 0.3 - 0.1, y), new(cx - slot * 0.1 - (y - y0 - h * 0.1) / (top - 1.6 - y0 - h * 0.1) * slot * 0.3 + 0.25, y)]);
+                    break;
+                case 2: // pliers: two handles crossing at a pivot, jaws up top
+                    lines.Add([new(cx - 0.25, top), new(cx + 0.15, top - h * 0.3), new(cx - slot * 0.3, y0 + h * 0.12)]);
+                    lines.Add([new(cx + 0.25, top), new(cx - 0.15, top - h * 0.3), new(cx + slot * 0.3, y0 + h * 0.12)]);
+                    lines.Add(WoodFace.Dot(cx, top - h * 0.3, 0.3));
+                    break;
+                case 3: // two chisels
+                    foreach (var dx in new[] { -slot * 0.2, slot * 0.2 })
+                    {
+                        etched.Add(Geo.Rect(cx + dx - 0.35, top - h * 0.45, cx + dx + 0.35, top));
+                        lines.Add(Geo.Loop(new PathD { new(cx + dx - 0.3, top - h * 0.45), new(cx + dx + 0.3, top - h * 0.45), new(cx + dx + 0.2, y0 + h * 0.15), new(cx + dx - 0.2, y0 + h * 0.15) }));
+                    }
+                    break;
+                case 4: // a mallet: a fat head and a handle
+                    etched.Add(WoodFace.RoundRect(cx - slot * 0.32, top - 1.8, cx + slot * 0.32, top, 0.4));
+                    lines.Add(Geo.Loop(Geo.Rect(cx - 0.3, y0 + h * 0.15, cx + 0.3, top - 1.8)));
+                    break;
+                default: // a square: an L
+                    etched.Add(new PathD { new(cx - slot * 0.35, top), new(cx - slot * 0.35 + 0.7, top), new(cx - slot * 0.35 + 0.7, y0 + h * 0.2 + 0.6), new(cx + slot * 0.35, y0 + h * 0.2 + 0.6), new(cx + slot * 0.35, y0 + h * 0.2), new(cx - slot * 0.35, y0 + h * 0.2) });
+                    break;
+            }
+        }
+    }
+
     /// <summary>Draws <paramref name="what"/> in the box between x0..x1 and y0..y1 (the shelf at y0).</summary>
     public static void Fill(ShelfContents what, double x0, double x1, double y0, double y1, Random rnd, PathsD etched, List<PathD> lines)
     {
@@ -287,6 +332,10 @@ public static class Contents
             case ShelfContents.Plates: Plates(x0, x1, y0, y1, rnd, etched, lines); break;
             case ShelfContents.Scrolls: Scrolls(x0, x1, y0, y1, rnd, etched, lines); break;
             case ShelfContents.Tech: Tech(x0, x1, y0, y1, rnd, etched, lines); break;
+            case ShelfContents.Tools:
+                // Tools hung on pegs on the back.
+                Tools(x0 + 0.3, y0 + 0.4, x1 - 0.3, y1 - 1.0, rnd, etched, lines);
+                break;
         }
     }
 

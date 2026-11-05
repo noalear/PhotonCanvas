@@ -181,7 +181,7 @@ public static class FurnitureCatalog
         b.Add("Bench", ItemKind.Bench, i => i with { WidthMm = 36 }, "A plank bench.");
         b.Add("Bar counter", ItemKind.Cabinet, i => i with { Front = CabinetFront.Panelled, Crown = Crown.Flat, WidthMm = 40, DepthMm = 12, HeightMm = 16, Columns = 4 }, "A long panelled counter.");
         b.Add("Bottle shelves", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Bottles, Crown = Crown.Cornice, WidthMm = 24, DepthMm = 8, HeightMm = 32, Shelves = 3 }, "Open shelves of bottles behind the bar.");
-        b.Add("Armchair", ItemKind.Armchair, i => i with { Seat = SeatStyle.Wooden, BackTop = BackTop.Pointed, HeightMm = 22 }, "A carved wooden armchair: a pointed back between pinnacles, a trefoil pierced through it over the theme's symbol, little arches under the arms.");
+        b.Add("Armchair", ItemKind.Armchair, i => i with { Seat = SeatStyle.Wooden, BackTop = BackTop.Pointed, HeightMm = 23, ArmMm = 13 }, "A carved wooden armchair: a pointed back between pinnacles, a trefoil pierced through it over the theme's symbol, little arches under the arms.");
         b.Add("Settle", ItemKind.Armchair, i => i with { Seat = SeatStyle.Settle, Columns = 2, WidthMm = 24, BackTop = BackTop.Square }, "A two-seat settle for by the fire: an arcade carved across its back, little arches under the arms and quatrefoils pierced through its front.");
         b.Add("Hall rug", ItemKind.Rug, i => i with { Rug = RugPattern.Kilim, WidthMm = 40, DepthMm = 24 }, "A woven rug with stepped diamonds.");
         b.Add("Banner", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Banner, WidthMm = 14, HeightMm = 26, HangMm = 14 }, "A swallow-tailed heraldic banner: a quartered shield with the theme's symbol in each quarter.");
@@ -191,13 +191,13 @@ public static class FurnitureCatalog
         b.Add("Writing desk", ItemKind.Desk, i => i, "A desk with a drawer, papers, a book and an inkwell.");
         b.Add("Lectern", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Lectern, WidthMm = 10 }, "A book stand with an open book.");
         b.Add("Map table", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.MapTable, WidthMm = 24, DepthMm = 16, HeightMm = 14 }, "A low sloped table with a map on it.");
-        b.Add("Reading chair", ItemKind.Armchair, i => i with { BackTop = BackTop.Winged, HeightMm = 22 }, "A wing chair.");
-        b.Add("Map", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Map, WidthMm = 20, HeightMm = 14, HangMm = 14 }, "A map for the wall.");
+        b.Add("Reading chair", ItemKind.Armchair, i => i with { Seat = SeatStyle.Reading, BackTop = BackTop.Pointed, HeightMm = 25, ArmMm = 13 }, "A carved wing chair: a buttoned back under a pointed crest with a quatrefoil pierced through it, pinnacles at its corners and little arches under the arms.");
+        b.Add("Map", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.FramedMap, WidthMm = 22, HeightMm = 20, HangMm = 12 }, "A map in a heavy frame with carved corner blocks, hung by two chains from a ring.");
 
         b.Room = Workshop;
         b.Add("Smithy forge", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 26, DepthMm = 14, HeightMm = 34 }, "A forge with a fire bed, a hood and flames.");
-        b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, WidthMm = 32, DepthMm = 12, HeightMm = 14 }, "A heavy bench with solid ends.");
-        b.Add("Tool cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Doors, Crown = Crown.Flat, WidthMm = 20, DepthMm = 9, HeightMm = 28 }, "A plain cupboard.");
+        b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, ToolRack = true, WidthMm = 32, DepthMm = 12, HeightMm = 14 }, "A heavy bench with solid ends, a rack of tools along its back and a vice on the corner.");
+        b.Add("Tool cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Contents = ShelfContents.Tools, Shelves = 1, Crown = Crown.Cornice, WidthMm = 20, DepthMm = 9, HeightMm = 30 }, "A cupboard with pierced lattice doors and tools hung on pegs inside.");
 
         b.Room = Storage;
         b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
@@ -208,8 +208,8 @@ public static class FurnitureCatalog
         b.Add("Shelving", ItemKind.Bookshelf, i => i with { Books = false }, "Plain shelves.");
 
         b.Room = Chapel;
-        b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth over it.");
-        b.Add("Pew", ItemKind.Armchair, i => i with { Seat = SeatStyle.Pew, Columns = 3, WidthMm = 30, DepthMm = 10, HeightMm = 16, SeatMm = 7.5 }, "A pew with tall ends.");
+        b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth hanging down its front, a budded cross and two candlesticks standing on it.");
+        b.Add("Pew", ItemKind.Armchair, i => i with { Seat = SeatStyle.Pew, Columns = 3, WidthMm = 30, DepthMm = 10, HeightMm = 16, SeatMm = 7.5 }, "A pew with tall ends and an arcade carved across its back.");
         b.Add("Altar candles", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");
 
         b.Room = Armoury;
@@ -264,7 +264,7 @@ public static class FurnitureCatalog
 
         b.Room = Workshop;
         b.Add("Forge", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 26, DepthMm = 14, HeightMm = 34 }, "A forge with a hood and flames.");
-        b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, WidthMm = 30, DepthMm = 12, HeightMm = 14 }, "A heavy bench.");
+        b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, ToolRack = true, WidthMm = 30, DepthMm = 12, HeightMm = 14 }, "A heavy bench with a rack of tools and a vice.");
 
         b.Room = Storage;
         b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
@@ -275,7 +275,7 @@ public static class FurnitureCatalog
         b.Add("Barred cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cupboard with a lattice front.");
 
         b.Room = Chapel;
-        b.Add("Dark altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth.");
+        b.Add("Dark altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth hanging down its front (the skull worked on it) and two candlesticks.");
         b.Add("Torch", ItemKind.Candlestand, i => i with { Candle = CandleStyle.Torch, WidthMm = 8, HeightMm = 26 }, "A torch on a stand.");
 
         b.Room = Armoury;
@@ -516,7 +516,7 @@ public static class FurnitureCatalog
         b.Add("Cross-braced crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.CrossBraced }, "A crate with an X brace on every side.");
 
         b.Room = Chapel;
-        b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Pediment, WidthMm = 26, DepthMm = 12, HeightMm = 24 }, "An altar with a cloth, under a pediment.");
+        b.Add("Altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 18 }, "A tall altar with a cloth hanging down its front, a budded cross and two candlesticks standing on it.");
         b.Add("Pew", ItemKind.Armchair, i => i with { Seat = SeatStyle.Pew, Columns = 3, WidthMm = 30, DepthMm = 10, HeightMm = 17, SeatMm = 7.5 }, "A pew with tall ends.");
         b.Add("Lectern", ItemKind.SlantDesk, i => i with { Slant = SlantStyle.Lectern, WidthMm = 10 }, "A book stand.");
         b.Add("Candelabra", ItemKind.Candlestand, i => i with { WidthMm = 14, HeightMm = 26 }, "A five-branch candelabra.");

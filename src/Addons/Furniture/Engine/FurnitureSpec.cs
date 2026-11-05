@@ -57,10 +57,10 @@ public enum CabinetFront
 public enum Crown { Flat, Cornice, Pediment, Arch }
 
 /// <summary>What stands on open shelves, seen from the front.</summary>
-public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty }
+public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools }
 
 /// <summary>Seats with arms and a back.</summary>
-public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle }
+public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle, Reading }
 
 /// <summary>The top of a seat's back.</summary>
 public enum BackTop { Square, Rounded, Arched, Pointed, Winged }
@@ -78,7 +78,7 @@ public enum CoffinStyle { Coffin, Sarcophagus, Pod }
 
 public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round }
 
-public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor }
+public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor, FramedMap }
 
 public enum CandleStyle { Candelabra, Lamp, Torch }
 
@@ -105,6 +105,8 @@ public sealed record FurnitureItem
     public LegStyle Legs { get; init; } = LegStyle.Legs;
     /// <summary>A rail low down between the legs (tables, benches, stools).</summary>
     public bool Stretcher { get; init; }
+    /// <summary>A workbench's tool rack standing along the back of the top, and a vice on its front corner (tables, benches).</summary>
+    public bool ToolRack { get; init; }
     public TopShape Top { get; init; } = TopShape.Round;
 
     /// <summary>Chairs: the seat's height (mm); the back reaches <see cref="HeightMm"/>.</summary>

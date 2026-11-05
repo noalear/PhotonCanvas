@@ -1,4 +1,5 @@
 using Clipper2Lib;
+using PhotonCanvas.Addon.Terrain;
 
 namespace PhotonCanvas.Addon.Furniture;
 
@@ -208,6 +209,8 @@ public static class Cabinets
         double ohs = Geo.Clamp(W * 0.05, 1.1, 2.2), step = Geo.Clamp(W * 0.04, 0.8, 1.6);
         double ohf = ohs;
         var crownTabs = new List<double>();
+        // An altar's cross and candlesticks stand on it, their tabs down through slots in the top.
+        var standing = front == CabinetFront.Altar && !metal && layers == 1 && hc == 0 ? AltarPieces(m, look, W, Dtop, T) : [];
         double crownTw = Geo.Clamp(W * 0.18, 1.5, 4), zc = Dtop - T / 2 - Math.Max(0, ohf < 1.2 ? 1.2 - ohf : 0);
         if (hc > 0)
         {
@@ -227,12 +230,22 @@ public static class Cabinets
                 slots.Add(Geo.Rect(u - sw / 2, v - (sideTw + f) / 2, u + sw / 2, v + (sideTw + f) / 2));
             }
             foreach (var x in crownTabs) slots.Add(Geo.Rect(x + o - (crownTw + f) / 2, Dt - zc - sw / 2, x + o + (crownTw + f) / 2, Dt - zc + sw / 2));
+            if (k == layers - 1)
+                foreach (var sp in standing) slots.Add(Geo.Rect(sp.X + o - (sp.TabW + f) / 2, Dt - sp.Z - sw / 2, sp.X + o + (sp.TabW + f) / 2, Dt - sp.Z + sw / 2));
             var etched = new PathsD();
             var lines = new List<PathD>();
-            if (front == CabinetFront.Altar && k == layers - 1) Cloth(look, m.Theme, Wt, Dt, etched, lines);
+            if (front == CabinetFront.Altar && k == layers - 1) Cloth(look, m.Theme, Wt, Dt, ClothW(W, T, Geo.Clamp(it.Columns, 1, 6)), etched, lines);
             m.Add(layers == 1 ? "Top" : k == 0 ? "Top (under)" : "Top", [Geo.Rect(0, 0, Wt, Dt)], slots, [Pose.Up(-o, bodyTop + k * T + T / 2, Dtop + of)],
                 grainAlongU: true, etched: etched, lines: lines);
         }
+
+        foreach (var sp in standing)
+            m.Add(sp.Name, sp.Shape, [], [Pose.Front(sp.X - sp.W / 2, bodyTop + layers * T, sp.Z)], grainAlongU: false, face: [], lines: sp.Lines);
+        if (standing.Count > 0) m.Note("Push the cross and the candlesticks into the slots in the top.");
+        if (front == CabinetFront.Altar && !metal && !m.PushFit) AltarCloth(m, look, W, T, bodyTop, kick, Dl);
+
+        // ---- open shelves: a band of tracery glued across the front under the top ----
+        if (open && !hutch && !metal && !m.PushFit && m.Theme != TerrainThemes.Cave) Tracery(m, look, W, T, bodyTop, Dl);
 
         // ---- a pediment or an arch on top, its tabs down through the top ----
         if (hc > 0)
@@ -278,6 +291,107 @@ public static class Cabinets
         }
 
         m.Note(Assembly(front, back, hutch, hc > 0, layers));
+    }
+
+    /// <summary>
+    /// What stands on an altar: a budded cross on a stepped foot in the middle (where the theme's symbol is a cross) and a
+    /// candlestick each side, each flat with a tab under it (u from its left edge, v up from the top's surface).
+    /// </summary>
+    static List<(string Name, double X, double Z, double W, double TabW, PathsD Shape, List<PathD> Lines)> AltarPieces(Maker m, FrontLook look, double W, double D, double T)
+    {
+        var list = new List<(string, double, double, double, double, PathsD, List<PathD>)>();
+        double H = m.Item.HeightMm, z = D * 0.4;
+        if (W < 14 || D < 6) return list;
+        double tw = 2.0;
+        bool cross = m.Theme is TerrainThemes.Medieval or TerrainThemes.Gothic;
+        if (cross)
+        {
+            double ch = Geo.Clamp(H * 0.6, 6, 11), cw = ch * 0.62, bar = Math.Max(1.4, ch * 0.15), fw = Math.Min(cw * 0.7, 5);
+            double cx = cw / 2, armY = ch * 0.66, foot = 2.2;
+            var c = new PathsD
+            {
+                Geo.Rect(cx - fw / 2, 0, cx + fw / 2, foot * 0.5),
+                Geo.Rect(cx - fw * 0.34, foot * 0.5 - 0.01, cx + fw * 0.34, foot),
+                Geo.Rect(cx - bar / 2, foot - 0.01, cx + bar / 2, ch - bar * 0.6),
+                Geo.Rect(bar * 0.6, armY - bar / 2, cw - bar * 0.6, armY + bar / 2),
+                Geo.Rect(cx - tw / 2, -T, cx + tw / 2, 0.01),
+            };
+            // Buds at the ends of the arms and the top, and a ring where they cross.
+            foreach (var (bx, by) in new[] { (bar * 0.7, armY), (cw - bar * 0.7, armY), (cx, ch - bar * 0.7) }) c.Add(Geo.Circle(bx, by, bar * 0.7, 0.02));
+            var lines = new List<PathD> { Geo.Loop(Geo.Circle(cx, armY, bar * 0.95, 0.02)), WoodFace.Dot(cx, armY, bar * 0.3) };
+
+            list.Add(("Altar cross", W / 2, z, cw, tw, Geo.Solid(c), lines));
+        }
+        // The candlesticks: a foot, a stem with a knob, a drip pan and the candle with its flame.
+        double sh = Geo.Clamp(H * 0.45, 6, 9), sw2 = 3.2, sx = sw2 / 2;
+        var stick = new PathsD
+        {
+            WoodFace.RoundRect(0, 0, sw2, 1.2, 0.4),
+            Geo.Rect(sx - 0.65, 1.1, sx + 0.65, sh * 0.5),
+            Geo.Circle(sx, sh * 0.32, 1.0, 0.02),
+            WoodFace.RoundRect(sx - 1.4, sh * 0.5 - 0.01, sx + 1.4, sh * 0.5 + 1.1, 0.3),
+            Geo.Rect(sx - 0.65, sh * 0.5 + 1.0, sx + 0.65, sh - 1.7),
+            Rugs.Ellipse(sx, sh - 1.05, 0.68, 0.95),
+            Geo.Rect(sx - tw / 2, -T, sx + tw / 2, 0.01),
+        };
+        var sl = new List<PathD> { new() { new(sx - 0.65, sh - 2.1), new(sx + 0.65, sh - 2.1) } };
+        double dx = cross ? Math.Min(W * 0.3, W / 2 - 4) : W * 0.25;
+        foreach (var x in new[] { W / 2 - dx, W / 2 + dx }) list.Add(("Candlestick", x, z, sw2, tw, Geo.Solid(stick), sl));
+        return list;
+    }
+
+    /// <summary>The cloth hanging down the altar's front from the top: a cross worked on it and a fringe along its end, glued on.</summary>
+    static void AltarCloth(Maker m, FrontLook look, double W, double T, double bodyTop, double kick, double D)
+    {
+        double cw = ClothW(W, T, Geo.Clamp(m.Item.Columns, 1, 6)), ch = Math.Min((bodyTop - kick) * 0.7, cw * 1.3), fringe = Math.Min(1.2, ch * 0.12);
+        if (cw < 4 || ch < 4) return;
+        var shape = new PathD { new(0, ch), new(0, fringe) };
+        // A fringe of teeth along the bottom.
+        int n = Math.Max(3, (int)Math.Round(cw / 1.0));
+        for (int i = 0; i < n; i++)
+        {
+            double a = cw * i / n, b = cw * (i + 1) / n;
+            shape.Add(new((a + b) / 2, 0));
+            shape.Add(new(b, fringe));
+        }
+        shape.Add(new(cw, ch));
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        etched.AddRange(Fronts.Outline(0.5, fringe + 0.5, cw - 0.5, ch - 0.5, 0.3));
+        for (double x = 0.6; x < cw - 0.4; x += 0.5) lines.Add([new(x, fringe * 0.6), new(x, fringe + 0.2)]);
+        double r = Math.Min(cw * 0.26, (ch - fringe) * 0.24);
+        if (m.Theme is TerrainThemes.Medieval or TerrainThemes.Gothic) { if (r > 0.6) lines.Add(Cross(cw / 2, fringe + (ch - fringe) * 0.5, r)); }
+        else Symbol(look, m.Theme, cw / 2, fringe + (ch - fringe) * 0.5, r, etched, lines);
+        m.Add("Altar cloth", [shape], [], [Pose.Front(W / 2 - cw / 2, bodyTop - ch, D - FrontIn + T / 2)], grainAlongU: false, face: [], etched: etched, lines: lines).Glue();
+        m.Note("Glue the cloth down the altar's front from under the top.");
+    }
+
+    /// <summary>
+    /// A band glued across the front of open shelves under the top: a row of arches (pointed, or round on a carved
+    /// look) cut open along its bottom edge between posts over the sides, a moulding scored along it and round each arch.
+    /// </summary>
+    static void Tracery(Maker m, FrontLook look, double W, double T, double bodyTop, double D)
+    {
+        double th = Geo.Clamp(m.Item.HeightMm * 0.14, 3, 5.5), band = Math.Max(1.4, th * 0.3), gap = 1.0;
+        double x0 = T + 0.3, x1 = W - T - 0.3;
+        int n = Math.Max(2, (int)Math.Round((x1 - x0) / 5.0));
+        double aw = (x1 - x0 - (n - 1) * gap) / n;
+        if (aw < 2.4 || th - band < 1.6) return;
+        var top = look == FrontLook.Carved ? BackTop.Arched : BackTop.Pointed;
+        var cuts = new PathsD();
+        var lines = new List<PathD> { new() { new(0, th - band * 0.45), new(W, th - band * 0.45) } };
+        for (int i = 0; i < n; i++)
+        {
+            double a = x0 + i * (aw + gap), b = a + aw;
+            var arch = Shapes.Topped(top, a, -1, b, th - band, Math.Min(aw * 0.5, th - band));
+            cuts.Add(arch);
+            // A groove round the arch, and a little cusp scored in each spandrel.
+            lines.AddRange(Geo.ClipLines([Geo.Loop(Geo.Offset([arch], 0.45).FirstOrDefault() ?? arch)], [Geo.Rect(0, 0.01, W, th)]));
+            if (i > 0) lines.Add(WoodFace.Dot(a - gap / 2, th - band - 0.1, Math.Min(0.35, gap * 0.3)));
+        }
+        var plate = Geo.Subtract([Geo.Rect(0, 0, W, th)], cuts);
+        m.Add("Tracery", plate, [], [Pose.Front(0, bodyTop - th, D + T / 2)], grainAlongU: true, face: [], lines: lines).Glue();
+        m.Note("Glue the tracery across the front under the top.");
     }
 
     /// <summary>How far a row of things on a shelf stops short of the sides (mm), and how far below the shelf over it.</summary>
@@ -496,9 +610,12 @@ public static class Cabinets
     }
 
     /// <summary>An altar cloth: a band across the top, hanging over the front, with a fringe.</summary>
-    static void Cloth(FrontLook look, string theme, double W, double D, PathsD etched, List<PathD> lines)
+    /// <summary>How wide an altar's cloth is: inside the middle one of its front's panels (between the carved ones either side).</summary>
+    static double ClothW(double W, double T, int cols) => Math.Min(Math.Min(W * 0.35, 9), (W - 2 * T) / Math.Max(3, cols | 1) - 1.2);
+
+    static void Cloth(FrontLook look, string theme, double W, double D, double cw, PathsD etched, List<PathD> lines)
     {
-        double cw = Math.Min(W * 0.35, 9), x0 = W / 2 - cw / 2;
+        double x0 = W / 2 - cw / 2;
         etched.AddRange(Fronts.Outline(x0, -1, x0 + cw, D + 1, 0.3));
         for (double x = x0 + 0.6; x < x0 + cw - 0.4; x += 0.5) lines.Add([new(x, 0), new(x, 0.7)]);
         double r = Math.Min(cw * 0.22, D * 0.18);
