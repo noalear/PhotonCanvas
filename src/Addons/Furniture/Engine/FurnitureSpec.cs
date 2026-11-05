@@ -57,7 +57,7 @@ public enum CabinetFront
 public enum Crown { Flat, Cornice, Pediment, Arch }
 
 /// <summary>What stands on open shelves, seen from the front.</summary>
-public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools, Stores }
+public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools, Stores, Weapons }
 
 /// <summary>What fills an open crate, heaped up over its rim.</summary>
 public enum CrateLoad { None, Apples, Sacks, Rocks, Treasure }

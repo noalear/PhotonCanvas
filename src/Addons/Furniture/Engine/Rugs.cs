@@ -142,6 +142,19 @@ public static class Rugs
                     nicks.Add(Geo.Circle(q.x, q.y, 0.35 + 0.5 * rnd.NextDouble(), 0.01));
                 etched.AddRange(Geo.Subtract(saddle, nicks));
 
+                // A dungeon hide is pieced from skins: stitched seams across it, a cross-stitch over each.
+                if (m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon)
+                    foreach (var (ax, ay, bx2, by2) in new[] { (0.32, 0.08, 0.42, 0.92), (0.66, 0.1, 0.58, 0.9), (0.1, 0.36, 0.33, 0.5), (0.62, 0.62, 0.92, 0.7) })
+                    {
+                        double x0s = W * ax, y0s = D * ay, x1s = W * bx2, y1s = D * by2, len = Math.Sqrt((x1s - x0s) * (x1s - x0s) + (y1s - y0s) * (y1s - y0s));
+                        double ux = (x1s - x0s) / len, uy = (y1s - y0s) / len;
+                        lines.Add([new(x0s, y0s), new(x1s, y1s)]);
+                        for (double t = 0.6; t < len - 0.3; t += 0.9)
+                        {
+                            double cx = x0s + ux * t, cy = y0s + uy * t;
+                            lines.Add([new(cx - uy * 0.45 - ux * 0.25, cy + ux * 0.45 - uy * 0.25), new(cx + uy * 0.45 + ux * 0.25, cy - ux * 0.45 + uy * 0.25)]);
+                        }
+                    }
                 // Fur: short strokes all over, and the spine.
                 lines.Add([new(W * 0.12, D / 2), new(W * 0.88, D / 2)]);
                 for (int i = 0; i < (int)(W * D / 6); i++)

@@ -953,5 +953,41 @@ public static class Profiles
         var railP = new PathsD { Geo.Rect(0, 0, Li, rh), Geo.Rect(-T, rh / 2 - rth / 2, 0.01, rh / 2 + rth / 2), Geo.Rect(Li - 0.01, rh / 2 - rth / 2, Li + T, rh / 2 + rth / 2) };
         m.Add("Rail", railP, [], [Pose.Front(T, yr, zc)], grainAlongU: true);
         m.Note("Push the board and the rail into one post, then put the other post on.");
+        if (m.Theme is "Dungeon" or "Cave" && !m.PushFit)
+        {
+            // A chain hanging in a loop from the board's front, a shackle at each end of it and one hanging free.
+            double sag = Math.Min(yb - yr - rh - 0.8, bh * 1.1), xa = Li * 0.3, xb2 = Li * 0.7, ya = bh * 0.22;
+            var path = new PathD();
+            for (int i = 0; i <= 16; i++)
+            {
+                double t = i / 16.0;
+                path.Add(new PointD(xa + (xb2 - xa) * t, ya - sag * 4 * t * (1 - t)));
+            }
+            var chain = Clipper.InflatePaths([path], 0.6, JoinType.Round, EndType.Round, 2, 4);
+            var cl = new List<PathD>();
+            for (int i = 1; i < 16; i += 1)
+            {
+                var q0 = path[i - 1]; var q1 = path[i + 1];
+                double dx = q1.x - q0.x, dy = q1.y - q0.y, len = Math.Sqrt(dx * dx + dy * dy), nx = -dy / len * 0.55, ny = dx / len * 0.55;
+                var q = path[i];
+                if (i % 2 == 0) cl.Add([new(q.x + nx, q.y + ny), new(q.x - nx, q.y - ny)]);
+                else cl.Add([new(q.x - dx / len * 0.3, q.y - dy / len * 0.3), new(q.x + dx / len * 0.3, q.y + dy / len * 0.3)]);
+            }
+            var cuffs = new PathsD();
+            var ce = new PathsD();
+            foreach (var x in new[] { xa, xb2 })
+            {
+                cuffs.Add(WoodFace.RoundRect(x - 1.1, ya - 0.6, x + 1.1, ya + 1.3, 0.5));
+                cl.Add(WoodFace.Dot(x, ya + 0.35, 0.3));
+            }
+            // A shackle hanging from the bottom of the loop.
+            double bx = (xa + xb2) / 2, by = ya - sag;
+            cuffs.Add(new PathD { new(bx - 0.6, by + 0.1), new(bx + 0.6, by + 0.1), new(bx + 0.6, by - 1.0), new(bx - 0.6, by - 1.0) });
+            cuffs.Add(Geo.Circle(bx, by - 1.9, 1.15, 0.02));
+            ce.Add(Geo.Circle(bx, by - 1.9, 0.5, 0.02));
+            var shape = Geo.Solid([.. chain, .. cuffs]);
+            m.Add("Chain", shape, [], [Pose.Front(T, yb, zc + T)], grainAlongU: true, face: [], etched: ce, lines: Geo.ClipLines(cl, shape)).Glue();
+            m.Note("Glue the chain on the front of the board.");
+        }
     }
 }

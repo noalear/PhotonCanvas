@@ -178,12 +178,15 @@ public static class Tables
     static void Crossed(Maker m)
     {
         var it = m.Item;
-        bool round = it.Kind == ItemKind.Stool ? it.Top == TopShape.Round : true;
+        // A stool on "slab" legs is a tree stump: two crossed slabs of trunk, roots flaring at the foot, and a
+        // round seat sawn across the grain with its growth rings.
+        bool stump = it.Kind == ItemKind.Stool && it.Legs == LegStyle.Slab;
+        bool round = stump || (it.Kind == ItemKind.Stool ? it.Top == TopShape.Round : true);
         double S = it.WidthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;
         string what = it.Kind == ItemKind.Stool ? "stool" : "table";
         double Hf = H - T;
         if (Hf < 4) { m.Bad($"The {what} is too low for a {T:0.##} mm sheet: make it at least {T + 4:0.#} mm high."); return; }
-        double Sl = round ? S * 0.72 : S - 2 * Math.Clamp(S * 0.06, 0.8, 4);
+        double Sl = stump ? S * 0.92 : round ? S * 0.72 : S - 2 * Math.Clamp(S * 0.06, 0.8, 4);
         if (Sl < sw + 3) { m.Bad($"The {what} is too small across for a {T:0.##} mm sheet: make it at least {(sw + 3) / (round ? 0.72 : 0.88):0.#} mm."); return; }
         // Two tabs on each leg, near its ends, where they fit inside the top with sheet round their slots;
         // otherwise one tab in the middle of the leg that's slotted from below (the other leg is open there).
@@ -197,10 +200,18 @@ public static class Tables
         // goes up to the rail, and the halving joint is in the rail. Too small for that: a slab with a notch.
         double lw = Geo.Clamp(Sl * 0.17, 1.5, 3.2), rail = Geo.Clamp(Hf * 0.28, 2.3, 4);
         double splay = Math.Min(lw * 0.45, Math.Max(0, ((round ? S * 0.92 : S) - Sl) / 2));
-        bool legged = Hf - rail >= 1.8 && Sl - 2 * lw >= sw + 0.6 && rail / 2 >= Maker.Bridge + f;
+        bool legged = !stump && Hf - rail >= 1.8 && Sl - 2 * lw >= sw + 0.6 && rail / 2 >= Maker.Bridge + f;
         PathsD Leg(bool fromTop)
         {
             var o = new PathsD { legged ? [new(-splay, 0), new(Sl + splay, 0), new(Sl, Hf), new(0, Hf)] : Geo.Rect(0, 0, Sl, Hf) };
+            if (stump)
+                foreach (var s in new[] { -1, 1 })
+                {
+                    // A root flaring out at each side of the foot.
+                    double x = s < 0 ? 0 : Sl, r = Math.Min(1.4, S * 0.12);
+                    o.Add(new PathD { new(x, Math.Min(Hf * 0.45, 3.2)), new(x + s * r, 0), new(x - s * 1.2, 0) });
+                }
+            if (stump) o = Geo.Solid(o);
             if (four) foreach (var s in new[] { -1, 1 }) o.Add(Geo.Rect(Sl / 2 + s * a - tw / 2, Hf - 0.01, Sl / 2 + s * a + tw / 2, Hf + T));
             else if (!fromTop) o.Add(Geo.Rect(Sl / 2 - tw / 2, Hf - 0.01, Sl / 2 + tw / 2, Hf + T));
             return o;
@@ -220,14 +231,23 @@ public static class Tables
                 h.Add(fromTop ? Geo.Rect(Sl / 2 - sw / 2, Hf - rail / 2, Sl / 2 + sw / 2, Hf + T + 1) : Geo.Rect(Sl / 2 - sw / 2, top - 0.5, Sl / 2 + sw / 2, Hf - rail / 2));
                 return h;
             }
-            if (fh > 0.8) h.Add(WoodFace.RoundRect(Sl / 2 - fw / 2, -3, Sl / 2 + fw / 2, fh, fw / 2));
+            if (fh > 0.8 && !stump) h.Add(WoodFace.RoundRect(Sl / 2 - fw / 2, -3, Sl / 2 + fw / 2, fh, fw / 2));
             h.Add(fromTop ? Geo.Rect(Sl / 2 - sw / 2, Hf / 2, Sl / 2 + sw / 2, Hf + T + 1) : Geo.Rect(Sl / 2 - sw / 2, -1, Sl / 2 + sw / 2, Hf / 2));
             return h;
         }
         double o0 = (S - Sl) / 2;
         var face = new PathsD { Geo.Rect(0, 0, Sl, Hf) };
-        m.Add("Leg (slot at the top)", Leg(true), LegHoles(true), [Pose.Front(o0, 0, S / 2)], grainAlongU: false, face: face);
-        m.Add("Leg (slot at the bottom)", Leg(false), LegHoles(false), [Pose.Left(S / 2, 0, o0)], grainAlongU: false, face: face);
+        List<PathD>? Bark(bool fromTop)
+        {
+            if (!stump) return null;
+            var rnd = m.Rnd;
+            var bark = new List<PathD>();
+            for (double x = 0.5; x < Sl - 0.3; x += 0.85)
+                bark.Add([new(x, 0.4 + rnd.NextDouble()), new(x + (rnd.NextDouble() - 0.5) * 0.4, Hf * (0.55 + 0.4 * rnd.NextDouble()))]);
+            return Geo.ClipLines(bark, Geo.Subtract(Geo.Solid(Leg(fromTop)), LegHoles(fromTop)));
+        }
+        m.Add("Leg (slot at the top)", Leg(true), LegHoles(true), [Pose.Front(o0, 0, S / 2)], grainAlongU: false, face: stump ? [] : face, lines: Bark(true));
+        m.Add("Leg (slot at the bottom)", Leg(false), LegHoles(false), [Pose.Left(S / 2, 0, o0)], grainAlongU: false, face: stump ? [] : face, lines: Bark(false));
 
         var slots = new PathsD();
         if (four)
@@ -239,7 +259,16 @@ public static class Tables
             }
         else slots.Add(Geo.Rect(S / 2 - sw / 2, S / 2 - (tw + f) / 2, S / 2 + sw / 2, S / 2 + (tw + f) / 2));
         var top = round ? new PathsD { Geo.Circle(S / 2, S / 2, S / 2) } : [Geo.Rect(0, 0, S, S)];
-        m.Add(it.Kind == ItemKind.Stool ? "Seat" : "Top", top, slots, [Pose.Up(0, H - T / 2, S)], grainAlongU: true, planks: it.Kind != ItemKind.Stool, plankMm: 3);
+        if (stump)
+        {
+            // Sawn across the trunk: growth rings round the heart, a crack in from the bark, bark round the edge.
+            var rings = new List<PathD>();
+            for (double r = S / 2 - 0.55; r > 0.5; r -= Math.Max(0.55, S * 0.07)) rings.Add(Geo.Loop(Geo.Circle(S / 2 + (S / 2 - r) * 0.06, S / 2, r, 0.02)));
+            rings.Add([new(S - 0.3, S / 2 + 0.2), new(S * 0.78, S / 2 + 0.5), new(S * 0.64, S / 2 + 0.3)]);
+            var barkRing = Geo.Subtract([Geo.Circle(S / 2, S / 2, S / 2, 0.02)], [Geo.Circle(S / 2, S / 2, S / 2 - 0.4, 0.02)]);
+            m.Add("Seat", top, slots, [Pose.Up(0, H - T / 2, S)], grainAlongU: true, face: [], etched: barkRing, lines: Geo.ClipLines(rings, top));
+        }
+        else m.Add(it.Kind == ItemKind.Stool ? "Seat" : "Top", top, slots, [Pose.Up(0, H - T / 2, S)], grainAlongU: true, planks: it.Kind != ItemKind.Stool, plankMm: 3);
         m.Note("Slide the two legs together at the middle, then push the top down onto their tabs.");
     }
 }

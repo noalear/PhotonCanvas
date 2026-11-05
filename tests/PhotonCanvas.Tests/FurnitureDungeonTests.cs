@@ -144,4 +144,36 @@ public class FurnitureDungeonTests
         Assert.Equal("", FurnitureCatalogTests.Check(altar with { Theme = "Dungeon" }, Sheet("Dungeon")));
         Assert.Equal("", FurnitureCatalogTests.Check(lectern with { Theme = "Dungeon" }, Sheet("Dungeon")));
     }
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void Stump_stool_spiked_throne_chained_stocks_and_weapons_cupboard_fit_in_every_theme(string theme)
+    {
+        var items = new[]
+        {
+            Defaults.For(ItemKind.Stool) with { Legs = LegStyle.Slab, WidthMm = 9, DepthMm = 9 },
+            Defaults.For(ItemKind.Armchair) with { Seat = SeatStyle.Throne, BackTop = BackTop.Pointed, WidthMm = 16, DepthMm = 14, HeightMm = 30, SeatMm = 10, ArmMm = 14 },
+            Defaults.For(ItemKind.Stocks),
+            Defaults.For(ItemKind.Cabinet) with { Front = CabinetFront.Lattice, Contents = ShelfContents.Weapons, Shelves = 1, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 30 },
+        };
+        foreach (var it in items)
+        {
+            Assert.Equal("", FurnitureCatalogTests.Check(it with { Theme = theme }, Sheet(theme)));
+            Assert.Equal("", FurnitureCatalogTests.Check(FurnitureCatalog.Sized(it with { Theme = theme }, 54), Sheet(theme, 3)));
+        }
+    }
+
+    [Fact]
+    public void Dungeon_stocks_hang_a_chain_and_the_throne_wears_spikes()
+    {
+        var stocks = FurnitureKit.Make(Defaults.For(ItemKind.Stocks) with { Theme = "Dungeon" }, Sheet("Dungeon"));
+        Assert.Contains(stocks.Parts, p => p.Name == "Chain" && p.Glued);
+        Assert.DoesNotContain(FurnitureKit.Make(Defaults.For(ItemKind.Stocks) with { Theme = "Dungeon" }, Sheet("Dungeon", push: true)).Parts, p => p.Name == "Chain");
+        Assert.DoesNotContain(FurnitureKit.Make(Defaults.For(ItemKind.Stocks) with { Theme = "Medieval" }, Sheet("Medieval")).Parts, p => p.Name == "Chain");
+        var throne = Defaults.For(ItemKind.Armchair) with { Seat = SeatStyle.Throne, BackTop = BackTop.Pointed, WidthMm = 16, DepthMm = 14, HeightMm = 30, SeatMm = 10, ArmMm = 14 };
+        double Top(string theme) => Geo.Bounds(FurnitureKit.Make(throne with { Theme = theme }, Sheet(theme)).Parts.Single(p => p.Name == "Back").Cut).bottom;
+        Assert.True(Top("Dungeon") > Top("Medieval") + 2);
+        var stool = FurnitureKit.Make(Defaults.For(ItemKind.Stool) with { Legs = LegStyle.Slab, WidthMm = 9, DepthMm = 9 }, Sheet("Cave"));
+        Assert.NotEmpty(stool.Parts.Single(p => p.Name == "Seat").Lines);
+    }
 }

@@ -228,6 +228,22 @@ public static class Armchairs
                 linesB.Add([new(x, seat - yb + 0.5), new(x, cushionTop)]);
             }
         }
+        if (throne && m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon && W >= 12)
+        {
+            // A warlord's crown of spikes along the back's top: iron spikes and tusks, the middle ones tallest.
+            var solid = Geo.Solid(back);
+            var spikes = new PathsD();
+            int n = Math.Max(5, (int)Math.Round((W - 2 * T) / 2.2)) | 1;
+            for (int i = 0; i < n; i++)
+            {
+                double x = T + 0.9 + (W - 2 * T - 1.8) * i / (n - 1), mid = 1 - Math.Abs(2.0 * i / (n - 1) - 1);
+                var col = Geo.Intersect(solid, [Geo.Rect(x - 0.05, -100, x + 0.05, 1000)]);
+                if (col.Count == 0) continue;
+                double top = Geo.Bounds(col).bottom, len = Geo.Clamp(W * 0.3, 3.5, 8) * (0.6 + 0.6 * mid), lean = (x - W / 2) / W * 2.4;
+                spikes.Add(new PathD { new(x - 1.3, top - 1.5), new(x + 1.3, top - 1.5), new(x + lean, top + len) });
+            }
+            back.AddRange(Geo.Offset(Geo.Offset(Geo.Solid(spikes), -0.5), 0.5, round: true));
+        }
         m.Add("Back", Geo.Solid(back), backHoles, [Pose.Front(0, yb, BackIn + T / 2)], grainAlongU: false, face: soft ? [] : null, etched: etchedB, lines: linesB);
 
         // ---- the seat (flat: u = x from the left side's inside, v from the front back) ----

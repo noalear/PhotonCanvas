@@ -287,7 +287,7 @@ public static class FurnitureCatalog
         b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of armour on a stand.");
         b.Add("Training dummy", ItemKind.Stand, i => i with { Stand = StandStyle.Dummy }, "A straw man on a post, bound with cord, its chest hacked with sword cuts.");
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 18, HeightMm = 18, HangMm = 14 }, "A shield over crossed swords.");
-        b.Add("Weapons cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Doors, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 32 }, "A tall plank cupboard.");
+        b.Add("Weapons cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Contents = ShelfContents.Weapons, Shelves = 1, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 30 }, "A tall cupboard with iron-barred doors, axes, a sword and a spear hung on pegs inside.");
 
         b.Room = Throne;
         b.Add("Warlord's throne", ItemKind.Armchair, i => i with { Seat = SeatStyle.Throne, BackTop = BackTop.Pointed, WidthMm = 16, DepthMm = 14, HeightMm = 30, SeatMm = 10, ArmMm = 14 }, "A throne on a dais.");
@@ -321,9 +321,9 @@ public static class FurnitureCatalog
         b.Add("Hide chest", ItemKind.Chest, i => i with { Bands = false }, "A plain chest.");
 
         b.Room = Kitchen;
-        b.Add("Hearth fire", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 24, DepthMm = 14, HeightMm = 28 }, "A stone fire with a smoke hood.");
+        b.Add("Hearth fire", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Spit, WidthMm = 26, DepthMm = 14, HeightMm = 18 }, "A fire in a ring of stones, a roast turning on a spit over it and a cauldron hanging beside.");
         b.Add("Slab table", ItemKind.Table, i => i with { Legs = LegStyle.Slab, WidthMm = 26, DepthMm = 14, HeightMm = 11 }, "A table on stone slabs.");
-        b.Add("Stump stool", ItemKind.Stool, i => i, "A round stool.");
+        b.Add("Stump stool", ItemKind.Stool, i => i with { Legs = LegStyle.Slab, WidthMm = 9, DepthMm = 9 }, "A sawn tree stump: bark down its sides, roots at its foot, growth rings across the seat.");
         b.Add("Pot shelf", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Jars, Crown = Crown.Flat, WidthMm = 18, DepthMm = 8, HeightMm = 22, Shelves = 2 }, "Shelves of pots.");
 
         b.Room = Hall;
