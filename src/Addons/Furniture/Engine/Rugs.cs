@@ -92,11 +92,8 @@ public static class Rugs
                 etched.AddRange(Fronts.Outline(0.9, 0.9, W - 0.9, D - 0.9, 0.6));
                 lines.Add(Geo.Loop(Geo.Rect(1.8, 1.8, W - 1.8, D - 1.8)));
                 Fringe(W, D, lines);
-                double step = Geo.Clamp(Math.Min(W, D) / 3, 3, 5);
-                int row = 0;
-                for (double y = 2.5 + step / 2; y < D - 2.5; y += step, row++)
-                    for (double x = 2.5 + step / 2 + (row % 2) * step / 2; x < W - 2.5; x += step)
-                        lines.Add(Geo.Loop(Cabinets.Trefoil(x, y, step * 0.3)));
+                // An ogee lattice with a lily in each cell, inside the border.
+                Pictures.Damask(2.2, 2.2, W - 2.2, D - 2.2, Geo.Clamp(Math.Min(W, D) / 4, 3.2, 5.5), etched, lines);
                 break;
             }
             default:
@@ -241,16 +238,17 @@ public static class Rugs
                 outline = Geo.Union([cloth, Geo.Rect(0, H - pole, W, H), Geo.Circle(0.6, H - pole / 2, 0.75), Geo.Circle(W - 0.6, H - pole / 2, 0.75)]);
                 etched.AddRange(Fronts.Outline([Geo.Rect(x0 + 0.7, tail + 0.4, x0 + cw - 0.7, H - pole - 0.7)], 0.35));
                 double r = Math.Min(cw * 0.3, (H - tail - pole) * 0.22);
-                Cabinets.Symbol(look, W / 2, tail + (H - tail - pole) * 0.55, r, etched, lines);
+                Cabinets.Symbol(look, m.Theme, W / 2, tail + (H - tail - pole) * 0.55, r, etched, lines);
                 break;
             }
             case HangingStyle.Painting:
             {
+                // A carved frame; a portrait in a tall one, a landscape in a wide one.
                 outline = [Geo.Rect(0, 0, W, H)];
-                double fr = Geo.Clamp(Math.Min(W, H) * 0.1, 0.8, 2);
-                etched.AddRange(Fronts.Outline(fr * 0.5, fr * 0.5, W - fr * 0.5, H - fr * 0.5, 0.3));
-                lines.Add(Geo.Loop(Geo.Rect(fr, fr, W - fr, H - fr)));
-                Landscape(fr, fr, W - fr, H - fr, rnd, etched, lines);
+                double fr = Geo.Clamp(Math.Min(W, H) * 0.12, 0.8, 2.4);
+                Pictures.Frame(0, 0, W, H, fr, etched, lines);
+                if (H > W * 1.1) Pictures.Portrait(fr, fr, W - fr, H - fr, etched, lines);
+                else Pictures.Landscape(fr, fr, W - fr, H - fr, rnd, etched, lines);
                 grain = false;
                 break;
             }
@@ -269,7 +267,7 @@ public static class Rugs
                 etched.AddRange(Fronts.Outline([shield], 0.5));
                 double r = sw * 0.24;
                 if (look == FrontLook.Plank) { lines.Add(WoodFace.Dot(cx, cy, r * 0.8)); etched.Add(Geo.Circle(cx, cy, r * 0.45, 0.01)); }
-                else Cabinets.Symbol(look, cx, cy, r, etched, lines);
+                else Cabinets.Symbol(look, m.Theme, cx, cy, r, etched, lines);
                 break;
             }
             case HangingStyle.Map:
@@ -279,13 +277,10 @@ public static class Rugs
                 outline = Geo.Union([Geo.Rect(roll * 0.5, 0, W - roll * 0.5, H), WoodFace.RoundRect(0, 0, roll * 1.6, H, roll * 0.7), WoodFace.RoundRect(W - roll * 1.6, 0, W, H, roll * 0.7)]);
                 lines.Add([new(roll * 1.6, 0.3), new(roll * 1.6, H - 0.3)]);
                 lines.Add([new(W - roll * 1.6, 0.3), new(W - roll * 1.6, H - 0.3)]);
-                var land = Hide(W * 0.45, H * 0.5, W * 0.32, H * 0.36, rnd);
-                lines.Add(Geo.Loop(land));
-                var road = new PathD();
-                for (int i = 0; i <= 8; i++) road.Add(new PointD(W * 0.2 + W * 0.5 * i / 8, H * (0.35 + 0.25 * Math.Sin(i * 0.9 + rnd.NextDouble()))));
-                lines.AddRange(Geo.ClipLines([road], [land]));
-                double cr = Math.Min(W, H) * 0.12;
-                if (cr > 0.8) lines.Add(Geo.Loop(Fronts.Star(W * 0.8, H * 0.25, cr, cr * 0.3, 4)));
+                double mx0 = roll * 1.6 + 0.4, mx1 = W - roll * 1.6 - 0.4;
+                lines.Add(Geo.Loop(Geo.Rect(mx0, 0.5, mx1, H - 0.5)));
+                if (look == FrontLook.Metal) Pictures.StarMap(mx0, 0.5, mx1, H - 0.5, rnd, etched, lines);
+                else Pictures.Map(mx0, 0.5, mx1, H - 0.5, rnd, etched, lines);
                 grain = false;
                 break;
             }
@@ -326,7 +321,7 @@ public static class Rugs
                     etched.Add(plate);
                     var inner = new PathsD();
                     var il = new List<PathD>();
-                    Cabinets.Symbol(look, W / 2, (fy0 + fy1) / 2 + r * 0.1, r * 0.55, inner, il);
+                    Cabinets.Symbol(look, m.Theme, W / 2, (fy0 + fy1) / 2 + r * 0.1, r * 0.55, inner, il);
                     etched = Geo.Subtract(etched, Geo.Offset([plate], -0.5));
                     lines.AddRange(il);
                     etched.AddRange(inner);
@@ -369,30 +364,5 @@ public static class Rugs
             Geo.Circle(0, len - 0.6, 0.75),
         };
         return Geo.Union(p);
-    }
-
-    /// <summary>A little landscape: hills, a sun, a tree, inside the frame.</summary>
-    static void Landscape(double x0, double y0, double x1, double y1, Random rnd, PathsD etched, List<PathD> lines)
-    {
-        double w = x1 - x0, h = y1 - y0;
-        if (w < 3 || h < 3) return;
-        var hill = new PathD();
-        for (int i = 0; i <= 20; i++)
-        {
-            double t = i / 20.0;
-            hill.Add(new PointD(x0 + w * t, y0 + h * (0.35 + 0.12 * Math.Sin(t * 5 + rnd.NextDouble() * 0.3))));
-        }
-        lines.Add(hill);
-        var far = new PathD();
-        for (int i = 0; i <= 20; i++)
-        {
-            double t = i / 20.0;
-            far.Add(new PointD(x0 + w * t, y0 + h * (0.55 + 0.1 * Math.Sin(t * 3 + 2))));
-        }
-        lines.Add(far);
-        etched.Add(Geo.Circle(x0 + w * 0.75, y0 + h * 0.78, Math.Min(w, h) * 0.08, 0.01));
-        double tx = x0 + w * 0.28, ty = y0 + h * 0.4;
-        lines.Add([new(tx, ty), new(tx, ty + h * 0.25)]);
-        etched.Add(Geo.Circle(tx, ty + h * 0.3, Math.Min(w, h) * 0.1, 0.01));
     }
 }
