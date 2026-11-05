@@ -50,8 +50,9 @@ public sealed record Opening
     /// <summary>Which side a door swings from, seen from the outside.</summary>
     public HingeSide Hinge { get; init; } = HingeSide.Left;
     /// <summary>
-    /// A door in box walls hangs on pins inside the wall and swings open; an arched or pointed one then has a
-    /// fixed panel over it (the leaf is square-topped). Otherwise it's glued in, filling the whole opening.
+    /// A door that swings on hinges (new doors do): in box walls it hangs on pins inside the wall, and an arched or
+    /// pointed one has a fixed panel over it (the leaf is square-topped); in single-panel walls it hangs on clips
+    /// beside the doorway. Off, it's glued in, filling the whole opening.
     /// </summary>
     public bool Opens { get; init; }
     public WindowBars Bars { get; init; } = WindowBars.Cross;
@@ -62,10 +63,10 @@ public sealed record Opening
 
     public static Opening NewDoor(BuildingSpec s, double x, double y) => new()
     {
-        Kind = OpeningKind.Door, X = x, Y = y, Shape = s.DoorShape, WidthMm = s.DoorWidthMm, HeightMm = s.DoorHeightMm, Look = s.DoorLook,
+        Kind = OpeningKind.Door, X = x, Y = y, Shape = s.DoorShape, WidthMm = s.DoorWidthMm, HeightMm = s.DoorHeightMm, Look = s.DoorLook, Opens = true,
     };
 
-    public static Opening NewDoorway(BuildingSpec s, double x, double y) => NewDoor(s, x, y) with { Kind = OpeningKind.Doorway };
+    public static Opening NewDoorway(BuildingSpec s, double x, double y) => NewDoor(s, x, y) with { Kind = OpeningKind.Doorway, Opens = false };
 
     public static Opening NewWindow(BuildingSpec s, double x, double y) => new()
     {
@@ -292,6 +293,12 @@ public sealed record HouseDesign
     public double DetailMm { get; init; }
     /// <summary>Whether every piece has its number (the one in the building booklet) scored small on it.</summary>
     public bool NumberPieces { get; init; } = true;
+    /// <summary>
+    /// Which version of the editor saved it (0: before versions were kept). Up to version 1 a door dropped in a
+    /// wall came glued in, and opening on hinges had to be ticked; such doors are read back as swinging.
+    /// </summary>
+    public int Version { get; init; }
+    public const int CurrentVersion = 2;
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
     public static BuildingSpec DefaultStyle() => BuildingSpec.Preset(BuildingKind.Cottage) with { Items = [] };
@@ -356,7 +363,7 @@ public sealed record HouseDesign
             WaysUp = [new PlacedWay { X = 7.5, Y = 3.7, Turn = 1, Kind = WayKind.Stairs }],
             Openings =
             [
-                Opening.NewDoor(style, 3.5, 7) with { Opens = true },
+                Opening.NewDoor(style, 3.5, 7),
                 Opening.NewDoorway(style, 5, 5.5),
                 Opening.NewWindow(style, 2, 4.5),
                 Opening.NewWindow(style, 3.5, 2),
@@ -408,13 +415,20 @@ public sealed record HouseDesign
         };
     }
 
-    public string ToJson() => JsonSerializer.Serialize(this, HouseJson.Options);
+    public string ToJson() => JsonSerializer.Serialize(this with { Version = CurrentVersion }, HouseJson.Options);
 
     public static HouseDesign? FromJson(string json)
     {
-        try { return JsonSerializer.Deserialize<HouseDesign>(json, HouseJson.Options); }
+        try { return JsonSerializer.Deserialize<HouseDesign>(json, HouseJson.Options)?.Upgraded(); }
         catch (Exception e) when (e is JsonException or NotSupportedException or ArgumentException) { return null; }
     }
+
+    /// <summary>A design saved by an earlier editor, brought up to date: its doors swing on hinges, as new ones do.</summary>
+    HouseDesign Upgraded() => Version >= CurrentVersion ? this : this with
+    {
+        Version = CurrentVersion,
+        Levels = [.. Levels.Select(l => l with { Openings = [.. l.Openings.Select(o => o.Kind == OpeningKind.Door ? o with { Opens = true } : o)] })],
+    };
 }
 
 static class HouseJson

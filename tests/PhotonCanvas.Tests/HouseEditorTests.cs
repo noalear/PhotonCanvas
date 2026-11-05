@@ -375,9 +375,10 @@ public class HouseEditorTests
     [Fact]
     public void A_door_fills_its_arch_unless_it_opens_on_hinges()
     {
-        var d = HouseDesign.Starter();
-        var door = d.Levels[0].Openings.First(o => o.Kind == OpeningKind.Door);
-        Assert.False(door.Opens);
+        var start = HouseDesign.Starter();
+        // A new door swings on hinges; unticked, it's glued in.
+        Assert.True(start.Levels[0].Openings.First(o => o.Kind == OpeningKind.Door).Opens);
+        var d = start with { Levels = [start.Levels[0] with { Openings = [.. start.Levels[0].Openings.Select(o => o.Kind == OpeningKind.Door ? o with { Opens = false } : o)] }] };
         var kit = HouseKitMaker.Make(d);
         var wall = kit.Walls.Single(w => w.Spec.Door == DoorKind.DoorwayAndDoor);
         Assert.False(wall.Spec.DoorOpens);
@@ -388,6 +389,25 @@ public class HouseEditorTests
         var hinged = HouseKitMaker.Make(opens);
         Assert.True(hinged.Walls.Single(w => w.Spec.Door == DoorKind.DoorwayAndDoor).Spec.DoorOpens);
         Assert.Contains(hinged.Pieces, p => p.Name.Contains("door head", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Doors_saved_glued_by_an_earlier_editor_open_on_hinges()
+    {
+        var style = HouseDesign.DefaultStyle();
+        var glued = HouseDesign.Starter() with
+        {
+            Levels = [new Level { Walls = Box(0, 0, 4, 3), Openings = [Opening.NewDoor(style, 1.5, 3) with { Opens = false }, Opening.NewDoorway(style, 3, 1.5)] }],
+        };
+        // Saved before versions were kept: every door came glued, so it's read back swinging (a doorway stays open).
+        var old = System.Text.Json.Nodes.JsonNode.Parse(glued.ToJson())!.AsObject();
+        old.Remove("Version");
+        var read = HouseDesign.FromJson(old.ToJsonString())!;
+        Assert.True(read.Levels[0].Openings.Single(o => o.Kind == OpeningKind.Door).Opens);
+        Assert.False(read.Levels[0].Openings.Single(o => o.Kind == OpeningKind.Doorway).Opens);
+        // Saved now, a door unticked stays glued.
+        var again = HouseDesign.FromJson(glued.ToJson())!;
+        Assert.False(again.Levels[0].Openings.Single(o => o.Kind == OpeningKind.Door).Opens);
     }
 
     [Fact]

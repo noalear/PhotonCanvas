@@ -46,7 +46,7 @@ Pick a tool along the top (or press its letter), then use it on the plan:
 | **Room** | R | Drag from one grid point to another: four walls round the rectangle at once. Drag a room against another and they share the wall between them. |
 | **Wall** | W | Drag from one grid point to another: a wall straight along, straight across or corner to corner (diagonal). It snaps to the nearest of those as you drag, and shows how long it is. |
 | **Erase** | E | Drag along walls to take them away, click one square of wall, or click a door or window. |
-| **Door** | D | Click a wall to put a door in it. Keep the button down and drag to slide it along the wall. Tick **Opens on hinges** to make it swing. |
+| **Door** | D | Click a wall to put a door in it. Keep the button down and drag to slide it along the wall. It swings on hinges; the **Picked** tab shows which side it's hinged on. |
 | **Doorway** | O | An open doorway with nothing in it, between two rooms, say. |
 | **Window** | N | Click a wall to put a window in it, and drag it along. |
 | **Floor** | L | Drag over squares to lay floor outside the rooms: a balcony, a landing, the floor of a walkway. Start a drag on a laid square to take floor up. |
@@ -211,13 +211,13 @@ corner to fit it in again or go back to the first view.
 
 On the **Picked** tab, with a door or window picked on the plan:
 
-- **Kind**: *Door that opens*, *Doorway (left open)* or *Window*.
+- **Kind**: *Door*, *Doorway (left open)* or *Window*.
 - **Shape**: square, a round or pointed arch, round, an arrow slit, angled corners (sci-fi) or rough (a cave).
 - **Width** and **Height** (mm); a window's **Sill** is how high its bottom is above its floor.
 - A door's **Looks like** (planks, studded, a metal blast door, a portcullis that slides up, a stone
-  slab). As it comes, a door is glued into its wall and fills the whole opening, arch and all. Tick
-  **Opens on hinges** for one that swings outwards, and pick which side it's **Hinged on the** (seen
-  from outside); the plan draws its swing. In box walls it turns on pins inside the wall: only a
+  slab). A door **Opens on hinges** as it comes, swinging outwards: pick which side it's **Hinged on
+  the** (seen from outside); the plan draws its swing. Untick it and the door is glued into its wall
+  instead, filling the whole opening, arch and all. In box walls it turns on pins inside the wall: only a
   square-topped leaf can swing inside a thick wall, so an arched or pointed door that opens has a
   fixed panel over it. In single-panel walls it's the furniture maker's door: it hangs on two clips
   slid onto the side of the doorway and covers the doorway a little all round (square, arched and
