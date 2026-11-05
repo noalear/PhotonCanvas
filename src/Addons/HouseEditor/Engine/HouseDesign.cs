@@ -163,6 +163,8 @@ public sealed record PlacedItem
     public double Y { get; init; }
     public double Turn { get; init; }
     public FurnitureItem Item { get; init; } = Defaults.For(ItemKind.Table);
+    /// <summary>A banana for scale, as big as a real one: shown in the 3D view, not cut (<see cref="Item"/> is ignored).</summary>
+    public bool Banana { get; init; }
 }
 
 /// <summary>A piece of furniture's look from above (see <see cref="HouseKitMaker.Look"/>): the floor it takes (mm) and its pieces, lowest first.</summary>

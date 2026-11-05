@@ -195,13 +195,16 @@ gap at the top and no step where the caps cross. Glue the caps marked *under* fi
 **Show** picks how much of the walls the 3D view draws:
 
 - **Everything, roofs on**: all the walls, and the roofs.
+- **Everything, but the roof off**: all the walls, with the roofs lifted off to look in from above.
 - **Walls cut away**: the walls on your side of the building that face you (or face away from you) are
   left out, wherever you turn it, so you can see into the rooms, like a doll's house. The roofs are off.
 - **Walls down**: no walls, just the columns, the floors and the tiles: the plan in 3D.
 
 **up to** shows the floors only up to one of them, to look into the rooms of a lower floor.
-**Engraving** shows the textures sunk into the pieces as deep as you'll etch them (0.3 to 1.5 mm), so
-you can see how they'll stand out; *Painted on* draws them flat, which is quickest on a big building.
+**Realistic engraving** shows the textures sunk into the pieces as deep as you'll etch them (pick 0.3 to
+1.5 mm beside it), so you can see how they'll stand out; turned off, they're painted on flat, which is
+quickest to turn round on a big building. A single-panel wall with an **Other side** of its own shows
+that texture on its back too.
 **Doors open** swings every door that opens out on its hinges (and slides portcullises up), to check
 which side each is hinged. Drag to
 turn the building, scroll to zoom, middle-drag or the arrow keys to move it, and the buttons in the
@@ -275,6 +278,10 @@ glues together the same way; pieces that come out the same are cut together ("Ta
 standing in a wall or column, off the edge of its floor, in the way of the stairs or over their opening,
 or running into another piece gets a yellow !. Rugs lie flat under the rest, and hangings (banners,
 tapestries, shields, screens) are glued up the wall at their own height: put them against a wall.
+
+**Banana for scale**, under the list, puts down a banana as big as a real one (about 17 cm long), to see
+how big the building really is in the 3D view. Drag it, turn it and take it away like furniture; it
+isn't cut.
 
 ## Stairs and ladders
 
