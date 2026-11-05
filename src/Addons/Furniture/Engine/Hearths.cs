@@ -16,6 +16,7 @@ public static class Hearths
     {
         var it = m.Item;
         var style = it.Hearth;
+        if (style == HearthStyle.Spit) { CookFire.Make(m); return; }
         var look = Fronts.Look(m);
         var rnd = m.Rnd;
         double W = it.WidthMm, D = it.DepthMm, H = it.HeightMm, T = m.T, f = m.Fit, sw = m.SlotW;

@@ -116,7 +116,32 @@ public static class Rugs
                 break;
             }
             case RugPattern.Hide:
-                outline = [Hide(W / 2, D / 2, W / 2, D / 2, rnd)];
+            {
+                // A shaggy edge: tufts of fur all round the hide (round, so none is too thin to cut).
+                var body = Hide(W / 2, D / 2, W / 2 - 0.6, D / 2 - 0.6, rnd);
+                var tufts = new PathsD { body };
+                double run = 0;
+                for (int i = 0; i < body.Count; i++)
+                {
+                    var p0 = body[i];
+                    var p1 = body[(i + 1) % body.Count];
+                    double len = Math.Sqrt((p1.x - p0.x) * (p1.x - p0.x) + (p1.y - p0.y) * (p1.y - p0.y));
+                    for (double t = run; t < len; t += 1.15)
+                    {
+                        double k = t / len;
+                        tufts.Add(Geo.Circle(p0.x + (p1.x - p0.x) * k, p0.y + (p1.y - p0.y) * k, 0.5 + 0.22 * rnd.NextDouble(), 0.01));
+                    }
+                    run = Math.Max(0, (run - len) % 1.15);
+                    if (run == 0) run = 1.15 - len % 1.15;
+                }
+                outline = Geo.Solid(tufts);
+                // A darker saddle of fur down the back, its edge ragged.
+                var saddle = Geo.Offset([body], -Math.Min(W, D) * 0.13);
+                var nicks = new PathsD();
+                foreach (var q in saddle.SelectMany(p => p).Where((_, i) => i % 3 == 0))
+                    nicks.Add(Geo.Circle(q.x, q.y, 0.35 + 0.5 * rnd.NextDouble(), 0.01));
+                etched.AddRange(Geo.Subtract(saddle, nicks));
+
                 // Fur: short strokes all over, and the spine.
                 lines.Add([new(W * 0.12, D / 2), new(W * 0.88, D / 2)]);
                 for (int i = 0; i < (int)(W * D / 6); i++)
@@ -126,6 +151,7 @@ public static class Rugs
                 }
                 lines = Geo.ClipLines(lines, Geo.Offset(outline, -0.3));
                 break;
+            }
             case RugPattern.Mat:
             {
                 outline = [Fronts.Chamfered(0, 0, W, D, Math.Min(1.5, Math.Min(W, D) * 0.15))];
@@ -286,9 +312,14 @@ public static class Rugs
         var etched = new PathsD();
         var lines = new List<PathD>();
         PathsD outline;
+        // Holes right through it (a tattered banner's tears).
+        var tears = new PathsD();
         bool grain = false;
         switch (it.Hanging)
         {
+            case HangingStyle.Banner when m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon && W >= 7 && H >= 14:
+                outline = WarBanner(W, H, look, m.Theme, rnd, etched, lines, tears);
+                break;
             case HangingStyle.Banner:
             {
                 // A pole across the top, the cloth hanging from it, a swallowtail (or a point) at the bottom.
@@ -521,8 +552,78 @@ public static class Rugs
             }
         }
         m.Add(it.Hanging switch { HangingStyle.Banner => "Banner", HangingStyle.Painting => "Painting", HangingStyle.Shield => "Shield", HangingStyle.Map or HangingStyle.FramedMap => "Map", HangingStyle.Monitor => "Screen", _ => "Tapestry" },
-            outline, [], [Pose.Front(0, y0, m.T / 2)], grainAlongU: true, face: grain ? null : [], etched: etched, lines: lines);
+            outline, tears, [Pose.Front(0, y0, m.T / 2)], grainAlongU: true, face: grain ? null : [], etched: etched, lines: lines);
         m.Note($"Glue it to the wall with its bottom {y0:0.#} mm up.");
+    }
+
+    /// <summary>
+    /// A war banner: a spear across the top with a head at each end, the cloth hanging from it on two chains,
+    /// its bottom torn into tatters and a tear or two through it; burnt dark but for a border and a great
+    /// skull left light.
+    /// </summary>
+    static PathsD WarBanner(double W, double H, FrontLook look, string theme, Random rnd, PathsD etched, List<PathD> lines, PathsD tears)
+    {
+        double ph = 1.2, yc = H - ph / 2, head = Math.Min(2.2, W * 0.18), cw = W * 0.72, x0 = (W - cw) / 2, x1 = x0 + cw;
+        double chain = Geo.Clamp(H * 0.1, 1.8, 3.5), top = H - ph - chain, tail = Math.Min(cw * 0.6, H * 0.22);
+        // The spear: a shaft, a head each end (blunted to what the laser leaves standing), a collar behind each head.
+        var spear = new PathsD
+        {
+            Geo.Rect(head - 0.2, H - ph, W - head + 0.2, H),
+            new PathD { new(0, yc), new(head, yc - 1.0), new(head, yc + 1.0) },
+            new PathD { new(W, yc), new(W - head, yc + 1.0), new(W - head, yc - 1.0) },
+            Geo.Rect(head - 0.1, yc - 0.85, head + 0.7, yc + 0.85), Geo.Rect(W - head - 0.7, yc - 0.85, W - head + 0.1, yc + 0.85),
+        };
+        var pole = Geo.Offset(Geo.Offset(Geo.Solid(spear), -0.4), 0.4, round: true);
+        lines.Add([new(head + 0.7, yc), new(W - head - 0.7, yc)]);
+        // The chains: a strip of links each side.
+        var chains = new PathsD();
+        foreach (var cx in new[] { x0 + 1.0, x1 - 1.0 })
+        {
+            chains.Add(Geo.Rect(cx - 0.6, top - 0.5, cx + 0.6, H - ph + 0.1));
+            for (double y = top + 0.2; y < H - ph - 0.3; y += 0.9) lines.Add([new(cx - 0.6, y), new(cx + 0.6, y)]);
+            lines.Add([new(cx, top), new(cx, H - ph)]);
+        }
+        // The cloth: straight down the sides, the bottom torn into tatters of different lengths.
+        var cloth = new PathD { new(x0, top), new(x1, top) };
+        int n = Math.Max(4, (int)Math.Round(cw / 1.3));
+        for (int i = 0; i <= n; i++)
+        {
+            double x = x1 - cw * i / n;
+            double y = i % 2 == 0 ? tail * (0.05 + 0.3 * rnd.NextDouble()) : tail * (0.7 + 0.3 * rnd.NextDouble());
+            cloth.Add(new PointD(x, y));
+        }
+        var cl = Geo.Offset(Geo.Offset(Geo.Solid([cloth]), -0.5), 0.5, round: true);
+        var outline = Geo.Union(Geo.Union(pole, chains), cl);
+        // A tear or two through it, clear of the edges and the skull.
+        double r = Math.Min(cw * 0.33, (top - tail) * 0.28), scx = W / 2, scy = tail + (top - tail) * 0.58;
+        foreach (var (tx, ty) in new[] { (x0 + cw * 0.26, tail + (top - tail) * 0.14), (x1 - cw * 0.3, scy - r * 1.7) })
+        {
+            if (ty - 1.4 < tail || Math.Sqrt((tx - scx) * (tx - scx) + (ty - scy) * (ty - scy)) < r * 1.2 + 1) continue;
+            // A ragged slash, leaning a little: jagged both sides, widest in the middle.
+            var t = new PathD();
+            double lean = (rnd.NextDouble() - 0.5) * 0.5, len = 1.4;
+            for (int k = 0; k <= 6; k++)
+            {
+                double f = k / 6.0 * 2 - 1, half = 0.5 * (1 - f * f) + (k % 2 == 0 ? 0.08 : -0.08);
+                t.Add(new PointD(tx + f * len * lean + Math.Max(0.05, half), ty + f * len));
+            }
+            for (int k = 6; k >= 0; k--)
+            {
+                double f = k / 6.0 * 2 - 1, half = 0.45 * (1 - f * f) + (k % 2 == 1 ? 0.08 : -0.08);
+                t.Add(new PointD(tx + f * len * lean - Math.Max(0.05, half), ty + f * len));
+            }
+            tears.Add(t);
+        }
+        // The field burnt dark inside a light border; the skull left light, its eyes and nose dark.
+        var field = Geo.Offset(cl, -0.7);
+        var skullE = new PathsD();
+        var skullL = new List<PathD>();
+        Cabinets.Symbol(look, theme, scx, scy, r, skullE, skullL);
+        var headArea = Geo.Solid([Geo.Circle(scx, scy + r * 0.18, r * 0.66, 0.01), WoodFace.RoundRect(scx - r * 0.4, scy - r * 0.8, scx + r * 0.4, scy - r * 0.05, r * 0.15)]);
+        etched.AddRange(Geo.Subtract(Geo.Subtract(field, Geo.Offset(headArea, 0.15)), Geo.Offset(tears, 0.2)));
+        etched.AddRange(skullE);
+        lines.AddRange(Geo.ClipLines(skullL, headArea));
+        return outline;
     }
 
     /// <summary>A heater shield: straight top, sides curving to a point.</summary>

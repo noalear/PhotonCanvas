@@ -19,7 +19,7 @@ On the **Sheet** tab, type your sheet's **Thickness** (2 mm suits 28 mm figures)
 ## Or start from a theme
 <!-- target: button:Start the list from this theme -->
 Pick a **Theme** at the top and press **Start the list from this theme** for a room's worth that suits
-it: bunks and lockers for a sci-fi ship, a trestle table and chests for a dungeon, a carved settle and a hooded great fireplace for a medieval hall. The faces change to
+it: bunks and lockers for a sci-fi ship, a cook fire with a roast turning on a spit, a torch on splayed legs and a tattered war banner for a dungeon, a carved settle and a hooded great fireplace for a medieval hall. The faces change to
 match (metal panels for sci-fi).
 
 The ready-made **Town** pieces dress the square outside the tavern: the theme's town wall, a guard
@@ -42,7 +42,7 @@ the preview follows.
 ones do: a cupboard's doors and drawer fronts, the bosses on a candelabra, a clock's bezel and trunk door,
 the arcade of arches across a wooden chest and the handles on its ends, the corbels under a stone
 fireplace's mantel, the tracery across the top of a bookcase, the book on a lectern, the cloth on an altar
-and the frames, braces and rope handles on the sides of a crate.
+the frames, braces and rope handles on the sides of a crate, and the ring of stones, roast and cauldron round a cook fire.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

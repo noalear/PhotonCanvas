@@ -70,7 +70,7 @@ public enum BackTop { Square, Rounded, Arched, Pointed, Winged }
 
 public enum BedStyle { Plain, FourPoster, Bunk, Pallet }
 
-public enum HearthStyle { Fireplace, Oven, Forge }
+public enum HearthStyle { Fireplace, Oven, Forge, Spit }
 
 /// <summary>Things with a sloping top on two shaped sides.</summary>
 public enum SlantStyle { Lectern, Scriptorium, Console, MapTable }
