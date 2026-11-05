@@ -281,6 +281,7 @@ public static class Storage
         bool closed = it.Lid == LidStyle.Flat;
         var panels = Box([W, H, D], T, [true, true, true, closed, true, true], m.PushFit ? m.Grip / 2 : 0);
         double band = Math.Clamp(Math.Min(W, D) * 0.07, 0.6, 1.2);
+        var arcade = chest ? Arcade(m, W, H, T, it.Bands ? T + 1.5 * band + 0.3 : T + 0.4) : null;
         foreach (var p in panels)
         {
             var etched = new PathsD();
@@ -290,8 +291,10 @@ public static class Storage
             {
                 double inset = T + band;
                 if (p.Lu > 2 * inset + 2) Bands([inset, p.Lu - inset], p.Lv, band, etched, lines);
-                if (p.Name == "Front") lines.AddRange(Lock(p.Lu / 2, p.Lv - Math.Min(p.Lv * 0.3, 3.5), Math.Min(p.Lu * 0.16, 2.6)));
+                if (p.Name == "Front" && arcade is null) lines.AddRange(Lock(p.Lu / 2, p.Lv - Math.Min(p.Lv * 0.3, 3.5), Math.Min(p.Lu * 0.16, 2.6)));
             }
+            // The carving that shows through the arcade's arches.
+            if (p.Name == "Front" && arcade is not null) { etched.AddRange(arcade.Value.Etched); lines.AddRange(arcade.Value.Lines); }
             if (!chest && it.Bands && p.Name != "Bottom")
             {
                 // A crate's sides and lid are drawn board by board (each board's grain its own way).
@@ -304,6 +307,7 @@ public static class Storage
             m.Add(p.Name, p.Cut, [], [p.Pose], grainAlongU: true, face: [Geo.Rect(0, 0, p.Lu, p.Lv)], planks: planks && (chest || !it.Bands), plankMm: chest ? 2.4 : 3,
                 etched: etched, lines: lines, ribs: p.Ribs);
         }
+        if (arcade is not null) m.Note("Glue the arcade on the front and a handle on each end.");
         if (chest && it.Lid is LidStyle.Loose or LidStyle.Domed)
         {
             double lo = Math.Clamp(Math.Min(W, D) * 0.04, 0.4, 1), cl = Math.Max(0.15, m.Fit);
@@ -411,6 +415,50 @@ public static class Storage
         }
         m.Note("Domed lid: stand the two ends and the two edge rails in the lid board's slots, then glue the planks over them round the curve, front to back.");
         return slots;
+    }
+
+    /// <summary>
+    /// A wooden chest's carved front: an arcade of pointed (gothic) or round arches cut through a plate glued
+    /// on the front between the bands, the theme's symbol carved on the front behind each arch, a lock plate
+    /// on the arcade's top rail, and a handle glued on each end. Null for a metal chest, a push fit, or a
+    /// front too small for two arches. Returns what to carve on the front itself.
+    /// </summary>
+    static (PathsD Etched, List<PathD> Lines)? Arcade(Maker m, double W, double H, double T, double side)
+    {
+        var look = Fronts.Look(m);
+        if (m.PushFit || look == FrontLook.Metal) return null;
+        double x0 = side, x1 = W - side, y0 = T + 0.4, y1 = H - 0.6, gap = 1.2, rail = Math.Max(1.4, Math.Min(3.2, (y1 - y0) * 0.22));
+        int n = Geo.Clamp((int)Math.Round((x1 - x0) / 7.5), 2, 5);
+        double aw = (x1 - x0 - (n + 1) * gap) / n, ay0 = y0 + gap, ay1 = y1 - rail;
+        if (aw < 2.6 || ay1 - ay0 < 3.4) return null;
+        var plate = new PathsD { Geo.Rect(0, 0, x1 - x0, y1 - y0) };
+        var holes = new PathsD();
+        var pl = new List<PathD>();
+        var fe = new PathsD();
+        var fl = new List<PathD>();
+        var top = look == FrontLook.Gothic ? BackTop.Pointed : BackTop.Arched;
+        for (int i = 0; i < n; i++)
+        {
+            double a = gap + i * (aw + gap), b = a + aw;
+            var arch = Shapes.Topped(top, a, ay0 - y0, b, ay1 - y0, Math.Min(aw * 0.5, (ay1 - ay0) * 0.45));
+            holes.Add(arch);
+            // A moulding scored round each arch, and the symbol behind it on the front.
+            pl.Add(Geo.Loop(Geo.Offset([arch], 0.45).FirstOrDefault() ?? arch));
+            double r = Math.Min(aw * 0.32, (ay1 - ay0) * 0.22);
+            if (r > 0.9) Cabinets.Symbol(look, m.Theme, x0 + (a + b) / 2, ay0 + (ay1 - ay0) * 0.42, r, fe, fl);
+        }
+        // The lock plate on the top rail.
+        pl.AddRange(Lock((x1 - x0) / 2, y1 - y0 - rail / 2, Math.Min(2.2, rail * 0.9)));
+        m.Add("Arcade", plate, holes, [Pose.Front(x0, y0, m.Item.DepthMm + T / 2)], grainAlongU: true, face: [], lines: pl).Glue();
+        // A handle on each end: a bar with a hand hole, glued on halfway up.
+        double D = m.Item.DepthMm, hw = Math.Min(5, D * 0.4), hh = 3.0, hy = H * 0.55 - hh / 2;
+        if (D > 8)
+        {
+            var handle = new PathsD { WoodFace.RoundRect(0, 0, hw, hh, 0.6) };
+            var hole = new PathsD { WoodFace.RoundRect(1.0, 1.0, hw - 1.0, hh - 1.0, 0.3) };
+            m.Add("Handle", handle, hole, [Pose.Left(-T / 2, hy, (D - hw) / 2), Pose.Right(W + T / 2, hy, (D + hw) / 2)], grainAlongU: true, face: []).Glue();
+        }
+        return (fe, fl);
     }
 
     /// <summary>A lock plate with a keyhole, scored.</summary>

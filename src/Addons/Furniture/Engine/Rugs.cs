@@ -23,19 +23,45 @@ public static class Rugs
         switch (it.Rug)
         {
             case RugPattern.Round:
-                outline = [Ellipse(W / 2, D / 2, W / 2, D / 2)];
-                for (int k = 1; k <= 3; k++)
+            {
+                double cx = W / 2, cy = D / 2, rx = W / 2, ry = D / 2;
+                outline = [Ellipse(cx, cy, rx, ry)];
+                PointD On(double a, double f) => new(cx + Math.Cos(a) * rx * f, cy + Math.Sin(a) * ry * f);
+                // A fringe of short stitches round the edge.
+                int ticks = (int)(Math.PI * (rx + ry) / 0.9);
+                for (int i = 0; i < ticks; i++) { double a = 2 * Math.PI * i / ticks; lines.Add([On(a, 0.985), On(a, 0.92)]); }
+                // A border band between two etched rings, a scrolling vine running round inside it.
+                etched.AddRange(Fronts.Outline([Ellipse(cx, cy, rx * 0.9, ry * 0.9)], 0.4));
+                etched.AddRange(Fronts.Outline([Ellipse(cx, cy, rx * 0.7, ry * 0.7)], 0.4));
+                int scrolls = Math.Max(8, (int)(Math.PI * (rx + ry) * 0.8 / 4.5)) / 2 * 2;
+                var vine = new PathD();
+                for (int i = 0; i <= 160; i++) { double a = 2 * Math.PI * i / 160; vine.Add(On(a, 0.8 + 0.045 * Math.Sin(a * scrolls))); }
+                lines.Add(vine);
+                for (int i = 0; i < scrolls; i++)
                 {
-                    double f = 1 - k * 0.12;
-                    etched.AddRange(Fronts.Outline([Ellipse(W / 2, D / 2, W / 2 * f, D / 2 * f)], 0.4));
+                    // A curl off the vine at each crest, turning in towards the vine.
+                    double a = 2 * Math.PI * (i + 0.25) / scrolls, f = i % 2 == 0 ? 0.845 : 0.755, cr = Math.Min(rx, ry) * 0.045;
+                    var c = On(a + Math.PI / scrolls * 0.5, f);
+                    if (cr > 0.25) lines.Add([.. Geo.Arc(c.x, c.y, cr, a, a + Math.PI * 1.5, 0.02)]);
                 }
-                for (int i = 0; i < 12; i++)
+                // The field: the theme's symbol in the middle, a lozenge either side and small ones round it.
+                double sr = Math.Min(rx, ry) * 0.3;
+                if (sr > 0.9) Cabinets.Symbol(Fronts.Look(m), m.Theme, cx, cy, sr, etched, lines);
+                foreach (var a in new[] { 0, Math.PI })
                 {
-                    double a = i * Math.PI / 6;
-                    lines.Add(Geo.Loop(Petal(W / 2, D / 2, a, W / 2 * 0.5, D / 2 * 0.5)));
+                    var p = On(a, 0.5);
+                    double lw = Math.Min(rx, ry) * 0.08;
+                    if (lw > 0.4) etched.Add(new PathD { new(p.x - lw * 1.6, p.y), new(p.x, p.y + lw), new(p.x + lw * 1.6, p.y), new(p.x, p.y - lw) });
                 }
-                etched.Add(Ellipse(W / 2, D / 2, W * 0.06, D * 0.06));
+                for (int i = 0; i < 8; i++)
+                {
+                    if (i % 4 == 0) continue;
+                    var p = On(i * Math.PI / 4, 0.55);
+                    lines.Add(WoodFace.Dot(p.x, p.y, Math.Min(rx, ry) * 0.03 + 0.15));
+                }
+                etched.AddRange(Fronts.Outline([Ellipse(cx, cy, rx * 0.62, ry * 0.62)], 0.3));
                 break;
+            }
             case RugPattern.Hide:
                 outline = [Hide(W / 2, D / 2, W / 2, D / 2, rnd)];
                 // Fur: short strokes all over, and the spine.
@@ -135,24 +161,6 @@ public static class Rugs
     }
 
     static PathD Diamond(double cx, double cy, double rx, double ry) => [new(cx, cy - ry), new(cx + rx, cy), new(cx, cy + ry), new(cx - rx, cy)];
-
-    static PathD Petal(double cx, double cy, double a, double rx, double ry)
-    {
-        var p = new PathD();
-        for (int i = 0; i <= 16; i++)
-        {
-            double t = i / 16.0 * Math.PI, r = Math.Sin(t) * 0.18, along = 0.35 + 0.65 * i / 16.0;
-            double lx = Math.Cos(a) * along - Math.Sin(a) * r, ly = Math.Sin(a) * along + Math.Cos(a) * r;
-            p.Add(new PointD(cx + lx * rx, cy + ly * ry));
-        }
-        for (int i = 15; i > 0; i--)
-        {
-            double t = i / 16.0 * Math.PI, r = -Math.Sin(t) * 0.18, along = 0.35 + 0.65 * i / 16.0;
-            double lx = Math.Cos(a) * along - Math.Sin(a) * r, ly = Math.Sin(a) * along + Math.Cos(a) * r;
-            p.Add(new PointD(cx + lx * rx, cy + ly * ry));
-        }
-        return p;
-    }
 
     /// <summary>A stepped (kilim) diamond.</summary>
     static PathD Stepped(double cx, double cy, double r)
@@ -306,13 +314,39 @@ public static class Rugs
                 double rod = Math.Min(1.0, H * 0.07), x0 = Math.Min(1.0, W * 0.08);
                 // Knobs on the rod's ends.
                 double kr = look != FrontLook.Metal && W >= 8 ? Math.Max(0.7, rod * 0.75) : 0;
-                outline = kr > 0
-                    ? Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(kr, H - rod, W - kr, H), Geo.Circle(kr, H - kr, kr, 0.02), Geo.Circle(W - kr, H - kr, kr, 0.02)])
-                    : Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(0, H - rod, W, H)]);
+                // A cloth hung by loops from the rod with a dagged hem, on a wooden one wide enough; else a fringe.
+                bool dagged = look != FrontLook.Metal && W - 2 * x0 >= 8 && H >= 14;
+                double loops = dagged ? Math.Min(1.4, H * 0.07) : 0, top = H - rod - loops, dd = dagged ? Math.Min(1.8, H * 0.08) : 0;
+                var cloth = new PathD { new(x0, top), new(x0, dd) };
+                if (dagged)
+                {
+                    int n = Math.Max(3, (int)Math.Round((W - 2 * x0) / 2.6));
+                    for (int i = 0; i < n; i++)
+                    {
+                        double a0 = x0 + (W - 2 * x0) * i / n, a1 = x0 + (W - 2 * x0) * (i + 1) / n, mid = (a0 + a1) / 2;
+                        cloth.AddRange([new(mid - 0.5, 0), new(mid + 0.5, 0), new(a1, dd)]);
+                    }
+                }
+                else cloth.Add(new PointD(W - x0, 0));
+                cloth.Add(new PointD(W - x0, top));
+                var parts = new PathsD { cloth, kr > 0 ? Geo.Rect(kr, H - rod, W - kr, H) : Geo.Rect(0, H - rod, W, H) };
+                if (kr > 0) parts.AddRange([Geo.Circle(kr, H - kr, kr, 0.02), Geo.Circle(W - kr, H - kr, kr, 0.02)]);
+                if (dagged)
+                {
+                    int nl = Math.Max(3, (int)Math.Round((W - 2 * x0) / 3.2));
+                    for (int i = 0; i < nl; i++)
+                    {
+                        double lx = x0 + 0.65 + (W - 2 * x0 - 1.3) * i / (nl - 1);
+                        parts.Add(Geo.Rect(lx - 0.65, top - 0.01, lx + 0.65, H - rod + 0.01));
+                        lines.Add([new(lx - 0.65, H - rod - 0.3), new(lx + 0.65, H - rod - 0.3)]);
+                    }
+                }
+                outline = Geo.Solid(parts);
                 double b = Geo.Clamp(Math.Min(W, H) * 0.1, 0.8, 2);
-                etched.AddRange(Fronts.Outline(x0 + b * 0.6, b * 1.2, W - x0 - b * 0.6, H - rod - b * 0.6, 0.45));
-                for (double x = x0 + 0.4; x < W - x0 - 0.3; x += 0.45) lines.Add([new(x, 0), new(x, b * 0.7)]);
-                double fx0 = x0 + b * 1.3, fx1 = W - x0 - b * 1.3, fy0 = b * 1.9, fy1 = H - rod - b * 1.3;
+                etched.AddRange(Fronts.Outline(x0 + b * 0.6, dd + b * 1.2, W - x0 - b * 0.6, top - b * 0.6, 0.45));
+                if (dagged) lines.Add([new(x0 + 0.2, dd + 0.5), new(W - x0 - 0.2, dd + 0.5)]);
+                else for (double x = x0 + 0.4; x < W - x0 - 0.3; x += 0.45) lines.Add([new(x, 0), new(x, b * 0.7)]);
+                double fx0 = x0 + b * 1.3, fx1 = W - x0 - b * 1.3, fy0 = dd + b * 1.9, fy1 = top - b * 1.3;
                 double r = Math.Min(fx1 - fx0, fy1 - fy0) * 0.3;
                 // A heraldic field: lilies left light on a dark ground, round the shield; diamonds on a metal one.
                 bool seme = look != FrontLook.Metal && fx1 - fx0 >= 8 && fy1 - fy0 >= 8;

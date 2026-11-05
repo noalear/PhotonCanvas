@@ -31,7 +31,15 @@ public static class Hearths
         // ---- the front (flat: u = x, v = y over the hearth) ----
         double Hf = (oven ? H : Hs) - T;
         double topV = oven ? Hs - T : Hf;
-        var front = new PathsD { oven ? Shapes.Topped(BackTop.Arched, 0, 0, W, Hf, Math.Min(W * 0.35, Hf - (Hs - T) + 0.01)) : Geo.Rect(0, 0, W, Hf) };
+        // An oven's dome carries a little chimney stack on its crown, capped, within the height asked.
+        double ch = oven ? Geo.Clamp(H * 0.16, 2.5, 5) : 0, cw = Geo.Clamp(W * 0.16, 2.6, 5);
+        var front = new PathsD { oven ? Shapes.Topped(BackTop.Arched, 0, 0, W, Hf - ch * 0.5, Math.Min(W * 0.35, Hf - ch * 0.5 - (Hs - T) + 0.01)) : Geo.Rect(0, 0, W, Hf) };
+        if (oven && Hf - ch * 1.5 > Hs - T + 1.5)
+        {
+            front.Add(Geo.Rect(W / 2 - cw / 2, Hf - ch * 1.5, W / 2 + cw / 2, Hf - 0.01));
+            front.Add(Geo.Rect(W / 2 - cw / 2 - 0.5, Hf - 1.0, W / 2 + cw / 2 + 0.5, Hf));
+            front = Geo.Solid(front);
+        }
         double ftw = Geo.Clamp(j * 0.4, 1.2, 3);
         double[] frontTabs = [j / 2, W - j / 2];
         foreach (var u in frontTabs)
@@ -80,6 +88,22 @@ public static class Hearths
             fl.Add(Geo.Loop([new(W / 2 - 0.8, ky), new(W / 2 + 0.8, ky), new(W / 2 + 1.1, ky + 1.9), new(W / 2 - 1.1, ky + 1.9)]));
         }
         fe = Geo.Subtract(Geo.Union(fe), Geo.Offset(fHoles, 0.4));
+        if (oven && look != FrontLook.Metal)
+        {
+            // A ring of wedge-shaped bricks round the oven door, left light against the coursed brick.
+            var door = new PathsD { Shapes.Topped(BackTop.Arched, j, oy0, W - j, oy0 + oh, Math.Min(ow / 2, oh * 0.6)) };
+            var ring = Geo.Intersect(Geo.Subtract(Geo.Offset(door, 1.8), Geo.Offset(door, 0.3)), [Geo.Rect(0, oy0, W, Hf)]);
+            fe = Geo.Subtract(fe, Geo.Offset(ring, 0.15));
+            fl.AddRange(Geo.ClipLines([Geo.Loop(Geo.Offset(door, 1.8).FirstOrDefault() ?? door[0])], [Geo.Rect(0, oy0, W, Hf)]));
+            double cx = W / 2, cy = oy0 + oh * 0.35;
+            var spokes = new List<PathD>();
+            for (int i = 0; i <= 12; i++)
+            {
+                double a = Math.PI * i / 12, rr = Math.Max(ow, oh) * 1.4;
+                spokes.Add([new(cx, cy), new(cx + Math.Cos(a) * rr, cy + Math.Sin(a) * rr)]);
+            }
+            fl.AddRange(Geo.ClipLines(spokes, ring));
+        }
         m.Add("Front", front, fHoles, [Pose.Front(0, T, D - T / 2)], grainAlongU: true, face: [], etched: fe, lines: fl);
 
         // ---- the cheeks (flat: u = z from the wall, v = y over the hearth) ----

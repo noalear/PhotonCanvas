@@ -32,11 +32,45 @@ public static class Beds
         double[] railZ = [si + T / 2, D - si - T / 2];
         double yr = yb - rh / 2;
 
-        // Head and foot boards: legs at the sides, slots for the mattress's and the rails' tabs.
+        // Head and foot boards: legs at the sides, slots for the mattress's and the rails' tabs. On a wooden
+        // bed the legs rise as corner posts with turned knobs, an arched (or pointed) panel between them.
+        var look = Fronts.Look(m);
+        double PostUp(double h) => look == FrontLook.Metal ? 0 : Geo.Clamp(Math.Min(3.2, h - Hm - 2.4), 0, 3.2);
         PathsD Board(double h)
         {
-            var o = new PathsD { WoodFace.RoundRect(0, -3, D, h, Math.Min(2, D * 0.12)) };
-            return Geo.Intersect(o, [Geo.Rect(0, 0, D, h)]);
+            double up = PostUp(h);
+            if (up < 1.4)
+            {
+                var o = new PathsD { WoodFace.RoundRect(0, -3, D, h, Math.Min(2, D * 0.12)) };
+                return Geo.Intersect(o, [Geo.Rect(0, 0, D, h)]);
+            }
+            double r = legs / 2, top = h - up, rise = Math.Min((D - 2 * legs) * 0.22, Math.Max(0, top - Hm - 1.2));
+            var b = new PathsD();
+            foreach (var u in new[] { legs / 2, D - legs / 2 })
+            {
+                b.Add(Geo.Rect(u - legs / 2, 0, u + legs / 2, h - 2 * r - 0.5));
+                b.Add(Geo.Rect(u - legs * 0.3, h - 2 * r - 0.6, u + legs * 0.3, h - r));
+                b.Add(Geo.Circle(u, h - r, r, 0.02));
+            }
+            b.Add(Shapes.Topped(look == FrontLook.Gothic ? BackTop.Pointed : BackTop.Arched, legs - 0.01, 0, D - legs + 0.01, top, rise));
+            return Geo.Solid(b);
+        }
+        // A carved panel: a sunk field with the theme's symbol on the head board, a plain field on the foot board.
+        (PathsD, List<PathD>) Carving(double h, bool head)
+        {
+            var e = new PathsD();
+            var l = new List<PathD>();
+            double up = PostUp(h), top = h - up, y0 = Hm + 0.6, y1 = top - Math.Min((D - 2 * legs) * 0.22, Math.Max(0, top - Hm - 1.2)) - 0.6;
+            if (up < 1.4 || y1 - y0 < 2.4 || D - 2 * legs < 5) return (e, l);
+            l.Add(Geo.Loop(Geo.Rect(legs + 0.8, y0, D - legs - 0.8, y1)));
+            l.Add(Geo.Loop(Geo.Rect(legs + 1.4, y0 + 0.6, D - legs - 1.4, y1 - 0.6)));
+            double sr = Math.Min((D - 2 * legs) * 0.18, (y1 - y0) * 0.32);
+            if (head && sr > 1.2) Cabinets.Symbol(look, m.Theme, D / 2, (y0 + y1) / 2, sr, e, l);
+            // The posts turned: rings scored at the top of each.
+            foreach (var u in new[] { legs / 2, D - legs / 2 })
+                foreach (var y in new[] { h - 2 * legs - 1.2, h - 2 * legs - 0.4 })
+                    if (y > top) l.Add([new(u - legs / 2 + 0.2, y), new(u + legs / 2 - 0.2, y)]);
+            return (e, l);
         }
         var holes = new PathsD { WoodFace.RoundRect(legs, -3, D - legs, yr - th / 2 - 1.2, Math.Min(1, (D - 2 * legs) / 2)) };
         foreach (var v in tabV)
@@ -45,8 +79,11 @@ public static class Beds
             holes.Add(Geo.Rect(z - (tw + f) / 2, yb - f / 2, z + (tw + f) / 2, yb + T + f / 2));
         }
         foreach (var z in railZ) holes.Add(Geo.Rect(z - sw / 2, yr - (th + f) / 2, z + sw / 2, yr + (th + f) / 2));
-        m.Add("Head board", Board(Hh), holes, [Pose.Left(T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3);
-        m.Add("Foot board", Board(Hf), holes, [Pose.Left(L - T / 2, 0, 0)], grainAlongU: false, planks: true, plankMm: 3);
+        var (he, hl) = Carving(Hh, true);
+        var (fe, fl) = Carving(Hf, false);
+        // Both carved faces towards the foot: the head board's over the pillows, the foot board's outside.
+        m.Add("Head board", Board(Hh), holes, [Pose.Right(T / 2, 0, D)], grainAlongU: false, planks: true, plankMm: 3, etched: he, lines: hl);
+        m.Add("Foot board", Board(Hf), holes, [Pose.Right(L - T / 2, 0, D)], grainAlongU: false, planks: true, plankMm: 3, etched: fe, lines: fl);
 
         // The mattress (seen from above: v from the far side to the near one), its tabs through the boards.
         var mat = new PathsD { Geo.Rect(0, 0, Lb, Db) };
