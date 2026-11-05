@@ -87,6 +87,46 @@ On the **Map** tab:
   save maps as files (once saved, changes go on being saved to the file), and **Sample village**
   brings back the sample.
 
+## Making a town for you
+
+![A walled town made by the city builder: main roads meeting at a market square with its temple and hall, lanes lined with houses, a river with bridges, gates in the wall, towers at its corners and fields outside](images/window-citybuilder-made.png)
+
+On the **Map** tab, **Make a town for me** makes a whole town the size of **Squares across** and
+**Squares down** (up to 300 each way, in a few seconds), in the map's **Look**:
+
+- **Streets**: how its roads run. **Crossroads**: two main roads crossing, with lanes off them in
+  each quarter. **Main street**: one wide street through the town with lanes off it (and back streets
+  in a big town). **Grid of streets**: streets in a grid, the main two wider. **Winding road**: a main
+  road wandering across, and lanes wandering along beside it. **Riverside**: a river along the
+  bottom with a paved quay, a main road along the town, lanes down to the water and back streets.
+- **How full**: further left, a house here and there; further right, buildings packed side by side.
+- **A town wall with gates**: a town wall round it, with a gate wherever a road goes through, a tower
+  in each corner, guardhouses by the gates and farms with fields outside.
+- **A river through it**: a river down one side, a bridge wherever a road crosses it, warehouses
+  along it.
+- **A market square**: a paved square where the main roads meet, with a temple, a town hall and a
+  tavern facing it, and a well, carts, crates, a statue and lamps on it.
+- **Use my saved buildings where they suit**: a plot gets one of your saved buildings when its
+  district (and type) suits, turned to face the road.
+
+Press **Make a town** for the town; press it again for another one (each is different), and undo
+puts your map back. Every building faces its road with its door, and is of the right kind for its part
+of town, which is its **District**: shops, workshops and taverns in the market, houses round it, a
+noble quarter of manors, warehouses at the docks, hovels at the town's edge, barns and stables on the
+farms. Each has a name (*The Golden Goose*, *Ashford Manor*, *Baker's shop*), the main streets are
+named, and there are lamps along them, trees in the gardens and woods outside. Under the button it
+says what was made. Then change anything you like: it's an ordinary map.
+
+![The same town in 3D: the wall and its corner towers, the houses with their roofs, the bridges over the river and the woods outside](images/window-citybuilder-made-3d.png)
+
+### Filling the roads with buildings
+
+**Fill with buildings** puts buildings along the roads (and round paved squares) on the free grass,
+facing the road, as full as **How full** says, of the kinds for the **District** picked; your saved
+buildings where they suit, if that's ticked. With **Select**, drag a box first to fill only inside it
+(it stays dashed on the plan until you click again); otherwise it fills the whole map. Lay out roads
+with **Road**, then fill each part of town with its own district.
+
 ## Reading a battle map
 <!-- windows: CityWindow -->
 
