@@ -87,6 +87,139 @@ public class PieceSplitTests
         Assert.Equal(215, Assert.Single(MaterialOutline.On(Pages.SwitchTo(r.State, 2))).Bounds.MaxX, 2);
     }
 
+    /// <summary>
+    /// Two 100 × 100 mm boards side by side and a Cut layer with an Engrave sub-layer (its own settings):
+    /// the shapes given go on the Cut layer.
+    /// </summary>
+    static (DocState State, List<PathShape> Pieces, HashSet<Guid> Art) TwoBoardsWithEngraveSubLayer(params PathShape[] art)
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Name = "Cut", Laser = LaserSettings.Blue(70, 40) };
+        var sub = Layer.Default(1, LayerMode.Fill) with { Name = "Engrave", ParentId = cut.Id, Laser = LaserSettings.Blue(37, 900), LinesPerCm = 50 };
+        s = s with { Layers = [cut, sub] };
+        var boards = new[] { 0, 100 }.Select(x => new PathShape { Name = $"Board {x}", LayerId = cut.Id, Geometry = PathGeometry.Rect(x, 0, 100, 100) }).ToList();
+        var onCut = art.Select(a => (PathShape)a.With(layerId: cut.Id)).ToList();
+        s = Ops.AddShapes(s, [.. boards, .. onCut]);
+        s = MaterialOutline.Mark(s, boards.Select(b => b.Id).ToHashSet());
+        return (s, MaterialOutline.On(s).ToList(), onCut.Select(a => a.Id).ToHashSet());
+    }
+
+    /// <summary>Where the laser is on in a job: the end of every move with S above 0, by the S it runs at.</summary>
+    static Dictionary<int, List<Vec2>> Burned(string motion)
+    {
+        var burned = new Dictionary<int, List<Vec2>>();
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        double x = 0, y = 0;
+        int power = 0;
+        foreach (var raw in motion.Split('\n'))
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(raw.Trim(), @"^G([01])\s?(?:X(-?[\d.]+))?\s?(?:Y(-?[\d.]+))?\s?(?:S(\d+))?");
+            if (!m.Success) continue;
+            bool moved = m.Groups[2].Success || m.Groups[3].Success;
+            if (m.Groups[2].Success) x = double.Parse(m.Groups[2].Value, inv);
+            if (m.Groups[3].Success) y = double.Parse(m.Groups[3].Value, inv);
+            if (m.Groups[1].Value != "1") continue;
+            if (m.Groups[4].Success) power = int.Parse(m.Groups[4].Value);
+            if (power > 0 && moved)
+            {
+                if (!burned.TryGetValue(power, out var at)) burned[power] = at = [];
+                at.Add(new Vec2(x, y));
+            }
+        }
+        return burned;
+    }
+
+    [Fact]
+    public void AnEngraveSubLayerOfACutLayerKeepsItsFillOnEachPiece()
+    {
+        // A circle across the join: each board gets half its outline as lines, and half its area engraved.
+        var circle = new PathShape { Name = "Circle", Geometry = PathGeometry.Ellipse(100, 50, 30, 30) };
+        var (s, pieces, art) = TwoBoardsWithEngraveSubLayer(circle);
+        var r = PieceSplit.Split(s, pieces, art, 220, 220);
+        Assert.Equal(2, r.Pieces);
+        Assert.Empty(r.Notes);
+        double half = Math.PI * 30 * 30 / 2;
+        for (int k = 1; k <= 2; k++)
+        {
+            var page = Pages.SwitchTo(r.State, k);
+            var fill = page.Layers.Single(l => l.Name == "Engrave");
+            var cutHere = page.Layers.Single(l => l.Name == "Cut");
+            // The same settings, with the page's share of the area.
+            Assert.Equal((LayerMode.Fill, 37.0, 900.0, 50.0), (fill.Mode, fill.Laser.Power, fill.Laser.Speed, fill.LinesPerCm));
+            var area = Assert.Single(page.ShapesFor(fill).OfType<PathShape>());
+            Assert.Equal(half, ShapeGeometry.Area(area.World), 0);
+            Assert.All(area.Geometry.Subpaths, p => Assert.True(p.Closed));
+            // The outline is still lines on the Cut layer, not closed along the join.
+            var lines = Assert.Single(page.ShapesFor(cutHere).OfType<PathShape>());
+            Assert.All(lines.Geometry.Subpaths, p => Assert.False(p.Closed));
+            Assert.Equal(Math.PI * 30, Length(lines.World), 0);
+
+            // The job: the fill and the cut at their own powers, and nothing burned off this piece.
+            var burned = Burned(JobBuilder.Build(page, new JobOptions()).Motion);
+            Assert.Equal([370, 700], burned.Keys.Order());
+            var b = MaterialOutline.On(page).Single().Bounds;
+            Assert.All(burned.SelectMany(kv => kv.Value), pt =>
+            {
+                Assert.InRange(pt.X, b.MinX - 0.05, b.MaxX + 0.05);
+                Assert.InRange(pt.Y, b.MinY - 0.05, b.MaxY + 0.05);
+            });
+        }
+    }
+
+    [Fact]
+    public void AnEngraveSubLayerFillsAPieceItsOutlineNeverTouches()
+    {
+        // The outline goes round the first board without touching it, but its area covers all of it.
+        var big = new PathShape { Name = "Big", Geometry = PathGeometry.Rect(-10, -10, 150, 120) };
+        var (s, pieces, art) = TwoBoardsWithEngraveSubLayer(big);
+        var r = PieceSplit.Split(s, pieces, art, 220, 220);
+        Assert.Empty(r.Notes);
+        var first = Pages.SwitchTo(r.State, 1);
+        var fill = first.Layers.Single(l => l.Name == "Engrave");
+        Assert.Equal(100 * 100, ShapeGeometry.Area(Assert.Single(first.ShapesFor(fill).OfType<PathShape>()).World), 0);
+        Assert.Empty(first.ShapesFor(first.Layers.Single(l => l.Name == "Cut")));
+        Assert.Equal([370], Burned(JobBuilder.Build(first, new JobOptions()).Motion).Keys);
+        // The second board gets the part the outline crosses, and those lines.
+        var second = Pages.SwitchTo(r.State, 2);
+        var fill2 = second.Layers.Single(l => l.Name == "Engrave");
+        Assert.Equal(40 * 100, ShapeGeometry.Area(Assert.Single(second.ShapesFor(fill2).OfType<PathShape>()).World), 0);
+        Assert.Equal([370, 700], Burned(JobBuilder.Build(second, new JobOptions()).Motion).Keys.Order());
+    }
+
+    [Fact]
+    public void NothingExtraIsBurnedOnAPieceAnEngravedShapeIsntOn()
+    {
+        // All on the first board, which marks it once each way. The second gets nothing.
+        var square = new PathShape { Name = "Square", Geometry = PathGeometry.Rect(10, 10, 20, 20) };
+        var (s, pieces, art) = TwoBoardsWithEngraveSubLayer(square);
+        var r = PieceSplit.Split(s, pieces, art, 220, 220);
+        var first = Pages.SwitchTo(r.State, 1);
+        var fill = first.Layers.Single(l => l.Name == "Engrave");
+        Assert.Equal(20 * 20, ShapeGeometry.Area(Assert.Single(first.ShapesFor(fill).OfType<PathShape>()).World), 3);
+        Assert.Equal(20 * 20, ShapeGeometry.Area(Assert.Single(first.ShapesFor(first.Layers.Single(l => l.Name == "Cut")).OfType<PathShape>()).World), 3);
+        var second = Pages.SwitchTo(r.State, 2);
+        Assert.Empty(second.ShapesFor(second.Layers.Single(l => l.Name == "Engrave")));
+        Assert.Empty(second.ShapesFor(second.Layers.Single(l => l.Name == "Cut")));
+        Assert.Contains(r.Notes, n => n.Contains("piece 2", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AScoreSubLayerStaysOnItsParentsLines()
+    {
+        var s = DocState.New();
+        var cut = s.Layers[0] with { Name = "Cut" };
+        var score = Layer.Default(1, LayerMode.Score) with { Name = "Score", ParentId = cut.Id };
+        s = s with { Layers = [cut, score] };
+        var boards = new[] { 0, 100 }.Select(x => new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(x, 0, 100, 100) }).ToList();
+        var circle = new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Ellipse(100, 50, 30, 30) };
+        s = MaterialOutline.Mark(Ops.AddShapes(s, [.. boards, circle]), boards.Select(b => b.Id).ToHashSet());
+        var r = PieceSplit.Split(s, MaterialOutline.On(s).ToList(), new HashSet<Guid> { circle.Id }, 220, 220);
+        var page = Pages.SwitchTo(r.State, 1);
+        var sub = page.Layers.Single(l => l.Name == "Score");
+        Assert.Equal(page.Layers.Single(l => l.Name == "Cut").Id, sub.ParentId);
+        Assert.Equal(Math.PI * 30, Length(Assert.Single(page.ShapesFor(sub).OfType<PathShape>()).World), 0);
+    }
+
     [Fact]
     public void AShapeWhollyOnOneBoardIsCopiedAsItIs()
     {
