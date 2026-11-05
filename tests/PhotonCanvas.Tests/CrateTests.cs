@@ -10,6 +10,15 @@ public class CrateTests
 
     static ItemKit Make(FurnitureItem it, WoodDetail detail = WoodDetail.Planks) => FurnitureKit.Make(it, Sheet with { Detail = detail });
     static Part Part(ItemKit k, string name) => k.Parts.Single(p => p.Name == name);
+
+    /// <summary>A face as it looks put together: the panel and what's glued on over it (boards, iron, trim), flat.</summary>
+    static Part Face(ItemKit k, string name)
+    {
+        var panel = Part(k, name);
+        var on = k.Parts.Where(p => p.Glued && p.Name.StartsWith(name + " ")).ToList();
+        var etched = Geo.Union(new PathsD(on.SelectMany(p => p.Etched).Concat(Geo.Subtract(panel.Etched, Geo.Union(new PathsD(on.SelectMany(p => p.Cut)))))));
+        return new Part(name, panel.Cut, etched, [.. panel.Lines, .. on.SelectMany(p => p.Lines)], panel.Poses);
+    }
     static FurnitureItem Crate(CrateStyle style, double w = 12, double d = 12, double h = 12) =>
         Defaults.For(ItemKind.Crate) with { CrateStyle = style, WidthMm = w, DepthMm = d, HeightMm = h };
 
@@ -25,7 +34,8 @@ public class CrateTests
     {
         var k = Make(Crate(style, size, size * 0.7, size * 0.7), detail);
         Assert.True(k.Ok, string.Join("; ", k.Findings.Select(f => f.Text)));
-        Assert.Equal(6, k.Parts.Count);
+        // Six panels, and the boards and trim glued on over them.
+        Assert.Equal(6, k.Parts.Count(p => !p.Glued));
         foreach (var p in k.Parts)
         {
             Assert.Equal(1, Geo.Pieces(p.Cut));
@@ -36,19 +46,21 @@ public class CrateTests
                     Assert.NotEqual(PointInPolygonResult.IsOutside, Clipper.PointInPolygon(q, Geo.Offset(p.Cut, 0.01)[0]));
         }
         // Something shows on the front, whatever the detail.
-        var front = Part(k, "Front");
+        var front = Face(k, "Front");
         Assert.True(Geo.Area(front.Etched) > 0.5 || front.Lines.Count > 3, $"{style} {detail}: nothing on the front");
     }
 
     [Fact]
     public void Grain_and_planks_look_different_on_a_crate()
     {
-        foreach (var style in Enum.GetValues<CrateStyle>().Where(s => s is not CrateStyle.Slatted))
+        // (Slatted crates are all slats; carved ones have no planks inside the frame.)
+        foreach (var style in Enum.GetValues<CrateStyle>().Where(s => s is not (CrateStyle.Slatted or CrateStyle.Carved or CrateStyle.Arched)))
         {
-            var it = Crate(style, 20, 14, 14);
-            var none = Part(Make(it, WoodDetail.None), "Front");
-            var grain = Part(Make(it, WoodDetail.Grain), "Front");
-            var planks = Part(Make(it, WoodDetail.Planks), "Front");
+            // (The same words on each, so only the wood differs.)
+            var it = Crate(style, 20, 14, 14) with { Label = "SALT" };
+            var none = Face(Make(it, WoodDetail.None), "Front");
+            var grain = Face(Make(it, WoodDetail.Grain), "Front");
+            var planks = Face(Make(it, WoodDetail.Planks), "Front");
             // No detail: the boards' grooves but no grain.
             Assert.True(grain.Lines.Count > none.Lines.Count + 5, $"{style}: grain adds grain lines");
             // Planks: the infill split into planks, so more grooves than one wide board.
@@ -59,7 +71,7 @@ public class CrateTests
     [Fact]
     public void Each_style_looks_different()
     {
-        var fronts = Enum.GetValues<CrateStyle>().Select(s => Part(Make(Crate(s, 20, 14, 14)), "Front")).ToList();
+        var fronts = Enum.GetValues<CrateStyle>().Select(s => Face(Make(Crate(s, 20, 14, 14)), "Front")).ToList();
         for (int i = 0; i < fronts.Count; i++)
             for (int j = i + 1; j < fronts.Count; j++)
             {
@@ -71,8 +83,9 @@ public class CrateTests
     [Fact]
     public void Plain_boards_are_planks_without_a_frame()
     {
-        var plain = Part(Make(Defaults.For(ItemKind.Crate) with { Bands = false, WidthMm = 20, DepthMm = 14, HeightMm = 14 }), "Front");
-        var braced = Part(Make(Crate(CrateStyle.Braced, 20, 14, 14)), "Front");
+        var plain = Face(Make(Defaults.For(ItemKind.Crate) with { Bands = false, WidthMm = 20, DepthMm = 14, HeightMm = 14 }), "Front");
+        // (Push fit: the frame etched on, on a box the same size.)
+        var braced = Part(FurnitureKit.Make(Crate(CrateStyle.Braced, 20, 14, 14), Sheet with { Detail = WoodDetail.Planks, PushFit = true }), "Front");
         Assert.True(Geo.Area(plain.Etched) > 0.5, "plank grooves");
         Assert.True(Geo.Area(braced.Etched) > Geo.Area(plain.Etched), "the frame and brace add grooves");
     }
@@ -103,5 +116,77 @@ public class CrateTests
         var back = FurnitureSet.FromJson(s.ToJson())!;
         Assert.Equal(CrateStyle.Military, back.Items[0].CrateStyle);
         Assert.Equal("RATIONS", back.Items[0].Label);
+    }
+
+    public static IEnumerable<object[]> Themed() =>
+        from s in Enum.GetValues<CrateStyle>()
+        from t in new[] { "Medieval", "Dungeon", "Cave", "Sci-fi", "Desert", "Gothic" }
+        from h in new[] { false, true }
+        select new object[] { s, t, h };
+
+    [Theory]
+    [MemberData(nameof(Themed))]
+    public void Every_style_in_every_theme_goes_together_with_its_boards_glued_on(CrateStyle style, string theme, bool handles)
+    {
+        var it = Crate(style, 18, 13, 13) with { Theme = theme, Handles = handles };
+        Assert.Equal("", FurnitureCatalogTests.Check(it, Sheet));
+        // Under push fit nothing's glued: it's all etched on the panels.
+        var push = FurnitureKit.Make(it, Sheet with { PushFit = true });
+        Assert.True(push.Ok);
+        Assert.DoesNotContain(push.Parts, p => p.Glued);
+    }
+
+    [Fact]
+    public void A_braced_crate_has_its_frame_and_brace_glued_on_proud_of_each_face()
+    {
+        var k = Make(Crate(CrateStyle.Braced, 16, 12, 12));
+        foreach (var face in new[] { "Front", "Back", "Left end", "Right end", "Lid" })
+        {
+            var boards = k.Parts.Where(p => p.Glued && p.Name.StartsWith(face + " ")).ToList();
+            Assert.NotEmpty(boards);
+            // They cover the frame, not the whole face.
+            var panel = Part(k, face);
+            double area = Geo.Area(new PathsD(boards.SelectMany(b => b.Cut)));
+            Assert.InRange(area, Geo.Area(panel.Cut) * 0.3, Geo.Area(panel.Cut) * 2.2);
+        }
+        // The long sides' boards reach over the ends' to close the corners, and the crate keeps its outside size.
+        var front = k.Parts.Single(p => p.Name == "Front boards");
+        var b = Geo.Bounds(front.Cut);
+        Assert.Equal(16, b.right - b.left, 2);
+        Assert.Equal(16 - 4, Geo.Bounds(Part(k, "Front").Cut) is var f ? f.right - f.left : 0, 2);
+        var all = FurnitureTests.Assemble(k, 2);
+        Assert.Equal(16, all.Max(p => p.Box().Max.X) - all.Min(p => p.Box().Min.X), 2);
+        Assert.Equal(12, all.Max(p => p.Box().Max.Y) - all.Min(p => p.Box().Min.Y), 2);
+        Assert.Equal(12, all.Max(p => p.Box().Max.Z) - all.Min(p => p.Box().Min.Z), 2);
+    }
+
+    [Theory]
+    [InlineData(CrateLoad.Apples, CrateStyle.Slatted)]
+    [InlineData(CrateLoad.Sacks, CrateStyle.Carved)]
+    [InlineData(CrateLoad.Rocks, CrateStyle.Lashed)]
+    [InlineData(CrateLoad.Apples, CrateStyle.Braced)]
+    public void An_open_crate_holds_its_load_heaped_over_the_rim(CrateLoad load, CrateStyle style)
+    {
+        var it = Crate(style, 16, 13, 9) with { Lid = LidStyle.None, Load = load };
+        Assert.Equal("", FurnitureCatalogTests.Check(it, Sheet));
+        var k = Make(it);
+        var heap = k.Parts.Single(p => p.Name == load.ToString());
+        var b = Geo.Bounds(heap.Cut);
+        Assert.True(b.bottom > 9 + 1, $"{load} tops out at {b.bottom:0.0}");
+        Assert.True(heap.Lines.Count > 4, "outlined");
+        // Its tabs go down through the bottom.
+        Assert.InRange(Geo.Tidy(Part(k, "Bottom").Cut).Count(p => Clipper.Area(p) < 0), 1, 2);
+        // A closed crate has nothing in it.
+        Assert.DoesNotContain(Make(it with { Lid = LidStyle.Flat }).Parts, p => p.Name == load.ToString());
+    }
+
+    [Fact]
+    public void Crate_handles_and_loads_round_trip()
+    {
+        var s = new FurnitureSet { Items = [Crate(CrateStyle.Lashed) with { Handles = true, Load = CrateLoad.Rocks, Lid = LidStyle.None }] };
+        var back = FurnitureSet.FromJson(s.ToJson())!.Items[0];
+        Assert.Equal(CrateStyle.Lashed, back.CrateStyle);
+        Assert.True(back.Handles);
+        Assert.Equal(CrateLoad.Rocks, back.Load);
     }
 }

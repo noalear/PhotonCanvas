@@ -41,7 +41,8 @@ the preview follows.
 **Pieces** shows what will be cut. Some pieces are cut to glue on, so they stand proud the way real
 ones do: a cupboard's doors and drawer fronts, the bosses on a candelabra, a clock's bezel and trunk door,
 the arcade of arches across a wooden chest and the handles on its ends, the corbels under a stone
-fireplace's mantel, the tracery across the top of a bookcase, the book on a lectern and the cloth on an altar.
+fireplace's mantel, the tracery across the top of a bookcase, the book on a lectern, the cloth on an altar
+and the frames, braces and rope handles on the sides of a crate.
 
 ## Put it in the design
 <!-- target: button:Put in the design -->

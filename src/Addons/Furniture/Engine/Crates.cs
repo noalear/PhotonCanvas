@@ -4,7 +4,7 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.Furniture;
 
 /// <summary>How a crate's faces are boarded (and painted): what's etched and scored on each side and the lid.</summary>
-public enum CrateStyle { Braced, CrossBraced, Slatted, Battened, Ironbound, Cargo, Military }
+public enum CrateStyle { Braced, CrossBraced, Slatted, Battened, Ironbound, Cargo, Military, Carved, Arched, Lashed }
 
 /// <summary>
 /// The faces of crates, board by board. Each board is its own shape with its grain running along it (a
@@ -18,7 +18,8 @@ public static class Crates
 {
     /// <summary>Names for the window, "Plain boards" (no style) first.</summary>
     public static readonly string[] StyleNames =
-        ["Plain boards", "Braced (Z)", "Cross-braced (X)", "Slatted", "Battened planks", "Iron-bound", "Cargo (stencilled)", "Military (rope handles)"];
+        ["Plain boards", "Braced (Z)", "Cross-braced (X)", "Slatted", "Battened planks", "Iron-bound", "Cargo (stencilled)", "Military (rope handles)",
+         "Carved star lattice", "Gothic arches, iron corners", "Lashed poles"];
 
     /// <summary>Words stencilled on cargo crates when none are given.</summary>
     static readonly string[] CargoWords = ["CARGO", "FRAGILE", "SUPPLIES", "TOOLS", "SALT", "FLOUR", "LAMP OIL", "SPICES", "ROPE", "No. 7"];
@@ -35,15 +36,24 @@ public static class Crates
     public enum Side { Long, End, Lid }
 
     /// <summary>
+    /// What stands proud of a face, glued on over it: the boards of a frame or a brace, iron corners and straps,
+    /// rope handles. Each separate bit is a piece of its own; <see cref="Etched"/> and <see cref="Lines"/> are
+    /// the whole face's (each piece keeps what falls on it).
+    /// </summary>
+    public sealed record Raised(List<PathsD> Pieces, PathsD Etched, List<PathD> Lines, string What);
+
+    /// <summary>
     /// A face <paramref name="Lu"/> × <paramref name="Lv"/> (its edge band <paramref name="T"/> wide is the
     /// finger joints) as etched areas and scored lines. <paramref name="label"/>: words to stencil (cargo
-    /// and military crates); null or empty picks some.
+    /// and military crates); null or empty picks some. With <paramref name="raise"/>, the frame, braces,
+    /// iron and handles come back as pieces to glue on over the face (and the face leaves out what they cover).
     /// </summary>
-    public static (PathsD Etched, List<PathD> Lines) Face(CrateStyle style, WoodDetail detail, Side side, double Lu, double Lv, double T, string? label, Random rnd)
+    public static (PathsD Etched, List<PathD> Lines, Raised? Up) Face(CrateStyle style, WoodDetail detail, Side side, double Lu, double Lv, double T, string? label, Random rnd,
+        string? theme = null, bool raise = false, bool handles = false)
     {
         var etched = new PathsD();
         var lines = new List<PathD>();
-        if (Lu < 3 || Lv < 3) return (etched, lines);
+        if (Lu < 3 || Lv < 3) return (etched, lines, null);
         var face = new PathsD { Geo.Rect(0, 0, Lu, Lv) };
         bool metal = detail == WoodDetail.Metal, stone = detail == WoodDetail.Stone;
         double fb = Math.Clamp(Math.Min(Lu, Lv) * 0.16, 1.2, 3), e = T * 0.5, g = WoodFace.GrooveMm;
@@ -52,6 +62,10 @@ public static class Crates
         // Things on top of the wood: grain and seams keep out from under them.
         var over = new PathsD();
         var overLines = new List<PathD>();
+        // What's glued on proud of the face, and bits the grain keeps off (they have outlines of their own).
+        var up = new PathsD();
+        var plain = new PathsD();
+        bool gothic = theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Gothic;
 
         if (metal || stone)
         {
@@ -60,9 +74,11 @@ public static class Crates
             // (Not a metal vent under the words.)
             if (style is not (CrateStyle.Cargo or CrateStyle.Military)) etched.AddRange(me);
             lines.AddRange(ml);
-            if (style == CrateStyle.Ironbound) Brackets(Lu, Lv, T, fb, over, overLines);
-            if (style is CrateStyle.Cargo or CrateStyle.Military) Marks(style, side, Lu, Lv, e, e + Math.Clamp(Math.Min(Lu, Lv) * 0.12, 0.4, 1.2) + 0.3, label, rnd, over);
-            return Finish(face, etched, lines, over, overLines);
+            if (style is (CrateStyle.Ironbound or CrateStyle.Arched) && !(metal && raise)) Brackets(Lu, Lv, T, fb, over, overLines, null);
+            if (style is CrateStyle.Cargo or CrateStyle.Military) Marks(style, side, Lu, Lv, e, metal && raise ? Math.Clamp(fb * 0.8, 1.2, 2) + 0.6 : e + Math.Clamp(Math.Min(Lu, Lv) * 0.12, 0.4, 1.2) + 0.3, label, rnd, over);
+            if (metal && raise) return MetalTrim(style, side, Lu, Lv, e, fb, face, etched, lines, over, overLines);
+            var (se, sl) = Finish(face, etched, lines, over, overLines, plain);
+            return (se, sl, null);
         }
 
         var top = new List<Board>();
@@ -71,6 +87,10 @@ public static class Crates
         var nails = new List<PointD>();
         // How far in from each end the words and handles keep (clear of the frame or the cleats).
         double clear = framed ? x0 + 0.3 : e + 0.5;
+        // Rope handles on the ends: the end keeps its frame but not its brace.
+        bool ropes = side == Side.End && (style == CrateStyle.Military || handles);
+        // The face inside the frame is carved, not boarded.
+        bool carvedIn = false;
         switch (style)
         {
             case CrateStyle.Braced:
@@ -78,7 +98,7 @@ public static class Crates
             case CrateStyle.Cargo:
                 if (!framed) break;
                 Frame(Lu, Lv, e, fb, top, nails);
-                if (style == CrateStyle.Cargo) break;
+                if (style == CrateStyle.Cargo || ropes) break;
                 Brace(top, nails, new PointD(x0, y0), new PointD(x1, y1), fb, x0, y0, x1, y1);
                 if (style == CrateStyle.CrossBraced)
                 {
@@ -89,8 +109,40 @@ public static class Crates
                     foreach (var piece in Pieces(half)) top.Add(new Board(piece, ang * 180 / Math.PI));
                     nails.Add(new(x0 + fb * 0.45, y1 - fb * 0.35));
                     nails.Add(new(x1 - fb * 0.45, y0 + fb * 0.35));
+                    if (gothic)
+                    {
+                        // A carved quatrefoil boss where the braces cross.
+                        double r = Math.Min(fb * 0.62, Math.Min(x1 - x0, y1 - y0) * 0.16);
+                        if (r >= 0.7) Boss(Candles.Quatrefoil(Lu / 2, Lv / 2, r), Lu / 2, Lv / 2, r * 0.4, up, plain, overLines);
+                    }
                 }
                 break;
+            case CrateStyle.Carved:
+            case CrateStyle.Arched:
+                if (!framed) break;
+                Frame(Lu, Lv, e, fb, top, nails);
+                if (style == CrateStyle.Arched) Plates(Lu, Lv, e, fb, over, overLines, raise ? up : null);
+                if (side == Side.Lid) break;
+                carvedIn = true;
+                if (style == CrateStyle.Carved) StarLattice(x0, y0, x1, y1, etched, lines);
+                else Arcade(x0, y0, x1, y1, gothic, theme, etched, lines);
+                break;
+            case CrateStyle.Lashed:
+            {
+                // Poles round the edge and one across, lashed where they cross; split logs between them.
+                if (!framed) break;
+                double pw = Math.Clamp(fb * 1.15, 1.3, 3.2);
+                double px0 = e + pw, py0 = e + pw, px1 = Lu - e - pw, py1 = Lv - e - pw;
+                if (px1 - px0 < 2 || py1 - py0 < 2) break;
+                Frame(Lu, Lv, e, pw, top, []);
+                if (side != Side.Lid && !ropes) Brace(top, [], new PointD(px0, py1), new PointD(px1, py0), pw, px0, py0, px1, py1);
+                infillAlongU = false;
+                foreach (double cx in new[] { (e + pw) / 2, Lu - (e + pw) / 2 })
+                    foreach (double cy in new[] { (e + pw) / 2, Lv - (e + pw) / 2 })
+                        Lashing(cx, cy, e + pw, plain, overLines);
+                clear = px0 + 0.3;
+                break;
+            }
             case CrateStyle.Slatted:
             {
                 // Uprights at the two ends, slats across with dark gaps between them.
@@ -127,16 +179,38 @@ public static class Crates
                 break;
             }
             case CrateStyle.Ironbound:
-                Brackets(Lu, Lv, T, fb, over, overLines);
-                if (Lu > 14 && side != Side.Lid)
+            {
+                // (Flat: iron a whole sheet thick reads as a block of wood.)
+                Brackets(Lu, Lv, T, fb, over, overLines, null);
+                // A dungeon's or a chapel's crate has its mark on the long sides; otherwise a strap down the middle with a ring.
+                bool mark = side == Side.Long && theme is PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon or PhotonCanvas.Addon.Terrain.TerrainThemes.Gothic;
+                double r = Math.Min(Lu * 0.2, (Lv - 2 * e) * 0.32);
+                if (mark && r >= 1)
                 {
-                    // A strap down the middle of a wide face.
-                    double sw = Math.Clamp(fb * 0.55, 0.8, 1.4), cx = Lu / 2;
+                    var me = new PathsD();
+                    var ml = new List<PathD>();
+                    if (gothic)
+                    {
+                        // A raised iron boss with a lily on it.
+                        Boss(Geo.Union([Geo.Circle(Lu / 2, Lv / 2, r, 0.01)]), Lu / 2, Lv / 2, 0, null, plain, overLines);
+                        Pictures.Lily(Lu / 2, Lv / 2 + r * 0.05, r * 0.7, me, ml);
+                    }
+                    else Cabinets.Symbol(FrontLook.Plank, theme, Lu / 2, Lv / 2, r, me, ml);
+                    plain.Add(Geo.Circle(Lu / 2, Lv / 2, r * 0.9, 0.01));
+                    over.AddRange(me);
+                    overLines.AddRange(ml);
+                }
+                else if (Lu > 14 && side != Side.Lid)
+                {
+                    // A strap down the middle of a wide face, with a ring to lift it by.
+                    double sw = Math.Clamp(fb * 0.55, raise ? 1.2 : 0.8, 1.4), cx = Lu / 2;
                     var strap = new PathsD { Geo.Rect(cx - sw / 2, -1, cx + sw / 2, Lv + 1) };
                     for (double y = e + 1.2; y < Lv - e - 0.8; y += 2.4) strap = Geo.Subtract(strap, [Geo.Circle(cx, y, 0.2, 0.01)]);
                     over.AddRange(strap);
+                    if (side == Side.Long && Lv > 7) overLines.Add(WoodFace.Dot(cx, Lv * 0.45, Math.Min(1.3, Lv * 0.12)));
                 }
                 break;
+            }
             case CrateStyle.Military:
             {
                 // Planks across, a cleat up each end, rope handles on the ends.
@@ -154,13 +228,17 @@ public static class Crates
             }
         }
         if (style is CrateStyle.Cargo or CrateStyle.Military) Marks(style, side, Lu, Lv, e, clear, label, rnd, over);
-        if (style == CrateStyle.Military && side == Side.End) RopeHandle(Lu, Lv, e, clear, over);
+        if (ropes)
+        {
+            var rope = RopeHandle(Lu, Lv, e, clear, over, raise);
+            if (raise) up.AddRange(rope);
+        }
 
         // The infill: what the boards on top leave, as planks (or one wide board) along u or v.
         var topArea = Geo.Union(new PathsD(top.SelectMany(b => b.Shape)));
         var boards = new List<Board>(top);
         var rest = Geo.Subtract(face, topArea);
-        if (style == CrateStyle.Slatted) rest = []; // all slats and uprights
+        if (style == CrateStyle.Slatted || carvedIn) rest = []; // all slats and uprights, or carved
         if (rest.Count > 0)
         {
             var rb = Geo.Bounds(rest);
@@ -202,28 +280,232 @@ public static class Crates
         var inside = Geo.Offset(face, -g * 0.8);
         var seams = new PathsD();
         foreach (var b in boards) seams.AddRange(Geo.Subtract(Geo.Offset(b.Shape, g / 2), Geo.Offset(b.Shape, -g / 2)));
-        etched.AddRange(Geo.Intersect(Geo.Union(seams), inside));
+        etched.AddRange(Geo.Subtract(Geo.Intersect(Geo.Union(seams), inside), plain));
+        var offGrain = Geo.Offset(Geo.Union(over, plain), 0.15);
         if (detail != WoodDetail.None)
             foreach (var b in boards)
             {
-                var keep = Geo.Subtract(Geo.Intersect(Geo.Offset(b.Shape, -g / 2 - 0.1), face), Geo.Offset(over, 0.15));
+                var keep = Geo.Subtract(Geo.Intersect(Geo.Offset(b.Shape, -g / 2 - 0.1), face), offGrain);
                 if (style == CrateStyle.Slatted) keep = Geo.Subtract(keep, Geo.Offset(etched, 0.1));
                 lines.AddRange(BoardGrain(keep, b.Angle, rnd));
             }
         foreach (var p in nails)
             if (p.x > NailR + 0.2 && p.x < Lu - NailR - 0.2 && p.y > NailR + 0.2 && p.y < Lv - NailR - 0.2)
                 lines.Add(WoodFace.Dot(p.x, p.y, NailR));
-        return Finish(face, etched, lines, over, overLines);
+        var (fe, fl) = Finish(face, etched, lines, over, overLines, plain);
+        if (!raise) return (fe, fl, null);
+        up.AddRange(topArea);
+        // Poles with their edges rounded off.
+        if (style == CrateStyle.Lashed) up = Geo.Offset(Geo.Offset(Geo.Union(up), -0.45), 0.45, round: true);
+        return Lift(face, fe, fl, up, style == CrateStyle.Ironbound ? "iron" : "boards");
     }
 
-    static (PathsD, List<PathD>) Finish(PathsD face, PathsD etched, List<PathD> lines, PathsD over, List<PathD> overLines)
+    /// <summary>
+    /// The face with what's raised taken off it, and the raised bits as pieces (the ones too small or too
+    /// thin to cut stay drawn on the face).
+    /// </summary>
+    static (PathsD, List<PathD>, Raised?) Lift(PathsD face, PathsD etched, List<PathD> lines, PathsD up, string what, PathsD? upEtched = null, List<PathD>? upLines = null)
+    {
+        var pieces = Pieces(Geo.Intersect(Geo.Union(up), face)).Where(p => Geo.Area(p) >= 1.2 && Maker.Thin(p) <= 0.05).ToList();
+        if (pieces.Count == 0) return (etched, lines, null);
+        var area = Geo.Union(new PathsD(pieces.SelectMany(p => p)));
+        var rest = Geo.Subtract(face, area);
+        return (Geo.Subtract(etched, area), Geo.ClipLines(lines, rest), new Raised(pieces, upEtched ?? etched, upLines ?? lines, what));
+    }
+
+    static (PathsD, List<PathD>) Finish(PathsD face, PathsD etched, List<PathD> lines, PathsD over, List<PathD> overLines, PathsD plain)
     {
         var all = Geo.Union(Geo.Union(etched), Geo.Union(over));
         // Lines don't run across what's painted or bolted on (its own lines are added after).
-        var clear = Geo.Subtract(face, Geo.Offset(over, 0.1));
+        var clear = Geo.Subtract(face, Geo.Offset(Geo.Union(over, plain), 0.1));
         var scored = Geo.ClipLines(lines, clear);
         scored.AddRange(Geo.ClipLines(overLines, face));
         return (Geo.Intersect(all, face), scored);
+    }
+
+    /// <summary>
+    /// A sci-fi crate's trim, bolted on proud of the face: a rim round it, latches on an ammo
+    /// crate's long sides and a bar handle on its ends; hazard stripes along a cargo crate's long sides.
+    /// </summary>
+    static (PathsD, List<PathD>, Raised?) MetalTrim(CrateStyle style, Side side, double Lu, double Lv, double e, double fb, PathsD face,
+        PathsD etched, List<PathD> lines, PathsD over, List<PathD> overLines)
+    {
+        var up = new PathsD();
+        var upLines = new List<PathD>();
+        // A rim round the face, its inside corners chamfered, bolted at the corners.
+        double w = Math.Clamp(fb * 0.8, 1.2, 2), c = w * 0.9, arm = w;
+        if (Lu - 2 * w < 2 || Lv - 2 * w < 2)
+        {
+            var (fe0, fl0) = Finish(face, etched, lines, over, overLines, []);
+            return (fe0, fl0, null);
+        }
+        var inner = new PathD
+        {
+            new(w + c, w), new(Lu - w - c, w), new(Lu - w, w + c), new(Lu - w, Lv - w - c),
+            new(Lu - w - c, Lv - w), new(w + c, Lv - w), new(w, Lv - w - c), new(w, w + c),
+        };
+        up.AddRange(Geo.Subtract(face, [inner]));
+        upLines.Add(Geo.Loop(Geo.Offset([inner], 0.3)[0]));
+        foreach (double x in new[] { w / 2, Lu - w / 2 })
+            foreach (double y in new[] { w / 2, Lv - w / 2 })
+                upLines.Add(WoodFace.Dot(x, y, 0.22));
+        // The panel inside the rim: a groove round it.
+        lines.Add(Geo.Loop(Geo.Offset([inner], -0.5)[0]));
+        double inner0 = arm + 0.5, inner1 = Lu - arm - 0.5;
+        if (style == CrateStyle.Cargo && side == Side.Long && inner1 - inner0 > 3)
+        {
+            // Hazard stripes in a band along the bottom.
+            double hb = Math.Clamp(Lv * 0.13, 1, 2), b0 = w + 0.5, b1 = b0 + hb, sw = hb * 0.7;
+            var band = new PathsD { Geo.Rect(inner0, b0, inner1, b1) };
+            var stripes = new PathsD();
+            for (double x = inner0 - hb; x < inner1 + hb; x += sw * 2)
+                stripes.Add([new(x, b0), new(x + sw, b0), new(x + sw + hb, b1), new(x + hb, b1)]);
+            etched.AddRange(Geo.Intersect(stripes, band));
+            lines.Add(Geo.Loop(band[0]));
+        }
+        if (style == CrateStyle.Military && side == Side.Long)
+        {
+            // Two latches hanging from the top edge.
+            double lw = Math.Clamp(Lu * 0.1, 1.4, 2.4), lh = Math.Clamp(Lv * 0.3, 1.8, 3);
+            foreach (double cx in new[] { Lu * 0.3, Lu * 0.7 })
+            {
+                if (cx - lw / 2 < arm + 0.4 || cx + lw / 2 > Lu - arm - 0.4) continue;
+                var latch = Geo.Rect(cx - lw / 2, Lv - lh, cx + lw / 2, Lv);
+                up.Add(latch);
+                upLines.Add(Geo.Loop(Geo.Rect(cx - lw / 2 + 0.3, Lv - lh + 0.3, cx + lw / 2 - 0.3, Lv - 0.3)));
+                upLines.Add([new(cx - lw / 2 + 0.3, Lv - lh * 0.55), new(cx + lw / 2 - 0.3, Lv - lh * 0.55)]);
+                upLines.Add(WoodFace.Dot(cx, Lv - lh * 0.3, 0.2));
+            }
+        }
+        if (style == CrateStyle.Military && side == Side.End)
+        {
+            // A bar handle: a loop standing off the end.
+            double hw = Math.Min(Lu - 2 * arm - 1, 6), hh = Math.Clamp(Lv * 0.32, 2.8, 3.4), cx = Lu / 2, cy = Lv * 0.55;
+            if (hw >= 3.2 && cy + hh / 2 < Lv - e - 0.3)
+            {
+                var ring = Geo.Subtract([WoodFace.RoundRect(cx - hw / 2, cy - hh / 2, cx + hw / 2, cy + hh / 2, 0.8)], [WoodFace.RoundRect(cx - hw / 2 + 1.2, cy - hh / 2 + 1.2, cx + hw / 2 - 1.2, cy + hh / 2 - 1.2, 0.3)]);
+                up.AddRange(ring);
+                upLines.AddRange(Geo.Offset(ring, -0.3).Select(Geo.Loop));
+            }
+        }
+        var (fe, fl) = Finish(face, etched, lines, over, overLines, []);
+        return Lift(face, fe, fl, up, "trim", [], upLines);
+    }
+
+    /// <summary>A carved boss (raised when <paramref name="up"/> is given): outlined, grain kept off it, a dot in the middle.</summary>
+    static void Boss(PathsD shape, double cx, double cy, double dot, PathsD? up, PathsD plain, List<PathD> overLines)
+    {
+        up?.AddRange(shape);
+        plain.AddRange(shape);
+        overLines.AddRange(Geo.Offset(shape, -0.25).Select(Geo.Loop));
+        if (dot > 0.2) overLines.Add(WoodFace.Dot(cx, cy, dot));
+    }
+
+    /// <summary>Square iron plates on the four corners, a quatrefoil pierced in each (left unetched).</summary>
+    static void Plates(double Lu, double Lv, double e, double fb, PathsD over, List<PathD> overLines, PathsD? up)
+    {
+        double s = Math.Clamp(e + fb * 1.25, 2.4, 4.5);
+        if (2 * s > Math.Min(Lu, Lv) - 1) return;
+        foreach (double x in new[] { 0.0, Lu - s })
+            foreach (double y in new[] { 0.0, Lv - s })
+            {
+                var plate = Geo.Rect(x, y, x + s, y + s);
+                up?.Add(plate);
+                double cx = x + s / 2, cy = y + s / 2, r = s * 0.17;
+                var q = Candles.Quatrefoil(cx, cy, r);
+                over.AddRange(Geo.Subtract([plate], q));
+                overLines.AddRange(q.Select(Geo.Loop));
+                foreach (var (dx, dy) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) })
+                    overLines.Add(WoodFace.Dot(cx + dx * s * 0.36, cy + dy * s * 0.36, 0.16));
+            }
+    }
+
+    /// <summary>A rope lashing round a joint of poles: turns of rope across it, both ways.</summary>
+    static void Lashing(double cx, double cy, double s, PathsD plain, List<PathD> overLines)
+    {
+        double h = s / 2;
+        plain.Add(Geo.Rect(cx - h, cy - h, cx + h, cy + h));
+        int n = 4;
+        for (int i = 0; i < n; i++)
+        {
+            double t = -h + s * (i + 0.5) / n;
+            overLines.Add([new(cx - h, cy + t - h * 0.35), new(cx + h, cy + t + h * 0.35)]);
+        }
+        overLines.Add([new(cx - h * 0.3, cy - h), new(cx + h * 0.3, cy + h)]);
+    }
+
+    /// <summary>
+    /// A carved lattice of eight-pointed stars inside the frame: the stars left standing, the ground between
+    /// them etched away, a ring scored in each.
+    /// </summary>
+    static void StarLattice(double x0, double y0, double x1, double y1, PathsD etched, List<PathD> lines)
+    {
+        double w = x1 - x0, h = y1 - y0;
+        if (w < 2.5 || h < 2.5) return;
+        double inset = 0.35;
+        x0 += inset; y0 += inset; x1 -= inset; y1 -= inset; w -= 2 * inset; h -= 2 * inset;
+        int ny = Math.Max(1, (int)Math.Round(h / 3.4)), nx = Math.Max(1, (int)Math.Round(w / (h / ny)));
+        double cw = w / nx, ch = h / ny, r = Math.Min(cw, ch) * 0.5;
+        var stars = new PathsD();
+        for (int i = 0; i < nx; i++)
+            for (int j = 0; j < ny; j++)
+            {
+                double cx = x0 + (i + 0.5) * cw, cy = y0 + (j + 0.5) * ch;
+                stars.Add(Fronts.Star(cx, cy, r * 0.98, r * 0.66, 8));
+                if (r >= 1) lines.Add(Geo.Loop(Fronts.Star(cx, cy, r * 0.55, r * 0.37, 8)));
+                if (r >= 1.4) lines.Add(WoodFace.Dot(cx, cy, r * 0.16));
+            }
+        // Diamonds where four cells meet.
+        for (int i = 0; i <= nx; i++)
+            for (int j = 0; j <= ny; j++)
+            {
+                double cx = x0 + i * cw, cy = y0 + j * ch, d = r * 0.42;
+                stars.Add([new(cx, cy - d), new(cx + d, cy), new(cx, cy + d), new(cx - d, cy)]);
+            }
+        var box = new PathsD { Geo.Rect(x0, y0, x1, y1) };
+        etched.AddRange(Geo.Subtract(box, Geo.Offset(Geo.Union(stars), 0.12)));
+        lines.Add(Geo.Loop(box[0]));
+    }
+
+    /// <summary>
+    /// An arcade of pointed arches inside the frame, their insides etched dark; in a gothic crate the middle
+    /// arch holds a lily (left standing), otherwise the theme's mark.
+    /// </summary>
+    static void Arcade(double x0, double y0, double x1, double y1, bool gothic, string? theme, PathsD etched, List<PathD> lines)
+    {
+        double w = x1 - x0, h = y1 - y0, gap = 0.7;
+        if (w < 3 || h < 3) return;
+        // An odd number, the middle one wider.
+        int n = Geo.Clamp((int)Math.Round(w / Math.Max(h * 0.55, 2.4)), 1, 5) | 1;
+        double unit = (w - (n + 1) * gap) / (n + (n > 1 ? 0.6 : 0));
+        if (unit < 1.2) { n = 1; unit = w - 2 * gap; }
+        double next = x0 + gap;
+        for (int i = 0; i < n; i++)
+        {
+            double aw = i == n / 2 && n > 1 ? unit * 1.6 : unit, ax = next;
+            next += aw + gap;
+            var arch = new PathsD { Fronts.PointedRect(ax, y0 + gap, ax + aw, y1 - gap) };
+            lines.AddRange(Geo.Offset(arch, gap * 0.45).Select(Geo.Loop));
+            if (i == n / 2 && n % 2 == 1 && aw >= 2.4)
+            {
+                double cx = ax + aw / 2, cy = y0 + gap + (y1 - y0 - 2 * gap) * 0.42, r = Math.Min(aw * 0.42, h * 0.3);
+                var mark = new PathsD();
+                var ml = new List<PathD>();
+                if (gothic) Pictures.Lily(cx, cy, r, mark, ml);
+                else Cabinets.Symbol(FrontLook.Plank, theme, cx, cy, r * 0.8, mark, ml);
+                if (gothic)
+                {
+                    etched.AddRange(Geo.Subtract(arch, Geo.Offset(Geo.Union(mark), 0.15)));
+                    continue;
+                }
+                etched.AddRange(Geo.Subtract(arch, [Geo.Circle(cx, cy, r, 0.01)]));
+                lines.Add(WoodFace.Dot(cx, cy, r));
+                etched.AddRange(mark);
+                lines.AddRange(ml);
+                continue;
+            }
+            etched.AddRange(arch);
+        }
     }
 
     /// <summary>A frame of four boards round the face: top and bottom right across, the uprights between them.</summary>
@@ -255,9 +537,9 @@ public static class Crates
     }
 
     /// <summary>Iron L brackets on the four corners, with raised rivets (left unetched) along their arms.</summary>
-    static void Brackets(double Lu, double Lv, double T, double fb, PathsD over, List<PathD> overLines)
+    static void Brackets(double Lu, double Lv, double T, double fb, PathsD over, List<PathD> overLines, PathsD? up)
     {
-        double arm = Math.Clamp(Math.Min(Lu, Lv) * 0.3, 2.2, 7), w = Math.Clamp(fb * 0.75, 0.9, 2);
+        double arm = Math.Clamp(Math.Min(Lu, Lv) * 0.3, 2.2, 7), w = Math.Clamp(fb * 0.75, up is null ? 0.9 : 1.2, 2);
         foreach (var (cx, sx) in new[] { (0.0, 1.0), (Lu, -1.0) })
             foreach (var (cy, sy) in new[] { (0.0, 1.0), (Lv, -1.0) })
             {
@@ -269,6 +551,7 @@ public static class Crates
                     Geo.Rect(Math.Min(X(-1), X(w)), Math.Min(Y(-1), Y(arm)), Math.Max(X(-1), X(w)), Math.Max(Y(-1), Y(arm))),
                 };
                 var plate = Geo.Union(l);
+                up?.AddRange(plate);
                 // A rivet in the corner and one near each arm's end.
                 double r = Math.Clamp(w * 0.18, 0.15, 0.3), m = Math.Max(T * 0.5 + r + 0.15, w / 2);
                 var rivets = new PathsD
@@ -394,12 +677,15 @@ public static class Crates
     }
 
     /// <summary>A rope handle: two cleats with a loop of rope hanging between them.</summary>
-    static void RopeHandle(double Lu, double Lv, double e, double clear, PathsD over)
+    /// <returns>The handle's whole shape (to raise it), or nothing if there's no room.</returns>
+    static PathsD RopeHandle(double Lu, double Lv, double e, double clear, PathsD over, bool thick)
     {
-        double span = Math.Min((Lu - 2 * clear) / 1.2, 8), cx = Lu / 2, cy = Lv * 0.7, cw = Math.Max(0.7, span * 0.16), ch = Math.Max(0.9, span * 0.2);
-        if (span < 3 || cy + ch / 2 > Lv - e) return;
-        foreach (double x in new[] { cx - span / 2, cx + span / 2 }) over.Add(Geo.Rect(x - cw / 2, cy - ch / 2, x + cw / 2, cy + ch / 2));
-        double sag = span * 0.45, th = Math.Max(0.35, span * 0.08);
+        double span = Math.Min((Lu - 2 * clear) / 1.2, 8), cx = Lu / 2, cy = Lv * 0.7, cw = Math.Max(thick ? 1.2 : 0.7, span * 0.16), ch = Math.Max(thick ? 1.4 : 0.9, span * 0.2);
+        if (span < 3 || cy + ch / 2 > Lv - e) return [];
+        var cleats = new PathsD();
+        foreach (double x in new[] { cx - span / 2, cx + span / 2 }) cleats.Add(Geo.Rect(x - cw / 2, cy - ch / 2, x + cw / 2, cy + ch / 2));
+        over.AddRange(cleats);
+        double sag = Math.Min(span * 0.45, cy - e - 1), th = Math.Max(thick ? 1.15 : 0.35, span * 0.08);
         var curve = new PathD();
         for (int i = 0; i <= 32; i++)
         {
@@ -415,6 +701,102 @@ public static class Crates
             twist.Add(Geo.Strip(new PointD(x - th * 0.5, y - th), new PointD(x + th * 0.5, y + th), Math.Max(0.08, th * 0.18)));
         }
         over.AddRange(Geo.Subtract(Geo.Union(rope), twist));
+        return Geo.Union(rope, cleats);
+    }
+
+    /// <summary>
+    /// What's heaped in an open crate, seen from the front: apples, tied sacks or rocks between
+    /// <paramref name="x0"/> and <paramref name="x1"/>, standing up over the rim at <paramref name="rim"/>.
+    /// The shape reaches down a little below the rim (to join the board it stands on); the ones behind
+    /// have only the outline that shows past the ones in front.
+    /// </summary>
+    public static (PathsD Shape, PathsD Etched, List<PathD> Lines) Heap(CrateLoad load, double x0, double x1, double rim, Random rnd)
+    {
+        var etched = new PathsD();
+        var lines = new List<PathD>();
+        double w = x1 - x0;
+        if (w < 3 || load == CrateLoad.None) return ([], etched, lines);
+        // Front (the row along the rim) and back (the row over it), each one's outline.
+        var front = new List<PathsD>();
+        var back = new List<PathsD>();
+        var backLines = new List<PathD>();
+        switch (load)
+        {
+            case CrateLoad.Apples:
+            {
+                double r = Geo.Clamp(w / 7, 1.1, 1.9);
+                int gaps = Math.Max(1, (int)Math.Ceiling((w - 2 * r) / (1.7 * r)));
+                double pitch = (w - 2 * r) / gaps;
+                for (int i = 0; i <= gaps; i++) front.Add([Geo.Circle(x0 + r + i * pitch, rim - r * 0.1, r, 0.01)]);
+                for (int i = 0; i < gaps; i++) back.Add([Geo.Circle(x0 + r + (i + 0.5) * pitch, rim + r * 0.95, r * 0.96, 0.01)]);
+                foreach (var (a, inFront) in front.Select(f => (f, true)).Concat(back.Select(k => (k, false))))
+                {
+                    var b = Geo.Bounds(a);
+                    var into = inFront ? lines : backLines;
+                    double cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2, ar = (b.right - b.left) / 2;
+                    // A stalk in the dimple at the top, a leaf beside it, a shine on the side.
+                    into.Add([new(cx, cy + ar * 0.6), new(cx + ar * 0.15, cy + ar * 0.92)]);
+                    etched.Add(Rugs.Ellipse(cx + ar * 0.42, cy + ar * 0.72, ar * 0.26, ar * 0.12));
+                    into.Add([.. Geo.Arc(cx, cy, ar * 0.62, Math.PI * 0.6, Math.PI * 0.95)]);
+                }
+                break;
+            }
+            case CrateLoad.Sacks:
+            {
+                double bw = Geo.Clamp(w / 2.4, 2.6, 4.6);
+                int n = Math.Max(1, (int)Math.Ceiling((w - bw) / (bw * 0.8)) + 1);
+                double pitch = n > 1 ? (w - bw) / (n - 1) : 0;
+                for (int i = 0; i < n; i++)
+                {
+                    double x = x0 + i * pitch, cx = x + bw / 2, b0 = rim - 1, top = rim + bw * (0.85 + 0.25 * rnd.NextDouble()), hgt = top - b0;
+                    double neck = b0 + hgt * 0.74, nw = Math.Max(1.15, bw * 0.28);
+                    var sack = Geo.Solid([[new(x + 0.1, b0), new(x + bw - 0.1, b0), new(x + bw, b0 + hgt * 0.4), new(cx + nw / 2 + 0.25, neck - 0.3), new(cx + nw / 2, neck),
+                        new(cx + nw / 2 + 0.45, top), new(cx - nw / 2 - 0.45, top), new(cx - nw / 2, neck), new(cx - nw / 2 - 0.25, neck - 0.3), new(x, b0 + hgt * 0.4)]]);
+                    (i % 2 == 0 ? front : back).Add(sack);
+                    var into = i % 2 == 0 ? lines : backLines;
+                    // The tie round the neck and a fold or two in the cloth.
+                    into.Add([new(cx - nw / 2 - 0.1, neck + 0.25), new(cx + nw / 2 + 0.1, neck + 0.25)]);
+                    into.Add([new(cx - bw * 0.22, b0 + hgt * 0.2), new(cx - bw * 0.08, neck - 0.4)]);
+                    into.Add([new(cx + bw * 0.25, b0 + hgt * 0.3), new(cx + bw * 0.12, neck - 0.5)]);
+                }
+                break;
+            }
+            case CrateLoad.Rocks:
+            {
+                double rr = Geo.Clamp(w / 6, 1.2, 2.2);
+                int gaps = Math.Max(1, (int)Math.Ceiling((w - 2 * rr) / (1.6 * rr)));
+                double pitch = (w - 2 * rr) / gaps;
+                for (int i = 0; i <= gaps; i++) front.Add(Rock(x0 + rr + i * pitch, rim - rr * 0.1, rr, rnd, lines));
+                for (int i = 0; i < gaps; i++) back.Add(Rock(x0 + rr + (i + 0.5) * pitch, rim + rr * 0.9, rr * 0.9, rnd, backLines));
+                break;
+            }
+        }
+        var frontAll = Geo.Union(new PathsD(front.SelectMany(p => p)));
+        var shape = Geo.Union(Geo.Union(frontAll, Geo.Union(new PathsD(back.SelectMany(p => p)))), [Geo.Rect(x0, rim - 1.2, x1, rim)]);
+        // Inside each one only what's its own: the back ones' detail stops at the front ones.
+        var outlines = new List<PathD>();
+        foreach (var f in front) outlines.AddRange(f.Select(Geo.Loop));
+        var showing = Geo.Subtract(shape, frontAll);
+        outlines.AddRange(Geo.ClipLines([.. back.SelectMany(b => b.Select(Geo.Loop)), .. backLines], showing));
+        outlines.AddRange(Geo.ClipLines(lines, shape));
+        return (shape, Geo.Intersect(Geo.Union(etched), shape), outlines);
+    }
+
+    /// <summary>A rock: a lumpy polygon with a facet line or two across it.</summary>
+    static PathsD Rock(double cx, double cy, double r, Random rnd, List<PathD> lines)
+    {
+        var p = new PathD();
+        int n = 7;
+        double a0 = rnd.NextDouble() * Math.PI;
+        for (int i = 0; i < n; i++)
+        {
+            double a = a0 + i * 2 * Math.PI / n + (rnd.NextDouble() - 0.5) * 0.4, rr = r * (0.8 + 0.2 * rnd.NextDouble());
+            p.Add(new PointD(cx + rr * Math.Cos(a), cy + rr * Math.Sin(a)));
+        }
+        var c = new PointD(cx + r * 0.15, cy + r * 0.2);
+        lines.Add([p[1], c, p[4]]);
+        lines.Add([c, new PointD((p[6].x + c.x) / 2 + r * 0.1, (p[6].y + c.y) / 2)]);
+        return Geo.Solid([p]);
     }
 
     /// <summary>Grain along a board (degrees from u), clipped to the area.</summary>
@@ -429,14 +811,28 @@ public static class Crates
         return Geo.Map(grain, q => new PointD(q.x * c - q.y * s, q.x * s + q.y * c));
     }
 
-    /// <summary>Each separate piece of some areas, with its holes.</summary>
+    /// <summary>Each separate piece of some areas, with its holes (an island in a hole is a piece of its own).</summary>
     static IEnumerable<PathsD> Pieces(PathsD a)
     {
-        var tidy = Geo.Tidy(a);
-        foreach (var p in tidy.Where(p => Clipper.Area(p) > 1e-4))
+        if (a.Count == 0) yield break;
+        var c = new ClipperD(4);
+        c.AddSubject(a);
+        var tree = new PolyTreeD();
+        c.Execute(ClipType.Union, FillRule.EvenOdd, tree);
+        var todo = new Stack<PolyPathD>();
+        for (int i = 0; i < tree.Count; i++) todo.Push(tree[i]);
+        while (todo.Count > 0)
         {
-            var holes = tidy.Where(h => Clipper.Area(h) < 0 && Clipper.PointInPolygon(h[0], p) == PointInPolygonResult.IsInside);
-            yield return [p, .. holes];
+            var outer = todo.Pop();
+            if (Math.Abs(Clipper.Area(outer.Polygon!)) <= 1e-4) continue;
+            var piece = new PathsD { outer.Polygon! };
+            for (int j = 0; j < outer.Count; j++)
+            {
+                var hole = outer[j];
+                piece.Add(hole.Polygon!);
+                for (int k = 0; k < hole.Count; k++) todo.Push(hole[k]);
+            }
+            yield return piece;
         }
     }
 }

@@ -34,7 +34,9 @@ public sealed class ItemEditor : StackPanel
     readonly ComboBox _lid = Combo();
     readonly CheckBox _bands = new();
     readonly TextBox _label = new() { Watermark = "Picked to suit", MaxLength = 24 };
-    Control _labelRow = null!;
+    Control _labelRow = null!, _loadRow = null!;
+    readonly ComboBox _load = Combo("Nothing", "Apples", "Sacks", "Rocks");
+    readonly CheckBox _handles = new() { Content = "Rope handles on the ends" };
     readonly NumericUpDown _foot = Number(1, 500, 0.5m, "0.#"), _mattress = Number(2, 500, 0.5m, "0.#");
     readonly CheckBox _bedding = new() { Content = "A pillow and a blanket etched on" };
     readonly ComboBox _doorShape = Combo("Square top", "Round arch", "Pointed arch"), _hinge = Combo("On the left", "On the right");
@@ -82,7 +84,8 @@ public sealed class ItemEditor : StackPanel
         _hangRow = Field("Hangs at", _hang, tip: "How high its bottom edge is up the wall (mm).");
         _lookRow = Field("Look", _look, tip: "The theme this piece is made in: its doors, handles and ornament. Ready-made pieces keep their own, so a sci-fi console can stand in a medieval list.");
         _labelRow = Field("Stencilled", _label, tip: "The words painted on a cargo or military crate's long sides. Left empty, each crate gets some to suit (SUPPLIES, FRAGILE, AMMO, RATIONS…).");
-        _boxRows = Stack(Field("Lid", _lid), _bands, _labelRow);
+        _loadRow = Field("Filled with", _load, tip: "What's heaped in an open crate, standing up over the rim (a board of it stands in the middle, its tabs down through the bottom).");
+        _boxRows = Stack(Field("Lid", _lid), _bands, _labelRow, _loadRow, _handles);
         _bedRows = Stack(Field("Foot board", _foot, tip: "How high the foot board is (mm)."), Field("Mattress", _mattress, tip: "How high the top of the mattress is (mm)."), _bedding);
         _doorRows = Stack(Field("Doorway", _doorShape, tip: "The doorway's shape, as cut by Walls."), Field("Hinges", _hinge, tip: "Which side of the doorway the door hangs on, seen from the side it opens to."),
             Field("Covers by", _overlap, tip: "How far the door reaches over the wall round the doorway (mm)."));
@@ -100,9 +103,11 @@ public sealed class ItemEditor : StackPanel
         foreach (var n in new[] { _count, _w, _d, _h, _legW, _seat, _shelves, _foot, _mattress, _wallT, _wallSheet, _overlap, _slot, _cols, _rows, _arm, _hang })
             n.ValueChanged += (_, _) => Edited();
         _style.SelectionChanged += (_, _) => { if (!_loading) { Edited(); Load(); } };
-        foreach (var c in new[] { _legs, _top, _back, _lid, _doorShape, _hinge, _crown, _contents, _backTop, _look })
+        foreach (var c in new[] { _legs, _top, _back, _doorShape, _hinge, _crown, _contents, _backTop, _look, _load })
             c.SelectionChanged += (_, _) => Edited();
-        foreach (var c in new[] { _rail, _toolRack, _backPanel, _books, _bands, _bedding })
+        // The lid shows or hides what's in the crate.
+        _lid.SelectionChanged += (_, _) => { if (!_loading) { Edited(); Load(); } };
+        foreach (var c in new[] { _rail, _toolRack, _backPanel, _books, _bands, _bedding, _handles })
             c.IsCheckedChanged += (_, _) => Edited();
         _label.TextChanged += (_, _) => Edited();
     }
@@ -169,6 +174,10 @@ public sealed class ItemEditor : StackPanel
         _bands.IsVisible = kind != ItemKind.Crate;
         _label.Text = it.Label ?? "";
         _labelRow.IsVisible = kind == ItemKind.Crate && it.Bands && it.CrateStyle is (CrateStyle.Cargo or CrateStyle.Military);
+        _load.SelectedIndex = (int)it.Load;
+        _loadRow.IsVisible = kind == ItemKind.Crate && it.Lid == LidStyle.None;
+        _handles.IsChecked = it.Handles;
+        _handles.IsVisible = kind == ItemKind.Crate && it.Bands && it.CrateStyle != CrateStyle.Military;
         _foot.Value = D(it.FootMm); _mattress.Value = D(it.MattressMm); _bedding.IsChecked = it.Bedding;
         _doorShape.SelectedIndex = (int)it.Shape; _hinge.SelectedIndex = (int)it.Hinge; _overlap.Value = D(it.OverlapMm);
         _wallT.Value = D(it.WallMm); _wallSheet.Value = D(it.WallSheetMm); _slot.Value = D(it.MountSlotMm);
@@ -255,6 +264,7 @@ public sealed class ItemEditor : StackPanel
             Lid = kind == ItemKind.Crate ? (_lid.SelectedIndex == 1 ? LidStyle.None : LidStyle.Flat) : (LidStyle)Math.Max(0, _lid.SelectedIndex),
             Bands = _bands.IsChecked == true,
             Label = string.IsNullOrWhiteSpace(_label.Text) ? null : _label.Text.Trim(),
+            Load = (CrateLoad)Math.Max(0, _load.SelectedIndex), Handles = _handles.IsChecked == true,
             FootMm = V(_foot, it.FootMm), MattressMm = V(_mattress, it.MattressMm), Bedding = _bedding.IsChecked == true,
             Shape = (DoorShape)Math.Max(0, _doorShape.SelectedIndex), Hinge = (HingeSide)Math.Max(0, _hinge.SelectedIndex), OverlapMm = V(_overlap, it.OverlapMm),
             WallMm = V(_wallT, it.WallMm), WallSheetMm = V(_wallSheet, it.WallSheetMm), MountSlotMm = V(_slot, it.MountSlotMm),
