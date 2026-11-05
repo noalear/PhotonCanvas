@@ -324,10 +324,10 @@ public sealed partial record HouseDesign
     /// <summary>Whether every piece has its number (the one in the building booklet) scored small on it.</summary>
     public bool NumberPieces { get; init; } = true;
     /// <summary>
-    /// Which version of the editor saved it (0: before versions were kept). Up to version 1 a door dropped in a
-    /// wall came glued in, and opening on hinges had to be ticked; such doors are read back as swinging.
+    /// Which version of the editor made it. Saves from before versions were kept are read back as version 1:
+    /// then a door dropped in a wall came glued in, and opening on hinges had to be ticked, so those doors are read back swinging.
     /// </summary>
-    public int Version { get; init; }
+    public int Version { get; init; } = CurrentVersion;
     public const int CurrentVersion = 2;
 
     /// <summary>The look the editor starts with: the cottage's box walls, without its roof (roofs come separately).</summary>
@@ -445,11 +445,17 @@ public sealed partial record HouseDesign
         };
     }
 
-    public string ToJson() => JsonSerializer.Serialize(this with { Version = CurrentVersion }, HouseJson.Options);
+    public string ToJson() => JsonSerializer.Serialize(this, HouseJson.Options);
 
     public static HouseDesign? FromJson(string json)
     {
-        try { return JsonSerializer.Deserialize<HouseDesign>(json, HouseJson.Options)?.Upgraded(); }
+        try
+        {
+            var d = JsonSerializer.Deserialize<HouseDesign>(json, HouseJson.Options);
+            if (d is null) return null;
+            using var doc = JsonDocument.Parse(json);
+            return doc.RootElement.ValueKind == JsonValueKind.Object && !doc.RootElement.TryGetProperty(nameof(Version), out _) ? (d with { Version = 1 }).Upgraded() : d.Upgraded();
+        }
         catch (Exception e) when (e is JsonException or NotSupportedException or ArgumentException) { return null; }
     }
 
