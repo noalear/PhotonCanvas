@@ -344,6 +344,17 @@ public static class CityScene
 
     static PathsD Box(double w, double d) => [new PathD { new(-w / 2, -d / 2), new(w / 2, -d / 2), new(w / 2, d / 2), new(-w / 2, d / 2) }];
 
+    /// <summary>A box <paramref name="w"/> × <paramref name="d"/> with its middle at (<paramref name="a"/>, <paramref name="b"/>).</summary>
+    static PathsD BoxAt(double a, double b, double w, double d) => [new PathD { new(a - w / 2, b - d / 2), new(a + w / 2, b - d / 2), new(a + w / 2, b + d / 2), new(a - w / 2, b + d / 2) }];
+
+    /// <summary>A square ring: the outside <paramref name="w"/> across, its walls <paramref name="t"/> thick.</summary>
+    static PathsD Frame(double w, double d, double t)
+    {
+        var inner = new PathD(Box(w - 2 * t, d - 2 * t)[0]);
+        inner.Reverse();
+        return [Box(w, d)[0], inner];
+    }
+
     static void AddProp(Scene3D scene, Prop p, double sq)
     {
         double k = sq * Math.Clamp(p.Size, 0.2, 6), turn = p.TurnDeg * Math.PI / 180;
@@ -400,6 +411,47 @@ public static class CityScene
             case PropKind.Statue:
                 Slab(Box(0.4 * k, 0.4 * k), 0, 0.2 * k, Color.FromRgb(0xB0, 0xA8, 0x9C));
                 Slab(Box(0.14 * k, 0.12 * k), 0.2 * k, 0.75 * k, Color.FromRgb(0xC8, 0xC2, 0xB8));
+                break;
+            // The town's bigger pieces, as blocks the furniture maker's sizes (the back is +v, the plan's top).
+            case PropKind.Trough:
+                Slab(Frame(1.26 * k, 0.43 * k, 0.07 * k), 0, 0.32 * k, Color.FromRgb(0x9C, 0x96, 0x8C));
+                Slab(Box(1.12 * k, 0.29 * k), 0, 0.26 * k, Color.FromRgb(0x4E, 0x86, 0xB6));
+                break;
+            case PropKind.Stage:
+                Slab(Box(3 * k, 2 * k), 0, 0.4 * k, Color.FromRgb(0x9A, 0x70, 0x48));
+                Slab(BoxAt(0, -1.1 * k, 1 * k, 0.2 * k), 0, 0.2 * k, Color.FromRgb(0x8A, 0x62, 0x3E));
+                Slab(BoxAt(0, 0.92 * k, 3 * k, 0.16 * k), 0.4 * k, 1.7 * k, Color.FromRgb(0x9E, 0x2E, 0x2E));
+                foreach (double side in new[] { -1.0, 1.0 })
+                    Slab(BoxAt(side * 1.4 * k, 0.75 * k, 0.2 * k, 0.2 * k), 0.4 * k, 1.8 * k, Color.FromRgb(0x7A, 0x52, 0x32));
+                break;
+            case PropKind.Stall:
+                Slab(BoxAt(0, -0.1 * k, 1.3 * k, 0.45 * k), 0, 0.36 * k, Color.FromRgb(0x9A, 0x70, 0x48));
+                foreach (double side in new[] { -1.0, 1.0 })
+                    Slab(BoxAt(side * 0.66 * k, 0.32 * k, 0.06 * k, 0.06 * k), 0, 0.8 * k, Color.FromRgb(0x6E, 0x4D, 0x30));
+                Slab(Box(1.42 * k, 0.79 * k), 0.8 * k, 0.86 * k, Color.FromRgb(0xC8, 0x4C, 0x3C));
+                break;
+            case PropKind.Bar:
+                Slab(BoxAt(0, -0.2 * k, 1.57 * k, 0.32 * k), 0, 0.42 * k, Color.FromRgb(0x7A, 0x52, 0x32));
+                foreach (double a in new[] { -0.5, 0.0, 0.5 })
+                    scene.AddSlab(Ring(0.12 * k, 10), new Frame3(o + u * (a * k) + v * (0.22 * k), u, v), 0, 0.32 * k, Look(Color.FromRgb(0x8A, 0x62, 0x3E), false), group: PropGroup);
+                Slab(BoxAt(0.7 * k, 0.3 * k, 0.06 * k, 0.06 * k), 0, 0.9 * k, Color.FromRgb(0x6E, 0x4D, 0x30));
+                break;
+            case PropKind.NoticeBoard:
+                foreach (double side in new[] { -1.0, 1.0 })
+                    Slab(BoxAt(side * 0.4 * k, 0, 0.06 * k, 0.06 * k), 0, 0.95 * k, Color.FromRgb(0x6E, 0x4D, 0x30));
+                Slab(Box(0.8 * k, 0.05 * k), 0.4 * k, 0.85 * k, Color.FromRgb(0xE8, 0xDC, 0xC4));
+                Slab(Box(0.94 * k, 0.39 * k), 0.95 * k, 1.0 * k, Color.FromRgb(0x7A, 0x52, 0x32));
+                break;
+            case PropKind.GuardTower:
+                Slab(Box(1.81 * k, 1.81 * k), 0, 3.4 * k, Color.FromRgb(0xA4, 0x9C, 0x90));
+                Slab(Frame(1.81 * k, 1.81 * k, 0.18 * k), 3.4 * k, 3.65 * k, Color.FromRgb(0xB4, 0xAC, 0xA0));
+                for (int i = 0; i < 4; i++)
+                    foreach (double side in new[] { -1.0, 1.0 })
+                    {
+                        double c = (-0.72 + 0.48 * i) * k;
+                        Slab(BoxAt(c, side * 0.815 * k, 0.24 * k, 0.18 * k), 3.65 * k, 3.85 * k, Color.FromRgb(0xB4, 0xAC, 0xA0));
+                        Slab(BoxAt(side * 0.815 * k, c, 0.18 * k, 0.24 * k), 3.65 * k, 3.85 * k, Color.FromRgb(0xB4, 0xAC, 0xA0));
+                    }
                 break;
         }
     }

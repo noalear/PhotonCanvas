@@ -1,6 +1,6 @@
 # Build a town
 <!-- category: Drawing -->
-<!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change and find its buildings, see it in 3D, save it as a battle map picture and cut its buildings, ground, bridges and scenery. -->
+<!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change and find its buildings, see it in 3D, save it as a battle map picture and cut its buildings, ground, bridges, walls, trees and scenery. -->
 <!-- page: citybuilder.md -->
 <!-- order: 79 -->
 The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
@@ -78,11 +78,13 @@ Click **3D** to see the town put together. Drag to turn it round and scroll to z
 With a building picked, press **Put this building in the design**: its pieces go into the design,
 nested onto the bed, a page per bed.
 
-## Cut the ground, bridges and scenery
+## Cut the ground, walls and scenery
 <!-- target: tabitem:Cut -->
 On the **Cut** tab, press **Put the ground in the design** for the ground as tiles that lock together,
 each square etched with its ground, **Put the bridges in the design** for a bridge wherever a road
-crosses water, and **Put the scenery in the design** for the wells, carts and fences.
+crosses water, **Put the town walls in the design** for the wall with its gatehouses and guard towers,
+**Put the trees in the design**, and **Put the scenery in the design** for the wells, carts, stalls,
+stages and fences.
 
 ## Save it as a picture
 <!-- target: button:Save as a picture… -->

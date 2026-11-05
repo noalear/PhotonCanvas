@@ -21,7 +21,7 @@ static class CityBuilderShots
         // A scratch data folder, so the pictures don't depend on the last map made.
         var data = Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-citybuilder");
 
-        void Shot(string name, CityMap map, int left, int view, Func<CityWindow, Task>? also = null)
+        void Shot(string name, CityMap map, int left, int view, Func<CityWindow, Task>? also = null, Action<CityWindow>? after = null)
         {
             Directory.CreateDirectory(data);
             File.WriteAllText(Path.Combine(data, "last.json"), map.ToJson());
@@ -39,6 +39,11 @@ static class CityBuilderShots
                 if (tc.Items.Count == 2 && tc.Items[0] is TabItem { Header: "Plan" }) tc.SelectedIndex = view;
             }
             settle(1500);
+            if (after is not null)
+            {
+                after(win);
+                settle(1200);
+            }
             win.CaptureRenderedFrame()?.Save(Path.Combine(folder, name + ".png"));
             Console.WriteLine($"citybuilder: {name}.png");
             win.Close();
@@ -79,6 +84,13 @@ static class CityBuilderShots
         Shot("window-citybuilder-made", village, 0, 0, MakeOne);
         Shot("window-citybuilder-made-3d", village, 0, 1, MakeOne);
         Shot("window-citybuilder-cut", village, 5, 0, MakeOne);
+        // Closer in on the market square in 3D: its stage, stalls, bar and trough, and the guard towers on the wall beyond.
+        Shot("window-citybuilder-square-3d", village, 0, 1, MakeOne, w =>
+        {
+            var view = F<CityView>(w, "_view");
+            view.Turn(-400, -5);
+            view.Zoom(3.4, new Avalonia.Point(view.Bounds.Width / 2, view.Bounds.Height / 2));
+        });
         // A town like it saved as a battle map picture (a part of it), and the ground by the river cut as tiles.
         var (town, _) = TownMaker.Make(new TownOptions { Name = "New town", Across = 64, Down = 48, Layout = TownLayout.Crossroads, Walls = true, River = true, Seed = 7, Theme = "Medieval" });
         File.WriteAllBytes(Path.Combine(folder, "citybuilder-picture.png"), TownPicture.Encode(town, new TownPictureOptions { PxPerSquare = 36, Box = (18, 16, 54, 38) }, "town.png"));

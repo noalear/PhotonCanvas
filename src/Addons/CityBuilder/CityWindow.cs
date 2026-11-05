@@ -64,7 +64,8 @@ public sealed class CityWindow : Window
     readonly CheckBox _cGrid = new() { Content = "Score the grid", IsChecked = true }, _cOutlines = new() { Content = "Score where the buildings stand", IsChecked = true },
         _cBox = new() { Content = "Only the last box dragged with Select" };
     readonly Button _cGround = UiKit.Button("Put the ground in the design"), _cBridges = UiKit.Button("Put the bridges in the design"), _cScenery = UiKit.Button("Put the scenery in the design");
-    readonly TextBlock _cGroundInfo = Hint(), _cBridgesInfo = Hint(), _cSceneryInfo = Hint();
+    readonly TextBlock _cGroundInfo = Hint(), _cBridgesInfo = Hint(), _cSceneryInfo = Hint(), _cWallsInfo = Hint(), _cTreesInfo = Hint();
+    readonly Button _cWalls = UiKit.Button("Put the town walls in the design"), _cTrees = UiKit.Button("Put the trees in the design");
 
     // Battle map
     readonly Button _openPic = UiKit.Button("Open a picture…"), _usePic = UiKit.Button("Use the selected picture"), _samplePic = UiKit.Button("Try a sample battle map"), _findGrid = UiKit.Button("Find the grid");
@@ -313,7 +314,11 @@ public sealed class CityWindow : Window
                 Field("Tile size (squares)", _cTile), Field("Sheet (mm)", _cThick), Field("Edges", _cJoin), _cGrid, _cOutlines, _cBox, _cGroundInfo, _cGround),
             Explained("Bridges", "A bridge wherever a road crosses water, from the bridge maker: stone arches for a cobbled road, planks for a track, as wide as the road and reaching onto the banks.",
                 _cBridgesInfo, _cBridges),
-            Explained("Scenery", "The scenery maker's pieces for the map's wells, carts, crates (as barrels), boulders and fences.",
+            Explained("Town walls", "The furniture maker's town wall in the map's look: sections two squares and one long, corners, a gatehouse over each road through it, a turret at each end, and the guard towers along it.",
+                _cWallsInfo, _cWalls),
+            Explained("Trees", "The furniture maker's trees in the map's look (oaks and pines, dead trees, palms or giant mushrooms), each as big as on the map. Bushes aren't cut.",
+                _cTreesInfo, _cTrees),
+            Explained("Scenery", "The scenery maker's wells, carts, crates (as barrels), boulders and fences, and the furniture maker's horse troughs, stages, market stalls, outdoor bars and notice boards.",
                 _cSceneryInfo, _cScenery),
             Hint("The buildings are cut with Put this building in the design and Put every building in the design, below."));
     }
@@ -415,6 +420,8 @@ public sealed class CityWindow : Window
         _cGround.Click += async (_, _) => await CutGround();
         _cBridges.Click += async (_, _) => await CutBridges();
         _cScenery.Click += async (_, _) => await CutScenery();
+        _cWalls.Click += async (_, _) => await CutFurniture(_cWalls, TownPieces.WallSet, "City walls", "the town walls");
+        _cTrees.Click += async (_, _) => await CutFurniture(_cTrees, TownPieces.TreeSet, "City trees", "the trees");
 
         _tMake.Click += async (_, _) => await MakeTown();
         _fill.Click += async (_, _) => await FillWithBuildings();
@@ -990,6 +997,8 @@ public sealed class CityWindow : Window
 
     /// <summary>The most ground tiles made at once: a big town's ground is cut a part at a time.</summary>
     const int MaxGroundTiles = 400;
+    /// <summary>The most trees cut at once (each is several pieces).</summary>
+    const int MaxTrees = 150;
 
     void RefreshCut()
     {
@@ -1004,9 +1013,22 @@ public sealed class CityWindow : Window
         _cBridgesInfo.Text = sites.Count == 0 ? "No road crosses water" + (box is null ? "." : " in the box.") : $"{sites.Count} {Plural("place", sites.Count)} where a road crosses water.";
         _cBridges.IsEnabled = sites.Count > 0;
         var set = TownPieces.Scenery(_map, _map.Theme, box);
-        _cSceneryInfo.Text = set is null ? "No wells, carts, crates, boulders or fences" + (box is null ? "." : " in the box.")
-            : string.Join(", ", set.Items.Select(i => $"{i.Count} × {PhotonCanvas.Addon.Scatter.Defaults.Info(i.Kind).Name.ToLowerInvariant()}" + (i.Kind == PhotonCanvas.Addon.Scatter.ItemKind.Fence ? $" ({i.WidthMm / _map.SquareMm:0.#} squares)" : ""))) + ".";
-        _cScenery.IsEnabled = set is not null;
+        var town = TownPieces.TownPropSet(_map, box);
+        var what = (set?.Items.Select(i => $"{i.Count} × {PhotonCanvas.Addon.Scatter.Defaults.Info(i.Kind).Name.ToLowerInvariant()}" + (i.Kind == PhotonCanvas.Addon.Scatter.ItemKind.Fence ? $" ({i.WidthMm / _map.SquareMm:0.#} squares)" : "")) ?? [])
+            .Concat(town?.Items.Select(i => $"{i.Count} × {(i.Name ?? "").ToLowerInvariant()}") ?? []).ToList();
+        _cSceneryInfo.Text = what.Count == 0 ? "No wells, carts, crates, boulders, fences, troughs, stages, stalls, bars or notice boards" + (box is null ? "." : " in the box.") : string.Join(", ", what) + ".";
+        _cScenery.IsEnabled = what.Count > 0;
+        var walls = TownPieces.Walls(_map, box);
+        _cWallsInfo.Text = walls.Count == 0 ? "No town wall or guard towers" + (box is null ? "." : " in the box.")
+            : string.Join(", ", new[] { (walls.Two, "section", " two squares long"), (walls.One, "section", " one square long"), (walls.CornersOut + walls.CornersIn, "corner", ""), (walls.Gates, "gatehouse", ""), (walls.Ends, "end", " with a turret"), (walls.Towers, "guard tower", "") }
+                .Where(x => x.Item1 > 0).Select(x => $"{x.Item1} {Plural(x.Item2, x.Item1)}{x.Item3}")) + ".";
+        _cWalls.IsEnabled = walls.Count > 0;
+        var trees = TownPieces.TreeSet(_map, box);
+        int treeCount = trees?.Items.Sum(i => i.Count) ?? 0;
+        _cTreesInfo.Text = trees is null ? "No trees" + (box is null ? "." : " in the box.")
+            : $"{treeCount} {Plural("tree", treeCount)}: " + string.Join(", ", trees.Items.Select(i => $"{i.Count} × {(i.Name ?? "").ToLowerInvariant()}")) + "."
+              + (treeCount > MaxTrees ? $" That's a lot to cut at once (at most {MaxTrees}): drag a box round a part with Select and tick the box above." : "");
+        _cTrees.IsEnabled = treeCount is > 0 and <= MaxTrees;
     }
 
     async Task CutGround()
@@ -1082,34 +1104,87 @@ public sealed class CityWindow : Window
             AppLog.Error("citybuilder", e);
             _status.Text = $"Couldn't make the bridges: {e.Message}";
         }
-        finally { _cBridges.IsEnabled = true; }
+        finally { RefreshCut(); }
     }
 
     async Task CutScenery()
     {
-        if (TownPieces.Scenery(_map, _map.Theme, BoxIf(_cBox)) is not { } set) return;
+        var box = BoxIf(_cBox);
+        var set = TownPieces.Scenery(_map, _map.Theme, box);
+        var town = TownPieces.TownPropSet(_map, box);
+        if (set is null && town is null) return;
         var before = _doc.State;
         _cScenery.IsEnabled = false;
+        _status.Text = "Making the scenery…";
         try
         {
-            var (state, kit, id, why) = await Task.Run(() =>
+            var (state, shapes, pieces, why) = await Task.Run(() =>
             {
-                var kit = PhotonCanvas.Addon.Scatter.ScatterKit.Make(set);
-                if (!kit.Ok) return (before, kit, Guid.Empty, kit.Items.SelectMany(i => i.Findings).First(f => f.Level == PhotonCanvas.Addon.Scatter.Severity.Bad).Text);
-                var (s, _, id) = PhotonCanvas.Addon.Scatter.Placement.Place(before, kit, set, _machine, new PhotonCanvas.Addon.Scatter.PlaceOptions());
-                return (s, kit, id, (string?)null);
+                var state = before;
+                var shapes = new HashSet<Guid>();
+                int pieces = 0;
+                // The scenery maker's wells, carts, barrels, boulders and fences.
+                if (set is not null)
+                {
+                    var kit = PhotonCanvas.Addon.Scatter.ScatterKit.Make(set);
+                    if (!kit.Ok) return (before, shapes, 0, kit.Items.SelectMany(i => i.Findings).First(f => f.Level == PhotonCanvas.Addon.Scatter.Severity.Bad).Text);
+                    var (s, _, id) = PhotonCanvas.Addon.Scatter.Placement.Place(state, kit, set, _machine, new PhotonCanvas.Addon.Scatter.PlaceOptions());
+                    state = s;
+                    shapes.UnionWith(PhotonCanvas.Addon.Scatter.Placement.ShapesOf(s, id));
+                    pieces += kit.PieceCount;
+                }
+                // The furniture maker's troughs, stages, stalls, bars and notice boards.
+                if (town is not null)
+                {
+                    var kit = PhotonCanvas.Addon.Furniture.FurnitureKit.Make(town);
+                    if (!kit.Ok) return (before, shapes, 0, kit.Items.SelectMany(i => i.Findings).First(f => f.Level == PhotonCanvas.Addon.Furniture.Severity.Bad).Text);
+                    var (s, _, id) = PhotonCanvas.Addon.Furniture.Placement.Place(state, kit, town, _machine, new PhotonCanvas.Addon.Furniture.PlaceOptions());
+                    state = s;
+                    shapes.UnionWith(PhotonCanvas.Addon.Furniture.Placement.ShapesOf(s, id));
+                    pieces += kit.PieceCount;
+                }
+                return (state, shapes, pieces, (string?)null);
             });
             if (why is not null) { _status.Text = $"Couldn't make the scenery: {why}"; return; }
             if (!ReferenceEquals(_doc.State, before)) { _status.Text = "The design changed meanwhile: press it again."; return; }
-            _doc.Commit("City scenery", state, PhotonCanvas.Addon.Scatter.Placement.ShapesOf(state, id));
-            _status.Text = $"Put the scenery in the design: {kit.PieceCount} pieces.";
+            _doc.Commit("City scenery", state, shapes);
+            _status.Text = $"Put the scenery in the design: {pieces} pieces.";
         }
         catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
         {
             AppLog.Error("citybuilder", e);
             _status.Text = $"Couldn't make the scenery: {e.Message}";
         }
-        finally { _cScenery.IsEnabled = true; }
+        finally { RefreshCut(); }
+    }
+
+    /// <summary>Puts a set of the furniture maker's pieces for the map (inside the box, if it's ticked) in the design.</summary>
+    async Task CutFurniture(Button button, Func<CityMap, (int X0, int Y0, int X1, int Y1)?, PhotonCanvas.Addon.Furniture.FurnitureSet?> make, string label, string what)
+    {
+        if (make(_map, BoxIf(_cBox)) is not { } set) return;
+        var before = _doc.State;
+        button.IsEnabled = false;
+        _status.Text = $"Making {what}…";
+        try
+        {
+            var (state, kit, id, why) = await Task.Run(() =>
+            {
+                var kit = PhotonCanvas.Addon.Furniture.FurnitureKit.Make(set);
+                if (!kit.Ok) return (before, kit, Guid.Empty, kit.Items.SelectMany(i => i.Findings).First(f => f.Level == PhotonCanvas.Addon.Furniture.Severity.Bad).Text);
+                var (s, _, id) = PhotonCanvas.Addon.Furniture.Placement.Place(before, kit, set, _machine, new PhotonCanvas.Addon.Furniture.PlaceOptions());
+                return (s, kit, id, (string?)null);
+            });
+            if (why is not null) { _status.Text = $"Couldn't make {what}: {why}"; return; }
+            if (!ReferenceEquals(_doc.State, before)) { _status.Text = "The design changed meanwhile: press it again."; return; }
+            _doc.Commit(label, state, PhotonCanvas.Addon.Furniture.Placement.ShapesOf(state, id));
+            _status.Text = $"Put {what} in the design: {kit.PieceCount} pieces, nested onto the bed.";
+        }
+        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
+        {
+            AppLog.Error("citybuilder", e);
+            _status.Text = $"Couldn't make {what}: {e.Message}";
+        }
+        finally { RefreshCut(); }
     }
 
     // ---- the battle map ----
