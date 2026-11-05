@@ -697,6 +697,7 @@ public class HouseEditorTests
     [InlineData(WayKind.Stairs)]
     [InlineData(WayKind.Ladder)]
     [InlineData(WayKind.Spiral)]
+    [InlineData(WayKind.HookedLadder)]
     public void A_way_up_goes_through_an_opening_cut_in_the_floor_above(WayKind kind)
     {
         var walls = Box(0, 0, 6, 4);

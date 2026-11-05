@@ -382,7 +382,7 @@ public sealed partial record HouseDesign
                 WallLooks = [.. l.WallLooks.Select(w => w with { Edge = E(w.Edge) })],
                 NoRailing = [.. l.NoRailing.Select(E)],
                 Columns = [.. l.Columns.Select(c => c with { At = P(c.At) })],
-                Furniture = [.. l.Furniture.Select(f => f with { X = f.Y, Y = W - f.X, Turn = T(f.Turn) })],
+                Furniture = [.. l.Furniture.Select(f => f with { X = f.Y, Y = W - f.X, Turn = ((f.Turn + 1) % 4 + 4) % 4 })],
                 WaysUp = [.. l.WaysUp.Select(w => w with { X = w.Y, Y = W - w.X, Turn = T(w.Turn) })],
             })],
             Roofs = [.. Roofs.Select(r => r with { X0 = r.Y0, X1 = r.Y1, Y0 = W - r.X1, Y1 = W - r.X0, Turn = T(r.Turn) })],
