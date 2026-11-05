@@ -203,7 +203,15 @@ gap at the top and no step where the caps cross. Glue the caps marked *under* fi
 **Engraving** shows the textures sunk into the pieces as deep as you'll etch them (0.3 to 1.5 mm), so
 you can see how they'll stand out; *Painted on* draws them flat, which is quickest on a big building.
 **Doors open** swings every door that opens out on its hinges (and slides portcullises up), to check
-which side each is hinged. Drag to
+which side each is hinged. **Realistic** draws it like a photo of the kit you'll cut: wood grain on
+the pieces, the laser-cut edges charred dark with the plies showing, the engraving burnt brown,
+sunlight from over your left shoulder casting soft shadows (onto the table it stands on too) and
+darker corners where little light gets in. It's a little slower to turn. The bulb button in the
+corner of the view is the same switch, and it changes every 3D view in the program.
+
+![The sample house drawn realistically, roof on: wood grain, charred edges, burnt mortar lines and the house's shadow falling on the table behind it](images/window-houseeditor-realistic.png)
+
+Drag to
 turn the building, scroll to zoom, middle-drag or the arrow keys to move it, and the buttons in the
 corner to fit it in again or go back to the first view.
 

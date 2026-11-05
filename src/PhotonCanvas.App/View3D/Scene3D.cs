@@ -46,6 +46,31 @@ public readonly record struct LineWidth(double Mm, double MinPx, double MaxPx)
 public sealed record SlabStyle(Func<Vec3, bool, Color> Paint, Color Edge, LineWidth EdgeWidth, Color Etched, Color Score, LineWidth ScoreWidth, double CornerDeg = 25)
 {
     /// <summary>
+    /// The colour of the sheet itself, unlit, for the realistic look (<see cref="Model3DPainter"/>), which lights it
+    /// itself. Unset, it's the brightest colour <see cref="Paint"/> gives any way the face turns: the colour a
+    /// <see cref="Lit"/> piece has facing straight at its light.
+    /// </summary>
+    public Color? Sheet { get; init; }
+
+    /// <summary>The sheet's own colour: <see cref="Sheet"/>, or the brightest <see cref="Paint"/> gives.</summary>
+    public Color SheetColour()
+    {
+        if (Sheet is { } sheet) return sheet;
+        Color best = Paint(new Vec3(0, 1, 0), false);
+        int bestSum = best.R + best.G + best.B;
+        // Directions spread evenly over a sphere (a Fibonacci spiral).
+        const int n = 96;
+        for (int i = 0; i < n; i++)
+        {
+            double y = 1 - 2 * (i + 0.5) / n, r = Math.Sqrt(1 - y * y), a = i * 2.399963229728653;
+            var c = Paint(new Vec3(r * Math.Cos(a), y, r * Math.Sin(a)), false);
+            int sum = c.R + c.G + c.B;
+            if (sum > bestSum) { best = c; bestSum = sum; }
+        }
+        return best;
+    }
+
+    /// <summary>
     /// The usual look: <paramref name="colour"/> lit from <paramref name="light"/> (ambient + diffuse), the edges round
     /// the piece a little darker (<paramref name="sideShade"/>).
     /// </summary>
@@ -67,7 +92,7 @@ public sealed record SlabStyle(Func<Vec3, bool, Color> Paint, Color Edge, LineWi
 /// </summary>
 public sealed class Scene3D
 {
-    internal sealed record Face(Vec3[][] Loops, Vec3 Normal, Color Colour, int Group)
+    internal sealed record Face(Vec3[][] Loops, Vec3 Normal, Color Colour, int Group, Surface? Look = null)
     {
         public bool Ghost => Colour.A < 255;
     }
@@ -98,10 +123,11 @@ public sealed class Scene3D
     /// <paramref name="normal"/> points to. A colour that isn't fully opaque makes it a ghost: drawn faint
     /// over what's behind it, and never hiding anything. Returns the face's number, for what goes on it.
     /// </summary>
-    public int AddFace(IEnumerable<Vec3[]> loops, Vec3 normal, Color colour, int group = 0)
+    /// <para><paramref name="surface"/> says what it's made of, for the realistic look; without it, that look paints it <paramref name="colour"/>.</para>
+    public int AddFace(IEnumerable<Vec3[]> loops, Vec3 normal, Color colour, int group = 0, Surface? surface = null)
     {
         var ls = loops.Where(l => l.Length >= 3).ToArray();
-        Faces.Add(new Face(ls, normal.Unit, colour, group));
+        Faces.Add(new Face(ls, normal.Unit, colour, group, colour.A < 255 ? null : surface));
         Version++;
         return Faces.Count - 1;
     }
@@ -151,16 +177,22 @@ public sealed class Scene3D
         Vec3 At(PointD p, double w) => frame.At(p.x, p.y, w);
         bool edged = style.Edge.A > 0;
         int top = -1, bottom = -1;
+        // What it's made of, for the realistic look: the sheet's two faces with its grain along u, its laser-cut
+        // edges charred, what's engraved burnt.
+        var sheet = style.SheetColour();
+        var grain = new Surface(sheet, SurfaceKind.Grain, frame.O, frame.U.Unit, frame.V.Unit);
+        var burnt = new Surface(style.Etched, SurfaceKind.Burnt, frame.O, frame.U.Unit, frame.V.Unit);
+        Surface CutEdge(Vec3 a, Vec3 b) => new(sheet, SurfaceKind.Cut, a, (b - a).Unit, n, w1 - w0);
         double depth = Math.Min(etchDepth, (w1 - w0) * 0.9);
         if (faces && depth > 0 && etched is { Count: > 0 })
         {
             // Sunk in: the top with the grooves as holes, their floors lower down, and their sides.
             var grooves = Clipper.Union(Clipper.SimplifyPaths(new PathsD(etched.Where(c => c.Count >= 3)), 0.08), Clipper2Lib.FillRule.NonZero)
                 .Where(c => c.Count >= 3 && Math.Abs(Clipper.Area(c)) > 0.01).ToList();
-            top = AddFace(loops.Concat(grooves).Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group);
-            bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group);
+            top = AddFace(loops.Concat(grooves).Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group, grain);
+            bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group, grain);
             double floor = w1 - depth;
-            AddFace(grooves.Select(c => c.Select(p => At(p, floor)).ToArray()), n, Shade(style.Etched, 0.92), group);
+            AddFace(grooves.Select(c => c.Select(p => At(p, floor)).ToArray()), n, Shade(style.Etched, 0.92), group, burnt);
             foreach (var c in grooves)
             {
                 // Outer edges of an etched area run anticlockwise, the edges of islands in it clockwise: the
@@ -172,7 +204,7 @@ public sealed class Scene3D
                     double dx = b.x - a.x, dy = b.y - a.y, len = Math.Sqrt(dx * dx + dy * dy);
                     if (len < 1e-6) continue;
                     var into = (frame.U * (-dy / len) + frame.V * (dx / len)).Unit;
-                    AddFace([[At(a, w1), At(a, floor), At(b, floor), At(b, w1)]], into, Shade(style.Paint(into, true), 0.9), group);
+                    AddFace([[At(a, w1), At(a, floor), At(b, floor), At(b, w1)]], into, Shade(style.Paint(into, true), 0.9), group, burnt with { Albedo = Shade(style.Etched, 0.8) });
                 }
             }
             if (scored is not null)
@@ -181,8 +213,8 @@ public sealed class Scene3D
         }
         else if (faces)
         {
-            top = AddFace(loops.Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group);
-            bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group);
+            top = AddFace(loops.Select(c => c.Select(p => At(p, w1)).ToArray()), n, style.Paint(n, false), group, grain);
+            bottom = AddFace(loops.Select(c => c.Select(p => At(p, w0)).ToArray()), -n, style.Paint(-n, false), group, grain);
             if (etched is { Count: > 0 }) AddFill(top, etched.Where(c => c.Count >= 3).Select(c => c.Select(p => At(p, w1)).ToArray()), style.Etched);
             if (scored is not null)
             {
@@ -211,7 +243,7 @@ public sealed class Scene3D
                 dir[i] = (dx / len, dy / len);
                 // Outward: to the right of the edge, as outlines run anticlockwise and holes clockwise.
                 var outward = (frame.U * (dy / len) + frame.V * (-dx / len)).Unit;
-                sideFace[i] = sides ? AddFace([[At(a, w1), At(b, w1), At(b, w0), At(a, w0)]], outward, style.Paint(outward, true), group) : -1;
+                sideFace[i] = sides ? AddFace([[At(a, w1), At(b, w1), At(b, w0), At(a, w0)]], outward, style.Paint(outward, true), group, CutEdge(At(a, w0), At(b, w0))) : -1;
             }
             if (!edged) continue;
             for (int i = 0; i < m; i++)
@@ -239,16 +271,42 @@ public sealed class Scene3D
         Color.FromArgb(c.A, (byte)Math.Clamp(c.R * k, 0, 255), (byte)Math.Clamp(c.G * k, 0, 255), (byte)Math.Clamp(c.B * k, 0, 255));
 }
 
+/// <summary>What a face is made of, for the realistic look (<see cref="Model3DPainter"/>).</summary>
+public enum SurfaceKind
+{
+    /// <summary>One colour, a little shiny.</summary>
+    Plain,
+    /// <summary>The face of a wooden sheet: grain running along <see cref="Surface.Along"/>.</summary>
+    Grain,
+    /// <summary>An edge the laser cut: charred dark, with the sheet's plies showing across it (along <see cref="Surface.Across"/>, through the sheet).</summary>
+    Cut,
+    /// <summary>Engraved: burnt, rough and mottled.</summary>
+    Burnt,
+}
+
+/// <summary>
+/// What a face is made of, for the realistic look: its own colour (unlit) and kind, and where its texture is laid,
+/// from <see cref="Origin"/> along <see cref="Along"/> and <see cref="Across"/> (unit vectors, mm). A cut edge's
+/// origin is on the sheet's bottom face, and <see cref="Thickness"/> is how thick the sheet is (its plies split it).
+/// </summary>
+public readonly record struct Surface(Color Albedo, SurfaceKind Kind, Vec3 Origin, Vec3 Along, Vec3 Across, double Thickness = 0);
+
 /// <summary>Which way the model is seen: screen right, screen up, and towards the viewer (unit vectors at right angles).</summary>
 public readonly record struct Camera3D(Vec3 Right, Vec3 Up, Vec3 Toward)
 {
+    /// <summary>Which way is up in the model (for the realistic look's light and the table it stands on); unset, Y.</summary>
+    public Vec3 Sky { get; init; }
+
+    /// <summary><see cref="Sky"/>, Y when it's unset.</summary>
+    public Vec3 SkyOrY => Sky.Length > 0 ? Sky.Unit : new Vec3(0, 1, 0);
+
     /// <summary>For a model with Y up: turned round by <paramref name="yawDeg"/>, looking down from <paramref name="pitchDeg"/> above level.</summary>
     public static Camera3D YUp(double yawDeg, double pitchDeg)
     {
         double y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
         var d = new Vec3(Math.Sin(y) * Math.Cos(p), Math.Sin(p), Math.Cos(y) * Math.Cos(p));
         var r = new Vec3(Math.Cos(y), 0, -Math.Sin(y));
-        return new(r, d.Cross(r), d);
+        return new(r, d.Cross(r), d) { Sky = new Vec3(0, 1, 0) };
     }
 
     /// <summary>For a model with Z up, seen from the −Y side: turned round by <paramref name="yawDeg"/>, looking down from <paramref name="pitchDeg"/>.</summary>
@@ -257,6 +315,6 @@ public readonly record struct Camera3D(Vec3 Right, Vec3 Up, Vec3 Toward)
         double y = yawDeg * Math.PI / 180, p = pitchDeg * Math.PI / 180;
         var d = new Vec3(Math.Sin(y) * Math.Cos(p), -Math.Cos(y) * Math.Cos(p), Math.Sin(p));
         var r = new Vec3(Math.Cos(y), Math.Sin(y), 0);
-        return new(r, d.Cross(r), d);
+        return new(r, d.Cross(r), d) { Sky = new Vec3(0, 0, 1) };
     }
 }

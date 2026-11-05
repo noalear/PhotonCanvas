@@ -61,5 +61,8 @@ static class HouseEditorShots
             plan.SelectItem(0);
             F<CheckBox>(w, "_doorsOpen").IsChecked = true;
         });
+        // The realistic look (one switch for every 3D view: put back after).
+        Shot("window-houseeditor-realistic", sample, 0, 0, 0, 1, w => F<CheckBox>(w, "_realistic").IsChecked = true);
+        PhotonCanvas.App.View3D.Look3D.Realistic = false;
     }
 }

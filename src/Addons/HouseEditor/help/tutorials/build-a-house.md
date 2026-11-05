@@ -52,8 +52,9 @@ room for a way up to the floor above: an opening is cut in that floor over it.
 ## Look inside
 <!-- target: tabitem:Put together -->
 **Put together** shows it in 3D. Pick **Walls cut away** under **Show** to see into the rooms, and
-drag to turn it round. **Engraving** shows the textures sunk in as deep as you'll etch them, and
-**Doors open** swings the doors that open out on their hinges.
+drag to turn it round. **Engraving** shows the textures sunk in as deep as you'll etch them,
+**Doors open** swings the doors that open out on their hinges, and **Realistic** shows it in wood,
+sunlight and shadow, the way the cut kit will look.
 
 ## Cut it
 <!-- target: button:Put in the design -->
