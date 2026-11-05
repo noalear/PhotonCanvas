@@ -48,9 +48,10 @@ public sealed class HouseEditorWindow : Window
         _copyUp = UiKit.Button("Copy walls up", tip: "Draws the floor below's walls on this floor too (doors and windows aren't copied)."),
         _removeLevel = UiKit.Button("Remove this floor"),
         _undoButton = UiKit.Button("Undo"), _redoButton = UiKit.Button("Redo");
-    readonly ComboBox _walls = Combo("Everything, roofs on", "Walls cut away", "Walls down"), _upTo = Combo("Every floor");
-    static readonly double[] Depths = [0, 0.3, 0.6, 1, 1.5];
-    readonly ComboBox _depth = Combo("Painted on (quickest)", "0.3 mm deep", "0.6 mm deep", "1 mm deep", "1.5 mm deep");
+    readonly ComboBox _walls = Combo("Everything, roofs on", "Everything, but the roof off", "Walls cut away", "Walls down"), _upTo = Combo("Every floor");
+    static readonly double[] Depths = [0.3, 0.6, 1, 1.5];
+    readonly CheckBox _realEtch = new() { Content = "Realistic engraving", IsChecked = true, VerticalAlignment = VerticalAlignment.Center };
+    readonly ComboBox _depth = Combo("0.3 mm deep", "0.6 mm deep", "1 mm deep", "1.5 mm deep");
 
     // What's picked on the plan.
     readonly StackPanel _picked = new() { Spacing = 8 };
@@ -97,6 +98,7 @@ public sealed class HouseEditorWindow : Window
     readonly StackPanel _itemPanel = new() { Spacing = 8 };
     readonly TextBlock _iInfo = Hint();
     readonly NumericUpDown _iW = Number(3, 400, 0.5m, "0.#"), _iD = Number(1, 400, 0.5m, "0.#"), _iH = Number(1, 400, 0.5m, "0.#");
+    readonly StackPanel _iSizes = new() { Spacing = 8 };
     readonly Button _iLeft = UiKit.Button("⟲ Turn left"), _iRight = UiKit.Button("⟳ Turn right"), _iMore = UiKit.Button("Put down more like it"), _iRemove = UiKit.Button("Take it away");
     readonly StackPanel _wayPanel = new() { Spacing = 8 };
     readonly TextBlock _wInfoWay = Hint();
@@ -107,6 +109,7 @@ public sealed class HouseEditorWindow : Window
     readonly ComboBox _placeTheme = Combo([.. FurnitureCatalog.Themes]);
     readonly ComboBox _placeRoom = Combo(["Every room", .. FurnitureCatalog.Rooms, "Plain pieces (every kind)"]);
     readonly TextBlock _placeInfo = new() { TextWrapping = TextWrapping.Wrap, Classes = { "muted" } };
+    readonly Button _banana = UiKit.Button("Banana for scale", tip: "Puts a life-size banana on the plan, to see how big the building really is in the 3D view. It's not cut.");
     // A column picked.
     static readonly ColumnShape[] ColumnShapes = [ColumnShape.Auto, ColumnShape.Square, ColumnShape.Octagon, ColumnShape.Round, ColumnShape.Hexagon, ColumnShape.Chamfered, ColumnShape.Fluted];
     static readonly string[] ColumnNames = ["Matching the walls' angles", "Square", "Octagonal", "Round", "Hexagonal", "Chamfered (corners cut off)", "Fluted (grooved, round)"];
@@ -230,8 +233,13 @@ public sealed class HouseEditorWindow : Window
         }
         showRow.Children.Add(Pair("Show", _walls, 170));
         showRow.Children.Add(Pair("up to", _upTo, 120));
-        showRow.Children.Add(Pair("Engraving", _depth, 150));
-        ToolTip.SetTip(_depth, "Shows the engraving sunk into the pieces as deep as your etch will go, so you can see how the textures stand out. Painted on is quickest to turn round.");
+        _realEtch.Margin = new Thickness(0, 0, 6, 4);
+        showRow.Children.Add(_realEtch);
+        ToolTip.SetTip(_realEtch, "On: the engraving is sunk into the pieces as deep as your etch will go, so you can see how the textures stand out. Off: it's painted on flat, which is quicker to turn round.");
+        _depth.Width = 120;
+        _depth.Margin = new Thickness(0, 0, 10, 4);
+        showRow.Children.Add(_depth);
+        ToolTip.SetTip(_depth, "How deep the realistic engraving is shown.");
         _doorsOpen.Margin = new Thickness(0, 0, 0, 4);
         showRow.Children.Add(_doorsOpen);
         ToolTip.SetTip(_doorsOpen, "Shows the doors that open swung out on their hinges (and portcullises slid up), so you can see which side each is hinged.");
@@ -387,11 +395,14 @@ public sealed class HouseEditorWindow : Window
         _placeTheme.SelectedIndex = Math.Max(0, FurnitureCatalog.Themes.ToList().IndexOf(_design.Style.Theme));
         _placeList.ItemsSource = PlaceNames();
         _placePanel.Children.Add(Explained("Furniture to put down", "Pick a theme and a room, click a piece, then click on the plan to stand it there. Its dark edge is its front. It's made by the furniture maker, from the furniture's own sheet, and keeps its theme's look in any building.",
-            Field("Theme", _placeTheme), Field("Room", _placeRoom), _placeList, _placeInfo));
+            Field("Theme", _placeTheme), Field("Room", _placeRoom), _placeList, _placeInfo, _banana));
         _wayPlacePanel.Children.Add(Explained("Ways up", "Click on the plan to put a way up to the floor above there: an opening is cut in that floor over it. The arrow shows which way it climbs.", Field("Put in", _wayPlace)));
+        _iSizes.Children.Add(Field("Width", _iW, tip: "Left to right across its front (mm)."));
+        _iSizes.Children.Add(Field("Depth", _iD, tip: "Front to back (mm)."));
+        _iSizes.Children.Add(Field("Height", _iH, tip: "Overall height (mm)."));
         _itemPanel.Children.Add(Explained("Furniture", "Drag it to move it (hold Shift to place it to the millimetre); turn it while dragging with the mouse wheel.",
             _iInfo, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _iLeft, _iRight } },
-            Field("Width", _iW, tip: "Left to right across its front (mm)."), Field("Depth", _iD, tip: "Front to back (mm)."), Field("Height", _iH, tip: "Overall height (mm)."),
+            _iSizes,
             new StackPanel { Spacing = 6, Children = { _iCopy, _iMore, _iRemove } }));
         _wayPanel.Children.Add(Explained("Way up", "It climbs to the floor above, through an opening cut in that floor. Drag it to move it.",
             _wInfoWay, Field("Kind", _wayKind), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _wLeft, _wRight } }, _wCopy, _wRemove));
@@ -508,9 +519,19 @@ public sealed class HouseEditorWindow : Window
         _placeList.SelectionChanged += (_, _) =>
         {
             int i = _placeList.SelectedIndex;
+            if (i >= 0) _plan.BananaToPlace = false;
+            else if (_plan.BananaToPlace) return;
             _plan.ToPlace = i >= 0 && i < _placeItems.Count ? _placeItems[i] : null;
             _placeInfo.Text = i >= 0 && i < _placeAbout.Count ? _placeAbout[i] : "";
             if (_plan.ToPlace is not null && _plan.Tool != PlanTool.Furnish) PickTool(PlanTool.Furnish);
+        };
+        _banana.Click += (_, _) =>
+        {
+            _plan.BananaToPlace = true;
+            _plan.ToPlace = null;
+            _placeList.SelectedIndex = -1;
+            _placeInfo.Text = $"A banana as big as a real one ({HouseKitMaker.BananaLongMm:0} mm long): click on the plan to lay it down. It shows only in the 3D view and isn't cut.";
+            PickTool(PlanTool.Furnish);
         };
         _wayPlace.SelectionChanged += (_, _) => _plan.WayToPlace = (WayKind)Math.Max(0, _wayPlace.SelectedIndex);
         _iLeft.Click += (_, _) => _plan.TurnPicked(1);
@@ -521,7 +542,8 @@ public sealed class HouseEditorWindow : Window
         _iMore.Click += (_, _) =>
         {
             if (PickedItem is not { } it) return;
-            _plan.ToPlace = it.Item;
+            _plan.BananaToPlace = it.Banana;
+            _plan.ToPlace = it.Banana ? null : it.Item;
             _placeList.SelectedIndex = -1;
             PickTool(PlanTool.Furnish);
         };
@@ -564,10 +586,17 @@ public sealed class HouseEditorWindow : Window
         _removeLevel.Click += (_, _) => RemoveLevel();
         _undoButton.Click += (_, _) => Undo();
         _redoButton.Click += (_, _) => Redo();
-        _walls.SelectedIndex = 1;
-        _depth.SelectedIndex = 2;
+        _walls.SelectedIndex = (int)WallsShown.CutAway;
+        _depth.SelectedIndex = 1;
         _doorsOpen.IsCheckedChanged += (_, _) => _view.SetDoorsOpen(_doorsOpen.IsChecked == true);
-        _depth.SelectionChanged += (_, _) => _view.SetEtchDepth(Depths[Math.Clamp(_depth.SelectedIndex, 0, Depths.Length - 1)]);
+        void EtchShown()
+        {
+            bool real = _realEtch.IsChecked == true;
+            _depth.IsEnabled = real;
+            _view.SetEtchDepth(real ? Depths[Math.Clamp(_depth.SelectedIndex, 0, Depths.Length - 1)] : 0);
+        }
+        _depth.SelectionChanged += (_, _) => EtchShown();
+        _realEtch.IsCheckedChanged += (_, _) => EtchShown();
         _walls.SelectionChanged += (_, _) => _view.SetWalls((WallsShown)Math.Max(0, _walls.SelectedIndex));
         _upTo.SelectionChanged += (_, _) => { if (!_loading) _view.SetUpTo(_upTo.SelectedIndex <= 0 ? int.MaxValue : _upTo.SelectedIndex - 1); };
 
@@ -1052,6 +1081,13 @@ public sealed class HouseEditorWindow : Window
     void ShowItem(PlacedItem p)
     {
         _loading = true;
+        _iSizes.IsVisible = !p.Banana;
+        if (p.Banana)
+        {
+            _iInfo.Text = $"A banana for scale on floor {_plan.Level + 1}: as big as a real one ({HouseKitMaker.BananaLongMm:0} mm long), to see how big the building really is. It shows only in the 3D view and isn't cut.";
+            _loading = false;
+            return;
+        }
         var (w, d) = HouseKitMaker.Footprint(_design.Style, p.Item);
         _iInfo.Text = $"{HouseKitMaker.ItemName(p.Item)} on floor {_plan.Level + 1}, {Turns[((p.Turn % 4) + 4) % 4]}: it takes {w:0.#} × {d:0.#} mm of floor.";
         _iW.Value = (decimal)Math.Clamp(p.Item.WidthMm, 3, 400);
@@ -1062,7 +1098,7 @@ public sealed class HouseEditorWindow : Window
 
     void ItemChanged()
     {
-        if (_loading || PickedItem is not { } p) return;
+        if (_loading || PickedItem is not { } p || p.Banana) return;
         var item = p.Item with { WidthMm = V(_iW, p.Item.WidthMm), DepthMm = V(_iD, p.Item.DepthMm), HeightMm = V(_iH, p.Item.HeightMm) };
         if (item == p.Item) return;
         var level = _design.Levels[_plan.Level];
