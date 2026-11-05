@@ -74,6 +74,7 @@ public sealed class HouseEditorWindow : Window
     readonly Button _oCopy = UiKit.Button("Copy", tip: CopyTip), _iCopy = UiKit.Button("Copy", tip: CopyTip), _wCopy = UiKit.Button("Copy", tip: CopyTip);
     readonly CheckBox _oOpens = new() { Content = "Opens on hinges" };
     readonly CheckBox _doorsOpen = new() { Content = "Doors open", VerticalAlignment = VerticalAlignment.Center };
+    readonly CheckBox _realistic = new() { Content = "Realistic look", VerticalAlignment = VerticalAlignment.Center };
     Control _oSillRow = null!, _oLookRow = null!, _oHingeRow = null!, _oBarsRow = null!, _oFillRow = null!;
     // A roof picked.
     readonly StackPanel _roofPanel = new() { Spacing = 8 };
@@ -264,9 +265,12 @@ public sealed class HouseEditorWindow : Window
         _depth.Margin = new Thickness(0, 0, 10, 4);
         showRow.Children.Add(_depth);
         ToolTip.SetTip(_depth, "How deep the realistic engraving is shown.");
-        _doorsOpen.Margin = new Thickness(0, 0, 0, 4);
+        _doorsOpen.Margin = new Thickness(0, 0, 10, 4);
         showRow.Children.Add(_doorsOpen);
         ToolTip.SetTip(_doorsOpen, "Shows the doors that open swung out on their hinges (and portcullises slid up), so you can see which side each is hinged.");
+        _realistic.Margin = new Thickness(0, 0, 0, 4);
+        showRow.Children.Add(_realistic);
+        ToolTip.SetTip(_realistic, "Draws the building like a photo of the real kit: wood grain on the pieces, charred laser-cut edges, burnt engraving, sunlight with soft shadows (onto the table too) and darker corners. A little slower to turn. The same switch is the bulb button in the corner of every 3D view.");
         var views = new TabControl();
         var assembled = new Grid { RowDefinitions = new("Auto,*"), Margin = new Thickness(0, 6, 0, 0) };
         assembled.Children.Add(showRow);
@@ -362,6 +366,8 @@ public sealed class HouseEditorWindow : Window
     }
 
     static Control Gap() => new Border { Width = 14 };
+
+    void RealisticChanged() => _realistic.IsChecked = PhotonCanvas.App.View3D.Look3D.Realistic;
 
     static Border Framed(Control c) => new() { CornerRadius = new(8), ClipToBounds = true, BorderBrush = Brush("Line"), BorderThickness = new(1), Margin = new(0, 6, 0, 0), Child = c };
 
@@ -648,6 +654,11 @@ public sealed class HouseEditorWindow : Window
         _walls.SelectedIndex = (int)WallsShown.CutAway;
         _depth.SelectedIndex = 1;
         _doorsOpen.IsCheckedChanged += (_, _) => _view.SetDoorsOpen(_doorsOpen.IsChecked == true);
+        // One switch for every 3D view (Look3D): this box and the bulb button in the view's corner stay in step.
+        _realistic.IsChecked = PhotonCanvas.App.View3D.Look3D.Realistic;
+        _realistic.IsCheckedChanged += (_, _) => PhotonCanvas.App.View3D.Look3D.Realistic = _realistic.IsChecked == true;
+        PhotonCanvas.App.View3D.Look3D.Changed += RealisticChanged;
+        Closed += (_, _) => PhotonCanvas.App.View3D.Look3D.Changed -= RealisticChanged;
         void EtchShown()
         {
             bool real = _realEtch.IsChecked == true;

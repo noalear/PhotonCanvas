@@ -63,6 +63,11 @@ public static class PieceSplit
         var shapes = s.Shapes.Where(x => art.Contains(x.Id) && !pieceIds.Contains(x.Id) && x.LayerId != material).ToList();
         var notes = new List<string>();
         var pages = new List<DesignPage>();
+        // Engrave sub-layers of a Cut or Score layer: its lines are cut to a piece as lines, which a
+        // fill can't fill, so on each page such a sub-layer becomes a layer of its own with the area share
+        // (by the area, which can be on a piece the lines never touch: a big outline round the piece).
+        var fillSubs = s.Layers.Where(l => l.Mode == LayerMode.Fill && l.ParentId is { } p && s.FindLayer(p) is { Mode: LayerMode.Cut or LayerMode.Score })
+            .GroupBy(l => l.ParentId!.Value).ToDictionary(g => g.Key, g => g.Select(l => l.Id).ToList());
         for (int i = 0; i < ordered.Count; i++)
         {
             var piece = ordered[i];
@@ -102,11 +107,25 @@ public static class PieceSplit
             for (int j = 0; j < ordered.Count; j++)
                 if (j != i) greyed.Add(new PathShape { Name = PieceName(j + 1), LayerId = others.Id, Geometry = ordered[j].World });
             int live = 0;
+            var ownLayer = new HashSet<Guid>(); // sub-layers that hold their own shapes on this page
             foreach (var x in shapes)
             {
                 var mode = s.FindLayer(x.LayerId)?.Mode ?? LayerMode.Cut;
                 var lies = Where(x, region, lineRegion, regionFlat, mode);
                 var layer = map.TryGetValue(x.LayerId, out var ml) ? ml : x.LayerId;
+                bool filled = false;
+                if (x is PathShape && fillSubs.TryGetValue(x.LayerId, out var subs))
+                {
+                    var areaLies = Where(x, region, lineRegion, regionFlat, LayerMode.Fill);
+                    var area = areaLies switch { Lies.Inside => x, Lies.Across => Clip(x, region, lineRegion, LayerMode.Fill), _ => null };
+                    if (area is not null)
+                        foreach (var sub in subs)
+                        {
+                            share.Add(Grouped(area.With(layerId: map[sub], id: Guid.NewGuid()), x));
+                            ownLayer.Add(map[sub]);
+                            filled = true;
+                        }
+                }
                 if (lies == Lies.Inside) share.Add(Grouped(x.With(layerId: layer, id: Guid.NewGuid()), x));
                 else
                 {
@@ -115,9 +134,10 @@ public static class PieceSplit
                     // The whole of it, greyed, so the design can be seen across the pieces.
                     greyed.Add(x.With(layerId: others.Id, id: Guid.NewGuid()).WithGroup(null));
                 }
-                if (lies != Lies.Outside) live++;
+                if (lies != Lies.Outside || filled) live++;
             }
             if (live == 0) notes.Add($"Nothing of the design is on {PieceName(i + 1).ToLowerInvariant()}.");
+            if (ownLayer.Count > 0) layers = [.. layers.Select(l => ownLayer.Contains(l.Id) ? l with { ParentId = null } : l)];
             List<Shape> onPage = [.. greyed, .. share, new PathShape { Name = PieceName(i + 1), LayerId = mat.Id, Geometry = piece.World }];
 
             // Moved (as little as it takes) so the piece is in the work area.

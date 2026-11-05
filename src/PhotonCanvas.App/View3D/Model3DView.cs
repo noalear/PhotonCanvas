@@ -1,5 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.Input;
+using Avalonia.Layout;
 using Avalonia.Media;
 
 namespace PhotonCanvas.App.View3D;
@@ -13,6 +16,9 @@ namespace PhotonCanvas.App.View3D;
 /// Until it's zoomed or moved, the whole model is fitted into the view however it's turned (as it changes,
 /// too). Once zoomed or moved, it stays that size and turns about whatever is in the middle of the view, and
 /// keeps that view while the model changes, so a detail can be watched while it's being changed.
+/// </para>
+/// <para>
+/// A button beside them switches every 3D view between the plain look and the realistic one (<see cref="Look3D"/>).
 /// </para>
 /// Fill <see cref="Scene"/> and call <see cref="Visual.InvalidateVisual"/> when the model changes.
 /// </summary>
@@ -35,8 +41,35 @@ public abstract class Model3DView : Control, INavigable
         _minPitch = minPitch;
         _maxPitch = maxPitch;
         _nav = new ViewNavigator(this, this) { WheelFirst = Wheel, Click = (at, keys) => Clicked(at, keys) };
+        _look = new ToggleButton
+        {
+            Classes = { "tool" },
+            Width = 26, Height = 26, MinWidth = 0, MinHeight = 0, Padding = new(0), Margin = new(0),
+            HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center,
+            Focusable = false,
+            Content = new PathIcon { Data = UiKit.Icon("IcBulb"), Width = 15, Height = 15 },
+            Cursor = new Cursor(StandardCursorType.Arrow),
+            IsChecked = Look3D.Realistic,
+        };
+        Avalonia.Automation.AutomationProperties.SetName(_look, LookTip);
+        ToolTip.SetTip(_look, LookTip);
+        _look.IsCheckedChanged += (_, _) => Look3D.Realistic = _look.IsChecked == true;
+        _nav.AddButton(_look);
         VisualChildren.Add(_nav.Buttons);
         LogicalChildren.Add(_nav.Buttons);
+        AttachedToVisualTree += (_, _) => { Look3D.Changed += LookChanged; LookChanged(); };
+        DetachedFromVisualTree += (_, _) => Look3D.Changed -= LookChanged;
+    }
+
+    /// <summary>What the look button says.</summary>
+    public const string LookTip = "Realistic look: wood grain, charred edges, sunlight and shadows (a little slower to turn). Switches every 3D view.";
+
+    readonly ToggleButton _look;
+
+    void LookChanged()
+    {
+        _look.IsChecked = Look3D.Realistic;
+        InvalidateVisual();
     }
 
     /// <summary>The wheel, before it zooms: true when the view used it for something of its own (with Ctrl held, say).</summary>
@@ -77,7 +110,7 @@ public abstract class Model3DView : Control, INavigable
     public sealed override void Render(DrawingContext ctx)
     {
         BeforeDraw();
-        if (!_painter.Draw(ctx, this, Scene, Camera, UiKit.Brush("Bg2"), HiddenGroups, _nav.Busy, _framing))
+        if (!_painter.Draw(ctx, this, Scene, Camera, UiKit.Brush("Bg2"), HiddenGroups, _nav.Busy, _framing, Look3D.Realistic))
         {
             if (Message is { } m) DrawMessage(ctx, Bounds, m);
             return;

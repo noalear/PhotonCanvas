@@ -16,7 +16,7 @@ namespace PhotonCanvas.App.View3D;
 /// </para>
 /// Keep one painter per view: it keeps its buffers, and redraws only when something has changed.
 /// </summary>
-public sealed class Model3DPainter
+public sealed partial class Model3DPainter
 {
     /// <summary>
     /// Room left round the model when it's fitted into the view (each side, top, bottom): more at the bottom,
@@ -106,9 +106,10 @@ public sealed class Model3DPainter
     /// <paramref name="background"/> first. Groups whose bit is set in <paramref name="hiddenGroups"/> are left out
     /// (but the model is still fitted as a whole). <paramref name="draft"/> draws quicker and rougher (while turning
     /// it). <paramref name="framing"/> says how big to draw it and what to put in the middle of the view; without it,
-    /// the whole model is fitted into the view. Returns false (having drawn only the background) when there's nothing to draw.
+    /// the whole model is fitted into the view. <paramref name="realistic"/> draws it with wood, light and shadow
+    /// (<see cref="Paint"/>). Returns false (having drawn only the background) when there's nothing to draw.
     /// </summary>
-    public bool Draw(DrawingContext ctx, Visual view, Scene3D scene, Camera3D camera, IBrush background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null)
+    public bool Draw(DrawingContext ctx, Visual view, Scene3D scene, Camera3D camera, IBrush background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null, bool realistic = false)
     {
         var size = view.Bounds.Size;
         ctx.FillRectangle(background, new Rect(size));
@@ -117,10 +118,10 @@ public sealed class Model3DPainter
         double scaling = TopLevel.GetTopLevel(view)?.RenderScaling ?? 1;
         if (!(scaling > 0)) scaling = 1;
         int w = Math.Max(1, (int)Math.Ceiling(size.Width * scaling)), h = Math.Max(1, (int)Math.Ceiling(size.Height * scaling));
-        var key = (scene, scene.Version, camera, w, h, scaling, hiddenGroups, draft, bgColour, framing);
+        var key = (scene, scene.Version, camera, w, h, scaling, hiddenGroups, draft, bgColour, framing, realistic);
         if (!key.Equals(_last) || _bitmap is null)
         {
-            if (!Paint(scene, camera, size, scaling, w, h, bgColour, hiddenGroups, draft, framing)) { _last = null; return false; }
+            if (!Paint(scene, camera, size, scaling, w, h, bgColour, hiddenGroups, draft, framing, realistic)) { _last = null; return false; }
             // At 96 dpi, so its size is the same in pixels and in screen units: drawing a bitmap takes the part of it
             // to draw in pixels, so at any other dpi (a screen scaled to 175 %, say) only its top-left corner was drawn,
             // stretched over the view.
@@ -141,17 +142,21 @@ public sealed class Model3DPainter
     /// The picture <see cref="Draw"/> would draw in a view <paramref name="width"/> × <paramref name="height"/> pixels
     /// (at 1:1), as 0xAARRGGBB, row by row; null when there's nothing to draw.
     /// </summary>
-    public uint[]? Picture(Scene3D scene, Camera3D camera, int width, int height, Color background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null)
+    public uint[]? Picture(Scene3D scene, Camera3D camera, int width, int height, Color background, ulong hiddenGroups = 0, bool draft = false, Framing? framing = null, bool realistic = false)
     {
         _last = null;
-        if (scene.IsEmpty || !Paint(scene, camera, new Size(width, height), 1, width, height, background, hiddenGroups, draft, framing)) return null;
+        if (scene.IsEmpty || !Paint(scene, camera, new Size(width, height), 1, width, height, background, hiddenGroups, draft, framing, realistic)) return null;
         var picture = new uint[width * height];
         for (int i = 0; i < picture.Length; i++) picture[i] = unchecked((uint)_px[i]);
         return picture;
     }
 
-    /// <summary>Fills <see cref="_px"/> with the picture, w × h pixels.</summary>
-    bool Paint(Scene3D scene, Camera3D cam, Size size, double scaling, int w, int h, Color background, ulong hidden, bool draft, Framing? framing)
+    /// <summary>
+    /// Fills <see cref="_px"/> with the picture, w × h pixels. Plainly, each face is its own colour. Realistically, each is
+    /// what it's made of (its <see cref="Surface"/>: wood grain, charred cut edges, burnt engraving) lit by a sun that casts
+    /// shadows (onto the table too) and a sky that lights what the sun doesn't, darker in corners and crevices.
+    /// </summary>
+    bool Paint(Scene3D scene, Camera3D cam, Size size, double scaling, int w, int h, Color background, ulong hidden, bool draft, Framing? framing, bool realistic = false)
     {
         _painted = null;
         _r = cam.Right; _u = cam.Up; _d = cam.Toward;
@@ -216,13 +221,15 @@ public sealed class Model3DPainter
         for (int i = 0; i < faces.Count; i++)
             if (seen[i] && faces[i].Ghost) Face(faces[i], i, ghost: true);
 
-        // Each solid face's colour where it's nearest.
+        // Each solid face's colour where it's nearest (realistically, what it's made of: lit further down).
         var colours = faces.Select(f => Pack(f.Colour)).ToArray();
         uint bg = Pack(background) | 0xFF000000u;
-        Parallel.For(0, _sh, row =>
-        {
-            for (int i = row * _sw, end = i + _sw; i < end; i++) _col[i] = _id[i] >= 0 ? colours[_id[i]] | 0xFF000000u : bg;
-        });
+        if (realistic) Materials(faces, bg, w, h, s, k * scaling);
+        else
+            Parallel.For(0, _sh, row =>
+            {
+                for (int i = row * _sw, end = i + _sw; i < end; i++) _col[i] = _id[i] >= 0 ? colours[_id[i]] | 0xFF000000u : bg;
+            });
 
         // What's engraved on the faces, shown only where its face is.
         foreach (var fill in scene.Fills)
@@ -244,11 +251,15 @@ public sealed class Model3DPainter
             // A ghost's edges show through other ghosts (so its shape can be made out), but not those round its back.
             if (ghost && !ghosts) continue;
             if (ghost && line.OwnerA >= 0 && line.OwnerB >= 0 && !seen[line.OwnerA] && !seen[line.OwnerB]) continue;
-            double hw = line.Width.ToPx(k) * scaling * s / 2;
             var mode = line.OnFace ? Kind.OnFace : ghost ? Kind.GhostEdge : Kind.Edge;
+            // Realistically, the light and shade show where the edges are: lines drawn round them would look drawn.
+            if (realistic && mode == Kind.Edge) continue;
+            double hw = line.Width.ToPx(k) * scaling * s / 2;
             var pen = new Pen3(mode, line.OwnerA, line.OwnerB, Pack(line.Colour), (float)(0.03 + 1.5 * sample));
             for (int j = 0; j + 1 < line.Points.Length; j++) Segment(line.Points[j], line.Points[j + 1], hw, pen);
         }
+
+        if (realistic) Light(scene, faces, hidden, cam, w, h, s, k * scaling, bg, draft);
 
         // The samples of each pixel averaged, the ghosts laid over the solid faces.
         if (_px.Length != w * h) _px = new int[w * h];
