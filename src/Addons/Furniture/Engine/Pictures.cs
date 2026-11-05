@@ -291,8 +291,30 @@ public static class Pictures
         return p;
     }
 
+    /// <summary>
+    /// A heraldic field: the ground burnt dark with lilies (fleurs-de-lis) left light on it in staggered rows, kept
+    /// clear of <paramref name="keepClear"/> (a shield in the middle, say).
+    /// </summary>
+    public static void Seme(double x0, double y0, double x1, double y1, double cell, PathsD keepClear, PathsD into)
+    {
+        if (x1 - x0 < cell * 0.8 || y1 - y0 < cell * 0.8) return;
+        var lilies = new PathsD();
+        var skip = new List<PathD>();
+        int ny = Math.Max(1, (int)Math.Round((y1 - y0) / cell)), nx = Math.Max(1, (int)Math.Round((x1 - x0) / cell));
+        double dy = (y1 - y0) / ny, dx = (x1 - x0) / nx;
+        for (int j = 0; j < ny; j++)
+            for (int i = 0; i < nx + (j % 2); i++)
+            {
+                double cx = x0 + dx * (i + (j % 2 == 0 ? 0.5 : 0)), cy = y0 + dy * (j + 0.5);
+                if (cx < x0 + dx * 0.3 || cx > x1 - dx * 0.3) continue;
+                Lily(cx, cy - dy * 0.3, Math.Min(dx, dy) * 0.36, lilies, skip);
+            }
+        var ground = Geo.Subtract([Geo.Rect(x0, y0, x1, y1)], Geo.Offset(Geo.Union(lilies), 0.12));
+        into.AddRange(Geo.Subtract(ground, Geo.Offset(keepClear, 0.35)));
+    }
+
     /// <summary>A stylised lily: three petals over a band, etched.</summary>
-    static void Lily(double cx, double cy, double r, PathsD etched, List<PathD> lines)
+    public static void Lily(double cx, double cy, double r, PathsD etched, List<PathD> lines)
     {
         if (r < 0.5) return;
         etched.Add(Rugs.Ellipse(cx, cy + r * 0.35, r * 0.22, r * 0.6));

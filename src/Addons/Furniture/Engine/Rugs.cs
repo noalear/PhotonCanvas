@@ -304,17 +304,26 @@ public static class Rugs
             {
                 // A tapestry on a rod: a border, a field of diamonds and a figure in the middle; a fringe at the bottom.
                 double rod = Math.Min(1.0, H * 0.07), x0 = Math.Min(1.0, W * 0.08);
-                outline = Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(0, H - rod, W, H)]);
+                // Knobs on the rod's ends.
+                double kr = look != FrontLook.Metal && W >= 8 ? Math.Max(0.7, rod * 0.75) : 0;
+                outline = kr > 0
+                    ? Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(kr, H - rod, W - kr, H), Geo.Circle(kr, H - kr, kr, 0.02), Geo.Circle(W - kr, H - kr, kr, 0.02)])
+                    : Geo.Union([Geo.Rect(x0, 0, W - x0, H - rod), Geo.Rect(0, H - rod, W, H)]);
                 double b = Geo.Clamp(Math.Min(W, H) * 0.1, 0.8, 2);
                 etched.AddRange(Fronts.Outline(x0 + b * 0.6, b * 1.2, W - x0 - b * 0.6, H - rod - b * 0.6, 0.45));
                 for (double x = x0 + 0.4; x < W - x0 - 0.3; x += 0.45) lines.Add([new(x, 0), new(x, b * 0.7)]);
                 double fx0 = x0 + b * 1.3, fx1 = W - x0 - b * 1.3, fy0 = b * 1.9, fy1 = H - rod - b * 1.3;
-                for (double s = -(fy1 - fy0); s < fx1 - fx0; s += 2.4)
-                {
-                    lines.AddRange(Geo.ClipLines([[new(fx0 + s, fy0), new(fx0 + s + (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
-                    lines.AddRange(Geo.ClipLines([[new(fx1 - s, fy0), new(fx1 - s - (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
-                }
                 double r = Math.Min(fx1 - fx0, fy1 - fy0) * 0.3;
+                // A heraldic field: lilies left light on a dark ground, round the shield; diamonds on a metal one.
+                bool seme = look != FrontLook.Metal && fx1 - fx0 >= 8 && fy1 - fy0 >= 8;
+                if (seme)
+                    Pictures.Seme(fx0, fy0, fx1, fy1, Geo.Clamp((fx1 - fx0) / 4, 2.8, 4), r > 1 ? [Heater(W / 2 - r, (fy0 + fy1) / 2 - r * 1.1, r * 2, r * 2.3)] : [], etched);
+                else
+                    for (double s = -(fy1 - fy0); s < fx1 - fx0; s += 2.4)
+                    {
+                        lines.AddRange(Geo.ClipLines([[new(fx0 + s, fy0), new(fx0 + s + (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
+                        lines.AddRange(Geo.ClipLines([[new(fx1 - s, fy0), new(fx1 - s - (fy1 - fy0), fy1)]], [Geo.Rect(fx0, fy0, fx1, fy1)]));
+                    }
                 if (r > 1)
                 {
                     var plate = Heater(W / 2 - r, (fy0 + fy1) / 2 - r * 1.1, r * 2, r * 2.3);
