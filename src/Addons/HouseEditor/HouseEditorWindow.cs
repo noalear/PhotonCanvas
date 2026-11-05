@@ -90,15 +90,24 @@ public sealed class HouseEditorWindow : Window
     readonly StackPanel _placePanel = new() { Spacing = 8 };
     readonly ListBox _placeList = new() { MaxHeight = 260, SelectionMode = SelectionMode.Single };
     readonly StackPanel _wayPlacePanel = new() { Spacing = 8 };
-    readonly ComboBox _wayPlace = Combo("Stairs (open, with a handrail)", "Solid stairs (stacked layers)", "Spiral stairs", "Ladder");
+    static readonly string[] WayKinds = ["Stairs (open, with a handrail)", "Solid stairs (stacked layers)", "Spiral stairs", "Leaning ladder", "Hooked ladder"];
+    readonly ComboBox _wayPlace = Combo(WayKinds);
     readonly StackPanel _itemPanel = new() { Spacing = 8 };
     readonly TextBlock _iInfo = Hint();
-    readonly NumericUpDown _iW = Number(3, 400, 0.5m, "0.#"), _iD = Number(1, 400, 0.5m, "0.#"), _iH = Number(1, 400, 0.5m, "0.#");
-    readonly StackPanel _iSizes = new() { Spacing = 8 };
+    readonly ItemEditor _iEdit = new(count: false);
     readonly Button _iLeft = UiKit.Button("⟲ Turn left"), _iRight = UiKit.Button("⟳ Turn right"), _iMore = UiKit.Button("Put down more like it"), _iRemove = UiKit.Button("Take it away");
     readonly StackPanel _wayPanel = new() { Spacing = 8 };
     readonly TextBlock _wInfoWay = Hint();
-    readonly ComboBox _wayKind = Combo("Stairs (open, with a handrail)", "Solid stairs (stacked layers)", "Spiral stairs", "Ladder");
+    readonly ComboBox _wayKind = Combo(WayKinds);
+    // The stairs maker's settings for the way up picked.
+    readonly NumericUpDown _wStairW = Number(5, 300, 1, "0.#"), _wRise = Number(1, 100, 0.5m, "0.#"), _wGoing = Number(3, 60, 0.5m, "0.#");
+    readonly ComboBox _wRail = Combo("No handrail", "On the left", "On the right", "Both sides");
+    readonly CheckBox _wTreads = new() { Content = "Etch the floor's texture on the steps" };
+    readonly NumericUpDown _wSpiralR = Number(10, 200, 1, "0.#"), _wSpiralStep = Number(10, 90, 5, "0.#"), _wHub = Number(4, 100, 0.5m, "0.#"), _wPin = Number(1, 10, 0.5m, "0.#");
+    readonly ComboBox _wSpin = Combo("Clockwise going up", "Anticlockwise going up");
+    readonly NumericUpDown _wLadderW = Number(4, 100, 0.5m, "0.#"), _wRung = Number(3, 30, 0.5m, "0.#"), _wLean = Number(55, 85, 1, "0");
+    readonly Button _wSuit = UiKit.Button("Size them to suit the figures", tip: "Back to the sizes the building's figures want: step height and depth, width, and the rest.");
+    Control _wStairRows = null!, _wRailRow = null!, _wRiseRows = null!, _wSpiralRows = null!, _wLadderRows = null!, _wLeanRow = null!;
     readonly Button _wLeft = UiKit.Button("⟲ Turn left"), _wRight = UiKit.Button("⟳ Turn right"), _wRemove = UiKit.Button("Take them away");
     List<FurnitureItem> _placeItems = [];
     List<string> _placeAbout = [];
@@ -203,8 +212,8 @@ public sealed class HouseEditorWindow : Window
         Tool(PlanTool.Window, "Window", "Click a wall to put a window in it. Drag it along the wall.");
         bar.Children.Add(Gap());
         Tool(PlanTool.Floor, "Floor", "Drag over squares to lay floor outside the rooms (a balcony or a landing); drag from a laid square to take it up. Rooms get a floor anyway.");
-        Tool(PlanTool.Furnish, "Furniture", "Pick a piece on the right, then click a room to put it down. Drag it about; turn it with the mouse wheel while dragging, or [ and ]. Delete takes it away. (U)");
-        Tool(PlanTool.Stairs, "Stairs", "Click to put stairs or a ladder up to the floor above: an opening is cut in that floor over them. Drag them about; turn them with the mouse wheel while dragging, or [ and ]. (A)");
+        Tool(PlanTool.Furnish, "Furniture", "Pick a piece on the right, then click a room to put it down. Drag it about; R turns it 45° (Shift+R back), and the mouse wheel while dragging or [ and ] a quarter. Delete takes it away. (U)");
+        Tool(PlanTool.Stairs, "Stairs", "Click to put stairs or a ladder up to the floor above: an opening is cut in that floor over them. Drag them about; turn them with R, the mouse wheel while dragging, or [ and ]. (A)");
         Tool(PlanTool.Roof, "Roof", "Drag out a rectangle over rooms for a roof that rests on their walls; click a roof to change its shape, pitch and covering (on the right).");
         _roofIt.Margin = new Thickness(0, 0, 4, 4);
         bar.Children.Add(_roofIt);
@@ -348,15 +357,22 @@ public sealed class HouseEditorWindow : Window
         _placePanel.Children.Add(Explained("Furniture to put down", "Pick a theme and a room, click a piece, then click on the plan to stand it there. Its dark edge is its front. It's made by the furniture maker, from the furniture's own sheet, and keeps its theme's look in any building.",
             Field("Theme", _placeTheme), Field("Room", _placeRoom), _placeList, _placeInfo, _banana));
         _wayPlacePanel.Children.Add(Explained("Ways up", "Click on the plan to put a way up to the floor above there: an opening is cut in that floor over it. The arrow shows which way it climbs.", Field("Put in", _wayPlace)));
-        _iSizes.Children.Add(Field("Width", _iW, tip: "Left to right across its front (mm)."));
-        _iSizes.Children.Add(Field("Depth", _iD, tip: "Front to back (mm)."));
-        _iSizes.Children.Add(Field("Height", _iH, tip: "Overall height (mm)."));
-        _itemPanel.Children.Add(Explained("Furniture", "Drag it to move it (hold Shift to place it to the millimetre); turn it while dragging with the mouse wheel.",
+        _itemPanel.Children.Add(Explained("Furniture", "Drag it to move it (hold Shift to place it to the millimetre). R turns it 45° (Shift+R back); the buttons, [ and ], or the mouse wheel while dragging turn it a quarter. Everything the furniture maker can change about it is here too.",
             _iInfo, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _iLeft, _iRight } },
-            _iSizes,
+            _iEdit,
             new StackPanel { Spacing = 6, Children = { _iMore, _iRemove } }));
-        _wayPanel.Children.Add(Explained("Way up", "It climbs to the floor above, through an opening cut in that floor. Drag it to move it.",
-            _wInfoWay, Field("Kind", _wayKind), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _wLeft, _wRight } }, _wRemove));
+        _wRiseRows = Stack(Field("Step height", _wRise, tip: "How high each step is (mm). The climb is shared out evenly; solid and spiral stairs use whole layers of the sheet."), Field("Step depth", _wGoing, tip: "How deep each step is, front to back (mm)."));
+        _wRailRow = Field("Handrail", _wRail, tip: "A rail on posts along the open side of the stairs, part of the side piece. Left and right as you go up.");
+        _wStairRows = Stack(Field("Width", _wStairW, tip: "How wide the stairs are, between the sides (mm)."), _wRailRow);
+        _wSpiralRows = Stack(
+            Field("Radius", _wSpiralR, tip: "From the pin to the end of each step (mm)."), Field("Turn per step °", _wSpiralStep, tip: "How far round each step is turned from the one under it (degrees)."),
+            Field("Centre Ø", _wHub, tip: "The round middle of each step and the spacers between them (mm)."), Field("Pin Ø", _wPin, tip: "The pin they're threaded on (mm): a bamboo skewer is about 3 mm."),
+            Field("Turns", _wSpin));
+        _wLeanRow = Field("Lean °", _wLean, tip: "How steeply the ladder leans (degrees from the floor).");
+        _wLadderRows = Stack(Field("Width", _wLadderW, tip: "Between the rails (mm)."), Field("Rung spacing", _wRung, tip: "Height between rungs (mm)."), _wLeanRow);
+        _wayPanel.Children.Add(Explained("Way up", "It climbs to the floor above, through an opening cut in that floor. Drag it to move it; R or the buttons turn it. Its own settings are the stairs maker's.",
+            _wInfoWay, Field("Kind", _wayKind), new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { _wLeft, _wRight } },
+            _wRiseRows, _wStairRows, _wSpiralRows, _wLadderRows, _wTreads, _wSuit, _wRemove));
         return Stack(_placePanel, _wayPlacePanel, _pickedNone, _picked, _roofPanel, _roomPanel, _wallPanel, _railPanel, _columnPanel, _itemPanel, _wayPanel);
     }
 
@@ -487,7 +503,15 @@ public sealed class HouseEditorWindow : Window
         _iRight.Click += (_, _) => _plan.TurnPicked(-1);
         _wLeft.Click += (_, _) => _plan.TurnPicked(1);
         _wRight.Click += (_, _) => _plan.TurnPicked(-1);
-        foreach (var n in new[] { _iW, _iD, _iH }) n.ValueChanged += (_, _) => ItemChanged();
+        _iEdit.Changed += (_, item) => ItemChanged(item);
+        foreach (var n in new[] { _wStairW, _wRise, _wGoing, _wSpiralR, _wSpiralStep, _wHub, _wPin, _wLadderW, _wRung, _wLean }) n.ValueChanged += (_, _) => WayChanged();
+        foreach (var c in new[] { _wRail, _wSpin }) c.SelectionChanged += (_, _) => WayChanged();
+        _wTreads.IsCheckedChanged += (_, _) => WayChanged();
+        _wSuit.Click += (_, _) =>
+        {
+            if (PickedWay is not { } w) return;
+            SetWay(new PlacedWay { X = w.X, Y = w.Y, Turn = w.Turn, Kind = w.Kind }, "Size a way up to suit the figures");
+        };
         _iMore.Click += (_, _) =>
         {
             if (PickedItem is not { } it) return;
@@ -511,6 +535,7 @@ public sealed class HouseEditorWindow : Window
             var list = level.WaysUp.ToList();
             list[i] = list[i] with { Kind = (WayKind)Math.Max(0, _wayKind.SelectedIndex) };
             SetLevel(level with { WaysUp = list }, "Change a way up");
+            if (PickedWay is { } now) ShowWay(now);
         };
         _wRemove.Click += (_, _) =>
         {
@@ -575,9 +600,15 @@ public sealed class HouseEditorWindow : Window
     {
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Z) { if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) Redo(); else Undo(); e.Handled = true; }
         else if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && e.Key == Key.Y) { Redo(); e.Handled = true; }
+        else if (e.Key == Key.R && e.KeyModifiers is KeyModifiers.None or KeyModifiers.Shift && FocusManager?.GetFocusedElement() is not (TextBox or NumericUpDown))
+        {
+            // R turns the furniture picked (or about to be put down) 45°; Shift+R turns it back.
+            _plan.TurnKey(back: e.KeyModifiers == KeyModifiers.Shift);
+            e.Handled = true;
+        }
         else if (e.KeyModifiers == KeyModifiers.None && FocusManager?.GetFocusedElement() is not (TextBox or NumericUpDown))
         {
-            PlanTool? t = e.Key switch { Key.S => PlanTool.Select, Key.R => PlanTool.Room, Key.W => PlanTool.Wall, Key.E => PlanTool.Erase, Key.D => PlanTool.Door, Key.O => PlanTool.Doorway, Key.N => PlanTool.Window, Key.L => PlanTool.Floor, Key.T => PlanTool.Roof, Key.U => PlanTool.Furnish, Key.A => PlanTool.Stairs, _ => null };
+            PlanTool? t = e.Key switch { Key.S => PlanTool.Select, Key.W => PlanTool.Wall, Key.E => PlanTool.Erase, Key.D => PlanTool.Door, Key.O => PlanTool.Doorway, Key.N => PlanTool.Window, Key.L => PlanTool.Floor, Key.T => PlanTool.Roof, Key.U => PlanTool.Furnish, Key.A => PlanTool.Stairs, _ => null };
             if (t is { } tool) { PickTool(tool); e.Handled = true; }
         }
     }
@@ -994,12 +1025,15 @@ public sealed class HouseEditorWindow : Window
     PlacedItem? PickedItem => _plan.SelectedItem >= 0 && _plan.SelectedItem < _design.Levels[_plan.Level].Furniture.Count ? _design.Levels[_plan.Level].Furniture[_plan.SelectedItem] : null;
     PlacedWay? PickedWay => _plan.SelectedWay >= 0 && _plan.SelectedWay < _design.Levels[_plan.Level].WaysUp.Count ? _design.Levels[_plan.Level].WaysUp[_plan.SelectedWay] : null;
 
-    static readonly string[] Turns = ["its front towards the bottom of the plan", "its front to the right", "its front to the top", "its front to the left"];
+    static readonly string[] Facings = ["towards the bottom of the plan", "towards the bottom right", "to the right", "towards the top right", "towards the top", "towards the top left", "to the left", "towards the bottom left"];
+
+    /// <summary>Which way a piece's front faces on the plan, in words.</summary>
+    public static string FacingWords(double turn) => Facings[(int)Math.Round(HouseKitMaker.TurnDeg(turn) / 45) % 8];
 
     void ShowItem(PlacedItem p)
     {
         _loading = true;
-        _iSizes.IsVisible = !p.Banana;
+        _iEdit.IsVisible = !p.Banana;
         if (p.Banana)
         {
             _iInfo.Text = $"A banana for scale on floor {_plan.Level + 1}: as big as a real one ({HouseKitMaker.BananaLongMm:0} mm long), to see how big the building really is. It shows only in the 3D view and isn't cut.";
@@ -1007,22 +1041,46 @@ public sealed class HouseEditorWindow : Window
             return;
         }
         var (w, d) = HouseKitMaker.Footprint(_design.Style, p.Item);
-        _iInfo.Text = $"{HouseKitMaker.ItemName(p.Item)} on floor {_plan.Level + 1}, {Turns[((p.Turn % 4) + 4) % 4]}: it takes {w:0.#} × {d:0.#} mm of floor.";
-        _iW.Value = (decimal)Math.Clamp(p.Item.WidthMm, 3, 400);
-        _iD.Value = (decimal)Math.Clamp(p.Item.DepthMm, 1, 400);
-        _iH.Value = (decimal)Math.Clamp(p.Item.HeightMm, 1, 400);
+        _iInfo.Text = $"{HouseKitMaker.ItemName(p.Item)} on floor {_plan.Level + 1}, its front {FacingWords(p.Turn)}: it takes {w:0.#} × {d:0.#} mm of floor.";
+        _iEdit.Show(p.Item);
         _loading = false;
     }
 
-    void ItemChanged()
+    void ItemChanged(FurnitureItem item)
     {
-        if (_loading || PickedItem is not { } p || p.Banana) return;
-        var item = p.Item with { WidthMm = V(_iW, p.Item.WidthMm), DepthMm = V(_iD, p.Item.DepthMm), HeightMm = V(_iH, p.Item.HeightMm) };
-        if (item == p.Item) return;
+        if (_loading || PickedItem is not { } p || p.Banana || item == p.Item) return;
         var level = _design.Levels[_plan.Level];
         var list = level.Furniture.ToList();
         list[_plan.SelectedItem] = p with { Item = item };
         SetLevel(level with { Furniture = list }, "Change furniture");
+    }
+
+    void SetWay(PlacedWay w, string what)
+    {
+        int i = _plan.SelectedWay;
+        var level = _design.Levels[_plan.Level];
+        if (i < 0 || i >= level.WaysUp.Count || level.WaysUp[i] == w) return;
+        var list = level.WaysUp.ToList();
+        list[i] = w;
+        SetLevel(level with { WaysUp = list }, what);
+    }
+
+    /// <summary>The way up picked as its settings say: only what differs from its kind's sizes for the figures is kept on it, so the rest still follows the building.</summary>
+    void WayChanged()
+    {
+        if (_loading || PickedWay is not { } w) return;
+        var b = HouseKitMaker.WaySpec(_design.Style, w.Kind);
+        double? N(NumericUpDown n, double usual) => n.Value is { } v && Math.Abs((double)v - usual) > 1e-6 ? (double)v : null;
+        var rail = (Stairs.Railing)Math.Max(0, _wRail.SelectedIndex);
+        bool clockwise = _wSpin.SelectedIndex != 1, treads = _wTreads.IsChecked == true;
+        SetWay(w with
+        {
+            WidthMm = N(_wStairW, b.StairWidthMm), RiseMm = N(_wRise, b.RiseMm), GoingMm = N(_wGoing, b.GoingMm),
+            Rail = rail == b.Rail ? null : rail, Treads = treads == b.TreadTexture ? null : treads,
+            SpiralRadiusMm = N(_wSpiralR, b.SpiralRadiusMm), SpiralStepDeg = N(_wSpiralStep, b.SpiralStepDeg), SpiralHubMm = N(_wHub, b.SpiralHubMm), SpiralPinMm = N(_wPin, b.SpiralPinMm),
+            Clockwise = clockwise == b.Clockwise ? null : clockwise,
+            LadderWidthMm = N(_wLadderW, b.LadderWidthMm), RungStepMm = N(_wRung, b.RungStepMm), LadderAngleDeg = N(_wLean, b.LadderAngleDeg),
+        }, "Change a way up");
     }
 
     void ShowWay(PlacedWay w)
@@ -1033,6 +1091,21 @@ public sealed class HouseEditorWindow : Window
             ? $"{HouseKitMaker.WayName(w.Kind)} on the top floor: add a floor above for them to climb to."
             : $"{HouseKitMaker.WayName(w.Kind)} from floor {_plan.Level + 1} up to floor {_plan.Level + 2}, climbing {climb} of the plan.";
         _wayKind.SelectedIndex = (int)w.Kind;
+        var spec = HouseKitMaker.WaySpec(_design.Style, w);
+        static decimal D(double v, NumericUpDown n) => Math.Clamp((decimal)v, n.Minimum, n.Maximum);
+        _wStairW.Value = D(spec.StairWidthMm, _wStairW); _wRise.Value = D(spec.RiseMm, _wRise); _wGoing.Value = D(spec.GoingMm, _wGoing);
+        _wRail.SelectedIndex = (int)spec.Rail; _wTreads.IsChecked = spec.TreadTexture;
+        _wSpiralR.Value = D(spec.SpiralRadiusMm, _wSpiralR); _wSpiralStep.Value = D(spec.SpiralStepDeg, _wSpiralStep); _wHub.Value = D(spec.SpiralHubMm, _wHub); _wPin.Value = D(spec.SpiralPinMm, _wPin);
+        _wSpin.SelectedIndex = spec.Clockwise ? 0 : 1;
+        _wLadderW.Value = D(spec.LadderWidthMm, _wLadderW); _wRung.Value = D(spec.RungStepMm, _wRung); _wLean.Value = D(spec.LadderAngleDeg, _wLean);
+        bool stairs = w.Kind is WayKind.Stairs or WayKind.SolidStairs, ladder = w.Kind is WayKind.Ladder or WayKind.HookedLadder;
+        _wStairRows.IsVisible = stairs;
+        _wRailRow.IsVisible = w.Kind == WayKind.Stairs;
+        _wRiseRows.IsVisible = _wTreads.IsVisible = !ladder;
+        _wSpiralRows.IsVisible = w.Kind == WayKind.Spiral;
+        _wLadderRows.IsVisible = ladder;
+        _wLeanRow.IsVisible = w.Kind == WayKind.Ladder;
+        _wSuit.IsEnabled = w != new PlacedWay { X = w.X, Y = w.Y, Turn = w.Turn, Kind = w.Kind };
         _loading = false;
     }
 
