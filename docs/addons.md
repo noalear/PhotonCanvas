@@ -207,6 +207,11 @@ should say more can call `ContextHelp.Describe(control, () => new HelpSubject { 
 `HelpTests.ContextHelp.cs` checks every ribbon button of every add-on finds its own page and a
 tutorial that points at it.
 
+A window that uses the right button for something of its own (the building editor's right-click picks
+its Select tool) calls `ContextHelp.Off(window)`: no help items there (a text box keeps its own cut,
+copy and paste menu). Give it `ContextHelp.HelpButton(window)` in its top-right corner instead: a
+**Help** button whose menu starts your tutorials and opens the window's page, found the same way.
+
 ### 3D views of a model put together
 
 Don't draw a 3D model by sorting its faces far to near and painting them over each other: with long
@@ -240,6 +245,12 @@ however it's turned; after that it keeps its size, turns about the middle of the
 view while the model changes. Don't give a 3D view its own mouse handling. A view that draws itself
 another way (the puzzle box, the stacked slices, the curved surface) implements `INavigable` and hooks up a
 `ViewNavigator` (adding its `Buttons` to its children) to get the same controls.
+
+To let people click the model, give each piece a `tag:` in `AddSlab` (the object it was made from)
+and override `Clicked(Point at, KeyModifiers keys)`: `HitAt(at)` gives what's under the pointer as it
+was last drawn: the face, its `Tag` and the point of the model it landed on (only what can be seen:
+ghosts and hidden groups are never hit). A click is a press and release without dragging; dragging
+still turns the model. The building editor picks walls, doors and furniture this way.
 
 A `SlabStyle` says the colours (`SlabStyle.Lit` lights one colour), the edge lines, and the colours of
 what's etched and scored. A face colour that isn't fully opaque makes a see-through ghost (the stairs

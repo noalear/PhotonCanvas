@@ -1,3 +1,5 @@
+using Avalonia;
+using Avalonia.Input;
 using Avalonia.Media;
 using Clipper2Lib;
 using PhotonCanvas.App.View3D;
@@ -35,10 +37,39 @@ public sealed class HouseView : Model3DView
         Color.FromRgb(0x7E, 0x5A, 0x38),
         Color.FromRgb(0x6B, 0x47, 0x28), new LineWidth(0.05, 0.25, 0.8));
 
+    /// <summary>What's picked: a warm orange, so it stands out from the wood and stone.</summary>
+    static readonly SlabStyle PickedLook = LookOf(Color.FromRgb(0xF0, 0x9A, 0x48));
+
     static readonly SlabStyle Wood = LookOf(Color.FromRgb(0xDD, 0xBE, 0x92)), Stone = LookOf(Color.FromRgb(0xD2, 0xC6, 0xB4)),
         Column = LookOf(Color.FromRgb(0xC4, 0xB6, 0xA2)), Roof = LookOf(Color.FromRgb(0xB9, 0x9A, 0x86));
 
     public HouseView() : base(35, 32) { }
+
+    PlanPick? _pick;
+    HouseDesign? _pickDesign;
+    // The pieces of what's picked (worked out each time the building is drawn again).
+    Func<HouseSolid, bool>? _picked;
+
+    /// <summary>A click on the building: the piece clicked (null for none) and where on it (mm, in the building).</summary>
+    public event Action<HouseSolid?, Furniture.V3>? Picked;
+
+    /// <summary>Shows what's picked on the plan picked in 3D too (in orange).</summary>
+    public void ShowPicked(PlanPick? pick, HouseDesign design)
+    {
+        bool same = pick == _pick;
+        _pick = pick;
+        _pickDesign = design;
+        if (!same) Build();
+    }
+
+    protected override string Hint => "Click to pick · drag to turn · middle-drag or arrows to move · scroll to zoom";
+
+    protected override void Clicked(Point at, KeyModifiers keys)
+    {
+        if (_kit is null) return;
+        var hit = HitAt(at);
+        Picked?.Invoke(hit?.Tag as HouseSolid, hit is { } h ? new Furniture.V3(h.Point.X, h.Point.Y, h.Point.Z) : default);
+    }
 
     /// <summary>Shows a building (or, with none, a message saying why there's nothing to show).</summary>
     public void Show(HouseKit? kit, string? message = null)
@@ -99,6 +130,7 @@ public sealed class HouseView : Model3DView
     {
         Scene.Clear();
         _groups.Clear();
+        _picked = _pick is { } pick && _pickDesign is { } design && _kit is { } k ? HousePicking.Matcher(design, k, pick) : null;
         if (_kit is { } kit)
         {
             var groupOf = new Dictionary<(double, double, double, int), int>();
@@ -145,8 +177,9 @@ public sealed class HouseView : Model3DView
         double T = s.Thickness;
         var p = DoorsOpen && s.Open is { } open ? open : s.Pose;
         var style = s.Kind switch { SolidKind.Floor or SolidKind.Furniture or SolidKind.Railing => Wood, SolidKind.Roof => Roof, SolidKind.Column => Column, _ => Stone };
+        if (_picked?.Invoke(s) == true) style = PickedLook;
         var outline = Geo.Tidy(Clipper.SimplifyPaths(s.Outline, 0.05));
         var frame = new Frame3(V(p.O), V(p.U), V(p.V));
-        Scene.AddSlab(outline, frame, -T / 2, T / 2, style, s.Etched, s.Lines, group: Math.Min(group, 63), faces: faces, sides: sides, etchDepth: EtchDepth);
+        Scene.AddSlab(outline, frame, -T / 2, T / 2, style, s.Etched, s.Lines, group: Math.Min(group, 63), faces: faces, sides: sides, etchDepth: EtchDepth, tag: s);
     }
 }

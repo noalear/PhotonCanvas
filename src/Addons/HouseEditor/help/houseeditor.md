@@ -32,6 +32,10 @@ the right, **Picked** shows the door, window, room or roof picked on the plan an
 look and sizes. Under them are the number of pieces and notes: how it goes together, a red ✕ that has to be
 fixed before it can go in, a yellow ! worth a look.
 
+**Help**, in the top-right corner, starts this window's tutorial (**Draw your own building**) or opens
+this page (**F1** does too). A right-click anywhere in the editor doesn't open a menu: it picks
+**Select**, so you can draw a wall or drop a door, right-click, and click the next thing to change it.
+
 Press **Put in the design** and every piece goes into the design, nested onto the bed, a page per
 bed. To change it later, select any of its pieces, right-click and choose **Edit in the building
 editor…**, change it and press **Update in the design**: the old pieces are replaced wherever they are.
@@ -42,7 +46,7 @@ Pick a tool along the top (or press its letter), then use it on the plan:
 
 | Tool | Key | What it does |
 |---|---|---|
-| **Select** | S | Click anything on the plan to change it on the **Picked** tab: a door or window (drag it along its wall; **Delete** takes it away), a wall, a column, a railing, a roof, a piece of furniture or a way up, or inside a room to give it a floor of its own. Where a roof covers a room, click again to swap between the roof and the room. |
+| **Select** | S, or right-click | Click anything on the plan (or in the 3D view) to change it on the **Picked** tab: a door or window (drag it along its wall; **Delete** takes it away), a wall, a column, a railing, a roof, a piece of furniture or a way up, or inside a room to give it a floor of its own. Where a roof covers a room, click again to swap between the roof and the room. |
 | **Room** | R | Drag from one grid point to another: four walls round the rectangle at once. Drag a room against another and they share the wall between them. |
 | **Wall** | W | Drag from one grid point to another: a wall straight along, straight across or corner to corner (diagonal). It snaps to the nearest of those as you drag, and shows how long it is. |
 | **Erase** | E | Drag along walls to take them away, click one square of wall, or click a door or window. |
@@ -58,6 +62,14 @@ Walls that close a space in make a **room**: it's shaded on the plan and gets a 
 on the plan to zoom (toward the pointer), drag with the right or middle button to move about, and
 press **F** to fit the whole building in. **Undo** and **Redo** (Ctrl+Z and Ctrl+Y) go back through
 every change.
+
+### Copying furniture, stairs, doors and windows
+
+Pick a piece of furniture, a way up, or a door or window, and press **Copy** on the **Picked** tab (or
+**Ctrl+D**): a copy goes down just beside it (in the same room, clear of the other furniture; a door or
+window further along the same wall) and is picked, ready to drag where you want it. To put a copy
+somewhere else, **Ctrl+C** copies what's picked; point at the plan (at a wall, for a door or window) and
+press **Ctrl+V** to paste it there, on this floor or any other.
 
 Each straight stretch of wall between two columns is one wall, labelled with a letter on the plan (on
 its inside); its pieces are named after it ("Wall C: base", "Floor 2 walls A, D"), so you know where
@@ -207,6 +219,14 @@ which side each is hinged. Drag to
 turn the building, scroll to zoom, middle-drag or the arrow keys to move it, and the buttons in the
 corner to fit it in again or go back to the first view.
 
+### Picking things in 3D
+
+Click anything in the 3D view to pick it, as if you'd clicked it on the plan with **Select**: a wall
+(or the door or window in it, where you click on or round one), a column, a railing, a roof, a piece
+of furniture, a way up, or a floor (its room). The plan goes to that floor, the **Picked** tab shows
+it, and it turns orange in the 3D view, as does whatever you pick on the plan. Only what you can see
+can be clicked: with the walls cut away, the ones in front aren't in the way.
+
 ## Doors and windows
 
 On the **Picked** tab, with a door or window picked on the plan:
@@ -264,7 +284,7 @@ Drag it about (it snaps to an eighth of a square; hold **Shift** to place it to 
 turn it a quarter at a time with the mouse wheel while dragging, or **[** and **]**.
 
 Click a piece (with **Furniture** or **Select**) to change it on the **Picked** tab: turn it, change its
-**Width**, **Depth** and **Height**, **Put down more like it**, or **Take it away**. Each piece is made
+**Width**, **Depth** and **Height**, **Copy** it, **Put down more like it**, or **Take it away**. Each piece is made
 by the furniture maker ([Mini furniture](furniture.md)) from the furniture's own sheet, so it slots and
 glues together the same way; pieces that come out the same are cut together ("Table: top", ×3). A piece
 standing in a wall or column, off the edge of its floor, in the way of the stairs or over their opening,

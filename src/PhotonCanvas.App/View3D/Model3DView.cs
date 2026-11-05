@@ -34,13 +34,19 @@ public abstract class Model3DView : Control, INavigable
         _pitch = _pitch0 = pitch;
         _minPitch = minPitch;
         _maxPitch = maxPitch;
-        _nav = new ViewNavigator(this, this) { WheelFirst = Wheel };
+        _nav = new ViewNavigator(this, this) { WheelFirst = Wheel, Click = (at, keys) => Clicked(at, keys) };
         VisualChildren.Add(_nav.Buttons);
         LogicalChildren.Add(_nav.Buttons);
     }
 
     /// <summary>The wheel, before it zooms: true when the view used it for something of its own (with Ctrl held, say).</summary>
     protected virtual bool Wheel(Avalonia.Input.PointerWheelEventArgs e) => false;
+
+    /// <summary>A click on the view (not a drag): see what's there with <see cref="HitAt"/> to pick it.</summary>
+    protected virtual void Clicked(Point at, Avalonia.Input.KeyModifiers keys) { }
+
+    /// <summary>What's under a point of the view, as last drawn (null if nothing, or the scene changed since).</summary>
+    protected Hit3D? HitAt(Point at, double reachPx = 4) => _painter.HitAt(Scene, at, reachPx);
 
     /// <summary>The model.</summary>
     protected Scene3D Scene { get; } = new();

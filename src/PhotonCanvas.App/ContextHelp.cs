@@ -57,6 +57,7 @@ public static class ContextHelp
     static long _targetAt;
     static readonly ConditionalWeakTable<Control, Func<HelpSubject?>> Described = new();
     static readonly ConditionalWeakTable<Control, string> Owners = new();
+    static readonly ConditionalWeakTable<Control, object> Quiet = new();
 
     /// <summary>Hook every window's right-click (once, by the main window).</summary>
     internal static void Install(MainWindow main)
@@ -81,12 +82,27 @@ public static class ContextHelp
     /// <summary>Say what a control (and what's inside it) is, for the help items. Asked each time it's right-clicked.</summary>
     public static void Describe(Control c, Func<HelpSubject?> subject) => Described.AddOrUpdate(c, subject);
 
+    /// <summary>
+    /// No help items on a right-click in this control or anything inside it (a window that uses the right button
+    /// for something of its own, like the building editor's "back to Select"). Its text boxes still get their own
+    /// cut, copy and paste menu. Give such a window <see cref="HelpButton"/> instead.
+    /// </summary>
+    public static void Off(Control c) => Quiet.AddOrUpdate(c, true);
+
+    static bool IsQuiet(Control c)
+    {
+        for (Control? a = c; a is not null; a = Up(a))
+            if (Quiet.TryGetValue(a, out _)) return true;
+        return false;
+    }
+
     /// <summary>A control an add-on made (its ribbon button, its panel in a program window).</summary>
     internal static void Own(Control c, string addonId) => Owners.AddOrUpdate(c, addonId);
 
     static void Requested(TopLevel top, ContextRequestedEventArgs e)
     {
         if (e.Source is not Control source || InMenu(source)) return;
+        if (IsQuiet(source)) { _target = null; return; }
         _target = new WeakReference<Control>(source);
         _targetAt = Environment.TickCount64;
         // The menu or flyout that will open: the nearest one set on the control or above it.
@@ -108,7 +124,7 @@ public static class ContextHelp
 
     static void Unanswered(TopLevel top, ContextRequestedEventArgs e)
     {
-        if (e.Handled || e.Source is not Control source || InMenu(source) || _main is null) return;
+        if (e.Handled || e.Source is not Control source || InMenu(source) || _main is null || IsQuiet(source)) return;
         var menu = new ContextMenu();
         Fill(menu.Items, source);
         e.Handled = true;
@@ -337,6 +353,76 @@ public static class ContextHelp
     }
 
     static string Short(string s) => s.Length <= 48 ? s : s[..46].TrimEnd() + "…";
+
+    // ---- a window's own Help button -----------------------------------------------------
+
+    /// <summary>
+    /// A <b>Help</b> button for a window of its own (an add-on's editor), for its top-right corner: its menu starts
+    /// the window's tutorials (those of the add-on that made it) and opens its page of the guide. Worked out each
+    /// time it's opened, the same way as the right-click help.
+    /// </summary>
+    public static Button HelpButton(Window window)
+    {
+        var b = new Button
+        {
+            Content = new StackPanel
+            {
+                Orientation = Avalonia.Layout.Orientation.Horizontal, Spacing = 6,
+                Children =
+                {
+                    new PathIcon { Data = UiKit.Icon("IcHelp"), Width = 15, Height = 15 },
+                    new TextBlock { Text = "Help", VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center },
+                },
+            },
+        };
+        ToolTip.SetTip(b, "This window's tutorial and its page of the help guide (F1)");
+        Avalonia.Automation.AutomationProperties.SetName(b, "Help");
+        var menu = new MenuFlyout { Placement = PlacementMode.BottomEdgeAlignedRight };
+        menu.Opening += (_, _) =>
+        {
+            menu.Items.Clear();
+            List<Control> items;
+            try { items = WindowItems(window); }
+            catch (Exception e)
+            {
+                AppLog.Error("Help button", e);
+                items = [new MenuItem { Header = "The help couldn't be found", IsEnabled = false }];
+            }
+            foreach (var i in items) menu.Items.Add(i);
+        };
+        b.Flyout = menu;
+        return b;
+    }
+
+    /// <summary>A window's tutorials (its add-on's, else the one about it), its page of the guide, and every tutorial.</summary>
+    static List<Control> WindowItems(Window window)
+    {
+        if (_main is not { } main) return [new MenuItem { Header = "The help isn't open to this window", IsEnabled = false }];
+        var (query, _) = Resolve(window);
+        var lib = HelpFiles.Library;
+        var page = lib.ForWindow(window.GetType().Name) ?? HelpFinder.Page(lib, query);
+        var tutorials = query.Folder is { } folder ? HelpFinder.TutorialsIn(lib, folder).ToList() : [];
+        if (tutorials.Count == 0 && HelpFinder.Tutorial(lib, query, page) is { } one) tutorials.Add(one);
+        var list = new List<Control>();
+        foreach (var t in tutorials)
+        {
+            var id = t.Id;
+            var item = new MenuItem { Header = $"Tutorial: {Short(t.Title)}" };
+            item.Click += (_, _) => Dispatcher.UIThread.Post(() => main.StartTutorial(id));
+            list.Add(item);
+        }
+        string title = page is { } pg && lib.Pages.TryGetValue(pg.File, out var p)
+            ? (pg.Anchor.Length > 0 ? p.Blocks.OfType<Heading>().FirstOrDefault(h => h.Anchor == pg.Anchor)?.Text ?? p.Title : p.Title)
+            : "";
+        var help = new MenuItem { Header = page is null ? "Help guide" : $"Help: {Short(title)}", InputGesture = new KeyGesture(Key.F1) };
+        help.Click += (_, _) => Dispatcher.UIThread.Post(() => main.ShowHelp(page?.File, page is { Anchor.Length: > 0 } a ? a.Anchor : null));
+        list.Add(help);
+        list.Add(new Separator());
+        var all = new MenuItem { Header = "All tutorials…" };
+        all.Click += (_, _) => Dispatcher.UIThread.Post(main.ShowTutorials);
+        list.Add(all);
+        return list;
+    }
 
     /// <summary>Turn an add-on off (and the ones that need it, after asking), saying how to get it back.</summary>
     static async Task Disable(MainWindow main, string id)
