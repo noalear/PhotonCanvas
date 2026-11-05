@@ -58,6 +58,46 @@ public sealed class Model3DPainter
     /// <summary>How the whole model just fits the view, seen the way it was last drawn.</summary>
     public Framing Fitted { get; private set; }
 
+    // What the buffers hold: the scene (and its version) last painted.
+    Scene3D? _painted;
+    int _paintedVersion;
+
+    /// <summary>
+    /// What's under a point of the view (screen units), as it was last drawn: the nearest solid face there (or, on an
+    /// edge or a gap, the nearest one within <paramref name="reachPx"/>), with the point of the model it's at and the
+    /// tag the face was added with. Null when nothing is there, or <paramref name="scene"/> has changed since it was drawn.
+    /// Ghosts and hidden groups are never hit: only what can be seen.
+    /// </summary>
+    public Hit3D? HitAt(Scene3D scene, Point at, double reachPx = 4)
+    {
+        if (!ReferenceEquals(scene, _painted) || scene.Version != _paintedVersion || _sw == 0 || _sh == 0) return null;
+        int cx = (int)Math.Floor(at.X * _sampleScale), cy = (int)Math.Floor(at.Y * _sampleScale);
+        int reach = (int)Math.Ceiling(Math.Max(0, reachPx) * _sampleScale);
+        int best = -1;
+        long bestD = long.MaxValue;
+        for (int dy = -reach; dy <= reach; dy++)
+        {
+            int y = cy + dy;
+            if (y < 0 || y >= _sh) continue;
+            for (int dx = -reach; dx <= reach; dx++)
+            {
+                int x = cx + dx;
+                if (x < 0 || x >= _sw) continue;
+                long d = (long)dx * dx + (long)dy * dy;
+                if (d >= bestD || d > (long)reach * reach) continue;
+                int i = y * _sw + x;
+                if (_id[i] < 0) continue;
+                best = i;
+                bestD = d;
+            }
+        }
+        if (best < 0) return null;
+        int face = _id[best];
+        double sx = best % _sw + 0.5, sy = best / _sw + 0.5;
+        var point = _r * ((sx - _ox) / _ks) + _u * ((_oy - sy) / _ks) + _d * _depth[best];
+        return new Hit3D(face, point, scene.TagOf(face));
+    }
+
     /// <summary>Where a point of the model was in the view, the last time it was drawn (screen units).</summary>
     public Point ToView(Vec3 p) => new((_ox + p.Dot(_r) * _ks) / _sampleScale, (_oy - p.Dot(_u) * _ks) / _sampleScale);
 
@@ -113,6 +153,7 @@ public sealed class Model3DPainter
     /// <summary>Fills <see cref="_px"/> with the picture, w × h pixels.</summary>
     bool Paint(Scene3D scene, Camera3D cam, Size size, double scaling, int w, int h, Color background, ulong hidden, bool draft, Framing? framing)
     {
+        _painted = null;
         _r = cam.Right; _u = cam.Up; _d = cam.Toward;
         // Fit the whole model (hidden groups too, so the picture doesn't jump when they're hidden).
         double x0 = double.MaxValue, y0 = double.MaxValue, x1 = double.MinValue, y1 = double.MinValue, z0 = double.MaxValue, z1 = double.MinValue;
@@ -235,6 +276,8 @@ public sealed class Model3DPainter
                 px[y * w + x] = unchecked((int)(0xFF000000u | (uint)(r / ss) << 16 | (uint)(g / ss) << 8 | (uint)(b / ss)));
             }
         });
+        _painted = scene;
+        _paintedVersion = scene.Version;
         return true;
     }
 
@@ -493,6 +536,9 @@ public sealed class Model3DPainter
         return 0xFF000000u | r << 16 | g << 8 | b;
     }
 }
+
+/// <summary>What a click in a 3D view landed on: the face (its number in the scene), the point of the model, and the face's tag.</summary>
+public readonly record struct Hit3D(int Face, Vec3 Point, object? Tag);
 
 /// <summary>
 /// How a model is drawn in a view: <see cref="PxPerMm"/> screen units to the mm, with the point <see cref="Target"/>

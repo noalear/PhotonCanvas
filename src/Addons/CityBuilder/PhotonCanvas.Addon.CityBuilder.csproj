@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>citybuilder</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The building editor makes each building's pieces and opens to change one; map to terrain finds a battle map's grid; the rest are what they build on (addon.json "requires" them): compile against them, never copy them. -->
+    <ProjectReference Include="..\Walls\PhotonCanvas.Addon.Walls.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\FloorTiles\PhotonCanvas.Addon.FloorTiles.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Stairs\PhotonCanvas.Addon.Stairs.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Roofs\PhotonCanvas.Addon.Roofs.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Furniture\PhotonCanvas.Addon.Furniture.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\Buildings\PhotonCanvas.Addon.Buildings.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\HouseEditor\PhotonCanvas.Addon.HouseEditor.csproj" Private="false" ExcludeAssets="runtime" />
+    <ProjectReference Include="..\MapTerrain\PhotonCanvas.Addon.MapTerrain.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
