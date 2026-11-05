@@ -83,4 +83,65 @@ public class FurnitureDungeonTests
         Assert.True(Math.Abs(Clipper.Area(rug.Etched)) > Math.Abs(Clipper.Area(rug.Cut)) * 0.15);
         Assert.Equal("", FurnitureCatalogTests.Check(it, Sheet("Dungeon")));
     }
+
+    static readonly FurnitureItem Anvil = Defaults.For(ItemKind.Stand) with { Stand = StandStyle.Anvil, WidthMm = 13, DepthMm = 8, HeightMm = 11 };
+    static readonly FurnitureItem WallTorch = Defaults.For(ItemKind.WallHanging) with { Hanging = HangingStyle.Torch, WidthMm = 7, DepthMm = 12, HeightMm = 16, HangMm = 14 };
+    static readonly FurnitureItem Treasure = Defaults.For(ItemKind.Chest) with { WidthMm = 18, DepthMm = 11, HeightMm = 10, Lid = LidStyle.Open, Load = CrateLoad.Treasure };
+
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void Anvil_wall_torch_and_treasure_chest_cut_whole_and_fit_in_every_theme(string theme)
+    {
+        foreach (var it in new[] { Anvil, WallTorch, Treasure, Defaults.For(ItemKind.Stand) with { Stand = StandStyle.Dummy } })
+        {
+            Assert.Equal("", FurnitureCatalogTests.Check(it with { Theme = theme }, Sheet(theme)));
+            Assert.Equal("", FurnitureCatalogTests.Check(FurnitureCatalog.Sized(it with { Theme = theme }, 54), Sheet(theme, 3)));
+        }
+    }
+
+    [Fact]
+    public void Wall_torch_is_a_post_an_arm_and_a_torch_up_on_the_wall()
+    {
+        var k = FurnitureKit.Make(WallTorch with { Theme = "Dungeon" }, Sheet("Dungeon"));
+        Assert.True(k.Ok);
+        Assert.Equal(["Torch post", "Torch arm", "Torch"], k.Parts.Select(p => p.Name));
+        Assert.Equal(FurnitureSpot.OnWall, FurnitureCatalog.SpotFor(WallTorch));
+        // The post has the slot for the arm's tab; everything sits from the hang height up.
+        Assert.True(k.Parts[0].Cut.Count > 1);
+        Assert.All(k.Parts, p => Assert.All(p.Poses, pose => Assert.True(pose.O.Y >= 14 - 1e-6)));
+    }
+
+    [Fact]
+    public void Treasure_chest_is_thrown_open_and_heaped_with_treasure_but_push_fit_leaves_the_lid_off()
+    {
+        var k = FurnitureKit.Make(Treasure with { Theme = "Dungeon" }, Sheet("Dungeon"));
+        Assert.Contains(k.Parts, p => p.Name == "Lid (thrown open)" && p.Glued);
+        Assert.Contains(k.Parts, p => p.Name == "Treasure");
+        Assert.DoesNotContain(k.Parts, p => p.Name == "Lid");
+        var push = FurnitureKit.Make(Treasure with { Theme = "Dungeon" }, Sheet("Dungeon", push: true));
+        Assert.DoesNotContain(push.Parts, p => p.Name == "Lid (thrown open)");
+        Assert.Contains(push.Parts, p => p.Name == "Treasure");
+    }
+
+    [Fact]
+    public void Dungeon_pieces_get_their_own_look()
+    {
+        // Barred doors: tall slots, not a lattice of diamonds.
+        var cup = Defaults.For(ItemKind.Cabinet) with { Front = CabinetFront.Lattice, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 26 };
+        static PathsD Front(ItemKit k) => k.Parts.Single(p => p.Name == "Front").Cut;
+        static int Tall(PathsD cut) => cut.Select(h => Geo.Bounds([h])).Count(b => b.bottom - b.top > 3 && b.bottom - b.top > 2 * (b.right - b.left) && b.bottom - b.top < 20);
+        Assert.True(Tall(Front(FurnitureKit.Make(cup with { Theme = "Dungeon" }, Sheet("Dungeon")))) >= 8);
+        Assert.Equal(0, Tall(Front(FurnitureKit.Make(cup with { Theme = "Medieval" }, Sheet("Medieval")))));
+        // Two skulls on the altar.
+        var altar = Defaults.For(ItemKind.Cabinet) with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 };
+        Assert.Equal(2, FurnitureKit.Make(altar with { Theme = "Dungeon" }, Sheet("Dungeon")).Parts.Where(p => p.Name == "Skull").Sum(p => p.Copies));
+        Assert.DoesNotContain(FurnitureKit.Make(altar with { Theme = "Medieval" }, Sheet("Medieval")).Parts, p => p.Name == "Skull");
+        // The chained book has its padlock hanging under it.
+        var lectern = Defaults.For(ItemKind.SlantDesk) with { Slant = SlantStyle.Lectern, WidthMm = 10 };
+        double Low(string theme) => Geo.Bounds(FurnitureKit.Make(lectern with { Theme = theme }, Sheet(theme)).Parts.Single(p => p.Name == "Book").Cut).top;
+        Assert.True(Low("Dungeon") < Low("Medieval") - 1);
+        Assert.Equal("", FurnitureCatalogTests.Check(cup with { Theme = "Dungeon" }, Sheet("Dungeon")));
+        Assert.Equal("", FurnitureCatalogTests.Check(altar with { Theme = "Dungeon" }, Sheet("Dungeon")));
+        Assert.Equal("", FurnitureCatalogTests.Check(lectern with { Theme = "Dungeon" }, Sheet("Dungeon")));
+    }
 }

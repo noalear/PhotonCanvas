@@ -17,7 +17,7 @@ public enum LegStyle { Legs, Slab, Trestle, Round }
 public enum TopShape { Square, Round }
 public enum BackStyle { Panel, Slats, Ladder }
 /// <summary>A chest's or crate's lid: lifts off (a rim under it), glued on, none, or (chests) a domed lid of planks that lifts off.</summary>
-public enum LidStyle { Loose, Flat, None, Domed }
+public enum LidStyle { Loose, Flat, None, Domed, Open }
 public enum DoorShape { Rectangle, Arched, Pointed }
 public enum HingeSide { Left, Right }
 /// <summary>The wood detail etched and scored on the faces.</summary>
@@ -60,7 +60,7 @@ public enum Crown { Flat, Cornice, Pediment, Arch }
 public enum ShelfContents { Books, Bottles, Jars, Plates, Scrolls, Tech, Empty, Tools, Stores }
 
 /// <summary>What fills an open crate, heaped up over its rim.</summary>
-public enum CrateLoad { None, Apples, Sacks, Rocks }
+public enum CrateLoad { None, Apples, Sacks, Rocks, Treasure }
 
 /// <summary>Seats with arms and a back.</summary>
 public enum SeatStyle { Armchair, Throne, Sofa, Pew, Command, Wooden, Settle, Reading }
@@ -75,13 +75,13 @@ public enum HearthStyle { Fireplace, Oven, Forge, Spit }
 /// <summary>Things with a sloping top on two shaped sides.</summary>
 public enum SlantStyle { Lectern, Scriptorium, Console, MapTable }
 
-public enum StandStyle { Armour, Dummy, Coats }
+public enum StandStyle { Armour, Dummy, Coats, Anvil }
 
 public enum CoffinStyle { Coffin, Sarcophagus, Pod }
 
 public enum RugPattern { Border, Kilim, Damask, Hide, Mat, Round, Runner }
 
-public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor, FramedMap }
+public enum HangingStyle { Tapestry, Banner, Painting, Shield, Map, Monitor, FramedMap, Torch }
 
 public enum CandleStyle { Candelabra, Lamp, Torch }
 

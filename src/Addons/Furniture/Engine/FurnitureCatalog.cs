@@ -198,6 +198,7 @@ public static class FurnitureCatalog
         b.Room = Workshop;
         b.Add("Smithy forge", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 26, DepthMm = 14, HeightMm = 34 }, "A forge with a fire bed, a hood and flames.");
         b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, ToolRack = true, WidthMm = 32, DepthMm = 12, HeightMm = 14 }, "A heavy bench with solid ends, a rack of tools along its back and a vice on the corner.");
+        b.Add("Anvil", ItemKind.Stand, i => i with { Stand = StandStyle.Anvil, WidthMm = 13, DepthMm = 8, HeightMm = 11 }, "A smith's anvil on a tree stump.");
         b.Add("Tool cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Contents = ShelfContents.Tools, Shelves = 1, Crown = Crown.Cornice, WidthMm = 20, DepthMm = 9, HeightMm = 30 }, "A cupboard with pierced lattice doors and tools hung on pegs inside.");
 
         b.Room = Storage;
@@ -266,23 +267,25 @@ public static class FurnitureCatalog
         b.Room = Workshop;
         b.Add("Forge", ItemKind.Fireplace, i => i with { Hearth = HearthStyle.Forge, WidthMm = 26, DepthMm = 14, HeightMm = 34 }, "A forge with a hood and flames.");
         b.Add("Workbench", ItemKind.Table, i => i with { Legs = LegStyle.Slab, Stretcher = true, ToolRack = true, WidthMm = 30, DepthMm = 12, HeightMm = 14 }, "A heavy bench with a rack of tools and a vice.");
+        b.Add("Anvil", ItemKind.Stand, i => i with { Stand = StandStyle.Anvil, WidthMm = 13, DepthMm = 8, HeightMm = 11 }, "A smith's anvil on a tree stump.");
 
         b.Room = Storage;
         b.Add("Crate", ItemKind.Crate, i => i, "A braced crate.");
         b.Add("Iron-bound crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.Ironbound, WidthMm = 14 }, "Planks with iron brackets on the corners and a skull on the front.");
         b.Add("Supply crate", ItemKind.Crate, i => i with { CrateStyle = CrateStyle.CrossBraced, WidthMm = 14, Handles = true }, "A cross-braced crate with rope handles on the ends.");
-        b.Add("Treasure chest", ItemKind.Chest, i => i with { WidthMm = 18, DepthMm = 11, HeightMm = 10, Lid = LidStyle.Domed }, "A big banded chest with a domed lid.");
-        b.Add("Rack of shelves", ItemKind.Bookshelf, i => i with { Books = false, Shelves = 3 }, "Plain shelves.");
-        b.Add("Barred cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Crown = Crown.Flat, WidthMm = 20, DepthMm = 10, HeightMm = 30 }, "A cupboard with a lattice front.");
+        b.Add("Treasure chest", ItemKind.Chest, i => i with { WidthMm = 18, DepthMm = 11, HeightMm = 10, Lid = LidStyle.Open, Load = CrateLoad.Treasure }, "An iron-bound chest thrown open, overflowing with gold coins, a crown and a goblet.");
+        b.Add("Storage shelving", ItemKind.Cabinet, i => i with { Front = CabinetFront.Open, Contents = ShelfContents.Stores, Crown = Crown.Flat, Shelves = 1, WidthMm = 24, DepthMm = 9, HeightMm = 22 }, "Rough open shelving stacked with sacks, pots, jugs and a little chest.", slug: "rack-of-shelves");
+        b.Add("Barred cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Lattice, Contents = ShelfContents.Jars, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 26 }, "A plank cupboard with iron-barred doors, jars and pots seen through the bars.");
 
         b.Room = Chapel;
-        b.Add("Dark altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "An altar with a cloth hanging down its front (the skull worked on it) and two candlesticks.");
+        b.Add("Dark altar", ItemKind.Cabinet, i => i with { Front = CabinetFront.Altar, Crown = Crown.Flat, Detail = WoodDetail.Stone, WidthMm = 26, DepthMm = 12, HeightMm = 16 }, "A stone altar: skulls set in pointed niches either side of a cloth worked with a skull, two skulls and two candlesticks on top.");
         b.Add("Torch", ItemKind.Candlestand, i => i with { Candle = CandleStyle.Torch, WidthMm = 8, HeightMm = 26 }, "A torch on a stand.");
+        b.Add("Wall torch", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Torch, WidthMm = 7, DepthMm = 12, HeightMm = 16, HangMm = 14 }, "A burning torch in an iron bracket on a plank post: an iron arm on a strut, the fire basket at its end.");
 
         b.Room = Armoury;
         b.Add("Weapon rack", ItemKind.WeaponRack, i => i, "Spears, a sword, an axe and a halberd in a rack.");
         b.Add("Armour stand", ItemKind.Stand, i => i with { Stand = StandStyle.Armour }, "A suit of armour on a stand.");
-        b.Add("Training dummy", ItemKind.Stand, i => i with { Stand = StandStyle.Dummy }, "A dummy to hit.");
+        b.Add("Training dummy", ItemKind.Stand, i => i with { Stand = StandStyle.Dummy }, "A straw man on a post, bound with cord, its chest hacked with sword cuts.");
         b.Add("Shield", ItemKind.WallHanging, i => i with { Hanging = HangingStyle.Shield, WidthMm = 18, HeightMm = 18, HangMm = 14 }, "A shield over crossed swords.");
         b.Add("Weapons cupboard", ItemKind.Cabinet, i => i with { Front = CabinetFront.Doors, Crown = Crown.Flat, WidthMm = 22, DepthMm = 10, HeightMm = 32 }, "A tall plank cupboard.");
 

@@ -241,7 +241,7 @@ public static class Cabinets
 
         foreach (var sp in standing)
             m.Add(sp.Name, sp.Shape, [], [Pose.Front(sp.X - sp.W / 2, bodyTop + layers * T, sp.Z)], grainAlongU: false, face: [], lines: sp.Lines);
-        if (standing.Count > 0) m.Note("Push the cross and the candlesticks into the slots in the top.");
+        if (standing.Count > 0) m.Note($"Push the {string.Join(" and the ", standing.Select(sp => sp.Name.ToLowerInvariant()).Distinct().Select(n => n == "altar cross" ? "cross" : n + "s"))} into the slots in the top.");
         if (front == CabinetFront.Altar && !metal && !m.PushFit) AltarCloth(m, look, W, T, bodyTop, kick, Dl);
 
         // ---- open shelves: a band of tracery glued across the front under the top ----
@@ -321,6 +321,21 @@ public static class Cabinets
             var lines = new List<PathD> { Geo.Loop(Geo.Circle(cx, armY, bar * 0.95, 0.02)), WoodFace.Dot(cx, armY, bar * 0.3) };
 
             list.Add(("Altar cross", W / 2, z, cw, tw, Geo.Solid(c), lines));
+        }
+        // On a dungeon altar, two skulls side by side in the middle.
+        if (m.Theme == TerrainThemes.Dungeon)
+        {
+            double sr = Geo.Clamp(W * 0.065, 1.6, 2.4), jw = sr * 1.25, jh = sr * 0.8, sx0 = sr;
+            var skull = Geo.Solid([Geo.Circle(sx0, jh + sr * 0.85, sr, 0.02), WoodFace.RoundRect(sx0 - jw / 2, 0, sx0 + jw / 2, jh + 0.6, 0.35), Geo.Rect(sx0 - tw / 2, -T, sx0 + tw / 2, 0.01)]);
+            var sk = new List<PathD>
+            {
+                WoodFace.Dot(sx0 - sr * 0.42, jh + sr * 0.75, sr * 0.28), WoodFace.Dot(sx0 + sr * 0.42, jh + sr * 0.75, sr * 0.28),
+                new() { new(sx0, jh + sr * 0.45), new(sx0 - 0.25, jh + sr * 0.15), new(sx0 + 0.25, jh + sr * 0.15), new(sx0, jh + sr * 0.45) },
+                new() { new(sx0 - jw / 2 + 0.2, jh * 0.55), new(sx0 + jw / 2 - 0.2, jh * 0.55) },
+            };
+            for (double x = sx0 - jw / 2 + 0.45; x < sx0 + jw / 2 - 0.3; x += 0.45) sk.Add([new(x, jh * 0.2), new(x, jh * 0.85)]);
+            double gx = Math.Max(sr + 1.0, W * 0.1);
+            foreach (var x in new[] { W / 2 - gx, W / 2 + gx }) list.Add(("Skull", x, z, 2 * sr, tw, skull, sk));
         }
         // The candlesticks: a foot, a stem with a knob, a drip pan and the candle with its flame.
         double sh = Geo.Clamp(H * 0.45, 6, 9), sw2 = 3.2, sx = sw2 / 2;
@@ -508,7 +523,9 @@ public static class Cabinets
                 {
                     double a = x0 + c * dw + frame, b = x0 + (c + 1) * dw - frame, ya = y0 + frame * 1.4, yb = y1 - frame;
                     Func<double, double, double, double, PathD>? topShape = look == FrontLook.Gothic ? Fronts.PointedRect : look == FrontLook.Carved ? Fronts.ArchedRect : null;
-                    holes.AddRange(front == CabinetFront.Glass ? Fronts.Panes(a, ya, b, yb, 3.2, 1.0, topShape) : Fronts.Lattice(a, ya, b, yb, 3.4, 1.0));
+                    holes.AddRange(front == CabinetFront.Glass ? Fronts.Panes(a, ya, b, yb, 3.2, 1.0, topShape)
+                        : m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon ? Fronts.Bars(a, ya, b, yb, 1.1, 1.0, lines)
+                        : Fronts.Lattice(a, ya, b, yb, 3.4, 1.0));
                 }
                 break;
             }
@@ -562,6 +579,19 @@ public static class Cabinets
                 {
                     double a = x0 + c * pw + 0.2, b = x0 + (c + 1) * pw - 0.2;
                     if (c == n / 2) { etched.AddRange(Fronts.Outline(a, y0, b, y1)); Symbol(look, m.Theme, (a + b) / 2, (y0 + y1) / 2, Math.Min(b - a, y1 - y0) * 0.36, etched, lines); }
+                    else if (m.Theme == TerrainThemes.Dungeon && b - a >= 4 && y1 - y0 >= 6)
+                    {
+                        // A pointed niche sunk in the stone (burnt dark), a skull set in it left light.
+                        double na = a + 0.6, nb = b - 0.6, nc = (na + nb) / 2, ny0 = y0 + 0.8, ny1 = y1 - 0.6;
+                        var niche = Fronts.PointedRect(na, ny0, nb, ny1);
+                        lines.Add(Geo.Loop(Fronts.PointedRect(na - 0.5, ny0 - 0.5, nb + 0.5, ny1 + 0.4)));
+                        double sr = Math.Min((nb - na) * 0.36, (ny1 - ny0) * 0.24), scy = ny0 + (ny1 - ny0) * 0.38;
+                        var head = Geo.Solid([Geo.Circle(nc, scy + sr * 0.18, sr * 0.66, 0.01), WoodFace.RoundRect(nc - sr * 0.4, scy - sr * 0.8, nc + sr * 0.4, scy - sr * 0.05, sr * 0.15)]);
+                        etched.AddRange(Geo.Subtract([niche], Geo.Offset(head, 0.15)));
+                        Symbol(look, m.Theme, nc, scy, sr, etched, lines);
+                        // The ledge the skull sits on.
+                        lines.Add([new(na, scy - sr * 0.95), new(nb, scy - sr * 0.95)]);
+                    }
                     else if (leaves is not null) leaves.Add(new Leaf(a, y0, b, y1, LeafKind.Panel, Handle: false));
                     else Fronts.Panel(look, a, y0, b, y1, etched, lines);
                 }

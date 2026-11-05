@@ -161,10 +161,49 @@ public static class Slants
             }
             // An illuminated letter at the head of the left page.
             be.Add(Geo.Rect(0.7, bh - 2.9, 2.0, bh - 1.6));
+            var bookShape = new PathsD { book };
+            if (m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon && bw >= 8 && bh >= 5)
+            {
+                // Chained: a chain across the pages from the top corner down to a padlock hanging under the book,
+                // and a sigil on the right-hand page.
+                double lx = bw / 2, lockW = Math.Min(2.0, bw * 0.18), lockH = lockW * 0.85, ly1 = -0.5, ly0 = ly1 - lockH;
+                bookShape.Add(WoodFace.RoundRect(lx - lockW / 2, ly0, lx + lockW / 2, ly1, 0.3));
+                bookShape.Add(Geo.Rect(lx - 0.6, ly1 - 0.1, lx + 0.6, 0.5));
+                bl.Add([.. Geo.Arc(lx, ly1 + 0.1, lockW * 0.32, 0, Math.PI)]);
+                be.Add(Geo.Circle(lx, (ly0 + ly1) / 2 + 0.15, 0.25, 0.01));
+                be.Add(Geo.Rect(lx - 0.1, ly0 + 0.3, lx + 0.1, (ly0 + ly1) / 2 + 0.1));
+                var a = new PointD(bw - 0.8, bh - 1.2);
+                var b = new PointD(lx + 0.2, 0.8);
+                double len = Math.Sqrt((b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y)), ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+                int nl = Math.Max(4, (int)(len / 0.62));
+                for (int i = 0; i < nl; i++)
+                {
+                    double t = (i + 0.5) / nl, cx = a.x + (b.x - a.x) * t, cy = a.y + (b.y - a.y) * t;
+                    if (i % 2 == 0)
+                    {
+                        // A link seen flat: a loop along the chain.
+                        var link = new PathD();
+                        for (int k = 0; k <= 12; k++) { double q = 2 * Math.PI * k / 12; link.Add(new PointD(cx + ux * 0.42 * Math.Cos(q) - uy * 0.26 * Math.Sin(q), cy + uy * 0.42 * Math.Cos(q) + ux * 0.26 * Math.Sin(q))); }
+                        bl.Add(link);
+                        be.Add(link);
+                    }
+                    else bl.Add([new(cx - ux * 0.4, cy - uy * 0.4), new(cx + ux * 0.4, cy + uy * 0.4)]);
+                }
+                // A star in a ring drawn on the right-hand page, its lines of text cleared round it.
+                double sr = Math.Min(bw * 0.12, bh * 0.2), scx = bw * 0.75, scy = bh * 0.6;
+                var star = Fronts.Star(scx, scy, sr * 0.9, sr * 0.36, 5);
+                var clear = new PathsD { Geo.Circle(scx, scy, sr + 0.3, 0.02) };
+                var text = bl.Skip(2).ToList();
+                bl.RemoveRange(2, bl.Count - 2);
+                bl.AddRange(Geo.ClipLines(text, Geo.Subtract([Geo.Rect(-1, -1, bw + 1, bh + 1)], clear)));
+                bl.Add(Geo.Loop(Geo.Circle(scx, scy, sr, 0.02)));
+                bl.Add(Geo.Loop(star));
+                bookShape = Geo.Solid(bookShape);
+            }
             // It lies on the sides' sloping edges (they stand a little proud of the top), glued to them.
             var bo = At(inset + by, -T / 2);
             var bpose = new Pose(new V3(W / 2 - bw / 2, bo.y, bo.x), V3.UnitX, new V3(0, d.y, d.x));
-            m.Add("Book", [book], [], [bpose], grainAlongU: true, face: [], etched: be, lines: bl).Glue();
+            m.Add("Book", bookShape, [], [bpose], grainAlongU: true, face: [], etched: be, lines: bl).Glue();
             m.Note("Glue the book open on the slope.");
         }
 

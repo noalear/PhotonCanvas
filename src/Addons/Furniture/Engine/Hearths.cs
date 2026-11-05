@@ -244,7 +244,7 @@ public static class Hearths
                 bre.AddRange(Fronts.Outline([shield], 0.45));
                 Cabinets.Symbol(look, m.Theme, Wb / 2, sy + sh * 0.08, sh * 0.28, bre, brl);
             }
-            else if (!forge && Hb > 8 && Wb > 8) Cabinets.Symbol(look, m.Theme, Wb / 2, Hb * 0.45, Math.Min(Wb * 0.18, Hb * 0.2), bre, brl);
+            else if ((!forge || m.Theme == PhotonCanvas.Addon.Terrain.TerrainThemes.Dungeon) && Hb > 8 && Wb > 8) Cabinets.Symbol(look, m.Theme, Wb / 2, Hb * (forge ? 0.3 : 0.45), Math.Min(Wb * (forge ? 0.13 : 0.18), Hb * 0.2), bre, brl);
             if (forge) for (double y = 1.5; y < Hb - 0.5; y += 2.2) brl.Add([new(0, y), new(Wb, y)]);
             var shapeB = Geo.Union(breast);
             m.Add(forge ? "Hood" : "Chimney breast", shapeB, [], [Pose.Front(xb, Hs + T, zbr)], grainAlongU: true, face: [], etched: Geo.Intersect(Geo.Union(bre), shapeB), lines: Geo.ClipLines(brl, shapeB));

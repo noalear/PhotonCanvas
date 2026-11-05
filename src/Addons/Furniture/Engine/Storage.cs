@@ -293,7 +293,7 @@ public static class Storage
         double band = Math.Clamp(Math.Min(W, D) * 0.07, 0.6, 1.2);
         var arcade = chest ? Arcade(m, W, H, T, it.Bands ? T + 1.5 * band + 0.3 : T + 0.4) : null;
         // An open crate's load stands on the bottom, its tabs down through it.
-        var heapSlots = !chest && !closed && it.Load != CrateLoad.None ? CrateHeap(m, W, D, H) : [];
+        var heapSlots = (chest ? it.Lid is LidStyle.None or LidStyle.Open : !closed) && it.Load != CrateLoad.None ? CrateHeap(m, W, D, H) : [];
         bool trimmed = false;
         foreach (var p in panels)
         {
@@ -341,6 +341,22 @@ public static class Storage
         }
         if (arcade is not null) m.Note("Glue the arcade on the front and a handle on each end.");
         if (trimmed) m.Note("Glue the boards, iron and handles on over the crate's sides and lid, each where its face's etching leaves a plain patch for it.");
+        if (chest && it.Lid == LidStyle.Open && !m.PushFit)
+        {
+            // The lid thrown back: standing up behind the chest, glued against the top of its back, banded with
+            // iron and a hasp hanging from its front edge.
+            double over = Math.Min(2.0, H * 0.25), Wl = W, Dl = D;
+            var etched = new PathsD();
+            var lines = new List<PathD>();
+            if (it.Bands && Wl > 2 * (T + band) + 2) Bands([T + band, Wl - T - band], Dl, band, etched, lines);
+            double hw = Math.Clamp(W * 0.12, 1.2, 2.2);
+            lines.Add(Geo.Loop(Geo.Rect(W / 2 - hw / 2, Dl - 2.8, W / 2 + hw / 2, Dl - 0.6)));
+            lines.Add(WoodFace.Dot(W / 2, Dl - 1.4, 0.3));
+            // Its banded face turned to the front, where it's seen.
+            m.Add("Lid (thrown open)", [Geo.Rect(0, 0, Wl, Dl)], [], [new Pose(new V3(0, H - over, -T / 2), new V3(1, 0, 0), new V3(0, 1, 0))],
+                grainAlongU: true, planks: true, plankMm: 2.4, etched: etched, lines: lines).Glue();
+            m.Note("Glue the lid standing up behind the chest, its bottom edge against the top of the chest's back.");
+        }
         if (chest && it.Lid is LidStyle.Loose or LidStyle.Domed)
         {
             double lo = Math.Clamp(Math.Min(W, D) * 0.04, 0.4, 1), cl = Math.Max(0.15, m.Fit);
@@ -387,7 +403,7 @@ public static class Storage
         double T = m.T, cl = 0.3, x0 = T + cl, x1 = W - T - cl, zc = D / 2;
         var (shape, etched, lines) = Crates.Heap(m.Item.Load, x0, x1, H, m.Rnd);
         if (shape.Count == 0 || x1 - x0 < 4) return [];
-        string name = m.Item.Load switch { CrateLoad.Apples => "Apples", CrateLoad.Sacks => "Sacks", _ => "Rocks" };
+        string name = m.Item.Load switch { CrateLoad.Apples => "Apples", CrateLoad.Sacks => "Sacks", CrateLoad.Treasure => "Treasure", _ => "Rocks" };
         // Too narrow a bottom for slots (they'd leave it a thin strip by the fingers): glued on it instead.
         if (zc - m.SlotW / 2 - T < Maker.Bridge)
         {
