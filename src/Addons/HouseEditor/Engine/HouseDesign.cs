@@ -6,6 +6,7 @@ using PhotonCanvas.Addon.Walls;
 using GableWindow = PhotonCanvas.Addon.Roofs.GableWindow;
 using PhotonCanvas.Addon.Furniture;
 using HingeSide = PhotonCanvas.Addon.Walls.HingeSide;
+using Railing = PhotonCanvas.Addon.Stairs.Railing;
 
 namespace PhotonCanvas.Addon.HouseEditor;
 
@@ -155,20 +156,26 @@ public sealed record Level
 /// <summary>
 /// A piece of furniture (the furniture maker's) standing on a floor: the middle of it on the plan
 /// (squares) and how many quarter turns it's turned (anticlockwise seen from above; 0 with its front
-/// towards you, the bottom of the plan).
+/// towards you, the bottom of the plan). Halves turn it to 45°.
 /// </summary>
 public sealed record PlacedItem
 {
     public double X { get; init; }
     public double Y { get; init; }
-    public int Turn { get; init; }
+    public double Turn { get; init; }
     public FurnitureItem Item { get; init; } = Defaults.For(ItemKind.Table);
     /// <summary>A banana for scale, as big as a real one: shown in the 3D view, not cut (<see cref="Item"/> is ignored).</summary>
     public bool Banana { get; init; }
 }
 
+/// <summary>A piece of furniture's look from above (see <see cref="HouseKitMaker.Look"/>): the floor it takes (mm) and its pieces, lowest first.</summary>
+public sealed record ItemLook(double W, double D, List<ItemTop> Parts);
+
+/// <summary>One of a piece of furniture's pieces seen from above (mm about the middle, y towards its front), how high its top is, and whether it lies flat.</summary>
+public sealed record ItemTop(Clipper2Lib.PathsD Shape, double Top, bool Flat);
+
 /// <summary>What climbs to the floor above: open stairs, solid stairs (stacked layers), spiral stairs or a leaning ladder.</summary>
-public enum WayKind { Stairs, SolidStairs, Spiral, Ladder }
+public enum WayKind { Stairs, SolidStairs, Spiral, Ladder, HookedLadder }
 
 /// <summary>
 /// A way up from a floor to the one above: the middle of it and its opening on the plan (squares), and
@@ -180,6 +187,27 @@ public sealed record PlacedWay
     public double Y { get; init; }
     public int Turn { get; init; }
     public WayKind Kind { get; init; } = WayKind.Stairs;
+
+    // The stairs maker's settings for it; left empty, each is sized to suit the building's figures.
+
+    /// <summary>Stairs: width between the sides, the height of each step and how deep each is (mm).</summary>
+    public double? WidthMm { get; init; }
+    public double? RiseMm { get; init; }
+    public double? GoingMm { get; init; }
+    /// <summary>Open stairs: which side has a handrail.</summary>
+    public Railing? Rail { get; init; }
+    /// <summary>The floor's texture etched on the steps.</summary>
+    public bool? Treads { get; init; }
+    /// <summary>Spiral stairs: radius, turn per step (degrees), the centre's size and the pin they're threaded on (mm), and which way they turn going up.</summary>
+    public double? SpiralRadiusMm { get; init; }
+    public double? SpiralStepDeg { get; init; }
+    public double? SpiralHubMm { get; init; }
+    public double? SpiralPinMm { get; init; }
+    public bool? Clockwise { get; init; }
+    /// <summary>Ladders: width between the rails and the distance between rungs (mm), and a leaning ladder's lean (degrees).</summary>
+    public double? LadderWidthMm { get; init; }
+    public double? RungStepMm { get; init; }
+    public double? LadderAngleDeg { get; init; }
 }
 
 /// <summary>How a column is built: as usual (a box when it's square in box walls, otherwise stacked layers), a box whatever its shape, or stacked layers on a pin.</summary>
