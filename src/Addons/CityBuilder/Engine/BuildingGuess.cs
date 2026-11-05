@@ -97,7 +97,7 @@ public static class BuildingGuess
         var plan = PlanShape.Of(walls);
         var list = new List<Opening>();
         // How far (squares) a door's and a window's middle must stay from a wall's ends, clear of the columns there.
-        double doorClear = (style.ColumnMm / 2 + style.DoorWidthMm / 2 + 6) / sq, windowClear = (style.ColumnMm / 2 + style.WindowWidthMm / 2 + 4) / sq;
+        double doorClear = (style.ColumnMm / 2 + style.DoorWidthMm / 2 + 10) / sq, windowClear = (style.ColumnMm / 2 + style.WindowWidthMm / 2 + 4) / sq;
         double apart = (style.DoorWidthMm / 2 + style.WindowWidthMm / 2 + 6) / sq;
         // Only the walls round the outside get doors and windows.
         var runs = plan.Runs.Where(r => r.Points.Zip(r.Points.Skip(1)).All(p => outer.Contains(WallEdge.Of(p.First, p.Second)))).ToList();

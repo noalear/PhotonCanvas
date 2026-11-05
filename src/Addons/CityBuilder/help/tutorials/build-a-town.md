@@ -1,6 +1,6 @@
 # Build a town
 <!-- category: Drawing -->
-<!-- summary: Lay out a town on a big map or read one from a battle map picture, change its buildings, see it in 3D and cut a building's pieces. -->
+<!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change and find its buildings, see it in 3D and cut a building's pieces. -->
 <!-- page: citybuilder.md -->
 <!-- order: 79 -->
 The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
@@ -10,6 +10,12 @@ view, each building a building editor building to cut.
 <!-- target: ribbon:Home/City -->
 <!-- wait: window:City builder -->
 Click **City** on the **Home** tab. It opens with the last map (the first time, a sample village).
+
+## Make a town for me
+<!-- target: button:Make a town -->
+On the **Map** tab, set the size, pick how the **Streets** run and tick **A town wall with gates**,
+then press **Make a town**: roads, a market square, every building facing its road and trees round
+it. Press it again for another. (Or read one from a picture, below.)
 
 ## Read a battle map
 <!-- target: tabitem:Battle map -->
@@ -26,6 +32,16 @@ best guess, so check it over.
 Click **Paint**, pick the **Ground** on the **Tools** tab, and drag over the squares it got wrong.
 The right button paints grass.
 
+## Lay a road
+<!-- target: button:Road -->
+Click **Road** and drag from one square to another: a road two squares wide runs there, round one
+corner (hold Ctrl for a straight one). Pick a dirt track or water for a river on the **Tools** tab.
+
+## Fill it with buildings
+<!-- target: button:Fill with buildings -->
+With **Select**, drag a box round the new road, pick a **District** under **Fill with buildings** on
+the **Map** tab and press **Fill with buildings**: buildings of that kind go up along it.
+
 ## Add a building
 <!-- target: button:Building -->
 Click **Building** and drag out a rectangle where a building should stand: it gets walls, a door
@@ -34,7 +50,13 @@ towards the road, windows and a roof.
 ## Change a building
 <!-- target: button:Select -->
 Click **Select**, then click a building: drag it to move it, press `R` to turn it, and change its
-name, type and roof on the **Building** tab.
+name, type, district and roof on the **Picked** tab. Drag a box round several things to move, turn or
+copy them all at once.
+
+## Find a building
+<!-- target: tabitem:Town -->
+The **Town** tab lists every building: type to find one by name, type, district or tag, and click it to
+go to it. Tick **Colour the plan by district** to see the town's parts.
 
 ## Open it in the building editor
 <!-- target: button:Edit in the building editor… -->

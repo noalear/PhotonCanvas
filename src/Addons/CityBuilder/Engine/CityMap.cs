@@ -49,11 +49,25 @@ public sealed record Fence
 /// <summary>A tree, rock, well… at a point on the map (squares), its size (1 = about a square) and turn (degrees).</summary>
 public sealed record Prop
 {
+    public Guid Id { get; init; } = Guid.NewGuid();
     public PropKind Kind { get; init; } = PropKind.Tree;
     public double X { get; init; }
     public double Y { get; init; }
     public double Size { get; init; } = 1;
     public double TurnDeg { get; init; }
+}
+
+/// <summary>Words written on the map (a street's or a district's name, a number for the game master's key): the middle of the text (squares) and how tall it is (squares).</summary>
+public sealed record CityLabel
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string Text { get; init; } = "";
+    public double X { get; init; }
+    public double Y { get; init; }
+    public double Size { get; init; } = 0.8;
+
+    /// <summary>Roughly how wide the text is (squares).</summary>
+    public double Width => Math.Max(0.5, Text.Length * Size * 0.55);
 }
 
 /// <summary>The battle map picture a map was read from, shown under the plan: its file and its grid.</summary>
@@ -84,6 +98,7 @@ public sealed record CityMap
     public List<CityBuilding> Buildings { get; init; } = [];
     public List<Fence> Fences { get; init; } = [];
     public List<Prop> Props { get; init; } = [];
+    public List<CityLabel> Labels { get; init; } = [];
     public CityPicture? Picture { get; init; }
 
     /// <summary>The letter each kind of ground is saved as.</summary>
@@ -149,6 +164,7 @@ public sealed record CityMap
         {
             Buildings = [.. Buildings.Where(b => { var (w, d) = CityFootprint.Size(b); return b.X + w <= across && b.Y + d <= down; })],
             Props = [.. Props.Where(p => p.X < across && p.Y < down)],
+            Labels = [.. Labels.Where(l => l.X < across && l.Y < down)],
             Fences = [.. Fences.Select(f => f with { Edges = [.. f.Edges.Where(e => e.X <= across && e.Y <= down)] })],
         };
     }
@@ -170,7 +186,8 @@ public sealed record CityMap
         {
             var m = JsonSerializer.Deserialize<CityMap>(json, CityJson.Options);
             if (m is null) return null;
-            return m with { Across = Math.Clamp(m.Across, 1, MaxSide), Down = Math.Clamp(m.Down, 1, MaxSide) };
+            // Older maps had no labels; their trees had no ids.
+            return m with { Across = Math.Clamp(m.Across, 1, MaxSide), Down = Math.Clamp(m.Down, 1, MaxSide), Labels = m.Labels ?? [], Props = [.. (m.Props ?? []).Select(p => p.Id == Guid.Empty ? p with { Id = Guid.NewGuid() } : p)] };
         }
         catch (Exception e) when (e is JsonException or NotSupportedException or ArgumentException) { return null; }
     }
