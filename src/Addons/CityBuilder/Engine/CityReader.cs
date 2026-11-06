@@ -305,6 +305,7 @@ public static class CityReader
                 n[x, y] = NatureOf(s[x, y]);
                 if (n[x, y] == Nature.Grass) greens.Add((s[x, y].V, s[x, y].Busy));
             }
+        Tinted(s, n, across, down);
         if (greens.Count >= 6)
         {
             var vs = greens.Select(g => g.V).OrderBy(v => v).ToArray();
@@ -320,6 +321,39 @@ public static class CityReader
                 }
         }
         return n;
+    }
+
+    /// <summary>
+    /// A map painted all one hue (a night scene, blue over everything) reads as water wherever the paint
+    /// is blue enough, cobbles and all. When a good share of the map is water and nearly every square is
+    /// the same blue, only the squares that are plainly water stay so: smoother than wet cobbles, or
+    /// clearly bluer than the run of them; the rest are paving.
+    /// </summary>
+    static void Tinted(Sample[,] s, Nature[,] n, int across, int down)
+    {
+        var water = new List<Sample>();
+        var hues = new List<double>();
+        for (int y = 0; y < down; y++)
+            for (int x = 0; x < across; x++)
+            {
+                if (n[x, y] == Nature.Water) water.Add(s[x, y]);
+                if (s[x, y].S > 0.1) hues.Add(s[x, y].H);
+            }
+        if (water.Count < 0.35 * across * down || hues.Count < 6) return;
+        hues.Sort();
+        double hMid = hues[hues.Count / 2];
+        if (hMid < 190 || hMid > 250) return;
+        if (hues.Count(h => Math.Abs(h - hMid) <= 30) < 0.75 * hues.Count) return;
+        var sats = water.Select(q => q.S).OrderBy(q => q).ToArray();
+        double sMid = sats[sats.Length / 2];
+        for (int y = 0; y < down; y++)
+            for (int x = 0; x < across; x++)
+            {
+                if (n[x, y] != Nature.Water) continue;
+                var q = s[x, y];
+                if (q.Busy < 0.045 || q.S > sMid + 0.08) continue;
+                n[x, y] = Nature.Mid;
+            }
     }
 
     internal static Nature NatureOf(Sample q)

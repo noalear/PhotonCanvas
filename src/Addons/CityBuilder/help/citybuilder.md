@@ -255,18 +255,24 @@ how many **Squares across** it is.
 Then press **Read the map**. It makes a new map from the picture (undo puts the old one back):
 
 - **The ground**: every square sorted by its colour into grass, dirt, cobbled road, paving, sand,
-  water, rock or fields.
+  water, rock or fields. On a map painted all one blue (a night scene) the wet cobbles aren't water:
+  only the smooth squares, or the ones clearly bluer than the rest, are.
 - **Buildings seen from above**: each roof is found as its own patch of colour with an outline
   drawn round it (a line, or a clean change of colour), at whatever angle it sits: a rectangle, or
   an L or a T of two or three, with the grid's own lines taken out first so they don't pass for an
   outline and the two slopes of a pitched roof (one lit, one in shade, the ridge between them)
-  joined into one. What's cobbled or gravelled inside (strokes running every way, where a roof's
-  tiles run in rows) is a road or a yard, not a roof; so is a strip that runs off the picture at both
-  ends. A roof square to the grid becomes a building on whole squares, matched to its footprint; one
-  at an angle keeps its angle (see **Tilt** on the **Picked** tab). Each gets walls round it, a door
-  towards the road, windows and a roof whose covering is guessed from its colour (red: clay tiles,
-  yellow: thatch, brown: wooden shingles, grey: slate). Its size guesses how many floors it has and
-  what it is (a shed, a house, a hall, a tower).
+  joined into one. A roof drawn with heavy texture (rows of shingles, bricks, a wash of rain over
+  everything) is no patch of one colour, so it's also looked for as a block of colour that isn't the
+  ground's (the ground being the biggest patch and everything of its hue): a grey roof on blue
+  cobbles, a tan one on grass, texture and all, parted from the next building along at the outline
+  between them. What's cobbled or gravelled inside (strokes running every way, where a roof's
+  tiles run in rows, with or without a slant of shading over them) is a road or a yard, not a roof;
+  so is a strip that runs off the picture at both ends. A roof square to the grid becomes a building
+  on whole squares, matched to its footprint; one at an angle keeps its angle (see **Tilt** on the
+  **Picked** tab). Each gets walls round it, a door towards the road, windows and a roof whose
+  covering is guessed from its colour (red: clay tiles, yellow: thatch, brown: wooden shingles,
+  grey: slate). Its size guesses how many floors it has and what it is (a shed, a house, a hall, a
+  tower).
 - **Buildings drawn as floor plans**: rooms closed in by walls drawn in dark lines. Rooms that share
   a line are one building, with that line as a wall inside it, and a gap in its outside line is its
   door.

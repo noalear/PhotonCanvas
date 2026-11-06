@@ -416,6 +416,97 @@ public class CityBuilderTests
         Assert.NotEmpty(res.Notes);
     }
 
+    /// <summary>
+    /// A night map: everything blue, the ground wet cobbles drawn as rings every way, a smooth canal
+    /// along the bottom, and two roofs nearly the ground's colour (a grey and a brown) drawn as rows of
+    /// shingles in dark dashes, a dark outline round each.
+    /// </summary>
+    static RasterImage Night(int sq = 40, int across = 20, int down = 16)
+    {
+        int w = sq * across, h = sq * down;
+        var px = new byte[w * h * 4];
+        var rnd = new Random(9);
+        // Cobbles: rings scattered over the ground.
+        var rings = new List<(int X, int Y, int R)>();
+        for (int i = 0; i < across * down * 8; i++) rings.Add((rnd.Next(w), rnd.Next(h), 3 + rnd.Next(3)));
+        var ring = new bool[w * h];
+        foreach (var (cx, cy, r) in rings)
+            for (int a = 0; a < 40; a++)
+            {
+                int x = cx + (int)Math.Round(r * Math.Cos(a * Math.PI / 20)), y = cy + (int)Math.Round(r * Math.Sin(a * Math.PI / 20));
+                if (x >= 0 && y >= 0 && x < w && y < h) ring[y * w + x] = true;
+            }
+        int Roof(int cx, int cy) => cx >= 3 && cx <= 7 && cy >= 3 && cy <= 6 ? 1 : cx >= 11 && cx <= 15 && cy >= 5 && cy <= 8 ? 2 : 0;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int cx = x / sq, cy = y / sq, roof = Roof(cx, cy);
+                int r, g, b, n = rnd.Next(-6, 7);
+                if (cy >= 13) (r, g, b) = (38, 78, 150);                                                   // the canal, smooth
+                else if (roof == 1) (r, g, b) = (88, 92, 102);                                             // grey shingles
+                else if (roof == 2) (r, g, b) = (112, 84, 66);                                             // brown shingles
+                else { (r, g, b) = (62, 96, 136); if (ring[y * w + x]) (r, g, b) = (34, 52, 78); }          // wet cobbles
+                if (roof > 0)
+                {
+                    // Rows of shingles: heavy dark dashes, staggered, and a dark outline three pixels wide.
+                    bool dash = y % 4 < 2 && (x + (y / 4 % 2) * 4) % 8 < 5;
+                    bool edge = Roof((x - 3) / sq, cy) != roof || Roof((x + 3) / sq, cy) != roof || Roof(cx, (y - 3) / sq) != roof || Roof(cx, (y + 3) / sq) != roof;
+                    if (dash || edge) { (r, g, b) = (24, 22, 26); n = 0; }
+                }
+                if (x % sq == 0 || y % sq == 0) { r = (int)(r * 0.8); g = (int)(g * 0.8); b = (int)(b * 0.8); }
+                int k = (y * w + x) * 4;
+                px[k] = (byte)Math.Clamp(r + n, 0, 255);
+                px[k + 1] = (byte)Math.Clamp(g + n, 0, 255);
+                px[k + 2] = (byte)Math.Clamp(b + n, 0, 255);
+                px[k + 3] = 255;
+            }
+        return new RasterImage(w, h, px);
+    }
+
+    [Fact]
+    public void A_night_map_finds_its_shingled_roofs_as_blobs_and_reads_wet_cobbles_as_paving_not_water()
+    {
+        var img = Night();
+        var grid = CityReader.FindGrid(img);
+        Assert.NotNull(grid);
+        Assert.Equal(40, grid!.SquarePx, 0);
+        var v = MapVision.Of(img, grid.SquarePx, grid.OffsetX, grid.OffsetY);
+        // The shingles part each roof into specks: no colour patch is anything like a roof's size...
+        var big = v.Patches.Where(p => p.Area >= 0.6 * v.Square * v.Square && !RoofFinder.Ground(p) && p.Hsv.S < 0.3).ToList();
+        Assert.True(big.Count == 0, string.Join("; ", big.Select(p => $"{p.Area / (v.Square * v.Square):0.0} sq at {p.Cells.Average(c => c % v.Width) / v.Square:0.0},{p.Cells.Average(c => c / v.Width) / v.Square:0.0} hsv {p.Hsv.H:0},{p.Hsv.S:0.00},{p.Hsv.V:0.00} tex {p.Tex:0.00}")));
+        // ...but as blocks of a colour that isn't the ground's, both are there, a square's worth each at least.
+        var blobs = RoofBlobs.Find(v, 0.6 * v.Square * v.Square, 200 * v.Square * v.Square, v.Patches.Count);
+        Assert.Contains(blobs, b => Math.Abs(b.Cells.Average(c => c % v.Width) / v.Square - 5.5) < 0.6 && Math.Abs(b.Cells.Average(c => c / v.Width) / v.Square - 5) < 0.6);
+        Assert.Contains(blobs, b => Math.Abs(b.Cells.Average(c => c % v.Width) / v.Square - 13.5) < 0.6 && Math.Abs(b.Cells.Average(c => c / v.Width) / v.Square - 7) < 0.6);
+        var res = CityReader.Read(img, new CityPicture { SquarePx = grid.SquarePx, OffsetX = grid.OffsetX, OffsetY = grid.OffsetY }, new CityReadOptions());
+        var m = res.Map;
+        string all = string.Join("; ", m.Buildings.Select(b => $"{b.X},{b.Y} {CityFootprint.Size(b)}"));
+        Assert.True(m.Buildings.Count == 2, all);
+        var grey = Assert.Single(m.Buildings, b => b.X == 3);
+        Assert.Equal(((3, 3), (5, 4)), ((grey.X, grey.Y), CityFootprint.Size(grey)));
+        var brown = Assert.Single(m.Buildings, b => b.X == 11);
+        Assert.Equal(((11, 5), (5, 4)), ((brown.X, brown.Y), CityFootprint.Size(brown)));
+        // The blue over everything doesn't make the cobbles water: only the smooth canal is.
+        Assert.Equal(Ground.Water, m.GroundAt(10, 14));
+        Assert.Equal(Ground.Water, m.GroundAt(2, 15));
+        Assert.Contains(m.GroundAt(10, 1), new[] { Ground.Road, Ground.Paving });
+        Assert.Contains(m.GroundAt(17, 10), new[] { Ground.Road, Ground.Paving });
+        Assert.Contains(m.GroundAt(5, 10), new[] { Ground.Road, Ground.Paving });
+    }
+
+    [Fact]
+    public void Strokes_count_as_a_roofs_rows_when_most_run_two_ways_square_or_slanted_but_not_every_way()
+    {
+        // Every way alike (cobbles): half.
+        Assert.Equal(0.5, RoofFinder.Agreement([10, 10, 10, 10, 10, 10, 10, 10]) / 80, 2);
+        // Rows one way with ticks square to them: nearly all.
+        Assert.True(RoofFinder.Agreement([50, 2, 1, 2, 30, 2, 1, 2]) / 90 > 0.9);
+        // Rows one way with shading slanted over them (not square): still nearly all.
+        Assert.True(RoofFinder.Agreement([50, 2, 1, 2, 1, 2, 30, 1]) / 89 > 0.9);
+        // Two directions next to each other are one direction, not rows and ticks.
+        Assert.True(RoofFinder.Agreement([50, 30, 2, 2, 2, 2, 2, 2]) / 92 < 0.8);
+    }
+
     /// <summary>A floor plan drawn in lines: a light floor, rooms closed in by dark walls, with a gap for a door.</summary>
     static RasterImage Plans(int sq = 40)
     {

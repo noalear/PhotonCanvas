@@ -60,6 +60,9 @@ public sealed class MapVision
     public int Height { get; }
     /// <summary>Picture pixels per working cell.</summary>
     public double Scale { get; }
+    /// <summary>The picture's size in pixels (the line maps are this wide and high).</summary>
+    public int ImageWidth { get; }
+    public int ImageHeight { get; }
     /// <summary>One grid square at the working size.</summary>
     public double Square { get; }
     /// <summary>The grid's first lines at the working size.</summary>
@@ -81,6 +84,8 @@ public sealed class MapVision
     public bool[] OnGrid { get; }
     /// <summary>How strongly the picture's thin dark lines show at each picture pixel (brightness below both sides).</summary>
     public float[] Lineness { get; }
+    /// <summary>As <see cref="Lineness"/>, but dark lines only: the strokes drawn on roofs and cobbles, without the highlights.</summary>
+    public float[] DarkLines { get; }
     /// <summary>The line strength that counts as a drawn outline (above the grid's own lines and the texture).</summary>
     public double LineLevel { get; }
     /// <summary>How strongly the grid's own lines show.</summary>
@@ -97,13 +102,16 @@ public sealed class MapVision
         double p = Math.Max(4, squarePx);
         // Work at about 24 cells to a square: fine enough for a roof's edge to a tenth of a square, coarse enough to be quick.
         Scale = Math.Max(1, p / 24);
+        ImageWidth = w;
+        ImageHeight = h;
         Width = Math.Max(1, (int)Math.Ceiling(w / Scale));
         Height = Math.Max(1, (int)Math.Ceiling(h / Scale));
         Square = p / Scale;
         OffsetX = ox / Scale;
         OffsetY = oy / Scale;
         var lum = img.Luminance();
-        Lineness = ThinLines(lum, w, h);
+        Lineness = ThinLines(lum, w, h, true);
+        DarkLines = ThinLines(lum, w, h, false);
         ct.ThrowIfCancellationRequested();
         var (level, gridLine) = OutlineLevel(Lineness, w, h, p, ox, oy);
         LineLevel = level;
@@ -191,7 +199,7 @@ public sealed class MapVision
     /// How much each pixel is a thin dark line: how far its brightness is below both its sides, two to
     /// six pixels away, across or down (a stroke one to eight pixels wide, blurred or not).
     /// </summary>
-    static float[] ThinLines(float[] lum, int w, int h)
+    static float[] ThinLines(float[] lum, int w, int h, bool lightToo)
     {
         var res = new float[w * h];
         int[] widths = [2, 3, 4, 6];
@@ -202,8 +210,12 @@ public sealed class MapVision
                 float v = lum[i], best = 0;
                 foreach (int d in widths)
                 {
+                    // Darker than both sides (a drawn line), or lighter than both (a chalk line, a glow round a night map's roofs).
                     if (x - d >= 0 && x + d < w) best = Math.Max(best, Math.Min(lum[i - d], lum[i + d]) - v);
                     if (y - d >= 0 && y + d < h) best = Math.Max(best, Math.Min(lum[i - d * w], lum[i + d * w]) - v);
+                    if (!lightToo) continue;
+                    if (x - d >= 0 && x + d < w) best = Math.Max(best, v - Math.Max(lum[i - d], lum[i + d]));
+                    if (y - d >= 0 && y + d < h) best = Math.Max(best, v - Math.Max(lum[i - d * w], lum[i + d * w]));
                 }
                 res[i] = best;
             }
