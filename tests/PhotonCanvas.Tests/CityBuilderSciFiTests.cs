@@ -41,6 +41,21 @@ public class CityBuilderSciFiTests
         Assert.All(m.Roads, r => Assert.True(r.Width is 3 or 4, $"{r.Name} is {r.Width} wide"));
         Assert.All(m.Roads, r => Assert.False(string.IsNullOrWhiteSpace(r.Name)));
         Assert.Contains(m.Labels, l => l.Text == "Central Plaza");
+        // Fire escapes up the sides of the taller blocks: against a building, off the streets, a landing a floor.
+        var escapes = m.Items.Where(i => i.CatalogId == "sci-fire-escape").ToList();
+        Assert.True(escapes.Count >= 3, $"{escapes.Count} fire escapes");
+        var cellsOf = m.Buildings.SelectMany(CityFootprint.Cells).ToHashSet();
+        var streets = m.Roads.SelectMany(r => r.Cells(m.Across, m.Down)).ToHashSet();
+        foreach (var e in escapes)
+        {
+            var (ex, ey) = ((int)Math.Floor(e.X), (int)Math.Floor(e.Y));
+            Assert.DoesNotContain((ex, ey), cellsOf);
+            Assert.DoesNotContain((ex, ey), streets);
+            Assert.Contains(m.Buildings, b => CityFootprint.Cells(b).Any(c => Math.Abs(c.X - ex) <= 1 && Math.Abs(c.Y - ey) <= 1));
+            Assert.InRange(e.Item.Rows, 2, 5);
+            var kit = PhotonCanvas.Addon.Furniture.FurnitureKit.Make(e.Item, PhotonCanvas.Addon.Furniture.FurnitureThemes.Apply(new PhotonCanvas.Addon.Furniture.FurnitureSet { Items = [], ThicknessMm = 2, FitMm = 0.1 }, "Sci-fi"));
+            Assert.True(kit.Ok, string.Join("; ", kit.Findings));
+        }
         // A few of them make up into kits.
         foreach (var b in m.Buildings.Where((_, i) => i % 7 == 0).Take(4))
         {

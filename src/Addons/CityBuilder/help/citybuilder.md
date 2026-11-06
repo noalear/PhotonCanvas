@@ -206,7 +206,12 @@ floors, each with a flat roof deck behind a railing and things standing on it (f
 beacons, signposts, lamps). Their outsides are the cyberpunk walls (hab concrete, steel cladding,
 shopfronts on the walls facing the street, glass on the towers), each wall a little different. The
 market square is the **Central Plaza**, with a corp tower, an arcade and a neon bar facing it. Light
-pylons stand along every street and holo signposts at its crossings. In the 3D view the streets are dark
+pylons stand along every street and holo signposts at its crossings. About two in three buildings of three floors
+or more have a **fire escape** up a side or back wall (never one facing the street): grated landings at
+each floor that wall reaches, stairs zig-zagging between them and a drop ladder to the street. It's the
+furniture maker's sci-fi **Fire escape**, cut with the town's furniture; put one down yourself with the
+**Furniture** tool and set its **Landings** to the building's floors. **Fill** gives a city's new blocks
+fire escapes too. In the 3D view the streets are dark
 asphalt and the buildings show their lights: lit windows, a neon strip round each roof and a sign band
 over each bar or shop (only drawn, never cut).
 

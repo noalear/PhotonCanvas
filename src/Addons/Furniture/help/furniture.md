@@ -122,7 +122,7 @@ change it). All sizes are in mm and are the outside of the furniture as it stand
 | **Gallows** | A gallows on a braced platform: steps up the front, railings, a trapdoor, two posts and a beam with knee braces, and a noose on its rope; dungeon and gothic ones also hang an iron gibbet cage on a chain. See [Town props](#town-props). | 46 × 38, 60 high |
 | **Fountain** | A tiered fountain: an eight-sided basin of water on a plinth, a column with two bowls, water falling from spouts under each, and a finial (a pine cone, a spire, an onion dome in the desert, a stone in a cave, an antenna for sci-fi). It's as wide as the smaller of **Width** and **Depth**. See [Town props](#town-props). | 50.8 × 50.8, 46 high |
 | **Ship fitting** | Starship fittings in plated metal, each starting at its own size. **Kind**: *Cryo pod* (a sleeper etched behind a tall window in the canopy, frost round it, a control panel, light strips and vents on the sides, a hood bulging over the front with a fan on top and coolant tubes glued up the sides), *Med bay bed with scanner* (a bed on a panelled pedestal with a red cross, a scanner arch over it with a glowing lens, a monitor on a post showing a heartbeat, a mattress and pillow), *Mess table with fixed stools* (a table on a spine of arches and two end legs, a lit strip down the top, pedestal stools on arms of the deck plate), *Server rack* (vented sides on feet, a hazard-striped plinth, fans on top, shelves through the sides holding drive bays, switches and readouts), *Crew bunks* (two bunks between end frames, a ladder cut up one end, a rail, a locker of drawers underneath, mattresses and pillows), *Cockpit console* (a desk on two pedestals, a keyboard and rows of buttons, a radar screen in the middle and a readout and a graph angled in either side), *Rifle rack* (a row of rifles with scopes, grips and magazines held by a clamp bar on a shelf, an ammo drawer below, a lit header), *Fuel drums* (three ribbed drums on a skid, glued up from rings; with a push fit, two halved profiles each with a label band) or *Reactor core* (a glowing core ringed by collars in a cage of four struts, an eight-sided base with a hazard ring and a fan housing on the cap). | 22 × 15, 32 high |
-| **Street piece** | Pieces for the town's streets and squares, each starting at its own size: see [Street pieces](#street-pieces). **Kind**: *Street lamp*, *Statue*, *Signpost*, *Market cross* or *Watchtower*. | 13 × 13, 46 high (a lamp) |
+| **Street piece** | Pieces for the town's streets and squares, each starting at its own size: see [Street pieces](#street-pieces). **Kind**: *Street lamp*, *Statue*, *Signpost*, *Market cross*, *Watchtower* or *Fire escape*. | 13 × 13, 46 high (a lamp) |
 
 **Leg width** sets how wide the legs, ends and posts are; 0 picks a width to suit the sheet.
 **Look** (on the newer kinds) is the theme a piece is made in: its door panels, handles, ornament
@@ -276,6 +276,14 @@ hole, the shaft's socle resting on the top one and a knop halfway up. Its head i
 a tabernacle of pointed niches under a pinnacled spire, a little kiosk with keyhole arches under an
 onion dome, a broken cross with a chain and shackle hanging from its arm, a totem of three carved
 faces under horns, or a beacon spire through a glowing ring.
+
+A **fire escape** stands against a city block's wall: a back frame of two posts with a band at each
+landing (open between, so the windows behind show), grated landings slotted through it with barred
+railings along the front and ends, a stair flight between each landing and the next turning back each
+time (its top tabbed up under the landing above, a hatch marked there), and a drop ladder from the first
+landing down to the street. **Landings** sets how many floors it serves; they're spaced evenly with the
+rail's height over the top one, so make it as tall as the floors (the city builder sizes it for each
+building). It's in the sci-fi look's town pieces.
 
 A **statue** stands on a pedestal: a plinth, four sides with sunk panels (an inscription on the front,
 the theme's symbol on the sides) and a slab on top. The figure is a front profile slotted up between

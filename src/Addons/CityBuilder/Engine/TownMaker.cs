@@ -760,6 +760,8 @@ public static class TownMaker
                     items.Add(CityItems.Make(sign, o.SquareMm, gx + 0.3, gy + 0.3, 45));
                 }
         }
+        // Fire escapes up the sides and backs of the taller blocks.
+        if (sci) items.AddRange(FireEscapes.For(buildings, g, taken, o.Theme, o.SquareMm, rnd, avoid: OnSquare));
         // Lamps along the high roads, on the grass at their edge (the top or left side), every ninth square.
         foreach (var r in roads.Where(r => r.Main && !sci))
         {
@@ -1150,11 +1152,19 @@ public static class TownMaker
         if (added == 0) return (m, 0);
         var fresh = buildings.Skip(m.Buildings.Count).ToList();
         var under = fresh.SelectMany(CityFootprint.Cells).ToHashSet();
+        var items = m.Items.Where(i => !under.Contains(((int)Math.Floor(i.X), (int)Math.Floor(i.Y)))).ToList();
+        // A city's new blocks get their fire escapes too, clear of the buildings and what's already standing.
+        if (SciFi(m.Theme))
+        {
+            var busy = buildings.SelectMany(CityFootprint.Cells).ToHashSet();
+            foreach (var i in items) busy.Add(((int)Math.Floor(i.X), (int)Math.Floor(i.Y)));
+            items.AddRange(FireEscapes.For(fresh, g, busy, m.Theme, m.SquareMm, rnd));
+        }
         return (m with
         {
             Buildings = buildings,
             Props = [.. m.Props.Where(p => !under.Contains(((int)Math.Floor(p.X), (int)Math.Floor(p.Y))))],
-            Items = [.. m.Items.Where(i => !under.Contains(((int)Math.Floor(i.X), (int)Math.Floor(i.Y))))],
+            Items = items,
         }, added);
     }
 }
