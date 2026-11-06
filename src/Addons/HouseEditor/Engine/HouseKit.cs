@@ -79,6 +79,17 @@ public static partial class HouseKitMaker
     public static string Letter(int i) => TileKitMaker.Column(i);
 
     /// <summary>
+    /// The plan's middle (squares): the middle of everything drawn on the floors that are made, where the building
+    /// sits on the origin of its pieces' places (<see cref="HouseSolid.Pose"/>: x along the plan, y up, z down the plan, mm).
+    /// </summary>
+    public static (double X, double Y) Middle(HouseDesign d)
+    {
+        var allPts = d.Levels.Take(Math.Min(d.Levels.Count, MaxLevels)).SelectMany(l => l.Walls.SelectMany(e => new[] { e.A, e.B }).Concat(l.Floor.SelectMany(f => new[] { f, f + new GridPt(1, 1) }))).ToList();
+        if (allPts.Count == 0) return (0, 0);
+        return ((allPts.Min(p => p.X) + allPts.Max(p => p.X)) / 2.0, (allPts.Min(p => p.Y) + allPts.Max(p => p.Y)) / 2.0);
+    }
+
+    /// <summary>
     /// The building's pieces. <paramref name="longestMm"/> is the longest piece the bed takes: walls
     /// longer are cut at a grid point with a straight column between, and floors bigger are cut in pieces
     /// along the walls under them.
@@ -103,9 +114,7 @@ public static partial class HouseKitMaker
         // The floor tiles don't depend on anything else: they're started now, alongside the walls.
         if (TileSpecOf(d, s, sq) is { } tileSpec) _ = Task.Run(() => { try { TileKitOf(tileSpec); } catch (Exception) { /* Tiles says what went wrong. */ } });
         var plans = d.Levels.Take(levels).Select(l => l.Shape()).ToList();
-        // The plan's middle (squares): the middle of everything drawn, so the building sits on the origin.
-        var allPts = d.Levels.Take(levels).SelectMany(l => l.Walls.SelectMany(e => new[] { e.A, e.B }).Concat(l.Floor.SelectMany(f => new[] { f, f + new GridPt(1, 1) }))).ToList();
-        double ox = (allPts.Min(p => p.X) + allPts.Max(p => p.X)) / 2.0, oy = (allPts.Min(p => p.Y) + allPts.Max(p => p.Y)) / 2.0;
+        var (ox, oy) = Middle(d);
         V3 World(double px, double py, double y) => new((px - ox) * sq, y, (py - oy) * sq);
 
         // Each floor's plate (plan mm, y towards you), worked out first: the columns under it are flush with it.

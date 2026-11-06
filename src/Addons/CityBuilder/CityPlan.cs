@@ -5,6 +5,8 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using PhotonCanvas.App;
+using PathsD = Clipper2Lib.PathsD;
+using RectD = Clipper2Lib.RectD;
 
 namespace PhotonCanvas.Addon.CityBuilder;
 
@@ -355,6 +357,7 @@ public sealed class CityPlan : Control
         // Buildings: their squares, roofs, walls with the doors and windows in them.
         var overlaps = CityFootprint.Overlaps(_map).SelectMany(p => new[] { p.A.Id, p.B.Id }).ToHashSet();
         foreach (var b in _map.Buildings) DrawBuilding(ctx, b, k, overlaps.Contains(b.Id));
+        DrawReach(ctx, k);
 
         // Furniture, under the trees.
         foreach (var i in _map.Items) DrawItem(ctx, i, k, Pick.Items.Contains(i.Id), false);
@@ -376,6 +379,58 @@ public sealed class CityPlan : Control
     }
 
     static Color Scene3DShade(Color c, double f) => Color.FromRgb((byte)(c.R * f), (byte)(c.G * f), (byte)(c.B * f));
+
+    // ---- the buildings as built ----
+
+    object? _reachFor;
+    int _reachVersion = -1;
+    List<(CityBuilding B, PathsD Extent, RectD Box)> _reach = [];
+    List<(CityBuilding A, CityBuilding B, PathsD Where)> _intrusions = [];
+    static readonly IBrush IntrudeBrush = new SolidColorBrush(Color.FromArgb(0x80, 0xE0, 0x30, 0x30));
+    static readonly IPen IntrudePen = new Pen(new SolidColorBrush(Color.FromRgb(0xC0, 0x20, 0x20)), 1.5);
+    static readonly IPen ReachPen = new Pen(new SolidColorBrush(Color.FromArgb(0x90, 0x2A, 0x1E, 0x12)), 1) { DashStyle = new DashStyle([3, 3], 0) };
+
+    /// <summary>Whether the plan shows where each building reaches once built (its roof's overhang and all), dashed.</summary>
+    public bool ShowReach { get; set; } = true;
+
+    /// <summary>The buildings that would run into each other once built (those made so far), and where.</summary>
+    public IReadOnlyList<(CityBuilding A, CityBuilding B, PathsD Where)> Intrusions { get { CacheReach(); return _intrusions; } }
+
+    void CacheReach()
+    {
+        if (ReferenceEquals(_reachFor, _map) && _reachVersion == CityBuilt.Version) return;
+        _reachFor = _map;
+        _reachVersion = CityBuilt.Version;
+        _reach = CityBuilt.Reaches(_map);
+        _intrusions = CityBuilt.Intrusions(_reach);
+    }
+
+    /// <summary>Each building's ground as built, dashed round it (close enough in to see), and where two would run into each other, red.</summary>
+    void DrawReach(DrawingContext ctx, double k)
+    {
+        CacheReach();
+        if (ShowReach && k >= 5)
+            foreach (var (_, e, _) in _reach) ctx.DrawGeometry(null, ReachPen, Outline(e));
+        foreach (var (_, _, where) in _intrusions) ctx.DrawGeometry(IntrudeBrush, IntrudePen, Outline(where));
+    }
+
+    /// <summary>Outlines on the map (squares) on screen, holes and all.</summary>
+    StreamGeometry Outline(PathsD paths)
+    {
+        var g = new StreamGeometry();
+        using (var c = g.Open())
+        {
+            c.SetFillRule(Avalonia.Media.FillRule.EvenOdd);
+            foreach (var p in paths)
+            {
+                if (p.Count < 3) continue;
+                c.BeginFigure(At(p[0].x, p[0].y), true);
+                for (int i = 1; i < p.Count; i++) c.LineTo(At(p[i].x, p[i].y));
+                c.EndFigure(true);
+            }
+        }
+        return g;
+    }
 
     void DrawBuilding(DrawingContext ctx, CityBuilding b, double k, bool overlapping)
     {

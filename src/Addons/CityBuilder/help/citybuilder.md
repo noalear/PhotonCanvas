@@ -17,9 +17,10 @@ from a 2D battle map picture: the city builder reads it as a best guess of the t
 and you put right whatever it got wrong. Each building opens in the [building editor](houseeditor.md)
 to change its rooms, doors, furniture and roof, and comes out as its laser-cut pieces.
 
-> **Note:** The 3D view is a light one on purpose: plain blocks and flat colours, no textures and no
-> engraving depth, so even a big town turns round quickly. The textures are on each building's own
-> pieces (and in the building editor's 3D view).
+> **Note:** The 3D view shows each building as it'll be once it's cut and put together, true to size
+> (its corner columns, its roof's overhang, its doors and shutters), but in flat colours, with no textures
+> and no engraving depth, so even a big town turns round quickly. The textures are on each building's
+> own pieces (and in the building editor's 3D view).
 
 ## The City builder window
 <!-- windows: CityWindow -->
@@ -44,7 +45,8 @@ the last map you worked on (the first time, a small sample village). It's laid o
   here instead; close it with the cross in its corner, or press its button again.
 - **The bar** along the bottom: the square under the pointer, what was last done, how big the map is
   on the table, how many buildings, roads, trees and pieces of furniture there are, and whether any buildings stand on
-  the same squares (they show red on the plan).
+  the same squares or would run into each other once they're built (both show red on the plan: see
+  [How big the buildings are once built](#how-big-the-buildings-are-once-built)).
 
 The map is saved as you go and opens again next time.
 
@@ -187,7 +189,8 @@ which is its **District**, and is the size such a building is on a battle map of
 cottage four squares by four, a town house four or five by six, a tavern eight by eight, a temple
 nine by thirteen): shops, workshops and taverns in the market, houses round it, a noble quarter of
 manors, warehouses at the docks, hovels at the town's edge, barns and a stable on the farms. There's a
-square of ground between buildings, so none touch. A town has one of each trade's shop or workshop,
+two squares of ground between buildings: once they're built, each reaches about a square past its plan
+(its corner columns and its roof's overhang), so with less they'd run into each other. A town has one of each trade's shop or workshop,
 one smithy, stable and mill (a few more in a city), and each building has a name of its own: a
 family's for the houses and cottages (*the Ashford house*, *Thorne cottage*), *Baker's shop*,
 *The Golden Goose*; change any of them on the **Picked** tab. There are lamps along the high roads,
@@ -201,7 +204,7 @@ you like: it's an ordinary map.
 ### Filling the roads with buildings
 
 **Fill with buildings** (beside the tools when **Select** is picked) puts buildings along the roads (and round paved squares) on the free grass,
-facing the road, as full as **How full** says, of the kinds for the **District** picked, a square apart
+facing the road, as full as **How full** says, of the kinds for the **District** picked, two squares apart
 and clear of the walls and fences, with names the town hasn't got yet; your saved buildings where they
 suit, if that's ticked. With **Select**, drag a box first to fill only inside it
 (it stays dashed on the plan until you click again); otherwise it fills the whole map. Lay out roads
@@ -287,6 +290,8 @@ the building editor):
   quarter turns, turning about its own middle; type another, or 0 to straighten it. **Square it to
   the grid** straightens it and puts it back on whole squares. (A tilted building draws, picks, turns
   and cuts like any other; it stands on every square it covers any part of.)
+- Under its settings: how big it is, and what it covers once built, with its roof and what sticks out
+  of its walls, and how many squares to keep between it and the next.
 - **Turn ⟳** turns it a quarter turn. **Add a floor** puts another floor on top (the top floor's
   walls and windows again; doors upstairs become windows) and moves its roofs up onto it; **Take the
   top floor off** does the opposite.
@@ -331,15 +336,36 @@ map to put it down. **Look again** reads the list again after saving one in the 
 
 ## The 3D view
 
-![The sample battle map's town in 3D: plain blocks for the houses with doors and windows cut in, roofs coloured by their covering, the river, the roads and the trees](images/window-citybuilder-battlemap-3d.png)
+![The sample village in 3D, each building as it'll be built: its corner columns, its roof overhanging the walls, its door and shutters](images/window-citybuilder-3d.png)
 
 **3D** on the toolbar shows the whole map put together: drag to turn it round, scroll to zoom in on a part,
-middle-drag or the arrow keys to move it, and press `F` (or double-click) to see it all again. Along its top, untick
-**Roofs** to look into the buildings, **Trees and things** to see the ground clearly (the furniture
-goes with them), or **Doors and windows** to make a very big town quicker still. The building or
+middle-drag or the arrow keys to move it, and press `F` (or double-click) to see it all again.
+
+With **As built** ticked (along its top), each building is every one of its pieces where it'll sit once it's cut
+and put together, true to size: its walls, its corner columns, its floors, its roofs overhanging the walls, its
+doors, shutters, lamps and sconces. They're made in the background when the map opens or a building changes (a
+building takes a moment; one moved, turned or copied isn't made again), and **Making them as built** along the top
+says how far it's got; until then a building shows as plain blocks. Tick **Doors open** to swing every door and
+shutter open, as far as it goes. Untick **As built** for plain blocks the size of each building's plan (quicker
+on a very big town, and only the first 200 buildings are shown as built anyway).
+
+Untick **Roofs** to look into the buildings, **Trees and things** to see the ground clearly (the furniture
+goes with them), or **Doors and windows** to leave the plain blocks' doors and windows out. The building or
 furniture picked shows orange. Each piece of furniture is put together as it'll be cut, its true size.
 
-![The sample village in 3D](images/window-citybuilder-3d.png)
+![The sample battle map's town in 3D](images/window-citybuilder-battlemap-3d.png)
+
+### How big the buildings are once built
+
+![Two houses too close together: each dashed round where it reaches once built, and red where their roofs would run into each other](images/window-citybuilder-reach.png)
+
+A building takes up more than the squares of its plan once it's built: its corner columns stand a little outside
+its walls, its roof overhangs them, and its doors and shutters swing out. Close in on the plan, each building
+is dashed round where it reaches once built, and where two buildings would run into each other the plan shows
+it red and the bar along the bottom says how many there are: move one of them a square or two away (or give it a
+smaller roof in the building editor). The **Picked** tab says what the building picked covers once built and how
+many squares to keep between it and the next. A town the city builder makes keeps two squares between its
+buildings, so they fit.
 
 ## Cutting the buildings
 

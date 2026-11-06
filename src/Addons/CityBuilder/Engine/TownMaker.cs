@@ -716,6 +716,20 @@ public static class TownMaker
                 if (!cells.Contains(n)) yield return n;
     }
 
+    /// <summary>
+    /// Squares of ground kept clear between buildings: built, each reaches about a square past its plan all round
+    /// (its corner columns, its roof's overhang, its doors and shutters swung open), so with fewer they'd run into each other.
+    /// </summary>
+    public const int Apart = 2;
+
+    /// <summary>The squares round one within <see cref="Apart"/> of it.</summary>
+    static IEnumerable<(int X, int Y)> Round(int x, int y)
+    {
+        for (int j = y - Apart; j <= y + Apart; j++)
+            for (int i = x - Apart; i <= x + Apart; i++)
+                if (i != x || j != y) yield return (i, j);
+    }
+
     /// <summary>The eight squares round a square (some may be off the map).</summary>
     static IEnumerable<(int X, int Y)> Neighbours8(int x, int y)
     {
@@ -753,7 +767,7 @@ public static class TownMaker
     /// <summary>
     /// Buildings along the roads (and round paved squares) on grass that's free and not kept <paramref name="clear"/>:
     /// for every stretch of road, plots side by side facing it (as close as <paramref name="density"/> says, but
-    /// never touching: a square of ground round each), each one's kind from its part of town
+    /// never touching: <see cref="Apart"/> squares of ground round each), each one's kind from its part of town
     /// (<paramref name="districtAt"/>; null leaves the plot empty) and no more of a kind than a town that size has
     /// (one smithy, one stable, each trade's shop once), a saved building where one of the right district and kind
     /// suits it, otherwise one made up of the size such a building is on a battle map. Returns how many were put up.
@@ -821,8 +835,8 @@ public static class TownMaker
             return new CityBuilding { Type = type, District = district, X = m.X, Y = m.Y, Design = m.Design };
         }
         var skipTo = new Dictionary<int, (int X, int Y)>();
-        // Puts a building up: its name (a family's, a trade's, a tavern's sign) given now, and a square of ground
-        // kept clear all round it so the next one doesn't touch it.
+        // Puts a building up: its name (a family's, a trade's, a tavern's sign) given now, and ground kept clear all
+        // round it so the next one doesn't run into it once they're both built.
         List<(int X, int Y)> Add(CityBuilding b, string? name = null)
         {
             number++;
@@ -831,7 +845,7 @@ public static class TownMaker
             var own = CityFootprint.Cells(b).ToList();
             foreach (var c in own) taken.Add(c);
             foreach (var (x, y) in own)
-                foreach (var n in Neighbours8(x, y))
+                foreach (var n in Round(x, y))
                     if (!taken.Contains(n)) clear.Add(n);
             buildings.Add(b);
             made[b.Type] = Made(b.Type) + 1;
@@ -894,10 +908,10 @@ public static class TownMaker
             if (b is null && ForTheme(Smaller(district), theme) is var small && small != type) b = MadeUp(small, district, x, y, face);
             if (b is null) continue;
             var own = Add(b, name);
-            // The next plot along: just past the square of ground round it in a packed street, otherwise a square or two on.
+            // The next plot along: just past the ground kept clear round it in a packed street, otherwise a square or two on.
             int gap = rnd.NextDouble() < density * 0.8 ? 0 : rnd.Next(1, 2 + (int)Math.Round((1 - density) * 4));
             int far = ax == 1 ? own.Max(c => c.X) : own.Max(c => c.Y);
-            skipTo[face] = ax == 1 ? (far + 2 + gap, y) : (x, far + 2 + gap);
+            skipTo[face] = ax == 1 ? (far + 1 + Apart + gap, y) : (x, far + 1 + Apart + gap);
         }
         return count;
     }
@@ -942,10 +956,10 @@ public static class TownMaker
         m = m.Tidied();
         var g = m.Paved().GroundGrid();
         var taken = m.Buildings.SelectMany(CityFootprint.Cells).ToHashSet();
-        // A square of ground round every building kept clear, and either side of the fences and walls.
+        // Ground round every building kept clear (enough for it as built), and either side of the fences and walls.
         var clear = new HashSet<(int X, int Y)>();
         foreach (var (x, y) in taken)
-            foreach (var n in Neighbours8(x, y))
+            foreach (var n in Round(x, y))
                 if (!taken.Contains(n)) clear.Add(n);
         BesideFences(m, clear);
         var area = box ?? (0, 0, m.Across, m.Down);

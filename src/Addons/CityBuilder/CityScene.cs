@@ -15,6 +15,13 @@ public sealed record CityShow
     public bool Openings { get; init; } = true;
     /// <summary>The buildings picked, shown orange.</summary>
     public HashSet<Guid> Picked { get; init; } = [];
+    /// <summary>
+    /// Each building as it'll be once it's cut and put together (<see cref="CityBuilt"/>), true to size: its corner
+    /// columns, roofs' overhang, doors, shutters and lamps. Buildings not made that way yet are drawn as plain blocks.
+    /// </summary>
+    public bool AsBuilt { get; init; } = true;
+    /// <summary>The doors and shutters swung open (as built).</summary>
+    public bool DoorsOpen { get; init; }
 }
 
 /// <summary>
@@ -81,7 +88,17 @@ public static class CityScene
         // The roads laid on the ground; the water left under their bridges, and the bridges over it.
         AddGround(scene, map.Paved(overWater: false), sq);
         foreach (var site in TownPieces.Bridges(map)) AddBridge(scene, site, sq);
-        foreach (var b in map.Buildings) AddBuilding(scene, b, sq, show, show.Picked.Contains(b.Id));
+        int built = 0;
+        foreach (var b in map.Buildings)
+        {
+            bool picked = show.Picked.Contains(b.Id);
+            if (show.AsBuilt && built < MostBuilt && CityBuilt.Known(b.Design) is { Ok: true } model)
+            {
+                AddBuilt(scene, b, model, sq, show, picked);
+                built++;
+            }
+            else AddBuilding(scene, b, sq, show, picked);
+        }
         AddWalls(scene, map, sq);
         if (show.Props)
         {
@@ -90,7 +107,60 @@ public static class CityScene
         }
     }
 
+    /// <summary>The most buildings drawn as built (the rest plain blocks), so a big town still turns round.</summary>
+    public const int MostBuilt = 200;
+
     static readonly Color ItemWood = Color.FromRgb(0xB0, 0x86, 0x58), ItemPicked = Color.FromRgb(0xF0, 0x9A, 0x2A);
+    static readonly Color FloorWood = Color.FromRgb(0xC9, 0xAC, 0x82), DoorWood = Color.FromRgb(0x8A, 0x62, 0x3E);
+
+    /// <summary>
+    /// A building as it'll be once it's cut and put together: every one of its pieces where it sits, true to size
+    /// (scaled only if it's drawn on other squares than the map's), coloured by what it is.
+    /// </summary>
+    public static void AddBuilt(Scene3D scene, CityBuilding b, BuiltModel m, double sq, CityShow show, bool selected)
+    {
+        var d = b.Design;
+        double k = sq / m.SquareMm;
+        // A point of the model (mm about its middle: x along the plan, y up, z down it) on the map: through its
+        // plan (squares), turned, shifted and tilted with the building; an affine map, so three points give it.
+        Vec3 OnMap(double px, double py, double up)
+        {
+            var (x, y) = CityFootprint.ToMap(b, px, py);
+            return new Vec3(x * sq, up, y * sq);
+        }
+        var o = OnMap(m.MiddleX, m.MiddleY, 0);
+        var ex = (OnMap(m.MiddleX + 1 / m.SquareMm, m.MiddleY, 0) - o) * (1 / k);
+        var ez = (OnMap(m.MiddleX, m.MiddleY + 1 / m.SquareMm, 0) - o) * (1 / k);
+        Vec3 P(Furniture.V3 p) => o + ex * (p.X * k) + new Vec3(0, p.Y * k, 0) + ez * (p.Z * k);
+        Vec3 D(Furniture.V3 v) => ex * v.X + new Vec3(0, v.Y, 0) + ez * v.Z;
+        Color Pick(Color c) => selected ? Tint(c) : c;
+        var s = HouseKitMaker.StyleFor(d);
+        var walls = Look(Pick(WallColour(s.Texture)));
+        var upper = s.UpperTexture is { } up ? Look(Pick(WallColour(up))) : walls;
+        var columns = Look(Pick(Scene3DShade(WallColour(d.ColumnTexture ?? s.Texture), 0.9)));
+        var roof = Look(Pick(RoofColour(d.Roofs.Count > 0 ? d.Roofs[0].Covering : s.RoofTexture)));
+        var floor = Look(Pick(FloorWood));
+        var wood = Look(Pick(ItemWood));
+        var door = Look(Pick(DoorWood));
+        foreach (var piece in m.Solids)
+        {
+            var pose = show.DoorsOpen && piece.Open is { } open ? open : piece.Pose;
+            var look = piece.Kind switch
+            {
+                SolidKind.Wall => piece.Level > 0 ? upper : walls,
+                SolidKind.Column => columns,
+                SolidKind.Roof => roof,
+                SolidKind.Floor or SolidKind.Ground => floor,
+                _ => piece.Open is not null ? door : wood,
+            };
+            var outline = k == 1 ? piece.Outline : Clipper.ScalePaths(piece.Outline, k);
+            var frame = new Frame3(P(pose.O), D(pose.U), D(pose.V));
+            double t = piece.Thickness * k / 2;
+            scene.AddSlab(outline, frame, -t, t, look, group: piece.Kind == SolidKind.Roof ? RoofGroup : WallGroup);
+        }
+    }
+
+    static Color Scene3DShade(Color c, double f) => Color.FromRgb((byte)(c.R * f), (byte)(c.G * f), (byte)(c.B * f));
 
     /// <summary>
     /// A piece of furniture put together as it will be once it's cut: every one of its flat pieces where it
