@@ -233,6 +233,7 @@ public sealed class ItemEditor : StackPanel
             ItemKind.Armchair when it.Seat is SeatStyle.Sofa or SeatStyle.Pew or SeatStyle.Settle => ("Seats", null),
             ItemKind.Screen => ("Panels", null),
             ItemKind.WeaponRack => (null, "Weapons"),
+            ItemKind.Street when it.Street == StreetStyle.FireEscape => (null, "Landings"),
             _ => (null, null),
         };
         _colsLabel.Text = counts.cols ?? ""; _colsRow.IsVisible = counts.cols is not null;
@@ -295,7 +296,7 @@ public sealed class ItemEditor : StackPanel
         ItemKind.Tree => ("Kind", ["Oak", "Pine", "Dead tree", "Palm", "Giant mushroom"]),
         ItemKind.Stall => ("Kind", ["Market stall", "Outdoor bar", "Notice board"]),
         ItemKind.Ship => ("Kind", ["Cryo pod", "Med bay bed with scanner", "Mess table with fixed stools", "Server rack", "Crew bunks", "Cockpit console", "Rifle rack", "Fuel drums", "Reactor core"]),
-        ItemKind.Street => ("Kind", ["Street lamp", "Statue", "Signpost", "Market cross", "Watchtower"]),
+        ItemKind.Street => ("Kind", ["Street lamp", "Statue", "Signpost", "Market cross", "Watchtower", "Fire escape"]),
         _ => null,
     };
 

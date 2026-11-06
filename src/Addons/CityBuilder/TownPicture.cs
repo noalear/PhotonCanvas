@@ -139,7 +139,7 @@ public static class TownPicture
         }
 
         // Furniture, under the trees.
-        foreach (var i in m.Items.Where(i => In(i.X, i.Y))) DrawItem(c, i, m.SquareMm, fill, line, shadow);
+        foreach (var i in m.Items.Where(i => In(i.X, i.Y))) DrawItem(c, i, m.SquareMm, fill, line, shadow, sci);
 
         // Trees and things.
         foreach (var p in m.Props.Where(p => In(p.X, p.Y)).OrderBy(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.GuardTower ? 1 : 0).ThenBy(p => p.Y))
@@ -773,7 +773,7 @@ public static class TownPicture
     /// A piece of furniture from above, turned as it's put down: a short shadow, then its pieces (the furniture
     /// maker's, lowest first), lighter the higher each stands, each with a thin dark edge.
     /// </summary>
-    public static void DrawItem(SKCanvas c, CityItem i, double squareMm, SKPaint fill, SKPaint line, SKPaint? shadow = null)
+    public static void DrawItem(SKCanvas c, CityItem i, double squareMm, SKPaint fill, SKPaint line, SKPaint? shadow = null, bool metal = false)
     {
         double sq = Math.Max(1, squareMm);
         var look = CityItems.Look(i, sq);
@@ -790,7 +790,7 @@ public static class TownPicture
         c.Scale((float)(1 / sq));
         var oldStyle = line.Style;
         var oldWidth = line.StrokeWidth;
-        line.Color = new SKColor(0x4A, 0x32, 0x1C, 0xD8);
+        line.Color = metal ? new SKColor(0x1E, 0x22, 0x28, 0xD8) : new SKColor(0x4A, 0x32, 0x1C, 0xD8);
         line.StrokeWidth = (float)(0.012 * sq);
         if (look.Parts.Count == 0)
         {
@@ -813,7 +813,8 @@ public static class TownPicture
                 }
                 double t = highest - lowest < 1e-6 ? 1 : (part.Top - lowest) / (highest - lowest);
                 byte L(double lo, double hi) => (byte)Math.Round(lo + (hi - lo) * t);
-                fill.Color = new SKColor(L(0x7A, 0xE2), L(0x52, 0xC2), L(0x2E, 0x90));
+                // A city's pieces are steel, an old town's wood.
+                fill.Color = metal ? new SKColor(L(0x46, 0xA8), L(0x4C, 0xB0), L(0x56, 0xBA)) : new SKColor(L(0x7A, 0xE2), L(0x52, 0xC2), L(0x2E, 0x90));
                 c.DrawPath(path, fill);
                 c.DrawPath(path, line);
             }

@@ -466,6 +466,8 @@ public static class FurnitureCatalog
             ("Holo signpost", "A signpost of glowing holo boards with chevrons pointing the way, an antenna on top."),
             ("Beacon", "A beacon spire through a glowing ring, a light at its tip, on three plated steps."),
             ("Sentry tower", "A plated sentry tower: braced legs, a ladder, a platform and parapet with hazard stripes, a searchlight under a ribbed metal roof."));
+        b.Add("Fire escape", ItemKind.Street, i => global::PhotonCanvas.Addon.Furniture.TownWalls.StreetSized(i, StreetStyle.FireEscape),
+            "A steel fire escape to stand against a city block: grated landings with barred railings at each floor, stairs zig-zagging between them and a drop ladder to the street. Set its landings to the building's floors.", "fire-escape");
         TownWalls(b, "Defence wall", "armoured defence wall with gun ports, a hazard-striped band and a skirt of plate");
         return b.Entries;
     }

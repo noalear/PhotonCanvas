@@ -3,8 +3,8 @@ using PhotonCanvas.Addon.Terrain;
 
 namespace PhotonCanvas.Addon.Furniture;
 
-/// <summary>A street piece: a street lamp, a statue on its pedestal, a signpost, a market cross or a wooden watchtower.</summary>
-public enum StreetStyle { Lamp, Statue, Signpost, MarketCross, Watchtower }
+/// <summary>A street piece: a street lamp, a statue on its pedestal, a signpost, a market cross, a wooden watchtower or a city block's fire escape.</summary>
+public enum StreetStyle { Lamp, Statue, Signpost, MarketCross, Watchtower, FireEscape }
 
 /// <summary>Street pieces for the city builder: lamps, statues, signposts, market crosses and watchtowers.</summary>
 public static partial class TownWalls
@@ -16,6 +16,7 @@ public static partial class TownWalls
         StreetStyle.Signpost => it with { Street = s, WidthMm = 26, DepthMm = 20, HeightMm = 40 },
         StreetStyle.MarketCross => it with { Street = s, WidthMm = 25.4, DepthMm = 25.4, HeightMm = 50 },
         StreetStyle.Watchtower => it with { Street = s, WidthMm = 38, DepthMm = 38, HeightMm = 88 },
+        StreetStyle.FireEscape => FireEscapeFor(it with { WidthMm = 50.8, DepthMm = 16 }, 2, 51),
         _ => it with { Street = s, WidthMm = 13, DepthMm = 13, HeightMm = 46 },
     };
 
@@ -28,6 +29,7 @@ public static partial class TownWalls
             case StreetStyle.Signpost: Signpost(m); break;
             case StreetStyle.MarketCross: MarketCross(m); break;
             case StreetStyle.Watchtower: Watchtower(m); break;
+            case StreetStyle.FireEscape: FireEscape(m); break;
             default: Lamp(m); break;
         }
     }
