@@ -56,6 +56,12 @@ public static class RoofFinder
             if (Shape(v, g, o) is { } roof) roofs.Add(roof);
         }
         roofs = JoinHalves(v, roofs, o);
+        // Then the blocks that aren't the ground's colour, texture and all (see <see cref="RoofBlobs"/>): the roofs the patches missed.
+        foreach (var blob in RoofBlobs.Find(v, least, most, v.Patches.Count, ct))
+        {
+            ct.ThrowIfCancellationRequested();
+            roofs.AddRange(ShapeBlob(v, blob, o));
+        }
         // Where two overlap, the surer one stays.
         roofs = roofs.OrderByDescending(r => r.Support * Math.Sqrt(r.Area)).ToList();
         var kept = new List<SeenRoof>();
@@ -142,7 +148,7 @@ public static class RoofFinder
     }
 
     /// <summary>Grass, trees and water by colour: never a roof.</summary>
-    static bool Ground(MapVision.Patch p)
+    internal static bool Ground(MapVision.Patch p)
     {
         var (h, s, _) = p.Hsv;
         if (s > 0.16 && h >= 62 && h < 170) return true;
@@ -332,12 +338,52 @@ public static class RoofFinder
                 if (rects.Count == 3) break;
             }
         }
+        return Check(v, group, cells, filled, box, fill, rects, o, "group");
+    }
+
+    /// <summary>
+    /// The roofs in a blob (see <see cref="RoofBlobs"/>): a blob is as often a row of buildings as one,
+    /// so every rectangle inside it big enough to be a roof is tried, the ones that touch as one roof
+    /// (an L, a T) and the rest each on its own.
+    /// </summary>
+    static List<SeenRoof> ShapeBlob(MapVision v, MapVision.Patch blob, Options o)
+    {
+        double sq = v.Square, sqArea = sq * sq;
+        var res = new List<SeenRoof>();
+        var cells = blob.Cells;
+        if (cells.Count < 0.6 * sqArea) return res;
+        var box = v.MinBox(cells);
+        var filled = Filled(v, cells, box);
+        double fill = filled.Count / Math.Max(1, box.Area);
+        var clusters = new List<List<MapVision.Box>>();
+        if (fill >= 0.8 && box.W >= 0.7 * sq && box.H >= 0.7 * sq) clusters.Add([box]);
+        else
+            foreach (var r in Inner(v, [.. filled], box.AngleDeg, sq))
+            {
+                if (r.Area < 1.2 * sqArea) continue;
+                var home = clusters.FirstOrDefault(c => c.Count < 3 && Touches(c, r, sq));
+                if (home is null) clusters.Add([r]);
+                else home.Add(r);
+            }
+        foreach (var rects in clusters)
+            if (Check(v, [blob], cells, filled, box, fill, rects, o, "blob") is { } roof) res.Add(roof);
+        return res;
+    }
+
+    /// <summary>
+    /// Some rectangles chosen for a patch (or a blob) checked as a roof: slid to their drawn lines, each
+    /// big enough, drawn round most of their outline, the strokes inside running one way.
+    /// </summary>
+    static SeenRoof? Check(MapVision v, List<MapVision.Patch> group, List<int> cells, HashSet<int> filled, MapVision.Box box, double fill, List<MapVision.Box> rects, Options o, string kind)
+    {
+        double sq = v.Square, sqArea = sq * sq;
         if (rects.Count == 0) return null;
         if (rects.Sum(r => r.Area) > o.LargestSquares * sqArea) return null;
         // A strip running off the picture at both ends is a road (or a river), not a roof.
         if (rects.Any(r => OffBothEnds(v, r))) return null;
-        // A rectangle found inside a patch that's mostly something else (a road with a straight bit) isn't a roof.
-        if (rects.Sum(r => r.Area) < 0.45 * cells.Count) return null;
+        // A rectangle found inside a patch that's mostly something else (a road with a straight bit) isn't a roof;
+        // a blob is a row of buildings as often as one, so each of its rectangles stands on its own.
+        if (kind == "group" && rects.Sum(r => r.Area) < 0.45 * cells.Count) return null;
         // Each edge to where the line is drawn, then how much of the outline is drawn.
         var set = new HashSet<int>(cells);
         for (int i = 0; i < rects.Count; i++) rects[i] = Slide(v, rects[i], set);
@@ -356,22 +402,22 @@ public static class RoofFinder
         foreach (var p in group) { r0 += p.R * p.Area; g0 += p.G * p.Area; b0 += p.B * p.Area; }
         double area = cells.Count;
         var roof = new SeenRoof { Rects = rects, AngleDeg = rects[0].AngleDeg, R = r0 / area, G = g0 / area, B = b0 / area, Support = support, Fill = fill, Aligned = aligned, Cells = cells };
-        Log?.Invoke($"group of {group.Count} at {box.Cx / sq:0.0},{box.Cy / sq:0.0}: {box.W / sq:0.0}x{box.H / sq:0.0} at {box.AngleDeg:0}° fill {fill:0.00} -> {rects.Count} rects [{string.Join("; ", rects.Select(r => $"{r.W / sq:0.0}x{r.H / sq:0.0} at {r.Cx / sq:0.0},{r.Cy / sq:0.0}"))}], support {support:0.00} (weakest side {weakest:0.00}) hsv {CityReader.Hsv(roof.R, roof.G, roof.B).H:0},{CityReader.Hsv(roof.R, roof.G, roof.B).S:0.00},{CityReader.Hsv(roof.R, roof.G, roof.B).V:0.00} tex {group.Sum(p => p.Tex * p.Area) / area:0.00} drawn {drawn:0.00} aligned {aligned:0.00} {(support >= need && weakest >= 0.2 && (aligned < 0 || aligned >= 0.66) ? "KEPT" : "no")}");
+        bool ok = support >= need && weakest >= 0.2 && (aligned < 0 || aligned >= 0.66);
+        Log?.Invoke($"{kind} of {group.Count} at {box.Cx / sq:0.0},{box.Cy / sq:0.0}: {box.W / sq:0.0}x{box.H / sq:0.0} at {box.AngleDeg:0}° fill {fill:0.00} -> {rects.Count} rects [{string.Join("; ", rects.Select(r => $"{r.W / sq:0.0}x{r.H / sq:0.0} at {r.Cx / sq:0.0},{r.Cy / sq:0.0}"))}], support {support:0.00} (weakest side {weakest:0.00}) hsv {CityReader.Hsv(roof.R, roof.G, roof.B).H:0},{CityReader.Hsv(roof.R, roof.G, roof.B).S:0.00},{CityReader.Hsv(roof.R, roof.G, roof.B).V:0.00} tex {group.Sum(p => p.Tex * p.Area) / area:0.00} drawn {drawn:0.00} aligned {aligned:0.00} {(ok ? "KEPT" : "no")}");
         // Strokes running every way inside it: cobbles or gravel, however well its sides show.
-        if (aligned >= 0 && aligned < 0.66) return null;
-        return support >= need && weakest >= 0.2 ? roof : null;
+        return ok ? roof : null;
     }
 
     /// <summary>
     /// How much the strokes inside some rectangles (away from their edges) run one way: each stroke pixel's
     /// direction is the one of eight it carries on in furthest, and the answer is the share of strokes in the
-    /// commonest direction and the one square to it (0.5 when they run every way, as cobbles do; near 1 for
-    /// rows of tiles). −1 when there are too few strokes to say (a plain roof).
+    /// two commonest directions (see <see cref="Agreement"/>; 0.5 when they run every way, as cobbles do;
+    /// near 1 for rows of tiles). −1 when there are too few strokes to say (a plain roof).
     /// </summary>
     static double Aligned(MapVision v, List<MapVision.Box> rects, HashSet<int> own)
     {
         double sc = v.Scale;
-        int imgW = (int)Math.Round(v.Width * sc), imgH = v.Lineness.Length / imgW;
+        int imgW = v.ImageWidth, imgH = v.ImageHeight;
         float level = (float)v.LineLevel * 0.5f;
         var bins = new double[8];
         double total = 0;
@@ -392,7 +438,7 @@ public static class RoofFinder
                     if (!own.Contains(v.Index(cx, cy)) || !own.Contains(v.Index(Math.Max(0, cx - 1), cy)) || !own.Contains(v.Index(Math.Min(v.Width - 1, cx + 1), cy))
                         || !own.Contains(v.Index(cx, Math.Max(0, cy - 1))) || !own.Contains(v.Index(cx, Math.Min(v.Height - 1, cy + 1)))) continue;
                     pixels++;
-                    float here = v.Lineness[y * imgW + x];
+                    float here = v.DarkLines[y * imgW + x];
                     // Along the grid's lines what's left of them would pass for rows of tiles: not counted.
                     if (here < level || v.OnGrid[y * imgW + x]) continue;
                     int best = -1;
@@ -404,8 +450,8 @@ public static class RoofFinder
                         for (int k = 1; k <= 2; k++)
                         {
                             int px = x + dx * k, py = y + dy * k, qx = x - dx * k, qy = y - dy * k;
-                            if (px >= 0 && py >= 0 && px < imgW && py < imgH) run += Math.Min(here, v.Lineness[py * imgW + px]);
-                            if (qx >= 0 && qy >= 0 && qx < imgW && qy < imgH) run += Math.Min(here, v.Lineness[qy * imgW + qx]);
+                            if (px >= 0 && py >= 0 && px < imgW && py < imgH) run += Math.Min(here, v.DarkLines[py * imgW + px]);
+                            if (qx >= 0 && qy >= 0 && qx < imgW && qy < imgH) run += Math.Min(here, v.DarkLines[qy * imgW + qx]);
                         }
                         if (run > bestRun) { bestRun = run; best = d; }
                     }
@@ -422,19 +468,43 @@ public static class RoofFinder
                 }
         }
         if (pixels < 0.3 * v.Square * v.Square * sc * sc || total < 0.015 * pixels) return -1;
-        // Rows of tiles run along the roof with the odd tick across them: the strokes in one direction and the one
-        // square to it (and half of those a step either side), the most of any such pair.
-        double most = 0;
+        double square = 0;
         for (int i = 0; i < 4; i++)
         {
             double pair = bins[i] + bins[i + 4];
             for (int k = 0; k < 8; k++) if (Math.Abs(k - i) % 4 == 1 || Math.Abs(k - i) % 4 == 3) pair += bins[k] / 2;
-            most = Math.Max(most, pair);
+            square = Math.Max(square, pair);
         }
-        return most / total;
+        // Cobbles' arcs run between the two square directions as much as along them; rows of tiles with a slant of
+        // shading over them have most of their strokes in two directions that aren't square, but still most in
+        // the square pair and its neighbours. Only when the square pair holds a fair share do the two commonest count.
+        return square / total < 0.6 ? square / total : Agreement(bins) / total;
     }
 
-    /// <summary>How far a stroke carries on from a pixel in one direction (and back the other way), in steps, up to six each way; the shorter of the two.</summary>
+    /// <summary>
+    /// Of strokes binned into eight directions (22.5° apart), how many run in the two commonest directions
+    /// that are at least 45° apart (the rows of tiles and the ticks across them, or the shading drawn
+    /// slantwise over the rows), counting those a step either side of each at half. Strokes running
+    /// every way (cobbles) give about half the total; rows of tiles nearly all of it.
+    /// </summary>
+    internal static double Agreement(double[] bins)
+    {
+        double most = 0;
+        for (int i = 0; i < 8; i++)
+            for (int j = i + 2; j < 8; j++)
+            {
+                if (Math.Min(j - i, 8 - (j - i)) < 2) continue;
+                double pair = bins[i] + bins[j];
+                for (int k = 0; k < 8; k++)
+                {
+                    int di = Math.Min(Math.Abs(k - i), 8 - Math.Abs(k - i)), dj = Math.Min(Math.Abs(k - j), 8 - Math.Abs(k - j));
+                    if (di == 1 || dj == 1) pair += bins[k] / 2;
+                }
+                most = Math.Max(most, pair);
+            }
+        return most;
+    }
+
     /// <summary>How far a stroke at a pixel runs on along a direction: the shorter of its two ways (up to 6), and both together.</summary>
     static (int Shortest, int Length) Run(MapVision v, int x, int y, (int dx, int dy) dir, int imgW, int imgH, float level)
     {
@@ -445,7 +515,7 @@ public static class RoofFinder
             while (k < 6)
             {
                 int px = x + dir.dx * (k + 1) * sign, py = y + dir.dy * (k + 1) * sign;
-                if (px < 0 || py < 0 || px >= imgW || py >= imgH || v.Lineness[py * imgW + px] < level) break;
+                if (px < 0 || py < 0 || px >= imgW || py >= imgH || v.DarkLines[py * imgW + px] < level) break;
                 k++;
             }
             shortest = Math.Min(shortest, k);
@@ -707,7 +777,7 @@ public static class RoofFinder
     {
         int w = v.Width;
         double sc = v.Scale;
-        int imgW = (int)Math.Round(w * sc);
+        int imgW = v.ImageWidth;
         int n = Math.Max(2, (int)(length * sc));
         int shown = 0, stepped = 0, count = 0, ended = 0;
         double level = v.LineLevel;
