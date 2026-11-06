@@ -33,7 +33,7 @@ public static class CityFootprint
         return (b.Turn & 1) == 1 ? (d, w) : (w, d);
     }
 
-    /// <summary>A point of the design's plan (squares) where it is on the map.</summary>
+    /// <summary>A point of the design's plan (squares) where it is on the map: turned, shifted, then tilted about the middle.</summary>
     public static (double X, double Y) ToMap(CityBuilding b, double x, double y)
     {
         var (w, d) = Extent(b.Design);
@@ -44,14 +44,25 @@ public static class CityFootprint
             3 => (y, w - x),
             _ => (x, y),
         };
-        return (u + b.X, v + b.Y);
+        double mx = u + b.X + b.ShiftX, my = v + b.Y + b.ShiftY;
+        if (b.TiltDeg == 0) return (mx, my);
+        var (cx, cy) = Centre(b);
+        double a = b.TiltDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a), dx = mx - cx, dy = my - cy;
+        return (cx + dx * c - dy * s, cy + dx * s + dy * c);
     }
 
     /// <summary>A point on the map in the design's own plan (the other way to <see cref="ToMap"/>).</summary>
     public static (double X, double Y) FromMap(CityBuilding b, double mx, double my)
     {
         var (w, d) = Extent(b.Design);
-        double u = mx - b.X, v = my - b.Y;
+        if (b.TiltDeg != 0)
+        {
+            var (cx, cy) = Centre(b);
+            double a = -b.TiltDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a), dx = mx - cx, dy = my - cy;
+            mx = cx + dx * c - dy * s;
+            my = cy + dx * s + dy * c;
+        }
+        double u = mx - b.X - b.ShiftX, v = my - b.Y - b.ShiftY;
         return (((b.Turn % 4) + 4) % 4) switch
         {
             1 => (v, d - u),
@@ -60,6 +71,23 @@ public static class CityFootprint
             _ => (u, v),
         };
     }
+
+    /// <summary>The middle of the building on the map (squares): the tilt turns about it.</summary>
+    public static (double X, double Y) Centre(CityBuilding b)
+    {
+        var (w, d) = Size(b);
+        return (b.X + b.ShiftX + w / 2.0, b.Y + b.ShiftY + d / 2.0);
+    }
+
+    /// <summary>The building's four corners on the map (squares), clockwise from the plan's top left.</summary>
+    public static (double X, double Y)[] Corners(CityBuilding b)
+    {
+        var (w, d) = Extent(b.Design);
+        return [ToMap(b, 0, 0), ToMap(b, w, 0), ToMap(b, w, d), ToMap(b, 0, d)];
+    }
+
+    /// <summary>Whether the building sits square to the grid, on whole squares.</summary>
+    public static bool OnGrid(CityBuilding b) => b.TiltDeg == 0 && b.ShiftX == 0 && b.ShiftY == 0;
 
     /// <summary>The squares of the design's own plan its ground floor covers: inside its rooms, or floor laid by hand.</summary>
     public static HashSet<(int X, int Y)> OwnCells(HouseDesign d)
@@ -79,14 +107,26 @@ public static class CityFootprint
         return cells;
     }
 
-    /// <summary>The map squares a building stands on.</summary>
+    /// <summary>The map squares a building stands on (every square it covers any real part of, when it's shifted or tilted).</summary>
     public static HashSet<(int X, int Y)> Cells(CityBuilding b)
     {
         var res = new HashSet<(int, int)>();
+        bool onGrid = OnGrid(b);
         foreach (var (x, y) in OwnCells(b.Design))
         {
-            var (mx, my) = ToMap(b, x + 0.5, y + 0.5);
-            res.Add(((int)Math.Floor(mx), (int)Math.Floor(my)));
+            if (onGrid)
+            {
+                var (mx, my) = ToMap(b, x + 0.5, y + 0.5);
+                res.Add(((int)Math.Floor(mx), (int)Math.Floor(my)));
+                continue;
+            }
+            // Off the grid, a square of the plan can lie over up to four map squares: sample it.
+            for (int j = 0; j < 3; j++)
+                for (int i = 0; i < 3; i++)
+                {
+                    var (mx, my) = ToMap(b, x + 0.2 + 0.3 * i, y + 0.2 + 0.3 * j);
+                    res.Add(((int)Math.Floor(mx), (int)Math.Floor(my)));
+                }
         }
         return res;
     }
@@ -94,8 +134,9 @@ public static class CityFootprint
     /// <summary>Is the map point (squares) on the building: inside the rectangle it takes up.</summary>
     public static bool Hit(CityBuilding b, double x, double y)
     {
-        var (w, d) = Size(b);
-        return x >= b.X && y >= b.Y && x <= b.X + w && y <= b.Y + d;
+        var (w, d) = Extent(b.Design);
+        var (u, v) = FromMap(b, x, y);
+        return u >= 0 && v >= 0 && u <= w && v <= d;
     }
 
     /// <summary>The buildings that stand on some of the same squares, as pairs.</summary>

@@ -158,31 +158,40 @@ fences, hedges and town walls, and the grid. Pick PNG, JPEG or WebP when you sav
 
 On the **Battle map** tab, press **Open a picture…** and pick a top-down map of a town (PNG, JPEG,
 WebP…), or **Use the selected picture** for one already in the design, or **Try a sample battle
-map** to see how it works. The picture shows under the plan and its grid is found by itself: check
-**Square (pixels)**, **Grid starts at x** and **Grid starts at y**, or press **Find the grid** again.
-For a picture with no grid lines, type how many **Squares across** it is.
+map** to see how it works. The picture shows under the plan and its grid is found by itself (the thin
+lines that repeat evenly right across the picture, dark or light, to a fraction of a pixel; the heavy
+outlines of the buildings don't pass for a coarser grid): check **Square (pixels)**, **Grid starts at
+x** and **Grid starts at y**, or press **Find the grid** again. For a picture with no grid lines, type
+how many **Squares across** it is.
 
 Then press **Read the map**. It makes a new map from the picture (undo puts the old one back):
 
 - **The ground**: every square sorted by its colour into grass, dirt, cobbled road, paving, sand,
   water, rock or fields.
-- **Buildings seen from above**: patches of one colour that stand out from the ground round them and
-  are building-shaped (compact, two squares or more each way, not part of a long road, not green or
-  blue) are roofs. Each gets walls round it, a door towards the road, windows and a roof whose
-  covering is guessed from its colour (red: clay tiles, yellow: thatch, brown: wooden shingles,
-  grey: slate). Its size guesses how many floors it has and what it is (a shed, a house, a hall, a
-  tower).
+- **Buildings seen from above**: each roof is found as its own patch of colour with an outline
+  drawn round it (a line, or a clean change of colour), at whatever angle it sits: a rectangle, or
+  an L or a T of two or three, with the grid's own lines taken out first so they don't pass for an
+  outline and the two slopes of a pitched roof (one lit, one in shade, the ridge between them)
+  joined into one. What's cobbled or gravelled inside (strokes running every way, where a roof's
+  tiles run in rows) is a road or a yard, not a roof; so is a strip that runs off the picture at both
+  ends. A roof square to the grid becomes a building on whole squares, matched to its footprint; one
+  at an angle keeps its angle (see **Tilt** on the **Picked** tab). Each gets walls round it, a door
+  towards the road, windows and a roof whose covering is guessed from its colour (red: clay tiles,
+  yellow: thatch, brown: wooden shingles, grey: slate). Its size guesses how many floors it has and
+  what it is (a shed, a house, a hall, a tower).
 - **Buildings drawn as floor plans**: rooms closed in by walls drawn in dark lines. Rooms that share
   a line are one building, with that line as a wall inside it, and a gap in its outside line is its
   door.
-- **Trees**: the green squares that are clearly darker or busier than the usual grass.
+- **Trees**: the green squares that are clearly darker or busier than the usual grass, and the
+  yellow-green ones busy with leaves; a clump of a few squares is one tree, sized to it.
 
 The settings:
 
 - **Buildings are**: **Worked out from the picture** looks for both; pick **Seen from above
   (roofs)** or **Drawn as floor plans (walls in lines)** when you know which.
 - **Find buildings**, **Find trees**: untick either to leave them out.
-- **Roofs**: further left finds more roofs (and more mistakes), further right only the clearest.
+- **Roofs**: how much of a roof's outline has to show. Further left finds more roofs (and more
+  mistakes: sheds, carts, patches of yard), further right only the clearest.
 - **Biggest (squares)**: anything bigger than this is ground (a market square, a field), not a building.
 - **Use my saved buildings where one fits**: a rectangular roof the same size as one of your saved
   buildings (either way round) gets that building, turned so its door faces the road, instead of one
@@ -201,6 +210,10 @@ Click a building with **Select** and the **Picked** tab shows it:
 
 - **Name**, **Type** (house, shop, tavern, temple…: anything you like), **District** (residential,
   market, docks…) and **Tags** (words to find it by, with commas between). The name shows on the plan.
+- **Tilt (°)**: a building read off a map at an angle keeps its angle, clockwise degrees past its
+  quarter turns, turning about its own middle; type another, or 0 to straighten it. **Square it to
+  the grid** straightens it and puts it back on whole squares. (A tilted building draws, picks, turns
+  and cuts like any other; it stands on every square it covers any part of.)
 - **Turn ⟳** turns it a quarter turn. **Add a floor** puts another floor on top (the top floor's
   walls and windows again; doors upstairs become windows) and moves its roofs up onto it; **Take the
   top floor off** does the opposite.

@@ -339,7 +339,14 @@ public sealed class CityPlan : Control
         var roofCol = _districts ? DistrictColour(b.District)
             : b.Design.Roofs.Count > 0 ? CityScene.RoofColour(b.Design.Roofs[0].Covering) : CityScene.WallColour(b.Design.Style.Texture);
         var fill = new SolidColorBrush(roofCol, 0.82);
-        foreach (var (x, y) in cells) ctx.FillRectangle(overlapping ? OverlapBrush : fill, new Rect(At(x, y), new Size(k + 0.5, k + 0.5)));
+        if (CityFootprint.OnGrid(b))
+            foreach (var (x, y) in cells) ctx.FillRectangle(overlapping ? OverlapBrush : fill, new Rect(At(x, y), new Size(k + 0.5, k + 0.5)));
+        else
+        {
+            // Off the grid (shifted or tilted): its real outline, not the squares under it.
+            var corners = CityFootprint.Corners(b).Select(c => At(c.X, c.Y)).ToList();
+            ctx.DrawGeometry(overlapping ? OverlapBrush : fill, null, new PolylineGeometry(corners, true));
+        }
         // The ridges, so the roofs read from above.
         var ridge = new Pen(new SolidColorBrush(Scene3DShade(roofCol, 0.6)), Math.Max(1, k * 0.06));
         foreach (var r in b.Design.Roofs)
@@ -381,13 +388,13 @@ public sealed class CityPlan : Control
         }
         if (picked)
         {
-            var (w, d) = CityFootprint.Size(b);
-            ctx.DrawRectangle(null, new Pen(PickBrush, 2) { DashStyle = new DashStyle([3, 2], 0) }, new Rect(At(b.X, b.Y), At(b.X + w, b.Y + d)));
+            var corners = CityFootprint.Corners(b).Select(c => At(c.X, c.Y)).ToList();
+            ctx.DrawGeometry(null, new Pen(PickBrush, 2) { DashStyle = new DashStyle([3, 2], 0) }, new PolylineGeometry(corners, true));
         }
         if (k >= 10)
         {
-            var (w, d) = CityFootprint.Size(b);
-            var mid = At(b.X + w / 2.0, b.Y + d / 2.0);
+            var (cx, cy) = CityFootprint.Centre(b);
+            var mid = At(cx, cy);
             Text(ctx, b.Name, mid + new Point(0, -6), Brushes.White, 10, true, shadow: true);
         }
     }

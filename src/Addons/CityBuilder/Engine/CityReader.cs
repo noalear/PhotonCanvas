@@ -15,7 +15,7 @@ public sealed record CityReadOptions
     public bool FindTrees { get; init; } = true;
     /// <summary>The biggest building to look for (squares): anything bigger is ground.</summary>
     public int LargestBuilding { get; init; } = 120;
-    /// <summary>How different a roof has to look from the ground round it to count (0.5 = usual; lower finds more, higher fewer).</summary>
+    /// <summary>How much of a roof's outline must show for it to count (0.5 = usual; lower finds more, higher fewer).</summary>
     public double Sensitivity { get; init; } = 0.5;
     public string Theme { get; init; } = "Medieval";
     public double SquareMm { get; init; } = 25.4;
@@ -27,10 +27,10 @@ public sealed record CityReadOptions
 public sealed record CityReadResult(CityMap Map, List<string> Notes);
 
 /// <summary>
-/// Reads a town from a battle map picture, as a best guess at the world seen from above: the grid (as
-/// the map to terrain reader finds it), then every square sorted by its colour into grass, roads, paving,
-/// dirt, sand, water, rock or fields; roofs found as patches of one colour that stand out from the ground
-/// round them and are building-shaped (compact, not too big, not part of a long road); floor plans found
+/// Reads a town from a battle map picture, as a best guess at the world seen from above: the grid (see
+/// <see cref="GridFinder"/>), then every square sorted by its colour into grass, roads, paving, dirt,
+/// sand, water, rock or fields; roofs found by <see cref="RoofFinder"/> as rectangles (at any angle)
+/// that a patch of one colour fills, with their outline drawn most of the way round; floor plans found
 /// as rooms closed in by walls drawn in dark lines; and woods as darker, busier green. Each building is
 /// made by <see cref="BuildingGuess"/> (or a saved building that fits), its door towards the road.
 /// </summary>
@@ -42,7 +42,8 @@ public static class CityReader
     /// <summary>What a square's colour says it is.</summary>
     internal enum Nature { Water, Grass, Trees, Sand, Dirt, Field, Light, Mid, Dark, Warm }
 
-    public static MapPicture? FindGrid(RasterImage img) => MapReader.FindGrid(img);
+    /// <summary>The picture's grid: by its drawn lines first, or else by how the picture repeats.</summary>
+    public static MapPicture? FindGrid(RasterImage img) => GridFinder.Find(img) ?? MapReader.FindGrid(img);
 
     public static CityReadResult Read(RasterImage img, CityPicture grid, CityReadOptions o, CancellationToken ct = default)
     {
@@ -78,24 +79,38 @@ public static class CityReader
             for (int x = 0; x < across; x++) ground[x, y] = GroundOf(nature[x, y]);
 
         var used = new bool[across, down];
+        var buildings = new List<CityBuilding>();
         var footprints = new List<SeenBuilding>();
+        // Where each footprint seen at an angle really sits.
+        var placings = new Dictionary<SeenBuilding, Placing>(ReferenceEqualityComparer.Instance);
+        int tilted = 0, fromPrefabs = 0;
         if (o.FindBuildings)
         {
-            if (o.Buildings != BuildingsShow.Roofs)
+            if (o.Buildings != BuildingsShow.Plans)
             {
-                var plans = Plans(samples, lum, w, h, x0, y0, p, across, down, o.LargestBuilding, ct);
+                // The roofs, as the roof finder sees them: rectangles at any angle.
+                var vision = MapVision.Of(img, p, x0, y0, ct);
+                var roofs = RoofFinder.Find(vision, new RoofFinder.Options { LargestSquares = Math.Max(1, o.LargestBuilding), Sensitivity = o.Sensitivity }, ct);
+                foreach (var r in roofs)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    if (Seen(vision, r, across, down) is not { } seen) continue;
+                    if (seen.Placing.Tilt != 0) { tilted++; placings[seen.Footprint] = seen.Placing; }
+                    footprints.Add(seen.Footprint);
+                    foreach (var c in seen.Footprint.Cells) used[c.X, c.Y] = true;
+                }
+                if (roofs.Count > 0) notes.Add($"{footprints.Count} building{(footprints.Count == 1 ? "" : "s")} found from their roofs" + (tilted > 0 ? $", {tilted} of them at an angle to the grid." : "."));
+            }
+            // Floor plans: asked for, or when the roofs gave next to nothing (a map drawn as plans has no roofs to find).
+            if (o.Buildings == BuildingsShow.Plans || (o.Buildings == BuildingsShow.Auto && footprints.Count < 2))
+            {
+                var plans = Plans(samples, lum, w, h, x0, y0, p, across, down, o.LargestBuilding, ct)
+                    .Where(f => !f.Cells.Any(c => used[c.X, c.Y])).ToList();
                 foreach (var f in plans) foreach (var c in f.Cells) used[c.X, c.Y] = true;
                 footprints.AddRange(plans);
                 if (plans.Count > 0) notes.Add($"{plans.Count} building{(plans.Count == 1 ? "" : "s")} found drawn as floor plans (rooms closed in by walls in lines).");
             }
-            if (o.Buildings != BuildingsShow.Plans)
-            {
-                var roofs = Roofs(samples, nature, used, across, down, o.LargestBuilding, o.Sensitivity, new Edging(lum, w, h, x0, y0, p), ct);
-                foreach (var f in roofs) foreach (var c in f.Cells) used[c.X, c.Y] = true;
-                footprints.AddRange(roofs);
-                if (roofs.Count > 0) notes.Add($"{roofs.Count} building{(roofs.Count == 1 ? "" : "s")} found from their roofs.");
-            }
-            if (footprints.Count == 0) notes.Add("No buildings were found: draw their footprints with the Building tool, or try another setting for how the buildings show.");
+            if (footprints.Count == 0) notes.Add("No buildings were found: draw their footprints with the Building tool, lower the sensitivity, or try another setting for how the buildings show.");
         }
         // What's under the buildings, and what looked like a roof but wasn't one.
         for (int y = 0; y < down; y++)
@@ -106,8 +121,6 @@ public static class CityReader
             }
 
         // Doors open onto roads, paving or dirt next to the building.
-        var buildings = new List<CityBuilding>();
-        int fromPrefabs = 0;
         foreach (var f in footprints)
         {
             ct.ThrowIfCancellationRequested();
@@ -118,14 +131,24 @@ public static class CityReader
                         if (nx >= 0 && ny >= 0 && nx < across && ny < down && !used[nx, ny] && ground[nx, ny] is Ground.Road or Ground.Paving or Ground.Dirt)
                             towards.Add((nx, ny));
             var fp = f with { DoorTowards = towards };
-            if (PrefabFit.Fit(fp, o.Prefabs) is { } fit)
+            placings.TryGetValue(f, out var placing);
+            if (placing.Tilt == 0 && PrefabFit.Fit(fp, o.Prefabs) is { } fit)
             {
                 buildings.Add(fit);
                 fromPrefabs++;
                 continue;
             }
             if (BuildingGuess.Make(fp, o.Theme, o.SquareMm) is not { } made) continue;
-            buildings.Add(new CityBuilding { Name = $"{fp.Type} {buildings.Count + 1}", Type = fp.Type, X = made.X, Y = made.Y, Design = made.Design });
+            var b = new CityBuilding { Name = $"{fp.Type} {buildings.Count + 1}", Type = fp.Type, X = made.X, Y = made.Y, Design = made.Design };
+            if (placing.Tilt != 0)
+            {
+                // Turned about its middle to where the roof really sits, its corner wherever that puts it.
+                var (bw, bd) = CityFootprint.Size(b);
+                double cx = placing.CentreX - bw / 2.0, cy = placing.CentreY - bd / 2.0;
+                int bx = (int)Math.Floor(cx), by = (int)Math.Floor(cy);
+                b = b with { X = bx, Y = by, ShiftX = cx - bx, ShiftY = cy - by, TiltDeg = placing.Tilt };
+            }
+            buildings.Add(b);
         }
         if (fromPrefabs > 0) notes.Add($"{fromPrefabs} of them use saved buildings that fit their footprint.");
 
@@ -134,17 +157,39 @@ public static class CityReader
         {
             var rnd = new Random(1234);
             int count = 0;
+            // One tree for a small clump of tree squares (one canopy drawn over a few squares); a tree a square in a wood.
+            var seen = new bool[across, down];
             for (int y = 0; y < down && props.Count < 6000; y++)
                 for (int x = 0; x < across && props.Count < 6000; x++)
                 {
-                    if (nature[x, y] != Nature.Trees || used[x, y]) continue;
+                    if (nature[x, y] != Nature.Trees || used[x, y] || seen[x, y]) continue;
+                    var clump = new List<(int X, int Y)>();
+                    var todo = new Stack<(int X, int Y)>();
+                    todo.Push((x, y));
+                    seen[x, y] = true;
+                    while (todo.Count > 0)
+                    {
+                        var (cx, cy) = todo.Pop();
+                        clump.Add((cx, cy));
+                        foreach (var (nx, ny) in new[] { (cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1) })
+                            if (nx >= 0 && ny >= 0 && nx < across && ny < down && !seen[nx, ny] && nature[nx, ny] == Nature.Trees && !used[nx, ny]) { seen[nx, ny] = true; todo.Push((nx, ny)); }
+                    }
                     var s = samples[x, y];
                     // Bluer, darker greens read as pines; the rest as leafy trees.
                     var kind = s.H > 120 && s.V < 0.35 ? PropKind.Pine : PropKind.Tree;
-                    props.Add(new Prop { Kind = kind, X = x + 0.5 + (rnd.NextDouble() - 0.5) * 0.3, Y = y + 0.5 + (rnd.NextDouble() - 0.5) * 0.3, Size = 1 + rnd.NextDouble() * 0.5, TurnDeg = rnd.Next(360) });
-                    count++;
+                    if (clump.Count <= 4)
+                    {
+                        props.Add(new Prop { Kind = kind, X = clump.Average(c => c.X) + 0.5, Y = clump.Average(c => c.Y) + 0.5, Size = Math.Clamp(Math.Sqrt(clump.Count) * 1.1, 1, 2.2), TurnDeg = rnd.Next(360) });
+                        count++;
+                        continue;
+                    }
+                    foreach (var (cx, cy) in clump)
+                    {
+                        props.Add(new Prop { Kind = kind, X = cx + 0.5 + (rnd.NextDouble() - 0.5) * 0.3, Y = cy + 0.5 + (rnd.NextDouble() - 0.5) * 0.3, Size = 1 + rnd.NextDouble() * 0.5, TurnDeg = rnd.Next(360) });
+                        count++;
+                    }
                 }
-            if (count > 0) notes.Add($"{count} tree{(count == 1 ? "" : "s")} where the green is darker and busier.");
+            if (count > 0) notes.Add($"{count} tree{(count == 1 ? "" : "s")} where the green is darker or busier.");
         }
         int water = 0, roads = 0;
         foreach (var g in ground) { if (g == Ground.Water) water++; else if (g is Ground.Road or Ground.Paving) roads++; }
@@ -153,6 +198,59 @@ public static class CityReader
         notes.Add("It's a best guess: paint the ground, move, turn and change the buildings to put right what it got wrong.");
         return new CityReadResult(map.WithGround(ground) with { Buildings = buildings, Props = props }, notes);
     }
+
+    /// <summary>Where a roof seen at an angle goes: its tilt past the quarter turns, and its middle (squares).</summary>
+    readonly record struct Placing(double Tilt, double CentreX, double CentreY);
+
+    /// <summary>
+    /// A roof the finder saw as a footprint on the grid: square to it (within five degrees) it's snapped to
+    /// whole squares, each of its rectangles rounded to squares (so an L stays an L); at an angle it's its
+    /// biggest rectangle, rounded to whole squares, kept at its angle about its middle.
+    /// </summary>
+    static (SeenBuilding Footprint, Placing Placing)? Seen(MapVision v, SeenRoof r, int across, int down)
+    {
+        double sq = v.Square;
+        var sample = new Sample(r.R, r.G, r.B, 0, Hsv(r.R, r.G, r.B).H, Hsv(r.R, r.G, r.B).S, Hsv(r.R, r.G, r.B).V);
+        string covering = CoveringFor(sample);
+        // Squares from working cells: the grid's first lines are at the offsets.
+        double Sx(double x) => (x - v.OffsetX) / sq;
+        double Sy(double y) => (y - v.OffsetY) / sq;
+        double a = r.AngleDeg;
+        bool square = a <= 5 || a >= 85;
+        if (square)
+        {
+            var cells = new HashSet<(int X, int Y)>();
+            foreach (var box in r.Rects)
+            {
+                // Along the axes (at 85° and more the box's width runs down the map).
+                double bw = a >= 85 ? box.H : box.W, bd = a >= 85 ? box.W : box.H;
+                int wSq = Math.Max(1, (int)Math.Round(bw / sq)), dSq = Math.Max(1, (int)Math.Round(bd / sq));
+                int x0 = (int)Math.Round(Sx(box.Cx) - wSq / 2.0), y0 = (int)Math.Round(Sy(box.Cy) - dSq / 2.0);
+                for (int y = y0; y < y0 + dSq; y++)
+                    for (int x = x0; x < x0 + wSq; x++)
+                        if (x >= 0 && y >= 0 && x < across && y < down) cells.Add((x, y));
+            }
+            if (cells.Count == 0) return null;
+            return (new SeenBuilding { Cells = cells, Covering = covering, Type = TypeFor(cells.Count) }, default);
+        }
+        var main = r.Rects[0];
+        // The tilt is the smaller turn from either axis, so the footprint's longer side stays its longer side.
+        double tilt = a <= 45 ? a : a - 90;
+        double mw = a <= 45 ? main.W : main.H, md = a <= 45 ? main.H : main.W;
+        int tw = Math.Max(1, (int)Math.Round(mw / sq)), td = Math.Max(1, (int)Math.Round(md / sq));
+        double cxSq = Sx(main.Cx), cySq = Sy(main.Cy);
+        // Its cells for the ground under it and the door: the squares its middle part lies over, square to the grid.
+        var own = new HashSet<(int X, int Y)>();
+        int ax0 = (int)Math.Round(cxSq - tw / 2.0), ay0 = (int)Math.Round(cySq - td / 2.0);
+        for (int y = ay0; y < ay0 + td; y++)
+            for (int x = ax0; x < ax0 + tw; x++)
+                if (x >= 0 && y >= 0 && x < across && y < down) own.Add((x, y));
+        if (own.Count == 0) return null;
+        return (new SeenBuilding { Cells = own, Covering = covering, Type = TypeFor(own.Count) }, new Placing(tilt, cxSq, cySq));
+    }
+
+    /// <summary>What a building of so many squares most likely is.</summary>
+    static string TypeFor(int squares) => squares >= 40 ? "Hall" : squares >= 20 ? "Big house" : squares <= 2 ? "Shed" : "House";
 
     static Sample Measure(byte[] px, float[] lum, int w, int h, double ax, double ay, double bx, double by)
     {
@@ -239,6 +337,8 @@ public static class CityReader
             return Nature.Dark;
         }
         if ((h < 18 || h > 330) && s > 0.32) return Nature.Warm;
+        // A yellow-green that's busy with strokes: a tree's leaves (a field is drawn in even rows).
+        if (h >= 35 && h < 65 && s > 0.45 && q.Busy > 0.16) return Nature.Trees;
         if (h >= 40 && h < 65 && s > 0.35 && v > 0.45) return Nature.Field;
         if (h >= 30 && h < 65 && v > 0.62) return Nature.Sand;
         if (h < 65) return v > 0.3 ? Nature.Dirt : Nature.Dark;
@@ -260,229 +360,6 @@ public static class CityReader
         _ => Ground.Floor,
     };
 
-    static double Distance(Sample a, Sample b)
-    {
-        double dr = a.R - b.R, dg = a.G - b.G, db = a.B - b.B;
-        return Math.Sqrt(dr * dr + dg * dg + db * db);
-    }
-
-    // ---- roofs ----
-
-    /// <summary>
-    /// Patches of one colour that stand out from the ground round them and are building-shaped. The squares are
-    /// grouped by colour (k-means); a colour that runs on and on (a road, a lawn) is ground, and so is anything
-    /// green or blue; a patch is a roof when it's compact (fills most of its bounding box, two squares or more
-    /// both ways), not too big, and its edge differs clearly from what's round it.
-    /// </summary>
-    static List<SeenBuilding> Roofs(Sample[,] s, Nature[,] nature, bool[,] used, int across, int down, int largest, double sensitivity, Edging edging, CancellationToken ct)
-    {
-        int n = across * down;
-        var label = Cluster(s, across, down, 8, ct);
-        var res = new List<SeenBuilding>();
-        var seen = new bool[across, down];
-        double needed = 0.08 + 0.16 * Math.Clamp(sensitivity, 0, 1);
-        for (int y = 0; y < down; y++)
-            for (int x = 0; x < across; x++)
-            {
-                if (seen[x, y]) continue;
-                // One patch: squares of one colour group, joined side by side.
-                int c = label[x, y];
-                var cells = Joined((x, y), q => label[q.X, q.Y] == c, across, down, seen);
-                if (cells.Count < 3 || cells.Count > n * 0.3) continue;
-                Try(cells, 0);
-            }
-        return res;
-
-        // A patch is a roof, or else (a roof the same colour group as the road beside it) maybe its two colours apart are.
-        void Try(List<(int X, int Y)> cells, int depth)
-        {
-            ct.ThrowIfCancellationRequested();
-            if (cells.Count < 3) return;
-            if (Roof(cells) is { } found) { res.Add(found); return; }
-            if (depth >= 3 || cells.Count < 6) return;
-            var (a, b) = Split(s, cells);
-            if (a.Count == 0 || b.Count == 0 || Distance(Mean(s, a), Mean(s, b)) < 0.06) return;
-            foreach (var part in new[] { a, b })
-            {
-                var inPart = part.ToHashSet();
-                var done = new bool[across, down];
-                foreach (var q in part)
-                    if (!done[q.X, q.Y]) Try(Joined(q, r => inPart.Contains(r), across, down, done), depth + 1);
-            }
-        }
-
-        SeenBuilding? Roof(List<(int X, int Y)> cells)
-        {
-            if (cells.Count > largest) return null;
-            if (cells.Any(q => used[q.X, q.Y])) return null;
-            int greenish = cells.Count(q => nature[q.X, q.Y] is Nature.Water or Nature.Grass or Nature.Trees);
-            if (greenish * 2 > cells.Count) return null;
-            int bx0 = cells.Min(q => q.X), bx1 = cells.Max(q => q.X), by0 = cells.Min(q => q.Y), by1 = cells.Max(q => q.Y);
-            int bw = bx1 - bx0 + 1, bd = by1 - by0 + 1;
-            if (bw < 2 || bd < 2) return null;
-            var set = Filled(cells.ToHashSet(), bx0, by0, bx1, by1);
-            double fill = set.Count / (double)(bw * bd);
-            if (fill < 0.6) return null;
-            // A long thin patch is a road or a wall, not a house.
-            int lo = Math.Min(bw, bd), hi = Math.Max(bw, bd);
-            if (hi > 4 * lo || (lo <= 2 && hi > 2.5 * lo)) return null;
-            // How much it stands out from what's just round it.
-            double inside = 0, outside = 0;
-            int ni = 0, no = 0;
-            var mean = Mean(s, set);
-            foreach (var (cx, cy) in set)
-                foreach (var (nx, ny) in new[] { (cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1) })
-                {
-                    if (set.Contains((nx, ny))) continue;
-                    if (nx < 0 || ny < 0 || nx >= across || ny >= down) continue;
-                    outside += Distance(s[nx, ny], mean);
-                    no++;
-                }
-            foreach (var q in set) { inside += Distance(s[q.X, q.Y], mean); ni++; }
-            if (no == 0) return null;
-            double contrast = outside / no - inside / Math.Max(1, ni);
-            // Red-tiled roofs stand out by colour anyway; greys need the clearer edge.
-            int warm = set.Count(q => nature[q.X, q.Y] == Nature.Warm);
-            bool red = warm * 2 > set.Count;
-            double need = red ? needed * 0.6 : needed;
-            if (contrast < need) return null;
-            // Roofs on a battle map are outlined (or cast a shadow); a paved square or a road isn't. Only the reddest
-            // roofs, or any patch when looking hard (Roofs turned well down), go without.
-            if (!red && sensitivity >= 0.3 && edging.Outlined(set) < 0.35) return null;
-            var (type, storeys) = BuildingGuess.Kind(set);
-            return new SeenBuilding { Cells = set, Covering = CoveringFor(mean), Storeys = storeys, Type = type, From = "roof" };
-        }
-    }
-
-    /// <summary>How much of a patch's edge is drawn darker than either side of it (an outline or a shadow), from the picture.</summary>
-    sealed class Edging(float[] lum, int w, int h, double x0, double y0, double p)
-    {
-        double Mean(double ax, double ay, double bx, double by)
-        {
-            int i0 = Math.Clamp((int)Math.Floor(ax), 0, w - 1), i1 = Math.Clamp((int)Math.Ceiling(bx), i0 + 1, w);
-            int j0 = Math.Clamp((int)Math.Floor(ay), 0, h - 1), j1 = Math.Clamp((int)Math.Ceiling(by), j0 + 1, h);
-            int sx = Math.Max(1, (i1 - i0) / 20), sy = Math.Max(1, (j1 - j0) / 20);
-            double sum = 0;
-            int n = 0;
-            for (int j = j0; j < j1; j += sy)
-                for (int i = i0; i < i1; i += sx) { sum += lum[j * w + i]; n++; }
-            return n == 0 ? 1 : sum / n;
-        }
-
-        /// <summary>The share (0 to 1) of the patch's outside edges that are darker than both sides by a clear step.</summary>
-        public double Outlined(HashSet<(int X, int Y)> cells)
-        {
-            int edges = 0, dark = 0;
-            double band = Math.Max(2, p * 0.12), side = p * 0.3;
-            foreach (var (x, y) in cells)
-                foreach (var (dx, dy) in new[] { (0, -1), (0, 1), (-1, 0), (1, 0) })
-                {
-                    if (cells.Contains((x + dx, y + dy))) continue;
-                    edges++;
-                    // The grid line between the square and its neighbour, and the strips either side of it.
-                    double lx = x0 + (dx > 0 ? x + 1 : x) * p, ly = y0 + (dy > 0 ? y + 1 : y) * p;
-                    // The darkest thin line near the grid line (an outline is a few pixels wide, on either side of it).
-                    double line = double.MaxValue, a, b;
-                    if (dy != 0)
-                    {
-                        double ax = x0 + x * p + p * 0.2, bx = x0 + x * p + p * 0.8;
-                        for (double d = -band; d <= band; d += 1) line = Math.Min(line, Mean(ax, ly + d - 1, bx, ly + d + 1));
-                        a = Mean(ax, ly - band - side, bx, ly - band);
-                        b = Mean(ax, ly + band, bx, ly + band + side);
-                    }
-                    else
-                    {
-                        double ay = y0 + y * p + p * 0.2, by = y0 + y * p + p * 0.8;
-                        for (double d = -band; d <= band; d += 1) line = Math.Min(line, Mean(lx + d - 1, ay, lx + d + 1, by));
-                        a = Mean(lx - band - side, ay, lx - band, by);
-                        b = Mean(lx + band, ay, lx + band + side, by);
-                    }
-                    if (Math.Min(a, b) - line > 0.1) dark++;
-                }
-            return edges == 0 ? 0 : (double)dark / edges;
-        }
-    }
-
-    /// <summary>The squares joined side by side to <paramref name="start"/> that pass <paramref name="same"/> (marked in <paramref name="seen"/>).</summary>
-    static List<(int X, int Y)> Joined((int X, int Y) start, Func<(int X, int Y), bool> same, int across, int down, bool[,] seen)
-    {
-        var cells = new List<(int X, int Y)>();
-        var todo = new Stack<(int X, int Y)>();
-        todo.Push(start);
-        seen[start.X, start.Y] = true;
-        while (todo.Count > 0)
-        {
-            var (cx, cy) = todo.Pop();
-            cells.Add((cx, cy));
-            foreach (var q in new[] { (cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1) })
-                if (q.Item1 >= 0 && q.Item2 >= 0 && q.Item1 < across && q.Item2 < down && !seen[q.Item1, q.Item2] && same(q))
-                {
-                    seen[q.Item1, q.Item2] = true;
-                    todo.Push(q);
-                }
-        }
-        return cells;
-    }
-
-    /// <summary>A patch's squares split in two by colour (two-means, started from its darkest and lightest squares).</summary>
-    static (List<(int X, int Y)> A, List<(int X, int Y)> B) Split(Sample[,] s, List<(int X, int Y)> cells)
-    {
-        var f = cells.Select(q => Feature(s[q.X, q.Y])).ToList();
-        var ca = f.MinBy(v => v.Item1);
-        var cb = f.MaxBy(v => v.Item1);
-        var side = new bool[cells.Count];
-        for (int it = 0; it < 10; it++)
-        {
-            for (int i = 0; i < f.Count; i++) side[i] = D2(f[i], cb) < D2(f[i], ca);
-            (double, double, double) M(bool which)
-            {
-                double a = 0, b = 0, c = 0;
-                int n = 0;
-                for (int i = 0; i < f.Count; i++) if (side[i] == which) { a += f[i].Item1; b += f[i].Item2; c += f[i].Item3; n++; }
-                return n == 0 ? (which ? cb : ca) : (a / n, b / n, c / n);
-            }
-            ca = M(false);
-            cb = M(true);
-        }
-        var A = new List<(int, int)>();
-        var B = new List<(int, int)>();
-        for (int i = 0; i < cells.Count; i++) (side[i] ? B : A).Add(cells[i]);
-        return (A, B);
-        static double D2((double, double, double) p, (double, double, double) q) => (p.Item1 - q.Item1) * (p.Item1 - q.Item1) + (p.Item2 - q.Item2) * (p.Item2 - q.Item2) + (p.Item3 - q.Item3) * (p.Item3 - q.Item3);
-    }
-
-    /// <summary>The squares with the holes in them filled (a chimney or a skylight in a roof).</summary>
-    static HashSet<(int X, int Y)> Filled(HashSet<(int X, int Y)> cells, int x0, int y0, int x1, int y1)
-    {
-        var outside = new HashSet<(int, int)>();
-        var todo = new Stack<(int, int)>();
-        for (int x = x0 - 1; x <= x1 + 1; x++) { todo.Push((x, y0 - 1)); todo.Push((x, y1 + 1)); }
-        for (int y = y0; y <= y1; y++) { todo.Push((x0 - 1, y)); todo.Push((x1 + 1, y)); }
-        while (todo.Count > 0)
-        {
-            var (x, y) = todo.Pop();
-            if (x < x0 - 1 || x > x1 + 1 || y < y0 - 1 || y > y1 + 1 || cells.Contains((x, y)) || !outside.Add((x, y))) continue;
-            todo.Push((x + 1, y)); todo.Push((x - 1, y)); todo.Push((x, y + 1)); todo.Push((x, y - 1));
-        }
-        var res = new HashSet<(int X, int Y)>(cells);
-        for (int y = y0; y <= y1; y++)
-            for (int x = x0; x <= x1; x++)
-                if (!outside.Contains((x, y))) res.Add((x, y));
-        return res;
-    }
-
-    static Sample Mean(Sample[,] s, IEnumerable<(int X, int Y)> cells)
-    {
-        double r = 0, g = 0, b = 0, busy = 0;
-        int n = 0;
-        foreach (var (x, y) in cells) { var q = s[x, y]; r += q.R; g += q.G; b += q.B; busy += q.Busy; n++; }
-        if (n == 0) return default;
-        r /= n; g /= n; b /= n;
-        var (h, sat, v) = Hsv(r, g, b);
-        return new Sample(r, g, b, busy / n, h, sat, v);
-    }
-
-    /// <summary>The roof maker's covering a roof's colour suggests.</summary>
     internal static string CoveringFor(Sample q)
     {
         if (q.S < 0.16) return "Slate";
@@ -491,50 +368,6 @@ public static class CityReader
         if (q.H < 45) return q.V < 0.5 ? "Wooden shingles" : "Clay tiles";
         return "Slate";
     }
-
-    /// <summary>The squares grouped into <paramref name="k"/> colours (k-means, started from evenly spread brightnesses, so the same map always groups the same way).</summary>
-    static int[,] Cluster(Sample[,] s, int across, int down, int k, CancellationToken ct)
-    {
-        var pts = new List<(double A, double B, double C)>(across * down);
-        for (int y = 0; y < down; y++)
-            for (int x = 0; x < across; x++) pts.Add(Feature(s[x, y]));
-        var order = Enumerable.Range(0, pts.Count).OrderBy(i => pts[i].A).ToArray();
-        k = Math.Min(k, pts.Count);
-        var centres = new (double A, double B, double C)[k];
-        for (int i = 0; i < k; i++) centres[i] = pts[order[(int)((i + 0.5) / k * (pts.Count - 1))]];
-        var label = new int[pts.Count];
-        for (int it = 0; it < 14; it++)
-        {
-            ct.ThrowIfCancellationRequested();
-            bool moved = false;
-            for (int i = 0; i < pts.Count; i++)
-            {
-                int best = 0;
-                double bd = double.MaxValue;
-                for (int c = 0; c < k; c++)
-                {
-                    double da = pts[i].A - centres[c].A, db = pts[i].B - centres[c].B, dc = pts[i].C - centres[c].C, d = da * da + db * db + dc * dc;
-                    if (d < bd) { bd = d; best = c; }
-                }
-                if (label[i] != best) { label[i] = best; moved = true; }
-            }
-            var sum = new (double A, double B, double C, int N)[k];
-            for (int i = 0; i < pts.Count; i++)
-            {
-                ref var t = ref sum[label[i]];
-                t.A += pts[i].A; t.B += pts[i].B; t.C += pts[i].C; t.N++;
-            }
-            for (int c = 0; c < k; c++) if (sum[c].N > 0) centres[c] = (sum[c].A / sum[c].N, sum[c].B / sum[c].N, sum[c].C / sum[c].N);
-            if (!moved && it > 0) break;
-        }
-        var res = new int[across, down];
-        for (int y = 0; y < down; y++)
-            for (int x = 0; x < across; x++) res[x, y] = label[y * across + x];
-        return res;
-    }
-
-    /// <summary>A colour as brightness and two colour differences (roughly how the eye sorts them).</summary>
-    static (double, double, double) Feature(Sample q) => ((q.R + q.G + q.B) / 3, (q.R - q.G) * 1.4, (q.R + q.G - 2 * q.B) * 0.7);
 
     // ---- floor plans ----
 

@@ -94,6 +94,132 @@ public class CityBuilderTests
         Assert.Equal(a.Id, o[0].A.Id);
     }
 
+    [Fact]
+    public void A_tilted_building_keeps_its_angle_and_stands_on_the_squares_under_it()
+    {
+        var b = Made(0, 0, 4, 2) with { X = 10, Y = 4, ShiftX = 0.5, ShiftY = 0.25, TiltDeg = 30 };
+        Assert.False(CityFootprint.OnGrid(b));
+        // It turns about its own middle, which stays put.
+        var (cx, cy) = CityFootprint.Centre(b);
+        Assert.Equal(12.5, cx, 9);
+        Assert.Equal(5.25, cy, 9);
+        var (mx, my) = CityFootprint.ToMap(b, 2, 1);
+        Assert.Equal(cx, mx, 9);
+        Assert.Equal(cy, my, 9);
+        // Its corners are 4 and 2 apart still, and every point comes back to where it was in the plan.
+        var corners = CityFootprint.Corners(b);
+        Assert.Equal(4, Math.Sqrt(Math.Pow(corners[1].X - corners[0].X, 2) + Math.Pow(corners[1].Y - corners[0].Y, 2)), 9);
+        Assert.Equal(2, Math.Sqrt(Math.Pow(corners[2].X - corners[1].X, 2) + Math.Pow(corners[2].Y - corners[1].Y, 2)), 9);
+        // The top edge slopes down to the right by 30°.
+        Assert.Equal(Math.Tan(30 * Math.PI / 180), (corners[1].Y - corners[0].Y) / (corners[1].X - corners[0].X), 9);
+        foreach (var (x, y) in new[] { (0.0, 0.0), (4.0, 0.0), (1.5, 2.0), (3.2, 0.7) })
+        {
+            var (px, py) = CityFootprint.ToMap(b, x, y);
+            var (bx, by) = CityFootprint.FromMap(b, px, py);
+            Assert.Equal(x, bx, 9);
+            Assert.Equal(y, by, 9);
+        }
+        // Its middle is on it, a point well outside its corners isn't; the squares it stands on take in every square of its plan.
+        Assert.True(CityFootprint.Hit(b, cx, cy));
+        Assert.False(CityFootprint.Hit(b, cx + 3, cy));
+        var cells = CityFootprint.Cells(b);
+        Assert.Contains(((int)Math.Floor(cx), (int)Math.Floor(cy)), cells);
+        for (int y = 0; y < 2; y++)
+            for (int x = 0; x < 4; x++)
+            {
+                var (px, py) = CityFootprint.ToMap(b, x + 0.5, y + 0.5);
+                Assert.Contains(((int)Math.Floor(px), (int)Math.Floor(py)), cells);
+            }
+        Assert.InRange(cells.Count, 8, 16);
+        // Squared to the grid, it's back on whole squares.
+        var squared = b with { TiltDeg = 0, ShiftX = 0, ShiftY = 0, X = (int)Math.Round(b.X + b.ShiftX), Y = (int)Math.Round(b.Y + b.ShiftY) };
+        Assert.True(CityFootprint.OnGrid(squared));
+        Assert.Equal(8, CityFootprint.Cells(squared).Count);
+    }
+
+    [Fact]
+    public void Turning_a_tilted_building_keeps_its_tilt_and_turns_it_about_the_pivot()
+    {
+        var b = Made(0, 0, 4, 2) with { X = 10, Y = 4, ShiftX = 0.5, ShiftY = 0.25, TiltDeg = 20 };
+        var m = CityMap.Empty(30, 30) with { Buildings = [b] };
+        var pick = new CityPick { Buildings = [b.Id] };
+        var (before, _) = CityFootprint.Centre(b);
+        var (turned, _, pivot) = CityEdit.Turn(m, pick, 1);
+        var t = Assert.Single(turned.Buildings);
+        Assert.Equal(1, t.Turn);
+        Assert.Equal(20, t.TiltDeg, 9);
+        Assert.False(CityFootprint.OnGrid(t));
+        // A quarter turn clockwise about the pivot takes the middle with it.
+        var (cx, cy) = CityFootprint.Centre(t);
+        var (bx, by) = CityFootprint.Centre(b);
+        Assert.Equal(pivot.X - (by - pivot.Y), cx, 6);
+        Assert.Equal(pivot.Y + (bx - pivot.X), cy, 6);
+        Assert.Equal(before, bx, 9);
+        // Four turns bring it back where it was.
+        var (back, _, _) = CityEdit.Turn(turned, pick, 3, pivot);
+        var r = Assert.Single(back.Buildings);
+        Assert.Equal(b.X + b.ShiftX, r.X + r.ShiftX, 6);
+        Assert.Equal(b.Y + b.ShiftY, r.Y + r.ShiftY, 6);
+        Assert.Equal(0, r.Turn);
+    }
+
+    // ---- finding the grid ----
+
+    /// <summary>A picture with a grid of thin lines every <paramref name="spacing"/> pixels from <paramref name="start"/>, a few heavy outlines over it, and grain.</summary>
+    static RasterImage Gridded(int w, int h, double spacing, double start, bool lightLines = false, bool grid = true)
+    {
+        var px = new byte[w * h * 4];
+        var rnd = new Random(9);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int n = rnd.Next(-8, 9);
+                int r = 110 + n, g = 150 + n, b = 80 + n;
+                // Three roofs, outlined heavily (lines that aren't the grid's).
+                if ((x is >= 100 and <= 260 && y is >= 90 and <= 210) || (x is >= 400 and <= 560 && y is >= 300 and <= 420) || (x is >= 620 and <= 700 && y is >= 60 and <= 300))
+                {
+                    r = 170 + n; g = 80 + n; b = 60 + n;
+                    bool edge = x is 100 or 101 or 259 or 260 or 400 or 401 or 559 or 560 or 620 or 621 or 699 or 700 || y is 90 or 91 or 209 or 210 or 300 or 301 or 419 or 420 or 60 or 61 or 299;
+                    if (edge) { r = 30; g = 25; b = 20; }
+                }
+                if (grid)
+                {
+                    double gx = (x - start) / spacing, gy = (y - start) / spacing;
+                    bool line = Math.Abs(gx - Math.Round(gx)) * spacing < 0.5 || Math.Abs(gy - Math.Round(gy)) * spacing < 0.5;
+                    if (line) { double f = lightLines ? 1.35 : 0.72; r = (int)(r * f); g = (int)(g * f); b = (int)(b * f); }
+                }
+                int k = (y * w + x) * 4;
+                px[k] = (byte)Math.Clamp(r, 0, 255);
+                px[k + 1] = (byte)Math.Clamp(g, 0, 255);
+                px[k + 2] = (byte)Math.Clamp(b, 0, 255);
+                px[k + 3] = 255;
+            }
+        return new RasterImage(w, h, px);
+    }
+
+    [Theory]
+    [InlineData(37.5, 12.3, false)]
+    [InlineData(70.25, 3.0, false)]
+    [InlineData(48, 20.0, true)]
+    public void The_grid_is_found_to_a_fraction_of_a_pixel_whatever_its_spacing(double spacing, double start, bool light)
+    {
+        var grid = GridFinder.Find(Gridded(800, 600, spacing, start, light));
+        Assert.NotNull(grid);
+        Assert.Equal(spacing, grid!.SquarePx, 1);
+        Assert.Equal(start, grid.OffsetX, 0);
+        Assert.Equal(start, grid.OffsetY, 0);
+    }
+
+    [Fact]
+    public void Heavy_outlines_dont_pass_for_a_coarser_grid_and_no_grid_is_none()
+    {
+        // The outlines repeat at 160 pixels or so: not the grid, which is every 40.
+        var grid = GridFinder.Find(Gridded(800, 600, 40, 0));
+        Assert.NotNull(grid);
+        Assert.Equal(40, grid!.SquarePx, 1);
+        Assert.Null(GridFinder.Find(Gridded(800, 600, 40, 0, grid: false)));
+    }
+
     // ---- making buildings from footprints ----
 
     [Fact]
