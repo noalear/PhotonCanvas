@@ -7,9 +7,9 @@ Turn the handle and the figures on top move: each one bobs, nods, pecks or spins
 material's real thickness, a square dowel for the shaft and a few round ones.
 
 ## Open the toy maker
-<!-- target: ribbon:Home/Automata -->
+<!-- target: ribbon:Designer/Automata -->
 <!-- wait: window:Toys and automata -->
-Click **Automata** on the **Home** tab.
+Click **Automata** on the **Designer** tab (in the **Toys** group).
 
 ## Choose Moving figures
 <!-- target: tabitem:Moving figures -->

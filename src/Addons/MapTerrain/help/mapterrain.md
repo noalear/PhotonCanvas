@@ -3,7 +3,7 @@
 An add-on (Settings → Add-ons → **Map to terrain**): on when PhotonCanvas is installed, and can be
 turned off. It needs the **Textured wall maker**, **Floor tile maker**, **Mini furniture maker** and
 **Whole-building kits** add-ons, which make its pieces and show them. Its button is
-**Home → Draw → Map to terrain**, and **Edit map terrain…** is on the right-click menu of the pieces
+**Designer → Town → Map to terrain**, and **Edit map terrain…** is on the right-click menu of the pieces
 it made.
 
 **Map to terrain** turns a floor plan into tabletop terrain you can cut and stand up: draw the rooms
@@ -24,7 +24,7 @@ and the doors that swing the way the furniture maker does ([Mini furniture](furn
 
 ![The map maker with a small dungeon drawn on the plan: two rooms, a corridor and an alcove, with the walls, doors and columns marked](images/window-mapterrain-plan.png)
 
-Click **Map to terrain** on the **Home** tab (in the **Draw** group). The **Map to terrain** window
+Click **Map to terrain** on the **Designer** tab (in the **Town** group). The **Map to terrain** window
 opens with a small dungeon to start from (or the last map you made). On the left are three tabs:
 **Plan** (the look, the grid, reading a battle map), **Walls** (the sheet, the walls and the doors)
 and **Floor** (the floor tiles). On the right, **Plan** is the floor plan you draw on, **Put

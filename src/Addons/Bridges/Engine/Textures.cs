@@ -22,7 +22,7 @@ public readonly record struct Face(double Length, double Height, double X0, doub
 
 /// <summary>
 /// The wall maker's preset textures and your own, drawn over a face: the same presets, sizes and
-/// layouts as Walls (Home → Draw → Walls), so a bridge can match the walls beside it. Copied from the
+/// layouts as Walls (Designer → Buildings → Walls), so a bridge can match the walls beside it. Copied from the
 /// wall maker so this add-on works without it.
 /// </summary>
 public static class Textures

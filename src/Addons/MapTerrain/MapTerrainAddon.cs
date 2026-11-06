@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.MapTerrain;
 
 /// <summary>
-/// Home → Draw → Map to terrain, its command and "Edit map terrain…" on the right-click menu, opening
+/// Designer → Town → Map to terrain, its command and "Edit map terrain…" on the right-click menu, opening
 /// <see cref="MapWindow"/>: draw a floor plan or read a battle map, and get every wall, column, door
 /// and floor tile for it from the wall, floor tile and furniture makers. It only adds shapes to the
 /// design; nothing is sent to the machine.
@@ -19,11 +19,11 @@ public sealed class MapTerrainAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Map to terrain", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Designer", "Town", "Map to terrain", Icon, Open)
         {
             Tip = "Draw a floor plan or read a battle map, and get every wall, column, door and floor tile for it",
             Large = true,
-            Order = 26,
+            Order = 11,
         });
         host.AddCommand(new AddonCommand("mapterrain.open", "Shapes", "Map to terrain…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit map terrain…", Open) { Visible = Selected });

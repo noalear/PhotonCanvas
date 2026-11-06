@@ -627,6 +627,11 @@ public partial class MainWindow : Window
         pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
         pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
 
+        // ---- Designer: the add-ons that make whole things (terrain, buildings, toys) ----
+        // Empty here: the maker add-ons put their buttons on it, and it hides while none are on.
+        _ribbon.AddonTab("Designer", "Makers for tabletop terrain, buildings, towns, furniture, figures' bases, game kits and toys",
+            "Buildings", "Town", "Terrain", "Furniture & props", "Minis & games", "Toys");
+
         // ---- Camera: what the machine sees ----
         var camera = _ribbon.Tab("Camera", "Use the machine's camera: fit designs to pieces, calibration (photo, live view and close-up are in the machine panel at the right)");
         var fit = camera.Group("Place");

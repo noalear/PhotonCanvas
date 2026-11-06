@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Scatter;
 
 /// <summary>
-/// Home → Draw → Scatter, its command and "Edit scatter terrain…" on the right-click menu, opening
+/// Designer → Furniture & props → Scatter, its command and "Edit scatter terrain…" on the right-click menu, opening
 /// <see cref="ScatterWindow"/>: barrels, fences, carts, market stalls, wells and gravestones for
 /// tabletop games. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,11 +18,11 @@ public sealed class ScatterAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Scatter", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Designer", "Furniture & props", "Scatter", Icon, Open)
         {
             Tip = "Barrels, fences, carts, market stalls, wells and gravestones that slot together, for tabletop games and models",
             Large = true,
-            Order = 24,
+            Order = 11,
         });
         host.AddCommand(new AddonCommand("scatter.open", "Shapes", "Scatter terrain…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit scatter terrain…", Open) { Visible = Selected });

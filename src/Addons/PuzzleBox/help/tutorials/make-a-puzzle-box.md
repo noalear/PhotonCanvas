@@ -7,9 +7,9 @@ A puzzle box is glued up from layers of sheet. Its top is sliding panels hooked 
 underneath, and a drawer hides in its bottom layers until you find the button inside.
 
 ## Open the puzzle box maker
-<!-- target: ribbon:Home/Puzzle box -->
+<!-- target: ribbon:Designer/Puzzle box -->
 <!-- wait: window:Puzzle box -->
-Click **Puzzle box** on the **Home** tab.
+Click **Puzzle box** on the **Designer** tab (in the **Toys** group).
 
 ## Pick the kind of box
 <!-- target: text:Kind of box -->

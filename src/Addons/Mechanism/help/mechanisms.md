@@ -1,6 +1,6 @@
 # Mechanisms
 
-An add-on (Settings → Add-ons → **Mechanism maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Mechanisms**, and **Edit mechanism…** is on the right-click menu of a mechanism's parts.
+An add-on (Settings → Add-ons → **Mechanism maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Toys → Mechanisms**, and **Edit mechanism…** is on the right-click menu of a mechanism's parts.
 
 **Mechanisms** makes things that move, cut from sheet material: a train of gears, a rack and
 pinion, planetary gears, a cam and follower, or an automaton box with a handle, cams and platforms
@@ -15,7 +15,7 @@ on a cut layer with your material's kerf, ready to cut.
 ## The Mechanism maker window
 <!-- windows: MechanismWindow -->
 
-Click **Mechanisms** on the **Home** tab (in the **Draw** group). The **Mechanism maker** opens
+Click **Mechanisms** on the **Designer** tab (in the **Toys** group). The **Mechanism maker** opens
 over the program.
 
 ![The Mechanism maker with a pair of gears: settings on the left, the gears turning on the right, the check's results under them](images/window-mechanism-gears.png)

@@ -8,9 +8,9 @@ a tavern or a courtyard. Every square of every edge has the same jigsaw joint, s
 together whichever way they're turned.
 
 ## Open the floor tile maker
-<!-- target: ribbon:Home/Floor tiles -->
+<!-- target: ribbon:Designer/Floor tiles -->
 <!-- wait: window:Floor tiles -->
-Click **Floor tiles** on the **Home** tab.
+Click **Floor tiles** on the **Designer** tab (in the **Terrain** group).
 
 ## Set the grid
 <!-- target: field:Grid square -->

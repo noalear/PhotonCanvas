@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Mechanism;
 
 /// <summary>
-/// Home → Draw → Mechanisms, its command and "Edit mechanism…" on the right-click menu, opening
+/// Designer → Toys → Mechanisms, its command and "Edit mechanism…" on the right-click menu, opening
 /// <see cref="MechanismWindow"/>: gears, a rack and pinion, planetary gears, a cam and follower or an
 /// automaton box, checked moving before they're cut. The geometry and the motion check are in Engine/.
 /// </summary>
@@ -18,10 +18,11 @@ public sealed class MechanismAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Mechanisms", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Designer", "Toys", "Mechanisms", Icon, Open)
         {
             Tip = "Gears, a rack and pinion, planetary gears, cams and automaton boxes, checked moving before you cut them",
             Large = true,
+            Order = 12,
         });
         host.AddCommand(new AddonCommand("mechanism.open", "Shapes", "Mechanism maker…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit mechanism…", Open) { Visible = Selected });

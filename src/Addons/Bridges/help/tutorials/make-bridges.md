@@ -7,9 +7,9 @@ A bridge cut from thin sheet slots together without tools: the planks drop into 
 sides, a stone bridge's road and inside walls tab into its side walls.
 
 ## Open the bridge maker
-<!-- target: ribbon:Home/Bridges -->
+<!-- target: ribbon:Designer/Bridges -->
 <!-- wait: window:Miniature bridges -->
-Click **Bridges** on the **Home** tab.
+Click **Bridges** on the **Designer** tab (in the **Terrain** group).
 
 ## Pick a plank bridge
 <!-- target: field:Kind -->

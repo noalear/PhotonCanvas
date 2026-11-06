@@ -50,6 +50,8 @@ public partial class MainWindow : IAddonServices
             if (!ConnectOnOpen && Environment.GetEnvironmentVariable("PHOTONCANVAS_ADDONS") != "1") return;
             try { _addons.StartAll(); }
             catch (Exception e) { AppLog.Error("Starting add-ons", e); }
+            // Tabs only add-ons fill (Designer) hide if none did.
+            _ribbon.Refresh();
         };
     }
 

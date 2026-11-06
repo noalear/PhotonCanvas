@@ -1,6 +1,6 @@
 # Toys and automata
 
-An add-on (Settings → Add-ons → **Toys and automata**): on when PhotonCanvas is installed, and can be turned off. It uses the [mechanism maker](mechanisms.md)'s cams and motion check, so that add-on must be on too. Its button is **Home → Draw → Automata**, and **Edit toy…** is on the right-click menu of a toy's parts.
+An add-on (Settings → Add-ons → **Toys and automata**): on when PhotonCanvas is installed, and can be turned off. It uses the [mechanism maker](mechanisms.md)'s cams and motion check, so that add-on must be on too. Its button is **Designer → Toys → Automata**, and **Edit toy…** is on the right-click menu of a toy's parts.
 
 **Automata** makes two kinds of toy, cut from sheet material:
 
@@ -27,7 +27,7 @@ Then it puts the parts in the design, named and marked, on a cut layer with your
 ## The Toys and automata window
 <!-- windows: AutomataWindow -->
 
-Click **Automata** on the **Home** tab (in the **Draw** group). The **Toys and automata** window
+Click **Automata** on the **Designer** tab (in the **Toys** group). The **Toys and automata** window
 opens over the program.
 
 ![The Toys and automata window: a bobbing fish, a pecking bird and a spinning dancer on a crank box, moving on the right](images/window-automata-figures.png)

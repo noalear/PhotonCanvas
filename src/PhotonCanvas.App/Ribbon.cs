@@ -128,6 +128,7 @@ public sealed class Ribbon : UserControl
         var tab = new RibbonTab(this, name, header);
         header.Click += (_, _) =>
         {
+            _wanted = null;
             if (_folded) Fold(false);
             Select(tab);
         };
@@ -138,10 +139,35 @@ public sealed class Ribbon : UserControl
         return tab;
     }
 
+    /// <summary>
+    /// A tab kept for add-ons' buttons (Designer): its place in the row is fixed here, its header
+    /// shows only while an add-on has a button on it, and its groups always come in
+    /// <paramref name="groups"/> order, whichever add-on starts first.
+    /// </summary>
+    public RibbonTab AddonTab(string name, string tip, params string[] groups)
+    {
+        var tab = Tab(name, tip);
+        tab.Extra = true;
+        tab.Kept = true;
+        tab.GroupOrder = groups;
+        tab.Header.IsVisible = false;
+        return tab;
+    }
+
     public void Select(string name)
     {
-        if (_tabs.FirstOrDefault(t => t.Name == name) is { } t) Select(t);
+        if (_tabs.FirstOrDefault(t => t.Name == name) is not { } t) return;
+        // Designer before its add-ons have started: opened once a button arrives on it.
+        if (t.Kept && !t.Header.IsVisible)
+        {
+            _wanted = t;
+            return;
+        }
+        Select(t);
     }
+
+    /// <summary>A hidden kept tab to open as soon as it shows (the one open when the program last closed).</summary>
+    RibbonTab? _wanted;
 
     /// <summary>The user switched tabs.</summary>
     public event Action<string>? TabSelected;
@@ -191,6 +217,18 @@ public sealed class Ribbon : UserControl
                 g.Root.IsVisible = any;
                 changed = true;
             }
+        // A kept tab (Designer) shows while any of its groups do.
+        foreach (var t in _tabs)
+        {
+            if (!t.Kept) continue;
+            bool any = t.Groups.Any(g => g.Root.IsVisible);
+            if (t.Header.IsVisible != any)
+            {
+                t.Header.IsVisible = any;
+                changed = true;
+            }
+            if (!any && _current == t) SelectFirstShown();
+        }
         if (!changed) return;
         // Widths change with what's shown: measure the tabs again.
         foreach (var t in _tabs)
@@ -228,8 +266,8 @@ public sealed class Ribbon : UserControl
     /// <summary>A tab's header button.</summary>
     public Control? TabHeader(string name) => _tabs.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase))?.Header;
 
-    /// <summary>The tab names, in order.</summary>
-    public IEnumerable<string> TabNames => _tabs.Select(t => t.Name);
+    /// <summary>The names of the tabs showing, in order.</summary>
+    public IEnumerable<string> TabNames => _tabs.Where(t => t.Header.IsVisible).Select(t => t.Name);
 
     internal void Track(Control c, Func<bool>? enabled)
     {
@@ -266,6 +304,13 @@ public sealed class Ribbon : UserControl
     internal void DropIfEmpty(RibbonTab tab)
     {
         if (!tab.Extra || tab.Groups.Count > 0) return;
+        if (tab.Kept)
+        {
+            // Stays in its place for the next add-on, just hidden.
+            tab.Header.IsVisible = false;
+            if (_current == tab) SelectFirstShown();
+            return;
+        }
         _tabs.Remove(tab);
         _tabStrip.Children.Remove(tab.Header);
         if (_current == tab)
@@ -276,6 +321,11 @@ public sealed class Ribbon : UserControl
         }
     }
 
+    void SelectFirstShown()
+    {
+        if (_tabs.FirstOrDefault(t => t.Header.IsVisible) is { } first) Select(first);
+    }
+
     /// <summary>
     /// Add a button for an add-on to a tab's group (both made if there aren't any); dispose the result
     /// to take it away again (with the group and tab, if they were made for it and are now empty).
@@ -283,6 +333,12 @@ public sealed class Ribbon : UserControl
     public IDisposable AddExtra(string tabName, string groupTitle, Func<RibbonGroup, Control> add, string? groupAfter = null, int order = 0)
     {
         var tab = TabFor(tabName);
+        tab.Header.IsVisible = true;
+        if (_wanted == tab)
+        {
+            _wanted = null;
+            Select(tab);
+        }
         var group = tab.GroupFor(groupTitle, groupAfter);
         group.Break();
         var c = add(group);
@@ -317,11 +373,31 @@ public sealed class RibbonTab
     /// <summary>Made for an add-on (taken away again when it's empty).</summary>
     internal bool Extra { get; set; }
 
+    /// <summary>Kept in its place when empty, only hidden (<see cref="Ribbon.AddonTab"/>).</summary>
+    internal bool Kept { get; set; }
+
+    /// <summary>The order its groups go in, when they are named here (<see cref="Ribbon.AddonTab"/>).</summary>
+    internal string[] GroupOrder { get; set; } = [];
+
     /// <summary>The group with this title, made (at the end) if there isn't one.</summary>
     internal RibbonGroup GroupFor(string title, string? after = null)
     {
         if (Groups.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)) is { } had) return had;
         var g = Group(title).With(g => g.Extra = true);
+        // A tab with a set group order: before the first group that comes after it.
+        int rank = Array.FindIndex(GroupOrder, x => string.Equals(x, title, StringComparison.OrdinalIgnoreCase));
+        if (rank >= 0)
+        {
+            int before = Groups.FindIndex(x => x != g && Array.FindIndex(GroupOrder, o => string.Equals(o, x.Title, StringComparison.OrdinalIgnoreCase)) is var r && (r < 0 || r > rank));
+            if (before >= 0)
+            {
+                Groups.Remove(g);
+                Groups.Insert(before, g);
+                Panel.Children.Remove(g.Root);
+                Panel.Children.Insert(Panel.Children.IndexOf(Groups[before + 1].Root), g.Root);
+            }
+            return g;
+        }
         // Where it belongs, if asked: just after that group.
         // "Tests|Materials": after the first of these there is.
         int at = -1;

@@ -7,9 +7,9 @@ A roof with shingles etched on finishes a building made with Walls, and lifts of
 inside. Make the walls first: the roof is made to fit them.
 
 ## Open the roof maker
-<!-- target: ribbon:Home/Roofs -->
+<!-- target: ribbon:Designer/Roofs -->
 <!-- wait: window:Roofs -->
-Click **Roofs** on the **Home** tab.
+Click **Roofs** on the **Designer** tab (in the **Buildings** group).
 
 ## Pick a theme
 <!-- target: field:Theme -->

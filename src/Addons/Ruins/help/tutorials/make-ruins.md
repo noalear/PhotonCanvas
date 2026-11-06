@@ -7,9 +7,9 @@ Ruins go well with whole walls: a broken section in the same bricks, slid into t
 rubble where it fell.
 
 ## Open the ruins maker
-<!-- target: ribbon:Home/Ruins -->
+<!-- target: ribbon:Designer/Ruins -->
 <!-- wait: window:Ruins and rubble -->
-Click **Ruins** on the **Home** tab.
+Click **Ruins** on the **Designer** tab (in the **Terrain** group).
 
 ## Match your walls
 <!-- target: button:Match the walls in the design -->

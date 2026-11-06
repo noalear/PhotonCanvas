@@ -7,9 +7,9 @@ The city builder lays out a whole town: the ground, the buildings, walls and tre
 that shows each building true to size as it'll be built, each one a building editor building to cut.
 
 ## Open the city builder
-<!-- target: ribbon:Home/City -->
+<!-- target: ribbon:Designer/City -->
 <!-- wait: window:City builder -->
-Click **City** on the **Home** tab. It opens with the last map (the first time, a sample village):
+Click **City** on the **Designer** tab (in the **Town** group). It opens with the last map (the first time, a sample village):
 the toolbar along the top, the tools down the left with what each puts down beside them, the plan in
 the middle and what's picked on the right.
 

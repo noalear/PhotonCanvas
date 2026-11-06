@@ -1,6 +1,6 @@
 # Textured walls
 
-An add-on (Settings → Add-ons → **Textured wall maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Walls**, and **Edit walls…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Textured wall maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Buildings → Walls**, and **Edit walls…** is on the right-click menu of the pieces it made.
 
 **Walls** makes walls for tabletop games, dioramas and model buildings, cut from sheet material with
 a texture etched on: brick, stone, wood, metal, or a pattern of your own. A wall is built as a
@@ -19,7 +19,7 @@ accessories. Columns cut from the same sheet join the walls: straight on, at cor
 
 ![The wall maker making a boxed stone castle wall: settings on the left, and on the right the wall put together with battlements, a walkway, arrow slits, a door and corner columns](images/window-walls-castle.png)
 
-Click **Walls** on the **Home** tab (in the **Draw** group). The **Textured walls** window opens. The
+Click **Walls** on the **Designer** tab (in the **Buildings** group). The **Textured walls** window opens. The
 settings are on the left in tabs; the preview on the right updates as you change things:
 
 - **Put together** shows one wall built, in 3D, with a column at each end (the first kind of column

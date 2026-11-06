@@ -7,9 +7,9 @@ Gears change how fast and which way things turn. The mechanism maker draws real 
 material, turns them on screen to check they mesh without jamming, and lays the parts out to cut.
 
 ## Open the mechanism maker
-<!-- target: ribbon:Home/Mechanisms -->
+<!-- target: ribbon:Designer/Mechanisms -->
 <!-- wait: window:Mechanism maker -->
-Click **Mechanisms** on the **Home** tab.
+Click **Mechanisms** on the **Designer** tab (in the **Toys** group).
 
 ## Choose Gears
 <!-- target: tabitem:Gears -->

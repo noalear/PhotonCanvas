@@ -5,7 +5,7 @@ turned off. It needs the **Building editor** and **Map to terrain** add-ons (and
 **Mini furniture maker** among them), the **Floor tile maker**, the **Miniature bridge maker** and the
 **Scatter terrain maker**: every building on the map is a building editor building, the battle map
 reader finds a picture's grid the way Map to terrain does, and the ground, bridges, walls, trees and
-scenery are cut by the others. Its button is **Home → Draw → City**.
+scenery are cut by the others. Its button is **Designer → Town → City**.
 
 **City** lays out a whole town, village or city on one big map: the ground of every square (grass,
 paving, water, fields…), the roads laid over it (each named, two squares wide for a street and four
@@ -27,7 +27,7 @@ to change its rooms, doors, furniture and roof, and comes out as its laser-cut p
 
 ![The city builder with the sample village on the plan: the toolbar along the top, the tools down the left with the trees and things to put down in pictures beside them, the plan in the middle and the Map tab on the right](images/window-citybuilder-plan.png)
 
-Click **City** on the **Home** tab (in the **Draw** group). The **City builder** window opens with
+Click **City** on the **Designer** tab (in the **Town** group). The **City builder** window opens with
 the last map you worked on (the first time, a small sample village). It's laid out like a map maker:
 
 - **The toolbar** along the top: a new map, open and save as (the first three buttons), **Undo**
