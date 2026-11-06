@@ -61,7 +61,7 @@ must not copy the program's assemblies (the targets file makes sure of that).
 
 `id`: lower case letters, digits, `-`, `_`, `.`; unique. `category` groups the Add-ons window: use
 Make, Picture, Camera, Laser, Arrange or Other. `requires` lists other add-ons' ids whose services you
-use (they start first, stop after you). Optional: `assembly` (default: the only `PhotonCanvas.Addon.*.dll`),
+use (they start first, stop after you). Optional: `assembly` (default: the only `PhotonCanvas.Addon.*.dll`, or the one named after the id),
 `entry` (default: the only public `IAddon` class) and `updates` (below).
 
 ### Updates

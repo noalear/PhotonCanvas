@@ -16,7 +16,7 @@ public sealed record AddonManifest
     public string Author { get; init; } = "";
     /// <summary>"Make", "Picture", "Camera", "Laser", "Arrange"… (groups the Add-ons window).</summary>
     public string Category { get; init; } = "Other";
-    /// <summary>The assembly file in the add-on's folder (default: the only .dll whose name starts with PhotonCanvas.Addon.).</summary>
+    /// <summary>The assembly file in the add-on's folder (default: see <see cref="MainAssemblyFile"/>).</summary>
     public string? Assembly { get; init; }
     /// <summary>The full name of the class implementing <see cref="IAddon"/> (default: the only one in the assembly).</summary>
     public string? Entry { get; init; }
@@ -33,6 +33,26 @@ public sealed record AddonManifest
     [JsonIgnore] public string Folder { get; init; } = "";
     /// <summary>Set by the program: shipped with PhotonCanvas (can be turned off but not deleted).</summary>
     [JsonIgnore] public bool BuiltIn { get; init; }
+
+    const string AssemblyPrefix = "PhotonCanvas.Addon.";
+
+    /// <summary>
+    /// The add-on's own assembly in <see cref="Folder"/>: the one "assembly" names; otherwise the only
+    /// PhotonCanvas.Addon.*.dll there, or, when there are more (another add-on's copied in beside it),
+    /// the one named after the id ("map-terrain" or "mapterrain" → PhotonCanvas.Addon.MapTerrain.dll).
+    /// </summary>
+    public string MainAssemblyFile()
+    {
+        if (Assembly is { Length: > 0 } a) return Path.Combine(Folder, a);
+        var dlls = Directory.GetFiles(Folder, AssemblyPrefix + "*.dll");
+        if (dlls.Length == 1) return dlls[0];
+        static string Key(string s) => new([.. s.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant)]);
+        var named = dlls.Where(f => Key(Path.GetFileNameWithoutExtension(f)[AssemblyPrefix.Length..]) == Key(Id)).ToList();
+        if (named.Count == 1) return named[0];
+        throw new InvalidOperationException(dlls.Length == 0
+            ? $"There's no {AssemblyPrefix}*.dll in its folder, and addon.json doesn't name one (\"assembly\")."
+            : $"Its folder has {dlls.Length} {AssemblyPrefix}*.dll files, and addon.json doesn't say which one is its own (\"assembly\").");
+    }
 
     static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, ReadCommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
 

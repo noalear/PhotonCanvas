@@ -4,7 +4,8 @@
     <AddonId> and adds its own files; this:
       - references the program (App, Doc, Core, Device, Avalonia) for compiling only: those are never
         copied into the add-on, so at run time the add-on uses the program's own copies;
-      - after each build, copies the add-on's assembly, its own extra libraries, addon.json and help/
+      - after each build, copies the add-on's assembly, its own extra libraries (never another
+        add-on's), addon.json and help/
         into the program's output: src/PhotonCanvas.App/bin/<Configuration>/net10.0/addons/<AddonId>/.
   -->
   <PropertyGroup>
@@ -32,7 +33,10 @@
     <ItemGroup>
       <!-- The add-on's own libraries: whatever is in its output that the program doesn't already have. -->
       <_AddonDll Include="$(OutDir)*.dll;$(OutDir)*.pdb" />
-      <_AddonOwn Include="@(_AddonDll)" Condition="!Exists('$(AppOutDir)%(Filename)%(Extension)')" />
+      <!-- Never another add-on's assembly: one this add-on compiles against through another
+           (Map to terrain → Buildings → Stairs, Roofs) still lands in its output, and a second
+           PhotonCanvas.Addon.*.dll in its folder stops it starting. That add-on loads its own. -->
+      <_AddonOwn Include="@(_AddonDll)" Condition="!Exists('$(AppOutDir)%(Filename)%(Extension)') And ('%(Filename)' == '$(TargetName)' Or !$([System.String]::Copy('%(Filename)').StartsWith('PhotonCanvas.Addon.')))" />
       <_AddonHelp Include="$(OutDir)help\**\*" />
     </ItemGroup>
     <RemoveDir Directories="$(AddonOutDir)" />
