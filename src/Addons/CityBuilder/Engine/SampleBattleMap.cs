@@ -69,10 +69,11 @@ public static class SampleBattleMap
                 }
                 else if (Road(cx, cy) && river >= 1.6)
                 {
-                    // Cobbles: small round stones.
+                    // Cobbles: small round stones in staggered rows, dark joints round each.
                     int sx = x / 9, sy = (y + (x / 9 % 2) * 4) / 9;
                     double s = 0.5 + ((sx * 31 + sy * 57) % 11) / 11.0 * 0.1 + (rnd.NextDouble() - 0.5) * 0.04;
-                    if (x % 9 < 1 || (y + (x / 9 % 2) * 4) % 9 < 1) s -= 0.14;
+                    double ux = x - sx * 9 - 4, uy = y + (x / 9 % 2) * 4 - sy * 9 - 4;
+                    if (ux * ux + uy * uy > 3.6 * 3.6) s -= 0.14;
                     r = s * 1.02; g = s; b = s * 0.94;
                 }
                 else

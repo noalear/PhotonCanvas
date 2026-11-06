@@ -94,9 +94,19 @@ public static class TownPicture
         foreach (var b in m.Buildings)
         {
             var (w, d) = CityFootprint.Size(b);
-            if (!In(b.X + w / 2.0, b.Y + d / 2.0, Math.Max(w, d))) continue;
+            var (bx, by) = CityFootprint.Centre(b);
+            if (!In(bx, by, Math.Max(w, d))) continue;
             float off = (float)(0.18 + 0.12 * Math.Max(1, b.Design.Levels.Count));
-            foreach (var (x, y) in CityFootprint.Cells(b)) c.DrawRect(x + off * 0.7f, y + off, 1.02f, 1.02f, shadow);
+            if (CityFootprint.OnGrid(b)) foreach (var (x, y) in CityFootprint.Cells(b)) c.DrawRect(x + off * 0.7f, y + off, 1.02f, 1.02f, shadow);
+            else
+            {
+                using var path = new SKPath();
+                var corners = CityFootprint.Corners(b);
+                path.MoveTo((float)(corners[0].X + off * 0.7f), (float)(corners[0].Y + off));
+                for (int i = 1; i < 4; i++) path.LineTo((float)(corners[i].X + off * 0.7f), (float)(corners[i].Y + off));
+                path.Close();
+                c.DrawPath(path, shadow);
+            }
         }
         foreach (var p in m.Props.Where(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.Bush or PropKind.Statue or PropKind.Well && In(p.X, p.Y)))
         {
@@ -122,7 +132,8 @@ public static class TownPicture
         foreach (var b in m.Buildings)
         {
             var (w, d) = CityFootprint.Size(b);
-            if (In(b.X + w / 2.0, b.Y + d / 2.0, Math.Max(w, d))) DrawRoofs(c, b, fill, line);
+            var (bx, by) = CityFootprint.Centre(b);
+            if (In(bx, by, Math.Max(w, d))) DrawRoofs(c, b, fill, line);
         }
 
         // Trees and things.
@@ -145,8 +156,8 @@ public static class TownPicture
         if (o.Names)
             foreach (var b in m.Buildings)
             {
-                var (w, d) = CityFootprint.Size(b);
-                Text(c, text, b.Name, b.X + w / 2f, b.Y + d / 2f, 0.32f);
+                var (bx, by) = CityFootprint.Centre(b);
+                Text(c, text, b.Name, (float)bx, (float)by, 0.32f);
             }
         if (o.Labels)
         {
@@ -531,7 +542,16 @@ public static class TownPicture
         {
             // No roof: the walls' colour, with a darker rim.
             fill.Color = ToSk(CityScene.WallColour(b.Design.Style.Texture));
-            foreach (var (x, y) in CityFootprint.Cells(b)) c.DrawRect(x - 0.005f, y - 0.005f, 1.01f, 1.01f, fill);
+            if (CityFootprint.OnGrid(b)) foreach (var (x, y) in CityFootprint.Cells(b)) c.DrawRect(x - 0.005f, y - 0.005f, 1.01f, 1.01f, fill);
+            else
+            {
+                using var path = new SKPath();
+                var corners = CityFootprint.Corners(b);
+                path.MoveTo((float)corners[0].X, (float)corners[0].Y);
+                for (int i = 1; i < 4; i++) path.LineTo((float)corners[i].X, (float)corners[i].Y);
+                path.Close();
+                c.DrawPath(path, fill);
+            }
             return;
         }
         foreach (var r in b.Design.Roofs)
