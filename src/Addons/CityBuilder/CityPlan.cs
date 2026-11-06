@@ -935,7 +935,7 @@ public sealed class CityPlan : Control
             var road = new CityRoad { Width = RoadWidth, Surface = RoadGround, Points = CityEdit.Bent(ln.A, ln.B, _ctrl) };
             bool blocked = CityEdit.Hits(_map, road, CityEdit.BuildingCells(_map));
             using (ctx.PushOpacity(0.75)) DrawRoad(ctx, road, k, new SolidColorBrush(blocked ? Color.FromRgb(0xE0, 0x40, 0x40) : RoadColour(RoadGround)), 0);
-            Text(ctx, $"{road.Length:0.#} squares" + (blocked ? " (stops at the building)" : ""), At(ln.B.X, ln.B.Y) + new Point(8, 4), UiKit.Brush("Text"), 11, false);
+            Text(ctx, $"{road.Length:0.#} squares" + (blocked ? " (stops at the building)" : ""), At(ln.B.X, ln.B.Y) + new Point(8, 4), UiKit.Brush("TextMain"), 11, false);
             return;
         }
         if (_line is { } fl && Tool == CityTool.Fence)
@@ -944,12 +944,12 @@ public sealed class CityPlan : Control
             if (FenceRectangle)
             {
                 ctx.DrawRectangle(null, pen, new Rect(At(fl.A.X, fl.A.Y), At(fl.B.X, fl.B.Y)));
-                Text(ctx, $"{Math.Abs(fl.B.X - fl.A.X):0.#} × {Math.Abs(fl.B.Y - fl.A.Y):0.#}", At(fl.B.X, fl.B.Y) + new Point(8, 4), UiKit.Brush("Text"), 11, false);
+                Text(ctx, $"{Math.Abs(fl.B.X - fl.A.X):0.#} × {Math.Abs(fl.B.Y - fl.A.Y):0.#}", At(fl.B.X, fl.B.Y) + new Point(8, 4), UiKit.Brush("TextMain"), 11, false);
             }
             else
             {
                 ctx.DrawLine(pen, At(fl.A.X, fl.A.Y), At(fl.B.X, fl.B.Y));
-                Text(ctx, $"{fl.A.DistanceTo(fl.B):0.#} squares", At(fl.B.X, fl.B.Y) + new Point(8, 4), UiKit.Brush("Text"), 11, false);
+                Text(ctx, $"{fl.A.DistanceTo(fl.B):0.#} squares", At(fl.B.X, fl.B.Y) + new Point(8, 4), UiKit.Brush("TextMain"), 11, false);
             }
             return;
         }
@@ -957,7 +957,7 @@ public sealed class CityPlan : Control
         {
             int x0 = Math.Min(dg.A.X, dg.B.X), x1 = Math.Max(dg.A.X, dg.B.X), y0 = Math.Min(dg.A.Y, dg.B.Y), y1 = Math.Max(dg.A.Y, dg.B.Y);
             ctx.FillRectangle(HoverBrush, new Rect(At(x0, y0), At(x1 + 1, y1 + 1)));
-            Text(ctx, $"{x1 - x0 + 1} × {y1 - y0 + 1}", At(x1 + 1, y1 + 1) + new Point(4, 2), UiKit.Brush("Text"), 11, false);
+            Text(ctx, $"{x1 - x0 + 1} × {y1 - y0 + 1}", At(x1 + 1, y1 + 1) + new Point(4, 2), UiKit.Brush("TextMain"), 11, false);
             return;
         }
         if (_hover is not { } hp) return;
@@ -999,7 +999,7 @@ public sealed class CityPlan : Control
                 var at = ItemSpot(new CityPt(hp.X, hp.Y));
                 DrawItem(ctx, ghost with { X = at.X, Y = at.Y, TurnDeg = FurnishTurn }, k, false, true);
                 var (w, d) = ghost.Size(_map.SquareMm);
-                Text(ctx, $"{ghost.Name}: {w * 5:0.#} × {d * 5:0.#} ft", At(at.X, at.Y) + new Point(10, 8), UiKit.Brush("Text"), 11, false, shadow: true);
+                Text(ctx, $"{ghost.Name}: {w * 5:0.#} × {d * 5:0.#} ft", At(at.X, at.Y) + new Point(10, 8), UiKit.Brush("TextMain"), 11, false, shadow: true);
                 break;
             }
             case CityTool.Furnish when _right:
