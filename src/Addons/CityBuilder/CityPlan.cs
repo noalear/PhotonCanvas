@@ -191,6 +191,19 @@ public sealed class CityPlan : Control
         InvalidateVisual();
     }
 
+    /// <summary>Zooms in (more than 1) or out about the middle of the plan.</summary>
+    public void ZoomBy(double factor)
+    {
+        var mid = new Point(Bounds.Width / 2, Bounds.Height / 2);
+        var before = ToMap(mid);
+        _zoom = Math.Clamp(_zoom * factor, 1, 60);
+        _pan += mid - At(before.X, before.Y);
+        InvalidateVisual();
+    }
+
+    /// <summary>Where the pointer is on the map (squares), or null when it's off the plan.</summary>
+    public event Action<(double X, double Y)?>? Hovered;
+
     Point At(double x, double y) { var o = Origin; double k = K; return new Point(o.X + x * k, o.Y + y * k); }
 
     (double X, double Y) ToMap(Point p) { var o = Origin; double k = K; return ((p.X - o.X) / k, (p.Y - o.Y) / k); }
@@ -1141,6 +1154,7 @@ public sealed class CityPlan : Control
         var p = ToMap(pos);
         var cp = new CityPt(p.X, p.Y);
         _hover = p;
+        Hovered?.Invoke(p);
         if (_down)
         {
             _ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
@@ -1370,6 +1384,7 @@ public sealed class CityPlan : Control
     {
         base.OnPointerExited(e);
         _hover = null;
+        Hovered?.Invoke(null);
         InvalidateVisual();
     }
 
