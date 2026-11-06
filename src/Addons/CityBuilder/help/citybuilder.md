@@ -8,8 +8,10 @@ reader finds a picture's grid the way Map to terrain does, and the ground, bridg
 scenery are cut by the others. Its button is **Home → Draw → City**.
 
 **City** lays out a whole town, village or city on one big map: the ground of every square (grass,
-roads, paving, water, fields…), the buildings standing on it, fences, hedges and town walls along the
-grid lines, and trees, rocks, wells and carts. Start from an empty map, from the sample village, or
+paving, water, fields…), the roads laid over it (each named, two squares wide for a street and four
+for a high road, on bridges over water), the buildings standing on it, fences, hedges and town walls
+from point to point (capped at their ends, a gatehouse wherever a road goes through), and trees,
+rocks, wells and carts. Start from an empty map, from the sample village, or
 from a 2D battle map picture: the city builder reads it as a best guess of the town seen from above
 and you put right whatever it got wrong. Each building opens in the [building editor](houseeditor.md)
 to change its rooms, doors, furniture and roof, and comes out as its laser-cut pieces.
@@ -45,16 +47,21 @@ enough, and each building's name once it's big enough to read.
 
 | Tool | What it does |
 |---|---|
-| **Select** | Click a building, a tree or thing, a label or a fence to pick it (its settings show on the **Picked** tab); Ctrl and click picks more, or takes one out again. Drag a box from an empty spot to pick everything inside it. Drag anything picked to move it all, a whole square at a time (the mouse wheel turns it while you drag). See [Picking several things](#picking-several-things) for the keys. |
+| **Select** | Click a building, a road, a wall or fence, a tree or thing or a label to pick it (its settings show on the **Picked** tab); Ctrl and click picks more, or takes one out again. Drag a box from an empty spot to pick everything inside it. Drag anything picked to move it all, a whole square at a time (the mouse wheel turns it while you drag). A road or wall picked on its own shows handles to stretch and bend it (see [Roads and walls](#roads-and-walls)). Double-click a building to open it in the [building editor](houseeditor.md). See [Picking several things](#picking-several-things) for the keys. |
 | **Building** | Drag out a rectangle: a new building stands on it, with walls round it, a door towards the nearest road or paving, windows along the walls and a roof (as many floors as **Floors** on the **Tools** tab says). With the right button, click a building to take it away. |
 | **Place** | Put down a saved building (pick it on the **Tools** tab first): click where its top left corner goes. `R`, the right button or Ctrl + the mouse wheel turns it before you click. |
 | **Paint** | Paint the ground with the **Ground** picked on the **Tools** tab, as many squares across as **Brush (squares)**. The right button paints grass. |
 | **Fill** | Click a patch of one ground to fill it all with another (the right button fills it with grass). |
-| **Road** | Drag from one square to another to lay a road there, round one corner; hold Ctrl for a straight line however it slants. What it lays (cobbles, a dirt track, paving, sand, water for a river or grass to take one up) and how many squares wide are under **Roads** on the **Tools** tab. The right button lays grass. |
-| **Fence** | Drag along the grid lines to put up the **Fence** picked on the **Tools** tab: a fence, a hedge, a stone wall or a town wall. Start on one that's there to take it away instead. |
+| **Road** | Drag from one point to another to lay a road there, round one corner; hold Ctrl for a straight line however it slants. What it is (cobbles, a dirt track, paving or sand) and how many squares wide are under **Roads** on the **Tools** tab: two for a street, four for a high road. It gets a street name of its own, stops at the first building in its way, and crosses water on a bridge. Drawn on from the end of another of the same kind, it carries that one on. The right button takes a road away. |
+| **Wall** | Drag to put up the **Kind** picked under **Walls and fences** on the **Tools** tab: a fence, a hedge, a stone wall or a town wall, as **A line** (it bends in eighths of a turn unless you hold Ctrl) or **A rectangle** all the way round. Drawn on from the end of another of the same kind, it carries that one on, and closes into a ring when it meets its own start. The right button cuts a gap in one. |
 | **Trees** | Click to put down the **Tree or thing** picked on the **Tools** tab: a tree, a pine tree, a bush, a boulder, a well, a cart, crates and barrels, a lamp or a statue, or one of the town's bigger pieces: a horse trough, a players' stage (three squares by two), a market stall, an outdoor bar, a notice board, a fountain (two squares by two), a gallows or a guard tower (two squares by two: put it on a grid point of a town wall and it stands astride the wall). The right button takes them away. |
-| **Label** | Click to write the **Text** under **Labels** on the **Tools** tab there: a street's name, a district's, a number for your game master's key. The right button takes one away. |
-| **Erase** | Drag over labels, trees, fences and buildings to take them away. |
+| **Label** | Click to write the **Text** under **Labels** on the **Tools** tab there, turned as far as **Turn (degrees)** says (`R` turns it 15° more, Shift+`R` back): a district's name, a number for your game master's key. Labels always read the right way up. The right button takes one away. |
+| **Erase** | Drag over labels, trees, roads, fences and buildings to take them away. |
+
+**Snap to** on the **Tools** tab says where what you put down and drag lands: **Whole squares**,
+**Half squares** or **Anywhere**. A road keeps its middle line where its squares fall (on a grid line
+for an even width, through the middles of squares for an odd one); trees and small things go to
+quarter squares.
 
 **Undo** and **Redo** (`Ctrl+Z`, `Ctrl+Y`) go back and forward a step at a time.
 
@@ -73,6 +80,29 @@ With **Select**, everything picked shows orange, and these keys work on all of i
 | `Esc` | Pick nothing. |
 
 ![A box dragged round the tavern and the things on the square: all of it picked, orange on the plan, with the type and district for the building on the Picked tab](images/window-citybuilder-several.png)
+
+### Roads and walls
+
+![A road picked on the plan with its handles, its name written along it, and the road's name, surface and width on the Picked tab](images/window-citybuilder-road.png)
+
+Roads lie on top of the ground: take one away and the grass (or the river) is still under it. Each has
+its name written along it, the right way up (left to right, or reading upwards), slid along clear of
+the roads crossing it. Roads can cross and overlap each other, but never run through a building: one
+laid, moved or widened into a building stops short of it (or goes back where it was) and the bar at
+the bottom says why. Where a road crosses water it's on a bridge, drawn on the plan, on the picture
+and in 3D, and cut with **Put the bridges in the design**.
+
+Walls and fences run from point to point, on the grid or at any angle. Where a road goes through a
+town wall there's a gatehouse as wide as the road (through a fence or hedge, just a gap), and
+moving the road takes its gate with it. Where water crosses one, it stops either side. A guard tower
+put astride one splits it, each side meeting the tower. Every other end is capped: a turret on a town
+wall, a pillar on a stone wall, a post on a fence. A wall ticked **Ruined** has no caps or
+gatehouses: its ends and gaps are left broken.
+
+Pick a road or wall on its own with **Select** and handles show on it: drag a round one to move a
+bend, a corner or an end, and a diamond (halfway along each stretch) to move that whole stretch
+sideways. Double-click the road or wall to put a new bend there; right-click a round handle to take
+that bend out. Dragging the road or wall itself moves all of it.
 
 ## The map
 
@@ -103,11 +133,11 @@ On the **Map** tab, **Make a town for me** makes a whole town the size of **Squa
   road wandering across, and lanes wandering along beside it. **Riverside**: a river along the
   bottom with a paved quay, a main road along the town, lanes down to the water and back streets.
 - **How full**: further left, a house here and there; further right, buildings packed side by side.
-- **A town wall with gates**: a town wall round it, with a gate wherever a road goes through, a tower
-  in each corner, guard towers astride the wall every dozen squares or so, guardhouses by the gates and
-  farms with fields outside.
-- **A river through it**: a river down one side, a bridge wherever a road crosses it, warehouses
-  along it.
+- **A town wall with gates**: a town wall all the way round it, with a gatehouse wherever a road goes
+  through, a guard tower astride each corner and others every dozen squares or so, guardhouses by the
+  gates and farms with fields outside. Nothing is built against it, inside or out.
+- **A river through it**: a river down one side with a square of shore along each bank, a bridge
+  wherever a road crosses it, warehouses along it. Lanes running along it stop short of the bank.
 - **A market square**: a paved square where the main roads meet, with a temple, a town hall and a
   tavern facing it, and on it a fountain in the middle (a well on a small square), a players' stage,
   market stalls, an outdoor bar, a notice board, a horse trough, a well, carts, crates, a statue and
@@ -116,12 +146,18 @@ On the **Map** tab, **Make a town for me** makes a whole town the size of **Squa
   district (and type) suits, turned to face the road.
 
 Press **Make a town** for the town; press it again for another one (each is different), and undo
-puts your map back. Every building faces its road with its door, and is of the right kind for its part
-of town, which is its **District**: shops, workshops and taverns in the market, houses round it, a
-noble quarter of manors, warehouses at the docks, hovels at the town's edge, barns and stables on the
-farms. Each has a name (*The Golden Goose*, *Ashford Manor*, *Baker's shop*), the main streets are
-named, and there are lamps along them, trees in the gardens and woods outside. Under the button it
-says what was made. Then change anything you like: it's an ordinary map.
+puts your map back. The high roads through it are four squares wide and the lanes two, each with its
+own name. Every building faces its road with its door, is of the right kind for its part of town,
+which is its **District**, and is the size such a building is on a battle map of five-foot squares (a
+cottage four squares by four, a town house four or five by six, a tavern eight by eight, a temple
+nine by thirteen): shops, workshops and taverns in the market, houses round it, a noble quarter of
+manors, warehouses at the docks, hovels at the town's edge, barns and a stable on the farms. There's a
+square of ground between buildings, so none touch. A town has one of each trade's shop or workshop,
+one smithy, stable and mill (a few more in a city), and each building has a name of its own: a
+family's for the houses and cottages (*the Ashford house*, *Thorne cottage*), *Baker's shop*,
+*The Golden Goose*; change any of them on the **Picked** tab. There are lamps along the high roads,
+trees in the gardens and woods outside. Under the button it says what was made. Then change anything
+you like: it's an ordinary map.
 
 ![The same town in 3D: the wall with its corner towers and guard towers, the houses with their roofs, the bridges over the river and the woods outside](images/window-citybuilder-made-3d.png)
 
@@ -130,8 +166,9 @@ says what was made. Then change anything you like: it's an ordinary map.
 ### Filling the roads with buildings
 
 **Fill with buildings** puts buildings along the roads (and round paved squares) on the free grass,
-facing the road, as full as **How full** says, of the kinds for the **District** picked; your saved
-buildings where they suit, if that's ticked. With **Select**, drag a box first to fill only inside it
+facing the road, as full as **How full** says, of the kinds for the **District** picked, a square apart
+and clear of the walls and fences, with names the town hasn't got yet; your saved buildings where they
+suit, if that's ticked. With **Select**, drag a box first to fill only inside it
 (it stays dashed on the plan until you click again); otherwise it fills the whole map. Lay out roads
 with **Road**, then fill each part of town with its own district.
 
@@ -197,7 +234,8 @@ got wrong.
 
 ![A house picked on the plan and its settings on the Picked tab: name, type, district, tags, its roof and covering](images/window-citybuilder-picked.png)
 
-Click a building with **Select** and the **Picked** tab shows it:
+Click a building with **Select** and the **Picked** tab shows it (double-click it to go straight to
+the building editor):
 
 - **Name**, **Type** (house, shop, tavern, temple…: anything you like), **District** (residential,
   market, docks…) and **Tags** (words to find it by, with commas between). The name shows on the plan.
@@ -217,7 +255,13 @@ Click a building with **Select** and the **Picked** tab shows it:
 With several things picked, the **Picked** tab says what they are. Type a **Type** or **District**
 there and every building picked gets it; with only trees and things picked, change what they are and
 their **Size** together. **Turn ⟳**, **Copy beside it** and **Take away** do what `R`, `Ctrl+D` and
-`Delete` do. A label picked on its own shows its **Text** and **Size** to change.
+`Delete` do. A label picked on its own shows its **Text**, **Size** and **Turn (degrees)** to change.
+
+A road picked on its own shows its **Name** (written along it), **Surface** (cobbles, a dirt track,
+paving or sand), **Width (squares)** (2 for a street, 4 for a high road; it won't widen into a
+building), how long it is and how many bridges it crosses on, and **Take it away**. A wall or fence
+picked on its own shows its **Kind**, **Ruined** (no caps or gatehouses, its ends left broken), how
+long it is with its gates and end caps, and **Take it away**.
 
 ## The town's buildings
 
@@ -293,9 +337,9 @@ pages of its own.
 [furniture maker](furniture.md)'s town pieces, in the map's look (a stone wall with a wall walk and
 merlons, a fortress wall, a log palisade, an armoured defence wall, a sandstone wall or a gothic city
 wall): a corner piece wherever the wall turns (the parapet round the outside of the turn, or the
-inside where it turns in), a gatehouse over each road through a gap two squares wide, an end with a
-turret wherever else it stops (at a river, say), and the rest in sections two squares and one square
-long. The wall isn't cut under a guard tower: the sections either side meet it. Under the tab it says
+inside where it turns in), a gatehouse over each road through it as wide as the road, an end with a
+turret wherever else it stops (at a river, say), and the rest in sections two squares, one square and
+half a square long. The wall isn't cut under a guard tower: the sections either side meet it. Under the tab it says
 how many of each that is.
 
 **Put the trees in the design** makes the map's trees as the furniture maker's: two profiles halved

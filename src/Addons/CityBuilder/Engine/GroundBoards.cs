@@ -45,6 +45,8 @@ public static class GroundBoards
 
     public static (TileSpec Spec, TileKit Kit) Make(CityMap m, GroundOptions o, CancellationToken ct = default)
     {
+        // The roads laid on the ground; water stays water under the bridges (cut by the bridge maker).
+        m = m.Paved(overWater: false);
         var (bx0, by0, bx1, by1) = o.Box ?? (0, 0, m.Across, m.Down);
         bx0 = Math.Clamp(bx0, 0, m.Across - 1); by0 = Math.Clamp(by0, 0, m.Down - 1);
         bx1 = Math.Clamp(bx1, bx0 + 1, m.Across); by1 = Math.Clamp(by1, by0 + 1, m.Down);
