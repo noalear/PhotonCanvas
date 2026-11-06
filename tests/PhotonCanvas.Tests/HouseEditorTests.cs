@@ -601,8 +601,10 @@ public class HouseEditorTests
         Assert.DoesNotContain(roofed.Findings, f => f.Text.Contains("under floor 2", StringComparison.Ordinal));
 
         // A yard of one square: the floor reaches a square past the walls, with a railing round its edge.
+        // (Its open edge has no column, so it stops half a wall's thickness past the railing's line.)
         var one = HouseKitMaker.Make(Yards(null, 1));
-        Assert.Equal(4 * sq + C, Width(one, "Floor 2"), 0.5);
+        double Wt = BuildingKitMaker.WallThickness(HouseKitMaker.StyleFor(d));
+        Assert.Equal(4 * sq + C / 2 + Wt / 2, Width(one, "Floor 2"), 0.5);
         var runs = HouseKitMaker.RailingRuns(d.Levels[1] with { Yard = 1 }, plans[0], plans[1], style.WallSheetMm, C);
         Assert.Equal(5, runs.Sum(r => r.Steps));
 

@@ -39,9 +39,11 @@ public static class RoofMaker
         if (turn) (L, W) = (W, L);
         double t = Math.Tan(pitch * Math.PI / 180), c = Math.Cos(pitch * Math.PI / 180), sn = Math.Sin(pitch * Math.PI / 180);
         double e = Math.Max(0, s.EaveMm), fit = Math.Max(0, s.FitMm), z0 = T;
-        // The gables (and a lean-to's back wall) stand over the walls: their middle over the walls' middle.
-        double x0 = s.InsetMm > 0 ? s.InsetMm - Math.Max(0, s.WallMm) / 2 - T / 2 : BridgeMm;
-        x0 = Math.Clamp(x0, BridgeMm, Math.Max(BridgeMm, Math.Min(L, W) / 4));
+        // The gables (and a lean-to's back wall) stand on the walls, flush with their outside faces, so the
+        // walls carry straight on up into them (on a wall thicker than the sheet, a gable over its middle
+        // left a ledge of the base showing along the top of the wall).
+        double x0 = s.InsetMm > 0 ? s.InsetMm - Math.Max(0, s.WallMm) : BridgeMm;
+        x0 = Math.Clamp(x0, s.InsetMm > 0 ? 0 : BridgeMm, Math.Max(BridgeMm, Math.Min(L, W) / 4));
 
         var standing = new List<(RoofPart Part, PathsD Tabs)>();
         switch (s.Style)
@@ -63,7 +65,7 @@ public static class RoofMaker
                     double ax = pts.Min(p => p.X) - fit / 2, bx = pts.Max(p => p.X) + fit / 2, ay = pts.Min(p => p.Y) - fit / 2, by = pts.Max(p => p.Y) + fit / 2;
                     slots.Add(Geo.Rect(ax, ay + W / 2, bx, by + W / 2));
                 }
-        var basePlate = Geo.Subtract([Geo.Rect(0, 0, L, W)], Geo.Union(slots));
+        var basePlate = Geo.Subtract(BaseOutline(s, L, W, x0), Geo.Union(slots));
         parts.Insert(0, new RoofPart("Base", basePlate, [], [], 1, [Pose.Flat(new V3(0, -W / 2, 0))]));
         parts.InsertRange(1, Locator(s, L, W, T, findings));
 
@@ -74,6 +76,23 @@ public static class RoofMaker
         findings.Add(new(Severity.Note, $"The ridge is {W / 2 * t + T:0.#} mm above the base ({W / 2 * t + 2 * T:0.#} mm above what it sits on)."));
         findings.Add(new(Severity.Note, "Glue the gables, trusses and slopes to the base and each other; the whole roof lifts off."));
         return Finish(parts, findings, T, s.Roofs);
+    }
+
+    /// <summary>
+    /// The base plate's outline: as big as what it sits on (the columns' caps at the corners), but under a
+    /// gable (and a lean-to's sides and back wall), where no slope comes down over it, cut back between the
+    /// corners to the gable's outside face, flush with the walls', so it doesn't stick out past the gable like
+    /// a shelf. The gable's tabs then sit in notches in its edge rather than slots.
+    /// </summary>
+    static PathsD BaseOutline(RoofSpec s, double L, double W, double x0)
+    {
+        var whole = new PathsD { Geo.Rect(0, 0, L, W) };
+        if (s.Style is not (RoofStyle.Gable or RoofStyle.LeanTo) || s.InsetMm <= 0) return whole;
+        double corner = Math.Max(0, s.CornerMm);
+        if (x0 < 0.2 || W - 2 * corner < 1 || L - 2 * corner < 1) return whole;
+        var cuts = new PathsD { Geo.Rect(-1, corner, x0, W - corner), Geo.Rect(L - x0, corner, L + 1, W - corner) };
+        if (s.Style == RoofStyle.LeanTo) cuts.Add(Geo.Rect(corner, W - x0, L - corner, W + 1));
+        return Geo.Subtract(whole, cuts);
     }
 
     /// <summary>Every copy of every part counted for <paramref name="models"/> of them.</summary>
@@ -412,13 +431,22 @@ public static class RoofMaker
             return meet + (j.Over ? T * Math.Sin(phi) : 0);
         }
         var shift = new double[n];
-        foreach (var j in seams) shift[j.Edge] = Reach(j);
+        var from = new double[n];
+        foreach (var j in seams)
+        {
+            shift[j.Edge] = Reach(j);
+            // Each strip lies a strip's width on its own slope, measured back from the joint (or from where the
+            // one underneath stops short of it), on both sides alike: the one that runs on over the joint is
+            // that much wider, not lifted off its slope (a strip measured back from its far end would start past
+            // the joint and float over the other slope, with a gap at the ridge).
+            from[j.Edge] = Math.Min(0, Reach(j with { Over = false })) - w;
+        }
         PathsD outer = [Geo.Rect(-big, -big, big, big)], inner = [Geo.Rect(-big, -big, big, big)];
         for (int i = 0; i < n; i++)
         {
             bool seam = seams.Any(j => j.Edge == i);
             outer = Geo.Intersect(outer, Inside(i, shift[i]));
-            inner = Geo.Intersect(inner, Inside(i, seam ? shift[i] - w : 0));
+            inner = Geo.Intersect(inner, Inside(i, seam ? from[i] : 0));
         }
         var cut = Geo.Tidy(Geo.Subtract(outer, inner));
         // The joints between ridge tiles, across each strip.
@@ -431,12 +459,13 @@ public static class RoofMaker
             var a = new PointD(e.A.x + e.Out.x * shift[j.Edge], e.A.y + e.Out.y * shift[j.Edge]);
             var b0 = slope[(j.Edge + 1) % n];
             double len = (b0.x - e.A.x) * e.D.x + (b0.y - e.A.y) * e.D.y;
-            var strip = Geo.Intersect(cut, Geo.Subtract(Inside(j.Edge, shift[j.Edge]), Inside(j.Edge, shift[j.Edge] - w)));
+            double sw = shift[j.Edge] - from[j.Edge];
+            var strip = Geo.Intersect(cut, Geo.Subtract(Inside(j.Edge, shift[j.Edge]), Inside(j.Edge, from[j.Edge])));
             for (double x = 7; x < len - 2; x += 7)
             {
                 PointD P(double along, double inward) => new(a.x + e.D.x * along - e.Out.x * inward, a.y + e.D.y * along - e.Out.y * inward);
-                if (s.Etch == EtchStyle.Grooves) marks.AddRange(Geo.Intersect([[P(x - g / 2, -1), P(x + g / 2, -1), P(x + g / 2, w + 1), P(x - g / 2, w + 1)]], strip));
-                else lines.AddRange(Geo.ClipLines([[P(x, -1), P(x, w + 1)]], strip));
+                if (s.Etch == EtchStyle.Grooves) marks.AddRange(Geo.Intersect([[P(x - g / 2, -1), P(x + g / 2, -1), P(x + g / 2, sw + 1), P(x - g / 2, sw + 1)]], strip));
+                else lines.AddRange(Geo.ClipLines([[P(x, -1), P(x, sw + 1)]], strip));
             }
         }
         PathsD etched = s.Shingle != Shingles.Plain && s.Etch == EtchStyle.Grooves ? Geo.Union(marks) : [];

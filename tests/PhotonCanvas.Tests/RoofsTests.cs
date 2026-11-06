@@ -124,10 +124,20 @@ public class RoofsTests
     {
         var kit = RoofMaker.Make(new RoofSpec { Shingle = Shingles.Plain });
         var basePart = Part(kit, "Base");
-        // The base has a hole for each tab: two per gable and per truss.
+        // The base has a hole for each truss's two tabs; the gables stand flush with its cut-back ends, their
+        // two tabs each in a notch in its edge.
         int holes = Geo.Tidy(basePart.Cut).Count(p => Clipper.Area(p) < 0);
-        int standing = Part(kit, "Gable end").Copies + (kit.Parts.FirstOrDefault(p => p.Name == "Truss")?.Copies ?? 0);
-        Assert.Equal(2 * standing, holes);
+        int trusses = kit.Parts.FirstOrDefault(p => p.Name == "Truss")?.Copies ?? 0;
+        Assert.Equal(2 * trusses, holes);
+        var gable = Part(kit, "Gable end");
+        double T = kit.ThicknessMm;
+        foreach (var pose in gable.Poses)
+            foreach (var u in new[] { 0.25, 0.75 })
+            {
+                // Under the middle of each tab, half a sheet into the base: no material (the notch).
+                var q = pose.At(gable.Cut.Max(p => p.Max(v => v.x)) * u, -T / 2, T / 2);
+                Assert.Equal(PointInPolygonResult.IsOutside, Clipper.PointInPolygon(new PointD(q.X, q.Y - basePart.Poses[0].O.Y), Geo.Tidy(basePart.Cut).OrderByDescending(p => Math.Abs(Clipper.Area(p))).First()));
+            }
     }
 
     [Fact]
