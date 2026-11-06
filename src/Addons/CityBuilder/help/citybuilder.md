@@ -197,6 +197,19 @@ family's for the houses and cottages (*the Ashford house*, *Thorne cottage*), *B
 trees in the gardens and woods outside. Under the button it says what was made. Then change anything
 you like: it's an ordinary map.
 
+In the **Sci-fi** look the town maker makes a cyberpunk city instead: a grid of blocks between avenues
+four squares wide and streets three wide (whatever **Streets** says, except **Riverside**), packed
+fuller, and paved all over. Its buildings are hab blocks, capsule hotels, corp towers and glass spires
+(their top floors stepping in), neon bars, noodle bars, tech shops, arcades and clinics downtown, shanty
+stacks in the slums, and depots, factories and a power plant in the industrial quarter: two to five
+floors, each with a flat roof deck behind a railing and things standing on it (fuel drums, server racks,
+beacons, signposts, lamps). Their outsides are the cyberpunk walls (hab concrete, steel cladding,
+shopfronts on the walls facing the street, glass on the towers), each wall a little different. The
+market square is the **Central Plaza**, with a corp tower, an arcade and a neon bar facing it. Light
+pylons stand along every street and holo signposts at its crossings. In the 3D view the streets are dark
+asphalt and the buildings show their lights: lit windows, a neon strip round each roof and a sign band
+over each bar or shop (only drawn, never cut).
+
 ![The same town in 3D: the wall with its corner towers and guard towers, the houses with their roofs, the bridges over the river and the woods outside](images/window-citybuilder-made-3d.png)
 
 ![Closer in on the market square in 3D: market stalls under their awnings, the outdoor bar with its barrels, a notice board, carts and the players' stage with its backdrop round the tiered fountain in the middle, the houses close round it](images/window-citybuilder-square-3d.png)

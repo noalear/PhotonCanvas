@@ -18,7 +18,11 @@ public sealed record TextureParts(PathsD Raised, PathsD Etched, List<PathD> Line
 }
 
 /// <summary>The face a texture covers: the panel's whole size, the part between the plain ends, and the top of the wall's body (under any battlements).</summary>
-public readonly record struct Face(double Length, double Height, double X0, double X1, double Top);
+public readonly record struct Face(double Length, double Height, double X0, double X1, double Top)
+{
+    /// <summary>The face's doors and windows (their frames' bounds): textures with fittings bolted on keep them clear.</summary>
+    public IReadOnlyList<RectD>? Avoid { get; init; }
+}
 
 /// <summary>The preset textures and your own, drawn over a wall's face.</summary>
 public static class Textures
@@ -38,7 +42,7 @@ public static class Textures
     public static TextureParts Make(WallSpec s, Face f)
     {
         if (s.Custom is { } custom && s.Texture == custom.Name) return Custom(custom, Math.Max(0.5, s.SizeA), f);
-        var (r, e, l) = TextureEngine.Make(s.Texture, f.Length, f.Height, f.X0, f.X1, f.Top, s.SizeA, s.SizeB, s.GrooveMm, s.Seed, s.Wear, s.DetailMm, s.Etch == EtchStyle.Lines);
+        var (r, e, l) = TextureEngine.Make(s.Texture, f.Length, f.Height, f.X0, f.X1, f.Top, s.SizeA, s.SizeB, s.GrooveMm, s.Seed, s.Wear, s.DetailMm, s.Etch == EtchStyle.Lines, f.Avoid);
         return new(r, e, l);
     }
 

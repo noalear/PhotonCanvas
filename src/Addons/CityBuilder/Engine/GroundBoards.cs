@@ -32,8 +32,10 @@ public sealed record GroundOptions
 /// </summary>
 public static class GroundBoards
 {
-    /// <summary>The floor tile maker's texture for a ground; null for the ones drawn here.</summary>
-    public static string? TextureFor(Ground g) => g switch
+    /// <summary>The floor tile maker's texture for a ground in a look (a cyberpunk city's streets deck plates, its pavements square slabs); null for the ones drawn here.</summary>
+    public static string? TextureFor(Ground g, string? theme = null) => TownMaker.SciFi(theme) && g is Ground.Road or Ground.Paving
+        ? (g == Ground.Road ? "Metal deck plates" : "Square tiles")
+        : g switch
     {
         Ground.Road => "Cobblestones",
         Ground.Paving => "Flagstones",
@@ -120,7 +122,7 @@ public static class GroundBoards
         Parallel.ForEach(wanted, new ParallelOptions { CancellationToken = ct }, w =>
         {
             var (gr, v) = w;
-            var tex = Texture(gr, spec, tw, th, o.Seed * 7919 + (int)gr * 104729 + v * 31);
+            var tex = Texture(gr, m.Theme, spec, tw, th, o.Seed * 7919 + (int)gr * 104729 + v * 31);
             var marks = tex.Raised.Count > 0
                 ? Geo.Union(Geo.Subtract([Geo.Rect(-g - 1, -g - 1, tw + g + 1, th + g + 1)], Geo.Union(tex.Raised)), tex.Etched)
                 : Geo.Union(tex.Etched);
@@ -162,10 +164,10 @@ public static class GroundBoards
     }
 
     /// <summary>The marks for one ground over a tile <paramref name="w"/> × <paramref name="h"/> mm, reaching a square past its edges.</summary>
-    static TextureParts Texture(Ground gr, TileSpec s, double w, double h, int seed)
+    static TextureParts Texture(Ground gr, string? theme, TileSpec s, double w, double h, int seed)
     {
         double g = s.SquareMm;
-        if (TextureFor(gr) is { } name && FloorTextures.Preset(name) is { } preset)
+        if (TextureFor(gr, theme) is { } name && FloorTextures.Preset(name) is { } preset)
         {
             var (a, b) = FloorTextures.SizesFor(preset, g);
             return FloorTextures.Make(s with { Texture = name, SizeA = a, SizeB = b, GrooveMm = preset.Groove }, w, h, seed);

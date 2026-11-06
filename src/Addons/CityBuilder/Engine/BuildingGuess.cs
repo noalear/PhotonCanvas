@@ -18,6 +18,18 @@ public sealed record SeenBuilding
     public string Type { get; init; } = "House";
     /// <summary>How the building was seen: "roof" (from above) or "plan" (its rooms drawn).</summary>
     public string From { get; init; } = "roof";
+    /// <summary>
+    /// A flat roof you can stand on instead of a pitched one: a deck over the top floor with railings round it and
+    /// the roof's clutter on it (vents, tanks, antennae, signs). Null: flat in the sci-fi look, pitched otherwise.
+    /// </summary>
+    public bool? RoofDeck { get; init; }
+    /// <summary>
+    /// The floor (0 = the ground floor) from which the floors above step in a square all round, leaving a terrace
+    /// with railings round them (a tower's setback); null for none. Only where what's left is at least 3 by 3.
+    /// </summary>
+    public int? SetbackFrom { get; init; }
+    /// <summary>Picks the roof's clutter.</summary>
+    public int Seed { get; init; } = 1;
 }
 
 /// <summary>
@@ -38,20 +50,43 @@ public static class BuildingGuess
     {
         if (f.Cells.Count == 0) return null;
         int x0 = f.Cells.Min(c => c.X), y0 = f.Cells.Min(c => c.Y);
-        var cells = f.Cells.Select(c => (c.X - x0, c.Y - y0)).ToHashSet();
+        var cells = f.Cells.Select(c => (X: c.X - x0, Y: c.Y - y0)).ToHashSet();
         var style = StyleFor(theme);
-        int storeys = Math.Clamp(f.Storeys, 1, HouseKitMaker.MaxLevels);
+        bool sci = IsSciFi(theme);
+        bool deck = f.RoofDeck ?? sci;
+        // A city's buildings each laid out afresh, so no two show the same pattern of panels and fittings.
+        if (sci) style = style with { Seed = 1000 + Math.Abs(f.Seed % 100000), Texture = Outside(f.Type).Ground, UpperTexture = Outside(f.Type).Upper };
+        // A roof deck is a floor of its own on top.
+        int storeys = Math.Clamp(f.Storeys, 1, HouseKitMaker.MaxLevels - (deck ? 1 : 0));
         var outer = Outline(cells);
         var inner = f.InnerWalls
             .Select(w => WallEdge.Of(new GridPt(w.A.X - x0, w.A.Y - y0), new GridPt(w.B.X - x0, w.B.Y - y0)))
             .Where(e => !outer.Contains(e)).ToHashSet();
         var towards = f.DoorTowards.Select(c => (c.X - x0, c.Y - y0)).ToHashSet();
+        // The squares the upper floors keep when they step in (a square in all round, if that leaves 3 by 3).
+        var upperCells = cells;
+        if (f.SetbackFrom is int from && from > 0 && from < storeys)
+        {
+            var inset = cells.Where(c => Neighbours(c).All(cells.Contains)).ToHashSet();
+            int iw = inset.Count == 0 ? 0 : inset.Max(c => c.X) - inset.Min(c => c.X) + 1, id = inset.Count == 0 ? 0 : inset.Max(c => c.Y) - inset.Min(c => c.Y) + 1;
+            if (iw >= 3 && id >= 3 && inset.Count >= 9 && Rectangles(inset).Count == 1) upperCells = inset;
+        }
         var levels = new List<Level>();
+        var looks = new Random(f.Seed * 31 + 7);
         for (int k = 0; k < storeys; k++)
         {
-            var walls = k == 0 ? outer.Concat(inner).ToList() : [.. outer];
-            var openings = Openings(walls, cells, k == 0 ? towards : null, style, k == 0, squareMm > 0 ? squareMm : style.SquareMm);
-            levels.Add(new Level { Walls = walls, Openings = openings });
+            var own = k >= (f.SetbackFrom ?? int.MaxValue) ? upperCells : cells;
+            var ownOuter = own == cells ? outer : Outline(own);
+            var walls = k == 0 ? ownOuter.Concat(inner).ToList() : [.. ownOuter];
+            var openings = Openings(walls, own, k == 0 ? towards : null, style, k == 0, squareMm > 0 ? squareMm : style.SquareMm);
+            levels.Add(new Level { Walls = walls, Openings = openings, WallLooks = sci ? CityLooks(f.Type, k, ownOuter, own, k == 0 ? towards : [], style, looks) : [] });
+        }
+        if (deck)
+        {
+            var top = levels.Count > 1 && (f.SetbackFrom ?? int.MaxValue) < storeys ? upperCells : cells;
+            levels.Add(new Level { Furniture = Rooftop(top, style, f.Seed) });
+            var d0 = new HouseDesign { Style = style, SquareMm = squareMm > 0 ? squareMm : style.SquareMm, Levels = levels, UpperFloor = FloorThemesFor(theme), VaryWalls = sci };
+            return (d0, x0, y0);
         }
         var cover = f.Covering ?? style.RoofTexture;
         var roofs = Rectangles(cells).Select(r =>
@@ -67,6 +102,87 @@ public static class BuildingGuess
         }).ToList();
         var design = new HouseDesign { Style = style, SquareMm = squareMm > 0 ? squareMm : style.SquareMm, Levels = levels, Roofs = roofs };
         return (design, x0, y0);
+    }
+
+    /// <summary>A cyberpunk city building's outside walls by what it is: the ground floor's, then the floors above.</summary>
+    public static (string Ground, string? Upper) Outside(string type) => type switch
+    {
+        "Corp tower" or "Spire" => (BuildingThemes.GlassFacade, BuildingThemes.GlassFacade),
+        "Data centre" or "Capsule hotel" => (BuildingThemes.HabConcrete, BuildingThemes.GlassFacade),
+        "Cargo depot" or "Factory" or "Hangar" or "Power plant" or "Hydroponics" or "Warehouse" or "Workshop" => (BuildingThemes.SteelCladding, BuildingThemes.SteelCladding),
+        "Stack" => (BuildingThemes.SteelCladding, BuildingThemes.HabConcrete),
+        _ => (BuildingThemes.HabConcrete, null),
+    };
+
+    /// <summary>Kinds with a shop at street level (a shutter, a sign box and posters on the walls to the road).</summary>
+    static bool StreetShop(string type) => type is "Neon bar" or "Noodle bar" or "Tech shop" or "Arcade" or "Clinic" or "Shop" or "Canteen" or "Hab block";
+
+    /// <summary>
+    /// A city building's walls of a floor that look different from the rest: the ground floor's walls to the road a
+    /// shopfront (on a hab block, now and then), and on hab blocks and stacks the odd wall clad in steel.
+    /// </summary>
+    static List<WallLook> CityLooks(string type, int level, HashSet<WallEdge> outer, HashSet<(int X, int Y)> cells, HashSet<(int, int)> towards, BuildingSpec style, Random rnd)
+    {
+        var list = new List<WallLook>();
+        var plan = PlanShape.Of([.. outer]);
+        bool shop = level == 0 && StreetShop(type) && (type != "Hab block" || rnd.NextDouble() < 0.45);
+        foreach (var run in plan.Runs)
+        {
+            var edges = run.Points.Zip(run.Points.Skip(1)).Select(p => WallEdge.Of(p.First, p.Second)).ToList();
+            bool toRoad = run.Points.Zip(run.Points.Skip(1)).Any(p => towards.Contains(Outside(p.First, p.Second, cells)));
+            string? tex = null;
+            if (shop && toRoad) tex = BuildingThemes.Shopfront;
+            else if (type is "Hab block" or "Stack" && level > 0 && rnd.NextDouble() < 0.18) tex = BuildingThemes.SteelCladding;
+            else if (type == "Stack" && rnd.NextDouble() < 0.3) tex = BuildingThemes.HabConcrete;
+            if (tex is null || tex == (level > 0 && style.UpperTexture is { } u ? u : style.Texture)) continue;
+            foreach (var e in edges) list.Add(new WallLook { Edge = e, Texture = tex, Wear = 0.5 });
+        }
+        return list;
+    }
+
+    static bool IsSciFi(string? theme) => theme is not null && theme.Contains("sci", StringComparison.OrdinalIgnoreCase);
+
+    static string FloorThemesFor(string? theme) => PhotonCanvas.Addon.FloorTiles.FloorThemes.Texture(PhotonCanvas.Addon.Buildings.BuildingThemes.Names.FirstOrDefault(n => string.Equals(n, theme, StringComparison.OrdinalIgnoreCase)) ?? theme);
+
+    static IEnumerable<(int X, int Y)> Neighbours((int X, int Y) c)
+    {
+        for (int j = -1; j <= 1; j++)
+            for (int i = -1; i <= 1; i++)
+                if (i != 0 || j != 0) yield return (c.X + i, c.Y + j);
+    }
+
+    /// <summary>
+    /// What stands on a flat roof: the roof's clutter from the sci-fi catalog (fuel tanks, a server rack for the air
+    /// plant, a cargo crate, a beacon mast, a holo sign, a light pylon), one to a square, about one to every four
+    /// squares of roof, kept off its edge squares where the roof is big enough to have a middle.
+    /// </summary>
+    public static List<PlacedItem> Rooftop(HashSet<(int X, int Y)> cells, BuildingSpec style, int seed)
+    {
+        string[] ids = ["sci-fuel-drums", "sci-server-rack", "sci-beacon", "sci-signpost", "sci-cargo-crate", "sci-street-lamp", "sci-tech-cabinet", "sci-reactor-core"];
+        var entries = ids.Select(PhotonCanvas.Addon.Furniture.FurnitureCatalog.Find).OfType<PhotonCanvas.Addon.Furniture.CatalogEntry>().ToList();
+        if (entries.Count == 0 || cells.Count == 0) return [];
+        var rnd = new Random(seed);
+        var middle = cells.Where(c => Neighbours(c).All(cells.Contains)).ToList();
+        var spots = (middle.Count >= 2 ? middle : [.. cells]).OrderBy(_ => rnd.Next()).ToList();
+        int want = Math.Clamp(cells.Count / 4, 1, 5);
+        var used = new HashSet<(int X, int Y)>();
+        var list = new List<PlacedItem>();
+        // A sign or a mast on most roofs, then the rest.
+        var order = new List<PhotonCanvas.Addon.Furniture.CatalogEntry>();
+        var tall = entries.Where(e => e.Id is "sci-beacon" or "sci-signpost" or "sci-street-lamp").ToList();
+        if (tall.Count > 0) order.Add(tall[rnd.Next(tall.Count)]);
+        while (order.Count < want) order.Add(entries[rnd.Next(entries.Count)]);
+        foreach (var e in order)
+        {
+            // A square of its own, none of its neighbours taken (so nothing stands against anything else).
+            int i = spots.FindIndex(c => !used.Contains(c) && !Neighbours(c).Any(used.Contains));
+            if (i < 0) break;
+            var at = spots[i];
+            used.Add(at);
+            var item = HouseKitMaker.FromCatalog(style, e);
+            list.Add(new PlacedItem { X = at.X + 0.5, Y = at.Y + 0.5, Turn = rnd.Next(4), Item = item });
+        }
+        return list;
     }
 
     /// <summary>The grid edges round a set of squares: wherever a square meets one that isn't in it.</summary>
@@ -91,13 +207,25 @@ public static class BuildingGuess
         return [.. Enumerable.Range(0, n).Select(i => length * (i + 0.5) / n)];
     }
 
+    /// <summary>Where a city block's windows go along a wall <paramref name="length"/> squares long: as many as fit a square apart, clear of its ends.</summary>
+    static IEnumerable<double> Rows(int length, double clear)
+    {
+        double span = length - 2 * clear;
+        if (span < 0) yield break;
+        int n = (int)Math.Floor(span) + 1;
+        for (int i = 0; i < n; i++) yield return n == 1 ? length / 2.0 : clear + span * i / (n - 1);
+    }
+
     static List<Opening> Openings(List<WallEdge> walls, HashSet<(int X, int Y)> cells, HashSet<(int, int)>? towards, BuildingSpec style, bool door, double sq)
     {
         var outer = Outline(cells);
         var plan = PlanShape.Of(walls);
         var list = new List<Opening>();
         // How far (squares) a door's and a window's middle must stay from a wall's ends, clear of the columns there.
-        double doorClear = (style.ColumnMm / 2 + style.DoorWidthMm / 2 + 10) / sq, windowClear = (style.ColumnMm / 2 + style.WindowWidthMm / 2 + 4) / sq;
+        // (A box wall's panel stops at the column's side, its frame 3 mm and its end a further 5 mm in: 9 mm with a little over.)
+        double doorClear = (style.ColumnMm / 2 + style.DoorWidthMm / 2 + 10) / sq, windowClear = (style.ColumnMm / 2 + style.WindowWidthMm / 2 + 9) / sq;
+        // How far apart two windows' middles must be (their frames and a gap between).
+        double windowApart = (style.WindowWidthMm + 8) / sq;
         double apart = (style.DoorWidthMm / 2 + style.WindowWidthMm / 2 + 6) / sq;
         // Only the walls round the outside get doors and windows.
         var runs = plan.Runs.Where(r => r.Points.Zip(r.Points.Skip(1)).All(p => outer.Contains(WallEdge.Of(p.First, p.Second)))).ToList();
@@ -132,10 +260,16 @@ public static class BuildingGuess
                 var (dx, dy) = PointAlong(r, d);
                 list.Add(Opening.NewDoor(style, dx, dy));
             }
-            foreach (var t in Spots(r.Steps))
+            double? last = null;
+            // A city block's windows come in rows, evenly along the wall a square or so apart.
+            foreach (var spot in IsSciFi(style.Theme) ? Rows(r.Steps, windowClear) : Spots(r.Steps))
             {
-                if (t < windowClear - 1e-9 || t > r.Steps - windowClear + 1e-9) continue;
+                // One a little too near an end is moved in, clear of its column, if that leaves it clear of the last.
+                if (r.Steps < 2 * windowClear) break;
+                double t = Math.Clamp(spot, windowClear, r.Steps - windowClear);
+                if (last is { } lt && t - lt < windowApart) continue;
                 if (doorAt is { } dd && Math.Abs(dd - t) < apart) continue;
+                last = t;
                 var (x, y) = PointAlong(r, t);
                 list.Add(Opening.NewWindow(style, x, y));
             }

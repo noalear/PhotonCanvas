@@ -165,7 +165,7 @@ public sealed class CityPlan : Control
         {
             for (int x = 0; x < w; x++)
             {
-                var c = CityScene.GroundColour(g[x, y]);
+                var c = CityScene.GroundColour(g[x, y], _map.Theme);
                 row[x] = unchecked((int)(0xFF000000u | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B));
             }
             System.Runtime.InteropServices.Marshal.Copy(row, 0, fb.Address + y * fb.RowBytes, w);

@@ -143,6 +143,12 @@ public static partial class HouseKitMaker
             int letter = 0;
             // Every wall's settings, then the walls made side by side (or found from last time).
             var specs = runs.Select(r => Looked(WallFor(s, k, Length(r.Run, sq), r.Openings), s, d, level.LookOf(WallEdge.Of(r.Run.Points[0], r.Run.Points[1])))).ToList();
+            if (d.VaryWalls)
+                for (int i = 0; i < specs.Count; i++)
+                {
+                    var (pa, pb) = (runs[i].Run.A, runs[i].Run.B);
+                    specs[i] = specs[i] with { Seed = specs[i].Seed + 7919 * (pa.X + 1) + 104729 * (pa.Y + 1) + 31 * (pb.X - pa.X) + 17 * (pb.Y - pa.Y) };
+                }
             var kits = new WallKit[specs.Count];
             Parallel.For(0, specs.Count, i => kits[i] = WallKitOf(specs[i]));
             for (int ri = 0; ri < runs.Count; ri++)

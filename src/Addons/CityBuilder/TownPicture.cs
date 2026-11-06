@@ -75,18 +75,20 @@ public static class TownPicture
         using var fill = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill };
         using var line = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Stroke, StrokeCap = SKStrokeCap.Round, StrokeJoin = SKStrokeJoin.Round };
 
+        // A cyberpunk city: dark asphalt streets, grey slab pavements, flat roof decks with their clutter.
+        bool sci = TownMaker.SciFi(m.Theme);
         // The ground: each square's colour first, then its marks (grass reaching a little over its edges).
         for (int y = Math.Max(0, y0 - 1); y < Math.Min(m.Down, y1 + 1); y++)
             for (int x = Math.Max(0, x0 - 1); x < Math.Min(m.Across, x1 + 1); x++)
             {
                 var g = ground.GroundAt(x, y);
                 double v = Noise(x * 0.35, y * 0.35, o.Seed) * 0.12 - 0.06;
-                fill.Color = Shade(Base(g), 1 + v);
+                fill.Color = Shade(sci && Cyber(g) is { } cg ? cg : Base(g), 1 + v);
                 c.DrawRect(x - 0.01f, y - 0.01f, 1.02f, 1.02f, fill);
             }
         for (int y = Math.Max(0, y0 - 1); y < Math.Min(m.Down, y1 + 1); y++)
             for (int x = Math.Max(0, x0 - 1); x < Math.Min(m.Across, x1 + 1); x++)
-                GroundMarks(c, ground, x, y, o.Seed, fill, line);
+                if (!(sci && CyberMarks(c, ground, x, y, o.Seed, fill, line))) GroundMarks(c, ground, x, y, o.Seed, fill, line);
         foreach (var site in TownPieces.Bridges(m)) DrawBridge(c, site, fill, line, view);
 
         // Shadows: buildings by their height, walls, trees.
@@ -141,7 +143,7 @@ public static class TownPicture
 
         // Trees and things.
         foreach (var p in m.Props.Where(p => In(p.X, p.Y)).OrderBy(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.GuardTower ? 1 : 0).ThenBy(p => p.Y))
-            DrawProp(c, p, fill, line);
+            DrawProp(c, p, fill, line, sci);
 
         // The grid.
         if (o.Grid)
@@ -198,6 +200,46 @@ public static class TownPicture
         Ground.Field => new SKColor(0x8E, 0x76, 0x46),
         _ => new SKColor(0xB4, 0x96, 0x6C),
     };
+
+    /// <summary>A cyberpunk city's ground colours: dark asphalt, grey slabs; null for the rest.</summary>
+    static SKColor? Cyber(Ground g) => g switch
+    {
+        Ground.Road => new SKColor(0x2E, 0x31, 0x38),
+        Ground.Paving => new SKColor(0x5C, 0x60, 0x68),
+        _ => null,
+    };
+
+    /// <summary>A cyberpunk city's street and pavement marks (false for any other ground): asphalt with its specks and patches, square slabs with their joints.</summary>
+    static bool CyberMarks(SKCanvas c, CityMap m, int x, int y, int seed, SKPaint fill, SKPaint line)
+    {
+        var g = m.GroundAt(x, y);
+        var rnd = new Random(Hash(x, y, seed));
+        switch (g)
+        {
+            case Ground.Road:
+                for (int i = 0; i < 18; i++)
+                {
+                    fill.Color = rnd.NextDouble() < 0.5 ? new SKColor(0x48, 0x4C, 0x55, 0x90) : new SKColor(0x1E, 0x20, 0x26, 0x90);
+                    c.DrawCircle(x + (float)rnd.NextDouble(), y + (float)rnd.NextDouble(), 0.01f + (float)rnd.NextDouble() * 0.015f, fill);
+                }
+                if (rnd.NextDouble() < 0.15)
+                {
+                    fill.Color = new SKColor(0x24, 0x27, 0x2D, 0xA0);
+                    c.DrawRect(x + (float)rnd.NextDouble() * 0.5f, y + (float)rnd.NextDouble() * 0.5f, 0.3f + (float)rnd.NextDouble() * 0.3f, 0.2f + (float)rnd.NextDouble() * 0.3f, fill);
+                }
+                return true;
+            case Ground.Paving:
+                for (int j = 0; j < 2; j++)
+                    for (int i = 0; i < 2; i++)
+                    {
+                        fill.Color = Shade(new SKColor(0x6A, 0x6E, 0x76), 0.9 + rnd.NextDouble() * 0.16);
+                        c.DrawRect(x + i * 0.5f + 0.015f, y + j * 0.5f + 0.015f, 0.47f, 0.47f, fill);
+                    }
+                return true;
+            default:
+                return false;
+        }
+    }
 
     static void GroundMarks(SKCanvas c, CityMap m, int x, int y, int seed, SKPaint fill, SKPaint line)
     {
@@ -538,9 +580,71 @@ public static class TownPicture
     /// <summary>Where the light comes from (the top left), as a way along the map.</summary>
     static readonly (double X, double Y) Light = (-0.6, -0.8);
 
+    static readonly SKColor[] Neon = [new(0xFF, 0x2E, 0xA6), new(0x22, 0xE5, 0xFF), new(0xFF, 0xB8, 0x2E), new(0xA0, 0x5C, 0xFF), new(0x5D, 0xFF, 0x8B)];
+
+    /// <summary>
+    /// A city block's flat roof from above: its dark deck with a parapet round it, the floors that step in lighter
+    /// on top, a neon strip along its edge, and the tanks, fans and masts standing on it.
+    /// </summary>
+    static void DrawDeck(SKCanvas c, CityBuilding b, SKPaint fill, SKPaint line)
+    {
+        var d = b.Design;
+        SKPoint P(double x, double y) { var (mx, my) = CityFootprint.ToMap(b, x, y); return new((float)mx, (float)my); }
+        int hash = 17;
+        foreach (char ch in b.Name) hash = unchecked(hash * 31 + ch);
+        var neon = Neon[Math.Abs(hash % Neon.Length)];
+        // Each floor's outline from the ground up, the top one lightest.
+        var walled = d.Levels.Where(l => l.Walls.Count > 0).ToList();
+        for (int k = 0; k < walled.Count; k++)
+        {
+            var plan = walled[k].Shape();
+            if (k > 0 && k < walled.Count - 1 && walled[k].Walls.Count == walled[k - 1].Walls.Count) continue;
+            double tone = 0.75 + 0.25 * k / Math.Max(1, walled.Count - 1);
+            using var path = new SKPath { FillType = SKPathFillType.EvenOdd };
+            foreach (var room in plan.Rooms)
+                foreach (var loop in room.Area)
+                {
+                    if (loop.Count < 3) continue;
+                    path.MoveTo(P(loop[0].x, loop[0].y));
+                    foreach (var q in loop.Skip(1)) path.LineTo(P(q.x, q.y));
+                    path.Close();
+                }
+            fill.Color = Shade(new SKColor(0x5A, 0x5E, 0x66), tone);
+            c.DrawPath(path, fill);
+            // The parapet round it, and on the top floor the neon along its edge.
+            line.StrokeWidth = 0.09f;
+            line.Color = Shade(new SKColor(0x8A, 0x8E, 0x96), tone);
+            c.DrawPath(path, line);
+            if (k == walled.Count - 1)
+            {
+                line.StrokeWidth = 0.03f;
+                line.Color = neon;
+                c.DrawPath(path, line);
+            }
+        }
+        // What stands on the deck: a dark box with a light on it.
+        var rnd = new Random(hash);
+        foreach (var it in d.Levels[^1].Furniture)
+        {
+            var at = P(it.X, it.Y);
+            float r = (float)Math.Clamp(Math.Max(it.Item.WidthMm, it.Item.DepthMm) / 25.4 * 0.5, 0.12, 0.45);
+            fill.Color = new SKColor(0x3A, 0x3E, 0x46);
+            c.DrawRect(at.X - r, at.Y - r, 2 * r, 2 * r, fill);
+            fill.Color = new SKColor(0x7C, 0x84, 0x8E);
+            c.DrawRect(at.X - r * 0.7f, at.Y - r * 0.7f, 1.4f * r, 1.4f * r, fill);
+            fill.Color = Neon[rnd.Next(Neon.Length)];
+            c.DrawCircle(at.X, at.Y, Math.Min(0.06f, r * 0.35f), fill);
+        }
+    }
+
     static void DrawRoofs(SKCanvas c, CityBuilding b, SKPaint fill, SKPaint line)
     {
         SKPoint P(double x, double y) { var (mx, my) = CityFootprint.ToMap(b, x, y); return new((float)mx, (float)my); }
+        if (b.Design.Roofs.Count == 0 && b.Design.VaryWalls)
+        {
+            DrawDeck(c, b, fill, line);
+            return;
+        }
         if (b.Design.Roofs.Count == 0)
         {
             // No roof: the walls' colour, with a darker rim.
@@ -719,7 +823,7 @@ public static class TownPicture
         c.Restore();
     }
 
-    static void DrawProp(SKCanvas c, Prop p, SKPaint fill, SKPaint line)
+    static void DrawProp(SKCanvas c, Prop p, SKPaint fill, SKPaint line, bool sci = false)
     {
         float x = (float)p.X, y = (float)p.Y, r = (float)Radius(p);
         var rnd = new Random(p.Id.GetHashCode());
@@ -835,6 +939,17 @@ public static class TownPicture
                 c.DrawCircle(0.24f, 0.2f, 0.1f, fill);
                 line.Color = new SKColor(0x3A, 0x2A, 0x1C);
                 c.DrawCircle(0.24f, 0.2f, 0.1f, line);
+                break;
+            }
+            case PropKind.Lamp when sci:
+            {
+                // A light pylon: a cyan pool of light round a dark post.
+                fill.Color = new SKColor(0x22, 0xE5, 0xFF, 0x38);
+                c.DrawCircle(0, 0, 0.36f, fill);
+                fill.Color = new SKColor(0x22, 0x26, 0x2C);
+                c.DrawRect(-0.06f, -0.06f, 0.12f, 0.12f, fill);
+                fill.Color = new SKColor(0x9C, 0xF4, 0xFF);
+                c.DrawCircle(0, 0, 0.035f, fill);
                 break;
             }
             case PropKind.Lamp:

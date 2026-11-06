@@ -540,7 +540,7 @@ public static class BoxWall
             return Done();
         }
         var bodyRect = new PathsD { Geo.Rect(0, T, L, H + 1) };
-        var (fe, fl) = FaceTexture(s, 0, L, H, Geo.Subtract(Geo.Intersect(frontCut, bodyRect), Geo.Union(keepClear, frontClear)));
+        var (fe, fl) = FaceTexture(s, 0, L, H, Geo.Subtract(Geo.Intersect(frontCut, bodyRect), Geo.Union(keepClear, frontClear)), WallKitMaker.Boxes(keepClear));
         fe.AddRange(Geo.Intersect(Geo.Union(frameRings), frontCut));
         fe.AddRange(doorEtched);
         fl.AddRange(Geo.ClipLines(frameLines, frontCut));
@@ -793,12 +793,12 @@ public static class BoxWall
     }
 
     /// <summary>A texture over a face (its own flat coordinates, from 0, 0), kept inside <paramref name="region"/>.</summary>
-    internal static (PathsD Etched, List<PathD> Lines) FaceTexture(WallSpec s, int face, double length, double height, PathsD region)
+    internal static (PathsD Etched, List<PathD> Lines) FaceTexture(WallSpec s, int face, double length, double height, PathsD region, IReadOnlyList<RectD>? avoid = null)
     {
         var etched = new PathsD();
         var lines = new List<PathD>();
         if (region.Count == 0) return (etched, lines);
-        var tex = Textures.Make(face == 0 ? s : s with { Seed = s.Seed + face * 101 }, new Face(length, height, 0, length, height));
+        var tex = Textures.Make(face == 0 ? s : s with { Seed = s.Seed + face * 101 }, new Face(length, height, 0, length, height) { Avoid = avoid });
         if (s.Etch == EtchStyle.Grooves)
         {
             var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-1, -1, length + 1, height + 1)], Geo.Union(tex.Raised)) : [];

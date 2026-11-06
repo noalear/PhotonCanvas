@@ -19,12 +19,19 @@ public static class BuildingThemes
 
     public static string About(string? theme) => TerrainThemes.About(theme);
 
+    /// <summary>The cyberpunk city's outside walls (the sci-fi look's), from the texture engine.</summary>
+    public const string HabConcrete = "Hab concrete", SteelCladding = "Steel cladding", Shopfront = "Shopfront", GlassFacade = "Glass facade";
+
     public static BuildingSpec Apply(BuildingSpec s, string? theme)
     {
         string name = TerrainThemes.At(TerrainThemes.IndexOf(theme));
         double k = Math.Max(0.2, s.ScaleMm / 28);
         var wall = WallThemes.Apply(new WallSpec(), name);
         var (winShape, ww, wh, bars) = WallThemes.Window(name);
+        // A sci-fi building's outside is the cyberpunk city's (hab concrete, plain rectangular windows): the wall
+        // maker's sci-fi panels are a ship's or a base's inside, kept for the walls inside.
+        bool city = name == TerrainThemes.SciFi;
+        if (city) (winShape, ww, wh, bars) = (OpeningShape.Rectangle, 13, 12, WindowBars.None);
         // A watchtower's arrow slits stay in the old-world looks.
         bool slits = s.WindowShape == OpeningShape.ArrowSlit && name is TerrainThemes.Medieval or TerrainThemes.Dungeon or TerrainThemes.Gothic;
         var (shingle, pitch) = RoofThemes.Shingle(name);
@@ -32,7 +39,7 @@ public static class BuildingThemes
         return s with
         {
             Theme = name,
-            Texture = name == TerrainThemes.Medieval ? (s.Storeys > 1 ? "Stone blocks" : "Fieldstone") : wall.Texture,
+            Texture = name == TerrainThemes.Medieval ? (s.Storeys > 1 ? "Stone blocks" : "Fieldstone") : city ? HabConcrete : wall.Texture,
             UpperTexture = name switch { TerrainThemes.Medieval when s.Storeys > 1 => "Timber frame", TerrainThemes.Desert => "Adobe", _ => null },
             DoorShape = door,
             DoorLook = wall.DoorLook,

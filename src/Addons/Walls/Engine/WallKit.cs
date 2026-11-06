@@ -308,7 +308,7 @@ public static class WallKitMaker
         {
             var e = new PathsD(etched);
             var l = new List<PathD>(lines);
-            var tex = Textures.Make(look, new Face(L, H, ez, L - ez, body));
+            var tex = Textures.Make(look, new Face(L, H, ez, L - ez, body) { Avoid = Boxes(keepClear) });
             if (s.Etch == EtchStyle.Grooves)
             {
                 var mortar = tex.Raised.Count > 0 ? Geo.Subtract([Geo.Rect(-1, -1, L + 1, H + 1)], Geo.Union(tex.Raised)) : [];
@@ -638,6 +638,9 @@ public static class WallKitMaker
     /// panel <paramref name="length"/> long), keeping those that fit between from and to, clear of the
     /// taken stretches and of each other.
     /// </summary>
+    /// <summary>The bounds of each separate shape (a door's or a window's frame), for textures to keep their fittings clear of.</summary>
+    public static List<RectD> Boxes(PathsD shapes) => shapes.Count == 0 ? [] : [.. Geo.Union(shapes).Select(p => Clipper.GetBounds(p))];
+
     public static List<double> Placed(IEnumerable<double> fromMiddle, double length, double width, double from, double to, List<(double X0, double X1)> taken, double gap)
     {
         var xs = new List<double>();

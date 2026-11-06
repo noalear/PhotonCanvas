@@ -54,10 +54,28 @@ public static class CityScene
         _ => Color.FromRgb(0xC4, 0xA6, 0x7C),
     };
 
+    /// <summary>A ground's colour in a look: a cyberpunk city's streets dark asphalt, its pavements grey slabs.</summary>
+    public static Color GroundColour(Ground g, string? theme) => !TownMaker.SciFi(theme) ? GroundColour(g) : g switch
+    {
+        Ground.Road => Color.FromRgb(0x33, 0x36, 0x3D),
+        Ground.Paving => Color.FromRgb(0x6A, 0x6E, 0x76),
+        Ground.Dirt => Color.FromRgb(0x5A, 0x52, 0x4A),
+        Ground.Grass => Color.FromRgb(0x4E, 0x6A, 0x4A),
+        Ground.Water => Color.FromRgb(0x24, 0x4A, 0x66),
+        Ground.Sand => Color.FromRgb(0x7A, 0x74, 0x6A),
+        Ground.Floor => Color.FromRgb(0x5C, 0x60, 0x68),
+        _ => GroundColour(g),
+    };
+
     /// <summary>A wall texture's colour, near enough.</summary>
     public static Color WallColour(string? texture)
     {
         string t = (texture ?? "").ToLowerInvariant();
+        // A cyberpunk city's outsides: stained concrete, dark steel, shopfronts, blue-black glass.
+        if (t.Contains("hab concrete")) return Color.FromRgb(0x8E, 0x8F, 0x8F);
+        if (t.Contains("steel cladding")) return Color.FromRgb(0x5E, 0x68, 0x72);
+        if (t.Contains("shopfront")) return Color.FromRgb(0x6E, 0x66, 0x6C);
+        if (t.Contains("glass facade")) return Color.FromRgb(0x3C, 0x4E, 0x62);
         if (t.Contains("timber") || t.Contains("wood") || t.Contains("plank")) return Color.FromRgb(0xC9, 0xA4, 0x76);
         if (t.Contains("brick")) return Color.FromRgb(0xB8, 0x6B, 0x4E);
         if (t.Contains("adobe") || t.Contains("sand")) return Color.FromRgb(0xD8, 0xB8, 0x88);
@@ -86,7 +104,8 @@ public static class CityScene
         map = map.Tidied();
         double sq = Math.Max(5, map.SquareMm);
         // The roads laid on the ground; the water left under their bridges, and the bridges over it.
-        AddGround(scene, map.Paved(overWater: false), sq);
+        bool sci = TownMaker.SciFi(map.Theme);
+        AddGround(scene, map.Paved(overWater: false), sq, map.Theme);
         foreach (var site in TownPieces.Bridges(map)) AddBridge(scene, site, sq);
         int built = 0;
         foreach (var b in map.Buildings)
@@ -98,19 +117,20 @@ public static class CityScene
                 built++;
             }
             else AddBuilding(scene, b, sq, show, picked);
+            if (sci) AddNeon(scene, b, sq, show.Openings);
         }
         AddWalls(scene, map, sq);
         if (show.Props)
         {
-            foreach (var p in map.Props) AddProp(scene, p, sq);
-            foreach (var i in map.Items) AddItem(scene, i, sq, show.Picked.Contains(i.Id));
+            foreach (var p in map.Props) AddProp(scene, p, sq, sci);
+            foreach (var i in map.Items) AddItem(scene, i, sq, show.Picked.Contains(i.Id), sci ? ItemMetal : null);
         }
     }
 
     /// <summary>The most buildings drawn as built (the rest plain blocks), so a big town still turns round.</summary>
     public const int MostBuilt = 200;
 
-    static readonly Color ItemWood = Color.FromRgb(0xB0, 0x86, 0x58), ItemPicked = Color.FromRgb(0xF0, 0x9A, 0x2A);
+    static readonly Color ItemWood = Color.FromRgb(0xB0, 0x86, 0x58), ItemPicked = Color.FromRgb(0xF0, 0x9A, 0x2A), ItemMetal = Color.FromRgb(0x7C, 0x84, 0x8E);
     static readonly Color FloorWood = Color.FromRgb(0xC9, 0xAC, 0x82), DoorWood = Color.FromRgb(0x8A, 0x62, 0x3E);
 
     /// <summary>
@@ -139,9 +159,11 @@ public static class CityScene
         var upper = s.UpperTexture is { } up ? Look(Pick(WallColour(up))) : walls;
         var columns = Look(Pick(Scene3DShade(WallColour(d.ColumnTexture ?? s.Texture), 0.9)));
         var roof = Look(Pick(RoofColour(d.Roofs.Count > 0 ? d.Roofs[0].Covering : s.RoofTexture)));
-        var floor = Look(Pick(FloorWood));
-        var wood = Look(Pick(ItemWood));
-        var door = Look(Pick(DoorWood));
+        bool sci = d.VaryWalls || (s.Texture ?? "") is "Hab concrete" or "Steel cladding" or "Shopfront" or "Glass facade" or "Sci-fi panels";
+        // A city block's floors and roof deck are dark poured slabs, its fittings steel.
+        var floor = Look(Pick(sci ? Color.FromRgb(0x50, 0x54, 0x5C) : FloorWood));
+        var wood = Look(Pick(sci ? ItemMetal : ItemWood));
+        var door = Look(Pick(sci ? Color.FromRgb(0x4A, 0x50, 0x58) : DoorWood));
         foreach (var piece in m.Solids)
         {
             var pose = show.DoorsOpen && piece.Open is { } open ? open : piece.Pose;
@@ -166,14 +188,14 @@ public static class CityScene
     /// A piece of furniture put together as it will be once it's cut: every one of its flat pieces where it
     /// sits, its true size, turned as it's put down (just a box the size of the floor it takes if it can't be made).
     /// </summary>
-    public static void AddItem(Scene3D scene, CityItem i, double sq, bool picked = false)
+    public static void AddItem(Scene3D scene, CityItem i, double sq, bool picked = false, Color? colour = null)
     {
         var solid = CityItems.SolidOf(i, sq);
         double a = i.TurnDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a), ox = i.X * sq, oz = i.Y * sq;
         // The piece's own x (along its front) and z (towards its front) turned as on the map, clockwise from above.
         Vec3 P(Furniture.V3 p) => new(ox + p.X * c - p.Z * s, p.Y, oz + p.X * s + p.Z * c);
         Vec3 D(Furniture.V3 d) => new(d.X * c - d.Z * s, d.Y, d.X * s + d.Z * c);
-        var style = Look(picked ? ItemPicked : ItemWood);
+        var style = Look(picked ? ItemPicked : colour ?? ItemWood);
         if (solid.Parts.Count == 0)
         {
             var flat = new Frame3(new Vec3(ox, 0, oz), new Vec3(c, 0, s), new Vec3(s, 0, -c));
@@ -216,14 +238,14 @@ public static class CityScene
         return res;
     }
 
-    static void AddGround(Scene3D scene, CityMap map, double sq)
+    static void AddGround(Scene3D scene, CityMap map, double sq, string? theme = null)
     {
         var up = new Vec3(0, 1, 0);
         foreach (var (x0, y0, x1, y1, g) in Patches(map))
         {
             double y = g == Ground.Water ? -1.2 : 0;
             double ax = x0 * sq, az = y0 * sq, bx = (x1 + 1) * sq, bz = (y1 + 1) * sq;
-            scene.AddFace([[new(ax, y, az), new(bx, y, az), new(bx, y, bz), new(ax, y, bz)]], up, Scene3D.Shade(GroundColour(g), 0.62 + 0.38 * up.Dot(Light.Unit)), GroundGroup);
+            scene.AddFace([[new(ax, y, az), new(bx, y, az), new(bx, y, bz), new(ax, y, bz)]], up, Scene3D.Shade(GroundColour(g, theme), 0.62 + 0.38 * up.Dot(Light.Unit)), GroundGroup);
         }
         // The map's edge: a board under it all.
         double W = map.Across * sq, D = map.Down * sq;
@@ -274,7 +296,7 @@ public static class CityScene
         double H = BuildingKitMaker.StoreyHeight(s) * k, T = s.WallSheetMm * k, Wt = Math.Max(1, BuildingKitMaker.WallThickness(s) * k);
         int levels = Math.Min(d.Levels.Count, HouseKitMaker.MaxLevels);
         Color Pick(Color c) => selected ? Tint(c) : c;
-        var floorLook = Look(Pick(Color.FromRgb(0xC9, 0xAC, 0x82)));
+        var floorLook = Look(Pick(d.VaryWalls ? Color.FromRgb(0x50, 0x54, 0x5C) : Color.FromRgb(0xC9, 0xAC, 0x82)));
         double Base(int level) => BuildingKitMaker.StoreyBase(s, level) * k;
 
         for (int lv = 0; lv < levels; lv++)
@@ -386,6 +408,93 @@ public static class CityScene
             var n = (pts[1] - pts[0]).Cross(pts[2] - pts[0]).Unit;
             if (n.Dot(pts[0] - centre) < 0) n = n * -1;
             scene.AddFace([pts], n, wall.Paint(n, true), RoofGroup);
+        }
+    }
+
+    // ---- a cyberpunk city's neon ----
+
+    /// <summary>The city's neon: magenta, cyan, amber, violet and acid green.</summary>
+    static readonly Color[] Neon =
+    [
+        Color.FromRgb(0xFF, 0x2E, 0xA6), Color.FromRgb(0x22, 0xE5, 0xFF), Color.FromRgb(0xFF, 0xB8, 0x2E), Color.FromRgb(0xA0, 0x5C, 0xFF), Color.FromRgb(0x5D, 0xFF, 0x8B),
+    ];
+    static readonly Color[] Lit = [Color.FromRgb(0xFF, 0xD0, 0x80), Color.FromRgb(0xA8, 0xEC, 0xFF), Color.FromRgb(0xFF, 0xE8, 0xB8)];
+    static readonly Color Unlit = Color.FromRgb(0x1E, 0x24, 0x2C);
+
+    /// <summary>Kinds with a shop or bar at street level: a neon sign band over the ground floor and a sign up the front.</summary>
+    static bool Street(string type) => type is "Neon bar" or "Noodle bar" or "Tech shop" or "Arcade" or "Clinic" or "Capsule hotel" or "Corp tower" or "Canteen";
+
+    /// <summary>
+    /// A cyberpunk building's lights as they'd look at night (drawn only, never cut): its windows lit or dark, a
+    /// neon strip round its roof line, a sign band over a shop's ground floor and a tall sign up the front of a
+    /// bar or arcade, each building in its own two colours.
+    /// </summary>
+    static void AddNeon(Scene3D scene, CityBuilding b, double sq, bool windows)
+    {
+        var d = b.Design;
+        if (d.Levels.Count == 0) return;
+        var s = HouseKitMaker.StyleFor(d);
+        double k = sq / Math.Max(5, d.SquareMm);
+        double H = BuildingKitMaker.StoreyHeight(s) * k, Wt = Math.Max(1, BuildingKitMaker.WallThickness(s) * k);
+        int hash = 17;
+        foreach (char c in b.Name + "|" + b.Type) hash = unchecked(hash * 31 + c);
+        var rnd = new Random(hash);
+        Color a = Neon[rnd.Next(Neon.Length)], c2 = Neon[rnd.Next(Neon.Length)];
+        if (c2 == a) c2 = Neon[(Array.IndexOf(Neon, a) + 2) % Neon.Length];
+        int levels = Math.Min(d.Levels.Count, HouseKitMaker.MaxLevels);
+        int top = Enumerable.Range(0, levels).LastOrDefault(i => d.Levels[i].Walls.Count > 0, -1);
+        if (top < 0) return;
+        bool street = Street(b.Type);
+        // Just off the wall's outside face (in squares), past its texture.
+        double off = (Wt / 2 + 1.6 * k) / sq;
+        var up = new Vec3(0, 1, 0);
+        void Quad(double x0, double y0, double x1, double y1, double nx, double ny, double h0, double h1, double o, Color colour)
+        {
+            var p = new[] { World(b, x0 + nx * o, y0 + ny * o, h0, sq), World(b, x1 + nx * o, y1 + ny * o, h0, sq), World(b, x1 + nx * o, y1 + ny * o, h1, sq), World(b, x0 + nx * o, y0 + ny * o, h1, sq) };
+            var n = (p[1] - p[0]).Cross(p[3] - p[0]).Unit;
+            var outward = World(b, x0 + nx, y0 + ny, h0, sq) - World(b, x0, y0, h0, sq);
+            if (n.Dot(outward) < 0) n = n * -1;
+            scene.AddFace([p], n, colour, WallGroup);
+        }
+        (Run? Run, double Nx, double Ny, double Len) longest = default;
+        for (int lv = 0; lv <= top; lv++)
+        {
+            var level = d.Levels[lv];
+            if (level.Walls.Count == 0) continue;
+            var plan = level.Shape();
+            double y0 = BuildingKitMaker.StoreyBase(s, lv) * k;
+            foreach (var run in plan.Runs)
+            {
+                double ax = run.A.X, ay = run.A.Y, bx = run.B.X, by = run.B.Y, len = Math.Sqrt((bx - ax) * (bx - ax) + (by - ay) * (by - ay));
+                if (len < 1e-6) continue;
+                double dx = (bx - ax) / len, dy = (by - ay) / len, nx = dy, ny = -dx, mx = (ax + bx) / 2, my = (ay + by) / 2;
+                bool left = plan.RoomAt(mx + nx * 0.3, my + ny * 0.3) >= 0, right = plan.RoomAt(mx - nx * 0.3, my - ny * 0.3) >= 0;
+                if (left == right) continue;
+                // The normal pointing out of the building.
+                if (left) (nx, ny) = (-nx, -ny);
+                if (lv == 0 && len > longest.Len) longest = (run, nx, ny, len);
+                if (lv == top) Quad(ax, ay, bx, by, nx, ny, y0 + H * 0.88, y0 + H * 0.96, off, c2);
+                if (lv == 0 && street) Quad(ax + dx * 0.15, ay + dy * 0.15, bx - dx * 0.15, by - dy * 0.15, nx, ny, y0 + H * 0.84, y0 + H * 0.89, off, a);
+                if (!windows) continue;
+                // The windows lit (or dark), set back in the wall.
+                foreach (var o in level.Openings.Where(o => o.Kind == OpeningKind.Window))
+                {
+                    if (HouseKitMaker.Along(run, o.X, o.Y) is not { } steps) continue;
+                    double t = steps / run.Steps, px = ax + (bx - ax) * t, py = ay + (by - ay) * t, hw = o.WidthMm * k / 2 / sq;
+                    double v0 = y0 + o.SillMm * k, v1 = Math.Min(y0 + H - 0.5, v0 + o.HeightMm * k);
+                    if (v1 <= v0) continue;
+                    var colour = rnd.NextDouble() < 0.3 ? Unlit : Lit[rnd.Next(Lit.Length)];
+                    Quad(px - dx * hw, py - dy * hw, px + dx * hw, py + dy * hw, nx, ny, v0, v1, -0.1 * Wt / sq, colour);
+                }
+            }
+        }
+        // A tall sign up the front of a bar, arcade or shop of three floors or more: a strip a sixth of a square wide.
+        if (street && top >= 2 && longest.Run is not null)
+        {
+            var r = longest.Run!;
+            double dx = (r.B.X - r.A.X) / longest.Len, dy = (r.B.Y - r.A.Y) / longest.Len, at = Math.Min(0.6, longest.Len * 0.2), wdt = 0.18;
+            double sx = r.A.X + dx * at, sy = r.A.Y + dy * at;
+            Quad(sx, sy, sx + dx * wdt, sy + dy * wdt, longest.Nx, longest.Ny, BuildingKitMaker.StoreyBase(s, 1) * k, BuildingKitMaker.StoreyBase(s, top) * k + H * 0.8, off + 2 * k / sq, a);
         }
     }
 
@@ -521,7 +630,7 @@ public static class CityScene
         return [Box(w, d)[0], inner];
     }
 
-    static void AddProp(Scene3D scene, Prop p, double sq)
+    static void AddProp(Scene3D scene, Prop p, double sq, bool sci = false)
     {
         double k = sq * Math.Clamp(p.Size, 0.2, 6), turn = p.TurnDeg * Math.PI / 180;
         var o = new Vec3(p.X * sq, 0, p.Y * sq);
@@ -569,6 +678,13 @@ public static class CityScene
             case PropKind.Crates:
                 Slab(Box(0.3 * k, 0.3 * k), 0, 0.3 * k, Color.FromRgb(0xB0, 0x86, 0x58));
                 scene.AddSlab(Ring(0.12 * k, 10), new Frame3(o + u * (0.3 * k), u, v), 0, 0.3 * k, Look(Color.FromRgb(0x8A, 0x62, 0x3E), false), group: PropGroup);
+                break;
+            case PropKind.Lamp when sci:
+                // A light pylon: a dark tapered post, a glowing bar on its neck and a beacon on top.
+                Slab(Box(0.09 * k, 0.09 * k), 0, 0.12 * k, Color.FromRgb(0xC8, 0xA8, 0x2A));
+                Slab(Box(0.05 * k, 0.05 * k), 0.12 * k, 0.9 * k, Color.FromRgb(0x30, 0x34, 0x3A));
+                scene.AddSlab(Box(0.05 * k, 0.03 * k), new Frame3(o + v * (0.04 * k), u, v), 0.55 * k, 0.85 * k, new SlabStyle((_, _) => Neon[1], Colors.Transparent, LineWidth.Px(0.5), Neon[1], Neon[1], LineWidth.Px(0.5)), group: PropGroup);
+                Slab(Box(0.04 * k, 0.04 * k), 0.9 * k, 0.96 * k, Neon[0]);
                 break;
             case PropKind.Lamp:
                 Slab(Box(0.05 * k, 0.05 * k), 0, 0.7 * k, Color.FromRgb(0x3A, 0x3A, 0x3A));

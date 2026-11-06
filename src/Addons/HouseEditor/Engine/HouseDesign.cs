@@ -321,6 +321,11 @@ public sealed partial record HouseDesign
     public double Wear { get; init; } = 0.5;
     /// <summary>The size of the textures' smallest marks (pits, nicks, grain, bolts) in mm; 0 = each texture's own.</summary>
     public double DetailMm { get; init; }
+    /// <summary>
+    /// Every wall's texture laid out afresh (its own seed, from where it stands), so no two walls of the building
+    /// repeat each other's pattern; off, walls of the same length on a floor come out alike (and are cut together).
+    /// </summary>
+    public bool VaryWalls { get; init; }
     /// <summary>Whether every piece has its number (the one in the building booklet) scored small on it.</summary>
     public bool NumberPieces { get; init; } = true;
     /// <summary>
