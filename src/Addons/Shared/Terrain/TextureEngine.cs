@@ -39,6 +39,10 @@ internal static class TextureEngine
         new(ThemeTextures.DungeonBlocks, "Block length", 14, "Course height", 8, true, 0.9, 0.7, Stuff.Stone, "Big, worn stone blocks, chipped, spalled, pitted and cracked: dungeons, crypts and keeps."),
         new(ThemeTextures.CaveRock, "Rock size", 16, "Layer height", 10, true, 1.0, 0.8, Stuff.SoftStone, "Rough rock in uneven layers with bedding lines, split by cracks and pitted: caves, cliffs and mines."),
         new(ThemeTextures.SciFiPanels, "Panel width", 16, "Panel height", 12, true, 0.5, 0.6, Stuff.Metal, "Wide bays between bolted pillars: a stepped armour plate in a deep recess with pipes, cables and control boxes, vents along the floor and angled plates along the top, scratched and worn."),
+        new(CyberWalls.HabConcrete, "Panel width", 18, "Panel height", 12, true, 0.5, 0.5, Stuff.Stone, "Cyberpunk city concrete: cast panels in courses with tie holes, a plinth, and the services bolted on (downpipes, air-conditioning units by the windows, vents, junction boxes and conduit), laid out afresh on every wall."),
+        new(CyberWalls.SteelCladding, "Bay width", 20, "Sheet height", 16, true, 0.5, 0.5, Stuff.Metal, "A steel frame bolted through gusset plates with corrugated sheets between, patch plates and cross braces here and there, vents and conduit: sheds, depots and slum stacks."),
+        new(CyberWalls.Shopfront, "Panel width", 18, "Panel height", 12, true, 0.5, 0.5, Stuff.Stone, "A cyberpunk street front: concrete with a roll-up shutter, a long sign box, torn posters, tags, a meter box and conduit."),
+        new(CyberWalls.GlassFacade, "Mullion spacing", 12, "Band spacing", 24, true, 0.5, 0.5, Stuff.Metal, "A tower's curtain wall: mullions and spandrel bands standing proud, the glass sunk between with transoms, blinds and ceiling lights."),
         new(ThemeTextures.Sandstone, "Block length", 16, "Course height", 7, true, 0.7, 0.7, Stuff.SoftStone, "Long, soft-cornered sandstone blocks eaten by the wind: rounded edges, wind lines and clusters of pits."),
         new(ThemeTextures.Adobe, "Patch size", 14, "Brick height", 3, true, 0.5, 0.6, Stuff.Plaster, "Smooth mud plaster with ragged patches fallen away to show worn bricks beneath, and spreading cracks."),
     ];
@@ -55,7 +59,7 @@ internal static class TextureEngine
     /// that isn't a preset.
     /// </summary>
     public static (PathsD Raised, PathsD Etched, List<PathD> Lines) Make(string name, double length, double height, double x0, double x1, double top,
-        double a, double b, double groove, int seed, double wear = 0.5, double detail = 0, bool linesOnly = false)
+        double a, double b, double groove, int seed, double wear = 0.5, double detail = 0, bool linesOnly = false, IReadOnlyList<RectD>? avoid = null)
     {
         if (Find(name) is not { } p) return ([], [], []);
         a = Math.Max(0.5, a);
@@ -81,6 +85,10 @@ internal static class TextureEngine
             case ThemeTextures.DungeonBlocks: t.Blocks(length, height, a, b, g, 0.7, 0.6, 0.85, 0.3); break;
             case ThemeTextures.CaveRock: t.Cave(length, height, a, b, g); break;
             case ThemeTextures.SciFiPanels: new SciFi(t).Make(length, height, a, b, g); break;
+            case CyberWalls.HabConcrete: new CyberWalls(t, avoid ?? []).Concrete(length, height, a, b, g); break;
+            case CyberWalls.SteelCladding: new CyberWalls(t, avoid ?? []).Cladding(length, height, a, b, g); break;
+            case CyberWalls.Shopfront: new CyberWalls(t, avoid ?? []).Shop(length, height, a, b, g); break;
+            case CyberWalls.GlassFacade: new CyberWalls(t, avoid ?? []).Glass(length, height, a, b, g); break;
             case ThemeTextures.Sandstone: t.Sand(length, height, a, b, g); break;
             case ThemeTextures.Adobe: t.Plaster(length, height, a, b, g); break;
         }

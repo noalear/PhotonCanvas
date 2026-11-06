@@ -51,6 +51,37 @@ public static class TownMaker
     };
 
     /// <summary>
+    /// A cyberpunk city's parts and what's built in them: hab blocks and capsule hotels where people live, corp
+    /// towers, neon bars, noodle bars, tech shops and arcades downtown, glass spires in the rich quarter, shanty
+    /// stacks in the slums, depots, factories and the power plant in the industrial parts.
+    /// </summary>
+    static readonly Dictionary<string, (string Type, double Weight)[]> SciKinds = new()
+    {
+        ["Market"] = [("Corp tower", 2), ("Neon bar", 2), ("Noodle bar", 2), ("Tech shop", 3), ("Arcade", 1), ("Clinic", 1), ("Capsule hotel", 1), ("Hab block", 2)],
+        ["Residential"] = [("Hab block", 5), ("Stack", 1), ("Capsule hotel", 1), ("Noodle bar", 1), ("Tech shop", 1.5), ("Neon bar", 0.5), ("Clinic", 0.3)],
+        ["Noble"] = [("Spire", 3), ("Corp tower", 1), ("Hab block", 1)],
+        ["Slums"] = [("Stack", 5), ("Hab block", 2), ("Neon bar", 0.5), ("Noodle bar", 0.5)],
+        ["Docks"] = [("Cargo depot", 4), ("Hangar", 1), ("Neon bar", 1), ("Hab block", 1)],
+        ["Farm"] = [("Hydroponics", 2), ("Hangar", 1), ("Cargo depot", 1)],
+        ["Military"] = [("Bunker", 2), ("Security post", 1)],
+        ["Temple"] = [("Shrine", 2), ("Hab block", 1)],
+        ["Industrial"] = [("Factory", 3), ("Cargo depot", 2), ("Power plant", 1), ("Data centre", 1)],
+        ["Outskirts"] = [("Hab block", 3), ("Cargo depot", 1), ("Hangar", 1)],
+        ["Wilderness"] = [("Stack", 2)],
+    };
+
+    /// <summary>Whether a look is the sci-fi one (its towns are cyberpunk cities).</summary>
+    public static bool SciFi(string? theme) => theme is not null && theme.Contains("sci", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The floors from which a city building steps in a square all round (towers), or null.</summary>
+    static int? Setback(string type, int storeys, Random rnd) => type switch
+    {
+        "Corp tower" or "Spire" when storeys >= 4 => storeys - 2 + (rnd.NextDouble() < 0.4 ? 1 : 0),
+        "Hab block" or "Capsule hotel" when storeys >= 4 && rnd.NextDouble() < 0.3 => storeys - 1,
+        _ => null,
+    };
+
+    /// <summary>
     /// Each kind's frontage and depth (squares, least and most) and floors (least and most): the sizes of such
     /// buildings on a battle map of five-foot squares (a cottage 20 by 20 feet, a town house 20 by 30, a tavern
     /// 35 by 40, a temple 45 by 65).
@@ -58,8 +89,9 @@ public static class TownMaker
     static (int F0, int F1, int D0, int D1, int S0, int S1) Size(string type) => type switch
     {
         "Hovel" => (3, 3, 3, 3, 1, 1),
+        "Hab block" => (4, 6, 4, 5, 3, 5),
         "Cottage" => (4, 5, 4, 4, 1, 1),
-        "House" or "Hab block" => (4, 5, 5, 6, 1, 2),
+        "House" => (4, 5, 5, 6, 1, 2),
         "Canteen" => (7, 8, 6, 8, 1, 2),
         "Hangar" => (7, 9, 6, 8, 1, 1),
         "Bunker" => (4, 5, 4, 5, 1, 1),
@@ -79,11 +111,27 @@ public static class TownMaker
         "Guardhouse" => (4, 5, 5, 6, 2, 2),
         "Shrine" => (3, 3, 3, 3, 1, 1),
         "Tower" => (4, 4, 4, 4, 3, 3),
+        // A cyberpunk city's: tall and blocky (up to five floors, a roof deck on top).
+        "Corp tower" => (6, 7, 6, 7, 5, 5),
+        "Spire" => (5, 6, 5, 6, 5, 5),
+        "Stack" => (3, 4, 3, 4, 2, 4),
+        "Neon bar" => (5, 6, 5, 6, 2, 3),
+        "Noodle bar" => (4, 4, 4, 5, 2, 3),
+        "Tech shop" => (4, 5, 4, 5, 2, 4),
+        "Arcade" => (6, 7, 5, 6, 2, 3),
+        "Clinic" => (5, 6, 5, 6, 3, 4),
+        "Capsule hotel" => (5, 6, 5, 6, 4, 5),
+        "Cargo depot" => (7, 8, 6, 8, 2, 2),
+        "Factory" => (7, 9, 6, 8, 2, 3),
+        "Power plant" => (6, 7, 6, 7, 3, 3),
+        "Data centre" => (6, 7, 6, 7, 3, 4),
+        "Hydroponics" => (6, 7, 5, 6, 2, 3),
+        "Security post" => (4, 5, 4, 5, 2, 3),
         _ => (4, 5, 5, 6, 1, 2),
     };
 
     /// <summary>The smaller kind to put up when a plot's too small for the one picked.</summary>
-    static string Smaller(string district) => district switch
+    static string Smaller(string district, string theme) => SciFi(theme) ? (district is "Slums" or "Wilderness" ? "Stack" : "Hab block") : district switch
     {
         "Slums" or "Wilderness" => "Hovel",
         "Outskirts" or "Farm" => "Cottage",
@@ -96,7 +144,11 @@ public static class TownMaker
     /// </summary>
     static int Limit(string type, int big) => type switch
     {
-        "Smithy" or "Mill" or "Stable" or "Chapel" or "Shrine" or "Inn" or "Guardhouse" or "Manor" or "Bunker" or "Hangar" => 1 + big,
+        "Smithy" or "Mill" or "Stable" or "Chapel" or "Shrine" or "Inn" or "Guardhouse" or "Manor" or "Bunker" or "Hangar"
+            or "Power plant" or "Data centre" or "Arcade" or "Clinic" or "Security post" or "Capsule hotel" => 1 + big,
+        "Corp tower" or "Spire" => 2 + big,
+        "Neon bar" => 3 + big,
+        "Noodle bar" or "Factory" or "Cargo depot" or "Hydroponics" => 2 + 2 * big,
         "Temple" or "Hall" => 1 + big / 3,
         "Tavern" or "Canteen" => 2 + big,
         "Warehouse" or "Barn" or "Tower" => 2 + 2 * big,
@@ -154,8 +206,23 @@ public static class TownMaker
     ];
     static readonly string[] Rivers = ["River Wend", "River Ashe", "River Moll", "River Tarn", "River Brede"];
 
+    // A cyberpunk city's names.
+    static readonly string[] SciAdjectives = ["Neon", "Chrome", "Electric", "Static", "Midnight", "Binary", "Toxic", "Velvet", "Broken", "Lucky", "Rusty", "Hollow", "Crimson", "Glitch", "Silent", "Burning", "Plastic", "Golden", "Acid", "Blue"];
+    static readonly string[] SciNouns = ["Lotus", "Circuit", "Koi", "Dragon", "Byte", "Spark", "Ghost", "Signal", "Socket", "Drone", "Tiger", "Pixel", "Relay", "Comet", "Moth", "Vector", "Orchid", "Fuse", "Cipher", "Rabbit"];
+    static readonly string[] Corps = ["Kaze Corp", "Helix Biotech", "Nova Kinetics", "Orbital Systems", "Zenith Dynamics", "Ironclad Robotics", "Mirage Media", "Quantum Freight", "Solaris Energy", "Cygnus Data", "Tessera Bank", "Obsidian Arms", "Halcyon Pharma", "Pulse Networks", "Vantage Security", "Aurora Foods"];
+    static readonly string[] Spires = ["Azure Spire", "Halo Heights", "Crystal Spire", "Zenith Heights", "Aurora Residences", "Skyline Tower", "Prism Spire", "Celeste Heights"];
+    static readonly string[] SciTrades = ["Cyberware", "Chip", "Drone", "Holo", "Synth", "Optics", "Implant", "Battery", "Data", "Gadget", "Spare parts", "Mod", "Ramen", "Pawn", "Arms", "Med", "Tattoo", "Vinyl", "Repair", "Comms"];
+    static readonly string[] SciHighRoads = ["Neon Boulevard", "Chrome Avenue", "Skyline Avenue", "Circuit Avenue", "Grid Highway", "Meridian Avenue", "Central Avenue", "Harbour Freeway"];
+    static readonly string[] SciStreets =
+    [
+        "Data Street", "Wire Alley", "Static Lane", "Rain Street", "Lantern Alley", "Relay Row", "Fiber Lane", "Vapor Alley", "Signal Street", "Pixel Row",
+        "Ion Street", "Coil Lane", "Cobalt Street", "Mercury Lane", "Arc Street", "Halo Street", "Vector Alley", "Glitch Alley", "Synth Street", "Laser Lane",
+        "Plasma Row", "Neon Alley", "Cable Street", "Grid Lane", "Byte Street", "Cipher Alley", "Drone Lane", "Echo Street", "Flux Lane", "Hex Street",
+        "Lumen Street", "Nexus Alley", "Orbit Lane", "Proxy Street", "Quartz Lane", "Radar Row", "Servo Street", "Titan Lane", "Volt Alley", "Xenon Street", "Zenith Lane",
+    ];
+
     /// <summary>Names given out once each in a town: shop and workshop trades, taverns, families, roads.</summary>
-    sealed class Names(Random rnd, IEnumerable<CityBuilding>? existing = null, IEnumerable<CityRoad>? roads = null)
+    sealed class Names(Random rnd, IEnumerable<CityBuilding>? existing = null, IEnumerable<CityRoad>? roads = null, bool sci = false)
     {
         // Names already in the town: its buildings' and roads', and the families and trades in them.
         readonly HashSet<string> _used = new([.. (existing ?? []).Select(b => b.Name), .. (existing ?? []).Select(b => b.Name.Split(' ')[0]), .. (roads ?? []).Select(r => r.Name)], StringComparer.OrdinalIgnoreCase);
@@ -168,6 +235,7 @@ public static class TownMaker
         public bool Left(string type) => type switch
         {
             "Shop" => ShopTrades.Any(t => !_trades.Contains(t)),
+            "Tech shop" => SciTrades.Any(t => !_trades.Contains(t + " shop")),
             "Workshop" => WorkshopTrades.Any(t => !_trades.Contains(t)),
             _ => true,
         };
@@ -202,15 +270,31 @@ public static class TownMaker
                 if (_used.Add($"{name} {i}")) return $"{name} {i}";
         }
 
-        public string HighRoad() => Fresh(HighRoads) ?? Lane();
+        public string HighRoad() => Fresh(sci ? SciHighRoads : HighRoads) ?? Lane();
 
-        public string Lane() => Fresh(Streets) ?? $"Lane {++_lane}";
+        public string Lane() => Fresh(sci ? SciStreets : Streets) ?? $"{(sci ? "Street" : "Lane")} {++_lane}";
 
         /// <summary>A name for a building of a kind (a trade's shop, a tavern's sign, a family's house), or null when the town has its one of that kind of shop.</summary>
         public string? For(string type, int n)
         {
             switch (type)
             {
+                case "Neon bar": return Fresh(SciAdjectives.SelectMany(a => SciNouns.Select(n => $"The {a} {n}"))) ?? Numbered("Bar");
+                case "Noodle bar": return Fresh(SciNouns.Select(n => $"{n} Noodles").Concat(SciAdjectives.Select(a => $"{a} Ramen"))) ?? Numbered("Noodle bar");
+                case "Tech shop": return Trade([.. SciTrades.Select(t => t + " shop")]);
+                case "Corp tower": return Fresh(Corps.Select(c => c + " tower")) ?? Numbered("Corp tower");
+                case "Spire": return Fresh(Spires) ?? Numbered("Spire");
+                case "Hab block": return Fresh(Enumerable.Range(0, 8).SelectMany(l => Enumerable.Range(1, 60).Select(n => $"Hab block {(char)('A' + l)}-{n}"))) ?? Numbered("Hab block");
+                case "Stack": return Fresh(Enumerable.Range(1, 99).Select(n => $"Stack {n}")) ?? Numbered("Stack");
+                case "Clinic": return Fresh(["Ripper clinic", "Street clinic", "Chrome clinic", "Night clinic", "Med bay"]) ?? Numbered("Clinic");
+                case "Arcade": return Fresh(["Pixel Arcade", "Neon Arcade", "Glitch Arcade", "High Score Arcade"]) ?? Numbered("Arcade");
+                case "Capsule hotel": return Fresh(["Capsule hotel", "Sleep pods", "Pod hotel", "Coffin hotel"]) ?? Numbered("Capsule hotel");
+                case "Cargo depot": return Fresh(["Cargo depot", "Freight depot", "Container yard", "Parts depot", "Salvage depot", "Supply depot"]) ?? Numbered("Depot");
+                case "Factory": return Fresh(["Drone factory", "Synth factory", "Chip fab", "Robot works", "Foundry", "Assembly plant"]) ?? Numbered("Factory");
+                case "Power plant": return Fresh(["Fusion plant", "Power plant", "Substation"]) ?? Numbered("Power plant");
+                case "Data centre": return Fresh(["Data centre", "Server farm", "Data vault"]) ?? Numbered("Data centre");
+                case "Hydroponics": return Fresh(["Hydroponics farm", "Algae farm", "Vertical farm", "Grow house"]) ?? Numbered("Grow house");
+                case "Security post": return Fresh(["Security post", "Precinct", "Checkpoint"]) ?? Numbered("Security post");
                 case "Tavern" or "Inn" or "Canteen": return Tavern();
                 case "Shop": return Trade(ShopTrades) is { } t ? $"{t}'s shop" : null;
                 case "Workshop": return Trade(WorkshopTrades) is { } w ? $"{w}'s workshop" : null;
@@ -218,7 +302,6 @@ public static class TownMaker
                 case "House": return $"{Family()} house";
                 case "Cottage": return $"{Family()} cottage";
                 case "Hovel": return $"{Family()} hovel";
-                case "Hab block": return $"{Family()} hab";
                 case "Temple": return Fresh(["Temple", "Temple of the Dawn", "Temple of the Harvest"]) ?? $"Temple {n}";
                 case "Hall": return Fresh(["Town hall", "Guild hall", "Moot hall"]) ?? $"Hall {n}";
                 case "Smithy": return Fresh(["Smithy"]) ?? $"{Family()} smithy";
@@ -235,14 +318,14 @@ public static class TownMaker
     }
 
     /// <summary>A street name the map hasn't got yet, for a road laid by hand.</summary>
-    public static string RoadName(CityMap m, int seed) => new Names(new Random(seed), m.Buildings, m.Roads).Lane();
+    public static string RoadName(CityMap m, int seed) => new Names(new Random(seed), m.Buildings, m.Roads, SciFi(m.Theme)).Lane();
 
     /// <summary>
     /// A name for a new building of a kind the map hasn't used yet: a family's for a house or cottage (the Ashford
     /// house), a trade's for a shop, a sign for a tavern.
     /// </summary>
     public static string BuildingName(CityMap m, string type, int seed) =>
-        new Names(new Random(seed), m.Buildings, m.Roads).For(type, m.Buildings.Count + 1) ?? $"{type} {m.Buildings.Count + 1}";
+        new Names(new Random(seed), m.Buildings, m.Roads, SciFi(m.Theme)).For(type, m.Buildings.Count + 1) ?? $"{type} {m.Buildings.Count + 1}";
 
     // ---- a whole town ----
 
@@ -255,7 +338,11 @@ public static class TownMaker
         int cx = w / 2 + rnd.Next(-w / 12, w / 12 + 1), cy = d / 2 + rnd.Next(-d / 12, d / 12 + 1);
         bool riverside = o.Layout == TownLayout.Riverside;
         int big = w * d / 6000;
-        var names = new Names(rnd);
+        // A sci-fi town is a cyberpunk city: a grid of avenues and streets packed with tall flat-roofed blocks.
+        bool sci = SciFi(o.Theme);
+        var layout = sci && o.Layout != TownLayout.Riverside ? TownLayout.Grid : o.Layout;
+        double density = sci ? Math.Min(1, 0.35 + o.Density) : o.Density;
+        var names = new Names(rnd, sci: sci);
 
         // The town wall's line (grid lines): plots inside it, farms outside.
         int inset = o.Walls ? Math.Clamp(Math.Min(w, d) / 8, 3, 12) : 0;
@@ -294,8 +381,8 @@ public static class TownMaker
         // The ground before the roads go down (put back under them at the end: the roads lie on top).
         var under = (Ground[,])g.Clone();
 
-        // The roads: four squares wide for the high roads through the town, two for the lanes.
-        const int High = 4, Lane = 2;
+        // The roads: four squares wide for the high roads through the town, two for the lanes (a city's streets three).
+        int High = 4, Lane = sci ? 3 : 2;
         var roads = new List<(CityRoad Road, HashSet<(int X, int Y)> Cells, bool Main, bool Across)>();
         void Lay(CityRoad road, bool main)
         {
@@ -323,7 +410,7 @@ public static class TownMaker
         }
         int t0x = Math.Max(1, wall.X0 + 2), t1x = Math.Min(w - 2, wall.X1 - 3), t0y = Math.Max(1, wall.Y0 + 2), t1y = Math.Min(d - 2, wall.Y1 - 3);
         int Between(int a, int b) => a >= b ? a : rnd.Next(a, b + 1);
-        switch (o.Layout)
+        switch (layout)
         {
             case TownLayout.Crossroads:
             {
@@ -364,6 +451,21 @@ public static class TownMaker
                     for (int y = cy + sy * Between(15, 18); sy < 0 ? y > t0y + 6 : y < t1y - 6; y += sy * Between(15, 18))
                         Road(t0x + rnd.Next(2, 8), y, t1x - rnd.Next(2, 8), y, Lane, false);
                 }
+                break;
+            }
+            case TownLayout.Grid when sci:
+            {
+                // A city's blocks: an avenue through the middle each way and every third street, streets three
+                // squares wide between, a block every 13 to 16 squares, running off the map at its edges.
+                Road(0, cy, w - 1, cy, High, true);
+                Road(cx, 0, cx, d - 1, High, true);
+                int e0x = o.Walls ? t0x : 0, e1x = o.Walls ? t1x : w - 1, e0y = o.Walls ? t0y : 0, e1y = o.Walls ? t1y : d - 1;
+                foreach (int sy in new[] { -1, 1 })
+                    for (int k = 1, y = cy + sy * Between(13, 16); y > e0y + 4 && y < e1y - 4; k++, y += sy * Between(13, 16))
+                        Road(e0x, y, e1x, y, k % 3 == 0 ? High : Lane, k % 3 == 0);
+                foreach (int sx in new[] { -1, 1 })
+                    for (int k = 1, x = cx + sx * Between(13, 16); x > e0x + 4 && x < e1x - 4; k++, x += sx * Between(13, 16))
+                        Road(x, e0y, x, e1y, k % 3 == 0 ? High : Lane, k % 3 == 0);
                 break;
             }
             case TownLayout.Grid:
@@ -517,7 +619,7 @@ public static class TownMaker
         }
 
         int noble = rnd.Next(4);
-        Place(g, w, d, taken, clear, buildings, rnd, o.Density, o.Theme, o.SquareMm, o.Prefabs, names, big, (x, y, onSquare) =>
+        Place(g, w, d, taken, clear, buildings, rnd, density, o.Theme, o.SquareMm, o.Prefabs, names, big, (x, y, onSquare) =>
         {
             if (onSquare) return "Market";
             if (!Inside(x, y)) return o.Walls ? "Farm" : null;
@@ -527,13 +629,15 @@ public static class TownMaker
             if (far < 0.3) return "Market";
             if (far < 0.6) return (x >= cx ? 1 : 0) + (y >= cy ? 2 : 0) == noble ? "Noble" : "Residential";
             if (far < 0.85) return "Residential";
+            // A city's edge: its industrial quarter on the far side from the rich one, slums and hab blocks round the rest.
+            if (sci) return o.Walls ? "Slums" : (x >= cx ? 1 : 0) + (y >= cy ? 2 : 0) == 3 - noble ? "Industrial" : rnd.NextDouble() < 0.4 ? "Slums" : "Residential";
             return o.Walls ? "Slums" : rnd.NextDouble() < 0.5 ? "Farm" : "Residential";
-        }, OnSquare, Inside, firstOnSquare: o.Square ? ["Temple", "Hall", "Tavern"] : []);
+        }, OnSquare, Inside, firstOnSquare: !o.Square ? [] : sci ? ["Corp tower", "Arcade", "Neon bar"] : ["Temple", "Hall", "Tavern"]);
 
         // Farms' fields outside the walls (or round the edge of an open town), with hedges, clear of the buildings.
         var props = new List<Prop>(towers);
         int fields = 0;
-        for (int tries = 0; tries < (w * d) / 60 && fields < (w * d) / 300 + 2; tries++)
+        for (int tries = 0; !sci && tries < (w * d) / 60 && fields < (w * d) / 300 + 2; tries++)
         {
             int fw = rnd.Next(5, 9), fd = rnd.Next(4, 7), fx = rnd.Next(1, Math.Max(2, w - fw - 1)), fy = rnd.Next(1, Math.Max(2, d - fd - 1));
             var cells = Cells(fx, fy, fw, fd);
@@ -602,15 +706,62 @@ public static class TownMaker
             // A bar, a notice board and a trough along its left or right side, or else its top or bottom, or else inside it.
             var sides = Enumerable.Range(square.Y0 + 1, Math.Max(0, square.Y1 - square.Y0 - 1)).SelectMany(y => new[] { (square.X0, y), (square.X1, y) }).OrderBy(_ => rnd.Next()).ToList();
             var ends = Enumerable.Range(square.X0 + 1, Math.Max(0, square.X1 - square.X0 - 1)).SelectMany(x => new[] { (x, square.Y0), (x, square.Y1) }).OrderBy(_ => rnd.Next()).ToList();
-            foreach (var (kind, len) in new[] { (PropKind.Bar, 2), (PropKind.NoticeBoard, 1), (PropKind.Trough, 2) })
+            foreach (var (kind, len) in sci ? new[] { (PropKind.Bar, 2), (PropKind.NoticeBoard, 1) } : new[] { (PropKind.Bar, 2), (PropKind.NoticeBoard, 1), (PropKind.Trough, 2) })
                 _ = Stand(kind, 1, len, 90, sides) || Stand(kind, len, 1, 0, ends) || Stand(kind, 1, len, 90, inside) || Stand(kind, len, 1, 0, inside);
             // The well moves off to the side when the fountain has the middle.
             if (fountain) _ = Stand(PropKind.Well, 1, 1, 0, sides) || Stand(PropKind.Well, 1, 1, 0, inside);
             for (int i = 0; i < Math.Max(2, (square.X1 - square.X0) / 3); i++)
                 Stand(i % 2 == 0 ? PropKind.Cart : PropKind.Crates, 1, 1, rnd.Next(4) * 90, inside);
         }
+        // A city's light pylons along every street, both sides, at the kerb wherever no building fronts it
+        // (between the blocks), six squares apart at least; and a holo signpost at the corner of each crossing.
+        var items = new List<CityItem>();
+        if (sci)
+        {
+            var roadCells = roads.SelectMany(r => r.Cells).ToHashSet();
+            foreach (var r in roads)
+            {
+                var along = r.Cells.GroupBy(c => r.Across ? c.X : c.Y).OrderBy(x => x.Key).ToList();
+                foreach (int side in new[] { -1, 1 })
+                {
+                    int last = int.MinValue / 2;
+                    foreach (var line in along)
+                    {
+                        int edge = side < 0 ? line.Min(c => r.Across ? c.Y : c.X) : line.Max(c => r.Across ? c.Y : c.X);
+                        var (ex, ey) = r.Across ? (line.Key, edge) : (edge, line.Key);
+                        var (bx, by) = r.Across ? (ex, ey + side) : (ex + side, ey);
+                        if (line.Key - last < 6 || bx < 0 || by < 0 || bx >= w || by >= d) continue;
+                        if (roadCells.Contains((bx, by)) || taken.Contains((bx, by)) || under[ex, ey] is Ground.Water or Ground.Sand || OnSquare(ex, ey)) continue;
+                        if (Round(ex, ey).Any(c => c.X >= 0 && c.Y >= 0 && c.X < w && c.Y < d && roads.Count(q => q.Cells.Contains(c)) > 1 && Math.Abs(c.X - ex) + Math.Abs(c.Y - ey) <= 1)) continue;
+                        double off = 0.5 - 0.3 * side;
+                        props.Add(new Prop { Kind = PropKind.Lamp, X = r.Across ? ex + 0.5 : ex + off, Y = r.Across ? ey + off : ey + 0.5, TurnDeg = r.Across ? (side < 0 ? 180 : 0) : (side < 0 ? 90 : 270) });
+                        last = line.Key;
+                    }
+                }
+            }
+            // The crossings: road squares on two roads, a signpost on the top left corner of each (every other one).
+            var cross = roadCells.Where(c => roads.Count(q => q.Cells.Contains(c)) > 1).ToHashSet();
+            var seenX = new HashSet<(int, int)>();
+            int n = 0;
+            if (TownPieces.Piece(o.Theme, "signpost") is { } sign)
+                foreach (var c0 in cross.OrderBy(c => c.Y).ThenBy(c => c.X))
+                {
+                    if (!seenX.Add(c0)) continue;
+                    var group = new HashSet<(int X, int Y)> { c0 };
+                    var todo = new Stack<(int X, int Y)>([c0]);
+                    while (todo.Count > 0)
+                    {
+                        var (x, y) = todo.Pop();
+                        foreach (var nb in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                            if (cross.Contains(nb) && seenX.Add(nb)) { group.Add(nb); todo.Push(nb); }
+                    }
+                    int gx = group.Min(c => c.X), gy = group.Min(c => c.Y);
+                    if (n++ % 2 == 1 || OnSquare(gx, gy) || taken.Contains((gx - 1, gy - 1))) continue;
+                    items.Add(CityItems.Make(sign, o.SquareMm, gx + 0.3, gy + 0.3, 45));
+                }
+        }
         // Lamps along the high roads, on the grass at their edge (the top or left side), every ninth square.
-        foreach (var r in roads.Where(r => r.Main))
+        foreach (var r in roads.Where(r => r.Main && !sci))
         {
             int i = 0;
             foreach (var c in r.Cells.OrderBy(c => r.Across ? c.X : c.Y).ThenBy(c => r.Across ? c.Y : c.X))
@@ -628,16 +779,16 @@ public static class TownMaker
                 if (g[x, y] != Ground.Grass || taken.Contains((x, y)) || clear.Contains((x, y)) || NextToRoad(g, x, y, w, d)) continue;
                 double wood = 0.5 + 0.5 * Math.Sin(x / 5.3 + phaseT) * Math.Cos(y / 4.1 - phaseT);
                 bool town = Inside(x, y) && Far(x, y) < (o.Walls ? 2 : 0.8);
-                double p = town ? 0.04 : 0.05 + 0.4 * wood * wood;
+                double p = sci ? 0.012 : town ? 0.04 : 0.05 + 0.4 * wood * wood;
                 if (rnd.NextDouble() < p)
                     props.Add(new Prop { Kind = rnd.NextDouble() < (town ? 0.2 : 0.35) ? PropKind.Pine : rnd.NextDouble() < 0.15 ? PropKind.Bush : PropKind.Tree, X = x + 0.3 + rnd.NextDouble() * 0.4, Y = y + 0.3 + rnd.NextDouble() * 0.4, Size = 0.9 + rnd.NextDouble() * 0.6, TurnDeg = rnd.Next(360) });
-                else if (!town && rnd.NextDouble() < 0.006)
+                else if (!town && !sci && rnd.NextDouble() < 0.006)
                     props.Add(new Prop { Kind = PropKind.Boulder, X = x + 0.5, Y = y + 0.5, Size = 0.8 + rnd.NextDouble() * 0.6, TurnDeg = rnd.Next(360) });
             }
 
         // The square's name, and the river's along it where no bridge crosses (the roads carry their own names).
         var labels = new List<CityLabel>();
-        if (o.Square) labels.Add(new CityLabel { Text = "Market Square", X = (square.X0 + square.X1 + 1) / 2.0, Y = square.Y0 + 0.7, Size = 0.8 });
+        if (o.Square) labels.Add(new CityLabel { Text = sci ? "Central Plaza" : "Market Square", X = (square.X0 + square.X1 + 1) / 2.0, Y = square.Y0 + 0.7, Size = 0.8 });
         if (water.Count > 0)
         {
             var bridged = roads.SelectMany(r => r.Cells).Where(water.Contains).ToHashSet();
@@ -657,8 +808,13 @@ public static class TownMaker
         for (int y = 0; y < d; y++)
             for (int x = 0; x < w; x++)
                 if (g[x, y] == Ground.Road) final[x, y] = under[x, y];
+        // A city is paved all over: pavements, yards and the quays along its river.
+        if (sci)
+            for (int y = 0; y < d; y++)
+                for (int x = 0; x < w; x++)
+                    if (final[x, y] is Ground.Grass or Ground.Dirt or Ground.Sand or Ground.Field) final[x, y] = Ground.Paving;
         var map = CityMap.Empty(w, d, string.IsNullOrWhiteSpace(o.Name) ? "New town" : o.Name) with { Theme = o.Theme, SquareMm = o.SquareMm };
-        map = map.WithGround(final) with { Buildings = buildings, Roads = [.. roads.Select(r => r.Road)], Fences = fences, Props = props, Labels = labels };
+        map = map.WithGround(final) with { Buildings = buildings, Roads = [.. roads.Select(r => r.Road)], Fences = fences, Props = props, Labels = labels, Items = items };
 
         int fromSaved = buildings.Count(b => b.PrefabId is not null);
         notes.Add($"{buildings.Count} buildings" + (fromSaved > 0 ? $" ({fromSaved} of them your saved buildings)" : "") + $", {roads.Count} roads, {props.Count(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.Bush)} trees.");
@@ -667,6 +823,9 @@ public static class TownMaker
             int gates = WallLayout.Of(map, f => f.Kind == FenceKind.CityWall).Gates.Count;
             notes.Add($"A town wall with {gates} gate{(gates == 1 ? "" : "s")} and {towers.Count} guard tower{(towers.Count == 1 ? "" : "s")} on it, one at each corner.");
         }
+        if (sci)
+            notes.Add("A cyberpunk city, as the sci-fi look makes one: blocks between avenues and streets" + (layout != o.Layout ? $" (a grid, whatever the layout asked for)" : "")
+                + ", towers of up to five floors with flat roof decks, light pylons along the streets and holo signposts at the crossings.");
         if (fields > 0) notes.Add($"{fields} field{(fields == 1 ? "" : "s")} with hedges and fences.");
         notes.Add("By district: " + string.Join(", ", buildings.GroupBy(b => b.District).OrderByDescending(x => x.Count()).Select(x => $"{x.Count()} {x.Key.ToLowerInvariant()}")) + ".");
         return (map, notes);
@@ -774,15 +933,18 @@ public static class TownMaker
     /// </summary>
     static int Place(Ground[,] g, int w, int d, HashSet<(int X, int Y)> taken, HashSet<(int X, int Y)> clear, List<CityBuilding> buildings, Random rnd,
         double density, string theme, double squareMm, IReadOnlyList<PrefabInfo> prefabs, Names names, int big,
-        Func<int, int, bool, string?> districtAt, Func<int, int, bool> onSquare, Func<int, int, bool> allowed, string[] firstOnSquare)
+        Func<int, int, bool, string?> districtAt, Func<int, int, bool> onSquare, Func<int, int, bool> allowed, string[] firstOnSquare,
+        Func<int, int, bool>? pavedFree = null)
     {
         density = Math.Clamp(density, 0, 1);
         int count = 0, number = buildings.Count;
         var made = buildings.GroupBy(b => b.Type, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
         int Made(string type) => made.GetValueOrDefault(type);
         bool Room(string type) => Made(type) < Limit(type, big) && names.Left(type);
-        bool Road(int x, int y) => x >= 0 && y >= 0 && x < w && y < d && g[x, y] is Ground.Road or Ground.Paving;
-        bool Free(int x, int y) => x >= 0 && y >= 0 && x < w && y < d && g[x, y] is Ground.Grass or Ground.Dirt && !taken.Contains((x, y)) && !clear.Contains((x, y));
+        // On a city's map, paved all over, its pavements are the free ground and only its streets are roads.
+        bool Paved(int x, int y) => pavedFree is not null && g[x, y] == Ground.Paving && pavedFree(x, y);
+        bool Road(int x, int y) => x >= 0 && y >= 0 && x < w && y < d && (g[x, y] == Ground.Road || g[x, y] == Ground.Paving && !Paved(x, y));
+        bool Free(int x, int y) => x >= 0 && y >= 0 && x < w && y < d && (g[x, y] is Ground.Grass or Ground.Dirt || Paved(x, y)) && !taken.Contains((x, y)) && !clear.Contains((x, y));
 
         // Each way a plot can face its road: (towards the road), and the way along it.
         (int Fx, int Fy, int Ax, int Ay)[] faces = [(0, 1, 1, 0), (0, -1, 1, 0), (1, 0, 0, 1), (-1, 0, 0, 1)];
@@ -803,13 +965,14 @@ public static class TownMaker
         // A kind for a plot in a district: one the town hasn't its fill of yet, or else the district's everyday one.
         string Choose(string district)
         {
-            var kinds = Kinds.GetValueOrDefault(district) ?? Kinds["Residential"];
+            var table = SciFi(theme) ? SciKinds : Kinds;
+            var kinds = table.GetValueOrDefault(district) ?? table["Residential"];
             for (int i = 0; i < 4; i++)
             {
                 string t = ForTheme(Pick(kinds, rnd), theme);
                 if (Room(t)) return t;
             }
-            return ForTheme(Smaller(district), theme);
+            return ForTheme(Smaller(district, theme), theme);
         }
 
         // A made-up building of a kind on the plot at a front, as big as fits (down to its least; a little less when
@@ -830,7 +993,12 @@ public static class TownMaker
                     }
             if (plot is null) return null;
             var towards = Around(plot).Where(c => Road(c.X, c.Y)).ToHashSet();
-            var seen = new SeenBuilding { Cells = plot, Storeys = rnd.Next(s0, s1 + 1), Type = type, Covering = Covering(type, theme, rnd), DoorTowards = towards };
+            int storeys = rnd.Next(s0, s1 + 1);
+            var seen = new SeenBuilding
+            {
+                Cells = plot, Storeys = storeys, Type = type, Covering = Covering(type, theme, rnd), DoorTowards = towards,
+                Seed = rnd.Next(1, 1_000_000), SetbackFrom = SciFi(theme) ? Setback(type, storeys, rnd) : null,
+            };
             if (BuildingGuess.Make(seen, theme, squareMm) is not { } m) return null;
             return new CityBuilding { Type = type, District = district, X = m.X, Y = m.Y, Design = m.Design };
         }
@@ -905,7 +1073,7 @@ public static class TownMaker
             }
             // Made up, as big as such a building is; a smaller everyday one where it won't fit.
             b ??= MadeUp(type, district, x, y, face);
-            if (b is null && ForTheme(Smaller(district), theme) is var small && small != type) b = MadeUp(small, district, x, y, face);
+            if (b is null && ForTheme(Smaller(district, theme), theme) is var small && small != type) b = MadeUp(small, district, x, y, face);
             if (b is null) continue;
             var own = Add(b, name);
             // The next plot along: just past the ground kept clear round it in a packed street, otherwise a square or two on.
@@ -966,9 +1134,19 @@ public static class TownMaker
         bool Inside(int x, int y) => x >= area.X0 && y >= area.Y0 && x < area.X1 && y < area.Y1;
         var buildings = new List<CityBuilding>(m.Buildings);
         var d = string.IsNullOrWhiteSpace(district) ? "Residential" : district.Trim();
-        var names = new Names(rnd, m.Buildings, m.Roads);
+        var names = new Names(rnd, m.Buildings, m.Roads, SciFi(m.Theme));
+        // A city's pavements are free to build on, except its plazas (where things stand about) and next to its streets' crossings.
+        Func<int, int, bool>? paved = null;
+        if (SciFi(m.Theme))
+        {
+            var plaza = new HashSet<(int X, int Y)>();
+            foreach (var p in m.Props.Where(p => p.Kind is not (PropKind.Lamp or PropKind.Tree or PropKind.Pine or PropKind.Bush or PropKind.Boulder)))
+                for (int y = (int)Math.Floor(p.Y) - 2; y <= (int)Math.Floor(p.Y) + 2; y++)
+                    for (int x = (int)Math.Floor(p.X) - 2; x <= (int)Math.Floor(p.X) + 2; x++) plaza.Add((x, y));
+            paved = (x, y) => !plaza.Contains((x, y));
+        }
         int added = Place(g, m.Across, m.Down, taken, clear, buildings, rnd, density, m.Theme, m.SquareMm, prefabs, names, m.Across * m.Down / 6000,
-            (x, y, _) => Inside(x, y) ? d : null, (_, _) => false, Inside, []);
+            (x, y, _) => Inside(x, y) ? d : null, (_, _) => false, Inside, [], paved);
         if (added == 0) return (m, 0);
         var fresh = buildings.Skip(m.Buildings.Count).ToList();
         var under = fresh.SelectMany(CityFootprint.Cells).ToHashSet();
