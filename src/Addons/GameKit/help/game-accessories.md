@@ -1,6 +1,6 @@
 # Game accessories
 
-An add-on (Settings → Add-ons → **Game accessories maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Game kit**, and **Edit game accessories…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Game accessories maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Minis & games → Game kit**, and **Edit game accessories…** is on the right-click menu of the pieces it made.
 
 **Game kit** makes accessories for tabletop games, cut from one sheet: a **dice tower** with ramps
 inside and a tray for the dice to land in, a **card stand** to hold a hand of cards, a **deck tray**
@@ -9,7 +9,7 @@ and a bendable **movement gauge**, a **range ruler** and **area templates** mark
 centimetres, grid squares or a unit of your own, with fonts, borders, ornaments and designs you
 upload. The pieces slot together with tabs, finger joints and pins, so they
 stand up square on their own. The faces that show can be etched with wood grain or with one of the
-wall maker's textures (**Home → Draw → Walls**), so a dice tower can match the scenery.
+wall maker's textures (**Designer → Buildings → Walls**), so a dice tower can match the scenery.
 
 > **Note:** The accessories have been checked on screen and in tests (every piece is put together
 > in 3D and checked for clashes, slots with nothing in them and pieces that don't join), but not yet
@@ -24,7 +24,7 @@ wall maker's textures (**Home → Draw → Walls**), so a dice tower can match t
 
 ![The game accessories maker with a dice tower picked: its settings on the left, the tower put together on the right](images/window-gamekit-tower.png)
 
-Click **Game kit** on the **Home** tab (in the **Draw** group). The **Game accessories** window
+Click **Game kit** on the **Designer** tab (in the **Minis & games** group). The **Game accessories** window
 opens. On the left, the **Accessories** tab has the list of what to cut and the settings of the one
 picked; the **Sheet** tab has the sheet it's all cut from and the finish. On the right, **Put
 together** shows the accessory picked in 3D (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its

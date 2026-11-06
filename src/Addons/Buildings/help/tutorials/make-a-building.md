@@ -7,9 +7,9 @@ One window makes every piece of a building: textured walls, the columns they sli
 floors, the door and the furniture for every room.
 
 ## Open the building maker
-<!-- target: ribbon:Home/Buildings -->
+<!-- target: ribbon:Designer/Buildings -->
 <!-- wait: window:Whole buildings -->
-Click **Buildings** on the **Home** tab.
+Click **Buildings** on the **Designer** tab (in the **Buildings** group).
 
 ## Pick a building
 <!-- target: field:Building -->

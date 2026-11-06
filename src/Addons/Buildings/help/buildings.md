@@ -1,6 +1,6 @@
 # Whole buildings
 
-An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors** and **Roofs and towers** add-ons, which make its pieces. Its button is **Home → Draw → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Whole-building kits**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors** and **Roofs and towers** add-ons, which make its pieces. Its button is **Designer → Buildings → Buildings**, and **Edit building…** is on the right-click menu of the pieces it made.
 
 **Buildings** makes a whole building for tabletop games and dioramas in one go: pick a
 **Cottage**, a **Tavern** or a **Watchtower** (or a sci-fi outpost, a gothic chapel, a dungeon crypt,
@@ -23,7 +23,7 @@ jigsaw together and the furniture slots together.
 
 ![A tavern in the building maker: two storeys, stone below and timber frame above, put together on the right](images/window-buildings-tavern.png)
 
-Click **Buildings** on the **Home** tab (in the **Draw** group). The **Whole buildings** window
+Click **Buildings** on the **Designer** tab (in the **Buildings** group). The **Whole buildings** window
 opens. On the left are three tabs: **Building** (which building, its size, storeys, door and
 windows), **Walls** (the sheet the walls are cut from and their texture) and **Furniture** (what's
 in each room, and the sheet it's cut from). On the right, **Put together** shows the building in 3D
@@ -200,7 +200,7 @@ On the **Furniture** tab, the list holds the furniture maker's pieces and the st
 Pick one to change **Storey**, **How many** (0 leaves it out) and its **Width**, **Depth** and
 **Height**; pick a kind under the list and press **Add** for more, or **Remove** it. The furniture
 comes in the furniture maker's standard style; for other legs, backs or lids, make that piece with
-**Home → Draw → Furniture** instead.
+**Designer → Furniture & props → Furniture** instead.
 
 **Thickness** is the furniture sheet (2 mm suits 28 mm figures; use 1 mm for 15 mm figures).
 **Joints** *Push fit (grip ribs, no glue)* adds the furniture maker's small ribs to every slot, so

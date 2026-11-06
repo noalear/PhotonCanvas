@@ -8,8 +8,9 @@ A quick look at each part of the window, so you know where things are. Nothing i
 
 ## The ribbon
 <!-- target: tab:Home -->
-The commands, in tabs: Home, Arrange, Picture, Camera, Laser and View. Hover over a button to
-see what it does. Double-click a tab to fold the ribbon away; click a tab to bring it back.
+The commands, in tabs: Home, Arrange, Picture, Designer, Camera, Laser and View. Designer holds
+the makers for tabletop terrain, buildings, furniture, figures' bases, game kits and toys (it shows
+while their add-ons are on). Hover over a button to see what it does. Double-click a tab to fold the ribbon away; click a tab to bring it back.
 
 ## The File button
 <!-- target: header:File -->

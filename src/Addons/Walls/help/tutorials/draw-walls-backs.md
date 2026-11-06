@@ -8,9 +8,9 @@ The front is engraved and cut as usual; then you turn the pieces over and run a 
 only engraves their backs.
 
 ## Open the wall maker
-<!-- target: ribbon:Home/Walls -->
+<!-- target: ribbon:Designer/Walls -->
 <!-- wait: window:Textured walls -->
-Click **Walls** on the **Home** tab.
+Click **Walls** on the **Designer** tab (in the **Buildings** group).
 
 ## Make it a single panel
 <!-- target: field:Build it as -->

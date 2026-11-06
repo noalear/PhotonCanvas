@@ -1,6 +1,6 @@
 # Floors and stairs
 
-An add-on (Settings → Add-ons → **Stairs, ladders and floors**): on when PhotonCanvas is installed, and can be turned off. It works with the [Textured walls](walls.md) add-on and needs it on. Its button is **Home → Draw → Stairs & floors**, and **Edit floor and stairs…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Stairs, ladders and floors**): on when PhotonCanvas is installed, and can be turned off. It works with the [Textured walls](walls.md) add-on and needs it on. Its button is **Designer → Buildings → Stairs & floors**, and **Edit floor and stairs…** is on the right-click menu of the pieces it made.
 
 **Stairs & floors** makes an upper floor for a room built with the wall maker, and the way up to
 it, for tabletop games and model buildings. The floor is a plate that rests on the walls' tops:
@@ -20,7 +20,7 @@ reach a wall's top or a walkway.
 
 ![The floor and stairs maker: settings on the left, the floor and open stairs with a handrail put together in the room on the right](images/window-stairs-open.png)
 
-Click **Stairs & floors** on the **Home** tab (in the **Draw** group). The **Floors and stairs**
+Click **Stairs & floors** on the **Designer** tab (in the **Buildings** group). The **Floors and stairs**
 window opens. If there are walls from the wall maker in the design, the window starts with the
 floor made to fit them. The settings are on the left in tabs. On the right, **Put together** shows
 the floor and the way up in the room, with the walls and columns faint around them: drag it to

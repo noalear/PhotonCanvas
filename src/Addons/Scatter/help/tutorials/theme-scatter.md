@@ -7,9 +7,9 @@ Each theme has scenery of its own. Rock and mushrooms are stacked from layers of
 come out round and lumpy, and every Variation number grows them differently.
 
 ## Open the scatter terrain maker
-<!-- target: ribbon:Home/Scatter -->
+<!-- target: ribbon:Designer/Scatter -->
 <!-- wait: window:Scatter terrain -->
-Click **Scatter** on the **Home** tab.
+Click **Scatter** on the **Designer** tab (in the **Furniture & props** group).
 
 ## Pick the cave theme
 <!-- target: field:Theme -->

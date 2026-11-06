@@ -341,7 +341,7 @@ public sealed class StairsWindow : Window
     void MatchWalls()
     {
         var walls = Placement.WallsIn(_doc.State, _doc.Selection);
-        if (walls is null) { _matchNote.Text = "There are no walls from the wall maker in the design (Home → Walls makes them)."; return; }
+        if (walls is null) { _matchNote.Text = "There are no walls from the wall maker in the design (Designer → Buildings → Walls makes them)."; return; }
         var s = Current().FitTo(walls);
         Load(s);
         _matchNote.Text = $"Matched: {walls.HeightMm:0.#} mm walls of {walls.ThicknessMm:0.##} mm sheet, {s.WallLengthMm:0.#} mm between column centres." +

@@ -1,12 +1,12 @@
 # Miniature bridges
 
-An add-on (Settings → Add-ons → **Miniature bridge maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Bridges**, and **Edit bridge…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Miniature bridge maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Terrain → Bridges**, and **Edit bridge…** is on the right-click menu of the pieces it made.
 
 **Bridges** makes flat-pack bridges for tabletop games, dioramas and model railways, cut from one
 sheet: **plank bridges** (level or arched footbridges with a railing, standing on legs or resting on
 the banks), **rope bridges** (planks hanging on sagging ropes between posts, to string between two
 hills or cliffs) and **stone arch bridges** (one or more arches, a parapet, and stone etched on the
-sides in the same textures as the wall maker, **Home → Draw → Walls**). Everything slots together,
+sides in the same textures as the wall maker, **Designer → Buildings → Walls**). Everything slots together,
 so it stands up square on its own; a drop of glue keeps it that way.
 
 > **Note:** The bridges have been checked on screen and in tests (every piece is put together in
@@ -19,7 +19,7 @@ so it stands up square on its own; a drop of glue keeps it that way.
 
 ![The bridge maker with an arched plank footbridge: its settings on the left and the bridge put together on the right](images/window-bridges-plank.png)
 
-Click **Bridges** on the **Home** tab (in the **Draw** group). The **Miniature bridges** window
+Click **Bridges** on the **Designer** tab (in the **Terrain** group). The **Miniature bridges** window
 opens. On the left, the **Bridge** tab has the kind of bridge, its size and its style; the **Sheet**
 tab has the sheet it's cut from. On the right, **Put together** shows the bridge in 3D (drag it to
 turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its pieces flat, one of each, with how many of each there are.

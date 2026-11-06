@@ -7,9 +7,9 @@ Scatter terrain cut from thin sheet slots together without tools, so a whole vil
 one job on the laser.
 
 ## Open the scatter terrain maker
-<!-- target: ribbon:Home/Scatter -->
+<!-- target: ribbon:Designer/Scatter -->
 <!-- wait: window:Scatter terrain -->
-Click **Scatter** on the **Home** tab.
+Click **Scatter** on the **Designer** tab (in the **Furniture & props** group).
 
 ## Set the sheet
 <!-- target: tabitem:Sheet -->

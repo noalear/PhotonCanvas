@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Buildings;
 
 /// <summary>
-/// Home → Draw → Buildings, its command and "Edit building…" on the right-click menu, opening
+/// Designer → Buildings → Buildings, its command and "Edit building…" on the right-click menu, opening
 /// <see cref="BuildingWindow"/>: a whole building (cottage, tavern, watchtower) made at once with the
 /// wall maker and the furniture maker. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,11 +18,11 @@ public sealed class BuildingsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Buildings", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Buildings", Icon, Open)
         {
             Tip = "A whole cottage, tavern or watchtower at once: every wall, column, floor, door and piece of furniture, sized for your figures",
             Large = true,
-            Order = 25,
+            Order = 11,
         });
         host.AddCommand(new AddonCommand("buildings.open", "Shapes", "Whole buildings…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit building…", Open) { Visible = Selected });

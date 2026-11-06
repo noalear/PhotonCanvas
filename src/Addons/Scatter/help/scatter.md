@@ -1,14 +1,14 @@
 # Scatter terrain
 
-An add-on (Settings → Add-ons → **Scatter terrain maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Draw → Scatter**, and **Edit scatter terrain…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Scatter terrain maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Furniture & props → Scatter**, and **Edit scatter terrain…** is on the right-click menu of the pieces it made.
 
 **Scatter** makes the small scenery that fills a tabletop: barrels, fences, carts, market stalls,
 wells and gravestones, and for other themes braziers, consoles, stalagmites, giant mushrooms,
 boulders, urns and palm trees, cut from one sheet. The pieces slot together with tabs, finger joints and
 halving joints, so they go together square without tools (a drop of glue keeps them that way). Wood
 grain and planks, stonework, awning stripes, roof shingles and lettering are etched and scored on
-the faces that show. It goes with the wall maker (**Home → Draw → Walls**) and the furniture maker
-(**Home → Draw → Furniture**): the same 28 mm sizes, and a well's stonework is laid out like the wall
+the faces that show. It goes with the wall maker (**Designer → Buildings → Walls**) and the furniture maker
+(**Designer → Furniture & props → Furniture**): the same 28 mm sizes, and a well's stonework is laid out like the wall
 maker's texture of the same name.
 
 > **Note:** The scenery has been checked on screen and in tests (every piece is put together in 3D
@@ -21,7 +21,7 @@ maker's texture of the same name.
 
 ![The scatter terrain maker with a village's worth on the list: the market stall picked, its settings on the left and the stall put together on the right](images/window-scatter-stall.png)
 
-Click **Scatter** on the **Home** tab (in the **Draw** group). The **Scatter terrain** window opens.
+Click **Scatter** on the **Designer** tab (in the **Furniture & props** group). The **Scatter terrain** window opens.
 On the left, the **Scenery** tab has the list of what to cut and the settings of the one picked; the
 **Sheet** tab has the sheet it's all cut from. On the right, **Put together** shows the piece picked
 in 3D (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its pieces flat, one of each, with how many of
@@ -40,7 +40,7 @@ Picking one sets the **Wood** detail and turns the pieces already on the list to
 become metal drums for sci-fi, fences take the theme's style, a well's stonework changes and
 gravestones are weathered in the dungeon, cave and gothic looks. Nothing is added or taken off.
 **Start the list from this theme** replaces the list with scenery of the theme's own. Crates,
-chests and the like come from the furniture maker (**Home → Draw → Furniture**) in the same theme.
+chests and the like come from the furniture maker (**Designer → Furniture & props → Furniture**) in the same theme.
 
 | Theme | Wood | Fences | Start the list from this theme |
 |---|---|---|---|

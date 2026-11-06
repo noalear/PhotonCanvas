@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.PuzzleBox;
 
 /// <summary>
-/// Home → Draw → Puzzle box, its command and "Edit puzzle box…" on the right-click menu, opening
+/// Designer → Toys → Puzzle box, its command and "Edit puzzle box…" on the right-click menu, opening
 /// <see cref="PuzzleBoxWindow"/>: layered boxes with sliding-panel tops and hidden drawers. It only
 /// adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,11 +18,11 @@ public sealed class PuzzleBoxAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Puzzle box", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Designer", "Toys", "Puzzle box", Icon, Open)
         {
             Tip = "Boxes with secrets: sliding-panel tops that only come out in the right order, and drawers hidden in the layers",
             Large = true,
-            Order = 32,
+            Order = 11,
         });
         host.AddCommand(new AddonCommand("puzzlebox.open", "Shapes", "Puzzle box…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Edit puzzle box…", Open) { Visible = Selected });
