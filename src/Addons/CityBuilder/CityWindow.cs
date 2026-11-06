@@ -68,6 +68,8 @@ public sealed partial class CityWindow : Window
     readonly Button _cGround = UiKit.Button("Put the ground in the design"), _cBridges = UiKit.Button("Put the bridges in the design"), _cScenery = UiKit.Button("Put the scenery in the design");
     readonly TextBlock _cGroundInfo = Hint(), _cBridgesInfo = Hint(), _cSceneryInfo = Hint(), _cWallsInfo = Hint(), _cTreesInfo = Hint();
     readonly Button _cWalls = UiKit.Button("Put the town walls in the design"), _cTrees = UiKit.Button("Put the trees in the design");
+    readonly Button _cFurniture = UiKit.Button("Put the furniture in the design");
+    readonly TextBlock _cFurnitureInfo = Hint();
 
     // Battle map
     readonly Button _openPic = UiKit.Button("Open a picture…"), _usePic = UiKit.Button("Use the selected picture"), _samplePic = UiKit.Button("Try a sample battle map"), _findGrid = UiKit.Button("Find the grid");
@@ -118,6 +120,23 @@ public sealed partial class CityWindow : Window
     readonly TextBox _lText = new();
     readonly NumericUpDown _lSize = Number(0.2m, 10, 0.1m, "0.#"), _lTurn = Number(-90, 90, 15, "0");
     readonly Button _lDelete = UiKit.Button("Take it away");
+
+    // A piece of furniture picked
+    readonly TextBox _iName = new();
+    readonly NumericUpDown _iTurn = Number(0, 359, 15, "0");
+    readonly TextBlock _iInfo = Hint();
+    readonly Button _iCopy = UiKit.Button("Copy beside it"), _iDelete = UiKit.Button("Take it away");
+    Control _itemPanel = null!;
+
+    // The Furniture tool's pieces
+    readonly ComboBox _fuRoom = Combo([.. CityItems.Rooms]), _fuLook = Combo([.. PhotonCanvas.Addon.Furniture.FurnitureCatalog.Themes]);
+    readonly NumericUpDown _fuTurn = Number(0, 359, 15, "0");
+    readonly WrapPanel _fuPieces = new();
+    readonly List<(PhotonCanvas.Addon.Furniture.CatalogEntry Entry, ToggleButton Button)> _fuButtons = [];
+    string? _fuLookFor;
+    int _fuVersion;
+    /// <summary>The furniture palette's pictures being drawn (for the help's pictures to wait for).</summary>
+    Task _fuPictures = Task.CompletedTask;
 
     // A road or a wall picked
     readonly TextBox _rName = new();
@@ -175,7 +194,7 @@ public sealed partial class CityWindow : Window
         _plan.PickChanged += () =>
         {
             // Something picked on the plan shows on the Picked tab (unless one of the toolbar's pages is open, which may want the box just dragged).
-            if (!_plan.Pick.IsEmpty && !_fromList && _plan.Tool is CityTool.Select or CityTool.Label && (_side.SelectedItem == _townTab || _side.SelectedItem == _mapTab)) _side.SelectedItem = _pickedTab;
+            if (!_plan.Pick.IsEmpty && !_fromList && _plan.Tool is CityTool.Select or CityTool.Label or CityTool.Furnish && (_side.SelectedItem == _townTab || _side.SelectedItem == _mapTab)) _side.SelectedItem = _pickedTab;
             ShowPicked();
             RefreshPictureInfo();
             if (OnPage(_cutPage)) RefreshCut();
@@ -190,6 +209,7 @@ public sealed partial class CityWindow : Window
         KeyDown += OnKey;
         _tAcross.Value = _map.Across;
         _tDown.Value = _map.Down;
+        FillFurniture();
         SyncPalettes();
         ShowView(false);
         Opened += async (_, _) => await LoadPictures();
@@ -239,6 +259,7 @@ public sealed partial class CityWindow : Window
         _cScenery.Click += async (_, _) => await CutScenery();
         _cWalls.Click += async (_, _) => await CutFurniture(_cWalls, TownPieces.WallSet, "City walls", "the town walls");
         _cTrees.Click += async (_, _) => await CutFurniture(_cTrees, TownPieces.TreeSet, "City trees", "the trees");
+        _cFurniture.Click += async (_, _) => await CutFurniture(_cFurniture, CityItems.Set, "City furniture", "the furniture");
 
         _tMake.Click += async (_, _) => await MakeTown();
         _fill.Click += async (_, _) => await FillWithBuildings();
@@ -275,6 +296,14 @@ public sealed partial class CityWindow : Window
         _labelTurn.Value = 0;
         _fenceRuined.IsCheckedChanged += (_, _) => _plan.FenceRuined = _fenceRuined.IsChecked == true;
         _plan.LabelTurnChanged += t => { _loading = true; _labelTurn.Value = (decimal)Math.Round(t); _loading = false; };
+        _fuRoom.SelectionChanged += (_, _) => FillFurniture();
+        _fuLook.SelectionChanged += (_, _) => FillFurniture();
+        _fuTurn.ValueChanged += (_, _) => { if (_fuSyncing) return; _plan.FurnishTurn = (double)(_fuTurn.Value ?? 0); _plan.InvalidateVisual(); };
+        _plan.FurnishTurnChanged += _ => SyncFurniture();
+        _iName.LostFocus += (_, _) => ChangeItem(i => i with { Name = string.IsNullOrWhiteSpace(_iName.Text) ? i.Name : _iName.Text.Trim() }, "Rename furniture");
+        _iTurn.ValueChanged += (_, _) => ChangeItem(i => i with { TurnDeg = (double)(_iTurn.Value ?? 0) % 360 }, "Turn furniture");
+        _iCopy.Click += (_, _) => _plan.DuplicatePicked();
+        _iDelete.Click += (_, _) => _plan.DeletePicked();
 
         _find.TextChanged += (_, _) => FillTownList();
         _findType.SelectionChanged += (_, _) => FillTownList();
@@ -367,6 +396,7 @@ public sealed partial class CityWindow : Window
         foreach (var (k, b) in _tools) b.IsChecked = k == t;
         if (_paletteItems.TryGetValue(t, out var item) && _palette.SelectedItem != item) _palette.SelectedItem = item;
         if (t == CityTool.Place && _plan.ToPlace is null) _status.Text = "Pick a saved building beside the tools first.";
+        if (t == CityTool.Furnish && _plan.ToFurnish is null) FillFurniture();
         _plan.InvalidateVisual();
     }
 
@@ -423,6 +453,12 @@ public sealed partial class CityWindow : Window
         _down.Value = _map.Down;
         _square.Value = (decimal)_map.SquareMm;
         _loading = false;
+        // The furniture's look follows the map's when that changes.
+        if (_fuLookFor != _map.Theme)
+        {
+            _fuLookFor = _map.Theme;
+            _fuLook.SelectedItem = PhotonCanvas.Addon.Furniture.FurnitureCatalog.Themes.Contains(_map.Theme) ? _map.Theme : "Medieval";
+        }
         _undoButton.IsEnabled = _undo.Count > 0;
         _redoButton.IsEnabled = _redo.Count > 0;
         var overlaps = CityFootprint.Overlaps(_map);
@@ -431,8 +467,8 @@ public sealed partial class CityWindow : Window
         int onRoads = _map.Roads.Count(r => CityEdit.Hits(_map, r, cells));
         string warnings = (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "")
             + (onRoads > 0 ? $" {onRoads} road{(onRoads == 1 ? " runs" : "s run")} through a building." : "");
-        _mapInfo.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things." + warnings;
-        _summary.Text = $"{_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m) · {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")} · {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")} · {_map.Props.Count} trees and things" + warnings;
+        _mapInfo.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $", {_map.Items.Count} piece{(_map.Items.Count == 1 ? "" : "s")} of furniture." : ".") + warnings;
+        _summary.Text = $"{_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m) · {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")} · {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")} · {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $" · {_map.Items.Count} furniture" : "") + warnings;
         _makeAll.IsEnabled = _map.Buildings.Count > 0;
         RefreshTown();
         ShowPicked();
@@ -445,7 +481,7 @@ public sealed partial class CityWindow : Window
     void Show3D()
     {
         _viewStale = false;
-        _view.Show(_map, new CityShow { Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true, Picked = [.. _plan.Pick.Buildings] });
+        _view.Show(_map, new CityShow { Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true, Picked = [.. _plan.Pick.Buildings, .. _plan.Pick.Items] });
     }
 
     // ---- the building picked ----
@@ -459,24 +495,37 @@ public sealed partial class CityWindow : Window
         var label = pick.Labels.Count == 1 && pick.Count == 1 ? _map.Labels.FirstOrDefault(l => l.Id == pick.Labels.First()) : null;
         var road = pick.Roads.Count == 1 && pick.Count == 1 ? _map.Road(pick.Roads.First()) : null;
         var fence = pick.Fences.Count == 1 && pick.Count == 1 ? _map.FenceById(pick.Fences.First()) : null;
+        var item = pick.Items.Count == 1 && pick.Count == 1 ? _map.ItemById(pick.Items.First()) : null;
         _noBuilding.IsVisible = pick.IsEmpty;
+        _itemPanel.IsVisible = item is not null;
         _buildingPanel.IsVisible = b is not null;
         _labelPanel.IsVisible = label is not null;
         _roadPanel.IsVisible = road is not null;
         _fencePanel.IsVisible = fence is not null;
-        _groupPanel.IsVisible = !pick.IsEmpty && b is null && label is null && road is null && fence is null;
+        _groupPanel.IsVisible = !pick.IsEmpty && b is null && label is null && road is null && fence is null && item is null;
         int many = pick.Buildings.Count;
         _makeOne.IsEnabled = !_making && many > 0;
         _gMake.IsEnabled = !_making && many > 0;
         _gMake.IsVisible = many > 0;
         _gMake.Content = many == 1 ? "Put the picked building in the design" : $"Put the {many} picked buildings in the design";
-        if (_threeD && !_view.Shown.Picked.SetEquals(pick.Buildings)) Show3D();
+        if (_threeD && !_view.Shown.Picked.SetEquals(pick.Buildings.Concat(pick.Items))) Show3D();
         _loadingBuilding = true;
         if (label is not null)
         {
             _lText.Text = label.Text;
             _lSize.Value = (decimal)label.Size;
             _lTurn.Value = (decimal)Math.Round(label.TurnDeg);
+        }
+        if (item is not null)
+        {
+            double sq = _map.SquareMm;
+            var (iw, id) = item.Size(sq);
+            double ih = CityItems.Height(item, sq) / sq;
+            _iName.Text = item.Name;
+            _iTurn.Value = (decimal)Math.Round(item.TurnDeg) % 360;
+            var from = PhotonCanvas.Addon.Furniture.FurnitureCatalog.Find(item.CatalogId);
+            _iInfo.Text = $"{iw * 5:0.#} × {id * 5:0.#} feet and {ih * 5:0.#} feet tall ({iw:0.##} × {id:0.##} squares, {item.WidthMm:0} × {item.DepthMm:0} mm)."
+                + (from is not null ? $" From the {from.Theme.ToLowerInvariant()} {(from.Room == PhotonCanvas.Addon.Furniture.FurnitureCatalog.Town ? "town" : from.Room.ToLowerInvariant())} pieces." : "");
         }
         if (road is not null)
         {
@@ -505,6 +554,7 @@ public sealed partial class CityWindow : Window
             var parts = new List<string>();
             if (bs.Count > 0) parts.Add($"{bs.Count} building{(bs.Count == 1 ? "" : "s")}");
             if (ps.Count > 0) parts.Add($"{ps.Count} tree{(ps.Count == 1 ? "" : "s")} and thing{(ps.Count == 1 ? "" : "s")}");
+            if (pick.Items.Count > 0) parts.Add($"{pick.Items.Count} piece{(pick.Items.Count == 1 ? "" : "s")} of furniture");
             if (pick.Labels.Count > 0) parts.Add($"{pick.Labels.Count} label{(pick.Labels.Count == 1 ? "" : "s")}");
             if (pick.Fences.Count > 0) parts.Add($"{pick.Fences.Count} wall{(pick.Fences.Count == 1 ? "" : "s")} and fence{(pick.Fences.Count == 1 ? "" : "s")}");
             if (pick.Roads.Count > 0) parts.Add($"{pick.Roads.Count} road{(pick.Roads.Count == 1 ? "" : "s")}");
@@ -561,6 +611,15 @@ public sealed partial class CityWindow : Window
         if (ids.Count == 0) return;
         var m = _map with { Props = [.. _map.Props.Select(p => ids.Contains(p.Id) ? change(p) : p)] };
         if (m.Props.SequenceEqual(_map.Props)) return;
+        Commit(m, label);
+    }
+
+    void ChangeItem(Func<CityItem, CityItem> change, string label)
+    {
+        if (_loadingBuilding || _loading || _plan.Pick.Items.Count != 1) return;
+        var id = _plan.Pick.Items.First();
+        var m = _map with { Items = [.. _map.Items.Select(i => i.Id == id ? change(i) : i)] };
+        if (m.Items.SequenceEqual(_map.Items)) return;
         Commit(m, label);
     }
 
@@ -926,7 +985,77 @@ public sealed partial class CityWindow : Window
             : $"{treeCount} {Plural("tree", treeCount)}: " + string.Join(", ", trees.Items.Select(i => $"{i.Count} × {(i.Name ?? "").ToLowerInvariant()}")) + "."
               + (treeCount > MaxTrees ? $" That's a lot to cut at once (at most {MaxTrees}): drag a box round a part with Select and tick the box above." : "");
         _cTrees.IsEnabled = treeCount is > 0 and <= MaxTrees;
+        var furniture = CityItems.Set(_map, box);
+        int pieces = furniture?.Items.Sum(i => i.Count) ?? 0;
+        _cFurnitureInfo.Text = furniture is null ? "No furniture" + (box is null ? "." : " in the box.")
+            : $"{pieces} {Plural("piece", pieces)} of furniture: " + string.Join(", ", furniture.Items.Select(i => $"{i.Count} × {(i.Name ?? "").ToLowerInvariant()}")) + ".";
+        _cFurniture.IsEnabled = pieces > 0;
     }
+
+    // ---- the Furniture tool's pieces ----
+
+    /// <summary>The catalog's pieces for the room and look picked, as picture buttons; the one the plan puts down lit.</summary>
+    void FillFurniture()
+    {
+        var room = _fuRoom.SelectedItem as string ?? PhotonCanvas.Addon.Furniture.FurnitureCatalog.Town;
+        var look = _fuLook.SelectedItem as string ?? _map.Theme;
+        var entries = CityItems.Catalog(look, room);
+        _fuPieces.Children.Clear();
+        _fuButtons.Clear();
+        var jobs = new List<(Avalonia.Controls.Image Image, PhotonCanvas.Addon.Furniture.CatalogEntry Entry)>();
+        foreach (var e in entries)
+        {
+            var img = new Avalonia.Controls.Image { Stretch = Stretch.Uniform };
+            var face = new Border { Width = 52, Height = 52, CornerRadius = new(5), ClipToBounds = true, Background = new SolidColorBrush(CityScene.GroundColour(Ground.Paving)), Child = img, HorizontalAlignment = HorizontalAlignment.Center };
+            var b = new ToggleButton
+            {
+                Classes = { "tool" }, Width = 72, Padding = new(3, 4), Margin = new(0, 0, 2, 2),
+                HorizontalContentAlignment = HorizontalAlignment.Center, VerticalContentAlignment = VerticalAlignment.Top,
+                Content = new StackPanel
+                {
+                    Spacing = 3,
+                    Children = { face, new TextBlock { Text = e.Name, FontSize = 11, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center } },
+                },
+            };
+            ToolTip.SetTip(b, e.About.Length > 0 ? $"{e.Name}: {e.About}" : e.Name);
+            var entry = e;
+            b.Click += (_, _) => { _plan.ToFurnish = entry; PickTool(CityTool.Furnish); SyncPalettes(); };
+            _fuButtons.Add((e, b));
+            jobs.Add((img, e));
+            _fuPieces.Children.Add(b);
+        }
+        if (_plan.ToFurnish is null && entries.Count > 0) _plan.ToFurnish = entries[0];
+        SyncPalettes();
+        int version = ++_fuVersion;
+        _fuPictures = DrawFurniture(jobs, version);
+    }
+
+    async Task DrawFurniture(List<(Avalonia.Controls.Image Image, PhotonCanvas.Addon.Furniture.CatalogEntry Entry)> jobs, int version)
+    {
+        foreach (var (img, e) in jobs)
+        {
+            byte[]? png;
+            try { png = await Task.Run(() => PalettePictures.Furniture(e)); }
+            catch (Exception x) when (x is ArgumentException or InvalidOperationException or IndexOutOfRangeException or ArithmeticException)
+            {
+                AppLog.Error("citybuilder palette", x);
+                continue;
+            }
+            if (version != _fuVersion) return;
+            using var stream = new MemoryStream(png);
+            img.Source = new Avalonia.Media.Imaging.Bitmap(stream);
+        }
+    }
+
+    void SyncFurniture()
+    {
+        foreach (var (e, b) in _fuButtons) b.IsChecked = _plan.ToFurnish?.Id == e.Id;
+        _fuSyncing = true;
+        _fuTurn.Value = (decimal)Math.Round(_plan.FurnishTurn) % 360;
+        _fuSyncing = false;
+    }
+
+    bool _fuSyncing;
 
     async Task CutGround()
     {

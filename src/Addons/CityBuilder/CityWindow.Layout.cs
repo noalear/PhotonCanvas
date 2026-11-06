@@ -30,12 +30,13 @@ public sealed partial class CityWindow
     const string WallIcon = "M2 4h4v3h3V4h6v3h3V4h4v17H2zM9.5 21v-4.5a2.5 2.5 0 0 1 5 0V21z";
     const string TreeIcon = "M12 2a6 6 0 0 0-5.8 7.6A5 5 0 0 0 8 19h3v3h2v-3h3a5 5 0 0 0 1.8-9.4A6 6 0 0 0 12 2z";
     const string EraserIcon = "M14.6 3.4a2 2 0 0 1 2.8 0l4.2 4.2a2 2 0 0 1 0 2.8L11.5 20.5H20V22H8.6l-5.2-5.2a2 2 0 0 1 0-2.8zM8.8 9.2l-4 4 4.4 4.4h2.2l3.8-3.8z";
+    const string ChairIcon = "M6 2h2v9H6zM16 2h2v9h-2zM8 4h8v2H8zM4 11h16v3H4zM5 14h2v8H5zM17 14h2v8h-2z";
     const string CloseIcon = "M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z";
 
-    /// <summary>The tools down the left, in order (a gap before each group), with the number key that picks each.</summary>
+    /// <summary>The tools down the left, in order (a gap before each group), with the key that picks each (the numbers, then E for Erase).</summary>
     static readonly (CityTool Tool, string Name, string Icon, bool Gap, string Tip)[] RailTools =
     [
-        (CityTool.Select, "Select", "IcCursor", false, "Click a building, road, wall, tree or label to pick it (Ctrl and click to pick more), or drag a box round things. Drag to move what's picked, or a road's or wall's handles to stretch and bend it; R turns it, Delete takes it away. Double-click a building to open it in the building editor."),
+        (CityTool.Select, "Select", "IcCursor", false, "Click a building, road, wall, tree, piece of furniture or label to pick it (Ctrl and click to pick more), or drag a box round things. Drag to move what's picked (as far at a time as Snap says), or a road's or wall's handles to stretch and bend it; R turns it a quarter turn, Ctrl+R 15°, Delete takes it away. Double-click a building to open it in the building editor."),
         (CityTool.Building, "Building", HouseIcon, true, "Drag out a building's footprint: walls go round it, with a door towards the road, windows and a roof. The right button takes a building away."),
         (CityTool.Place, "Place", StampIcon, false, "Put down one of your saved buildings: pick it beside the tools, then click the map. R, the right button or Ctrl + the wheel turns it first."),
         (CityTool.Ground, "Paint", BrushIcon, true, "Paint the ground: pick what beside the tools, and the brush's size. The right button paints grass."),
@@ -43,6 +44,7 @@ public sealed partial class CityWindow
         (CityTool.Road, "Road", RoadIcon, true, "Drag from one point to another to lay a road (round one corner; hold Ctrl for a straight one). A street is two squares wide, a high road four. Roads stop at buildings and cross water on bridges. The right button takes a road away."),
         (CityTool.Fence, "Wall", WallIcon, false, "Drag a fence, hedge, wall or town wall, as a line or a rectangle; it bends in eighths of a turn unless you hold Ctrl. Its ends are capped and a road through it is a gate. The right button cuts a gap in one."),
         (CityTool.Prop, "Things", TreeIcon, true, "Click to put down a tree or a thing: rocks, wells, carts, lamps, market stalls, a stage, a fountain, a guard tower… The right button takes them away."),
+        (CityTool.Furnish, "Furniture", ChairIcon, false, "Put down the furniture maker's pieces, true to size, on a fine grid (tenths of a square): tables and benches outside the inn, the stocks, chests, barrels, a weapon rack… Click one that's down to drag it; R turns the next one 45°. The right button takes one away."),
         (CityTool.Label, "Label", "IcText", false, "Click to write a label on the map: a district's name, a number for your key. R turns it. The right button takes one away."),
         (CityTool.Erase, "Erase", EraserIcon, true, "Drag over trees, roads, walls, labels and buildings to take them away."),
     ];
@@ -101,7 +103,8 @@ public sealed partial class CityWindow
         {
             (CitySnap.Squares, "Whole", "Snap to whole squares"),
             (CitySnap.HalfSquares, "Half", "Snap to half squares"),
-            (CitySnap.Free, "Free", "Put things anywhere (trees and small things still go to quarter squares)"),
+            (CitySnap.Fine, "Fine", "Snap to tenths of a square (six inches), the furniture's grid"),
+            (CitySnap.Free, "Free", "Put things anywhere"),
         };
         var snapButtons = new List<(CitySnap, ToggleButton)>();
         for (int i = 0; i < snaps.Length; i++)
@@ -186,7 +189,8 @@ public sealed partial class CityWindow
                     },
                 },
             };
-            ToolTip.SetTip(b, $"{name} (key {(i + 1) % 10}): {tip}");
+            string key = i < 10 ? $"{(i + 1) % 10}" : t == CityTool.Erase ? "E" : "";
+            ToolTip.SetTip(b, key.Length > 0 ? $"{name} (key {key}): {tip}" : $"{name}: {tip}");
             var tool = t;
             b.Click += (_, _) => PickTool(tool);
             _tools[t] = b;
@@ -206,6 +210,7 @@ public sealed partial class CityWindow
         Key.D0 when RailTools.Length >= 10 => RailTools[9].Tool,
         >= Key.NumPad1 and <= Key.NumPad9 when k - Key.NumPad1 < RailTools.Length => RailTools[k - Key.NumPad1].Tool,
         Key.NumPad0 when RailTools.Length >= 10 => RailTools[9].Tool,
+        Key.E => CityTool.Erase,
         _ => null,
     };
 
@@ -228,7 +233,8 @@ public sealed partial class CityWindow
             Tips(
                 "Click a thing to pick it; Ctrl and click picks more.",
                 "Drag from an empty spot to pick all in a box.",
-                "Drag what's picked to move it; R turns it, Delete takes it away, Ctrl+D copies it beside itself.",
+                "Drag what's picked to move it, as far at a time as Snap says (arrow keys too; Ctrl and an arrow a tenth of a square).",
+                "R turns it a quarter turn; Ctrl+R turns each thing 15° on its own spot (a building tilts). Delete takes it away, Ctrl+D copies it beside itself.",
                 "Pick a road or wall and drag its handles to stretch and bend it.",
                 "Double-click a building to open it in the building editor."),
             Explained("Fill with buildings", "Buildings along the roads on the free grass, of the kinds the district has: in the last box you dragged, or all over the map.",
@@ -292,10 +298,17 @@ public sealed partial class CityWindow
             Things("On the square", PropKind.Stall, PropKind.Bar, PropKind.Stage, PropKind.Gallows),
             Things("Defences", PropKind.GuardTower));
 
+        _fuPieces.Margin = new(0, 2, 0, 0);
+        Add(CityTool.Furnish, "Furniture", "The furniture maker's pieces, true to size for the map's squares. Pick one, then click the map to put it down on the fine grid (a tenth of a square, six inches) and drag it into place before you let go. Drag one that's down to move it; the right button takes one away.",
+            Labelled("Where it goes", _fuRoom), Labelled("Look", _fuLook), _fuPieces,
+            Labelled("Turn (degrees: R turns it 45°, Ctrl + the wheel 15°)", _fuTurn),
+            Hint("Wells, market stalls, troughs, a stage and the town's other big pieces are under Things: set Snap to Fine to put those on the fine grid too. The furniture is cut on the Cut page."));
+        _paletteSync.Add(SyncFurniture);
+
         Add(CityTool.Label, "Label", "Click to write it on the map: a street's name, a district's, a number for your key. Labels always read the right way up.",
             Labelled("Text", _labelText), Labelled("Size (squares)", _labelSize), Labelled("Turn (degrees: R turns it 15° more, Shift+R back)", _labelTurn));
 
-        Add(CityTool.Erase, "Erase", "Drag over the plan to take away the trees, things, labels, roads, walls and buildings under the brush.");
+        Add(CityTool.Erase, "Erase", "Drag over the plan to take away the trees, things, furniture, labels, roads, walls and buildings under the brush.");
 
         _palette.SelectionChanged += (_, e) =>
         {
@@ -647,6 +660,8 @@ public sealed partial class CityWindow
                 _cWallsInfo, _cWalls),
             Explained("Trees", "The furniture maker's trees in the map's look (oaks and pines, dead trees, palms or giant mushrooms), each as big as on the map. Bushes aren't cut.",
                 _cTreesInfo, _cTrees),
+            Explained("Furniture", "The furniture maker's pieces put down with the Furniture tool, in the map's look, the same pieces counted together and nested onto the bed.",
+                _cFurnitureInfo, _cFurniture),
             Explained("Scenery", "The scenery maker's wells, carts, crates (as barrels), boulders and fences, and the furniture maker's horse troughs, stages, market stalls, outdoor bars, notice boards, fountains, gallows, street lamps and statues.",
                 _cSceneryInfo, _cScenery));
     }
@@ -662,7 +677,7 @@ public sealed partial class CityWindow
 
     Control PickedTab()
     {
-        var none = Hint("Click a building, road, wall, tree or label on the plan with Select, or drag a box round several, to change them here.");
+        var none = Hint("Click a building, road, wall, tree, piece of furniture or label on the plan with Select, or drag a box round several, to change them here.");
         var building = BuildingTab();
         _groupBuildings = Stack(Field("Type", _gType, tip: "Typed here, every building picked gets it."), Field("District", _gDistrict, tip: "Typed here, every building picked gets it."));
         _groupProps = Stack(Field("Tree or thing", _gProp), Field("Size", _gPropSize, tip: "1 is about a square across."));
@@ -679,8 +694,12 @@ public sealed partial class CityWindow
         _fencePanel = Stack(
             Explained("The wall", "Drag it to move it; drag a round handle to move a corner or an end, a diamond to move a whole side. Double-click it to add a corner, right-click a corner to take it out. Where a road goes through it there's a gate.",
                 Field("Kind", _wKind), _wRuined, _wInfo, _wDelete));
+        _itemPanel = Stack(
+            Explained("The furniture", "Drag it on the plan to move it on the fine grid; the arrow keys move it a tenth of a square. R turns it a quarter turn, Ctrl+R 15°. It's cut with the rest of the furniture on the Cut page.",
+                Field("Name", _iName), Field("Turn (degrees)", _iTurn), _iInfo,
+                new WrapPanel { Children = { _iCopy.With(b => b.Margin = new(0, 0, 4, 4)), _iDelete.With(b => b.Margin = new(0, 0, 4, 4)) } }));
         _noBuilding = none;
-        return new StackPanel { Children = { none, building, _groupPanel, _labelPanel, _roadPanel, _fencePanel } };
+        return new StackPanel { Children = { none, building, _groupPanel, _itemPanel, _labelPanel, _roadPanel, _fencePanel } };
     }
 
     Control BuildingTab()

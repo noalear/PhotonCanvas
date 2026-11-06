@@ -1,9 +1,9 @@
 namespace PhotonCanvas.Addon.CityBuilder;
 
-/// <summary>How points put down or dragged on the map snap: to whole squares (grid points), half squares, or not at all.</summary>
-public enum CitySnap { Squares, HalfSquares, Free }
+/// <summary>How points put down or dragged on the map snap: to whole squares (grid points), half squares, tenths of a square (the fine grid, six inches on a five-foot square), or not at all.</summary>
+public enum CitySnap { Squares, HalfSquares, Free, Fine }
 
-/// <summary>What's picked on the map: buildings, roads, fences, trees and things and labels, by their ids.</summary>
+/// <summary>What's picked on the map: buildings, roads, fences, trees and things, furniture and labels, by their ids.</summary>
 public sealed record CityPick
 {
     public HashSet<Guid> Buildings { get; init; } = [];
@@ -11,35 +11,37 @@ public sealed record CityPick
     public HashSet<Guid> Labels { get; init; } = [];
     public HashSet<Guid> Fences { get; init; } = [];
     public HashSet<Guid> Roads { get; init; } = [];
+    public HashSet<Guid> Items { get; init; } = [];
 
     public static CityPick None => new();
 
-    public bool IsEmpty => Buildings.Count == 0 && Props.Count == 0 && Labels.Count == 0 && Fences.Count == 0 && Roads.Count == 0;
+    public bool IsEmpty => Buildings.Count == 0 && Props.Count == 0 && Labels.Count == 0 && Fences.Count == 0 && Roads.Count == 0 && Items.Count == 0;
 
     /// <summary>How many things are picked.</summary>
-    public int Count => Buildings.Count + Props.Count + Labels.Count + Fences.Count + Roads.Count;
+    public int Count => Buildings.Count + Props.Count + Labels.Count + Fences.Count + Roads.Count + Items.Count;
 
     public static CityPick Of(CityBuilding b) => new() { Buildings = [b.Id] };
     public static CityPick Of(Prop p) => new() { Props = [p.Id] };
     public static CityPick Of(CityLabel l) => new() { Labels = [l.Id] };
     public static CityPick Of(Fence f) => new() { Fences = [f.Id] };
     public static CityPick Of(CityRoad r) => new() { Roads = [r.Id] };
+    public static CityPick Of(CityItem i) => new() { Items = [i.Id] };
 
     /// <summary>Everything in this or the other.</summary>
     public CityPick With(CityPick o) => new()
     {
-        Buildings = [.. Buildings, .. o.Buildings], Props = [.. Props, .. o.Props], Labels = [.. Labels, .. o.Labels], Fences = [.. Fences, .. o.Fences], Roads = [.. Roads, .. o.Roads],
+        Buildings = [.. Buildings, .. o.Buildings], Props = [.. Props, .. o.Props], Labels = [.. Labels, .. o.Labels], Fences = [.. Fences, .. o.Fences], Roads = [.. Roads, .. o.Roads], Items = [.. Items, .. o.Items],
     };
 
     /// <summary>The other's things added, or taken out where they're picked already (Ctrl and click).</summary>
     public CityPick Toggle(CityPick o)
     {
         static HashSet<T> Flip<T>(HashSet<T> a, HashSet<T> b) { var r = new HashSet<T>(a); r.SymmetricExceptWith(b); return r; }
-        return new() { Buildings = Flip(Buildings, o.Buildings), Props = Flip(Props, o.Props), Labels = Flip(Labels, o.Labels), Fences = Flip(Fences, o.Fences), Roads = Flip(Roads, o.Roads) };
+        return new() { Buildings = Flip(Buildings, o.Buildings), Props = Flip(Props, o.Props), Labels = Flip(Labels, o.Labels), Fences = Flip(Fences, o.Fences), Roads = Flip(Roads, o.Roads), Items = Flip(Items, o.Items) };
     }
 
     /// <summary>Whether all of the other's things are picked here.</summary>
-    public bool Holds(CityPick o) => o.Buildings.IsSubsetOf(Buildings) && o.Props.IsSubsetOf(Props) && o.Labels.IsSubsetOf(Labels) && o.Fences.IsSubsetOf(Fences) && o.Roads.IsSubsetOf(Roads);
+    public bool Holds(CityPick o) => o.Buildings.IsSubsetOf(Buildings) && o.Props.IsSubsetOf(Props) && o.Labels.IsSubsetOf(Labels) && o.Fences.IsSubsetOf(Fences) && o.Roads.IsSubsetOf(Roads) && o.Items.IsSubsetOf(Items);
 
     /// <summary>Just the things still on the map.</summary>
     public CityPick On(CityMap m) => new()
@@ -49,6 +51,7 @@ public sealed record CityPick
         Labels = [.. Labels.Where(id => m.Labels.Any(l => l.Id == id))],
         Fences = [.. Fences.Where(id => m.Fences.Any(f => f.Id == id))],
         Roads = [.. Roads.Where(id => m.Roads.Any(r => r.Id == id))],
+        Items = [.. Items.Where(id => m.Items.Any(i => i.Id == id))],
     };
 }
 
@@ -60,11 +63,12 @@ public sealed record CityClip
     public List<CityLabel> Labels { get; init; } = [];
     public List<Fence> Fences { get; init; } = [];
     public List<CityRoad> Roads { get; init; } = [];
+    public List<CityItem> Items { get; init; } = [];
     /// <summary>Its size (squares), to keep it on the map.</summary>
     public int Width { get; init; }
     public int Depth { get; init; }
 
-    public bool IsEmpty => Buildings.Count == 0 && Props.Count == 0 && Labels.Count == 0 && Fences.Count == 0 && Roads.Count == 0;
+    public bool IsEmpty => Buildings.Count == 0 && Props.Count == 0 && Labels.Count == 0 && Fences.Count == 0 && Roads.Count == 0 && Items.Count == 0;
 }
 
 /// <summary>
@@ -88,6 +92,7 @@ public static class CityEdit
             Labels = [.. m.Labels.Where(l => In(l.X, l.Y)).Select(l => l.Id)],
             Fences = [.. m.Fences.Where(f => f.Points.Count > 0 && f.Points.All(p => In(p.X, p.Y))).Select(f => f.Id)],
             Roads = [.. m.Roads.Where(r => r.Points.Count > 0 && r.Points.All(p => In(p.X, p.Y))).Select(r => r.Id)],
+            Items = [.. m.Items.Where(i => In(i.X, i.Y)).Select(i => i.Id)],
         };
     }
 
@@ -101,6 +106,7 @@ public static class CityEdit
         foreach (var l in m.Labels.Where(l => pick.Labels.Contains(l.Id))) Add(l.X, l.Y);
         foreach (var f in m.Fences.Where(f => pick.Fences.Contains(f.Id))) foreach (var p in f.Points) Add(p.X, p.Y);
         foreach (var r in m.Roads.Where(r => pick.Roads.Contains(r.Id))) foreach (var p in r.Points) Add(p.X, p.Y);
+        foreach (var i in m.Items.Where(i => pick.Items.Contains(i.Id))) Add(i.X, i.Y);
         return x0 > x1 ? null : (x0, y0, x1, y1);
     }
 
@@ -121,6 +127,63 @@ public static class CityEdit
         (dx, dy) = Clamp(m, pick, dx, dy);
         if (dx == 0 && dy == 0) return (m, pick);
         return Map(m, pick, (x, y) => (x + dx, y + dy), 0, b => b with { X = b.X + dx, Y = b.Y + dy });
+    }
+
+    /// <summary>
+    /// The picked things moved part of a square (half a square, a tenth, or anything), kept on the map: a building
+    /// moved off the grid keeps its whole squares in X and Y and the rest in its shift.
+    /// </summary>
+    public static (CityMap Map, CityPick Pick) Move(CityMap m, CityPick pick, double dx, double dy)
+    {
+        if (Math.Abs(dx - Math.Round(dx)) < 1e-9 && Math.Abs(dy - Math.Round(dy)) < 1e-9) return Move(m, pick, (int)Math.Round(dx), (int)Math.Round(dy));
+        m = m.Tidied();
+        if (Bounds(m, pick) is not { } bb) return (m, pick);
+        double lo = -bb.X0, hi = m.Across - bb.X1, top = -bb.Y0, bottom = m.Down - bb.Y1;
+        dx = lo > hi ? 0 : Math.Clamp(dx, lo, hi);
+        dy = top > bottom ? 0 : Math.Clamp(dy, top, bottom);
+        if (Math.Abs(dx) < 1e-9 && Math.Abs(dy) < 1e-9) return (m, pick);
+        return Map(m, pick, (x, y) => (x + dx, y + dy), 0, b => Shifted(b, dx, dy));
+    }
+
+    /// <summary>A building moved part of a square: whole squares in X and Y, the rest in its shift.</summary>
+    public static CityBuilding Shifted(CityBuilding b, double dx, double dy)
+    {
+        double nx = Math.Round(b.X + b.ShiftX + dx, 6), ny = Math.Round(b.Y + b.ShiftY + dy, 6);
+        int x = (int)Math.Floor(nx + 1e-9), y = (int)Math.Floor(ny + 1e-9);
+        double sx = Math.Round(nx - x, 6), sy = Math.Round(ny - y, 6);
+        return b with { X = x, Y = y, ShiftX = Math.Abs(sx) < 1e-6 ? 0 : sx, ShiftY = Math.Abs(sy) < 1e-6 ? 0 : sy };
+    }
+
+    /// <summary>
+    /// Each picked thing turned <paramref name="deg"/> degrees (clockwise seen from above) about its own middle:
+    /// a building tilts (going round a quarter turn when it passes 45°), trees, things and furniture turn, labels
+    /// turn and stay the right way up. Roads and walls stay as they are (drag their handles).
+    /// </summary>
+    public static CityMap TurnEach(CityMap m, CityPick pick, double deg)
+    {
+        m = m.Tidied();
+        static double Round(double v) => Math.Abs(v - Math.Round(v)) < 1e-6 ? Math.Round(v) : Math.Round(v, 4);
+        CityBuilding Tilt(CityBuilding b)
+        {
+            var (cx, cy) = CityFootprint.Centre(b);
+            double tilt = b.TiltDeg + deg;
+            int turn = b.Turn;
+            while (tilt > 45 + 1e-9) { tilt -= 90; turn++; }
+            while (tilt <= -45 - 1e-9) { tilt += 90; turn--; }
+            var t = b with { Turn = ((turn % 4) + 4) % 4, TiltDeg = Round(tilt) };
+            // Its middle stays where it was.
+            var (nx, ny) = CityFootprint.Centre(t);
+            var moved = Shifted(t, cx - nx, cy - ny);
+            return Math.Abs(moved.TiltDeg) < 1e-9 && Math.Abs(moved.ShiftX) < 1e-6 && Math.Abs(moved.ShiftY) < 1e-6 ? moved with { TiltDeg = 0, ShiftX = 0, ShiftY = 0 } : moved;
+        }
+        static double Deg(double d) => Round((((d % 360) + 360) % 360));
+        return m with
+        {
+            Buildings = [.. m.Buildings.Select(b => pick.Buildings.Contains(b.Id) ? Tilt(b) : b)],
+            Props = [.. m.Props.Select(p => pick.Props.Contains(p.Id) ? p with { TurnDeg = Deg(p.TurnDeg + deg) } : p)],
+            Items = [.. m.Items.Select(i => pick.Items.Contains(i.Id) ? i with { TurnDeg = Deg(i.TurnDeg + deg) } : i)],
+            Labels = [.. m.Labels.Select(l => pick.Labels.Contains(l.Id) ? l with { TurnDeg = CityLabel.Upright(l.TurnDeg + deg) } : l)],
+        };
     }
 
     /// <summary>
@@ -189,6 +252,7 @@ public static class CityEdit
             Labels = [.. m.Labels.Select(l => { if (!pick.Labels.Contains(l.Id)) return l; var (x, y) = at(l.X, l.Y); return l with { X = x, Y = y, TurnDeg = CityLabel.Upright(l.TurnDeg + turnDeg) }; })],
             Fences = [.. m.Fences.Select(f => pick.Fences.Contains(f.Id) ? f with { Points = [.. f.Points.Select(P)] } : f)],
             Roads = [.. m.Roads.Select(r => pick.Roads.Contains(r.Id) ? r with { Points = [.. r.Points.Select(P)] } : r)],
+            Items = [.. m.Items.Select(i => { if (!pick.Items.Contains(i.Id)) return i; var (x, y) = at(i.X, i.Y); return i with { X = Math.Round(x, 6), Y = Math.Round(y, 6), TurnDeg = (i.TurnDeg + turnDeg) % 360 }; })],
         };
         return (map, pick);
     }
@@ -204,6 +268,7 @@ public static class CityEdit
             Labels = [.. m.Labels.Where(l => !pick.Labels.Contains(l.Id))],
             Fences = [.. m.Fences.Where(f => !pick.Fences.Contains(f.Id))],
             Roads = [.. m.Roads.Where(r => !pick.Roads.Contains(r.Id))],
+            Items = [.. m.Items.Where(i => !pick.Items.Contains(i.Id))],
         };
     }
 
@@ -221,6 +286,7 @@ public static class CityEdit
             Labels = [.. m.Labels.Where(l => pick.Labels.Contains(l.Id)).Select(l => l with { X = l.X - ox, Y = l.Y - oy })],
             Fences = [.. m.Fences.Where(f => pick.Fences.Contains(f.Id)).Select(f => f with { Points = [.. f.Points.Select(O)] })],
             Roads = [.. m.Roads.Where(r => pick.Roads.Contains(r.Id)).Select(r => r with { Points = [.. r.Points.Select(O)] })],
+            Items = [.. m.Items.Where(i => pick.Items.Contains(i.Id)).Select(i => i with { X = i.X - ox, Y = i.Y - oy })],
             Width = Math.Max(1, (int)Math.Ceiling(bb.X1) - ox),
             Depth = Math.Max(1, (int)Math.Ceiling(bb.Y1) - oy),
         };
@@ -238,8 +304,9 @@ public static class CityEdit
         var labels = clip.Labels.Select(l => l with { Id = Guid.NewGuid(), X = l.X + x, Y = l.Y + y }).ToList();
         var fences = clip.Fences.Select(f => f with { Id = Guid.NewGuid(), Points = [.. f.Points.Select(O)] }).ToList();
         var roads = clip.Roads.Select(r => r with { Id = Guid.NewGuid(), Points = [.. r.Points.Select(O)] }).ToList();
-        var map = m with { Buildings = [.. m.Buildings, .. buildings], Props = [.. m.Props, .. props], Labels = [.. m.Labels, .. labels], Fences = [.. m.Fences, .. fences], Roads = [.. m.Roads, .. roads] };
-        return (map, new CityPick { Buildings = [.. buildings.Select(b => b.Id)], Props = [.. props.Select(p => p.Id)], Labels = [.. labels.Select(l => l.Id)], Fences = [.. fences.Select(f => f.Id)], Roads = [.. roads.Select(r => r.Id)] });
+        var items = clip.Items.Select(i => i with { Id = Guid.NewGuid(), X = i.X + x, Y = i.Y + y }).ToList();
+        var map = m with { Buildings = [.. m.Buildings, .. buildings], Props = [.. m.Props, .. props], Labels = [.. m.Labels, .. labels], Fences = [.. m.Fences, .. fences], Roads = [.. m.Roads, .. roads], Items = [.. m.Items, .. items] };
+        return (map, new CityPick { Buildings = [.. buildings.Select(b => b.Id)], Props = [.. props.Select(p => p.Id)], Labels = [.. labels.Select(l => l.Id)], Fences = [.. fences.Select(f => f.Id)], Roads = [.. roads.Select(r => r.Id)], Items = [.. items.Select(i => i.Id)] });
     }
 
     /// <summary>
@@ -287,6 +354,7 @@ public static class CityEdit
     {
         CitySnap.Squares => new(Math.Round(p.X - offset) + offset, Math.Round(p.Y - offset) + offset),
         CitySnap.HalfSquares => new(Math.Round(p.X * 2) / 2, Math.Round(p.Y * 2) / 2),
+        CitySnap.Fine => new(Math.Round(p.X * 10) / 10, Math.Round(p.Y * 10) / 10),
         _ => new(Math.Round(p.X, 3), Math.Round(p.Y, 3)),
     };
 

@@ -136,6 +136,9 @@ public static class TownPicture
             if (In(bx, by, Math.Max(w, d))) DrawRoofs(c, b, fill, line);
         }
 
+        // Furniture, under the trees.
+        foreach (var i in m.Items.Where(i => In(i.X, i.Y))) DrawItem(c, i, m.SquareMm, fill, line, shadow);
+
         // Trees and things.
         foreach (var p in m.Props.Where(p => In(p.X, p.Y)).OrderBy(p => p.Kind is PropKind.Tree or PropKind.Pine or PropKind.GuardTower ? 1 : 0).ThenBy(p => p.Y))
             DrawProp(c, p, fill, line);
@@ -661,6 +664,60 @@ public static class TownPicture
         PropKind.Statue => 0.3,
         _ => 0.35,
     } * Math.Max(0.3, p.Size);
+
+    /// <summary>
+    /// A piece of furniture from above, turned as it's put down: a short shadow, then its pieces (the furniture
+    /// maker's, lowest first), lighter the higher each stands, each with a thin dark edge.
+    /// </summary>
+    public static void DrawItem(SKCanvas c, CityItem i, double squareMm, SKPaint fill, SKPaint line, SKPaint? shadow = null)
+    {
+        double sq = Math.Max(1, squareMm);
+        var look = CityItems.Look(i, sq);
+        var (w, d) = i.Size(sq);
+        c.Save();
+        c.Translate((float)i.X, (float)i.Y);
+        c.RotateDegrees((float)i.TurnDeg);
+        if (shadow is not null)
+        {
+            // The shadow falls to the bottom right, however it's turned.
+            double a = -i.TurnDeg * Math.PI / 180, ox = 0.05, oy = 0.08;
+            c.DrawRect((float)(ox * Math.Cos(a) - oy * Math.Sin(a) - w / 2), (float)(ox * Math.Sin(a) + oy * Math.Cos(a) - d / 2), (float)w, (float)d, shadow);
+        }
+        c.Scale((float)(1 / sq));
+        var oldStyle = line.Style;
+        var oldWidth = line.StrokeWidth;
+        line.Color = new SKColor(0x4A, 0x32, 0x1C, 0xD8);
+        line.StrokeWidth = (float)(0.012 * sq);
+        if (look.Parts.Count == 0)
+        {
+            fill.Color = new SKColor(0xB0, 0x86, 0x58);
+            var r = new SKRect((float)(-w * sq / 2), (float)(-d * sq / 2), (float)(w * sq / 2), (float)(d * sq / 2));
+            c.DrawRect(r, fill);
+            c.DrawRect(r, line);
+        }
+        else
+        {
+            double lowest = look.Parts.Min(p => p.Top), highest = look.Parts.Max(p => p.Top);
+            foreach (var part in look.Parts)
+            {
+                using var path = new SKPath { FillType = SKPathFillType.EvenOdd };
+                foreach (var loop in part.Shape.Where(q => q.Count >= 3))
+                {
+                    path.MoveTo((float)loop[0].x, (float)loop[0].y);
+                    for (int k = 1; k < loop.Count; k++) path.LineTo((float)loop[k].x, (float)loop[k].y);
+                    path.Close();
+                }
+                double t = highest - lowest < 1e-6 ? 1 : (part.Top - lowest) / (highest - lowest);
+                byte L(double lo, double hi) => (byte)Math.Round(lo + (hi - lo) * t);
+                fill.Color = new SKColor(L(0x7A, 0xE2), L(0x52, 0xC2), L(0x2E, 0x90));
+                c.DrawPath(path, fill);
+                c.DrawPath(path, line);
+            }
+        }
+        line.Style = oldStyle;
+        line.StrokeWidth = oldWidth;
+        c.Restore();
+    }
 
     static void DrawProp(SKCanvas c, Prop p, SKPaint fill, SKPaint line)
     {

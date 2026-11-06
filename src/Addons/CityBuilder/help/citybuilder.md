@@ -10,8 +10,9 @@ scenery are cut by the others. Its button is **Home → Draw → City**.
 **City** lays out a whole town, village or city on one big map: the ground of every square (grass,
 paving, water, fields…), the roads laid over it (each named, two squares wide for a street and four
 for a high road, on bridges over water), the buildings standing on it, fences, hedges and town walls
-from point to point (capped at their ends, a gatehouse wherever a road goes through), and trees,
-rocks, wells and carts. Start from an empty map, from the sample village, or
+from point to point (capped at their ends, a gatehouse wherever a road goes through), trees,
+rocks, wells and carts, and the furniture maker's pieces put down on a fine grid (tables and benches
+outside the inn, the stocks, crates, an anvil). Start from an empty map, from the sample village, or
 from a 2D battle map picture: the city builder reads it as a best guess of the town seen from above
 and you put right whatever it got wrong. Each building opens in the [building editor](houseeditor.md)
 to change its rooms, doors, furniture and roof, and comes out as its laser-cut pieces.
@@ -33,16 +34,16 @@ the last map you worked on (the first time, a small sample village). It's laid o
   each opening its page on the right: **Town maker** (a town made for you), **Battle map** (reading a
   picture), **Picture** (saving the map as a battle map picture) and **Cut** (putting the town's
   pieces in the design). **Help** has this page and the tutorial.
-- **The tools** down the left (the number keys `1` to `0` pick them, top to bottom), and beside them
-  what the tool picked puts down, in pictures: the grounds to paint, the roads, walls and fences, the
-  trees and things, your saved buildings.
+- **The tools** down the left (the number keys `1` to `0` pick them, top to bottom, and `E` picks
+  **Erase**), and beside them what the tool picked puts down, in pictures: the grounds to paint, the
+  roads, walls and fences, the trees and things, the furniture, your saved buildings.
 - **The plan** in the middle: the map from above, to draw on (or the town in 3D). The buttons in its
   bottom right corner show the whole map and zoom in and out.
 - **The tabs** on the right: **Picked** (what's picked on the plan, to change it), **Town** (every
   building, to find one) and **Map** (its name, look and size). A page opened from the toolbar shows
   here instead; close it with the cross in its corner, or press its button again.
 - **The bar** along the bottom: the square under the pointer, what was last done, how big the map is
-  on the table, how many buildings, roads and trees there are, and whether any buildings stand on
+  on the table, how many buildings, roads, trees and pieces of furniture there are, and whether any buildings stand on
   the same squares (they show red on the plan).
 
 The map is saved as you go and opens again next time.
@@ -57,21 +58,25 @@ enough, and each building's name once it's big enough to read.
 
 | Tool | What it does |
 |---|---|
-| **Select** | Click a building, a road, a wall or fence, a tree or thing or a label to pick it (its settings show on the **Picked** tab); Ctrl and click picks more, or takes one out again. Drag a box from an empty spot to pick everything inside it. Drag anything picked to move it all, a whole square at a time (the mouse wheel turns it while you drag). A road or wall picked on its own shows handles to stretch and bend it (see [Roads and walls](#roads-and-walls)). Double-click a building to open it in the [building editor](houseeditor.md). See [Picking several things](#picking-several-things) for the keys. |
+| **Select** | Click a building, a road, a wall or fence, a tree or thing, a piece of furniture or a label to pick it (its settings show on the **Picked** tab); Ctrl and click picks more, or takes one out again. Drag a box from an empty spot to pick everything inside it. Drag anything picked to move it all, as far at a time as **Snap** says (the mouse wheel turns it while you drag). A road or wall picked on its own shows handles to stretch and bend it (see [Roads and walls](#roads-and-walls)). Double-click a building to open it in the [building editor](houseeditor.md). See [Picking several things](#picking-several-things) for the keys. |
 | **Building** | Drag out a rectangle: a new building stands on it, with walls round it, a door towards the nearest road or paving, windows along the walls and a roof (as many floors as **Floors** beside the tools says). With the right button, click a building to take it away. |
-| **Place** | Put down a saved building (pick it from the pictures beside the tools first; see [Saved buildings](#saved-buildings)): click where its top left corner goes. `R`, the right button or Ctrl + the mouse wheel turns it before you click. |
+| **Place** | Put down a saved building (pick it from the pictures beside the tools first; see [Saved buildings](#saved-buildings)): click where its top left corner goes, on a whole square or, with **Snap** at **Half** or finer, on a half square or less. `R`, the right button or Ctrl + the mouse wheel turns it before you click; once it's down, `Ctrl+R` tilts it 15° at a time. |
 | **Paint** | Paint the ground picked from the pictures beside the tools (grass, dirt, cobbled road, paving, sand, water, rock, fields or an inside floor), as many squares across as **Brush (squares)**. The right button paints grass. |
 | **Fill** | Pick a ground the same way, then click a patch of one ground to fill it all with it (the right button fills it with grass). |
 | **Road** | Drag from one point to another to lay a road there, round one corner; hold Ctrl for a straight line however it slants. What it's laid with (**Cobbles**, a **Dirt track**, **Paving** or **Sand**, in pictures beside the tools) and how many squares wide: **Lane (2)** for a street, **High road (4)**, or any **Width (squares)**. It gets a street name of its own, stops at the first building in its way, and crosses water on a bridge. Drawn on from the end of another of the same kind, it carries that one on. The right button takes a road away. |
 | **Wall** | Drag to put up the kind picked beside the tools: a **Fence**, a **Hedge**, a **Stone wall** or a **Town wall**, as **A line** (it bends in eighths of a turn unless you hold Ctrl) or **A rectangle** all the way round. Drawn on from the end of another of the same kind, it carries that one on, and closes into a ring when it meets its own start. The right button cuts a gap in one. |
 | **Things** | Click to put down the tree or thing picked from the pictures beside the tools: under **Trees and rocks** a tree, a pine tree, a bush or a boulder; **In the street** a well, a cart, crates and barrels, a lamp, a statue, a horse trough, a notice board or a fountain (two squares by two); **On the square** a market stall, an outdoor bar, a players' stage (three squares by two) or a gallows; and under **Defences** a guard tower (two squares by two: put it on a grid point of a town wall and it stands astride the wall). The right button takes them away. |
+| **Furniture** | Put down the furniture maker's pieces, true to size for the map's squares: pick **Where it goes** (**Town** first: the stocks, tables and benches, crates and chests, an anvil, a weapon rack, signposts and market crosses; then each room's pieces) and the **Look**, then a piece from the pictures, and click the map. It goes down on the fine grid (a tenth of a square, six inches) with its middle at the pointer; keep the button down and drag to put it just so. Click one that's down to drag it again. `R` turns the next one 45° (Ctrl + the mouse wheel 15°), or **Turn (degrees)**. The right button takes one away. See [Furniture in the town](#furniture-in-the-town). |
 | **Label** | Click to write the **Text** beside the tools there, turned as far as **Turn (degrees)** says (`R` turns it 15° more, Shift+`R` back): a district's name, a number for your game master's key. Labels always read the right way up. The right button takes one away. |
-| **Erase** | Drag over labels, trees, roads, fences and buildings to take them away. |
+| **Erase** | Drag over labels, trees, furniture, roads, fences and buildings to take them away. |
 
 **Snap** on the toolbar says where what you put down and drag lands: on **Whole** squares, **Half**
-squares or anywhere (**Free**). A road keeps its middle line where its squares fall (on a grid line
-for an even width, through the middles of squares for an odd one); trees and small things go to
-quarter squares.
+squares, tenths of a square (**Fine**, six inches on a five-foot square) or anywhere (**Free**). It
+goes for buildings, roads, walls and fences, trees and things and labels alike: with **Half**, a
+building put down or dragged lands on half squares, off the grid. A road keeps its middle line where
+its squares fall (on a grid line for an even width, through the middles of squares for an odd one);
+with **Whole** or **Half**, trees and small things go to quarter squares and the town's bigger pieces
+to half squares. Furniture always keeps to the fine grid (or anywhere, with **Free**).
 
 **Undo** and **Redo** on the toolbar (`Ctrl+Z`, `Ctrl+Y`) go back and forward a step at a time.
 
@@ -82,7 +87,8 @@ With **Select**, everything picked shows orange, and these keys work on all of i
 | Key | What it does |
 |---|---|
 | `R` (Shift+`R`) | Turn it a quarter turn about its middle, clockwise (the other way). Four turns bring it back where it was. |
-| Arrow keys | Move it a square. |
+| `Ctrl+R` (Ctrl+Shift+`R`) | Turn each thing 15° on its own spot, clockwise (the other way): a building tilts about its middle (its **Tilt** on the **Picked** tab), trees, things, furniture and labels turn. Roads and walls stay as they are. |
+| Arrow keys | Move it a step of **Snap** (a square, a half, a tenth); furniture on its own a tenth of a square. With Ctrl, a tenth whatever **Snap** says. |
 | `Delete` | Take it away. |
 | `Ctrl+C`, `Ctrl+X`, `Ctrl+V` | Copy it, cut it, and put a copy down with its top left corner on the square under the pointer. |
 | `Ctrl+D` | Put a copy beside it. |
@@ -90,6 +96,25 @@ With **Select**, everything picked shows orange, and these keys work on all of i
 | `Esc` | Pick nothing. |
 
 ![A box dragged round the tavern and the things on the square: all of it picked, orange on the plan, with the type and district for the building on the Picked tab](images/window-citybuilder-several.png)
+
+### Furniture in the town
+
+![A paved yard in front of an inn: long tables with benches either side, the stocks, crates and a chest, an anvil and a weapon rack, each seen from above on the fine grid, the Furniture pieces in pictures beside the tools and a long table on the Picked tab](images/window-citybuilder-furniture.png)
+
+The **Furniture** tool puts down the [furniture maker](furniture.md)'s ready-made pieces, the same as
+in the building editor, sized for the map's squares (with **Square (mm)** at 25.4 a long table is
+about a square and three quarters, seven feet). Each is drawn from above as it'll be made, its pieces
+lighter the higher they stand and its front a dark edge. On the plan and in the 3D view it's its
+true size, so you can see what fits between the buildings and round the tables.
+
+![The same yard in 3D: the inn, and each table, bench, crate and the stocks put together as they'll be cut](images/window-citybuilder-furniture-3d.png)
+
+Pick one on the plan (with **Select** or the **Furniture** tool) and the **Picked** tab shows its
+**Name**, **Turn (degrees)** and how big it is in feet and squares; **Copy beside it** and **Take it
+away** are there too. It moves with everything else you pick, is copied and pasted the same way, and
+is cut on the **Cut** page with the rest of the furniture. Wells, market stalls, troughs, a stage and
+the town's other bigger pieces are under **Things**; set **Snap** to **Fine** to put those down on the
+fine grid too.
 
 ### Roads and walls
 
@@ -310,8 +335,9 @@ map to put it down. **Look again** reads the list again after saving one in the 
 
 **3D** on the toolbar shows the whole map put together: drag to turn it round, scroll to zoom in on a part,
 middle-drag or the arrow keys to move it, and press `F` (or double-click) to see it all again. Along its top, untick
-**Roofs** to look into the buildings, **Trees and things** to see the ground clearly, or **Doors and
-windows** to make a very big town quicker still. The building picked shows orange.
+**Roofs** to look into the buildings, **Trees and things** to see the ground clearly (the furniture
+goes with them), or **Doors and windows** to make a very big town quicker still. The building or
+furniture picked shows orange. Each piece of furniture is put together as it'll be cut, its true size.
 
 ![The sample village in 3D](images/window-citybuilder-3d.png)
 
@@ -327,7 +353,7 @@ great many pieces, so it may be better to do a few buildings at a time.
 Each building is made at its own grid square: open it in the building editor to change its sheet,
 walls (box or flat), textures and sizes before cutting.
 
-## Cutting the ground, bridges, walls, trees and scenery
+## Cutting the ground, bridges, walls, trees, scenery and furniture
 
 ![The Cut page for a walled town: the ground in tiles four squares across with jigsaw edges, the bridges where roads cross the river, the town wall's sections, corners, gatehouses and guard towers, the trees, and the market square's scenery](images/window-citybuilder-cut.png)
 
@@ -379,6 +405,10 @@ squares), and the furniture maker's horse troughs, players' stages, market stall
 notice boards, fountains, gallows (there's no sci-fi gallows, so a sci-fi map gets the medieval one), street
 lamps and statues, each in the map's look: a lantern post, a brazier, a torch or a light pylon, and a knight, an angel,
 a warlord, an idol, a spearman or a trooper on a pedestal. Hedges and stone walls aren't cut.
+
+**Put the furniture in the design** makes the furniture put down with the **Furniture** tool, the
+[furniture maker](furniture.md)'s way, in the map's look, the same pieces counted together (four
+benches alike are four of one bench) and nested onto the bed. Under it, it says how many of each.
 
 Each set goes in the design with its settings, like anything the furniture maker makes: right-click
 one of its pieces and choose **Edit furniture…** to change its sheet or sizes.

@@ -1,6 +1,6 @@
 # Build a town
 <!-- category: Drawing -->
-<!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change and find its buildings, see it in 3D, save it as a battle map picture and cut its buildings, ground, bridges, walls, trees and scenery. -->
+<!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change, tilt and find its buildings, put down furniture on a fine grid, see it in 3D, save it as a battle map picture and cut its buildings, ground, bridges, walls, trees, scenery and furniture. -->
 <!-- page: citybuilder.md -->
 <!-- order: 79 -->
 The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
@@ -62,6 +62,19 @@ Click **Select**, then click a building: drag it to move it, press `R` to turn i
 name, type, district and roof on the **Picked** tab. Click a road or wall to drag its handles and
 stretch or bend it. Drag a box round several things to move, turn or copy them all at once.
 
+## Tilt it or move it half a square
+<!-- target: button:Half -->
+Click **Half** beside **Snap** on the toolbar: what you drag or put down now lands on half squares, off
+the grid. With a building picked, press `Ctrl+R` to tilt it 15° on its own spot (Ctrl+Shift+`R` the
+other way); **Square it to the grid** on the **Picked** tab puts it straight again.
+
+## Put down furniture
+<!-- target: button:Furniture -->
+Click **Furniture**, keep **Where it goes** on **Town** and click a **Long table** beside the tools.
+Click in front of a building to put it down on the fine grid (a tenth of a square) and drag it just
+so before you let go. Press `R` to turn the next piece 45°, put a **Bench** either side, and add the
+**Stocks** on the green. Each is its true size, so you can see what fits.
+
 ## Find a building
 <!-- target: tabitem:Town -->
 The **Town** tab lists every building: type to find one by name, type, district or tag, and click it to
@@ -87,13 +100,13 @@ Click **3D** on the toolbar to see the town put together. Drag to turn it round 
 With a building picked, press **Put this building in the design** on the **Picked** tab: its pieces go into the design,
 nested onto the bed, a page per bed.
 
-## Cut the ground, walls and scenery
+## Cut the ground, walls, scenery and furniture
 <!-- target: button:Cut -->
 Click **Cut** on the toolbar and press **Put the ground in the design** for the ground as tiles that lock together,
 each square etched with its ground, **Put the bridges in the design** for a bridge wherever a road
 crosses water, **Put the town walls in the design** for the wall with its gatehouses and guard towers,
-**Put the trees in the design**, and **Put the scenery in the design** for the wells, carts, stalls, fountains,
-stages and fences.
+**Put the trees in the design**, **Put the scenery in the design** for the wells, carts, stalls, fountains,
+stages and fences, and **Put the furniture in the design** for the tables, benches and the rest you put down.
 
 ## Save it as a picture
 <!-- target: button:Picture -->

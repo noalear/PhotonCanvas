@@ -7,7 +7,7 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using SkiaSharp;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building, several things and a road picked, the town's buildings by district, a town made for you, its Cut tab, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building, several things and a road picked, the town's buildings by district, a town made for you, its Cut tab, furniture outside an inn on the plan and in 3D, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -99,6 +99,23 @@ static class CityBuilderShots
             view.Turn(-400, -5);
             view.Zoom(3.4, new Avalonia.Point(view.Bounds.Width / 2, view.Bounds.Height / 2));
         });
+        // Furniture outside an inn on the fine grid: tables and benches, the stocks, crates, an anvil, a weapon rack.
+        var inn = Furnished();
+        Shot("window-citybuilder-furniture", inn, "Picked", false, async w =>
+        {
+            await F<Task>(w, "_fuPictures");
+            var plan = F<CityPlan>(w, "_plan");
+            plan.SetPick(CityPick.Of(plan.Map.Items[0]));
+        }, tool: CityTool.Furnish);
+        Shot("window-citybuilder-furniture-3d", inn, "Picked", true, w =>
+        {
+            var view = F<CityView>(w, "_view");
+            // From the yard's side, low enough to see the benches' legs and the inn's door.
+            view.Turn(60, -15);
+            view.Zoom(1.5, new Avalonia.Point(view.Bounds.Width / 2, view.Bounds.Height / 2));
+            return Task.CompletedTask;
+        });
+
         // A town like it saved as a battle map picture (a part of it), and the ground by the river cut as tiles.
         var (town, _) = TownMaker.Make(new TownOptions { Name = "New town", Across = 64, Down = 48, Layout = TownLayout.Crossroads, Walls = true, River = true, Seed = 7, Theme = "Medieval" });
         File.WriteAllBytes(Path.Combine(folder, "citybuilder-picture.png"), TownPicture.Encode(town, new TownPictureOptions { PxPerSquare = 36, Box = (18, 16, 54, 38) }, "town.png"));
@@ -116,6 +133,33 @@ static class CityBuilderShots
             await w.UsePicture(SampleBattleMap.Make(), null);
             await w.ReadPicture();
         });
+    }
+
+    /// <summary>A little paved yard in front of an inn, with furniture put down on the fine grid.</summary>
+    static CityMap Furnished()
+    {
+        var m = CityMap.Empty(14, 9, "The Crossed Keys");
+        var g = m.GroundGrid();
+        for (int y = 0; y < 9; y++) for (int x = 0; x < 14; x++) g[x, y] = y >= 5 || x >= 7 ? Ground.Paving : Ground.Grass;
+        m = m.WithGround(g);
+        var cells = new HashSet<(int X, int Y)>();
+        for (int y = 1; y < 5; y++) for (int x = 1; x < 6; x++) cells.Add((x, y));
+        var (design, bx, by) = BuildingGuess.Make(new SeenBuilding { Cells = cells, Storeys = 2, Type = "Tavern", Covering = "Clay tiles", DoorTowards = [.. Enumerable.Range(1, 5).Select(x => (x, 5))] }, "Medieval", 25.4)!.Value;
+        var inn = new CityBuilding { Name = "The Crossed Keys", Type = "Tavern", X = bx, Y = by, Design = design };
+        PhotonCanvas.Addon.Furniture.CatalogEntry E(string room, string name) => CityItems.Catalog("Medieval", room).First(e => e.Name == name);
+        string town = PhotonCanvas.Addon.Furniture.FurnitureCatalog.Town;
+        var table = E(town, "Long table");
+        var bench = E(town, "Bench");
+        CityItem I(PhotonCanvas.Addon.Furniture.CatalogEntry e, double x, double y, double turn = 0) => CityItems.Make(e, m.SquareMm, x, y, turn);
+        var items = new List<CityItem>
+        {
+            I(table, 3.0, 6.6), I(bench, 3.0, 6.0, 180), I(bench, 3.0, 7.2),
+            I(table, 8.2, 6.4, 90), I(bench, 7.6, 6.4, 90), I(bench, 8.8, 6.4, 270),
+            I(E(town, "Stocks"), 11.2, 2.4, 15),
+            I(E(town, "Crate"), 7.6, 1.4), I(E(town, "Iron-bound crate"), 8.3, 1.5, 10), I(E(town, "Chest"), 7.7, 2.2, 90),
+            I(E(town, "Anvil"), 11.0, 6.8, 30), I(E(town, "Weapon rack"), 12.6, 4.6, 270),
+        };
+        return m with { Buildings = [inn], Items = items, Props = [new Prop { Kind = PropKind.Well, X = 10.5, Y = 4.5 }, new Prop { Kind = PropKind.Tree, X = 12.5, Y = 7.5, Size = 1.3 }] };
     }
 
     /// <summary>Floor tiles drawn as cut: light wood, the etching darker, scored lines dark, each a little apart from the next.</summary>

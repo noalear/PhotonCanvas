@@ -3,8 +3,8 @@ using SkiaSharp;
 namespace PhotonCanvas.Addon.CityBuilder;
 
 /// <summary>
-/// The little pictures on the city builder's palettes: each ground, road surface, wall or fence and tree or thing
-/// drawn on a scrap of map the way the battle map picture draws it, as PNG files' bytes. Made once and kept.
+/// The little pictures on the city builder's palettes: each ground, road surface, wall or fence, tree or thing and
+/// piece of furniture drawn on a scrap of map the way the battle map picture draws it, as PNG files' bytes. Made once and kept.
 /// </summary>
 public static class PalettePictures
 {
@@ -34,6 +34,17 @@ public static class PalettePictures
         int side = (int)Math.Ceiling(view) + 1;
         var under = k is PropKind.Tree or PropKind.Pine or PropKind.Bush or PropKind.Boulder or PropKind.GuardTower ? CityBuilder.Ground.Grass : CityBuilder.Ground.Paving;
         return Draw(Patch(side, side, under) with { Props = [new Prop { Kind = k, X = side / 2.0, Y = side / 2.0 }] }, view);
+    });
+
+    /// <summary>A piece of the furniture maker's catalog seen from above on a patch of paving, filling the picture.</summary>
+    public static byte[] Furniture(PhotonCanvas.Addon.Furniture.CatalogEntry e) => Get($"furniture {e.Id}", () =>
+    {
+        var patch = Patch(1, 1, CityBuilder.Ground.Paving);
+        var item = CityItems.Make(e, patch.SquareMm);
+        var (w, d) = item.Size(patch.SquareMm);
+        double view = Math.Max(0.6, Math.Max(w, d) * 1.15 + 0.1);
+        int side = (int)Math.Ceiling(view) + 1;
+        return Draw(Patch(side, side, CityBuilder.Ground.Paving) with { Items = [item with { X = side / 2.0, Y = side / 2.0 }] }, view);
     });
 
     static CityMap Patch(int across, int down, Ground g)

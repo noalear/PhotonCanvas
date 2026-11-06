@@ -962,6 +962,7 @@ public static class TownMaker
         {
             Buildings = buildings,
             Props = [.. m.Props.Where(p => !under.Contains(((int)Math.Floor(p.X), (int)Math.Floor(p.Y))))],
+            Items = [.. m.Items.Where(i => !under.Contains(((int)Math.Floor(i.X), (int)Math.Floor(i.Y))))],
         }, added);
     }
 }

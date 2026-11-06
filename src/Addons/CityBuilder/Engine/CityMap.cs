@@ -287,6 +287,52 @@ public sealed record Prop
 }
 
 /// <summary>
+/// A piece of the furniture maker's put down in the town, on a fine grid: a table and benches outside an inn, the
+/// stocks on the green, a chest, a weapon rack by the guardhouse. Its middle (squares), how far it's turned
+/// (degrees, clockwise seen from above; 0 with its front towards the bottom of the plan), the floor it takes (mm,
+/// as made: across its front, then front to back) and the piece itself, sized for the map's squares; the catalog
+/// entry it came from, if it did.
+/// </summary>
+public sealed record CityItem
+{
+    public Guid Id { get; init; } = Guid.NewGuid();
+    public string? CatalogId { get; init; }
+    public string Name { get; init; } = "";
+    public double X { get; init; }
+    public double Y { get; init; }
+    public double TurnDeg { get; init; }
+    public double WidthMm { get; init; } = 25;
+    public double DepthMm { get; init; } = 25;
+    public PhotonCanvas.Addon.Furniture.FurnitureItem Item { get; init; } = new();
+
+    /// <summary>The floor it takes (squares, as made: across its front, then front to back).</summary>
+    public (double W, double D) Size(double squareMm) => (WidthMm / Math.Max(1, squareMm), DepthMm / Math.Max(1, squareMm));
+
+    /// <summary>A point of the piece (squares from its middle: u along its front to its right, v towards its front) on the map.</summary>
+    public CityPt At(double u, double v)
+    {
+        double a = TurnDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a);
+        return new(X + u * c - v * s, Y + u * s + v * c);
+    }
+
+    /// <summary>Its four corners on the map (squares): front left, front right, back right, back left.</summary>
+    public CityPt[] Corners(double squareMm)
+    {
+        var (w, d) = Size(squareMm);
+        return [At(-w / 2, d / 2), At(w / 2, d / 2), At(w / 2, -d / 2), At(-w / 2, -d / 2)];
+    }
+
+    /// <summary>Whether a point (squares) is on it (or within <paramref name="reach"/> of it).</summary>
+    public bool Hit(double x, double y, double squareMm, double reach = 0.02)
+    {
+        var (w, d) = Size(squareMm);
+        double a = -TurnDeg * Math.PI / 180, dx = x - X, dy = y - Y;
+        double u = dx * Math.Cos(a) - dy * Math.Sin(a), v = dx * Math.Sin(a) + dy * Math.Cos(a);
+        return Math.Abs(u) <= w / 2 + reach && Math.Abs(v) <= d / 2 + reach;
+    }
+}
+
+/// <summary>
 /// Words written on the map (a district's or a river's name, a number for the game master's key): the middle of
 /// the text (squares), how tall it is (squares) and how far it's turned (degrees, clockwise seen from above).
 /// </summary>
@@ -351,6 +397,8 @@ public sealed record CityMap
     public List<Fence> Fences { get; init; } = [];
     public List<Prop> Props { get; init; } = [];
     public List<CityLabel> Labels { get; init; } = [];
+    /// <summary>The furniture maker's pieces put down in the town (tables, benches, the stocks…).</summary>
+    public List<CityItem> Items { get; init; } = [];
     public CityPicture? Picture { get; init; }
 
     /// <summary>The letter each kind of ground is saved as.</summary>
@@ -421,6 +469,7 @@ public sealed record CityMap
         {
             Buildings = [.. Buildings.Where(b => { var (w, d) = CityFootprint.Size(b); return b.X + w <= across && b.Y + d <= down; })],
             Props = [.. Props.Where(p => p.X < across && p.Y < down)],
+            Items = [.. Items.Where(i => i.X < across && i.Y < down)],
             Labels = [.. Labels.Where(l => l.X < across && l.Y < down)],
             Fences = [.. Tidied().Fences.Where(f => f.Points.Any(p => p.X < across && p.Y < down)).Select(f => f with { Points = [.. f.Points.Select(p => Clamp(p, across, down))] })],
             Roads = [.. Roads.Where(r => r.Points.Any(p => p.X < across && p.Y < down)).Select(r => r with { Points = [.. r.Points.Select(p => Clamp(p, across, down))] })],
@@ -473,6 +522,7 @@ public sealed record CityMap
 
     public CityRoad? Road(Guid id) => Roads.FirstOrDefault(r => r.Id == id);
     public Fence? FenceById(Guid id) => Fences.FirstOrDefault(f => f.Id == id);
+    public CityItem? ItemById(Guid id) => Items.FirstOrDefault(i => i.Id == id);
 
     public CityBuilding? Building(Guid id) => Buildings.FirstOrDefault(b => b.Id == id);
 
@@ -491,10 +541,10 @@ public sealed record CityMap
         {
             var m = JsonSerializer.Deserialize<CityMap>(json, CityJson.Options);
             if (m is null) return null;
-            // Older maps had no labels or roads; their trees had no ids, their fences were one-square edges.
+            // Older maps had no labels, roads or furniture; their trees had no ids, their fences were one-square edges.
             return (m with
             {
-                Across = Math.Clamp(m.Across, 1, MaxSide), Down = Math.Clamp(m.Down, 1, MaxSide), Labels = m.Labels ?? [], Roads = m.Roads ?? [],
+                Across = Math.Clamp(m.Across, 1, MaxSide), Down = Math.Clamp(m.Down, 1, MaxSide), Labels = m.Labels ?? [], Roads = m.Roads ?? [], Items = m.Items ?? [],
                 Fences = [.. (m.Fences ?? []).Select(f => f with { Points = f.Points ?? [], Edges = f.Edges ?? [] })],
                 Props = [.. (m.Props ?? []).Select(p => p.Id == Guid.Empty ? p with { Id = Guid.NewGuid() } : p)],
             }).Tidied();
