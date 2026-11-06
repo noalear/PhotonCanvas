@@ -158,14 +158,21 @@ public sealed partial class CityWindow : Window
     readonly Button _bCopy = UiKit.Button("Copy it"), _bDelete = UiKit.Button("Take it away"), _bRoofIt = UiKit.Button("Roof it again"), _bSavePrefab = UiKit.Button("Save as a building to reuse");
     readonly TextBox _bTilt = new();
     readonly Button _bSquare = UiKit.Button("Square it to the grid");
-    readonly TextBlock _bInfo = Hint();
+    readonly TextBlock _bInfo = Hint(), _bBuilt = Hint();
     Control _buildingPanel = null!, _noBuilding = null!;
     bool _loadingBuilding;
 
     // Views
     readonly CityPlan _plan = new();
     readonly CityView _view = new();
-    readonly CheckBox _vRoofs = new() { Content = "Roofs", IsChecked = true }, _vProps = new() { Content = "Trees and things", IsChecked = true }, _vOpenings = new() { Content = "Doors and windows", IsChecked = true };
+    readonly CheckBox _vRoofs = new() { Content = "Roofs", IsChecked = true }, _vProps = new() { Content = "Trees and things", IsChecked = true }, _vOpenings = new() { Content = "Doors and windows", IsChecked = true },
+        _vBuilt = new() { Content = "As built", IsChecked = true }, _vDoors = new() { Content = "Doors open" };
+    /// <summary>How far the buildings are made as built, in the 3D view's corner while they're being made.</summary>
+    readonly TextBlock _vMaking = new() { Classes = { "muted" }, VerticalAlignment = VerticalAlignment.Center, IsVisible = false };
+    /// <summary>Looks in while the buildings are made as built (in the background), to show each as it's done.</summary>
+    readonly DispatcherTimer _built = new() { Interval = TimeSpan.FromMilliseconds(400) };
+    int _builtSeen = -1, _shownBuilt = -1;
+    DateTime _built3D;
     readonly Button _undoButton = UiKit.Button("Undo"), _redoButton = UiKit.Button("Redo");
     readonly TextBlock _summary = new();
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
@@ -205,7 +212,8 @@ public sealed partial class CityWindow : Window
         PickTool(CityTool.Select);
         Load(_map, refit: true);
         _save.Tick += (_, _) => { _save.Stop(); SaveLast(); };
-        Closed += (_, _) => SaveLast();
+        _built.Tick += (_, _) => BuiltTick();
+        Closed += (_, _) => { SaveLast(); _built.Stop(); };
         KeyDown += OnKey;
         _tAcross.Value = _map.Across;
         _tDown.Value = _map.Down;
@@ -364,7 +372,8 @@ public sealed partial class CityWindow : Window
         _bDelete.Click += (_, _) => _plan.DeletePicked();
         _bSavePrefab.Click += async (_, _) => await SaveAsPrefab();
 
-        foreach (var c in new[] { _vRoofs, _vProps, _vOpenings }) c.IsCheckedChanged += (_, _) => Show3D();
+        foreach (var c in new[] { _vRoofs, _vProps, _vOpenings, _vBuilt, _vDoors }) c.IsCheckedChanged += (_, _) => Show3D();
+        _vBuilt.IsCheckedChanged += (_, _) => { _vDoors.IsEnabled = _vBuilt.IsChecked == true; ShowMaking(); };
         _makeOne.Click += async (_, _) => await Make([.. _map.Buildings.Where(b => _plan.Pick.Buildings.Contains(b.Id))]);
         _makeAll.Click += async (_, _) => await Make(_map.Buildings);
     }
@@ -461,14 +470,7 @@ public sealed partial class CityWindow : Window
         }
         _undoButton.IsEnabled = _undo.Count > 0;
         _redoButton.IsEnabled = _redo.Count > 0;
-        var overlaps = CityFootprint.Overlaps(_map);
-        double wM = _map.Across * _map.SquareMm / 1000, dM = _map.Down * _map.SquareMm / 1000;
-        var cells = CityEdit.BuildingCells(_map);
-        int onRoads = _map.Roads.Count(r => CityEdit.Hits(_map, r, cells));
-        string warnings = (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "")
-            + (onRoads > 0 ? $" {onRoads} road{(onRoads == 1 ? " runs" : "s run")} through a building." : "");
-        _mapInfo.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $", {_map.Items.Count} piece{(_map.Items.Count == 1 ? "" : "s")} of furniture." : ".") + warnings;
-        _summary.Text = $"{_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m) · {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")} · {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")} · {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $" · {_map.Items.Count} furniture" : "") + warnings;
+        Summarise();
         _makeAll.IsEnabled = _map.Buildings.Count > 0;
         RefreshTown();
         ShowPicked();
@@ -476,12 +478,79 @@ public sealed partial class CityWindow : Window
         if (OnPage(_cutPage)) RefreshCut();
         _viewStale = true;
         if (_threeD) Show3D();
+        // Every building made as built in the background, for the 3D view and to see where they'd run into each other.
+        if (CityBuilt.WarmUp(_map) > 0 && !_built.IsEnabled) _built.Start();
+        ShowMaking();
+    }
+
+    /// <summary>The map's size and what's on it, and anything wrong: buildings on the same squares, roads through them, buildings that'd run into each other once built.</summary>
+    void Summarise()
+    {
+        var overlaps = CityFootprint.Overlaps(_map);
+        double wM = _map.Across * _map.SquareMm / 1000, dM = _map.Down * _map.SquareMm / 1000;
+        var cells = CityEdit.BuildingCells(_map);
+        int onRoads = _map.Roads.Count(r => CityEdit.Hits(_map, r, cells));
+        int intrude = CityBuilt.Intrusions(_map).Count(x => !overlaps.Any(o => o.A.Id == x.A.Id && o.B.Id == x.B.Id || o.A.Id == x.B.Id && o.B.Id == x.A.Id));
+        string warnings = (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "")
+            + (onRoads > 0 ? $" {onRoads} road{(onRoads == 1 ? " runs" : "s run")} through a building." : "")
+            + (intrude > 0 ? $" {intrude} pair{(intrude == 1 ? "" : "s")} of buildings would run into each other once built (their roofs or what sticks out of their walls; red on the plan)." : "");
+        _mapInfo.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $", {_map.Items.Count} piece{(_map.Items.Count == 1 ? "" : "s")} of furniture." : ".") + warnings;
+        _summary.Text = $"{_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m) · {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")} · {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")} · {_map.Props.Count} trees and things" + (_map.Items.Count > 0 ? $" · {_map.Items.Count} furniture" : "") + (warnings.Length > 0 ? " ·" + warnings : "");
+    }
+
+    /// <summary>
+    /// Another building made as built: the plan shows where it reaches and the warnings are looked at again; the
+    /// 3D view shows it (every second and a half or so while they're being made, so a big town doesn't hold it up).
+    /// </summary>
+    void BuiltTick()
+    {
+        int left = CityBuilt.WarmUp(_map);
+        if (left == 0) _built.Stop();
+        ShowMaking();
+        if (CityBuilt.Version != _builtSeen)
+        {
+            _builtSeen = CityBuilt.Version;
+            _plan.InvalidateVisual();
+            Summarise();
+            if (Picked() is { } b) _bBuilt.Text = BuiltText(b);
+        }
+        if (_vBuilt.IsChecked != true || _shownBuilt == CityBuilt.Version) return;
+        if (!_threeD) _viewStale = true;
+        else if (left == 0 || DateTime.UtcNow - _built3D > TimeSpan.FromSeconds(1.5)) Show3D();
+    }
+
+    void ShowMaking()
+    {
+        var (done, of) = CityBuilt.Progress(_map);
+        _vMaking.IsVisible = _vBuilt.IsChecked == true && done < of;
+        _vMaking.Text = $"Making them as built: {done} of {of}…";
+    }
+
+    /// <summary>What a building covers once it's built, with its roof and all that sticks out of its walls.</summary>
+    static string BuiltText(CityBuilding b)
+    {
+        if (CityBuilt.Known(b.Design) is not { } m) return "Working out its size as built…";
+        if (!m.Ok) return "It can't be made as it is: open it in the building editor to see why.";
+        var box = m.Box;
+        double w = box.right - box.left, d = box.bottom - box.top;
+        if ((b.Turn & 1) == 1) (w, d) = (d, w);
+        var (pw, pd) = CityFootprint.Size(b);
+        double past = Math.Max(Math.Max(-box.left, -box.top), Math.Max(box.right - CityFootprint.Extent(b.Design).W, box.bottom - CityFootprint.Extent(b.Design).D));
+        return $"As built, with its roof and what sticks out of its walls, it covers {w:0.#} × {d:0.#} squares ({w * m.SquareMm:0} × {d * m.SquareMm:0} mm), "
+            + $"reaching {(past < 0.95 ? $"{past:0.#} of a square" : $"{past:0.#} squares")} past its {pw} × {pd} (dashed round it on the plan). Keep {Math.Max(1, Math.Ceiling(past * 2)):0} squares between it and the next like it, so they don't touch.";
     }
 
     void Show3D()
     {
         _viewStale = false;
-        _view.Show(_map, new CityShow { Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true, Picked = [.. _plan.Pick.Buildings, .. _plan.Pick.Items] });
+        _built3D = DateTime.UtcNow;
+        _shownBuilt = CityBuilt.Version;
+        _view.Show(_map, new CityShow
+        {
+            Roofs = _vRoofs.IsChecked == true, Props = _vProps.IsChecked == true, Openings = _vOpenings.IsChecked == true,
+            AsBuilt = _vBuilt.IsChecked == true, DoorsOpen = _vDoors.IsChecked == true,
+            Picked = [.. _plan.Pick.Buildings, .. _plan.Pick.Items],
+        });
     }
 
     // ---- the building picked ----
@@ -581,6 +650,7 @@ public sealed partial class CityWindow : Window
         _bInfo.Text = $"{w} × {d} squares, {floors} floor{(floors == 1 ? "" : "s")}, {b.Design.Levels.Sum(l => l.Walls.Count)} squares of wall"
             + (CityFootprint.OnGrid(b) ? "" : b.TiltDeg != 0 ? $", tilted {b.TiltDeg:0.#}°" : ", off the grid")
             + (b.PrefabId is not null ? ". From a saved building." : ".");
+        _bBuilt.Text = BuiltText(b);
         _bTilt.Text = b.TiltDeg.ToString("0.#");
         _bSquare.IsEnabled = !CityFootprint.OnGrid(b);
         if (b.Design.Roofs.Count > 0)
@@ -1463,7 +1533,7 @@ public sealed partial class CityWindow : Window
         Add(21, 8, 4, 3, 1, "House", "Miller's house", "Farm", "Thatch");
         Add(10, 15, 4, 3, 1, "House", "Weaver's house", "Residential", "Thatch");
         Add(21, 15, 3, 3, 3, "Tower", "Watchtower", "Military", "Slate");
-        Add(25, 15, 4, 3, 1, "Smithy", "Smithy", "Market", "Wooden shingles");
+        Add(26, 15, 4, 3, 1, "Smithy", "Smithy", "Market", "Wooden shingles");
         Add(2, 8, 4, 3, 1, "House", "Cottage", "Residential", "Thatch");
         var fence = new Fence { Kind = FenceKind.Fence, Edges = [.. Enumerable.Range(26, 9).Select(x => new FenceEdge(x, 9, true)), .. Enumerable.Range(2, 7).Select(y => new FenceEdge(26, y, false))] };
         var hedge = new Fence { Kind = FenceKind.Hedge, Edges = [.. Enumerable.Range(0, 10).Select(x => new FenceEdge(x, 17, true))] };

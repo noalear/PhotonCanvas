@@ -7,7 +7,7 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using SkiaSharp;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building, several things and a road picked, the town's buildings by district, a town made for you, its Cut tab, furniture outside an inn on the plan and in 3D, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building, several things and a road picked, the town's buildings by district, a town made for you, its Cut tab, furniture outside an inn on the plan and in 3D, houses too close together once built, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -36,6 +36,10 @@ static class CityBuilderShots
             win.GetType().GetMethod("PickTool", Any)!.Invoke(win, [tool]);
             win.ShowPage(page);
             win.ShowView(threeD);
+            // Every building made as built (in the background), so the 3D view and the plan show them true to size.
+            var built = Task.WhenAll(F<CityPlan>(win, "_plan").Map.Buildings.Select(b => CityBuilt.Get(b.Design)));
+            for (int i = 0; i < 1200 && !built.IsCompleted; i++) settle(50);
+            win.GetType().GetMethod("BuiltTick", Any)!.Invoke(win, null);
             settle(1500);
             if (after is not null)
             {
@@ -110,9 +114,17 @@ static class CityBuilderShots
         Shot("window-citybuilder-furniture-3d", inn, "Picked", true, w =>
         {
             var view = F<CityView>(w, "_view");
-            // From the yard's side, low enough to see the benches' legs and the inn's door.
-            view.Turn(60, -15);
-            view.Zoom(1.5, new Avalonia.Point(view.Bounds.Width / 2, view.Bounds.Height / 2));
+            // Closer in, from the usual corner: the inn's door and shutters, the benches' legs.
+            view.Zoom(1.6, new Avalonia.Point(view.Bounds.Width / 2, view.Bounds.Height / 2));
+            return Task.CompletedTask;
+        });
+
+        // Two houses a square apart, red where their roofs would run into each other once built, and one two squares on that fits.
+        var close = Close();
+        Shot("window-citybuilder-reach", close, "Picked", false, w =>
+        {
+            var plan = F<CityPlan>(w, "_plan");
+            plan.Select(plan.Map.Buildings[0].Id);
             return Task.CompletedTask;
         });
 
@@ -133,6 +145,22 @@ static class CityBuilderShots
             await w.UsePicture(SampleBattleMap.Make(), null);
             await w.ReadPicture();
         });
+    }
+
+    /// <summary>Three cottages along a lane: the first two a square apart, the third two squares on.</summary>
+    static CityMap Close()
+    {
+        var m = CityMap.Empty(24, 14) with { Name = "Too close" };
+        m = m with { Roads = [new CityRoad { Name = "Mill Lane", Width = 2, Points = [new(0, 10), new(24, 10)] }] };
+        var buildings = new List<CityBuilding>();
+        foreach (var (x, name) in new[] { (2, "Ashford cottage"), (7, "Thorne cottage"), (13, "Miller cottage") })
+        {
+            var cells = new HashSet<(int X, int Y)>();
+            for (int j = 4; j < 9; j++) for (int i = x; i < x + 4; i++) cells.Add((i, j));
+            var (design, bx, by) = BuildingGuess.Make(new SeenBuilding { Cells = cells, Type = "Cottage", DoorTowards = [(x + 1, 9), (x + 2, 9)] }, "Medieval", 25.4)!.Value;
+            buildings.Add(new CityBuilding { Name = name, Type = "Cottage", District = "Residential", X = bx, Y = by, Design = design });
+        }
+        return m with { Buildings = buildings };
     }
 
     /// <summary>A little paved yard in front of an inn, with furniture put down on the fine grid.</summary>

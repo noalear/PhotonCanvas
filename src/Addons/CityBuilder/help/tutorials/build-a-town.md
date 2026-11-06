@@ -3,8 +3,8 @@
 <!-- summary: Make a town for you, or read one from a battle map picture, lay roads and fill them with buildings, change, tilt and find its buildings, put down furniture on a fine grid, see it in 3D, save it as a battle map picture and cut its buildings, ground, bridges, walls, trees, scenery and furniture. -->
 <!-- page: citybuilder.md -->
 <!-- order: 79 -->
-The city builder lays out a whole town: the ground, the buildings, walls and trees, in a light 3D
-view, each building a building editor building to cut.
+The city builder lays out a whole town: the ground, the buildings, walls and trees, in a 3D view
+that shows each building true to size as it'll be built, each one a building editor building to cut.
 
 ## Open the city builder
 <!-- target: ribbon:Home/City -->
@@ -92,8 +92,10 @@ click it and click the map to put down another.
 
 ## See it in 3D
 <!-- target: button:3D -->
-Click **3D** on the toolbar to see the town put together. Drag to turn it round and scroll to zoom in; untick
-**Roofs** to look inside.
+Click **3D** on the toolbar to see the town put together, each building as it'll be once it's cut and put
+together, true to size (its roof's overhang, doors and shutters): tick **Doors open** to swing them open.
+Drag to turn it round and scroll to zoom in; untick **Roofs** to look inside. Back on the plan, any buildings
+that would run into each other once built show red: move one a square or two away.
 
 ## Cut a building
 <!-- target: button:Put this building in the design -->

@@ -147,7 +147,8 @@ public class CityBuilderTownTests
     {
         var o = new TownOptions { Across = 60, Down = 44, Seed = 5, Layout = TownLayout.Grid };
         int few = TownMaker.Make(o with { Density = 0 }).Map.Buildings.Count, many = TownMaker.Make(o with { Density = 1 }).Map.Buildings.Count;
-        Assert.True(many > few * 1.3, $"{few} sparse, {many} packed");
+        // Two squares between buildings however full (so they don't run into each other once built): packing them adds fewer.
+        Assert.True(many > few * 1.2, $"{few} sparse, {many} packed");
     }
 
     [Fact]
@@ -188,7 +189,7 @@ public class CityBuilderTownTests
         var sw = Stopwatch.StartNew();
         var (m, _) = TownMaker.Make(new TownOptions { Across = 160, Down = 120, Layout = TownLayout.Grid, Walls = true, River = true, Density = 0.8, Seed = 2 });
         sw.Stop();
-        Assert.True(m.Buildings.Count > 200, $"{m.Buildings.Count} buildings");
+        Assert.True(m.Buildings.Count > 150, $"{m.Buildings.Count} buildings");
         Assert.True(sw.Elapsed.TotalSeconds < 20, $"{sw.Elapsed.TotalSeconds:0.0} s");
         Sound(m);
         Tidy(m);

@@ -445,9 +445,12 @@ public sealed partial class CityWindow
         _planBox.Children.Add(_plan);
         _planBox.Children.Add(ZoomButtons());
         var shows = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14 };
-        foreach (var c in new[] { _vRoofs, _vProps, _vOpenings }) shows.Children.Add(c);
+        foreach (var c in new[] { _vBuilt, _vDoors, _vRoofs, _vProps, _vOpenings }) shows.Children.Add(c);
+        shows.Children.Add(_vMaking);
+        ToolTip.SetTip(_vBuilt, "Each building as it'll be once it's cut and put together, true to size: its corner columns, its roofs' overhang, its doors, shutters and lamps. Untick for plain blocks the size of its plan.");
+        ToolTip.SetTip(_vDoors, "The doors and shutters swung open, as far as they go.");
+        ToolTip.SetTip(_vOpenings, "Doors and windows cut in the plain blocks (buildings not shown as built).");
         var hud = new Border { Classes = { "hud" }, Padding = new(10, 2), Margin = new(8), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Child = shows };
-        ToolTip.SetTip(hud, "A light view: plain blocks, no textures or engraving, so a whole town turns round quickly.");
         _box3d.Children.Add(_view);
         _box3d.Children.Add(hud);
         return new Border
@@ -708,7 +711,7 @@ public sealed partial class CityWindow
         _bDistrict.Watermark = "Residential, market, docks…";
         _buildingPanel = Stack(
             Explained("The building", "What it is, for finding it again; its name shows on the plan.",
-                Field("Name", _bName), Field("Type", _bType), Field("District", _bDistrict), Field("Tags", _bTags), _bInfo),
+                Field("Name", _bName), Field("Type", _bType), Field("District", _bDistrict), Field("Tags", _bTags), _bInfo, _bBuilt),
             Explained("Its shape", "Quick changes here; open it in the building editor for everything else (rooms, doors, furniture, stairs).",
                 new WrapPanel { Children = { _bTurn.With(b => b.Margin = new(0, 0, 4, 4)), _bUp.With(b => b.Margin = new(0, 0, 4, 4)), _bDownLevel.With(b => b.Margin = new(0, 0, 4, 4)) } },
                 Field("Tilt (°)", _bTilt, tip: "A building read off a map that sits at an angle keeps its angle: clockwise degrees past its quarter turns. Square it to the grid to put it on whole squares."),
