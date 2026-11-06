@@ -34,8 +34,15 @@ The right button paints grass.
 
 ## Lay a road
 <!-- target: button:Road -->
-Click **Road** and drag from one square to another: a road two squares wide runs there, round one
-corner (hold Ctrl for a straight one). Pick a dirt track or water for a river on the **Tools** tab.
+Click **Road** and drag from one point to another: a street two squares wide runs there, round one
+corner (hold Ctrl for a straight one), with a name of its own written along it. Make it 4 wide on
+the **Tools** tab for a high road, or a dirt track. It stops at a building in its way and crosses
+water on a bridge.
+
+## Put up a wall
+<!-- target: button:Wall -->
+Click **Wall**, pick a town wall under **Walls and fences** on the **Tools** tab (**A rectangle** to go
+all the way round), and drag. Its ends are capped, and where a road goes through it there's a gate.
 
 ## Fill it with buildings
 <!-- target: button:Fill with buildings -->
@@ -50,8 +57,8 @@ towards the road, windows and a roof.
 ## Change a building
 <!-- target: button:Select -->
 Click **Select**, then click a building: drag it to move it, press `R` to turn it, and change its
-name, type, district and roof on the **Picked** tab. Drag a box round several things to move, turn or
-copy them all at once.
+name, type, district and roof on the **Picked** tab. Click a road or wall to drag its handles and
+stretch or bend it. Drag a box round several things to move, turn or copy them all at once.
 
 ## Find a building
 <!-- target: tabitem:Town -->
@@ -60,8 +67,8 @@ go to it. Tick **Colour the plan by district** to see the town's parts.
 
 ## Open it in the building editor
 <!-- target: button:Edit in the building editor… -->
-Press **Edit in the building editor…** to change its rooms, doors, furniture and roof. Close the
-editor and the building on the map changes to match.
+Press **Edit in the building editor…** (or double-click the building on the plan) to change its
+rooms, doors, furniture and roof. Close the editor and the building on the map changes to match.
 
 ## Save it to use again
 <!-- target: button:Save as a building to reuse -->

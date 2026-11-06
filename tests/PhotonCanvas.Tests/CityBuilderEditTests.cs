@@ -19,39 +19,65 @@ public class CityBuilderEditTests
     }
 
     /// <summary>A 20 × 16 map: a 3 × 2 house at (4, 4), a tree at (9.5, 5.5), a label, and a fence along the top of the house and down its right.</summary>
-    static CityMap Little(out CityBuilding house, out Prop tree, out CityLabel label)
+    static CityMap Little(out CityBuilding house, out Prop tree, out CityLabel label) => Little(out house, out tree, out label, out _);
+
+    static CityMap Little(out CityBuilding house, out Prop tree, out CityLabel label, out Fence fence)
     {
         house = Made(4, 4, 3, 2);
         tree = new Prop { Kind = PropKind.Tree, X = 9.5, Y = 5.5 };
         label = new CityLabel { Text = "Mill Lane", X = 6, Y = 8 };
-        var fence = new Fence { Kind = FenceKind.Fence, Edges = [new(4, 3, true), new(5, 3, true), new(6, 3, true), new(7, 3, false), new(7, 4, false)] };
+        fence = new Fence { Kind = FenceKind.Fence, Points = [new(4, 3), new(7, 3), new(7, 5)] };
         return CityMap.Empty(20, 16) with { Buildings = [house], Props = [tree], Labels = [label], Fences = [fence] };
     }
+
+    static List<(double, double)> Pts(Fence f) => [.. f.Points.Select(p => (p.X, p.Y))];
 
     [Fact]
     public void A_box_picks_what_is_wholly_inside_it()
     {
-        var m = Little(out var house, out var tree, out var label);
+        var m = Little(out var house, out var tree, out var label, out var fence);
         var all = CityEdit.Within(m, 3, 2, 10, 9);
         Assert.Equal([house.Id], all.Buildings);
         Assert.Equal([tree.Id], all.Props);
         Assert.Equal([label.Id], all.Labels);
-        Assert.Equal(5, all.Fences.Count);
-        // Drawn from the other corner, and one that cuts the house in two.
+        Assert.Equal([fence.Id], all.Fences);
+        // Drawn from the other corner, and one that cuts the house and the fence in two.
         Assert.Equal(all.Buildings, CityEdit.Within(m, 10, 9, 3, 2).Buildings);
         var part = CityEdit.Within(m, 3, 2, 5.5, 9);
         Assert.Empty(part.Buildings);
-        Assert.Equal(new HashSet<FenceEdge> { new(4, 3, true) }, part.Fences);
+        Assert.Empty(part.Fences);
     }
 
     [Fact]
-    public void A_fence_run_is_the_edges_joined_end_to_end()
+    public void Old_fences_of_grid_edges_become_lines_from_point_to_point()
     {
-        var m = Little(out _, out _, out _);
-        m = m with { Fences = [.. m.Fences, new Fence { Kind = FenceKind.Fence, Edges = [new(12, 12, true)] }] };
-        Assert.Equal(5, CityEdit.Run(m, new FenceEdge(5, 3, true)).Count);
-        Assert.Single(CityEdit.Run(m, new FenceEdge(12, 12, true)));
-        Assert.Empty(CityEdit.Run(m, new FenceEdge(0, 0, true)));
+        var old = CityMap.Empty(20, 16) with
+        {
+            Fences =
+            [
+                new Fence { Kind = FenceKind.Hedge, Edges = [new(4, 3, true), new(5, 3, true), new(6, 3, true), new(7, 3, false), new(7, 4, false), new(12, 12, true)] },
+                // A ring: a field's hedge all the way round.
+                new Fence { Kind = FenceKind.Fence, Edges = [new(0, 0, true), new(1, 0, true), new(2, 0, false), new(1, 1, true), new(0, 1, true), new(0, 0, false)] },
+            ],
+        };
+        var m = old.Tidied();
+        Assert.Equal(3, m.Fences.Count);
+        Assert.All(m.Fences, f => Assert.Empty(f.Edges));
+        var run = m.Fences.Single(f => f.Kind == FenceKind.Hedge && f.Points.Count == 3);
+        Assert.Equal(5, run.Length, 6);
+        Assert.Equal(old.Fences[0].Id, run.Id);
+        Assert.Contains((7.0, 3.0), Pts(run));
+        Assert.Single(m.Fences, f => f.Kind == FenceKind.Hedge && f.Length == 1);
+        var ring = m.Fences.Single(f => f.Kind == FenceKind.Fence);
+        Assert.True(ring.Closed);
+        Assert.Equal(4, ring.Points.Count);
+        Assert.Equal(6, ring.Length, 6);
+        // The same edges back.
+        Assert.Equal(old.Fences.SelectMany(f => f.Edges).ToHashSet(), m.Fences.SelectMany(f => f.GridEdges()).ToHashSet());
+        // Saved and opened again, as lines.
+        var back = CityMap.FromJson(old.ToJson())!;
+        Assert.Equal(3, back.Fences.Count);
+        Assert.Equal(Pts(run), Pts(back.Fences.Single(f => f.Id == run.Id)));
     }
 
     [Fact]
@@ -64,14 +90,12 @@ public class CityBuilderEditTests
         Assert.Equal((house.X + 3, house.Y - 1), (h.X, h.Y));
         Assert.Equal((12.5, 4.5), (moved.Props[0].X, moved.Props[0].Y));
         Assert.Equal((9.0, 7.0), (moved.Labels[0].X, moved.Labels[0].Y));
-        Assert.Contains(new FenceEdge(7, 2, true), moved.Fences[0].Edges);
-        Assert.Contains(new FenceEdge(10, 3, false), moved.Fences[0].Edges);
-        Assert.Equal(5, moved.Fences[0].Edges.Count);
-        Assert.Equal(moved.Fences[0].Edges.ToHashSet(), after.Fences);
+        Assert.Equal([(7.0, 2.0), (10.0, 2.0), (10.0, 4.0)], Pts(moved.Fences[0]));
+        Assert.Equal([moved.Fences[0].Id], after.Fences);
         // Too far: stopped at the edge (the fence's top at row 3 can go up 3 squares, no more).
         var (far, _) = CityEdit.Move(m, pick, -100, -100);
         Assert.Equal((0, 1), (far.Building(house.Id)!.X, far.Building(house.Id)!.Y));
-        Assert.Contains(new FenceEdge(0, 0, true), far.Fences[0].Edges);
+        Assert.Equal((0.0, 0.0), Pts(far.Fences[0])[0]);
         // Nothing to move: the same map.
         Assert.Same(m, CityEdit.Move(m, CityPick.None, 2, 2).Map);
     }
@@ -95,13 +119,13 @@ public class CityBuilderEditTests
         var (x, p, pivot) = CityEdit.Turn(m, all, 1);
         for (int i = 0; i < 3; i++) (x, p, pivot) = CityEdit.Turn(x, p, 1, pivot);
         Assert.Equal((house.X, house.Y, 0), (x.Building(house.Id)!.X, x.Building(house.Id)!.Y, x.Building(house.Id)!.Turn));
-        Assert.Equal(m.Fences[0].Edges.ToHashSet(), x.Fences[0].Edges.ToHashSet());
+        Assert.Equal(Pts(m.Fences[0]), Pts(x.Fences[0]));
         Assert.Equal((tree.X, tree.Y), (x.Props[0].X, x.Props[0].Y));
         Assert.Equal((label.X, label.Y), (x.Labels[0].X, x.Labels[0].Y));
         // A turn the other way undoes one.
         var (once, p1, pv) = CityEdit.Turn(m, all, 1);
         var (back, _, _) = CityEdit.Turn(once, p1, -1, pv);
-        Assert.Equal(m.Fences[0].Edges.ToHashSet(), back.Fences[0].Edges.ToHashSet());
+        Assert.Equal(Pts(m.Fences[0]), Pts(back.Fences[0]));
         Assert.Equal((house.X, house.Y), (back.Building(house.Id)!.X, back.Building(house.Id)!.Y));
         // Turned at the map's edge, it's moved back onto the map.
         var edge = CityMap.Empty(10, 10) with { Buildings = [Made(0, 0, 6, 1) with { }] };
@@ -124,7 +148,8 @@ public class CityBuilderEditTests
         Assert.Equal(2, pasted.Buildings.Count);
         Assert.Equal(2, pasted.Props.Count);
         Assert.Equal(2, pasted.Labels.Count);
-        Assert.Equal(10, pasted.Fences.Sum(f => f.Edges.Count));
+        Assert.Equal(2, pasted.Fences.Count);
+        Assert.Equal(10, pasted.Fences.Sum(f => f.Length), 6);
         var copy = pasted.Buildings.Single(b => b.Id != house.Id);
         Assert.Contains(copy.Id, pick.Buildings);
         Assert.Equal((house.X + 7, house.Y + 5), (copy.X, copy.Y));
@@ -135,7 +160,7 @@ public class CityBuilderEditTests
         // Taking them away.
         var gone = CityEdit.Delete(pasted, pick);
         Assert.Single(gone.Buildings);
-        Assert.Equal(5, gone.Fences.Sum(f => f.Edges.Count));
+        Assert.Single(gone.Fences);
     }
 
     [Fact]
