@@ -120,8 +120,16 @@ public static partial class HouseKitMaker
         // Each floor's plate (plan mm, y towards you), worked out first: the columns under it are flush with it.
         var swung = new List<SwungDoor>();
         bool anyPolygon = false;
+        // Each storey's walls (cut where they're too long) and its columns, worked out first: the floors reach round the columns.
+        var splits = Enumerable.Range(0, levels).Select(k => Split(d.Levels[k], plans[k], s, sq, k, longestMm, findings)).ToList();
+        var allJoints = splits.Select((sp, k) =>
+        {
+            var j = plans[k].Joints.ToDictionary(x => x.Key, x => x.Value);
+            foreach (var (g2, dirs) in sp.Joints) j[g2] = dirs;
+            return j;
+        }).ToList();
         var plates = new List<PathsD> { new() };
-        for (int k = 1; k < levels; k++) plates.Add(PlateArea(d, plans, k, sq, C));
+        for (int k = 1; k < levels; k++) plates.Add(PlateArea(d, plans, k, sq, s, allJoints[k - 1], allJoints[k]));
 
         for (int k = 0; k < levels; k++)
         {
@@ -129,7 +137,7 @@ public static partial class HouseKitMaker
             var plan = plans[k];
             double y0 = BuildingKitMaker.StoreyBase(s, k);
             string floorName = levels == 1 ? "" : $"floor {k + 1} ";
-            var (runs, extraJoints) = Split(level, plan, s, sq, k, longestMm, findings);
+            var runs = splits[k].Runs;
             // Walls that come out the same are cut together: their pieces once, with copies for each.
             var groups = new Dictionary<string, (List<Walls.Part> Parts, WallSpec Spec, List<string> Letters)>();
             int letter = 0;
@@ -219,8 +227,7 @@ public static partial class HouseKitMaker
             }
 
             // The columns: one at every corner, end and junction, and where a long wall was cut.
-            var joints = plan.Joints.ToDictionary(j => j.Key, j => j.Value);
-            foreach (var (g2, dirs) in extraJoints) joints[g2] = dirs;
+            var joints = allJoints[k];
             var byShape = new Dictionary<string, (double[] Dirs, bool Flush, ColumnShape Shape, bool Boxed, string? Texture, List<(Walls.Model.V3, double)> At)>();
             var unsuited = new List<ColumnShape>();
             var unboxable = new List<ColumnShape>();
@@ -592,14 +599,23 @@ public static partial class HouseKitMaker
 
     /// <summary>
     /// The area a floor's plate covers (plan mm): the rooms under it and on it, and the floor laid by hand,
-    /// grown to cover the columns and walls round them.
+    /// grown to the walls' outside faces and round the columns under it and on it, so its edge is flush with
+    /// the walls and the columns and never sticks out past them.
     /// </summary>
-    public static PathsD PlateArea(HouseDesign d, List<PlanShape> plans, int k, double sq, double columnMm)
+    public static PathsD PlateArea(HouseDesign d, List<PlanShape> plans, int k, double sq, BuildingSpec s,
+        IReadOnlyDictionary<GridPt, List<GridPt>> jointsBelow, IReadOnlyDictionary<GridPt, List<GridPt>> jointsOn)
     {
         var area = FloorArea(d.Levels[k], plans[k - 1], plans[k]);
         if (area.Count == 0) return [];
+        double C = s.ColumnMm, Wt = Math.Min(BuildingKitMaker.WallThickness(s), C);
         var mm = Geo.Map(area, p => new PointD(p.x * sq, p.y * sq));
-        return Geo.Union(Clipper.InflatePaths(mm, columnMm / 2, JoinType.Miter, EndType.Polygon, 4, 3));
+        // As far as it could ever reach (the columns' outside), then only the walls' faces and the columns' feet in that.
+        var reach = Geo.Union(Clipper.InflatePaths(mm, C / 2, JoinType.Miter, EndType.Polygon, 4, 3));
+        var keep = Clipper.InflatePaths(mm, Wt / 2, JoinType.Miter, EndType.Polygon, 4, 3);
+        foreach (var (level, joints) in new[] { (d.Levels[k - 1], jointsBelow), (d.Levels[k], jointsOn) })
+            foreach (var (g, dirs) in joints)
+                if (Inside(reach, g.X * sq, g.Y * sq)) keep.AddRange(Geo.Tidy([ColumnFoot(level, s, g, dirs, sq)]));   // (tidied: wound the same way as the rest)
+        return Geo.Tidy(Geo.Intersect(reach, Geo.Union(keep)));
     }
 
     static bool Inside(PathsD area, double x, double y) =>

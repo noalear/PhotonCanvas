@@ -402,7 +402,7 @@ public static partial class HouseKitMaker
             double lip = WallKitMaker.ColumnLip(wall);
             double baseY = BuildingKitMaker.StoreyBase(s, r.Level) + WallKitMaker.ColumnTopMm(wall);
             var rectMm = new PathsD { Geo.Rect(r.X0 * sq, r.Y0 * sq, r.X1 * sq, r.Y1 * sq) };
-            // (The floor above reaches half a column past its edge onto the walls: that much is no matter.)
+            // (The floor above reaches onto the walls and round the columns at its edge: that much is no matter.)
             if (r.Level + 1 < levels && plates[r.Level + 1].Count > 0 && Geo.Area(Geo.Intersect(rectMm, Geo.Offset(plates[r.Level + 1], -(s.ColumnMm / 2 + 0.5)))) > sq * sq * 0.25)
                 findings.Add(new(Severity.Warn, $"{what} is under floor {r.Level + 2}'s floor: put it on the floor above, or over rooms with nothing above them."));
             for (int j = 0; j < i; j++)
