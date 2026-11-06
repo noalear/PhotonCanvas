@@ -19,9 +19,10 @@ public enum PropKind { Tree, Pine, Bush, Boulder, Well, Cart, Crates, Lamp, Stat
 
 /// <summary>
 /// A building on the map: the building editor's design (its plan's top left corner at 0, 0), where its top
-/// left corner is on the map (squares) and how many quarter turns it's turned (clockwise seen from above).
-/// The turn only places it: the pieces are cut from the design as it is. <see cref="PrefabId"/> is the
-/// building editor's saved building it came from, if any.
+/// left corner is on the map (squares, plus a shift of less than a square), how many quarter turns it's
+/// turned (clockwise seen from above) and any further tilt in degrees about its middle (a house read off
+/// a map that sits at an angle to the grid). The turn and tilt only place it: the pieces are cut from the
+/// design as it is. <see cref="PrefabId"/> is the building editor's saved building it came from, if any.
 /// </summary>
 public sealed record CityBuilding
 {
@@ -36,6 +37,11 @@ public sealed record CityBuilding
     public int X { get; init; }
     public int Y { get; init; }
     public int Turn { get; init; }
+    /// <summary>How far past X, Y its corner really is (squares; 0 on a map drawn to the grid).</summary>
+    public double ShiftX { get; init; }
+    public double ShiftY { get; init; }
+    /// <summary>Its turn past the quarter turns, clockwise about its middle (degrees; 0 on a map drawn to the grid).</summary>
+    public double TiltDeg { get; init; }
     public HouseDesign Design { get; init; } = new();
 }
 

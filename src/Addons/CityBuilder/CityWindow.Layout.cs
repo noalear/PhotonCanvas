@@ -692,6 +692,8 @@ public sealed partial class CityWindow
                 Field("Name", _bName), Field("Type", _bType), Field("District", _bDistrict), Field("Tags", _bTags), _bInfo),
             Explained("Its shape", "Quick changes here; open it in the building editor for everything else (rooms, doors, furniture, stairs).",
                 new WrapPanel { Children = { _bTurn.With(b => b.Margin = new(0, 0, 4, 4)), _bUp.With(b => b.Margin = new(0, 0, 4, 4)), _bDownLevel.With(b => b.Margin = new(0, 0, 4, 4)) } },
+                Field("Tilt (°)", _bTilt, tip: "A building read off a map that sits at an angle keeps its angle: clockwise degrees past its quarter turns. Square it to the grid to put it on whole squares."),
+                _bSquare,
                 Field("Roof", _bRoof), Field("Covering", _bCovering), _bRoofIt,
                 _bEdit),
             Explained("More", "Copy it, take it away, keep it to use again, or cut it.", new WrapPanel { Children = { _bCopy.With(b => b.Margin = new(0, 0, 4, 4)), _bDelete.With(b => b.Margin = new(0, 0, 4, 4)), _bSavePrefab.With(b => b.Margin = new(0, 0, 4, 4)) } },

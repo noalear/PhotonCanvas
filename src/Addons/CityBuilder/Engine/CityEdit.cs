@@ -145,9 +145,12 @@ public static class CityEdit
         var (turned, after) = Map(m, pick, Rot, q * 90, b =>
         {
             var (w, d) = CityFootprint.Size(b);
-            var (ax, ay) = Rot(b.X, b.Y);
-            var (bx, by2) = Rot(b.X + w, b.Y + d);
-            return b with { Turn = (b.Turn + q) % 4, X = (int)Math.Round(Math.Min(ax, bx)), Y = (int)Math.Round(Math.Min(ay, by2)) };
+            var (ax, ay) = Rot(b.X + b.ShiftX, b.Y + b.ShiftY);
+            var (bx, by2) = Rot(b.X + b.ShiftX + w, b.Y + b.ShiftY + d);
+            // On the grid the corner stays a whole number; off it the shift goes round with the building (its tilt is about its own middle, so it keeps).
+            double nx = Math.Min(ax, bx), ny = Math.Min(ay, by2);
+            int x = CityFootprint.OnGrid(b) ? (int)Math.Round(nx) : (int)Math.Floor(nx + 1e-9), y = CityFootprint.OnGrid(b) ? (int)Math.Round(ny) : (int)Math.Floor(ny + 1e-9);
+            return b with { Turn = (b.Turn + q) % 4, X = x, Y = y, ShiftX = CityFootprint.OnGrid(b) ? 0 : nx - x, ShiftY = CityFootprint.OnGrid(b) ? 0 : ny - y };
         });
         // Back onto the map: moved by what it hangs over the edge (and the pivot with it).
         if (Bounds(turned, after) is not { } nb) return (turned, after, (cx, cy));

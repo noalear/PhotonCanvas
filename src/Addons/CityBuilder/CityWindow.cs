@@ -137,6 +137,8 @@ public sealed partial class CityWindow : Window
     readonly ComboBox _bRoof = Combo("Gable", "Hipped", "Lean-to", "Flat");
     readonly Button _bTurn = UiKit.Button("Turn ⟳"), _bUp = UiKit.Button("Add a floor"), _bDownLevel = UiKit.Button("Take the top floor off"), _bEdit = new() { Content = "Edit in the building editor…", Classes = { "primary" } };
     readonly Button _bCopy = UiKit.Button("Copy it"), _bDelete = UiKit.Button("Take it away"), _bRoofIt = UiKit.Button("Roof it again"), _bSavePrefab = UiKit.Button("Save as a building to reuse");
+    readonly TextBox _bTilt = new();
+    readonly Button _bSquare = UiKit.Button("Square it to the grid");
     readonly TextBlock _bInfo = Hint();
     Control _buildingPanel = null!, _noBuilding = null!;
     bool _loadingBuilding;
@@ -283,8 +285,8 @@ public sealed partial class CityWindow : Window
             _fromList = true;
             _plan.SetPick(CityPick.Of(b));
             _fromList = false;
-            var (w, d) = CityFootprint.Size(b);
-            _plan.CentreOn(b.X + w / 2.0, b.Y + d / 2.0);
+            var (cx, cy) = CityFootprint.Centre(b);
+            _plan.CentreOn(cx, cy);
             ShowView(false);
         };
         _byDistrict.IsCheckedChanged += (_, _) => _plan.DistrictColours = _byDistrict.IsChecked == true;
@@ -321,6 +323,8 @@ public sealed partial class CityWindow : Window
         _bDistrict.LostFocus += (_, _) => ChangeBuilding(b => b with { District = (_bDistrict.Text ?? "").Trim() }, "Change a building's district");
         _bTags.LostFocus += (_, _) => ChangeBuilding(b => b with { Tags = Tags(_bTags.Text) }, "Change a building's tags");
         _bTurn.Click += (_, _) => _plan.TurnPicked(1);
+        _bTilt.LostFocus += (_, _) => ChangeBuilding(b => double.TryParse(_bTilt.Text, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.CurrentCulture, out double t) ? b with { TiltDeg = Math.Clamp(t, -89, 89) } : b, "Tilt a building");
+        _bSquare.Click += (_, _) => ChangeBuilding(b => b with { TiltDeg = 0, ShiftX = 0, ShiftY = 0, X = (int)Math.Round(b.X + b.ShiftX), Y = (int)Math.Round(b.Y + b.ShiftY) }, "Square a building to the grid");
         _bUp.Click += (_, _) => ChangeBuilding(b => b with { Design = AddFloor(b.Design) }, "Add a floor");
         _bDownLevel.Click += (_, _) => ChangeBuilding(b => b with { Design = TakeFloor(b.Design) }, "Take a floor off");
         _bRoof.SelectionChanged += (_, _) => ChangeBuilding(b => b with { Design = b.Design with { Roofs = [.. b.Design.Roofs.Select(r => r with { Kind = (RoofKind)Math.Max(0, _bRoof.SelectedIndex) })] } }, "Change a roof");
@@ -525,7 +529,10 @@ public sealed partial class CityWindow : Window
         var (w, d) = CityFootprint.Size(b);
         int floors = b.Design.Levels.Count;
         _bInfo.Text = $"{w} × {d} squares, {floors} floor{(floors == 1 ? "" : "s")}, {b.Design.Levels.Sum(l => l.Walls.Count)} squares of wall"
+            + (CityFootprint.OnGrid(b) ? "" : b.TiltDeg != 0 ? $", tilted {b.TiltDeg:0.#}°" : ", off the grid")
             + (b.PrefabId is not null ? ". From a saved building." : ".");
+        _bTilt.Text = b.TiltDeg.ToString("0.#");
+        _bSquare.IsEnabled = !CityFootprint.OnGrid(b);
         if (b.Design.Roofs.Count > 0)
         {
             _bRoof.SelectedIndex = (int)b.Design.Roofs[0].Kind;
@@ -1358,5 +1365,5 @@ static class CityBuildingCompare
 {
     public static bool ToJsonEqual(this CityBuilding a, CityBuilding b) =>
         a.Name == b.Name && a.Type == b.Type && a.District == b.District && a.Tags.SequenceEqual(b.Tags) && a.X == b.X && a.Y == b.Y && a.Turn == b.Turn
-        && a.PrefabId == b.PrefabId && a.Design.ToJson() == b.Design.ToJson();
+        && a.ShiftX == b.ShiftX && a.ShiftY == b.ShiftY && a.TiltDeg == b.TiltDeg && a.PrefabId == b.PrefabId && a.Design.ToJson() == b.Design.ToJson();
 }

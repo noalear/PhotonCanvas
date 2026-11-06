@@ -26,8 +26,8 @@ battle map**). Its grid is found by itself.
 
 ## Make the town from it
 <!-- target: button:Read the map -->
-Press **Read the map**: the ground, the buildings and the trees are read from the picture. It's a
-best guess, so check it over.
+Press **Read the map**: the ground, the buildings (each roof as its own building, square to the grid
+or at its angle) and the trees are read from the picture. It's a best guess, so check it over.
 
 ## Paint the ground
 <!-- target: button:Paint -->
