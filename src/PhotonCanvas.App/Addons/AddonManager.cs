@@ -296,10 +296,7 @@ sealed class AddonLoadContext : AssemblyLoadContext
 
     public Assembly LoadMain()
     {
-        var file = _manifest.Assembly is { Length: > 0 } a ? Path.Combine(_manifest.Folder, a)
-            : Directory.GetFiles(_manifest.Folder, "PhotonCanvas.Addon.*.dll").SingleOrDefault()
-              ?? throw new InvalidOperationException("addon.json doesn't say which .dll to load (\"assembly\"), and there isn't exactly one PhotonCanvas.Addon.*.dll.");
-        return FromFile(file);
+        return FromFile(_manifest.MainAssemblyFile());
     }
 
     public Assembly? Loaded(AssemblyName name) => _mine.GetValueOrDefault(name.Name ?? "");
