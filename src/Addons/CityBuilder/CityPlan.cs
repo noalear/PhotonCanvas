@@ -9,15 +9,15 @@ using PhotonCanvas.App;
 namespace PhotonCanvas.Addon.CityBuilder;
 
 /// <summary>What dragging on the map does.</summary>
-public enum CityTool { Select, Ground, Fill, Building, Place, Fence, Prop, Erase, Road, Label }
+public enum CityTool { Select, Ground, Fill, Building, Place, Fence, Prop, Erase, Road, Label, Furnish }
 
 /// <summary>
 /// The map seen from above, on its grid, over the battle map it was read from (if any): the ground, each
 /// building's walls, doors and roof, fences and the trees and other things. Zoom with the wheel; move it with
 /// the middle button, or Shift and drag. With the tool chosen: pick and drag buildings (R or the wheel while
 /// dragging turns one, Delete takes it away), paint or fill the ground, drag out a new building's footprint,
-/// put down a saved building, draw fences along the grid lines, drop trees and the like, lay roads, write
-/// labels, or rub things out. The right button rubs out with the painting tools. With Select, drag a box to
+/// put down a saved building, draw fences along the grid lines, drop trees and the like, put down the
+/// furniture maker's pieces on a fine grid, lay roads, write labels, or rub things out. The right button rubs out with the painting tools. With Select, drag a box to
 /// pick everything in it, Ctrl and click to add to what's picked, and copy, paste, turn and move it all at once.
 /// </summary>
 public sealed class CityPlan : Control
@@ -43,6 +43,12 @@ public sealed class CityPlan : Control
     /// <summary>What the Place tool puts down, turned by <see cref="PlaceTurn"/>.</summary>
     public PrefabInfo? ToPlace { get; set; }
     public int PlaceTurn { get; set; }
+    /// <summary>What the Furniture tool puts down, turned <see cref="FurnishTurn"/> degrees (clockwise from above, 0 with its front towards the bottom).</summary>
+    public PhotonCanvas.Addon.Furniture.CatalogEntry? ToFurnish { get => _furnish; set { _furnish = value; _ghost = null; } }
+    PhotonCanvas.Addon.Furniture.CatalogEntry? _furnish;
+    public double FurnishTurn { get; set; }
+    /// <summary>Raised when R turns the piece the Furniture tool puts down.</summary>
+    public event Action<double>? FurnishTurnChanged;
     /// <summary>Makes a new building for a footprint dragged out with the Building tool (squares, top left and size).</summary>
     public Func<int, int, int, int, CityBuilding?>? NewBuilding { get; set; }
     /// <summary>What the Road tool lays and how many squares wide.</summary>
@@ -54,7 +60,7 @@ public sealed class CityPlan : Control
     public double LabelTurn { get; set; }
     /// <summary>Raised when R turns the label the Label tool writes.</summary>
     public event Action<double>? LabelTurnChanged;
-    /// <summary>How the points of roads, fences and walls (and things put down) snap: to the grid, half squares, or not at all.</summary>
+    /// <summary>How the points of roads, fences and walls (and things put down and dragged) snap: to the grid, half squares, tenths, or not at all. Furniture keeps to tenths at most.</summary>
     public CitySnap Snap { get; set; } = CitySnap.Squares;
     /// <summary>What the Fence tool draws: a line from point to point, or (true) a rectangle all the way round; and whether it's a ruin.</summary>
     public bool FenceRectangle { get; set; }
@@ -69,7 +75,7 @@ public sealed class CityPlan : Control
     public bool DistrictColours { get => _districts; set { _districts = value; InvalidateVisual(); } }
     bool _districts;
 
-    /// <summary>What's picked: buildings, trees and things, labels and stretches of fence.</summary>
+    /// <summary>What's picked: buildings, trees and things, furniture, labels and stretches of fence.</summary>
     public CityPick Pick { get; private set; } = CityPick.None;
 
     /// <summary>The one building picked (when that's all that's picked).</summary>
@@ -234,6 +240,15 @@ public sealed class CityPlan : Control
         return null;
     }
 
+    /// <summary>The piece of furniture under the pointer (the last put down, on top, first).</summary>
+    CityItem? ItemAt((double X, double Y) p)
+    {
+        double reach = Math.Max(0.02, 3 / K);
+        for (int i = _map.Items.Count - 1; i >= 0; i--)
+            if (_map.Items[i].Hit(p.X, p.Y, _map.SquareMm, reach)) return _map.Items[i];
+        return null;
+    }
+
     CityLabel? LabelAt((double X, double Y) p)
     {
         for (int i = _map.Labels.Count - 1; i >= 0; i--)
@@ -261,10 +276,11 @@ public sealed class CityPlan : Control
         return null;
     }
 
-    /// <summary>The one thing under the pointer, as a pick: a label, a tree or thing, a building, a fence or a road.</summary>
+    /// <summary>The one thing under the pointer, as a pick: a label, a piece of furniture, a tree or thing, a building, a fence or a road.</summary>
     CityPick? HitAt((double X, double Y) p)
     {
         if (LabelAt(p) is { } l) return CityPick.Of(l);
+        if (ItemAt(p) is { } i) return CityPick.Of(i);
         if (PropAt(p) is { } q) return CityPick.Of(q);
         if (BuildingAt(p) is { } b) return CityPick.Of(b);
         if (FenceAt(p) is { } f) return CityPick.Of(f);
@@ -340,6 +356,9 @@ public sealed class CityPlan : Control
         var overlaps = CityFootprint.Overlaps(_map).SelectMany(p => new[] { p.A.Id, p.B.Id }).ToHashSet();
         foreach (var b in _map.Buildings) DrawBuilding(ctx, b, k, overlaps.Contains(b.Id));
 
+        // Furniture, under the trees.
+        foreach (var i in _map.Items) DrawItem(ctx, i, k, Pick.Items.Contains(i.Id), false);
+
         // Trees and the like, and the labels and road names.
         foreach (var p in _map.Props) DrawProp(ctx, p, k);
         DrawRoadNames(ctx, k);
@@ -352,7 +371,7 @@ public sealed class CityPlan : Control
 
         // What the pointer is over, and what's being dragged.
         DrawHover(ctx, k);
-        if (_map.Buildings.Count == 0 && _map.Props.Count == 0 && _map.Labels.Count == 0 && _map.Roads.Count == 0)
+        if (_map.Buildings.Count == 0 && _map.Props.Count == 0 && _map.Labels.Count == 0 && _map.Roads.Count == 0 && _map.Items.Count == 0)
             Text(ctx, "Read a battle map, or drag out buildings with the Building tool", new Point(Bounds.Width / 2, Bounds.Height - 22), UiKit.Brush("TextMuted"), 11, true);
     }
 
@@ -496,6 +515,69 @@ public sealed class CityPlan : Control
         if (p.Kind is PropKind.Cart or PropKind.Crates) ctx.FillRectangle(fill, new Rect(at.X - r * 0.8, at.Y - r * 0.5, r * 1.6, r));
         else ctx.DrawEllipse(fill, k >= 8 ? new Pen(new SolidColorBrush(Color.FromArgb(0x80, 0, 0, 0)), 1) : null, at, r, r);
         if (Pick.Props.Contains(p.Id)) ctx.DrawEllipse(null, new Pen(PickBrush, 2), at, r + 2, r + 2);
+    }
+
+    /// <summary>A piece of furniture's pieces seen from above, ready to draw (mm about its middle, front towards +y), lighter the higher each stands.</summary>
+    static readonly System.Runtime.CompilerServices.ConditionalWeakTable<HouseEditor.ItemLook, List<(Avalonia.Media.Geometry Shape, IBrush Fill)>> ItemDrawings = [];
+
+    static List<(Avalonia.Media.Geometry Shape, IBrush Fill)> ItemDrawing(HouseEditor.ItemLook look)
+    {
+        if (ItemDrawings.TryGetValue(look, out var known)) return known;
+        double lowest = look.Parts.Count > 0 ? look.Parts.Min(p => p.Top) : 0, highest = look.Parts.Count > 0 ? look.Parts.Max(p => p.Top) : 1;
+        var parts = new List<(Avalonia.Media.Geometry, IBrush)>();
+        foreach (var part in look.Parts)
+        {
+            var g = new StreamGeometry();
+            using (var c = g.Open())
+            {
+                c.SetFillRule(FillRule.EvenOdd);
+                foreach (var path in part.Shape.Where(q => q.Count >= 3))
+                {
+                    c.BeginFigure(new Point(path[0].x, path[0].y), true);
+                    foreach (var q in path.Skip(1)) c.LineTo(new Point(q.x, q.y));
+                    c.EndFigure(true);
+                }
+            }
+            double t = highest - lowest < 1e-6 ? 1 : (part.Top - lowest) / (highest - lowest);
+            byte L(double lo, double hi) => (byte)Math.Round(lo + (hi - lo) * t);
+            parts.Add((g, new SolidColorBrush(Color.FromArgb(0xF0, L(0x7A, 0xE2), L(0x52, 0xC2), L(0x2E, 0x90)))));
+        }
+        ItemDrawings.AddOrUpdate(look, parts);
+        return parts;
+    }
+
+    static readonly IBrush ItemFloor = new SolidColorBrush(Color.FromArgb(0x50, 0x3A, 0x26, 0x12));
+    static readonly IBrush ItemFront = new SolidColorBrush(Color.FromRgb(0x3A, 0x26, 0x12));
+
+    /// <summary>
+    /// A piece of furniture seen from above, turned as it's put down: the floor it takes, its pieces (the furniture
+    /// maker's, lowest first) once there's room to make them out, and its front as a dark edge.
+    /// </summary>
+    void DrawItem(DrawingContext ctx, CityItem i, double k, bool picked, bool ghost)
+    {
+        double sq = _map.SquareMm, px = k / Math.Max(1, sq);
+        var corners = i.Corners(sq).Select(q => At(q.X, q.Y)).ToList();
+        var outline = new PolylineGeometry(corners, true);
+        var look = CityItems.Look(i, sq);
+        using (ctx.PushOpacity(ghost ? 0.6 : 1))
+        {
+            ctx.DrawGeometry(ItemFloor, null, outline);
+            if (Math.Min(look.W, look.D) * px >= 4 && look.Parts.Count > 0)
+            {
+                double a = i.TurnDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a);
+                var at = At(i.X, i.Y);
+                // The piece's mm about its middle → the screen, turned clockwise as on the map.
+                using (ctx.PushTransform(new Matrix(c * px, s * px, -s * px, c * px, at.X, at.Y)))
+                {
+                    var line = new Pen(new SolidColorBrush(Color.FromArgb(0xD8, 0x4A, 0x32, 0x1C)), 0.8 / px);
+                    foreach (var (g, fill) in ItemDrawing(look)) ctx.DrawGeometry(fill, line, g);
+                }
+            }
+            else ctx.DrawGeometry(new SolidColorBrush(Color.FromRgb(0xB0, 0x86, 0x58)), null, outline);
+            if (k >= 12) ctx.DrawLine(new Pen(ItemFront, Math.Clamp(k * 0.04, 1.5, 3), lineCap: PenLineCap.Flat), corners[0], corners[1]);
+        }
+        if (picked) ctx.DrawGeometry(null, new Pen(PickBrush, 2), outline);
+        else if (ghost) ctx.DrawGeometry(null, new Pen(PickBrush, 1.2) { DashStyle = new DashStyle([3, 2], 0) }, outline);
     }
 
     void DrawLabel(DrawingContext ctx, CityLabel l, double k, bool picked)
@@ -841,9 +923,8 @@ public sealed class CityPlan : Control
             }
             case CityTool.Place when ToPlace is { } p:
             {
-                var b = p.Place((int)Math.Floor(hp.X), (int)Math.Floor(hp.Y), PlaceTurn);
-                var (w, d) = CityFootprint.Size(b);
-                ctx.FillRectangle(HoverBrush, new Rect(At(b.X, b.Y), At(b.X + w, b.Y + d)));
+                var b = PlaceAt(p, hp);
+                ctx.DrawGeometry(HoverBrush, null, new PolylineGeometry(CityFootprint.Corners(b).Select(c => At(c.X, c.Y)).ToList(), true));
                 foreach (var w0 in b.Design.Levels.FirstOrDefault()?.Walls ?? [])
                 {
                     var (ax, ay) = CityFootprint.ToMap(b, w0.A.X, w0.A.Y);
@@ -853,7 +934,21 @@ public sealed class CityPlan : Control
                 break;
             }
             case CityTool.Prop:
-                ctx.DrawEllipse(_right ? RubBrush : HoverBrush, null, At(hp.X, hp.Y), Math.Max(3, k * 0.4), Math.Max(3, k * 0.4));
+            {
+                var at = PropSpot(new CityPt(hp.X, hp.Y));
+                ctx.DrawEllipse(_right ? RubBrush : HoverBrush, null, At(at.X, at.Y), Math.Max(3, k * 0.4), Math.Max(3, k * 0.4));
+                break;
+            }
+            case CityTool.Furnish when !_right && ItemAt(hp) is null && Ghost() is { } ghost:
+            {
+                var at = ItemSpot(new CityPt(hp.X, hp.Y));
+                DrawItem(ctx, ghost with { X = at.X, Y = at.Y, TurnDeg = FurnishTurn }, k, false, true);
+                var (w, d) = ghost.Size(_map.SquareMm);
+                Text(ctx, $"{ghost.Name}: {w * 5:0.#} × {d * 5:0.#} ft", At(at.X, at.Y) + new Point(10, 8), UiKit.Brush("Text"), 11, false, shadow: true);
+                break;
+            }
+            case CityTool.Furnish when _right:
+                if (ItemAt(hp) is { } under) DrawItem(ctx, under, k, true, false);
                 break;
             case CityTool.Road:
             {
@@ -904,6 +999,55 @@ public sealed class CityPlan : Control
     /// <summary>Where a road's point snaps (its middle line on grid lines, or square middles for an odd width).</summary>
     CityPt RoadSnap(CityPt p, double width) => CityEdit.Snapped(p, Snap, CityEdit.RoadOffset(width));
 
+    /// <summary>How far one step of the snap is (squares): 1, a half, a tenth, or 0 for anywhere.</summary>
+    double SnapStep => Snap switch { CitySnap.Squares => 1, CitySnap.HalfSquares => 0.5, CitySnap.Fine => 0.1, _ => 0 };
+
+    /// <summary>How far what's picked moves at a time when it's dragged (squares; 0 for anywhere): the snap's step, a tenth at most for furniture on its own.</summary>
+    double MoveStep(CityPick pick)
+    {
+        double step = SnapStep;
+        bool furniture = pick.Items.Count > 0 && pick.Count == pick.Items.Count;
+        return furniture ? Math.Min(step, 0.1) : step;
+    }
+
+    /// <summary>A distance moved, to the nearest step (or a thousandth of a square, for anywhere).</summary>
+    static double Stepped(double d, double step) => step <= 0 ? Math.Round(d, 3) : Math.Round(Math.Round(d / step) * step, 6);
+
+    /// <summary>Where a piece of furniture put down goes: on the fine grid (tenths of a square) unless Snap is Free.</summary>
+    CityPt ItemSpot(CityPt p) => CityEdit.Snapped(p, Snap == CitySnap.Free ? CitySnap.Free : CitySnap.Fine);
+
+    /// <summary>Where a tree or thing put down goes: the town's bigger pieces on half squares, trees and the like on quarters, or on the fine grid, or anywhere.</summary>
+    CityPt PropSpot(CityPt p) => Snap switch
+    {
+        CitySnap.Free => CityEdit.Snapped(p, CitySnap.Free),
+        CitySnap.Fine => CityEdit.Snapped(p, CitySnap.Fine),
+        _ when Prop.Footprint(PropKind) is not null => CityEdit.Snapped(p, CitySnap.HalfSquares),
+        _ => new CityPt(Math.Round(p.X * 4) / 4, Math.Round(p.Y * 4) / 4),
+    };
+
+    /// <summary>A saved building put down with its top left corner at the pointer: on whole squares, or half squares or finer as Snap says.</summary>
+    CityBuilding PlaceAt(PrefabInfo prefab, (double X, double Y) p)
+    {
+        double step = SnapStep;
+        if (step >= 1) return prefab.Place((int)Math.Floor(p.X), (int)Math.Floor(p.Y), PlaceTurn);
+        double x = step > 0 ? Math.Round(Math.Floor(p.X / step + 1e-9) * step, 6) : Math.Round(p.X, 3);
+        double y = step > 0 ? Math.Round(Math.Floor(p.Y / step + 1e-9) * step, 6) : Math.Round(p.Y, 3);
+        var b = prefab.Place((int)Math.Floor(x), (int)Math.Floor(y), PlaceTurn);
+        return CityEdit.Shifted(b, x - b.X, y - b.Y);
+    }
+
+    CityItem? _ghost;
+
+    /// <summary>The piece the Furniture tool puts down, made for the map's squares (remembered while it's the same).</summary>
+    CityItem? Ghost()
+    {
+        if (_furnish is null) return null;
+        if (_ghost is { } g && g.CatalogId == _furnish.Id && Math.Abs(_ghostSquare - _map.SquareMm) < 1e-9) return g;
+        _ghostSquare = _map.SquareMm;
+        return _ghost = CityItems.Make(_furnish, _map.SquareMm);
+    }
+    double _ghostSquare;
+
     /// <summary>The point (or side, between it and the next) of the picked road or fence within a few pixels of the pointer.</summary>
     (int Index, bool Side)? HandleAt((double X, double Y) p)
     {
@@ -941,6 +1085,12 @@ public sealed class CityPlan : Control
         {
             PlaceTurn = (PlaceTurn + (e.Delta.Y > 0 ? 1 : 3)) % 4;
             InvalidateVisual();
+            e.Handled = true;
+            return;
+        }
+        if (Tool == CityTool.Furnish && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            TurnFurnish(e.Delta.Y > 0 ? 15 : -15);
             e.Handled = true;
             return;
         }
@@ -1081,7 +1231,7 @@ public sealed class CityPlan : Control
                 if (_right) { PlaceTurn = (PlaceTurn + 1) % 4; _down = false; }
                 else if (ToPlace is { } prefab)
                 {
-                    var b = prefab.Place((int)Math.Floor(p.X), (int)Math.Floor(p.Y), PlaceTurn);
+                    var b = PlaceAt(prefab, p);
                     _map = _map.WithBuilding(b);
                     SetPick(CityPick.Of(b));
                     _changed = true;
@@ -1099,12 +1249,34 @@ public sealed class CityPlan : Control
                 if (_right) RemovePropAt(p);
                 else
                 {
-                    // The town's bigger pieces on half squares, trees and the like on quarters (or where they're dropped).
-                    var at = Snap == CitySnap.Free ? CityEdit.Snapped(cp, CitySnap.Free)
-                        : Prop.Footprint(PropKind) is not null ? CityEdit.Snapped(cp, CitySnap.HalfSquares)
-                        : new CityPt(Math.Round(p.X * 4) / 4, Math.Round(p.Y * 4) / 4);
+                    // The town's bigger pieces on half squares, trees and the like on quarters (or on the fine grid, or where they're dropped).
+                    var at = PropSpot(cp);
                     _map = _map with { Props = [.. _map.Props, new Prop { Kind = PropKind, X = at.X, Y = at.Y, TurnDeg = Prop.Footprint(PropKind) is null ? Random.Shared.Next(360) : 0, Size = PropKind is PropKind.Tree or PropKind.Pine ? 1.2 : 1 }] };
                     _changed = true;
+                }
+                break;
+            case CityTool.Furnish:
+                if (_right) RemoveItemAt(p);
+                else if (ItemAt(p) is { } under)
+                {
+                    // One already down: pick it and drag it.
+                    if (!Pick.Holds(CityPick.Of(under))) SetPick(CityPick.Of(under));
+                    _moveFrom = _map;
+                    _movePick = Pick;
+                    _grabAt = p;
+                }
+                else if (Ghost() is { } piece && _map.In((int)Math.Floor(p.X), (int)Math.Floor(p.Y)))
+                {
+                    // A new one where the pointer is, still to be dragged into place before the button's let go.
+                    var at = ItemSpot(cp);
+                    var item = piece with { Id = Guid.NewGuid(), X = at.X, Y = at.Y, TurnDeg = FurnishTurn };
+                    _map = _map with { Items = [.. _map.Items, item] };
+                    SetPick(CityPick.Of(item));
+                    _changed = true;
+                    _label = "Put down furniture";
+                    _moveFrom = _map;
+                    _movePick = Pick;
+                    _grabAt = p;
                 }
                 break;
             case CityTool.Label:
@@ -1135,7 +1307,7 @@ public sealed class CityPlan : Control
         var d = b - a;
         if (Math.Abs(d.X) > 2 * Math.Abs(d.Y)) return new CityPt(b.X, a.Y);
         if (Math.Abs(d.Y) > 2 * Math.Abs(d.X)) return new CityPt(a.X, b.Y);
-        double step = Snap == CitySnap.Squares ? 1 : Snap == CitySnap.HalfSquares ? 0.5 : 0.001;
+        double step = SnapStep > 0 ? SnapStep : 0.001;
         double m = Math.Round((Math.Abs(d.X) + Math.Abs(d.Y)) / 2 / step) * step;
         return new CityPt(a.X + Math.Sign(d.X) * m, a.Y + Math.Sign(d.Y) * m);
     }
@@ -1166,9 +1338,9 @@ public sealed class CityPlan : Control
                 case CityTool.Select when _box is { } bx:
                     _box = (bx.A, p);
                     break;
-                case CityTool.Select when _moveFrom is { } from:
+                case CityTool.Select or CityTool.Furnish when _moveFrom is { } from:
                 {
-                    int dx = (int)Math.Round(p.X - _grabAt.X), dy = (int)Math.Round(p.Y - _grabAt.Y);
+                    double step = MoveStep(_movePick), dx = Stepped(p.X - _grabAt.X, step), dy = Stepped(p.Y - _grabAt.Y, step);
                     var (moved, pick) = CityEdit.Move(from, _movePick, dx, dy);
                     if (!ReferenceEquals(moved, _map))
                     {
@@ -1199,6 +1371,9 @@ public sealed class CityPlan : Control
                     break;
                 case CityTool.Prop when _right:
                     RemovePropAt(p);
+                    break;
+                case CityTool.Furnish when _right:
+                    RemoveItemAt(p);
                     break;
             }
         }
@@ -1373,6 +1548,7 @@ public sealed class CityPlan : Control
                 CityTool.Prop => _right ? "Take away trees" : "Add a tree",
                 CityTool.Road => "Lay a road",
                 CityTool.Label => _right ? "Take a label away" : "Add a label",
+                CityTool.Furnish => _right ? "Take away furniture" : "Move furniture",
                 _ => "Rub out",
             });
             _changed = false;
@@ -1397,10 +1573,16 @@ public sealed class CityPlan : Control
             case Key.Delete or Key.Back when !Pick.IsEmpty:
                 DeletePicked();
                 break;
+            case Key.R when ctrl:
+                // Ctrl+R: each thing picked turned 15° about its own middle (a building tilts), Shift the other way.
+                TurnEachPicked(e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -15 : 15);
+                break;
             case Key.R or Key.OemCloseBrackets or Key.OemOpenBrackets:
             {
                 int by = e.Key == Key.OemOpenBrackets || e.KeyModifiers.HasFlag(KeyModifiers.Shift) ? -1 : 1;
-                if (Tool == CityTool.Place) { PlaceTurn = ((PlaceTurn + by) % 4 + 4) % 4; InvalidateVisual(); }
+                if (Tool == CityTool.Furnish && !_down && (Pick.IsEmpty || Pick.Items.Count != Pick.Count)) TurnFurnish(45 * by);
+                else if (Tool == CityTool.Furnish && !_down) { TurnEachPicked(45 * by); TurnFurnish(45 * by); }
+                else if (Tool == CityTool.Place) { PlaceTurn = ((PlaceTurn + by) % 4 + 4) % 4; InvalidateVisual(); }
                 else if (Tool == CityTool.Label && Pick.IsEmpty) { LabelTurn = CityLabel.Upright(LabelTurn + 15 * by); LabelTurnChanged?.Invoke(LabelTurn); InvalidateVisual(); }
                 else if (_down && _moveFrom is not null)
                 {
@@ -1417,8 +1599,12 @@ public sealed class CityPlan : Control
                 break;
             }
             case Key.Left or Key.Right or Key.Up or Key.Down when !Pick.IsEmpty && !_down:
-                Nudge(e.Key == Key.Left ? -1 : e.Key == Key.Right ? 1 : 0, e.Key == Key.Up ? -1 : e.Key == Key.Down ? 1 : 0);
+            {
+                // A step of the snap (a tenth of a square for furniture, or with Ctrl).
+                double step = ctrl ? 0.1 : MoveStep(Pick) is > 0 and var s ? s : 0.1;
+                Nudge(step * (e.Key == Key.Left ? -1 : e.Key == Key.Right ? 1 : 0), step * (e.Key == Key.Up ? -1 : e.Key == Key.Down ? 1 : 0));
                 break;
+            }
             case Key.Escape:
                 _box = null;
                 _line = null;
@@ -1479,6 +1665,21 @@ public sealed class CityPlan : Control
         (_turned, _pivot) = (_map, pivot);
     }
 
+    /// <summary>Each thing picked turned some degrees (clockwise) about its own middle: buildings tilt, trees, things, furniture and labels turn.</summary>
+    public void TurnEachPicked(double deg)
+    {
+        if (Pick.IsEmpty || Pick.Buildings.Count + Pick.Props.Count + Pick.Items.Count + Pick.Labels.Count == 0) return;
+        Apply(CityEdit.TurnEach(_map, Pick, deg), Pick, Pick.Buildings.Count == 1 && Pick.Count == 1 ? "Tilt a building" : "Turn");
+    }
+
+    /// <summary>Turns the piece the Furniture tool puts down by some degrees.</summary>
+    public void TurnFurnish(double deg)
+    {
+        FurnishTurn = Math.Round((((FurnishTurn + deg) % 360) + 360) % 360, 4);
+        FurnishTurnChanged?.Invoke(FurnishTurn);
+        InvalidateVisual();
+    }
+
     /// <summary>Turns the one label picked by some degrees, kept the right way up.</summary>
     public void TurnLabel(double deg)
     {
@@ -1487,7 +1688,7 @@ public sealed class CityPlan : Control
         Apply(_map with { Labels = [.. _map.Labels.Select(l => l.Id == id ? l with { TurnDeg = CityLabel.Upright(l.TurnDeg + deg) } : l)] }, Pick, "Turn a label");
     }
 
-    public void Nudge(int dx, int dy)
+    public void Nudge(double dx, double dy)
     {
         var (m, pick) = CityEdit.Move(_map, Pick, dx, dy);
         if (pick.Roads.Count > 0)
@@ -1593,12 +1794,25 @@ public sealed class CityPlan : Control
         _changed = true;
     }
 
+    void RemoveItemAt((double X, double Y) p)
+    {
+        if (ItemAt(p) is not { } i) return;
+        _map = _map with { Items = [.. _map.Items.Where(x => x.Id != i.Id)] };
+        if (Pick.Items.Contains(i.Id)) SetPick(Pick.On(_map));
+        _changed = true;
+    }
+
     void EraseAt((double X, double Y) p)
     {
         if (LabelAt(p) is { } l)
         {
             _map = _map with { Labels = [.. _map.Labels.Where(x => x.Id != l.Id)] };
             _changed = true;
+            return;
+        }
+        if (ItemAt(p) is not null)
+        {
+            RemoveItemAt(p);
             return;
         }
         int props = _map.Props.Count;

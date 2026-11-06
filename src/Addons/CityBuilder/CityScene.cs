@@ -84,7 +84,36 @@ public static class CityScene
         foreach (var b in map.Buildings) AddBuilding(scene, b, sq, show, show.Picked.Contains(b.Id));
         AddWalls(scene, map, sq);
         if (show.Props)
+        {
             foreach (var p in map.Props) AddProp(scene, p, sq);
+            foreach (var i in map.Items) AddItem(scene, i, sq, show.Picked.Contains(i.Id));
+        }
+    }
+
+    static readonly Color ItemWood = Color.FromRgb(0xB0, 0x86, 0x58), ItemPicked = Color.FromRgb(0xF0, 0x9A, 0x2A);
+
+    /// <summary>
+    /// A piece of furniture put together as it will be once it's cut: every one of its flat pieces where it
+    /// sits, its true size, turned as it's put down (just a box the size of the floor it takes if it can't be made).
+    /// </summary>
+    public static void AddItem(Scene3D scene, CityItem i, double sq, bool picked = false)
+    {
+        var solid = CityItems.SolidOf(i, sq);
+        double a = i.TurnDeg * Math.PI / 180, c = Math.Cos(a), s = Math.Sin(a), ox = i.X * sq, oz = i.Y * sq;
+        // The piece's own x (along its front) and z (towards its front) turned as on the map, clockwise from above.
+        Vec3 P(Furniture.V3 p) => new(ox + p.X * c - p.Z * s, p.Y, oz + p.X * s + p.Z * c);
+        Vec3 D(Furniture.V3 d) => new(d.X * c - d.Z * s, d.Y, d.X * s + d.Z * c);
+        var style = Look(picked ? ItemPicked : ItemWood);
+        if (solid.Parts.Count == 0)
+        {
+            var flat = new Frame3(new Vec3(ox, 0, oz), new Vec3(c, 0, s), new Vec3(s, 0, -c));
+            scene.AddSlab(Box(Math.Max(1, i.WidthMm), Math.Max(1, i.DepthMm)), flat, 0, Math.Max(1, i.Item.HeightMm), style, group: PropGroup);
+            return;
+        }
+        double t = solid.ThicknessMm;
+        foreach (var (outline, poses) in solid.Parts)
+            foreach (var q in poses)
+                scene.AddSlab(outline, new Frame3(P(q.O), D(q.U), D(q.V)), -t / 2, t / 2, style, group: PropGroup);
     }
 
     // ---- the ground ----
