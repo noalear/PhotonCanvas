@@ -21,7 +21,7 @@ static class CityBuilderShots
         // A scratch data folder, so the pictures don't depend on the last map made.
         var data = Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-citybuilder");
 
-        void Shot(string name, CityMap map, int left, int view, Func<CityWindow, Task>? also = null, Action<CityWindow>? after = null)
+        void Shot(string name, CityMap map, string page, bool threeD, Func<CityWindow, Task>? also = null, Action<CityWindow>? after = null, CityTool tool = CityTool.Select)
         {
             Directory.CreateDirectory(data);
             File.WriteAllText(Path.Combine(data, "last.json"), map.ToJson());
@@ -33,11 +33,9 @@ static class CityBuilderShots
                 var t = also(win);
                 for (int i = 0; i < 1200 && !t.IsCompleted; i++) settle(50);
             }
-            foreach (var tc in win.GetLogicalDescendantsOf<TabControl>())
-            {
-                if (tc.Items.Count == 6 && tc.Items[0] is TabItem { Header: "Map" }) tc.SelectedIndex = left;
-                if (tc.Items.Count == 2 && tc.Items[0] is TabItem { Header: "Plan" }) tc.SelectedIndex = view;
-            }
+            win.GetType().GetMethod("PickTool", Any)!.Invoke(win, [tool]);
+            win.ShowPage(page);
+            win.ShowView(threeD);
             settle(1500);
             if (after is not null)
             {
@@ -51,20 +49,20 @@ static class CityBuilderShots
         }
 
         var village = CityWindow.Sample();
-        Shot("window-citybuilder-plan", village, 2, 0);
-        Shot("window-citybuilder-3d", village, 0, 1);
-        Shot("window-citybuilder-picked", village, 4, 0, w =>
+        Shot("window-citybuilder-plan", village, "Map", false, tool: CityTool.Prop);
+        Shot("window-citybuilder-3d", village, "Map", true);
+        Shot("window-citybuilder-picked", village, "Picked", false, w =>
         {
             F<CityPlan>(w, "_plan").Select(village.Buildings[0].Id);
             return Task.CompletedTask;
         });
-        Shot("window-citybuilder-several", village, 4, 0, w =>
+        Shot("window-citybuilder-several", village, "Picked", false, w =>
         {
             // A box round the tavern, the well, the cart and the square's crates and lamp.
             F<CityPlan>(w, "_plan").SetPick(CityEdit.Within(village, 9.5, 7.5, 22, 16.5));
             return Task.CompletedTask;
         });
-        Shot("window-citybuilder-town", village, 3, 0, w =>
+        Shot("window-citybuilder-town", village, "Town", false, w =>
         {
             F<CheckBox>(w, "_byDistrict").IsChecked = true;
             return Task.CompletedTask;
@@ -72,8 +70,8 @@ static class CityBuilderShots
         // A town made for you: a walled crossroads town with a river.
         async Task MakeOne(CityWindow w)
         {
-            F<NumericUpDown>(w, "_across").Value = 64;
-            F<NumericUpDown>(w, "_down").Value = 48;
+            F<NumericUpDown>(w, "_tAcross").Value = 64;
+            F<NumericUpDown>(w, "_tDown").Value = 48;
             F<ComboBox>(w, "_tLayout").SelectedIndex = 0;
             F<CheckBox>(w, "_tWalls").IsChecked = true;
             F<CheckBox>(w, "_tRiver").IsChecked = true;
@@ -81,11 +79,11 @@ static class CityBuilderShots
             await (Task)w.GetType().GetMethod("MakeTown", Any)!.Invoke(w, null)!;
             F<Button>(w, "_tMake").BringIntoView();
         }
-        Shot("window-citybuilder-made", village, 0, 0, MakeOne);
-        Shot("window-citybuilder-made-3d", village, 0, 1, MakeOne);
-        Shot("window-citybuilder-cut", village, 5, 0, MakeOne);
+        Shot("window-citybuilder-made", village, "Town maker", false, MakeOne);
+        Shot("window-citybuilder-made-3d", village, "Town maker", true, MakeOne);
+        Shot("window-citybuilder-cut", village, "Cut", false, MakeOne);
         // A lane picked in the made town: its handles on the plan, its name, surface and width on the Picked tab.
-        Shot("window-citybuilder-road", village, 4, 0, MakeOne, w =>
+        Shot("window-citybuilder-road", village, "Picked", false, MakeOne, w =>
         {
             var plan = F<CityPlan>(w, "_plan");
             var lane = plan.Map.Roads.Where(r => r.Width == 2).OrderByDescending(r => r.Length).First();
@@ -93,9 +91,9 @@ static class CityBuilderShots
             // Its name in the middle, the bridge beside it.
             var (_, at, _) = CityPlan.RoadNames(plan.Map).First(n => n.Road.Id == lane.Id);
             plan.CentreOn(at.X + 3, at.Y);
-        });
+        }, CityTool.Road);
         // Closer in on the market square in 3D: its stage, stalls, bar and trough, and the guard towers on the wall beyond.
-        Shot("window-citybuilder-square-3d", village, 0, 1, MakeOne, w =>
+        Shot("window-citybuilder-square-3d", village, "Town maker", true, MakeOne, w =>
         {
             var view = F<CityView>(w, "_view");
             view.Turn(-400, -5);
@@ -108,12 +106,12 @@ static class CityBuilderShots
         var (_, ground) = GroundBoards.Make(town, new GroundOptions { TileSquares = 4, Box = (40, 18, 56, 30) });
         File.WriteAllBytes(Path.Combine(folder, "citybuilder-ground.png"), TilesPicture(ground.Board, 3, 1.5));
         Console.WriteLine("citybuilder: citybuilder-ground.png");
-        Shot("window-citybuilder-battlemap", CityMap.Empty(40, 28), 1, 0, async w =>
+        Shot("window-citybuilder-battlemap", CityMap.Empty(40, 28), "Battle map", false, async w =>
         {
             await w.UsePicture(SampleBattleMap.Make(), null);
             await w.ReadPicture();
         });
-        Shot("window-citybuilder-battlemap-3d", CityMap.Empty(40, 28), 1, 1, async w =>
+        Shot("window-citybuilder-battlemap-3d", CityMap.Empty(40, 28), "Battle map", true, async w =>
         {
             await w.UsePicture(SampleBattleMap.Make(), null);
             await w.ReadPicture();
