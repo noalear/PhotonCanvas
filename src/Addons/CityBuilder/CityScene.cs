@@ -76,10 +76,13 @@ public static class CityScene
     public static void Build(Scene3D scene, CityMap map, CityShow show)
     {
         scene.Clear();
+        map = map.Tidied();
         double sq = Math.Max(5, map.SquareMm);
-        AddGround(scene, map, sq);
+        // The roads laid on the ground; the water left under their bridges, and the bridges over it.
+        AddGround(scene, map.Paved(overWater: false), sq);
+        foreach (var site in TownPieces.Bridges(map)) AddBridge(scene, site, sq);
         foreach (var b in map.Buildings) AddBuilding(scene, b, sq, show, show.Picked.Contains(b.Id));
-        foreach (var f in map.Fences) AddFence(scene, f, sq);
+        AddWalls(scene, map, sq);
         if (show.Props)
             foreach (var p in map.Props) AddProp(scene, p, sq);
     }
@@ -287,29 +290,93 @@ public static class CityScene
         }
     }
 
-    // ---- fences ----
+    // ---- bridges ----
 
-    static void AddFence(Scene3D scene, Fence f, double sq)
+    /// <summary>A bridge as a plain deck over the water with a parapet (or a rail for a plank bridge) along each side.</summary>
+    static void AddBridge(Scene3D scene, BridgeSite site, double sq)
     {
-        var (h, t, colour) = f.Kind switch
+        int x0 = site.Cells.Min(c => c.X), x1 = site.Cells.Max(c => c.X) + 1, y0 = site.Cells.Min(c => c.Y), y1 = site.Cells.Max(c => c.Y) + 1;
+        bool planks = site.Road == Ground.Dirt;
+        var deck = Look(planks ? Color.FromRgb(0x9A, 0x70, 0x48) : Color.FromRgb(0xB8, 0xB0, 0xA2));
+        var side = Look(planks ? Color.FromRgb(0x6E, 0x4E, 0x30) : Color.FromRgb(0xA4, 0x9C, 0x90));
+        double top = 0.35 * sq, rise = planks ? 0.35 * sq : 0.4 * sq, t = planks ? 0.06 * sq : 0.18 * sq;
+        // A little onto each bank, so it meets the road.
+        double ax = x0 - (site.Across ? 0.2 : 0), bx = x1 + (site.Across ? 0.2 : 0), ay = y0 - (site.Across ? 0 : 0.2), by = y1 + (site.Across ? 0 : 0.2);
+        var outline = new PathsD { new PathD { new(ax * sq, -ay * sq), new(bx * sq, -ay * sq), new(bx * sq, -by * sq), new(ax * sq, -by * sq) } };
+        if (!Clipper.IsPositive(outline[0])) outline[0].Reverse();
+        var flat = new Frame3(new Vec3(0, 0, 0), new Vec3(1, 0, 0), new Vec3(0, 0, -1));
+        scene.AddSlab(outline, flat, -1.2, top, deck, group: WallGroup);
+        foreach (bool far in new[] { false, true })
         {
-            FenceKind.Hedge => (0.5 * sq, 0.3 * sq, Color.FromRgb(0x4F, 0x7A, 0x3A)),
-            FenceKind.StoneWall => (0.45 * sq, 0.16 * sq, Color.FromRgb(0xA8, 0xA1, 0x96)),
-            FenceKind.CityWall => (1.8 * sq, 0.5 * sq, Color.FromRgb(0xB6, 0xAE, 0xA0)),
-            _ => (0.4 * sq, 0.06 * sq, Color.FromRgb(0x8E, 0x68, 0x44)),
-        };
-        var look = Look(colour);
-        // Straight runs along each line, so a long wall is one block.
-        foreach (var (x0, y0, x1, y1) in Runs(f.Edges))
-        {
-            var a = new Vec3(x0 * sq, 0, y0 * sq);
-            var b = new Vec3(x1 * sq, 0, y1 * sq);
-            double L = (b - a).Length;
-            if (L < 1e-6) continue;
-            var u = (b - a) * (1 / L);
-            var outline = new PathsD { new PathD { new(-t / 2, 0), new(L + t / 2, 0), new(L + t / 2, h), new(-t / 2, h) } };
-            scene.AddSlab(outline, new Frame3(a, u, new Vec3(0, 1, 0)), -t / 2, t / 2, look, group: WallGroup);
+            var a = site.Across ? new Vec3(ax * sq, top, (far ? by : ay) * sq) : new Vec3((far ? bx : ax) * sq, top, ay * sq);
+            var e = site.Across ? new Vec3(bx * sq, top, (far ? by : ay) * sq) : new Vec3((far ? bx : ax) * sq, top, by * sq);
+            double L = (e - a).Length;
+            var u = (e - a) * (1 / L);
+            var wall = new PathsD { new PathD { new(0, 0), new(L, 0), new(L, rise), new(0, rise) } };
+            double inward = far ? -t : t;
+            scene.AddSlab(wall, new Frame3(a, u, new Vec3(0, 1, 0)), Math.Min(0, inward), Math.Max(0, inward), side, group: WallGroup);
         }
+    }
+
+    // ---- fences and walls ----
+
+    static (double H, double T, Color Colour) FenceLook(FenceKind k, double sq) => k switch
+    {
+        FenceKind.Hedge => (0.5 * sq, 0.3 * sq, Color.FromRgb(0x4F, 0x7A, 0x3A)),
+        FenceKind.StoneWall => (0.45 * sq, 0.16 * sq, Color.FromRgb(0xA8, 0xA1, 0x96)),
+        FenceKind.CityWall => (1.8 * sq, 0.5 * sq, Color.FromRgb(0xB6, 0xAE, 0xA0)),
+        _ => (0.4 * sq, 0.06 * sq, Color.FromRgb(0x8E, 0x68, 0x44)),
+    };
+
+    /// <summary>The fences and walls where they stand (open where roads go through), with a town wall's turrets and gatehouses.</summary>
+    static void AddWalls(Scene3D scene, CityMap map, double sq)
+    {
+        var layout = WallLayout.Of(map);
+        foreach (var piece in layout.Pieces)
+        {
+            var (h, t, colour) = FenceLook(piece.Fence.Kind, sq);
+            if (piece.Fence.Ruined) h *= 0.6;
+            var look = Look(colour);
+            int n = piece.Points.Count, segs = piece.Closed && n > 2 ? n : n - 1;
+            for (int i = 0; i < segs; i++)
+                Block(scene, piece.Points[i], piece.Points[(i + 1) % n], 0, h, t, t / 2, look, sq);
+        }
+        foreach (var e in layout.Ends.Where(e => e.Kind == WallEndKind.Cap))
+        {
+            var (h, t, colour) = FenceLook(e.Fence.Kind, sq);
+            // A turret a little taller and wider than the wall; a pillar or a post.
+            var (len, wide, high) = e.Fence.Kind switch
+            {
+                FenceKind.CityWall => (0.8, 0.85, h + 0.4 * sq),
+                FenceKind.StoneWall => (0.28, 0.28, h + 0.08 * sq),
+                FenceKind.Fence => (0.12, 0.12, h + 0.06 * sq),
+                _ => (0.0, 0.0, 0.0),
+            };
+            if (len <= 0) continue;
+            Block(scene, e.At - e.Out * (len / 2), e.At + e.Out * (len / 2), 0, high, wide * sq, 0, Look(Scene3D.Shade(colour, 0.92)), sq);
+        }
+        foreach (var g in layout.Gates.Where(g => g.Fence.Kind == FenceKind.CityWall))
+        {
+            var (h, t, colour) = FenceLook(FenceKind.CityWall, sq);
+            var look = Look(Scene3D.Shade(colour, 0.92));
+            var u = (g.B - g.A).Unit;
+            // A tower either side of the road and the gatehouse over it, high enough to pass under.
+            Block(scene, g.A - u * 0.75, g.A, 0, h + 0.5 * sq, 0.95 * sq, 0, look, sq);
+            Block(scene, g.B, g.B + u * 0.75, 0, h + 0.5 * sq, 0.95 * sq, 0, look, sq);
+            Block(scene, g.A, g.B, h * 0.62, h + 0.25 * sq, 0.8 * sq, 0, look, sq);
+        }
+    }
+
+    /// <summary>A block along the line from a to b (squares) from height h0 to h1 (mm), t thick (mm), reaching <paramref name="past"/> (mm) beyond each end.</summary>
+    static void Block(Scene3D scene, CityPt a, CityPt b, double h0, double h1, double t, double past, SlabStyle look, double sq)
+    {
+        var pa = new Vec3(a.X * sq, 0, a.Y * sq);
+        var pb = new Vec3(b.X * sq, 0, b.Y * sq);
+        double L = (pb - pa).Length;
+        if (L < 1e-6) return;
+        var u = (pb - pa) * (1 / L);
+        var outline = new PathsD { new PathD { new(-past, h0), new(L + past, h0), new(L + past, h1), new(-past, h1) } };
+        scene.AddSlab(outline, new Frame3(pa, u, new Vec3(0, 1, 0)), -t / 2, t / 2, look, group: WallGroup);
     }
 
     /// <summary>One-square edges joined into straight runs (grid points from, to).</summary>

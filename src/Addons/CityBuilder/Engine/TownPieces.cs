@@ -17,9 +17,9 @@ public sealed record BridgeSite(HashSet<(int X, int Y)> Cells, bool Across, int 
 /// What a town wall is cut as: sections two squares long and one, corners (the parapet round the outside of
 /// the turn, or the inside), gatehouses over the roads through it, ends with a turret, and guard towers.
 /// </summary>
-public sealed record WallCut(int Two, int One, int CornersOut, int CornersIn, int Gates, int Ends, int Towers)
+public sealed record WallCut(int Two, int One, int CornersOut, int CornersIn, int Gates, int Ends, int Towers, int Half = 0)
 {
-    public int Count => Two + One + CornersOut + CornersIn + Gates + Ends + Towers;
+    public int Count => Two + One + CornersOut + CornersIn + Gates + Ends + Towers + Half;
 }
 
 /// <summary>
@@ -35,6 +35,8 @@ public static class TownPieces
     /// <summary>Every place a road (cobbles, paving or a dirt track) crosses water: road squares with water on both sides, side by side.</summary>
     public static List<BridgeSite> Bridges(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
     {
+        // The roads laid over the ground, their squares over the water too.
+        m = m.Paved();
         static bool IsRoad(Ground g) => g is Ground.Road or Ground.Paving or Ground.Dirt;
         bool Water(int x, int y) => x >= 0 && y >= 0 && x < m.Across && y < m.Down && m.GroundAt(x, y) == Ground.Water;
         // A road square over water: water to its left and right (a road running down), or above and below (one running across).
@@ -132,6 +134,7 @@ public static class TownPieces
     /// </summary>
     public static ScatterSet? Scenery(CityMap m, string theme, (int X0, int Y0, int X1, int Y1)? box = null)
     {
+        m = m.Tidied();
         bool In(double x, double y) => box is not { } b || x >= b.X0 && y >= b.Y0 && x < b.X1 && y < b.Y1;
         var props = m.Props.Where(p => In(p.X, p.Y)).ToList();
         double k = m.SquareMm / 25.4;
@@ -148,11 +151,11 @@ public static class TownPieces
         Add(SItemKind.Boulder, props.Count(p => p.Kind == PropKind.Boulder));
         // Fences: each straight run in sections of up to four squares, the same lengths together.
         var sections = new Dictionary<int, int>();
-        foreach (var f in m.Fences.Where(f => f.Kind == FenceKind.Fence))
-            foreach (var (ax, ay, bx, by) in CityScene.Runs(f.Edges))
+        foreach (var piece in WallLayout.Of(m, f => f.Kind == FenceKind.Fence).Pieces)
+            foreach (var (a, b) in Segs(piece))
             {
-                if (!In((ax + bx) / 2.0, (ay + by) / 2.0)) continue;
-                int len = Math.Abs(bx - ax) + Math.Abs(by - ay);
+                if (!In((a.X + b.X) / 2, (a.Y + b.Y) / 2)) continue;
+                int len = (int)Math.Round(a.DistanceTo(b));
                 while (len > 0)
                 {
                     int part = len > 4 ? (len == 5 ? 3 : 4) : len;
@@ -164,6 +167,12 @@ public static class TownPieces
             Add(SItemKind.Fence, count, it => it with { WidthMm = Math.Round(len * m.SquareMm - 1, 1), Style = FenceStyle.PostAndRail });
         if (items.Count == 0) return null;
         return new ScatterSet { Items = items, Theme = theme, ScaleMm = Math.Round(28 * k, 1) };
+    }
+
+    static IEnumerable<(CityPt A, CityPt B)> Segs(WallPiece p)
+    {
+        for (int i = 0; i + 1 < p.Points.Count; i++) yield return (p.Points[i], p.Points[i + 1]);
+        if (p.Closed && p.Points.Count > 2) yield return (p.Points[^1], p.Points[0]);
     }
 
     // ---- the furniture maker's town pieces ----
@@ -189,88 +198,118 @@ public static class TownPieces
 
     /// <summary>
     /// How the town wall (inside the box) is cut: a corner piece where it turns (an outside one where the turn
-    /// goes round the town, an inside one where it goes in), a gatehouse over each road through a gap two
-    /// squares wide, a turret at each other end, nothing under a guard tower, and the straight runs in
-    /// sections of two squares and one.
+    /// goes round the town, an inside one where it goes in), a gatehouse over each road through it, a turret at
+    /// each other end, nothing under a guard tower, and the straight runs in sections of two squares and one (and
+    /// half a square where a wall laid on half squares needs one).
     /// </summary>
     public static WallCut Walls(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null)
     {
-        static (int X, int Y) End(FenceEdge e) => e.Across ? (e.X + 1, e.Y) : (e.X, e.Y + 1);
+        m = m.Tidied();
         var towers = m.Props.Where(p => p.Kind == PropKind.GuardTower && InBox(box, p.X, p.Y)).ToList();
-        bool UnderTower(double x, double y, double margin) => towers.Any(t => Math.Abs(t.X - x) < 0.9 * t.Size + margin && Math.Abs(t.Y - y) < 0.9 * t.Size + margin);
-        var edges = m.Fences.Where(f => f.Kind == FenceKind.CityWall).SelectMany(f => f.Edges)
-            .Where(e => { var (mx, my) = e.Across ? (e.X + 0.5, (double)e.Y) : (e.X, e.Y + 0.5); return InBox(box, mx, my) && !UnderTower(mx, my, 0); })
-            .ToHashSet();
-        if (edges.Count == 0) return new(0, 0, 0, 0, 0, 0, towers.Count);
-        // The edge leaving a grid point each way.
-        (int X, int Y)[] dirs = [(1, 0), (-1, 0), (0, 1), (0, -1)];
-        static FenceEdge Toward((int X, int Y) p, (int X, int Y) d) => d switch
+        var layout = WallLayout.Of(m, f => f.Kind == FenceKind.CityWall);
+        if (layout.Pieces.Count == 0) return new(0, 0, 0, 0, 0, 0, towers.Count);
+        // The middle of the town walls, for telling which way an open stretch's corners turn.
+        var all = m.Fences.Where(f => f.Kind == FenceKind.CityWall).SelectMany(f => f.Points).ToList();
+        var centre = new CityPt(all.Average(p => p.X), all.Average(p => p.Y));
+        var capped = layout.Ends.Where(e => e.Kind == WallEndKind.Cap).Select(e => e.At).ToList();
+        bool IsCap(CityPt p) => capped.Any(c => c.DistanceTo(p) < 1e-6);
+        int two = 0, one = 0, half = 0, cornersOut = 0, cornersIn = 0, ends = 0;
+        foreach (var piece in layout.Pieces)
         {
-            (1, 0) => new(p.X, p.Y, true), (-1, 0) => new(p.X - 1, p.Y, true),
-            (0, 1) => new(p.X, p.Y, false), _ => new(p.X, p.Y - 1, false),
-        };
-        var points = edges.SelectMany(e => new[] { (e.X, e.Y), End(e) }).Distinct().ToList();
-        List<(int X, int Y)> Arms((int X, int Y) p) => [.. dirs.Where(d => edges.Contains(Toward(p, d)))];
-        double cx = edges.Average(e => e.Across ? e.X + 0.5 : e.X), cy = edges.Average(e => e.Across ? e.Y : e.Y + 0.5);
-        var used = new HashSet<FenceEdge>();
-        int cornersOut = 0, cornersIn = 0, gates = 0, ends = 0;
-        foreach (var p in points.OrderBy(p => p.Y).ThenBy(p => p.X))
-        {
-            var arms = Arms(p);
-            if (arms.Count != 2 || arms[0].X * arms[1].X + arms[0].Y * arms[1].Y != 0) continue;
-            var (a, b) = (Toward(p, arms[0]), Toward(p, arms[1]));
-            if (used.Contains(a) || used.Contains(b)) continue;
-            used.Add(a);
-            used.Add(b);
-            // The turn goes round the town if the corner's inside faces the wall's middle.
-            double dot = (arms[0].X + arms[1].X) * (cx - p.X) + (arms[0].Y + arms[1].Y) * (cy - p.Y);
-            if (dot > 0) cornersOut++; else cornersIn++;
-        }
-        var gated = new HashSet<(int X, int Y)>();
-        bool Road(int x, int y) => m.In(x, y) && m.GroundAt(x, y) is Ground.Road or Ground.Paving or Ground.Dirt;
-        foreach (var p in points.OrderBy(p => p.Y).ThenBy(p => p.X))
-        {
-            var arms = Arms(p);
-            if (arms.Count != 1 || gated.Contains(p)) continue;
-            // A gap two squares wide the other way, the wall going on beyond it and a road through it: a gatehouse.
-            var away = (X: -arms[0].X, Y: -arms[0].Y);
-            var q = (X: p.X + 2 * away.X, Y: p.Y + 2 * away.Y);
-            if (gated.Contains(q) || !Arms(q).Contains(away)) continue;
-            if (edges.Contains(Toward(p, away)) || edges.Contains(Toward((p.X + away.X, p.Y + away.Y), away)) || UnderTower(p.X + away.X, p.Y + away.Y, 0)) continue;
-            // The squares either side of the gap.
-            bool road = Enumerable.Range(0, 2).Any(i =>
+            double area = 0;
+            if (piece.Fence.Closed)
+                for (int i = 0; i < piece.Fence.Points.Count; i++) area += piece.Fence.Points[i].Cross(piece.Fence.Points[(i + 1) % piece.Fence.Points.Count]);
+            foreach (var (pts, closed, openStart, openEnd) in ClipToBox(piece, box))
             {
-                int gx = p.X + away.X * i + (away.X < 0 ? -1 : 0), gy = p.Y + away.Y * i + (away.Y < 0 ? -1 : 0);
-                return away.Y == 0 ? Road(gx, gy) || Road(gx, gy - 1) : Road(gx, gy) || Road(gx - 1, gy);
-            });
-            if (!road) continue;
-            gated.Add(p);
-            gated.Add(q);
-            gates++;
-        }
-        foreach (var p in points)
-        {
-            var arms = Arms(p);
-            if (arms.Count != 1 || gated.Contains(p) || UnderTower(p.X, p.Y, 0.15)) continue;
-            // An end at the edge of the box goes on outside it: no turret.
-            if (box is { } bx && (p.X <= bx.X0 || p.Y <= bx.Y0 || p.X >= bx.X1 || p.Y >= bx.Y1)) continue;
-            var e = Toward(p, arms[0]);
-            if (used.Add(e)) ends++;
-        }
-        int two = 0, one = 0;
-        foreach (var line in edges.Where(e => !used.Contains(e)).GroupBy(e => (e.Across, e.Across ? e.Y : e.X)))
-        {
-            var at = line.Select(e => e.Across ? e.X : e.Y).OrderBy(v => v).ToList();
-            int run = 1;
-            for (int i = 1; i <= at.Count; i++)
-            {
-                if (i < at.Count && at[i] == at[i - 1] + 1) { run++; continue; }
-                two += run / 2;
-                one += run % 2;
-                run = 1;
+                int n = pts.Count;
+                int segCount = closed ? n : n - 1;
+                var corner = new bool[n];
+                for (int i = 0; i < n; i++)
+                {
+                    if (!closed && (i == 0 || i == n - 1)) continue;
+                    var a = pts[(i - 1 + n) % n];
+                    var b = pts[(i + 1) % n];
+                    var din = (pts[i] - a).Unit;
+                    var dout = (b - pts[i]).Unit;
+                    if (din.Dot(dout) > Math.Cos(10 * Math.PI / 180)) continue;
+                    corner[i] = true;
+                    bool outside = piece.Fence.Closed && Math.Abs(area) > 1e-9
+                        ? Math.Sign(din.Cross(dout)) == Math.Sign(area)
+                        : (dout - din).Dot(centre - pts[i]) > 0;
+                    if (outside) cornersOut++; else cornersIn++;
+                }
+                bool capStart = !closed && !openStart && IsCap(pts[0]), capEnd = !closed && !openEnd && IsCap(pts[^1]);
+                if (capStart) ends++;
+                if (capEnd) ends++;
+                for (int i = 0; i < segCount; i++)
+                {
+                    int j = (i + 1) % n;
+                    double len = pts[i].DistanceTo(pts[j]);
+                    if (corner[i]) len -= 1;
+                    if (corner[j]) len -= 1;
+                    if (i == 0 && capStart) len -= 1;
+                    if (j == n - 1 && !closed && capEnd) len -= 1;
+                    if (len < 0.2) continue;
+                    int twos = (int)Math.Floor(len / 2 + 1e-6);
+                    double rest = len - 2 * twos;
+                    two += twos;
+                    if (rest >= 1 - 1e-6) { one++; rest -= 1; }
+                    if (rest >= 0.25) half++;
+                }
             }
         }
-        return new(two, one, cornersOut, cornersIn, gates, ends, towers.Count);
+        int gates = layout.Gates.Count(g => InBox(box, g.Middle.X, g.Middle.Y));
+        return new(two, one, cornersOut, cornersIn, gates, ends, towers.Count, half);
+    }
+
+    /// <summary>How wide each gate through the town wall (inside the box) is, in whole squares.</summary>
+    public static List<int> GateWidths(CityMap m, (int X0, int Y0, int X1, int Y1)? box = null) =>
+        [.. WallLayout.Of(m, f => f.Kind == FenceKind.CityWall).Gates.Where(g => InBox(box, g.Middle.X, g.Middle.Y)).Select(g => Math.Max(1, (int)Math.Round(g.Width)))];
+
+    /// <summary>
+    /// A stretch of wall as the parts of it inside the box (all of it when there's none): each part's points, whether
+    /// it still goes all the way round, and whether its start and end were cut by the box (going on outside it).
+    /// </summary>
+    static IEnumerable<(List<CityPt> Points, bool Closed, bool OpenStart, bool OpenEnd)> ClipToBox(WallPiece piece, (int X0, int Y0, int X1, int Y1)? box)
+    {
+        if (box is not { } b)
+        {
+            yield return (piece.Points, piece.Closed, false, false);
+            yield break;
+        }
+        var rect = new[] { new CityPt(b.X0, b.Y0), new CityPt(b.X1, b.Y0), new CityPt(b.X1, b.Y1), new CityPt(b.X0, b.Y1) };
+        var pts = piece.Closed ? [.. piece.Points, piece.Points[0]] : piece.Points;
+        List<CityPt>? cur = null;
+        bool curOpenStart = false;
+        for (int i = 0; i + 1 < pts.Count; i++)
+        {
+            var (a, c) = (pts[i], pts[i + 1]);
+            if (Geometry.Clip(a, c, rect) is not { } t || t.T1 - t.T0 < 1e-9)
+            {
+                if (cur is not null) { yield return (cur, false, curOpenStart, true); cur = null; }
+                continue;
+            }
+            var p0 = a + (c - a) * t.T0;
+            var p1 = a + (c - a) * t.T1;
+            if (cur is null || t.T0 > 1e-9)
+            {
+                if (cur is not null) yield return (cur, false, curOpenStart, true);
+                cur = [p0];
+                curOpenStart = t.T0 > 1e-9;
+            }
+            cur.Add(p1);
+            if (t.T1 < 1 - 1e-9)
+            {
+                yield return (cur, false, curOpenStart, true);
+                cur = null;
+            }
+        }
+        if (cur is not null)
+        {
+            // All of a ring inside the box is still a ring.
+            if (piece.Closed && !curOpenStart && cur.Count == pts.Count) yield return (piece.Points, true, false, false);
+            else yield return (cur, false, curOpenStart, false);
+        }
     }
 
     /// <summary>The town wall's pieces and guard towers (inside the box) from the furniture maker, in the map's look; null if there are none.</summary>
@@ -278,8 +317,27 @@ public static class TownPieces
     {
         var cut = Walls(m, box);
         var items = new List<FurnitureItem>();
+        var gates = GateWidths(m, box).GroupBy(w => w).OrderBy(g => g.Key).ToList();
         foreach (var (end, count) in new[] { ("wall-2", cut.Two), ("wall-1", cut.One), ("wall-corner-out", cut.CornersOut), ("wall-corner-in", cut.CornersIn), ("wall-gate", cut.Gates), ("wall-end", cut.Ends), ("guard-tower", cut.Towers) })
-            if (count > 0 && Piece(m.Theme, end) is { } e) items.Add(Sized(e, m.SquareMm, 1, count));
+        {
+            if (count <= 0 || Piece(m.Theme, end) is not { } e) continue;
+            if (end == "wall-gate" && gates.Count > 0)
+            {
+                // A gatehouse as wide as each gap: two squares for a lane, four for a high road.
+                foreach (var g in gates)
+                {
+                    var it = Sized(e, m.SquareMm, 1, g.Count());
+                    items.Add(g.Key == 2 ? it : it with { WidthMm = Math.Round(it.WidthMm * g.Key / 2.0, 1), Name = $"{e.Name} ({g.Key} squares)" });
+                }
+                continue;
+            }
+            items.Add(Sized(e, m.SquareMm, 1, count));
+        }
+        if (cut.Half > 0 && Piece(m.Theme, "wall-1") is { } h)
+        {
+            var it = Sized(h, m.SquareMm, 1, cut.Half);
+            items.Add(it with { WidthMm = Math.Round(it.WidthMm / 2, 1), Name = $"{h.Name} (half a square)" });
+        }
         return Set(m.Theme, items);
     }
 

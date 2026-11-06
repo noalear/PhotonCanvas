@@ -93,11 +93,14 @@ public sealed class CityWindow : Window
     readonly ComboBox _roadGround = Combo([.. RoadGrounds.Select(CityMap.Label)]);
     readonly NumericUpDown _roadWidth = Number(1, 9, 1, "0");
     readonly TextBox _labelText = new() { Text = "Market Street" };
-    readonly NumericUpDown _labelSize = Number(0.2m, 10, 0.1m, "0.#");
+    readonly NumericUpDown _labelSize = Number(0.2m, 10, 0.1m, "0.#"), _labelTurn = Number(-90, 90, 15, "0");
+    readonly ComboBox _snap = Combo("Whole squares", "Half squares", "Anywhere");
+    readonly ComboBox _fenceShape = Combo("A line", "A rectangle");
+    readonly CheckBox _fenceRuined = new() { Content = "Ruined (broken, its ends left open)" };
     List<PrefabInfo> _prefabs = [];
 
     /// <summary>What the Road tool can lay.</summary>
-    static readonly Ground[] RoadGrounds = [Ground.Road, Ground.Dirt, Ground.Paving, Ground.Sand, Ground.Water, Ground.Grass];
+    static readonly Ground[] RoadGrounds = [Ground.Road, Ground.Dirt, Ground.Paving, Ground.Sand];
 
     // The town's buildings
     readonly TextBox _find = new() { Watermark = "Find by name, type, district or tag" };
@@ -116,8 +119,20 @@ public sealed class CityWindow : Window
     readonly Button _gTurn = UiKit.Button("Turn ⟳"), _gCopy = UiKit.Button("Copy beside it"), _gDelete = UiKit.Button("Take away");
     Control _groupBuildings = null!, _groupProps = null!, _groupPanel = null!, _labelPanel = null!;
     readonly TextBox _lText = new();
-    readonly NumericUpDown _lSize = Number(0.2m, 10, 0.1m, "0.#");
+    readonly NumericUpDown _lSize = Number(0.2m, 10, 0.1m, "0.#"), _lTurn = Number(-90, 90, 15, "0");
     readonly Button _lDelete = UiKit.Button("Take it away");
+
+    // A road or a wall picked
+    readonly TextBox _rName = new();
+    readonly ComboBox _rSurface = Combo([.. RoadGrounds.Select(CityMap.Label)]);
+    readonly NumericUpDown _rWidth = Number(1, 9, 1, "0");
+    readonly TextBlock _rInfo = Hint();
+    readonly Button _rDelete = UiKit.Button("Take it away");
+    readonly ComboBox _wKind = Combo([.. Enum.GetValues<FenceKind>().Select(CityMap.Label)]);
+    readonly CheckBox _wRuined = new() { Content = "Ruined (broken, its ends left open)" };
+    readonly TextBlock _wInfo = Hint();
+    readonly Button _wDelete = UiKit.Button("Take it away");
+    Control _roadPanel = null!, _fencePanel = null!;
     TabControl _left = null!;
 
     // The building picked
@@ -170,17 +185,17 @@ public sealed class CityWindow : Window
             _tools[t] = b;
             bar.Children.Add(b);
         }
-        Tool(CityTool.Select, "Select", "Click a building, tree, label or fence to pick it (Ctrl and click to pick more), or drag a box round things. Drag to move what's picked; R turns it, Delete takes it away, Ctrl+C and Ctrl+V copy and paste it, Ctrl+D copies it beside itself.");
+        Tool(CityTool.Select, "Select", "Click a building, road, wall, tree or label to pick it (Ctrl and click to pick more), or drag a box round things. Drag to move what's picked, or a road's or wall's handles to stretch and bend it; R turns it, Delete takes it away, Ctrl+C and Ctrl+V copy and paste it, Ctrl+D copies it beside itself. Double-click a building to open it in the building editor.");
         Tool(CityTool.Building, "Building", "Drag out a building's footprint: walls go round it, with a door towards the road, windows and a roof. The right button takes a building away.");
         Tool(CityTool.Place, "Place", "Pick a saved building on the left, then click the map to put it down. R, the right button or Ctrl + the wheel turns it first.");
         bar.Children.Add(Gap());
         Tool(CityTool.Ground, "Paint", "Paint the ground (pick what on the left, and the brush size). The right button paints grass.");
         Tool(CityTool.Fill, "Fill", "Click to fill a patch of one ground with another.");
-        Tool(CityTool.Road, "Road", "Drag from one square to another to lay a road (round one corner; hold Ctrl for a straight line however it slants). Pick what and how wide on the Tools tab. The right button lays grass.");
-        Tool(CityTool.Fence, "Fence", "Drag along the grid lines for a fence, hedge, wall or town wall (pick which on the left); drag over one to take it away.");
+        Tool(CityTool.Road, "Road", "Drag from one point to another to lay a road (round one corner; hold Ctrl for a straight line however it slants). Two squares wide is a street, four a high road: pick what and how wide on the Tools tab. Roads stop at buildings and cross water on bridges. The right button takes a road away.");
+        Tool(CityTool.Fence, "Wall", "Drag a fence, hedge, wall or town wall along the grid (pick which, and a line or a rectangle, on the Tools tab); it bends in eighths of a turn unless you hold Ctrl. The right button cuts a gap in one.");
         Tool(CityTool.Prop, "Trees", "Click to put down a tree (or a rock, a well, a cart… pick which on the left). The right button takes them away.");
         Tool(CityTool.Label, "Label", "Click to write a label on the map (type it on the Tools tab): a street's name, a district's, a number for your key. The right button takes one away.");
-        Tool(CityTool.Erase, "Erase", "Drag over trees, fences and buildings to take them away.");
+        Tool(CityTool.Erase, "Erase", "Drag over trees, roads, fences and buildings to take them away.");
         bar.Children.Add(Gap());
         foreach (var b in new[] { _undoButton, _redoButton }) { b.Margin = new Thickness(0, 0, 4, 4); bar.Children.Add(b); }
         ToolTip.SetTip(_undoButton, "Ctrl+Z");
@@ -300,12 +315,15 @@ public sealed class CityWindow : Window
         _prefabList.SelectionMode = SelectionMode.Single;
         return Stack(
             Explained("Paint and fill", "What the Paint and Fill tools lay down.", Field("Ground", _paint), Field("Brush (squares)", _brush)),
-            Explained("Roads", "What the Road tool lays from one square to another, and how wide.", Field("Lay", _roadGround), Field("Width (squares)", _roadWidth)),
+            Explained("Snapping", "Where what you put down and drag lands: on whole squares, half squares, or anywhere. Roads keep to their middles; trees and small things go to quarter squares.", Field("Snap to", _snap)),
+            Explained("Roads", "What the Road tool lays, and how wide: on a battle map of five-foot squares a street is 2 squares wide and a high road 4.", Field("Lay", _roadGround), Field("Width (squares)", _roadWidth)),
             Explained("New buildings", "A footprint dragged out with the Building tool gets walls, a door towards the road, windows and a roof.", Field("Floors", _storeysNew)),
             Explained("Saved buildings", "Buildings saved in the building editor (with \"Save as a building to reuse\"), to put down with the Place tool as many times as you like.",
                 Field("Type", _typeFilter), _prefabList, _prefabNote, _refreshPrefabs),
-            Explained("Fences and trees", "What the Fence and Trees tools put down.", Field("Fence", _fence), Field("Tree or thing", _prop)),
-            Explained("Labels", "What the Label tool writes on the map, and how tall (squares).", Field("Text", _labelText), Field("Size (squares)", _labelSize)));
+            Explained("Walls and fences", "What the Wall tool puts down: a line from one point to the next, or a rectangle all the way round. A wall's ends get end caps (a ruined one's are left broken); a road through it is a gate.",
+                Field("Kind", _fence), Field("Shape", _fenceShape), _fenceRuined),
+            Explained("Trees and things", "What the Trees tool puts down.", Field("Tree or thing", _prop)),
+            Explained("Labels", "What the Label tool writes on the map, how tall (squares) and how far it's turned (degrees, R turns it as you go).", Field("Text", _labelText), Field("Size (squares)", _labelSize), Field("Turn (degrees)", _labelTurn)));
     }
 
     Control CutTab()
@@ -336,7 +354,7 @@ public sealed class CityWindow : Window
 
     Control PickedTab()
     {
-        var none = Hint("Click a building, tree, label or fence on the plan with the Select tool, or drag a box round several, to change them here.");
+        var none = Hint("Click a building, road, wall, tree or label on the plan with the Select tool, or drag a box round several, to change them here.");
         var building = BuildingTab();
         _groupBuildings = Stack(Field("Type", _gType, tip: "Typed here, every building picked gets it."), Field("District", _gDistrict, tip: "Typed here, every building picked gets it."));
         _groupProps = Stack(Field("Tree or thing", _gProp), Field("Size", _gPropSize, tip: "1 is about a square across."));
@@ -345,9 +363,15 @@ public sealed class CityWindow : Window
                 _gInfo, _groupBuildings, _groupProps,
                 new WrapPanel { Children = { _gTurn.With(b => b.Margin = new(0, 0, 4, 4)), _gCopy.With(b => b.Margin = new(0, 0, 4, 4)), _gDelete.With(b => b.Margin = new(0, 0, 4, 4)) } }));
         _labelPanel = Stack(
-            Explained("The label", "Drag it on the plan to move it.", Field("Text", _lText), Field("Size (squares)", _lSize), _lDelete));
+            Explained("The label", "Drag it on the plan to move it; R turns it.", Field("Text", _lText), Field("Size (squares)", _lSize), Field("Turn (degrees)", _lTurn), _lDelete));
+        _roadPanel = Stack(
+            Explained("The road", "Its name is written along it. Drag it to move it; drag a round handle to move a bend or an end, a diamond to move a whole stretch. Double-click it to add a bend, right-click a bend to take it out.",
+                Field("Name", _rName), Field("Surface", _rSurface), Field("Width (squares)", _rWidth, tip: "2 for a street, 4 for a high road."), _rInfo, _rDelete));
+        _fencePanel = Stack(
+            Explained("The wall", "Drag it to move it; drag a round handle to move a corner or an end, a diamond to move a whole side. Double-click it to add a corner, right-click a corner to take it out. Where a road goes through it there's a gate.",
+                Field("Kind", _wKind), _wRuined, _wInfo, _wDelete));
         _noBuilding = none;
-        return new StackPanel { Children = { none, building, _groupPanel, _labelPanel } };
+        return new StackPanel { Children = { none, building, _groupPanel, _labelPanel, _roadPanel, _fencePanel } };
     }
 
     Control BuildingTab()
@@ -395,11 +419,15 @@ public sealed class CityWindow : Window
             var cells = new HashSet<(int X, int Y)>();
             for (int j = y; j < y + d; j++) for (int i = x; i < x + w; i++) cells.Add((i, j));
             var (type, _) = BuildingGuess.Kind(cells);
-            var towards = Around(cells).Where(c => _map.GroundAt(c.X, c.Y) is Ground.Road or Ground.Paving or Ground.Dirt).ToHashSet();
+            var paved = _map.Paved();
+            var towards = Around(cells).Where(c => paved.GroundAt(c.X, c.Y) is Ground.Road or Ground.Paving or Ground.Dirt).ToHashSet();
             var f = new SeenBuilding { Cells = cells, Storeys = (int)(_storeysNew.Value ?? 1), Type = type, DoorTowards = towards };
             if (BuildingGuess.Make(f, _map.Theme, _map.SquareMm) is not { } made) return null;
-            return new CityBuilding { Name = $"{type} {_map.Buildings.Count + 1}", Type = type, X = made.X, Y = made.Y, Design = made.Design };
+            return new CityBuilding { Name = TownMaker.BuildingName(_map, type, Environment.TickCount), Type = type, X = made.X, Y = made.Y, Design = made.Design };
         };
+        _plan.NameRoad = m => TownMaker.RoadName(m, Environment.TickCount);
+        _plan.OpenBuilding += async id => { if (_map.Building(id) is not null) { _plan.Select(id); await EditBuilding(); } };
+        _plan.Said += text => _status.Text = text;
         _undoButton.Click += (_, _) => Undo();
         _redoButton.Click += (_, _) => Redo();
 
@@ -462,6 +490,12 @@ public sealed class CityWindow : Window
         _labelText.TextChanged += (_, _) => { _plan.LabelText = _labelText.Text ?? ""; _plan.InvalidateVisual(); };
         _labelSize.ValueChanged += (_, _) => _plan.LabelSize = (double)(_labelSize.Value ?? 0.8m);
         _labelSize.Value = 0.8m;
+        _labelTurn.ValueChanged += (_, _) => { _plan.LabelTurn = (double)(_labelTurn.Value ?? 0); _plan.InvalidateVisual(); };
+        _labelTurn.Value = 0;
+        _snap.SelectionChanged += (_, _) => _plan.Snap = (CitySnap)Math.Max(0, _snap.SelectedIndex);
+        _fenceShape.SelectionChanged += (_, _) => _plan.FenceRectangle = _fenceShape.SelectedIndex == 1;
+        _fenceRuined.IsCheckedChanged += (_, _) => _plan.FenceRuined = _fenceRuined.IsChecked == true;
+        _plan.LabelTurnChanged += t => { _loading = true; _labelTurn.Value = (decimal)Math.Round(t); _loading = false; };
 
         _find.TextChanged += (_, _) => FillTownList();
         _findType.SelectionChanged += (_, _) => FillTownList();
@@ -487,7 +521,15 @@ public sealed class CityWindow : Window
         _gDelete.Click += (_, _) => _plan.DeletePicked();
         _lText.LostFocus += (_, _) => ChangeLabel(l => l with { Text = string.IsNullOrWhiteSpace(_lText.Text) ? l.Text : _lText.Text.Trim() }, "Change a label");
         _lSize.ValueChanged += (_, _) => ChangeLabel(l => l with { Size = (double)(_lSize.Value ?? 0.8m) }, "Resize a label");
+        _lTurn.ValueChanged += (_, _) => ChangeLabel(l => l with { TurnDeg = CityLabel.Upright((double)(_lTurn.Value ?? 0)) }, "Turn a label");
         _lDelete.Click += (_, _) => _plan.DeletePicked();
+        _rName.LostFocus += (_, _) => ChangeRoad(r => r with { Name = (_rName.Text ?? "").Trim() }, "Rename a road");
+        _rSurface.SelectionChanged += (_, _) => ChangeRoad(r => r with { Surface = RoadGrounds[Math.Clamp(_rSurface.SelectedIndex, 0, RoadGrounds.Length - 1)] }, "Change a road's surface");
+        _rWidth.ValueChanged += (_, _) => ChangeRoad(r => r with { Width = (double)(_rWidth.Value ?? 2) }, "Change a road's width");
+        _rDelete.Click += (_, _) => _plan.DeletePicked();
+        _wKind.SelectionChanged += (_, _) => ChangeFence(f => f with { Kind = (FenceKind)Math.Max(0, _wKind.SelectedIndex) }, "Change a wall's kind");
+        _wRuined.IsCheckedChanged += (_, _) => ChangeFence(f => f with { Ruined = _wRuined.IsChecked == true }, _wRuined.IsChecked == true ? "Ruin a wall" : "Mend a wall");
+        _wDelete.Click += (_, _) => _plan.DeletePicked();
         _typeFilter.SelectionChanged += (_, _) => FillPrefabList();
         _prefabList.SelectionChanged += (_, _) =>
         {
@@ -598,8 +640,11 @@ public sealed class CityWindow : Window
         _redoButton.IsEnabled = _redo.Count > 0;
         var overlaps = CityFootprint.Overlaps(_map);
         double wM = _map.Across * _map.SquareMm / 1000, dM = _map.Down * _map.SquareMm / 1000;
-        _summary.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things."
-            + (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "");
+        var cells = CityEdit.BuildingCells(_map);
+        int onRoads = _map.Roads.Count(r => CityEdit.Hits(_map, r, cells));
+        _summary.Text = $"{_map.Name}: {_map.Across} × {_map.Down} squares ({wM:0.##} × {dM:0.##} m on the table), {_map.Buildings.Count} building{(_map.Buildings.Count == 1 ? "" : "s")}, {_map.Roads.Count} road{(_map.Roads.Count == 1 ? "" : "s")}, {_map.Props.Count} trees and things."
+            + (overlaps.Count > 0 ? $" {overlaps.Count} pair{(overlaps.Count == 1 ? "" : "s")} of buildings stand on the same squares (red on the plan)." : "")
+            + (onRoads > 0 ? $" {onRoads} road{(onRoads == 1 ? " runs" : "s run")} through a building." : "");
         _makeAll.IsEnabled = _map.Buildings.Count > 0;
         RefreshTown();
         ShowPicked();
@@ -623,11 +668,15 @@ public sealed class CityWindow : Window
     {
         var pick = _plan.Pick;
         var b = Picked();
-        var label = pick.Labels.Count == 1 && pick.Buildings.Count + pick.Props.Count + pick.Fences.Count == 0 ? _map.Labels.FirstOrDefault(l => l.Id == pick.Labels.First()) : null;
+        var label = pick.Labels.Count == 1 && pick.Count == 1 ? _map.Labels.FirstOrDefault(l => l.Id == pick.Labels.First()) : null;
+        var road = pick.Roads.Count == 1 && pick.Count == 1 ? _map.Road(pick.Roads.First()) : null;
+        var fence = pick.Fences.Count == 1 && pick.Count == 1 ? _map.FenceById(pick.Fences.First()) : null;
         _noBuilding.IsVisible = pick.IsEmpty;
         _buildingPanel.IsVisible = b is not null;
         _labelPanel.IsVisible = label is not null;
-        _groupPanel.IsVisible = !pick.IsEmpty && b is null && label is null;
+        _roadPanel.IsVisible = road is not null;
+        _fencePanel.IsVisible = fence is not null;
+        _groupPanel.IsVisible = !pick.IsEmpty && b is null && label is null && road is null && fence is null;
         int many = pick.Buildings.Count;
         _makeOne.IsEnabled = many > 0;
         _makeOne.Content = many > 1 ? $"Put the {many} picked buildings in the design" : "Put this building in the design";
@@ -637,6 +686,27 @@ public sealed class CityWindow : Window
         {
             _lText.Text = label.Text;
             _lSize.Value = (decimal)label.Size;
+            _lTurn.Value = (decimal)Math.Round(label.TurnDeg);
+        }
+        if (road is not null)
+        {
+            _rName.Text = road.Name;
+            _rSurface.SelectedIndex = Math.Max(0, Array.IndexOf(RoadGrounds, road.Surface));
+            _rWidth.Value = (decimal)road.Width;
+            int bends = Math.Max(0, road.Points.Count - 2);
+            _rInfo.Text = $"{road.Length:0.#} squares long ({road.Length * 5:0} feet), {bends} bend{(bends == 1 ? "" : "s")}."
+                + (TownPieces.Bridges(_map).Count(x => x.Cells.Overlaps(road.Cells(_map.Across, _map.Down))) is var n && n > 0 ? $" It crosses water on {n} bridge{(n == 1 ? "" : "s")}." : "");
+        }
+        if (fence is not null)
+        {
+            _wKind.SelectedIndex = (int)fence.Kind;
+            _wRuined.IsChecked = fence.Ruined;
+            var lay = WallLayout.Of(_map, f => f.Id == fence.Id);
+            int gates = lay.Gates.Count, caps = lay.Ends.Count(e => e.Kind == WallEndKind.Cap), towers = lay.Ends.Count(e => e.Kind == WallEndKind.Tower);
+            _wInfo.Text = $"{fence.Length:0.#} squares long" + (fence.Closed ? ", all the way round" : "")
+                + (gates > 0 ? $", {gates} gate{(gates == 1 ? "" : "s")}" : "")
+                + (caps > 0 ? $", {caps} end cap{(caps == 1 ? "" : "s")}" : "")
+                + (towers > 0 ? $", meets {towers} guard tower end{(towers == 1 ? "" : "s")}" : "") + ".";
         }
         if (_groupPanel.IsVisible)
         {
@@ -646,7 +716,8 @@ public sealed class CityWindow : Window
             if (bs.Count > 0) parts.Add($"{bs.Count} building{(bs.Count == 1 ? "" : "s")}");
             if (ps.Count > 0) parts.Add($"{ps.Count} tree{(ps.Count == 1 ? "" : "s")} and thing{(ps.Count == 1 ? "" : "s")}");
             if (pick.Labels.Count > 0) parts.Add($"{pick.Labels.Count} label{(pick.Labels.Count == 1 ? "" : "s")}");
-            if (pick.Fences.Count > 0) parts.Add($"{pick.Fences.Count} square{(pick.Fences.Count == 1 ? "" : "s")} of fence");
+            if (pick.Fences.Count > 0) parts.Add($"{pick.Fences.Count} wall{(pick.Fences.Count == 1 ? "" : "s")} and fence{(pick.Fences.Count == 1 ? "" : "s")}");
+            if (pick.Roads.Count > 0) parts.Add($"{pick.Roads.Count} road{(pick.Roads.Count == 1 ? "" : "s")}");
             _gInfo.Text = "Picked: " + string.Join(", ", parts) + ".";
             _groupBuildings.IsVisible = bs.Count > 0;
             _gType.Text = bs.Select(x => x.Type).Distinct().Count() == 1 ? bs[0].Type : "";
@@ -710,6 +781,34 @@ public sealed class CityWindow : Window
         var m = _map with { Labels = [.. _map.Labels.Select(l => l.Id == id ? change(l) : l)] };
         if (m.Labels.SequenceEqual(_map.Labels)) return;
         Commit(m, label);
+    }
+
+    void ChangeRoad(Func<CityRoad, CityRoad> change, string label)
+    {
+        if (_loadingBuilding || _plan.Pick.Roads.Count != 1) return;
+        var id = _plan.Pick.Roads.First();
+        if (_map.Road(id) is not { } r) return;
+        var changed = change(r);
+        if (changed == r) return;
+        var m = _map with { Roads = [.. _map.Roads.Select(x => x.Id == id ? changed : x)] };
+        // Wider, a road mustn't run into a building.
+        if (changed.Width > r.Width && CityEdit.Hits(m, changed, CityEdit.BuildingCells(m)))
+        {
+            _status.Text = "That wide, the road would run into a building.";
+            ShowPicked();
+            return;
+        }
+        Commit(m, label);
+    }
+
+    void ChangeFence(Func<Fence, Fence> change, string label)
+    {
+        if (_loadingBuilding || _plan.Pick.Fences.Count != 1) return;
+        var id = _plan.Pick.Fences.First();
+        if (_map.FenceById(id) is not { } f) return;
+        var changed = change(f);
+        if (changed.Kind == f.Kind && changed.Ruined == f.Ruined) return;
+        Commit(_map with { Fences = [.. _map.Fences.Select(x => x.Id == id ? changed : x)] }, label);
     }
 
     // ---- the town's buildings ----

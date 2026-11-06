@@ -37,7 +37,7 @@ public class CityBuilderTests
         Assert.Equal(m.Rows, back.Rows);
         Assert.Equal(m.Buildings.Count, back.Buildings.Count);
         Assert.Equal(m.Buildings[0].Design.ToJson(), back.Buildings[0].Design.ToJson());
-        Assert.Equal(m.Fences.Sum(f => f.Edges.Count), back.Fences.Sum(f => f.Edges.Count));
+        Assert.Equal(m.Tidied().Fences.SelectMany(f => f.GridEdges()).ToHashSet(), back.Fences.SelectMany(f => f.GridEdges()).ToHashSet());
         Assert.Equal(m.Props.Count, back.Props.Count);
         Assert.Equal(Ground.Road, back.GroundAt(17, 3));
         Assert.Null(CityMap.FromJson("{not json"));

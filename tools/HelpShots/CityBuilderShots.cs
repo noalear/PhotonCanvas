@@ -7,7 +7,7 @@ using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Materials;
 using SkiaSharp;
 
-/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building and several things picked, the town's buildings by district, a town made for you, its Cut tab, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
+/// <summary>The city builder's pictures (in its own help/images): the sample village on the plan and in 3D, a building, several things and a road picked, the town's buildings by district, a town made for you, its Cut tab, a part of it saved as a battle map picture, its ground cut as tiles, and the sample battle map read into a town.</summary>
 static class CityBuilderShots
 {
     const BindingFlags Any = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
@@ -84,6 +84,16 @@ static class CityBuilderShots
         Shot("window-citybuilder-made", village, 0, 0, MakeOne);
         Shot("window-citybuilder-made-3d", village, 0, 1, MakeOne);
         Shot("window-citybuilder-cut", village, 5, 0, MakeOne);
+        // A lane picked in the made town: its handles on the plan, its name, surface and width on the Picked tab.
+        Shot("window-citybuilder-road", village, 4, 0, MakeOne, w =>
+        {
+            var plan = F<CityPlan>(w, "_plan");
+            var lane = plan.Map.Roads.Where(r => r.Width == 2).OrderByDescending(r => r.Length).First();
+            plan.SetPick(CityPick.Of(lane));
+            // Its name in the middle, the bridge beside it.
+            var (_, at, _) = CityPlan.RoadNames(plan.Map).First(n => n.Road.Id == lane.Id);
+            plan.CentreOn(at.X + 3, at.Y);
+        });
         // Closer in on the market square in 3D: its stage, stalls, bar and trough, and the guard towers on the wall beyond.
         Shot("window-citybuilder-square-3d", village, 0, 1, MakeOne, w =>
         {

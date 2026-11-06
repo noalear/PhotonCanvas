@@ -103,16 +103,17 @@ public class CityBuilderTownPiecesTests
         var (m, notes) = TownMaker.Make(new TownOptions { Across = 64, Down = 48, Layout = TownLayout.Crossroads, Walls = true, Seed = 3 });
         var towers = m.Props.Where(p => p.Kind == PropKind.GuardTower).ToList();
         Assert.NotEmpty(towers);
-        // Each astride the wall on a grid point, the wall not running under it.
-        var wall = m.Fences.Where(f => f.Kind == FenceKind.CityWall).SelectMany(f => f.Edges).ToList();
+        // Each astride the wall on a grid point, the wall not running under it (its corners are under towers).
+        var lay = WallLayout.Of(m, f => f.Kind == FenceKind.CityWall);
+        var wall = lay.Pieces.SelectMany(p => Enumerable.Range(0, p.Points.Count - 1).SelectMany(i => Enumerable.Range(0, 41).Select(k => p.Points[i] + (p.Points[i + 1] - p.Points[i]) * (k / 40.0)))).ToList();
         Assert.All(towers, t =>
         {
             Assert.Equal((Math.Round(t.X), Math.Round(t.Y)), (t.X, t.Y));
-            Assert.DoesNotContain(wall, e => Math.Abs((e.Across ? e.X + 0.5 : e.X) - t.X) < 0.9 && Math.Abs((e.Across ? e.Y : e.Y + 0.5) - t.Y) < 0.9);
+            Assert.DoesNotContain(wall, q => Math.Abs(q.X - t.X) < 0.9 && Math.Abs(q.Y - t.Y) < 0.9);
         });
         Assert.Contains(notes, n => n.Contains("guard tower"));
         var cut = TownPieces.Walls(m);
-        Assert.Equal((4, 0, towers.Count), (cut.CornersOut, cut.CornersIn, cut.Towers));
+        Assert.Equal((0, 0, towers.Count), (cut.CornersOut, cut.CornersIn, cut.Towers));
         Assert.True(cut.Gates >= 4, $"{cut.Gates} gates");
         // The market square: a stage, stalls, a bar, a notice board and a trough, on its paving and clear of the roads through it.
         foreach (var kind in new[] { PropKind.Stage, PropKind.Stall, PropKind.Bar, PropKind.NoticeBoard, PropKind.Trough })

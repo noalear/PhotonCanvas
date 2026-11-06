@@ -56,6 +56,9 @@ public static class TownPicture
 
     public static SKBitmap Render(CityMap m, TownPictureOptions o)
     {
+        m = m.Tidied();
+        // The ground with the roads laid on it, the water left under their bridges.
+        var ground = m.Paved(overWater: false);
         var (x0, y0, x1, y1) = o.Box ?? (0, 0, m.Across, m.Down);
         x0 = Math.Clamp(x0, 0, m.Across - 1); y0 = Math.Clamp(y0, 0, m.Down - 1);
         x1 = Math.Clamp(x1, x0 + 1, m.Across); y1 = Math.Clamp(y1, y0 + 1, m.Down);
@@ -76,14 +79,15 @@ public static class TownPicture
         for (int y = Math.Max(0, y0 - 1); y < Math.Min(m.Down, y1 + 1); y++)
             for (int x = Math.Max(0, x0 - 1); x < Math.Min(m.Across, x1 + 1); x++)
             {
-                var g = m.GroundAt(x, y);
+                var g = ground.GroundAt(x, y);
                 double v = Noise(x * 0.35, y * 0.35, o.Seed) * 0.12 - 0.06;
                 fill.Color = Shade(Base(g), 1 + v);
                 c.DrawRect(x - 0.01f, y - 0.01f, 1.02f, 1.02f, fill);
             }
         for (int y = Math.Max(0, y0 - 1); y < Math.Min(m.Down, y1 + 1); y++)
             for (int x = Math.Max(0, x0 - 1); x < Math.Min(m.Across, x1 + 1); x++)
-                GroundMarks(c, m, x, y, o.Seed, fill, line);
+                GroundMarks(c, ground, x, y, o.Seed, fill, line);
+        foreach (var site in TownPieces.Bridges(m)) DrawBridge(c, site, fill, line, view);
 
         // Shadows: buildings by their height, walls, trees.
         using var shadow = new SKPaint { IsAntialias = true, Style = SKPaintStyle.Fill, Color = new SKColor(0, 0, 0, 0x58), MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 0.05f * px, false) };
@@ -121,8 +125,8 @@ public static class TownPicture
             c.Restore();
         }
 
-        // Fences, hedges and walls.
-        foreach (var f in m.Fences) DrawFence(c, f, fill, line);
+        // Fences, hedges and walls, open where the roads go through, with a town wall's turrets and gatehouses.
+        DrawWalls(c, m, fill, line);
 
         // The buildings' roofs.
         foreach (var b in m.Buildings)
@@ -156,8 +160,24 @@ public static class TownPicture
                 Text(c, text, b.Name, (float)bx, (float)by, 0.32f);
             }
         if (o.Labels)
+        {
+            foreach (var (r, at, deg) in CityPlan.RoadNames(m).Where(s => In(s.At.X, s.At.Y, 6)))
+            {
+                c.Save();
+                c.Translate((float)at.X, (float)at.Y);
+                c.RotateDegrees((float)deg);
+                Text(c, text, r.Name, 0, 0, (float)(CityPlan.NameSize(r) * 0.8));
+                c.Restore();
+            }
             foreach (var l in m.Labels.Where(l => In(l.X, l.Y, 6)))
-                Text(c, text, l.Text, (float)l.X, (float)l.Y, (float)Math.Max(0.2, l.Size * 0.62));
+            {
+                c.Save();
+                c.Translate((float)l.X, (float)l.Y);
+                c.RotateDegrees((float)l.TurnDeg);
+                Text(c, text, l.Text, 0, 0, (float)Math.Max(0.2, l.Size * 0.62));
+                c.Restore();
+            }
+        }
         return bmp;
     }
 
@@ -347,58 +367,159 @@ public static class TownPicture
 
     // ---- fences and walls ----
 
-    static void DrawFence(SKCanvas c, Fence f, SKPaint fill, SKPaint line)
+    static void DrawWalls(SKCanvas c, CityMap m, SKPaint fill, SKPaint line)
     {
-        var runs = CityScene.Runs(f.Edges).ToList();
-        switch (f.Kind)
+        var layout = WallLayout.Of(m);
+        static IEnumerable<(CityPt A, CityPt B)> Segs(WallPiece p)
         {
-            case FenceKind.CityWall:
-                line.StrokeCap = SKStrokeCap.Square;
-                line.Color = new SKColor(0x4A, 0x46, 0x40);
-                line.StrokeWidth = 0.5f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                line.Color = new SKColor(0x9A, 0x94, 0x8A);
-                line.StrokeWidth = 0.42f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                // The walk along the top, and the battlements along both sides.
-                line.Color = new SKColor(0x7E, 0x78, 0x6E);
-                line.StrokeWidth = 0.22f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                fill.Color = new SKColor(0xB4, 0xAE, 0xA2);
-                foreach (var (ax, ay, bx, by) in runs)
-                {
-                    double len = Math.Abs(bx - ax) + Math.Abs(by - ay), ux = Math.Sign(bx - ax), uy = Math.Sign(by - ay);
-                    for (double t = 0.12; t < len; t += 0.33)
-                        foreach (int side in new[] { -1, 1 })
-                        {
-                            double mx = ax + ux * t + side * uy * 0.16, my = ay + uy * t - side * ux * 0.16;
-                            c.DrawRect((float)mx - 0.06f, (float)my - 0.06f, 0.12f, 0.12f, fill);
-                        }
-                }
-                line.StrokeCap = SKStrokeCap.Round;
-                break;
-            case FenceKind.StoneWall:
-                line.Color = new SKColor(0x50, 0x4C, 0x46);
-                line.StrokeWidth = 0.2f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                line.Color = new SKColor(0xA0, 0x9A, 0x90);
-                line.StrokeWidth = 0.14f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                break;
-            case FenceKind.Hedge:
-                fill.Color = new SKColor(0x2E, 0x52, 0x24);
-                foreach (var (ax, ay, bx, by) in runs) Along(ax, ay, bx, by, 0.12, (x, y, i) => c.DrawCircle((float)x, (float)y, 0.17f, fill));
-                fill.Color = new SKColor(0x4A, 0x78, 0x36);
-                foreach (var (ax, ay, bx, by) in runs) Along(ax, ay, bx, by, 0.12, (x, y, i) => c.DrawCircle((float)x - 0.03f, (float)y - 0.04f, 0.12f, fill));
-                break;
-            default:
-                line.Color = new SKColor(0x5A, 0x3E, 0x26);
-                line.StrokeWidth = 0.05f;
-                foreach (var (ax, ay, bx, by) in runs) c.DrawLine((float)ax, (float)ay, (float)bx, (float)by, line);
-                fill.Color = new SKColor(0x46, 0x30, 0x1C);
-                foreach (var (ax, ay, bx, by) in runs) Along(ax, ay, bx, by, 0.5, (x, y, i) => c.DrawRect((float)x - 0.05f, (float)y - 0.05f, 0.1f, 0.1f, fill));
-                break;
+            for (int i = 0; i + 1 < p.Points.Count; i++) yield return (p.Points[i], p.Points[i + 1]);
+            if (p.Closed && p.Points.Count > 2) yield return (p.Points[^1], p.Points[0]);
         }
+        SKPath PathOf(WallPiece p)
+        {
+            var path = new SKPath();
+            path.MoveTo((float)p.Points[0].X, (float)p.Points[0].Y);
+            foreach (var q in p.Points.Skip(1)) path.LineTo((float)q.X, (float)q.Y);
+            if (p.Closed) path.Close();
+            return path;
+        }
+        void Stroke(WallPiece p, SKColor colour, float width, SKStrokeCap cap = SKStrokeCap.Square)
+        {
+            using var path = PathOf(p);
+            line.Color = colour;
+            line.StrokeWidth = width;
+            line.StrokeCap = cap;
+            line.StrokeJoin = SKStrokeJoin.Miter;
+            c.DrawPath(path, line);
+            line.StrokeJoin = SKStrokeJoin.Round;
+            line.StrokeCap = SKStrokeCap.Round;
+        }
+        foreach (var p in layout.Pieces)
+        {
+            bool ruin = p.Fence.Ruined;
+            switch (p.Fence.Kind)
+            {
+                case FenceKind.CityWall:
+                    Stroke(p, new SKColor(0x4A, 0x46, 0x40), 0.5f);
+                    Stroke(p, ruin ? new SKColor(0x8A, 0x84, 0x7A) : new SKColor(0x9A, 0x94, 0x8A), 0.42f);
+                    // The walk along the top, and the battlements along both sides.
+                    Stroke(p, new SKColor(0x7E, 0x78, 0x6E), 0.22f);
+                    fill.Color = new SKColor(0xB4, 0xAE, 0xA2);
+                    foreach (var (a, b) in Segs(p))
+                    {
+                        double len = a.DistanceTo(b);
+                        var u = (b - a).Unit;
+                        int i = 0;
+                        for (double t = 0.12; t < len; t += 0.33, i++)
+                            foreach (int side in new[] { -1, 1 })
+                            {
+                                // A ruin's battlements are mostly gone.
+                                if (ruin && (i * 7 + side * 3) % 5 != 0) continue;
+                                double mx = a.X + u.X * t + side * u.Y * 0.16, my = a.Y + u.Y * t - side * u.X * 0.16;
+                                c.DrawRect((float)mx - 0.06f, (float)my - 0.06f, 0.12f, 0.12f, fill);
+                            }
+                    }
+                    break;
+                case FenceKind.StoneWall:
+                    Stroke(p, new SKColor(0x50, 0x4C, 0x46), 0.2f);
+                    Stroke(p, new SKColor(0xA0, 0x9A, 0x90), 0.14f);
+                    break;
+                case FenceKind.Hedge:
+                    fill.Color = new SKColor(0x2E, 0x52, 0x24);
+                    foreach (var (a, b) in Segs(p)) Along(a.X, a.Y, b.X, b.Y, 0.12, (x, y, i) => c.DrawCircle((float)x, (float)y, 0.17f, fill));
+                    fill.Color = new SKColor(0x4A, 0x78, 0x36);
+                    foreach (var (a, b) in Segs(p)) Along(a.X, a.Y, b.X, b.Y, 0.12, (x, y, i) => c.DrawCircle((float)x - 0.03f, (float)y - 0.04f, 0.12f, fill));
+                    break;
+                default:
+                    Stroke(p, new SKColor(0x5A, 0x3E, 0x26), 0.05f, SKStrokeCap.Butt);
+                    fill.Color = new SKColor(0x46, 0x30, 0x1C);
+                    foreach (var (a, b) in Segs(p)) Along(a.X, a.Y, b.X, b.Y, 0.5, (x, y, i) => c.DrawRect((float)x - 0.05f, (float)y - 0.05f, 0.1f, 0.1f, fill));
+                    break;
+            }
+        }
+        void Square(CityPt at, CityPt way, float length, float across, SKColor body, SKColor rim)
+        {
+            c.Save();
+            c.Translate((float)at.X, (float)at.Y);
+            c.RotateDegrees((float)(Math.Atan2(way.Y, way.X) * 180 / Math.PI));
+            fill.Color = rim;
+            c.DrawRect(-length / 2 - 0.04f, -across / 2 - 0.04f, length + 0.08f, across + 0.08f, fill);
+            fill.Color = body;
+            c.DrawRect(-length / 2, -across / 2, length, across, fill);
+            c.Restore();
+        }
+        // The ends: a town wall's round turret, a stone wall's pillar, a fence's post.
+        foreach (var e in layout.Ends.Where(e => e.Kind == WallEndKind.Cap))
+        {
+            switch (e.Fence.Kind)
+            {
+                case FenceKind.CityWall:
+                    fill.Color = new SKColor(0x4A, 0x46, 0x40);
+                    c.DrawCircle((float)e.At.X, (float)e.At.Y, 0.46f, fill);
+                    fill.Color = new SKColor(0xA4, 0x9E, 0x94);
+                    c.DrawCircle((float)e.At.X, (float)e.At.Y, 0.4f, fill);
+                    fill.Color = new SKColor(0x7E, 0x78, 0x6E);
+                    c.DrawCircle((float)e.At.X, (float)e.At.Y, 0.24f, fill);
+                    break;
+                case FenceKind.StoneWall:
+                    Square(e.At, e.Out, 0.26f, 0.26f, new SKColor(0xA8, 0xA2, 0x98), new SKColor(0x50, 0x4C, 0x46));
+                    break;
+                case FenceKind.Fence:
+                    Square(e.At, e.Out, 0.12f, 0.12f, new SKColor(0x5A, 0x3E, 0x26), new SKColor(0x3A, 0x28, 0x16));
+                    break;
+            }
+        }
+        // The gates: a town wall's gatehouse over the road (a tower each side, the roof of the passage between), a fence's gate posts.
+        foreach (var g in layout.Gates)
+        {
+            var u = (g.B - g.A).Unit;
+            if (g.Fence.Kind == FenceKind.CityWall)
+            {
+                Square(g.A - u * 0.38, u, 0.76f, 0.92f, new SKColor(0xA4, 0x9E, 0x94), new SKColor(0x4A, 0x46, 0x40));
+                Square(g.B + u * 0.38, u, 0.76f, 0.92f, new SKColor(0xA4, 0x9E, 0x94), new SKColor(0x4A, 0x46, 0x40));
+                var mid = g.Middle;
+                c.Save();
+                c.Translate((float)mid.X, (float)mid.Y);
+                c.RotateDegrees((float)(Math.Atan2(u.Y, u.X) * 180 / Math.PI));
+                float w = (float)g.Width;
+                fill.Color = new SKColor(0x6E, 0x4A, 0x30, 0xE0);
+                c.DrawRect(-w / 2, -0.3f, w, 0.6f, fill);
+                line.Color = new SKColor(0x3A, 0x28, 0x16, 0xC0);
+                line.StrokeWidth = 0.025f;
+                for (float t = -w / 2 + 0.15f; t < w / 2; t += 0.15f) c.DrawLine(t, -0.3f, t, 0.3f, line);
+                c.Restore();
+            }
+            else if (g.Fence.Kind != FenceKind.Hedge)
+            {
+                Square(g.A, u, 0.16f, 0.16f, new SKColor(0x5A, 0x3E, 0x26), new SKColor(0x3A, 0x28, 0x16));
+                Square(g.B, u, 0.16f, 0.16f, new SKColor(0x5A, 0x3E, 0x26), new SKColor(0x3A, 0x28, 0x16));
+            }
+        }
+    }
+
+    /// <summary>A bridge over the water: its shadow, a deck of flagstones or planks, a parapet or rail along each side.</summary>
+    static void DrawBridge(SKCanvas c, BridgeSite site, SKPaint fill, SKPaint line, SKRect view)
+    {
+        float x0 = site.Cells.Min(q => q.X), x1 = site.Cells.Max(q => q.X) + 1, y0 = site.Cells.Min(q => q.Y), y1 = site.Cells.Max(q => q.Y) + 1;
+        if (x1 < view.Left || x0 > view.Right || y1 < view.Top || y0 > view.Bottom) return;
+        bool planks = site.Road == Ground.Dirt;
+        // Reaching a little onto each bank.
+        if (site.Across) { x0 -= 0.15f; x1 += 0.15f; } else { y0 -= 0.15f; y1 += 0.15f; }
+        fill.Color = new SKColor(0, 0, 0, 0x50);
+        c.DrawRect(x0 + 0.12f, y0 + 0.18f, x1 - x0, y1 - y0, fill);
+        fill.Color = planks ? new SKColor(0x96, 0x6C, 0x44) : new SKColor(0xA8, 0xA0, 0x92);
+        c.DrawRect(x0, y0, x1 - x0, y1 - y0, fill);
+        line.StrokeCap = SKStrokeCap.Butt;
+        line.Color = planks ? new SKColor(0x5A, 0x3E, 0x26, 0xA0) : new SKColor(0x6A, 0x64, 0x5C, 0x70);
+        line.StrokeWidth = 0.02f;
+        float step = planks ? 0.2f : 0.5f;
+        if (site.Across) for (float t = x0 + step; t < x1; t += step) c.DrawLine(t, y0, t, y1, line);
+        else for (float t = y0 + step; t < y1; t += step) c.DrawLine(x0, t, x1, t, line);
+        line.Color = planks ? new SKColor(0x4A, 0x32, 0x1E) : new SKColor(0x7E, 0x78, 0x6E);
+        line.StrokeWidth = planks ? 0.1f : 0.2f;
+        if (site.Across) { c.DrawLine(x0, y0 + 0.08f, x1, y0 + 0.08f, line); c.DrawLine(x0, y1 - 0.08f, x1, y1 - 0.08f, line); }
+        else { c.DrawLine(x0 + 0.08f, y0, x0 + 0.08f, y1, line); c.DrawLine(x1 - 0.08f, y0, x1 - 0.08f, y1, line); }
+        line.StrokeCap = SKStrokeCap.Round;
     }
 
     /// <summary>Points every <paramref name="step"/> squares along a straight run, both ends included.</summary>
