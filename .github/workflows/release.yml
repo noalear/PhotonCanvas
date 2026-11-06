@@ -8,7 +8,9 @@
 #             repository), set the RELEASES_REPO variable to "owner/name" and the RELEASES_TOKEN
 #             secret to a token that can write releases there. Copies built from then on update
 #             from there (it's written into their update.json).
-#   Checked   the tests run beside the build; a failing test means no release.
+#   Checked   every change runs the full test suite before it's merged, so a release doesn't run it
+#             again (it had grown past the job's time limit and was stopping releases). Run the
+#             workflow by hand with "Run the tests" ticked to have GitHub run them too.
 #   Safe      every download is listed in SHA256SUMS, and the program refuses a file that doesn't match.
 #   Small     PhotonCanvas-<build>.files.txt lists every file's SHA-256, so the program downloads only
 #             the files that changed, read straight out of the zip.
@@ -29,8 +31,8 @@ on:
         description: 'Builds to make (win-x64 win-arm64 osx-arm64 osx-x64 linux-x64 linux-arm64)'
         default: 'win-x64'
         required: false
-      skip_tests:
-        description: 'Skip the tests'
+      run_tests:
+        description: 'Run the tests too (the release waits for them)'
         type: boolean
         default: false
 
@@ -44,21 +46,21 @@ concurrency:
 permissions:
   contents: write
 
-# Tests and the build run side by side on two machines; the release waits for both.
+# The tests only run when asked for by hand; then they run beside the build and the release waits for both.
 jobs:
   test:
-    if: ${{ !inputs.skip_tests }}
+    if: ${{ inputs.run_tests }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Package cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-test-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
@@ -73,14 +75,14 @@ jobs:
     outputs:
       version: ${{ steps.v.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
       - name: Package cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.nuget/packages
           key: nuget-build-${{ hashFiles('**/*.csproj', '**/Directory.Build.*') }}
@@ -108,7 +110,7 @@ jobs:
           sha256sum "${files[@]}" > SHA256SUMS
           cat SHA256SUMS
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           retention-days: 3
@@ -121,16 +123,16 @@ jobs:
 
   release:
     needs: [test, build]
-    # Tests skipped by hand still count as passed; a failed or cancelled test run means no release.
+    # Tests not run count as passed; a failed or cancelled test run means no release.
     if: ${{ !cancelled() && needs.build.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist
