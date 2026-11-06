@@ -38,7 +38,7 @@ public static partial class BuildingKitMaker
 
     /// <summary>
     /// The floors between storeys (and under the battlements) for a building that isn't a rectangle: a plate
-    /// as big as the outside of its columns, lying on the walls and the columns, with the floors' texture
+    /// flush with the outside of its walls and columns, lying on the walls and the columns, with the floors' texture
     /// etched on. The way up and its opening are the stair maker's, made for the biggest rectangle that fits
     /// in the room, in its back right corner.
     /// </summary>
@@ -49,7 +49,8 @@ public static partial class BuildingKitMaker
         if (count <= 0) return;
         double T = s.WallSheetMm, Wt = WallThickness(s), H = StoreyHeight(s);
         var b = fp.Bounds;
-        var outline = fp.Outline(s.ColumnMm / 2);
+        // As big as the outside of the columns at the corners, but flush with the walls' outside faces between them.
+        var outline = Geo.Intersect(fp.Outline(s.ColumnMm / 2), Geo.Union(Geo.Tidy(fp.Outline(Math.Min(Wt, s.ColumnMm) / 2)), Geo.Tidy(ColumnOutlines(s, fp, s.ColumnMm))));
 
         // The texture: the stair maker's floor over the building's whole bounds, cut to the plate. Its plan runs
         // from the back right corner, turned half round, as the rectangle's floors are.
@@ -259,6 +260,15 @@ public static partial class BuildingKitMaker
             AddRoofPart(part, cut, Geo.Intersect(part.Etched, cut), Geo.ClipLines(part.Lines, cut), part.Poses, MainPoint, MainDir, mainKit.ThicknessMm, top, pieces, solids);
         }
 
+        // How far forward the back wing's ridge cap lies on its front slope (on the plan): the wings' slopes and
+        // caps stop against it rather than running on into it.
+        double capFront = cym;
+        if (mainKit.Parts.FirstOrDefault(p => p.Name == "Ridge cap (left)") is { } frontCap)
+            foreach (var pose in frontCap.Poses)
+                foreach (var q in frontCap.Cut.SelectMany(path => path))
+                    foreach (var w in new[] { 0.0, mainKit.ThicknessMm })
+                        capFront = Math.Min(capFront, cym + pose.At(q.x, q.y, w).Y);
+
         // The back wing's front slope's outside face, on the plan with height: n · (p − q) = T on it.
         var n = (X: 0.0, Y: -sn, Z: c);
         double Above(double x, double y, double z) => n.X * x + n.Y * (y - front) + n.Z * (z - T) - T;
@@ -296,7 +306,7 @@ public static partial class BuildingKitMaker
                 // Slopes and the ridge cap: cut along the valley, where they meet the back wing's front slope.
                 var pose = part.Poses[0];
                 double G(double u, double v) { var q = Plan3(pose.At(u, v)); return Above(q.X, q.Y, q.Z); }
-                var keep = HalfPlane(part.Cut, G);
+                var keep = Geo.Intersect(HalfPlane(part.Cut, G), HalfPlane(part.Cut, (u, v) => capFront - 0.5 - Plan3(pose.At(u, v)).Y));
                 if (part.Name.Contains("cap", StringComparison.Ordinal))
                 {
                     // The ridge cap stops short of the back wing's ridge cap.

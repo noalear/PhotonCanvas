@@ -120,13 +120,14 @@ How the roof is held together and how it sits on the walls.
 
 - The roof is built on a **base** plate the size of the building. The gables, the **trusses** between
   them (**Trusses every**, about 60 mm apart; 0 = none) and a hipped roof's **ridge board** stand on it
-  with tabs in slots. A hipped roof's ridge board and trusses slot together halfway, as a cross. The
+  with tabs in slots. Under a gable (and a lean-to's sides and back wall) the base is cut back between
+  the column corners, so it doesn't stick out past the gable; the gable's tabs sit in notches in its edge. A hipped roof's ridge board and trusses slot together halfway, as a cross. The
   slopes rest on the gables and trusses: glue everything, and the whole roof lifts off.
 - **Slot fit**: added to the sheet's thickness for the slots. With your material's cut settings
   picked, the kerf is allowed for too.
 - Under the base, a **locator** frame drops inside the walls so the roof can't slide off. **Walls
   inside** is from the outer edge to the inside face of the walls (0 = no locator), **Wall thickness**
-  the walls' (the gables stand over their middle), **Column corners** the square corners the locator
+  the walls' (the gables stand flush with their outside faces), **Column corners** the square corners the locator
   keeps clear of (the columns and their caps), and **Rests above walls** how far the column caps
   stand above the walls' tops: the locator is stacked deep enough to reach 2 mm below the tops. **Match
   the walls in the design** fills all four in.

@@ -577,7 +577,7 @@ public static partial class BuildingKitMaker
         return new Pose(new V3(x, y, z), new V3(c, 0, -sn), new V3(-sn, 0, -c));
     }
 
-    /// <summary>The stairs maker's settings for the floors between storeys: a plate over the columns' outside, lying on the walls and columns, with an opening and a way up at the back.</summary>
+    /// <summary>The stairs maker's settings for the floors between storeys: a plate over the columns' outside (cut back flush with the walls between them by Floors()), lying on the walls and columns, with an opening and a way up at the back.</summary>
     public static FloorSpec FloorSpecFor(BuildingSpec s, int floors)
     {
         double k28 = K(s), Wt = WallThickness(s);
@@ -632,9 +632,14 @@ public static partial class BuildingKitMaker
             {
                 // The plate lies on the columns rather than round them: fill their holes in (inside the plate's edge) and drill the pin holes instead.
                 var edge = Geo.Bounds(cut);
-                cut = Geo.Subtract(Geo.Intersect(Geo.Union(cut, columnHoles), [Geo.Rect(edge.left, edge.top, edge.right, edge.bottom)]), pins);
+                cut = Geo.Intersect(Geo.Union(cut, columnHoles), [Geo.Rect(edge.left, edge.top, edge.right, edge.bottom)]);
+                // Between the columns it stops flush with the walls' outside faces instead of sticking out past them.
+                double half = Math.Min(WallThickness(s), s.ColumnMm) / 2;
+                var tops = new PathsD();
+                foreach (var c in FloorKitMaker.ColumnCentres(spec)) tops.AddRange(Geo.Move([FloorKitMaker.ColumnTop(spec)], c.x, c.y));
+                cut = Geo.Subtract(Geo.Intersect(cut, Geo.Union([Geo.Rect(-half, -half, W + half, D + half)], Geo.Tidy(tops))), pins);
             }
-            var etched = plate ? Geo.Subtract(part.Etched, Geo.Offset(pins, 0.8)) : part.Etched;
+            var etched = plate ? Geo.Subtract(Geo.Intersect(part.Etched, cut), Geo.Offset(pins, 0.8)) : part.Etched;
             var lines = plate ? Geo.ClipLines(part.Lines, Geo.Subtract(cut, Geo.Offset(pins, 0.8))) : part.Lines;
             string name = part.Name switch { "Floor" => "Floor", _ => part.Name };
             pieces.Add(new Piece(name, Sheet.Walls, cut, etched, lines, part.Copies));
