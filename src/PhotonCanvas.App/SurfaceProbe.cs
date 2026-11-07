@@ -94,21 +94,35 @@ public sealed class SurfaceProbe(DeviceClient client)
     public async Task<List<double?>> MeasureAsync(IReadOnlyList<Vec2> aims, double focusMm, PointerCalibration cal, IProgress<string> progress, CancellationToken ct)
     {
         var heights = new List<double?>();
-        await Session(async () =>
-        {
-            progress.Report("Head to the focus height…");
-            await client.MoveFocusAsync(focusMm, ZOffset, cancellationToken: ct);
-            var off = await PhotoAsync(null, ct);
-            for (int i = 0; i < aims.Count; i++)
-            {
-                ct.ThrowIfCancellationRequested();
-                progress.Report($"Point {i + 1} of {aims.Count}");
-                var on = await PhotoAsync(aims[i], ct);
-                heights.Add(DotFinder.Find(on, off) is { } dot && cal.Depth(aims[i], dot.Centre) is { } depth ? focusMm - depth : null);
-            }
-        }, ct);
+        await Session(async () => heights = await ReadAtAsync(aims, focusMm, cal, progress, ct), ct);
         return heights;
     }
+
+    /// <summary>
+    /// The heights at <paramref name="aims"/> with the head moved to focus at <paramref name="focusMm"/>, inside a
+    /// session (<see cref="RunAsync"/>) that has already darkened the lights. Null where the dot isn't read.
+    /// </summary>
+    public async Task<List<double?>> ReadAtAsync(IReadOnlyList<Vec2> aims, double focusMm, PointerCalibration cal, IProgress<string>? progress, CancellationToken ct)
+    {
+        var heights = new List<double?>();
+        progress?.Report($"Head to focus at {focusMm:0.#} mm…");
+        await client.MoveFocusAsync(focusMm, ZOffset, cancellationToken: ct);
+        var off = await PhotoAsync(null, ct);
+        for (int i = 0; i < aims.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            progress?.Report($"Point {i + 1} of {aims.Count} (head at {focusMm:0.#} mm)");
+            var on = await PhotoAsync(aims[i], ct);
+            heights.Add(DotFinder.Find(on, off) is { } dot && cal.Depth(aims[i], dot.Centre) is { } depth ? focusMm - depth : null);
+        }
+        return heights;
+    }
+
+    /// <summary>
+    /// Run <paramref name="run"/> as one measuring session: checks the machine is idle, darkens the fill lights, and
+    /// puts the lights and pointer back afterwards (even if it fails or is stopped).
+    /// </summary>
+    public Task RunAsync(Func<Task> run, CancellationToken ct) => Session(run, ct);
 
     /// <summary>A close-up photo with the pointer aimed at <paramref name="aim"/> (or off, for null).</summary>
     async Task<RasterImage> PhotoAsync(Vec2? aim, CancellationToken ct)

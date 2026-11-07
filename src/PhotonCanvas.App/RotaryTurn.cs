@@ -59,7 +59,7 @@ static class RotaryTurn
     /// The feed's units per motor unit: the one-turn check's when there is one, else 1 ÷ the belt factor
     /// stored on the machine (ConveyorURate), else 1 ÷ the conveyor setting here.
     /// </summary>
-    static async Task<double> NowScaleAsync(AppSettings settings, MachinePanel machine)
+    internal static async Task<double> NowScaleAsync(AppSettings settings, MachinePanel machine)
     {
         if (settings.RotaryNowScale > 0) return settings.RotaryNowScale;
         if (_machineRate is null)
@@ -69,6 +69,17 @@ static class RotaryTurn
                 _machineRate = r;
         }
         return _machineRate is { } rate ? 1 / rate : RotaryReturn.NowScale(settings);
+    }
+
+    /// <summary>
+    /// The conveyor-feed units that turn the object <paramref name="degrees"/> straight away (positive the way a design
+    /// runs down the page), with the saved rotary settings. Null when the work mode isn't the rotary.
+    /// </summary>
+    public static async Task<double?> FeedUnitsAsync(AppSettings settings, MachinePanel machine, double degrees)
+    {
+        if (WorkModes.From(settings) is not WorkMode.Rotary mode) return null;
+        double circ = Math.PI * Math.Max(1, settings.RotaryDiameterMm);
+        return RotaryReturn.UnitsFor(degrees, mode, circ) * await NowScaleAsync(settings, machine);
     }
 
     /// <summary>The scale turns use now, as far as is known without asking the machine.</summary>

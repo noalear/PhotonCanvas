@@ -225,6 +225,30 @@ public sealed class AppSettings
     /// is assumed (the machine scales the feed by its belt factor). Corrected from a one-turn check.
     /// </summary>
     public double RotaryNowScale { get; set; }
+    /// <summary>
+    /// Rotary: how high the axis of the rotary is above the bed, in mm the way a focus height is given (so a part's
+    /// top height minus this is its distance from the axis). Null until typed or set from a scan of a round rod.
+    /// </summary>
+    public double? RotaryAxisHeightMm { get; set; }
+    /// <summary>Scan the part: measure with the pointer and close-up camera (true) or the machine's auto-focus.</summary>
+    public bool RotaryScanPointer { get; set; } = true;
+    /// <summary>Scan the part: angles to measure at, the span of the turn, and the places along the axis.</summary>
+    public int RotaryScanStops { get; set; } = 24;
+    public double RotaryScanFromDeg { get; set; }
+    public double RotaryScanToDeg { get; set; } = 360;
+    public double RotaryScanX0 { get; set; } = 95;
+    public double RotaryScanX1 { get; set; } = 125;
+    public int RotaryScanPoints { get; set; } = 7;
+    /// <summary>
+    /// Scan the part: the stock is a standard shape (a square bar, a round rod…), so the scan only finds how it sits
+    /// and the model is that exact shape; <see cref="StockKind.Scanned"/> uses what was measured. Sizes in mm.
+    /// </summary>
+    public StockKind RotaryStockKind { get; set; } = StockKind.Scanned;
+    public double RotaryStockWidthMm { get; set; } = 50.8;
+    public double RotaryStockHeightMm { get; set; } = 50.8;
+    public bool RotaryStockInches { get; set; } = true;
+    /// <summary>Scan the part: extra wait after each turn for the part to settle (seconds).</summary>
+    public double RotaryScanSettleS { get; set; } = 0.5;
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
     public double ConveyorUMultiple { get; set; } = 0.74592;
     public double ConveyorAngle { get; set; }

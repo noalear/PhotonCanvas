@@ -8,6 +8,7 @@ section at a time for a design bigger than the bed, or across several pieces tha
 |---|---|
 | **Work mode** | Flat bed, rotary attachment or conveyor, and their settings. Hidden unless you have an attachment. |
 | **Curved surface** | Mark on a curved piece: the head follows it in height steps. |
+| **Scan the part** | On the rotary: turn the part a step at a time and measure its top at each step, for a model of its shape. Shows only in the rotary work mode. |
 | **Layer by layer** | Mark one layer at a time, with a stop between to change the screen, colour or material. |
 | **Sections** | Mark a design bigger than the work area, moving the material between sections. |
 | **Split onto pieces** | Mark one design across several pieces (four boards making one picture): a page per piece, lined up by the camera. From the Split onto pieces add-on, which has its own page under **Add-ons**. |
@@ -125,6 +126,95 @@ and run the test again to check.
 **Read from the machine** fills both in from the calibration stored on the machine (needs the
 connection). The work area becomes 610 × 220 mm: design X moves the belt, and the laser draws across
 it.
+
+### Scan the part
+
+<!-- windows: RotaryScanWindow -->
+
+![Scan the part: the stock model of a glued stack, and one place along it end-on](images/window-rotary-scan.png)
+
+**Scan the part** (Laser tab, Work area group, in the rotary work mode) measures a part held in the
+rotary before you mark or carve it: a glued stack of slices, a branch, a turned blank that isn't quite
+round. The part is turned a step at a time, and at each step the height of its top is measured along
+the laser line. Together the readings make a model of the stock: how far the surface reaches from the
+rotary's axis all the way round and along it, shown in 3D. The laser is never fired, but the rotary
+turns and the head moves up and down, so keep hands clear of the chuck. This is experimental and
+hasn't been tried on the machine yet.
+
+How it measures:
+
+- **Red pointer and close-up camera**: at each step the pointer is aimed at several places along the
+  laser line and the close-up camera reads how far below the head's focus each dot lands (laser
+  triangulation, the same as [Curved surface](#curved-surface)). Calibrate the pointer once first
+  (**Curved surface** → **Calibrate the pointer…**), and focus on the top of the part before you scan:
+  the head starts there. Each head height reads about 8 mm either side of it, so places it misses are
+  tried again from other heights (up to six an angle), starting near what the last angle read there.
+  Only places the close-up camera can see are read: the window says the area it was calibrated over.
+- **The machine's auto-focus**: one reading an angle, wherever the machine focuses (the middle of the
+  field), but it reaches any height. Put the part's axis under the middle of the field.
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Measure with** | Red pointer and close-up camera, The machine's auto-focus | Red pointer | How the top is measured (above). |
+| **From X (mm)** / **To X (mm)** | 0 to 220 | 95 / 125 | Where along the rotary's axis to measure (the work area's X). Pointer only. |
+| **Places along it** | 1 to 60 | 7 | How many places between them, at every step. |
+| **Use the selection** | | | Sets the X range to the selected shapes (all of them if none is selected) and, on a rotary page, the angles to how far round they reach from the job's start (the rotary start line, or the middle of the design). This is how to say which area needs scanning. |
+| **Angles** | 2 to 360 | 24 | How many angles to measure at. 24 over a whole turn is every 15°. |
+| **From (°)** / **To (°)** | −3600 to 3600 | 0 / 360 | The span of the turn, from where the part is now. Positive is the way a design runs down the page. 0 to 360 is a whole turn (360 itself isn't measured again). |
+| **Wait after a turn (s)** | 0 to 10 | 0.5 | Extra wait after each turn, for the part to stop moving. The machine doesn't say when a turn is done, so the wait is worked out from its length, plus this. |
+| **Stock** | As scanned, Round rod, Square bar, Rectangular bar, Hexagon bar | As scanned | What the model is. **As scanned** uses what was measured. A standard stock (a 2" square bar, a round rod) is taken to be exactly that shape: the scan only works out how it sits in the chuck, and the model is the exact shape (see below). |
+| **Size** / **Units** | 0.01 to 1000, mm or inches | 2 inches | The standard stock's size: a rod's diameter, a bar's width, a hexagon across the flats. |
+| **Height** | 0.01 to 1000 | 2 inches | A rectangular bar's other side. |
+| **I know the axis height** / **Axis height (mm)** | −200 to 200 | off | How high the rotary's axis is above the bed, the way you'd type a focus height. A part's top height minus this is how far it reaches from the axis. The 3D model needs it. |
+| **Rod Ø (mm)** | 1 to 200 | 20 | For **It was a round rod**: the diameter of a round rod you scanned. |
+
+- **Scan** asks first, then turns and measures. When it's done it turns the part back to where it
+  started (on round on a whole turn, if that's shorter). The readings are kept for next time.
+- **Stop** stops at once, where it is: the part isn't turned back. The window then shows **Return to
+  start** with the angle, which turns it back.
+- **It was a round rod**: if you don't know the axis height, put a round rod (a dowel, a drill blank)
+  in the chuck, scan it over a whole turn, type its diameter and click this. The axis height is the
+  average top height less the radius (allowing for a rod held a little off-centre). It stays right
+  until the rotary is moved.
+- **Turn the high side up** turns the part (the shorter way) so the highest point read is on top,
+  under the laser line.
+- The stock model as it stands (the fitted standard stock, or the scan) is kept for other tools to work
+  from, with the axis height it was made with.
+- **Save as CSV…** saves the readings as a spreadsheet, one row an angle and one column a place
+  (distances from the axis, gaps filled, when the axis height is known; top heights otherwise).
+  **Save as STL…** saves the stock model as a 3D file (needs a whole turn, two or more places and
+  the axis height): X along the axis, the axis at 0, what faced the laser at the start on top (+Z).
+
+#### Standard stock
+
+When the part is a standard stock, choose it under **Stock** and type its size (for a 2" × 2" square
+bar: **Square bar**, **Size** 2, **Units** inches). The readings are then only used to find how the
+stock sits: how far it's turned in the chuck, how far its middle is off the axis, and (if **I know the
+axis height** is off) the axis height too, which is then filled in. The model is the exact shape in
+that place, so a few readings are enough: the auto-focus at every 15° does. The readings show as dots
+on the end-on view, over the fitted outline, and the words say how closely they fit; a loose fit
+(over ±0.5 mm) means the size is wrong or the stock isn't that shape. **Turn the high side up** becomes
+**Turn a flat face up**, which turns the bar (the shorter way) until the face nearest the top lies
+level on top. The same shape is used all along the part, so a bar held crooked in the chuck fits
+loosely.
+
+![Scan the part with a standard stock: a 2" square bar fitted to the scan](images/window-rotary-scan-square.png)
+
+What it shows:
+
+- The 3D view: the stock model, the axis (grey), an orange line along what faced the laser when the
+  scan started, and a blue ring round the place chosen with **Place along it**. Places that weren't
+  read are filled in from the readings either side.
+- Below it, that place end-on with the axis in the middle and the start (orange) at the top; without
+  the axis height, its top height against the angle turned.
+- In words: how many points were read, the highest and lowest, how much it rises and falls as it
+  turns, and, fitting it as a round part, how far off the axis it sits and which angle its high side
+  is at. With the axis height: the nearest and furthest the surface comes to the axis, so the circle
+  it needs to turn in and the biggest round it could be cut to.
+
+> **Note:** The angle at a point is the turn that brings it to the top, counted the way a rotary job
+> turns the part, so it lines up with a rotary page: a point at angle θ sits θ/360 of the way round
+> from the job's start line. Start the scan with the part where a job would start.
 
 ### What changes on an attachment
 
@@ -321,6 +411,7 @@ numbers and spreadsheet rows only move on after the last section.
 
 - [Mark on a rotary or the conveyor](tutorial:area-work-mode)
 - [Calibrate the red pointer](tutorial:area-calibrate-pointer)
+- [Scan a part in the rotary](tutorial:area-rotary-scan)
 - [Mark on a curved piece](tutorial:area-curved-surface)
 - [Mark one layer at a time](tutorial:area-layer-by-layer)
 - [Mark a design bigger than the bed](tutorial:area-sections)
