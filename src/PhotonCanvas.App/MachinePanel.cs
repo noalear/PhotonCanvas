@@ -492,7 +492,15 @@ public sealed class MachinePanel : UserControl
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         if (Mode is "P_WORKING" or "P_PAUSE" or "P_FRAMING")
             throw new DeviceException(DeviceException.BusyCode, "The machine is busy. Wait for it to finish, or stop it, first.");
+        // Asleep, it answers but doesn't move (seen 2026-11-07): wake it first, as leaving focus mode does.
+        if (Mode == "P_SLEEP")
+        {
+            Log("The machine is asleep: waking it before turning the rotary.");
+            await c.ReturnToIdleAsync();
+            await Task.Delay(1500);
+        }
         Log($"Turning the rotary {u:0.###} (hold, then turn).");
+        // Hold every time: the motor may have been let go (or by a sleep) since the last turn.
         await c.AccessoryAsync("lock");
         await c.AccessoryAsync("goto", u, speed);
     }
