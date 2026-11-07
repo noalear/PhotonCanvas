@@ -12,9 +12,9 @@ This needs the machine connected (see [The machine and settings](machine.md)). L
 sheet of wood or card over the whole 220 × 220 mm bed.
 
 ## Open the calibration
-<!-- target: ribbon:Camera/Calibrate -->
+<!-- target: ribbon:Machine/Calibrate camera -->
 <!-- wait: window:Camera calibration -->
-Click **Calibrate** on the **Camera** tab.
+Click **Calibrate camera** on the **Machine** tab.
 
 ## Focus on the scrap
 <!-- target: button:Auto-focus on the material -->

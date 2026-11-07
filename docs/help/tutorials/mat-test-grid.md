@@ -7,9 +7,9 @@ Not sure what settings to use on a new material? A test grid burns a labelled sq
 combination of two settings on a scrap of it. You pick the square you like and use its numbers.
 
 ## Open the test grid
-<!-- target: ribbon:Laser/Test grid -->
+<!-- target: ribbon:Tests/Test grid -->
 <!-- wait: window:Test grid -->
-Put a scrap of the material on the bed, then click **Test grid** on the **Laser** tab.
+Put a scrap of the material on the bed, then click **Tests** on the **Materials & Tests** tab, pick **Test grid** in the list and click **Open**.
 
 ## Choose the test
 <!-- target: field:Test -->
@@ -36,9 +36,9 @@ Click **Add to design**. The grid goes at the top-left of the work area, each sq
 layer named after its settings.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Move the grid onto the scrap, frame it and **Ship It**, then press the machine's button.
 
 ## Keep the best
-<!-- target: ribbon:Laser/Record results -->
+<!-- target: ribbon:Tests/Record results -->
 **Record results** saves the squares you like to the library, with a photo of each.

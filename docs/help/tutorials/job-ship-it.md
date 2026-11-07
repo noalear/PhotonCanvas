@@ -17,7 +17,7 @@ The job bar shows the job as it would run now. Look at the timeline and the **Ch
 should say **All clear**, or click it to see what to look at.
 
 ## Ship it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Ship it to the machine -->
 Click **Ship It** (here or at the left of the job bar). The button says **Shipping it…** while the
 job is made ready.

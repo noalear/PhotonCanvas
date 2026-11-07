@@ -8,11 +8,11 @@ them at the end. You need the machine connected (**Connect** at the right end of
 photos are kept).
 
 ## Turn it on
-<!-- target: ribbon:Laser/Time-lapse -->
+<!-- target: ribbon:Machine/Time-lapse -->
 Click **Time-lapse**. It stays on for every job until you click it again.
 
 ## Run a job
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Ship the job and start it on the machine as usual. The photos start when the job does.
 
 ## Find the video

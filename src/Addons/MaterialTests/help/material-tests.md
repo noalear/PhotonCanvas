@@ -1,6 +1,6 @@
 # Material tests
 
-This add-on adds the Laser tab's **Tests** group: tests that each answer one question about a material (how deep a pass goes, what cuts through, what kerf, how pictures come out) and save the answer with it in the library, plus **Inlay**, which is built on those answers. A burned test opens its results by itself when the job finishes. How the tests work in general, the test grid and Record results are explained in
+This add-on adds most of the tests to the Tests window (**Tests** on the **Materials & Tests** tab): tests that each answer one question about a material (how deep a pass goes, what cuts through, what kerf, how pictures come out) and save the answer with it in the library, plus **Inlay**, which is built on those answers. A burned test opens its results by itself when the job finishes. How the tests work in general, the test grid and Record results are explained in
 [Materials and tests](materials-and-tests.md).
 
 | Button | Answers |
@@ -177,7 +177,7 @@ up front.
 The laser itself never fires while measuring: only the pointer and the head move.
 
 You need: the machine connected, the focus set on the material, and the pointer calibrated once
-(**Laser → Curved surface → Calibrate the pointer…**, see
+(**Machine → Curved surface → Calibrate the pointer…**, see
 [Work area](work-area.md)). Select closed shapes (not text) and click **Exact depth**.
 
 ![Exact depth before starting: the shape with its measuring points, depth, tolerance and first guess](images/window-laser-exact-depth.png)

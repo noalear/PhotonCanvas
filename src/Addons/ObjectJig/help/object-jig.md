@@ -14,7 +14,7 @@ marked with **Ship It**, as always. Not yet tried on the machine or on real phot
 
 <!-- windows: JigWindow -->
 
-Click **Object jig** on the **Camera** tab (in **Place**). The window has the object on the left,
+Click **Object jig** on the **Placement** tab (in **Jigs**). The window has the object on the left,
 then the jig, then the design; the preview on the right shows the jig to scale with the objects in
 it (green) and the design on each (blue). Nothing changes in the design until **Make the jig**.
 
@@ -121,7 +121,7 @@ aren't touched).
 
 <!-- windows: FindJigWindow -->
 
-**Find the jig** (Camera tab, **Place**) is for a jig's objects page (the one with the jig drawn in
+**Find the jig** (Placement tab, **Jigs**) is for a jig's objects page (the one with the jig drawn in
 grey). Lay the jig anywhere on the bed, any way round, with nothing touching it; the objects can be
 in it. Measure the focus on the jig's top.
 

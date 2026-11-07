@@ -13,9 +13,9 @@ This needs the machine connected (see [The machine and settings](machine.md)). L
 board (not shiny) under the head, covering the middle of the bed.
 
 ## Open Curved surface
-<!-- target: ribbon:Laser/Curved surface -->
+<!-- target: ribbon:Machine/Curved surface -->
 <!-- wait: window:Curved surface -->
-Click **Curved surface** on the **Laser** tab.
+Click **Curved surface** on the **Machine** tab.
 
 ## Type the board's thickness
 <!-- target: field:Board (mm) -->

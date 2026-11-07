@@ -306,7 +306,7 @@ public sealed class FloorTilesWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: the laser burns each edge back by half its kerf, so tabs come out a little loose. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for joints at their drawn size."
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so tabs come out a little loose. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for joints at their drawn size."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so tabs and sockets come out their drawn size."
             : $"{r.M.Label}: no kerf measured yet, so tabs come out a little loose (run a cut test).";
         Changed();

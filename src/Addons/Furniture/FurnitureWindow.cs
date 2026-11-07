@@ -232,7 +232,7 @@ public sealed class FurnitureWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out a little loose. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for slots at their drawn size."
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out a little loose. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for slots at their drawn size."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so slots come out their drawn width."
             : $"{r.M.Label}: no kerf measured yet, so slots come out a little loose (run a cut test).";
         SheetChanged();

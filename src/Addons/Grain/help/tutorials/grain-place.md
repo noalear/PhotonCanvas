@@ -7,10 +7,9 @@ An artistic use of the grain map: the picture goes where the board's own pattern
 and the grain becomes part of the engraving.
 
 ## Pick the board's outline
-<!-- target: ribbon:Home/Pick piece -->
+<!-- target: ribbon:Placement/Pick piece -->
 <!-- wait: tool:Wand -->
-With the board on the bed and the camera picture showing (**Show** in the machine panel), click **Pick
-piece** on the **Home** tab (or press `W`), then click inside the board. Keep its outline selected.
+With the board on the bed and the camera picture showing (**Show** in the machine panel), click **Pick piece** on the **Placement** tab (or press `W`), then click inside the board. Keep its outline selected.
 
 ## Open Grain
 <!-- target: ribbon:Picture/Grain -->

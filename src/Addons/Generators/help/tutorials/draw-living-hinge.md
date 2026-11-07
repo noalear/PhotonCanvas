@@ -7,9 +7,9 @@ A living hinge is a pattern of staggered slits that lets a flat sheet bend. Use 
 sides, covers and round corners in plywood or MDF.
 
 ## Open the generators
-<!-- target: ribbon:Home/Generators -->
+<!-- target: ribbon:Import/Generators -->
 <!-- wait: window:Generators -->
-Click **Generators** on the **Home** tab.
+Click **Generators** on the **Import** tab.
 
 ## Choose Living hinge
 <!-- target: tabitem:Living hinge -->

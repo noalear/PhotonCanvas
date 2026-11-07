@@ -7,9 +7,9 @@ The library remembers the settings that worked on each material, with stars, not
 Start each job from settings you trust instead of guessing them again.
 
 ## Open the library
-<!-- target: ribbon:Laser/Library -->
+<!-- target: ribbon:Materials & Tests/Library -->
 <!-- wait: window:Material library -->
-Click **Library** on the **Laser** tab.
+Click **Library** on the **Materials & Tests** tab.
 
 ## Add a material
 <!-- target: button:New material -->

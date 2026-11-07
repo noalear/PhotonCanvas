@@ -1,6 +1,6 @@
 # CMYK split
 
-An add-on (Settings → Add-ons → **CMYK split**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Edit → CMYK split**.
+An add-on (Settings → Add-ons → **CMYK split**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Effects → CMYK split**.
 
 ## CMYK split
 
@@ -13,7 +13,7 @@ elsewhere. Each goes on its own new Picture layer (**Cyan ·**, **Magenta ·**, 
 
 ![The Layers panel after a CMYK split: a Picture layer for each ink](images/panel-layers-cmyk.png)
 
-- Mark each plate on its own screen. **Laser → Layer by layer** runs one layer at a time with a
+- Mark each plate on its own screen. **Machine → Layer by layer** runs one layer at a time with a
   pause between ([Work area](work-area.md)).
 - The plates are made from the picture as its tone settings show it: **Brightness**, **Contrast**,
   **Gamma** and **Invert** are applied to the colours first, so each plate starts with those at

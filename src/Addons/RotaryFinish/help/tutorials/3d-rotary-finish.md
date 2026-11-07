@@ -7,9 +7,9 @@ A stack of slices has steps all over. Glued up on a dowel and turned in the rota
 laser can take the steps off, down to the model's real shape.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->
@@ -29,7 +29,7 @@ The dowel the chuck holds. 6 mm is a good start; a notch in its hole points to t
 
 ## Choose the engrave settings
 <!-- target: field:Engrave with -->
-Pick settings with a measured depth a pass (Laser → Etch rate test). The depth fills in.
+Pick settings with a measured depth a pass (Materials & Tests → Tests → Etch rate test). The depth fills in.
 
 ## The focus band
 <!-- target: field:Focus band (mm) -->

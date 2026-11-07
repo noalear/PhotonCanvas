@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Bases;
 
 /// <summary>
-/// Designer → Minis & games → Bases, its command and "Edit bases…" on the right-click menu, opening
+/// Mini-Designer → Accessories → Bases, its command and "Edit bases…" on the right-click menu, opening
 /// <see cref="BasesWindow"/>: textured bases for tabletop figures and movement trays to carry them.
 /// It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class BasesAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Minis & games", "Bases", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Accessories", "Bases", Icon, Open)
         {
             Tip = "Bases for tabletop figures with cracked earth, rocks, grass, flagstones or deck plates etched on, and movement trays to carry them",
             Large = true,

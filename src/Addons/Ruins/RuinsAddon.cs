@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Ruins;
 
 /// <summary>
-/// Designer → Terrain → Ruins, its command and "Edit ruins…" on the right-click menu, opening
+/// Mini-Designer → Terrain → Ruins, its command and "Edit ruins…" on the right-click menu, opening
 /// <see cref="RuinsWindow"/>: broken walls, rubble, fallen stones and broken pillars for tabletop games
 /// and models. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class RuinsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Terrain", "Ruins", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Terrain", "Ruins", Icon, Open)
         {
             Tip = "Broken wall sections, rubble piles, fallen stones and broken pillars, in the wall maker's textures, for tabletop games and models",
             Large = true,

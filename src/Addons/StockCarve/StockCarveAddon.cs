@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.StockCarve;
 
 /// <summary>
-/// Carve stock to a model (Laser → Work area): a part scanned in the rotary, a model lined up inside it, and a
+/// Carve stock to a model (Machine → Work area): a part scanned in the rotary, a model lined up inside it, and a
 /// page that engraves the part down to the model's shape as it turns.
 /// </summary>
 public sealed class StockCarveAddon : IAddon
@@ -14,10 +14,10 @@ public sealed class StockCarveAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Laser", "Work area", "Carve to model", "IcDepth", Open)
+        host.AddRibbonButton(new RibbonButton("Machine", "Work area", "Carve to model", "IcDepth", Open)
         {
             Tip = "Line a 3D model up inside the part scanned in the rotary, see where it sticks out, and engrave the part down to the model's shape",
-            Order = 20,
+            Order = 21,
         });
         host.AddCommand(new AddonCommand("stock-carve.open", "Laser", "Carve stock to a model…", "", Open));
     }

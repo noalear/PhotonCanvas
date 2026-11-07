@@ -8,7 +8,7 @@ using static PhotonCanvas.App.UiKit;
 namespace PhotonCanvas.Addon.DepthCharge;
 
 /// <summary>
-/// Picture → Turn it into → Depthmap, the Selection panel's Depthmap… button and the right-click
+/// Picture → Effects → Depthmap, the Selection panel's Depthmap… button and the right-click
 /// item: a depthmap of a picture (or a picture file) via DepthCharge, laid over the original on its
 /// own greyscale slices layer.
 /// </summary>
@@ -23,10 +23,11 @@ public sealed class DepthChargeAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Turn it into", "Depthmap", "IcDepth", () => _ = host.Guard(() => Make(host.SelectedPicture)))
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Depthmap", "IcDepth", () => _ = host.Guard(() => Make(host.SelectedPicture)))
         {
             Tip = "Make a relief depthmap with DepthCharge (select a picture first, or pick a file)",
             Large = true,
+            Order = 11,
         });
         host.AddContextMenuItem(new ContextMenuEntry("Depthmap with DepthCharge…", () => _ = host.Guard(() => Make(host.SelectedPicture)))
         {

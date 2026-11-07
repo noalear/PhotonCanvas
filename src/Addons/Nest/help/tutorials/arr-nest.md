@@ -7,7 +7,7 @@ Nest packs parts by their real shapes, turning them where it helps, and can fill
 copies. Use it to get the most parts out of a board or an offcut.
 
 ## Outline the material (optional)
-<!-- target: ribbon:Home/Pick piece -->
+<!-- target: ribbon:Placement/Pick piece -->
 To use the board in the machine, outline it (draw round it, or **Pick piece** on the camera
 picture), then right-click the outline → **Use as material outline**.
 

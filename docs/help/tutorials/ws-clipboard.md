@@ -12,27 +12,30 @@ another design. You need a shape: draw one first if the design is empty.
 Click a shape to select it.
 
 ## Copy it
-<!-- target: ribbon:Home/Copy -->
-Click **Copy** (`Ctrl+C`).
+<!-- target: canvas -->
+Press `Ctrl+C`, or right-click the shape and choose **Copy**.
 
 ## Paste it
-<!-- target: ribbon:Home/Paste -->
+<!-- target: canvas -->
 <!-- wait: shapes:+1 -->
-Click **Paste** (`Ctrl+V`). The copy lands 5 mm right of and below the original; each paste goes
-5 mm further.
+Press `Ctrl+V`, or right-click and choose **Paste**. The copy lands 5 mm right of and below the
+original; each paste goes 5 mm further.
 
 ## Duplicate
-<!-- target: ribbon:Home/Duplicate -->
+<!-- target: canvas -->
 <!-- wait: shapes:+1 -->
-**Duplicate** (`Ctrl+D`) copies and pastes in one go, without touching the clipboard.
+`Ctrl+D` (or **Duplicate** on the right-click menu) copies and pastes in one go, without touching
+the clipboard.
 
 ## Cut
-<!-- target: ribbon:Home/Cut -->
-**Cut** (`Ctrl+X`) copies the selection and removes it, ready to paste somewhere else.
+<!-- target: canvas -->
+`Ctrl+X` (or **Cut** on the right-click menu) copies the selection and removes it, ready to paste
+somewhere else.
 
 ## Delete
-<!-- target: ribbon:Home/Delete -->
-**Delete** (`Delete` or `Backspace`) removes the selection. `Ctrl+Z` brings it back.
+<!-- target: canvas -->
+`Delete` or `Backspace` removes the selection (so does **Delete it** on the right-click menu).
+`Ctrl+Z` brings it back.
 
 ## More on a right-click
 <!-- target: canvas -->

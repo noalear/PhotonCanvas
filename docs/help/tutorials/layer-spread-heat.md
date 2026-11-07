@@ -42,6 +42,6 @@ The job's checks say how warm the sheet gets and how much waiting it adds. If on
 the limit, lower the power, go faster or allow more warming.
 
 ## See the order
-<!-- target: ribbon:Laser/Show order -->
-Turn on **Show order**: the pieces are coloured from first (blue) to last (red), from the middle
+<!-- target: ribbon:View/Processing order -->
+Turn on **Processing order** (View tab): the pieces are coloured from first (blue) to last (red), from the middle
 outwards.

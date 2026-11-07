@@ -84,4 +84,17 @@
   <StreamGeometry x:Key="IcSections">M2 4h20v16H2z M4 6v12h4.7V6z M10.7 6v12h2.6V6z M15.3 6v12H20V6z</StreamGeometry>
   <!-- Prism splitting light (diffraction) -->
   <StreamGeometry x:Key="IcPrism">M2.5 19.5 9 5l6.5 14.5zM5.6 17.5h6.8L9 9.9zM15.3 9.4l6-2.6.5 1.1-6 2.6zM16 12.1l6.4-.4.1 1.2-6.4.4zM16.6 14.6l5.7 2.6-.5 1.1-5.7-2.6z</StreamGeometry>
+  <StreamGeometry x:Key="IcTests">M9 2h6v2h-1v4.6l6.3 10.9c.6 1.1-.2 2.5-1.5 2.5H5.2c-1.3 0-2.1-1.4-1.5-2.5L10 8.6V4H9z M11 4h2v5.1l2.6 4.4H8.4L11 9.1z</StreamGeometry>
+  <StreamGeometry x:Key="IcKnocked">M2 14h8v8H2z M4 16v4h4v-4z M11 7h2v2.6l6.3-6.3 1.4 1.4-6.3 6.3H17v2h-6z</StreamGeometry>
+  <StreamGeometry x:Key="IcEveryPiece">M3 3h8v8H3z M5 5v4h4V5z M13 3h8v8h-8z M15 5v4h4V5z M3 13h8v8H3z M5 15v4h4v-4z M13 13h8v8h-8z M15 15v4h4v-4z M6 6h2v2H6z M16 6h2v2h-2z M6 16h2v2H6z M16 16h2v2h-2z</StreamGeometry>
+  <StreamGeometry x:Key="IcLineUp">M2 5h9v12H2z M4 7v8h5V7z M13 5h9v12h-9z M15 7v8h5V7z M1 19h22v2H1z</StreamGeometry>
+  <StreamGeometry x:Key="IcJig">M2 5h20v14H2z M5 8h5v8H5z M16 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z</StreamGeometry>
+  <StreamGeometry x:Key="IcFindJig">M2 3h12v8H2z M4 5h3v4H4z M9 5h3v4H9z M16 11a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M16 12.6a2.4 2.4 0 1 0 0 4.8a2.4 2.4 0 1 0 0-4.8z M18.6 18.1l1.2-1.2 3 3-1.2 1.2z</StreamGeometry>
+  <StreamGeometry x:Key="IcShadowBoard">M2 4h20v16H2z M5 10.5h9v3H5z M17 9a3 3 0 1 1 0 6a3 3 0 1 1 0-6z</StreamGeometry>
+  <StreamGeometry x:Key="IcSimplify">M2 16h4v4H2z M10 6h4v4h-4z M18 14h4v4h-4z M5.3 15.3l5-5 1.4 1.4-5 5z M13.7 9.3l5 5-1.4 1.4-5-5z</StreamGeometry>
+  <StreamGeometry x:Key="IcCutShapes">M3 3h11v11H3z M10 10h11v11H10z</StreamGeometry>
+  <StreamGeometry x:Key="IcTabs">M3 3h8v2H5v14h6v2H3z M13 3h8v18h-8v-2h6V5h-6z</StreamGeometry>
+  <StreamGeometry x:Key="IcStartPoint">F1 M12 3a9 9 0 1 1 0 18a9 9 0 1 1 0-18z M12 5a7 7 0 1 0 0 14a7 7 0 1 0 0-14z M12 1a3 3 0 1 1 0 6a3 3 0 1 1 0-6z</StreamGeometry>
+  <StreamGeometry x:Key="IcAlignLasers">M7 8a4 4 0 1 1 0 8a4 4 0 1 1 0-8z M7 9.6a2.4 2.4 0 1 0 0 4.8a2.4 2.4 0 1 0 0-4.8z M18 9.5a2.5 2.5 0 1 1 0 5a2.5 2.5 0 1 1 0-5z M11.5 12l3.2-3v2.2h.3v1.6h-.3V15z</StreamGeometry>
+  <StreamGeometry x:Key="IcGenerators">M3 7h18v13H3z M5 9v9h14V9z M3 4h3v3H3z M9 4h3v3H9z M15 4h3v3h-3z</StreamGeometry>
 </ResourceDictionary>

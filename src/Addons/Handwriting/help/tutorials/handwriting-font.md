@@ -7,9 +7,9 @@ Turn your handwriting into a font that engraves as single lines, fast. You'll ne
 pen and a phone camera (or the machine's camera).
 
 ## Open Handwriting
-<!-- target: ribbon:Home/Handwriting -->
+<!-- target: ribbon:Import/Handwriting -->
 <!-- wait: window:Handwriting -->
-Click **Handwriting** on the **Home** tab.
+Click **Handwriting** on the **Import** tab.
 
 ## Start a font
 <!-- target: button:Make a font -->

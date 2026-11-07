@@ -8,7 +8,7 @@ puts your markup on top and makes a quote to send. Set your rates once; after th
 a minute. Nothing is sent to the machine.
 
 ## Open Quote
-<!-- target: ribbon:Laser/Quote -->
+<!-- target: ribbon:Machine/Quote -->
 <!-- wait: window:Quote and cost -->
 With your design open, click **Quote**.
 

@@ -9,7 +9,7 @@ light, like a banknote. They're filled shapes, so they engrave crisply with ordi
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Engraving
 <!-- target: ribbon:Picture/Engraving -->

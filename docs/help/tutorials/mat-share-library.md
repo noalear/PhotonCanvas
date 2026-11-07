@@ -7,9 +7,9 @@ Materials, their recipes, colour palettes and photos travel as `.pcmat` files. S
 someone who has the same machine, or bring in what they found.
 
 ## Open the library
-<!-- target: ribbon:Laser/Library -->
+<!-- target: ribbon:Materials & Tests/Library -->
 <!-- wait: window:Material library -->
-Click **Library** on the **Laser** tab.
+Click **Library** on the **Materials & Tests** tab.
 
 ## Put your name on it
 <!-- target: text:Your name -->

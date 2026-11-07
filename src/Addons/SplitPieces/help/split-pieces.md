@@ -1,6 +1,6 @@
 # Split onto pieces
 
-This add-on marks one design across several separate pieces that go together afterwards. It adds **Split onto pieces** to the Laser tab's **Work area** group and the right-click menu, and **Line up pieces** to the Camera tab's **Place** group.
+This add-on marks one design across several separate pieces that go together afterwards. It adds **Split onto pieces** to the Machine tab's **Work area** group and the right-click menu, and **Line up pieces** to the Camera tab's **Place** group.
 
 ## Split onto pieces
 
@@ -21,7 +21,7 @@ slid along against a fence, use [Sections](work-area.md#sections).
    the bed.
 3. Put the design over them where you want it, on the layers you'll mark with.
 4. Select the design and the pieces (a box round everything does it), then click **Split onto
-   pieces** in the **Work area** group of the **Laser** tab, or right-click → **Split onto
+   pieces** in the **Work area** group of the **Machine** tab, or right-click → **Split onto
    pieces…**. With no piece selected, the outlines whose box overlaps the design's box are used.
 
 ![Four boards as material outlines, laid out two by two, with the design over them](images/workspace-pieces-layout.png)
@@ -62,7 +62,7 @@ holds the whole design, but its job can't be built while the design runs off the
 ### Lining the pieces up
 <!-- windows: LineUpWindow -->
 
-**Line up pieces** (Camera tab, **Place** group) opens **Line up the pieces**, which also opens
+**Line up pieces** (Placement tab, **Onto pieces** group) opens **Line up the pieces**, which also opens
 by itself after a split. While it's following, the camera looks every second or two, finds the
 page's piece and moves the whole page onto it, so the design lands exactly on the piece. The parts
 of the other pieces that the camera sees in the work area count too: lay the pieces you've already

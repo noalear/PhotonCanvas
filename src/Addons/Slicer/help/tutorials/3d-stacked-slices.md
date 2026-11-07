@@ -8,9 +8,9 @@ layers as thick as your sheet, then glue them up in order. You need a model file
 and the real thickness of your sheet.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab. The **Stacked slices** window opens.
+Click **3D to slices** on the **Import** tab. The **Stacked slices** window opens.
 
 ## Open the model browser
 <!-- target: button:Open a 3D model… -->

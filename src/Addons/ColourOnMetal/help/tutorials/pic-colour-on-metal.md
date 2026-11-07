@@ -4,13 +4,13 @@
 <!-- page: colour-on-metal.md -->
 <!-- order: 50 -->
 The MOPA laser colours stainless steel and titanium. This turns a picture into the colours your own
-plate made, one layer per colour. You need a measured palette first (Laser → Colour test, then
+plate made, one layer per colour. You need a measured palette first (Materials & Tests → Tests → Colour test, then
 Measure colours), and **Colour on metal** ticked in Settings → Equipment (it is at first).
 
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Colour on metal
 <!-- target: ribbon:Picture/Colour on metal -->

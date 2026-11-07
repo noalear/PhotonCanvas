@@ -8,9 +8,9 @@ picture several times side by side, each with one change. You need a picture lay
 it, the material on the bed and the machine connected.
 
 ## Open the line test
-<!-- target: ribbon:Laser/Line test -->
+<!-- target: ribbon:Tests/Line test -->
 <!-- wait: window:Line test -->
-Click **Line test** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Line test** in the list and click **Open**.
 
 ## Choose the layer
 <!-- target: field:Settings of -->
@@ -31,7 +31,7 @@ Each patch changes one thing from the first. Finer lines get less power, for the
 The patches go in the middle of the bed, and the window closes.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Line test -->
 Frame it, **Ship It** and press the machine's button. When it's done, the window opens again.
 

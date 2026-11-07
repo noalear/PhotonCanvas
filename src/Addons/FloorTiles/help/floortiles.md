@@ -1,6 +1,6 @@
 # Floor tiles
 
-An add-on (Settings → Add-ons → **Floor tile maker**): on when PhotonCanvas is installed, and can be turned off. It uses the wall maker's textures, so **Textured wall maker** has to be on too. Its button is **Designer → Terrain → Floor tiles**, and **Edit floor tiles…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Floor tile maker**): on when PhotonCanvas is installed, and can be turned off. It uses the wall maker's textures, so **Textured wall maker** has to be on too. Its button is **Mini-Designer → Terrain → Floor tiles**, and **Edit floor tiles…** is on the right-click menu of the pieces it made.
 
 **Floor tiles** makes floor tiles for tabletop games, dioramas and model buildings on a square
 grid, cut from sheet material with a texture etched on: dungeon flagstones, crazy paving, cobbles,
@@ -19,7 +19,7 @@ tile fits against any other on the grid, turned any way round. They go with the 
 
 ![The floor tile maker making a board of dungeon flagstones 6 squares by 4, cut into six 2 × 2 tiles that lock together with jigsaw edges](images/window-floortiles-dungeon.png)
 
-Click **Floor tiles** on the **Designer** tab (in the **Terrain** group). The **Floor tiles** window opens.
+Click **Floor tiles** on the **Mini-Designer** tab (in the **Terrain** group). The **Floor tiles** window opens.
 The settings are on the left in tabs; the preview on the right shows a board put together (so you
 can see the joints lock) or the loose tiles side by side, with a base layer and a clip under them if
 there are any, and updates as you change things. Under it are the number of pieces and any
@@ -167,7 +167,7 @@ grid the same way.
 
 The pieces go on three layers, run in this order: **Floor tiles · lines** (light scoring) and
 **Floor tiles · etch** (the texture, a Fill layer) first, while the sheet is whole, then **Floor
-tiles · cut**. Set the etch layer's power and speed for the depth you want (Laser → Tests → Material
+tiles · cut**. Set the etch layer's power and speed for the depth you want (Materials & Tests → Tests → Material
 test helps).
 
 ## Try it

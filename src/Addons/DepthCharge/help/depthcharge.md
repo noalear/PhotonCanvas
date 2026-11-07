@@ -1,6 +1,6 @@
 # Depthmap with DepthCharge
 
-An add-on (Settings → Add-ons → **Depthmap with DepthCharge**): on when PhotonCanvas is installed, and can be turned off. Its buttons are **Picture → Turn it into → Depthmap**, **Depthmap…** in the Selection panel's Picture settings, and **Depthmap with DepthCharge…** on the right-click menu.
+An add-on (Settings → Add-ons → **Depthmap with DepthCharge**): on when PhotonCanvas is installed, and can be turned off. Its buttons are **Picture → Effects → Depthmap**, **Depthmap…** in the Selection panel's Picture settings, and **Depthmap with DepthCharge…** on the right-click menu.
 
 ## Depthmap with DepthCharge
 <!-- windows: DepthChargeWindow -->

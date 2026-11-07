@@ -9,7 +9,7 @@ For four-colour screen printing each ink needs its own screen. CMYK split makes 
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a colour picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a colour picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Split it
 <!-- target: ribbon:Picture/CMYK split -->
@@ -22,5 +22,5 @@ There are four new Picture layers, one per ink, with halftone dots at the usual 
 the original picture's layer output off.
 
 ## Mark one layer at a time
-<!-- target: ribbon:Laser/Layer by layer -->
+<!-- target: ribbon:Machine/Layer by layer -->
 **Layer by layer** marks one layer, then waits while you change the screen.

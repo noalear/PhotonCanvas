@@ -1,6 +1,6 @@
 # Puzzle boxes
 
-An add-on (Settings → Add-ons → **Puzzle box maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Toys → Puzzle box**, and **Edit puzzle box…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Puzzle box maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Mini-Designer → Mechanical → Puzzle box**, and **Edit puzzle box…** is on the right-click menu of the pieces it made.
 
 **Puzzle box** makes boxes with secrets, glued up from layers of sheet: a **sliding-panel puzzle
 box** whose top only comes apart in the right order, a **secret drawer box** whose drawer is hidden
@@ -19,7 +19,7 @@ it opens, and that it doesn't open any sooner.
 
 ![The puzzle box maker with a sliding-panel box with a secret drawer: its settings on the left, the box put together on the right with the steps of opening it under it](images/window-puzzlebox.png)
 
-Click **Puzzle box** on the **Designer** tab (in the **Toys** group). The **Puzzle box** window opens. On
+Click **Puzzle box** on the **Mini-Designer** tab (in the **Mechanical** group). The **Puzzle box** window opens. On
 the left, the **Box** tab has the kind of box, its size, its top, the hidden drawer and a message;
 the **Sheet** tab has the sheet it's cut from. On the right, **Put together** shows the box in 3D
 (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows every piece flat, with how many of each there are.

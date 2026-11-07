@@ -17,7 +17,7 @@ Click **Equipment** in the list on the left.
 
 ## Attachments
 <!-- target: text:Attachments -->
-Tick the rotaries and the conveyor you have. Only those show under **Laser → Work mode**.
+Tick the rotaries and the conveyor you have. Only those show under **Machine → Work mode**.
 
 ## Features to show
 <!-- target: button:G-code console -->

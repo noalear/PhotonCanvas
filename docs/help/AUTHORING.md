@@ -50,9 +50,9 @@ control it's about; a step can wait for the user to do something and then move o
 When and why to use it, in two or three sentences (this is the first card).
 
 ## Open the cut test
-<!-- target: ribbon:Laser/Cut test -->
+<!-- target: ribbon:Tests/Cut test -->
 <!-- wait: window:Cut test -->
-Click **Cut test** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Cut test** in the list and click **Open**.
 
 ## Choose the speeds
 <!-- target: field:Speeds -->

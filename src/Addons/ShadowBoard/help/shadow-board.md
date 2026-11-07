@@ -11,7 +11,7 @@ The shadow board maker is an add-on: turn it off in **Settings → Add-ons** if 
 
 ## Before you start
 
-- The camera must be calibrated (**Camera** tab → **Calibrate**) near the height the tools lie at.
+- The camera must be calibrated (**Machine** tab → **Calibrate camera**) near the height the tools lie at.
 - Lay the tools where you want them in the drawer, flat side down, at least a finger's width apart.
   The board is built round them where they lie, so the layout on the bed is the layout in the drawer.
 - A plain, even background helps: lay the tools on a sheet of card or MDF the opposite shade to them.

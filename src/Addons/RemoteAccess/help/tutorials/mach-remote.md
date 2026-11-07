@@ -8,9 +8,9 @@ designs, through this computer. Connect to the machine from PhotonCanvas once fi
 keys are set up.
 
 ## Open Remote access
-<!-- target: ribbon:Laser/Remote access -->
+<!-- target: ribbon:Machine/Remote access -->
 <!-- wait: window:Remote access -->
-Click **Remote access** on the **Laser** tab.
+Click **Remote access** on the **Machine** tab.
 
 ## Start the server
 <!-- target: button:Start server -->

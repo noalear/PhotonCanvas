@@ -139,7 +139,7 @@ area it's retaken after the height changes, since where the camera looks depends
 <!-- windows: SettingsWindow -->
 
 The **Settings** window holds what you set up once. Open it with the gear at the top right,
-**File → Settings…**, **Laser → Machine settings** or the status pill's **Machine settings…**. It
+**File → Settings…**, **Machine → Machine settings** or the status pill's **Machine settings…**. It
 always opens on the **Machine** page. Pick a page from the list on the left; changes save at once.
 
 The machine stays connected when you close it.
@@ -272,16 +272,16 @@ updating from a version that didn't ask. Change it here any time.
 ![Settings, Equipment page](images/window-settings--equipment.png)
 
 **ATTACHMENTS**: **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
-**Conveyor feeder**. Only the ones ticked show up under **Laser → Work mode**; with none ticked,
+**Conveyor feeder**. Only the ones ticked show up under **Machine → Work mode**; with none ticked,
 **Work mode** is hidden and jobs are always on the flat bed (see [Work area](work-area.md)).
 
 **FEATURES TO SHOW**: untick what you don't use. It only comes out of the ribbon; nothing is lost.
 
 | Tick | Shows |
 |---|---|
-| **Colour on metal** (on) | **Picture → Colour on metal**, and the **Colour on metal** group on the **Laser** tab (**Colour test**, **Measure colours**), while the Colour on metal add-on is on. |
+| **Colour on metal** (on) | **Picture → Colour on metal**, and **Colour test** and **Measure colours** in the Tests window (Materials & Tests → Tests), while the Colour on metal add-on is on. |
 | **Diffraction gratings** (on) | **Picture → Diffraction** (while the Diffraction pictures add-on is on). |
-| **G-code console** (on) | **Laser → Console** (see [The G-code console](#the-g-code-console)). |
+| **G-code console** (on) | **Machine → Console** (see [The G-code console](#the-g-code-console)). |
 
 **EXTRACTION**: sent at the start of every job, as xTool Studio does it. Experimental: these are
 xTool Studio's commands with the numbers changed, not yet heard on the machine. Check the fan sounds
@@ -488,7 +488,7 @@ fire the laser. Not yet tried on the machine.
 
 ![The G-code console, not connected: the warning, the command line and the macros](images/window-console.png)
 
-Open it with **Console** on the **Laser** tab (in the **Machine** group), or
+Open it with **Console** on the **Machine** tab (in the **Settings** group), or
 **Settings → Tools → G-code console…**. The console is there while **G-code console** is ticked in
 [Settings → Equipment](#equipment), as it is to begin with; unticked, the ribbon button is hidden,
 but **G-code console…** under Settings → Tools still opens it. It can also be given a keyboard
@@ -511,7 +511,7 @@ to change, with **Delete** to remove it. Macros are kept in your settings.
 
 ## Machine settings button
 
-**Machine settings**, at the right of the **Laser** tab, opens the Settings window on the
+**Machine settings**, at the right of the **Machine** tab (in its **Settings** group), opens the Settings window on the
 **Machine** page: connection, camera calibration, lights, options and the machine's event log. It's
 the same as the gear at the top right.
 

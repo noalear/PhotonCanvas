@@ -5,7 +5,7 @@ using PhotonCanvas.Core;
 namespace PhotonCanvas.Addon.Topo;
 
 /// <summary>
-/// Home → Bring in → Topo map: stacked contour maps of any place (or an elevation file), sliced by
+/// Import → 3D & maps → Topo map: stacked contour maps of any place (or an elevation file), sliced by
 /// 3D to slices (this add-on requires it). Heights come from the free Terrain Tiles on AWS, places
 /// from OpenStreetMap's Nominatim; both only when the person asks (Find, or moving the area).
 /// </summary>
@@ -18,10 +18,10 @@ public sealed class TopoAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Bring in", "Topo map", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Import", "3D & maps", "Topo map", Icon, Open)
         {
             Tip = "Any place on Earth as a stacked contour map: find it, choose the area and how many layers, and cut the layers (numbered, with where the next one sits marked) to glue up",
-            Order = 10,
+            Order = 13,
         });
         host.AddCommand(new AddonCommand("topo.open", "File", "Topo map…", "", Open));
         // Old tiles go when the folder grows big (in the background: it's only tidying).

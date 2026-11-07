@@ -3,7 +3,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.DiffractionPictures;
 
-/// <summary>Picture → Turn it into → Diffraction: grating layers over a picture (MOPA on polished stainless).</summary>
+/// <summary>Picture → Effects → Diffraction: grating layers over a picture (MOPA on polished stainless).</summary>
 public sealed class DiffractionAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -11,7 +11,7 @@ public sealed class DiffractionAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Turn it into", "Diffraction", "IcPrism", () =>
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Diffraction", "IcPrism", () =>
         {
             if (host.SelectedPicture is { } im) _ = host.Guard(() => Make(im));
         })
@@ -21,6 +21,7 @@ public sealed class DiffractionAddon : IAddon
             Enabled = () => host.SelectedPicture is not null,
             // Settings → Equipment can still hide it for machines without a MOPA.
             Visible = () => host.AppSettings.ShowDiffraction,
+            Order = 14,
         });
     }
 

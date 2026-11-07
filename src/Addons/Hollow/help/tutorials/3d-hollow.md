@@ -7,9 +7,9 @@ A solid stack uses a lot of material that nobody sees. Hollowing keeps a shell r
 cuts the middles out, and can leave room inside for a light or magnets.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

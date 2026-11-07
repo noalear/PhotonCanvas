@@ -1,6 +1,6 @@
 # Diffraction pictures
 
-This add-on turns a picture into tiny diffraction gratings on polished stainless with a MOPA laser: the plate shimmers with rainbow colours as it tilts. It adds **Diffraction** to the Picture tab's **Turn it into** group while it's on (Settings → Equipment can hide it on machines without a MOPA).
+This add-on turns a picture into tiny diffraction gratings on polished stainless with a MOPA laser: the plate shimmers with rainbow colours as it tilts. It adds **Diffraction** to the Picture tab's **Effects** group while it's on (Settings → Equipment can hide it on machines without a MOPA).
 
 ## Diffraction
 <!-- windows: DiffractionWindow -->
@@ -52,7 +52,7 @@ kept within what the pulse width allows, and its scan angle turns with the pictu
 **Overscan (mm)** is set to 0.2, so the beam is at a steady speed where it marks. As with colour
 on metal, the picture's own layer stops being sent if the picture is alone on it.
 
-> **Tip:** Run a grating test first (Laser → Colour test, Diffraction gratings) to find the power and
+> **Tip:** Run a grating test first (Materials & Tests → Tests → Colour test, Diffraction gratings) to find the power and
 > the pitch that show green for you. Hold the plate flat and focused.
 
 ## Tutorials

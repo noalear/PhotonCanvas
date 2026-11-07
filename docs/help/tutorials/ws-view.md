@@ -23,5 +23,4 @@ The **Order** chip in the job bar is the same switch.
 
 ## Pictures as burned
 <!-- target: ribbon:View/Pictures as burned -->
-Click **Pictures as burned**. A picture on a layer whose material has a tone test (Laser → **Tone
-test**) shows as it will come out, in the material's own colours. Other pictures look as usual.
+Click **Pictures as burned**. A picture on a layer whose material has a tone test (Materials & Tests → Tests → **Tone test**) shows as it will come out, in the material's own colours. Other pictures look as usual.

@@ -89,7 +89,7 @@ public sealed class PapercraftAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Bring in", "Papercraft", "IcDepth", Open)
+        host.AddRibbonButton(new RibbonButton("Import", "3D & maps", "Papercraft", "IcDepth", Open)
         {
             Tip = "Unfold a 3D model into a flat sheet that folds back up into it",
         });
@@ -135,7 +135,7 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 
 | Call | Adds |
 |---|---|
-| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Order` sorts add-ons' buttons within a group (after the program's own), so the order doesn't depend on which add-on started first. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. Makers of whole things (tabletop terrain, buildings, furniture, bases, game kits, toys) go on the **Designer** tab, in one of its groups *Buildings*, *Town*, *Terrain*, *Furniture & props*, *Minis & games* or *Toys*: the tab sits after Picture, keeps those groups in that order whichever add-on starts first, and hides while no add-on has a button on it. |
+| `AddRibbonButton(RibbonButton)` | A ribbon button in a tab's group (made if missing, and taken away again when your last button goes). The tabs are Home, Arrange, Import, Mini-Designer, Placement, Materials & Tests, Machine and View (see `docs/help/workspace.md`); a button made for an old tab (Picture, Camera, Laser, Designer) lands where that went (`RibbonPlaces.cs`). A test goes on the tab `"Tests"`: it isn't a ribbon button but an entry in the Tests window's list (Materials & Tests → Tests), under its group as the heading (*Find the settings*, *Pictures*, *Colour on metal*, *Use your results*, *Machine checks*, *Experimental*, or a new one); tutorials point at it as `ribbon:Tests/Label`. `Large`, `Tip`, `Enabled`, `Checked` (a toggle), `Visible`, `GroupAfter` (where a new group goes: `"Tests|Materials"` = after the first of those there is). A group made for add-ons hides while none of its buttons show. `Order` sorts add-ons' buttons within a group (after the program's own), so the order doesn't depend on which add-on started first. `Icon` = a program icon key from `src/PhotonCanvas.App/Icons.axaml` or SVG path data in a 24×24 box. Makers of tabletop miniatures (terrain, buildings, furniture, bases, game accessories, moving toys) go on the **Mini-Designer** tab, in one of its groups *Buildings*, *Town*, *Terrain*, *Furniture & props*, *Accessories* or *Mechanical*: the tab sits after Import, keeps those groups in that order whichever add-on starts first, and hides while no add-on has a button on it. |
 | `AddCommand(AddonCommand)` | A command in the shortcut list and command search; `Keys` like `"Ctrl+Alt+P"` gives it a shortcut (the person can change it). |
 | `AddContextMenuItem(ContextMenuEntry)` | An item on the canvas's right-click menu (`Visible`, `Enabled`, `Gesture`). |
 | `ShowCloseUpAreaWhile(when)` | The outline of where the close-up camera looks, on the canvas while `when()` says so (e.g. while your test is in the design). |

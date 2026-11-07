@@ -8,7 +8,7 @@ background, a corner you don't want.
 
 ## Have a picture
 <!-- target: canvas -->
-You need a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+You need a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Pick the eraser
 <!-- target: ribbon:Picture/Eraser -->

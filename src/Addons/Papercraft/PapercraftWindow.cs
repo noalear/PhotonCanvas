@@ -74,7 +74,7 @@ public sealed class PapercraftWindow : Window
                 Field("Flat below (°)", _flat, tip: "Faces that bend less than this are treated as one flat face: no fold line between them."),
                 _numbers,
                 Hint("Matching edges carry the same number: glue the tab on one under the edge with the same number on the other."),
-                Field("Put on", _stock, tip: "The whole bed, or a sheet you've outlined on the work area (Camera → Outline material)."),
+                Field("Put on", _stock, tip: "The whole bed, or a sheet you've outlined on the work area (right-click a shape → Use as material outline)."),
                 _summary,
             },
         };

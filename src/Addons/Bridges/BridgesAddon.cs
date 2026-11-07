@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Bridges;
 
 /// <summary>
-/// Designer → Terrain → Bridges, its command and "Edit bridge…" on the right-click menu, opening
+/// Mini-Designer → Terrain → Bridges, its command and "Edit bridge…" on the right-click menu, opening
 /// <see cref="BridgesWindow"/>: plank, rope and stone arch bridges for tabletop games and models. It only
 /// adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class BridgesAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Terrain", "Bridges", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Terrain", "Bridges", Icon, Open)
         {
             Tip = "Plank footbridges, sagging rope bridges and stone arch bridges that slot together, for tabletop games and models",
             Large = true,

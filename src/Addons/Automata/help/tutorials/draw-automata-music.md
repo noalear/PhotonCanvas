@@ -7,9 +7,9 @@ You need a hand-crank paper-strip music box movement (15 or 30 notes) and thin c
 the strips that came with it.
 
 ## Open the toy maker
-<!-- target: ribbon:Designer/Automata -->
+<!-- target: ribbon:Mini-Designer/Automata -->
 <!-- wait: window:Toys and automata -->
-Click **Automata** on the **Designer** tab (in the **Toys** group).
+Click **Automata** on the **Mini-Designer** tab (in the **Mechanical** group).
 
 ## Choose Music box strip
 <!-- target: tabitem:Music box strip -->

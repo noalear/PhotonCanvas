@@ -167,7 +167,7 @@ public sealed class HttpRemote : IRemote
         }
         catch (HttpRequestException e)
         {
-            throw new RemoteError(0, $"Can't reach the computer at {Name}. Is the phone on the same network, and the server running (PhotonCanvas → Laser → Remote access)?", e);
+            throw new RemoteError(0, $"Can't reach the computer at {Name}. Is the phone on the same network, and the server running (PhotonCanvas → Machine → Remote access)?", e);
         }
         if (res.IsSuccessStatusCode) return res;
         using (res)

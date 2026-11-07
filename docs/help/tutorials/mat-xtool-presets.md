@@ -11,9 +11,9 @@ changes and nothing is sent anywhere.
 Close xTool Studio if it's open, so its folder can be read.
 
 ## Open the library
-<!-- target: ribbon:Laser/Library -->
+<!-- target: ribbon:Materials & Tests/Library -->
 <!-- wait: window:Material library -->
-Click **Library** on the **Laser** tab.
+Click **Library** on the **Materials & Tests** tab.
 
 ## Import
 <!-- target: button:Import from xTool Studio -->

@@ -316,7 +316,7 @@ public sealed class StairsWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out a little loose. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for slots at their drawn size."
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out a little loose. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for slots at their drawn size."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so slots come out their drawn width."
             : $"{r.M.Label}: no kerf measured yet, so slots come out a little loose (run a cut test).";
         Changed();
@@ -341,7 +341,7 @@ public sealed class StairsWindow : Window
     void MatchWalls()
     {
         var walls = Placement.WallsIn(_doc.State, _doc.Selection);
-        if (walls is null) { _matchNote.Text = "There are no walls from the wall maker in the design (Designer → Buildings → Walls makes them)."; return; }
+        if (walls is null) { _matchNote.Text = "There are no walls from the wall maker in the design (Mini-Designer → Buildings → Walls makes them)."; return; }
         var s = Current().FitTo(walls);
         Load(s);
         _matchNote.Text = $"Matched: {walls.HeightMm:0.#} mm walls of {walls.ThicknessMm:0.##} mm sheet, {s.WallLengthMm:0.#} mm between column centres." +

@@ -1,7 +1,7 @@
 # Topo map stacks
 <!-- windows: TopoWindow -->
 
-An add-on (Settings → Add-ons → **Topo map stacks**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Bring in → Topo map**. It needs **3D to slices**, which does the slicing: turning that off turns this off too.
+An add-on (Settings → Add-ons → **Topo map stacks**): on when PhotonCanvas is installed, and can be turned off. Its button is **Import → 3D & maps → Topo map**. It needs **3D to slices**, which does the slicing: turning that off turns this off too.
 
 **Topo map** makes a layered relief map of any place on Earth: a mountain, a lake and the hills
 round it, an island, your town. Find the place, choose how much ground the map covers, its shape
@@ -14,7 +14,7 @@ elevation file you've downloaded.
 
 ## Open the Topo map window
 
-Click **Topo map** in the **Bring in** group of the **Home** tab (or search the commands for
+Click **Topo map** in the **3D & maps** group of the **Import** tab (or search the commands for
 "Topo map"). The window has the ground on the left and the settings on the right.
 
 ## Find a place

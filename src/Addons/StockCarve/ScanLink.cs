@@ -4,7 +4,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.StockCarve;
 
-/// <summary>The stock from the last "Scan the part" (Laser → Work area), as a stock map.</summary>
+/// <summary>The stock from the last "Scan the part" (Machine → Work area), as a stock map.</summary>
 static class ScanLink
 {
     /// <summary>A scan (or a stock model saved as one) as a stock map, for a rotary whose axis is <paramref name="axisHeightMm"/> above the bed.</summary>
@@ -23,7 +23,7 @@ static class ScanLink
         {
             return (null, $"Couldn't read the last scan: {e.Message}");
         }
-        if (scan is null) return (null, "There's no scan yet: scan the part first (Laser → Scan the part, in rotary mode).");
+        if (scan is null) return (null, "There's no scan yet: scan the part first (Machine → Scan the part, in rotary mode).");
         if ((scan.AxisHeightMm ?? settings.RotaryAxisHeightMm) is not { } axis)
             return (null, "The scan can't be turned into a shape until the rotary's axis height is known: measure it in Scan the part first.");
         var stock = FromScan(scan, axis);

@@ -14,41 +14,47 @@ Both take 4000 × 3000 photos. This firmware has no video stream, so "live" mean
 after another, as fast as the machine allows. Both cameras are dark while a job runs: the machine
 turns its lights off.
 
-Everything on the **Camera** tab needs the machine connected (see
-[The machine and settings](machine.md)). The one exception is the calibration window, which can
-work from a photo saved earlier.
+The camera's buttons are on two tabs. Using the camera's picture to put a design where it belongs
+is on the **Placement** tab; setting the cameras and lasers up, once for the machine, is in the
+**Calibrate** group of the **Machine** tab, with focusing in its **Focus** group. They all need the
+machine connected (see [The machine and settings](machine.md)). The one exception is the
+calibration window, which can work from a photo saved earlier.
 
-![The Camera tab](images/ribbon-camera.png)
+![The Placement tab](images/ribbon-placement.png)
 
 The camera picture itself is worked from the machine panel at the right end of the ribbon, on every
 tab: **Photo**, **Show**, **Live** and **Close-up** (see [The machine and settings](machine.md)).
 
-| Group | Buttons |
+| Where | Buttons |
 |---|---|
-| **Place** | **Fit to piece**; add-ons add **Cut round prints** and **Every piece** (Camera placement) and **Line up pieces** (Split onto pieces) |
-| **Set up** | **Calibrate**, **Focus on selection**, **Thickness**, **Align MOPA**, **Close-up position** |
+| Placement → **Onto pieces** | **Fit to piece**; add-ons add **Every piece** and **Cut round prints** (Camera placement), **Knocked piece** (Knocked-piece recovery) and **Line up pieces** (Split onto pieces) |
+| Placement → **Jigs** | **Object jig** and **Find the jig** (Object jig add-on) |
+| Placement → **From the photo** | **Pick piece** and **Trace edge** (outline a piece on the camera picture, see [Drawing](drawing.md)); **Shadow board** (add-on) |
+| Placement → **Check the burn** | **Touch up** (add-on) |
+| Machine → **Focus** | **Focus on selection**, **Thickness** |
+| Machine → **Calibrate** | **Calibrate camera**, **Close-up position**, **Align lasers**; **Kerf gauge** (add-on) |
 
 ## What each one needs
 
 | Feature | Needs |
 |---|---|
-| **Show**, **Photo**, **Live** on the work area | Connected; the camera calibrated (**Calibrate**) |
+| **Show**, **Photo**, **Live** on the work area | Connected; the camera calibrated (**Calibrate camera**) |
 | **Close-up** | Connected. Laying its photo on the work area also needs **Close-up position** at the current focus height |
 | **Fit to piece**, **Every piece** | Connected; the camera calibrated near the piece's height; the design selected |
 | **Line up pieces** | Connected; the camera calibrated near the pieces' height; a piece's page from **Split onto pieces** (both from the Split onto pieces add-on) |
 | **Cut round prints** | Connected; the camera calibrated, or **Close-up position** covering the area |
-| **Focus on selection** | Connected; focused once; the red pointer calibrated (Laser tab → **Curved surface**) |
+| **Focus on selection** | Connected; focused once; the red pointer calibrated (Machine → **Curved surface**) |
 | **Thickness** | Connected |
-| **Align MOPA** | Connected; **Close-up position** at the current focus height |
+| **Align lasers** | Connected; **Close-up position** at the current focus height |
 
-On a new machine, do **Calibrate** first, then **Close-up position**. Each takes a few minutes and
+On a new machine, do **Calibrate camera** first, then **Close-up position**. Each takes a few minutes and
 a piece of scrap.
 
 ## The camera picture under your design
 
 ### How it lines up
 
-The overview camera sees the bed at an angle, through a wide lens. **Calibrate** measures both from
+The overview camera sees the bed at an angle, through a wide lens. **Calibrate camera** measures both from
 25 marks burned across the bed: a perspective map, plus a lens correction. Every photo is then
 straightened onto the 220 × 220 mm work area (0.2 mm per pixel) and drawn under your design. Where
 the camera can't see, the picture is see-through.
@@ -165,7 +171,7 @@ close-up photos (see [Materials and tests](materials-and-tests.md)).
 
 <!-- windows: CalibrationWindow -->
 
-**Calibrate** opens **Camera calibration**: PhotonCanvas burns a grid of marks, photographs them,
+**Calibrate camera** (Machine → Calibrate) opens **Camera calibration**: PhotonCanvas burns a grid of marks, photographs them,
 finds each mark in the photo and works out how the camera's picture maps onto the bed. It takes
 about 5 minutes and a scrap sheet, once for each material height you use. Checked on the
 machine.
@@ -302,7 +308,7 @@ machine.
 
 How it reads the height: the pointer comes in at a slant, so its dot moves sideways in the close-up
 picture as the surface rises or falls. The pointer calibration records where the dot lands at
-each height. It's made once, in Laser tab → **Curved surface** → **Calibrate the pointer…** (see
+each height. It's made once, in Machine → **Curved surface** → **Calibrate the pointer…** (see
 [Calibrate the pointer](work-area.md#calibrate-the-pointer)).
 
 - It needs the machine connected, the pointer calibrated, and a focus already set (auto-focus, or a
@@ -334,7 +340,7 @@ the message.
 are burned where it can see them and found in a close-up photo. From then on, at that focus height,
 close-up photos land on the bed by themselves: tone and line tests are read from sharp close-up
 photos, the close-up viewer's photo lies on the work area, and **Cut round prints** and
-**Align MOPA** can use it. Checked on the machine: all ten dots found, lining up within
+**Align lasers** can use it. Checked on the machine: all ten dots found, lining up within
 0.03 mm.
 
 The position is kept per focus height (a saved one is used within 0.5 mm of it). Doing it again at
@@ -382,12 +388,14 @@ Don't move the scrap after burning: the dots are found where they were burned.
   angle the close-up picture is turned by, so the viewer comes out straight.
 - **Remove the dots from the design**: deletes the "Close-up marks" layer.
 
-## Align MOPA
+## Align lasers
 
 <!-- windows: LaserAlignWindow -->
 
-**Align MOPA** lines the MOPA (fiber) laser up with the blue one. The two lasers can land a little
-apart, which shows when one design uses both. Both lasers burn a grid of dots where the close-up
+**Align lasers** (Machine → Calibrate) lines the MOPA (fiber) laser up with the blue one. The two
+lasers can land a little apart, which shows when one design uses both. Only the MOPA is moved: the
+blue laser is the one the camera is calibrated to (**Calibrate camera** burns its marks with it), so
+it is already where the camera says, and the MOPA is measured against it. Both lasers burn a grid of dots where the close-up
 camera sees, the camera measures where each grid landed, and from then on all MOPA work is moved by
 the difference. It needs the close-up camera's position at the
 current focus height ([Close-up position](#close-up-position)). **Align MOPA to blue** has two tabs.

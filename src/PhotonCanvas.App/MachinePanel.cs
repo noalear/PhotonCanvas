@@ -292,7 +292,7 @@ public sealed class MachinePanel : UserControl
         Changed();
     }
 
-    /// <summary>The part of the bed the close-up camera sees at the current focus height, if that's known (Camera → Close-up position).</summary>
+    /// <summary>The part of the bed the close-up camera sees at the current focus height, if that's known (Machine → Close-up position).</summary>
     public Rect2? CloseUpSees() => CloseUpPlacement() is { } toCamera ? Sees(toCamera) : null;
 
     /// <summary>Where it looked at the nearest focus height that's known (a first guess at another height).</summary>
@@ -677,7 +677,7 @@ public sealed class MachinePanel : UserControl
     public async Task<SkiaSharp.SKBitmap> CaptureAreaAsync(Rect2 area, double mmPerPx, double distanceMm)
     {
         var choice = CalibrationSet.For(_calibrations, distanceMm)
-            ?? throw new InvalidOperationException("The camera isn't calibrated yet (Camera tab → Calibrate).");
+            ?? throw new InvalidOperationException("The camera isn't calibrated yet (Machine → Calibrate camera).");
         byte[] jpg;
         await PointersOffAsync();
         try

@@ -8,9 +8,9 @@ test cuts a grid of small squares, and the ones that drop out went through. You 
 the honeycomb or pins (air assist on, if you have it) and the machine connected.
 
 ## Open the cut test
-<!-- target: ribbon:Laser/Cut test -->
+<!-- target: ribbon:Tests/Cut test -->
 <!-- wait: window:Cut test -->
-Put the material on the bed, then click **Cut test** on the **Laser** tab.
+Put the material on the bed, then click **Tests** on the **Materials & Tests** tab, pick **Cut test** in the list and click **Open**.
 
 ## Choose the laser
 <!-- target: field:Laser -->
@@ -30,7 +30,7 @@ More passes on each row, or more power. The preview above shows the grid.
 It goes in the middle of the bed, and the window closes.
 
 ## Cut it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Cut test -->
 Frame it, **Ship It** and press the machine's button. Stay with it: slow cuts can flare up. When it's
 done, the window opens again.

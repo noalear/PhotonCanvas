@@ -111,7 +111,7 @@ public sealed class BatchPlaceWindow : Window
         bool ok = false;
         if (!_machine.IsConnected) _heightState.Text = "⚠ Connect to the machine first.";
         else if (DistanceValue is not { } d) _heightState.Text = "⚠ Enter the distance to the top of the pieces.";
-        else if (_machine.CameraMapFor(d) is not { } choice) _heightState.Text = "⚠ The camera isn't calibrated yet (Camera tab → Calibrate).";
+        else if (_machine.CameraMapFor(d) is not { } choice) _heightState.Text = "⚠ The camera isn't calibrated yet (Machine → Calibrate camera).";
         else
         {
             ok = choice.Exact;

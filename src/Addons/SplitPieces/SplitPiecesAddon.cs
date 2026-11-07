@@ -5,8 +5,8 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.SplitPieces;
 
 /// <summary>
-/// Laser → Work area → Split onto pieces (and the right-click item): the selected design split across
-/// material outlines, a page per piece; then Camera → Place → Line up pieces fits each page onto its
+/// Machine → Work area → Split onto pieces (and the right-click item): the selected design split across
+/// material outlines, a page per piece; then Placement → Onto pieces → Line up pieces fits each page onto its
 /// piece and the ones laid beside it.
 /// </summary>
 public sealed class SplitPiecesAddon : IAddon
@@ -17,16 +17,17 @@ public sealed class SplitPiecesAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Laser", "Work area", "Split onto pieces", "IcBreak", () => _ = host.Guard(Split))
+        host.AddRibbonButton(new RibbonButton("Machine", "Work area", "Split onto pieces", "IcBreak", () => _ = host.Guard(Split))
         {
             Tip = "Mark a design across several pieces that go together (four boards making one picture): select the design and the pieces' material outlines; each piece gets a page with its share, and Line up pieces fits it to the pieces on the bed",
             Enabled = () => host.Document.Selection.Count > 0,
+            Order = 20,
         });
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Line up pieces", "IcFitPiece", ShowLineUp)
+        host.AddRibbonButton(new RibbonButton("Placement", "Onto pieces", "Line up pieces", "IcLineUp", ShowLineUp)
         {
             Tip = "For a design split onto pieces: the camera keeps looking and moves the page's design onto its piece and the pieces laid beside it, so they line up. No clicking while you place them",
             Large = true,
-            Order = 20,
+            Order = 13,
         });
         host.AddContextMenuItem(new ContextMenuEntry("Split onto pieces…", () => _ = host.Guard(Split))
         {

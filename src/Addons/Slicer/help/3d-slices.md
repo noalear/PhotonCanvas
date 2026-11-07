@@ -1,6 +1,6 @@
 # 3D models and stacked slices
 
-An add-on (Settings → Add-ons → **3D to slices**): on when PhotonCanvas is installed, and can be turned off. Its button is **Home → Bring in → 3D to slices**. It includes the assembly booklet and dowel pins.
+An add-on (Settings → Add-ons → **3D to slices**): on when PhotonCanvas is installed, and can be turned off. Its button is **Import → 3D & maps → 3D to slices**. It includes the assembly booklet and dowel pins.
 
 **3D to slices** turns a 3D model into flat parts that you cut from sheet material and put back
 together into the model: solid layers glued one on another, an open grid of slotted sheets (egg
@@ -8,7 +8,7 @@ crate), or fins slotted onto rings (radial). It reads STL, OBJ and STEP files, s
 slices it to your material's thickness, names and marks every part, and lays the parts out on the
 work area a bed at a time.
 
-To carve a 3D model into one board as a relief instead, use **Picture → 3D model**: see
+To carve a 3D model into one board as a relief instead, use **Import → 3D model**: see
 [Pictures](pictures.md).
 
 > **Note:** Edge shaping, egg crate, radial, the cut-test slot fit and slicing onto a material
@@ -17,7 +17,7 @@ To carve a 3D model into one board as a relief instead, use **Picture → 3D mod
 ## Open the Stacked slices window
 <!-- windows: StackSliceWindow -->
 
-Click **3D to slices** on the **Home** tab (in the **Bring in** group). The **Stacked slices**
+Click **3D to slices** on the **Import** tab (in the **3D & maps** group). The **Stacked slices**
 window opens over the program and stays open until you close it.
 
 ![The Stacked slices window with a chess pawn open: the preview on the left, the settings on the right](images/window-3d-slices-pawn.png)
@@ -150,7 +150,7 @@ through.
 | **Engrave with** | Your library's engrave settings that have a measured depth a pass | The settings the steps are engraved with, from the [Etch rate test](materials-and-tests.md) saved to the [material library](material-library.md): shown as "material · settings (0.12 mm a pass)". Choosing one sets **Depth a pass (mm)**. With no results yet it says "No etch-rate results yet". |
 | **Depth a pass (mm)** | 0.02 to 2, steps of 0.01 (the first etch result, or 0.15) | How deep one engrave pass goes: the height of one step. |
 
-- Measure the depth a pass first (Laser → **Etch rate**, saved to the library). Until then the
+- Measure the depth a pass first (Materials & Tests → Tests → **Etch rate**, saved to the library). Until then the
   number is a guess, and the shaping comes out too deep or too shallow; the window says so under
   the settings.
 - The summary adds a line: "Edge shaping: N engraving steps on M parts, at most K deep (X mm of

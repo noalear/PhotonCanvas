@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.CityBuilder;
 
 /// <summary>
-/// Designer → Town → City, and its command, opening <see cref="CityWindow"/>: a town laid out on a big map
+/// Mini-Designer → Town → City, and its command, opening <see cref="CityWindow"/>: a town laid out on a big map
 /// (or read from a battle map picture), its buildings made in and opened in the building editor. It only adds
 /// shapes to the design when asked to put a building's pieces in; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class CityBuilderAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Town", "City", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Town", "City", Icon, Open)
         {
             Tip = "Lay out a whole town on a big map, or read one from a battle map picture: roads, water, buildings, walls and trees, in a quick 3D view",
             Large = true,

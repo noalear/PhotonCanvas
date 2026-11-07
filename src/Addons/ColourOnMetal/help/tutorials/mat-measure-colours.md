@@ -8,9 +8,9 @@ and which hues the plate reaches. Saved as a palette on the material, they're wh
 metal are made from. You need the burned test still in the design.
 
 ## Open Measure colours
-<!-- target: ribbon:Laser/Measure colours -->
+<!-- target: ribbon:Tests/Measure colours -->
 <!-- wait: window:Measure colours -->
-Click **Measure colours** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Measure colours** in the list and click **Open**.
 
 ## Oxide or gratings
 <!-- target: field:Measure -->

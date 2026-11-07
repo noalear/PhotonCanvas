@@ -15,16 +15,16 @@ Put each screen or colour on its own layer.
 For screen printing, select the design and click **Flip across** on the **Arrange** tab.
 
 ## Open Layer by layer
-<!-- target: ribbon:Laser/Layer by layer -->
+<!-- target: ribbon:Machine/Layer by layer -->
 <!-- wait: window:Layer by layer -->
-Click **Layer by layer** on the **Laser** tab. The first layer is picked.
+Click **Layer by layer** on the **Machine** tab. The first layer is picked.
 
 ## Pick a layer
 <!-- target: window:Layer by layer -->
 Click the layer to mark: only it (and its sub-layers) goes in the job.
 
 ## Ship it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Click **Ship It** and press the machine's start button.
 
 ## Change and carry on

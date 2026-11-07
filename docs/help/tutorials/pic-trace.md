@@ -9,7 +9,7 @@ silhouettes and scanned drawings you want to cut or engrave as clean shapes.
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Trace
 <!-- target: ribbon:Picture/Trace -->

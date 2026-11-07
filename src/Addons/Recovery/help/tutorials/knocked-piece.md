@@ -12,9 +12,9 @@ Pause or stop the job on the machine. Leave the piece where it is now. This need
 connected and the camera calibrated.
 
 ## Open Knocked piece
-<!-- target: ribbon:Camera/Knocked piece -->
+<!-- target: ribbon:Placement/Knocked piece -->
 <!-- wait: window:Knocked piece -->
-Click **Knocked piece** on the **Camera** tab.
+Click **Knocked piece** on the **Placement** tab.
 
 ## Take a photo
 <!-- target: button:Take a photo -->

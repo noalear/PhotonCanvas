@@ -12,9 +12,9 @@ ornament in small, medium and large.
 Select what you want in several sizes on the work area.
 
 ## Open the generators
-<!-- target: ribbon:Home/Generators -->
+<!-- target: ribbon:Import/Generators -->
 <!-- wait: window:Generators -->
-Click **Generators** on the **Home** tab.
+Click **Generators** on the **Import** tab.
 
 ## Choose Sizes
 <!-- target: tabitem:Sizes -->

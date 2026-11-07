@@ -7,8 +7,8 @@ A plain import brings a drawing in shape by shape. Sometimes you want it as one 
 every piece loose to rearrange, or as a picture to engrave with dithering.
 
 ## Open the Import as menu
-<!-- target: ribbon:Home/Import as… -->
-Click **Import as…** in the **Bring in** group. Its menu has three choices:
+<!-- target: ribbon:Import/Import as… -->
+Click **Import as…** in the **Files** group of the **Import** tab. Its menu has three choices:
 
 - **Import, each file grouped…**: each file's shapes become one group.
 - **Import with every piece separate…**: every outline its own shape, holes too.

@@ -4,8 +4,7 @@
 <!-- page: layer-settings.md#picture-settings -->
 <!-- order: 190 -->
 A Picture layer turns a picture into dots, one laser pulse each. The resolution, the way grey
-tones become dots and how long each dot fires decide how it comes out. You need a picture: Home →
-**Picture** (`Ctrl+J`) imports one.
+tones become dots and how long each dot fires decide how it comes out. You need a picture: Import → **Picture** (`Ctrl+J`) imports one.
 
 ## Select the picture
 <!-- target: canvas -->
@@ -41,5 +40,5 @@ With Halftone or Line screen, **Cells / inch** sets how big the dots or lines ar
 Under **More settings**, **Dot time µs**: how long each dot fires. Longer is darker.
 
 ## Test it
-Laser → **Tone test** (from the Material tests add-on) burns grey patches with this layer's settings and corrects your pictures for
+Materials & Tests → Tests → **Tone test** (from the Material tests add-on) burns grey patches with this layer's settings and corrects your pictures for
 the material.

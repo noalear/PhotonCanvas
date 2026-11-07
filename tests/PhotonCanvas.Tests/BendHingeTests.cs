@@ -217,7 +217,7 @@ public class BendHingeTests
         var t = Assert.Single(lib.Tutorials);
         Assert.Equal("Drawing", t.Category);
         Assert.True(t.Steps.Count >= 3);
-        Assert.Contains(t.Steps, s => s.Target == "ribbon:Home/Bend to shape");
+        Assert.Contains(t.Steps, s => s.Target == "ribbon:Import/Bend to shape");
     }
 
     [Fact]

@@ -455,5 +455,5 @@ row move on past all of them.
 - Copying a numbered copy (duplicate, paste, array) keeps its number: after adding copies, select
   them all and click **Number copies** again.
 - Shapes that aren't grouped count as separate copies.
-- **Every piece** on the **Camera** tab (from the Camera placement add-on) numbers the copies it places
+- **Every piece** on the **Placement** tab (from the Camera placement add-on) numbers the copies it places
   by itself.

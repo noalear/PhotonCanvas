@@ -7,9 +7,9 @@ A matching pair of earring blanks with holes for the hooks: teardrops, leaves, c
 arches. Cut them from wood or acrylic, then engrave or paint them.
 
 ## Open the generators
-<!-- target: ribbon:Home/Generators -->
+<!-- target: ribbon:Import/Generators -->
 <!-- wait: window:Generators -->
-Click **Generators** on the **Home** tab.
+Click **Generators** on the **Import** tab.
 
 ## Choose Earrings
 <!-- target: tabitem:Earrings -->

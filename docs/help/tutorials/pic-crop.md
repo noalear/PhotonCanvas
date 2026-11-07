@@ -9,7 +9,7 @@ exactly where it was on the work area.
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Crop
 <!-- target: ribbon:Picture/Crop -->

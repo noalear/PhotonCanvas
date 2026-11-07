@@ -1,7 +1,7 @@
 # Handwriting to font
 
 An add-on (Settings → Add-ons → **Handwriting to font**): on when PhotonCanvas is installed, and can
-be turned off. Its button is **Home → Draw → Handwriting**.
+be turned off. Its button is **Import → Generate → Handwriting**.
 
 Write anything in your own handwriting, as single lines: one pass of the beam down the middle of
 each pen stroke, the way you wrote it. That engraves far faster than outlined or filled text, and
@@ -26,8 +26,7 @@ takes you through three steps.
      can be taken at an angle or turned any way round: the four corner squares tell the program
      where everything is. Get the whole sheet in, flat, in even light, with nothing dark touching
      the squares; straight from above is best.
-   - **Use the selected picture** reads a picture already in the design (**Picture → Import
-     picture**).
+   - **Use the selected picture** reads a picture already in the design (**Import → Picture**).
    - **Photograph it on the bed** takes an overview camera photo with the sheet lying in the
      machine (only when a laser is connected). Nothing moves and the laser stays off. Phone photos
      are sharper: use them for small handwriting.
@@ -59,7 +58,7 @@ at the height you wrote it relative to the solid line, so tails and small letter
 ## Write with it
 <!-- windows: HandwritingWindow -->
 
-**Home → Draw → Handwriting** opens the writing window. Pick the font, type the **Words** (Enter
+**Import → Generate → Handwriting** opens the writing window. Pick the font, type the **Words** (Enter
 starts a new line) and watch the preview.
 
 | Setting | What it does |

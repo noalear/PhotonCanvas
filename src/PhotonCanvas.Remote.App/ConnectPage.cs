@@ -5,7 +5,7 @@ using static PhotonCanvas.Remote.App.Ui;
 
 namespace PhotonCanvas.Remote.App;
 
-/// <summary>Where the server is: scan the QR code in PhotonCanvas (Laser → Remote access), or type the address and the code. Or try the demo.</summary>
+/// <summary>Where the server is: scan the QR code in PhotonCanvas (Machine → Remote access), or type the address and the code. Or try the demo.</summary>
 public sealed class ConnectPage : UserControl
 {
     readonly MainView _host;
@@ -43,7 +43,7 @@ public sealed class ConnectPage : UserControl
                     Text("PhotonCanvas Remote").With(t => { t.FontSize = 26; t.FontWeight = FontWeight.Bold; }),
                     Text("Watch and run your laser from here: what it's doing, its camera, pause and stop, your designs, and starting a job. The phone talks to PhotonCanvas on your computer, which talks to the machine.", "muted"),
                     Card("Connect to your computer",
-                        Text("In PhotonCanvas on your computer: Laser → Remote access → Start server. Then scan the QR code it shows."),
+                        Text("In PhotonCanvas on your computer: Machine → Remote access → Start server. Then scan the QR code it shows."),
                         _scan,
                         Text(phone.CanScan ? "Or type the address and the access code:" : "Type the address and the access code it shows:", "muted"),
                         Labelled("Address", _address),
@@ -67,7 +67,7 @@ public sealed class ConnectPage : UserControl
         if (scanned is null) return;
         if (ConnectionInfo.TryParse(scanned) is not { } c)
         {
-            Show("That QR code isn't the one from Remote access. Scan the code in PhotonCanvas: Laser → Remote access.");
+            Show("That QR code isn't the one from Remote access. Scan the code in PhotonCanvas: Machine → Remote access.");
             return;
         }
         _address.Text = c.Display;

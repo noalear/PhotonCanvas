@@ -11,9 +11,9 @@ outline to fit a design inside it, cut round it or mark it as your material.
 This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show** in the machine panel at the right end of the ribbon (see [See the bed under your design](tutorial:cam-see-the-bed)).
 
 ## Choose Pick piece
-<!-- target: ribbon:Home/Pick piece -->
+<!-- target: ribbon:Placement/Pick piece -->
 <!-- wait: tool:Wand -->
-Click the wand icon, **Pick piece**, on the **Home** tab (or press `W`).
+Click the wand icon, **Pick piece**, on the **Placement** tab (or press `W`).
 
 ## Click inside the piece
 <!-- target: canvas -->

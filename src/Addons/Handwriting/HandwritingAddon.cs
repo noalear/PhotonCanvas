@@ -4,7 +4,7 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.Handwriting;
 
 /// <summary>
-/// Home → Draw → Handwriting: write in a font made from your own handwriting (fill in a printed
+/// Import → Generate → Handwriting: write in a font made from your own handwriting (fill in a printed
 /// sheet, photograph it), as single lines for fast engraving.
 /// </summary>
 public sealed class HandwritingAddon : IAddon
@@ -17,10 +17,11 @@ public sealed class HandwritingAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Handwriting", IconPath, Open)
+        host.AddRibbonButton(new RibbonButton("Import", "Generate", "Handwriting", IconPath, Open)
         {
             Tip = "Write in your own handwriting, as single lines for fast engraving (make the font from a sheet you fill in)",
             Large = true,
+            Order = 12,
         });
         host.AddCommand(new AddonCommand("handwriting.write", "Shapes", "Write in my handwriting…", "", Open));
         host.AddCommand(new AddonCommand("handwriting.font", "Shapes", "Make a handwriting font…", "", MakeFont));

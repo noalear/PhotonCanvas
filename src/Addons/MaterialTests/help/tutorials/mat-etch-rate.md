@@ -8,7 +8,7 @@ same setting into small circles, each with more passes; the first one that goes 
 the answer. You need a board of known thickness on scrap, and the machine connected.
 
 ## Open the etch rate test
-<!-- target: ribbon:Laser/Etch rate -->
+<!-- target: ribbon:Tests/Etch rate -->
 <!-- wait: window:Etch rate test -->
 Put the board on scrap (circles that go through keep burning into what's below), then click **Etch
 rate**.

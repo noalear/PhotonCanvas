@@ -93,7 +93,7 @@ public sealed class DiffractionWindow : Window
             },
         };
         _skipGreyRow = _skipGrey;
-        ToolTip.SetTip(_greenPitch, "Pulse spacing that shows green where you'll look from. Smaller pitches show bluer, larger redder. Find yours with Laser → Colour test → Diffraction gratings.");
+        ToolTip.SetTip(_greenPitch, "Pulse spacing that shows green where you'll look from. Smaller pitches show bluer, larger redder. Find yours with Materials & Tests → Tests → Colour test → Diffraction gratings.");
         foreach (var n in new[] { _pixel, _angleSteps, _colourSteps, _colourAngle, _greenPitch, _power, _speed, _spacing }) n.ValueChanged += (_, _) => Later();
         _mode.SelectionChanged += (_, _) => Later();
         _pulse.SelectionChanged += (_, _) => Later();

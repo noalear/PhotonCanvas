@@ -144,7 +144,7 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
             ShowShaping();
             Later();
         };
-        ToolTip.SetTip(_shape, "Each slice's top is engraved down in steps, a pass a step, wherever the model slopes away inside the slice, so the stack's steps become the model's slopes. Needs the depth one engrave pass takes off: Laser → Etch rate test.");
+        ToolTip.SetTip(_shape, "Each slice's top is engraved down in steps, a pass a step, wherever the model slopes away inside the slice, so the stack's steps become the model's slopes. Needs the depth one engrave pass takes off: Materials & Tests → Tests → Etch rate test.");
         ToolTip.SetTip(_joined, "Where the shape slopes steeply (a trunk, an ear), two slices can miss each other even though the model is joined. This adds the shape where they meet to both, so they overlap enough to glue and pin. Sand it back to the shape.");
         _make.Click += (_, _) => Make();
         _openBooklet.IsVisible = false;
@@ -200,7 +200,7 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
                     {
                         Field("Outline", _outline),
                         _shape,
-                        Field("Engrave with", _etchWith, tip: "Engrave settings from your library with a measured depth a pass (Laser → Etch rate test)."),
+                        Field("Engrave with", _etchWith, tip: "Engrave settings from your library with a measured depth a pass (Materials & Tests → Tests → Etch rate test)."),
                         Field("Depth a pass (mm)", _step, tip: "How deep one engrave pass goes: one step of the shaping."),
                         _shapeNote,
                         Hint("A slice is the same shape top and bottom, but the model changes through it: a pyramid comes out stepped. Outer leaves material to sand back to the shape; Inner never sticks out."),
@@ -550,7 +550,7 @@ public sealed class StackSliceWindow : Window, IStackSliceSlot
         if (_etchWith.Parent is Control f1) f1.IsVisible = on;
         if (_step.Parent is Control f2) f2.IsVisible = on;
         _shapeNote.Text = _etches.Count == 0
-            ? "Measure the depth a pass first (Laser → Etch rate test, saved to the library); until then the depth here is a guess, and the shaping will be too deep or too shallow."
+            ? "Measure the depth a pass first (Materials & Tests → Tests → Etch rate test, saved to the library); until then the depth here is a guess, and the shaping will be too deep or too shallow."
             : "Engraved before the cut, on its own layer (\"Slices · shaping\", one pass a step). Where the model narrows downward the steps are underneath: those are sanded.";
     }
 

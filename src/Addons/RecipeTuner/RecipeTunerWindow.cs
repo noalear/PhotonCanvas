@@ -81,7 +81,7 @@ public sealed class RecipeTunerWindow : Window
                 Field("Material", _material),
                 Field("What for", _purpose),
                 _lightRow,
-                Explained("What it knows", "Rated recipes for this material and work. Rate more in Laser → Library, or with Record results after a test grid.", _knows, _known),
+                Explained("What it knows", "Rated recipes for this material and work. Rate more in Materials & Tests → Library, or with Record results after a test grid.", _knows, _known),
                 Field("Change", _knobs, tip: "The settings the tuner may change; the others stay as in the best recipe so far."),
                 Field("Tries", _count, tip: "How many settings to suggest in this round (2–12)."),
                 _suggest,
@@ -220,7 +220,7 @@ public sealed class RecipeTunerWindow : Window
         _add.IsEnabled = false;
         if (mat is null)
         {
-            _knows.Text = "Your material library is empty. Add a material in Laser → Library (or burn a Laser → Test grid and Record results), then come back.";
+            _knows.Text = "Your material library is empty. Add a material in Materials & Tests → Library (or burn a Materials & Tests → Tests → Test grid and Record results), then come back.";
             _known.Children.Clear();
             return;
         }

@@ -7,9 +7,9 @@ You need thin spring steel (blue-tempered 1095 shim, 0.5 mm is a good start), 3 
 the clamp bars, a few bolts and a fiber laser to cut them.
 
 ## Open the toy maker
-<!-- target: ribbon:Designer/Automata -->
+<!-- target: ribbon:Mini-Designer/Automata -->
 <!-- wait: window:Toys and automata -->
-Click **Automata** on the **Designer** tab (in the **Toys** group).
+Click **Automata** on the **Mini-Designer** tab (in the **Mechanical** group).
 
 ## Choose Music box comb
 <!-- target: tabitem:Music box comb -->

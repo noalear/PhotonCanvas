@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Walls;
 
 /// <summary>
-/// Designer → Buildings → Walls, its command and "Edit walls…" on the right-click menu, opening
+/// Mini-Designer → Buildings → Walls, its command and "Edit walls…" on the right-click menu, opening
 /// <see cref="WallsWindow"/>: textured wall panels for tabletop games and models, and the columns that
 /// join them. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class WallsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Walls", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Buildings", "Walls", Icon, Open)
         {
             Tip = "Wall panels with brick, stone, wood or your own texture etched on, doors, windows, battlements and mount points, and columns to join them",
             Large = true,

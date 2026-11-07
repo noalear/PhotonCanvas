@@ -5,8 +5,7 @@ the middle of every slice and, when you make the slices, adds a page that engrav
 down to the model's real shape on the rotary: the stack turns on its dowel in the chuck, and the
 laser takes the steps off the outside, a pass at a time.
 
-It works only with **Build as: Stacked layers (solid)**, and needs a rotary with a chuck (Laser →
-**Work mode**; a homemade one is **Your own rotary**, see [Work area](work-area.md#your-own-rotary)).
+It works only with **Build as: Stacked layers (solid)**, and needs a rotary with a chuck (Machine → **Work mode**; a homemade one is **Your own rotary**, see [Work area](work-area.md#your-own-rotary)).
 
 > **Warning:** Not yet tried on the machine. The commands follow xTool Studio's own rotary
 > commands, but finishing a stack hasn't been run on a real one. Try a small model in scrap first,
@@ -25,7 +24,7 @@ It works only with **Build as: Stacked layers (solid)**, and needs a rotary with
    is added after them.
 5. Cut the slices, push the dowel through them and glue the stack up on it, slice 1 at the bottom,
    lined up by the pins and the marks. Glue the dowel in.
-6. Fit the stack in the rotary's chuck by the dowel. Choose Laser → **Work mode** → **Rotary**
+6. Fit the stack in the rotary's chuck by the dowel. Choose Machine → **Work mode** → **Rotary**
    with your chuck, and type the **Object Ø (mm)** from the summary. Open the "… on the rotary"
    page.
 7. Turn the stack so the notch in the dowel hole points straight up, and focus on the slice the
@@ -35,7 +34,7 @@ It works only with **Build as: Stacked layers (solid)**, and needs a rotary with
 |---|---|---|
 | **Finish it on the rotary** | off | Turns it on. |
 | **Centre dowel Ø** | 2 to 30 mm (6) | The dowel the chuck holds. A hole this size goes through every slice, with a small notch on one side that points to the start. Set the cut layer's kerf for a snug fit. |
-| **Engrave with** | your library's engrave settings with a measured depth (Default engrave settings) | The settings every focus height engraves with. Measure the depth a pass first with the etch rate test (Laser tab), saved to the library. |
+| **Engrave with** | your library's engrave settings with a measured depth (Default engrave settings) | The settings every focus height engraves with. Measure the depth a pass first with the etch rate test (Materials & Tests → Tests), saved to the library. |
 | **Depth a pass (mm)** | 0.01 to 2 mm (0.1, or the chosen settings' depth) | How deep one pass goes on a flat piece with those settings. |
 | **Focus band (mm)** | 0.2 to 5 mm (1) | How far the surface may be from the focus. Smaller is sharper, with more focus heights. |
 | **Deepest (mm)** | 0.2 to 20 mm (3) | The most taken off anywhere. Spots that need more are left for sanding (the summary says how much). |

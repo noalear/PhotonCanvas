@@ -13,7 +13,7 @@ This is an add-on: turn it on or off in **Settings → Add-ons** (it's under **M
 ## Open the papercraft window
 <!-- windows: PapercraftWindow -->
 
-Click **3D to papercraft** on the **Home** tab (in the **Bring in** group). The **Fold-up papercraft**
+Click **3D to papercraft** on the **Import** tab (in the **3D & maps** group). The **Fold-up papercraft**
 window opens.
 
 ![The Fold-up papercraft window with a blocky walker model unfolded into 22 pieces](images/window-papercraft.png)

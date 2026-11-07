@@ -9,8 +9,7 @@ middle instead: quick, clean scoring of signatures, handwriting and line art.
 ## Select a line-art picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture of dark strokes on a light background. No picture yet? **Picture → Import
-picture** (`Ctrl+J`).
+Click a picture of dark strokes on a light background. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Trace the centre lines
 <!-- target: ribbon:Picture/Centre-line trace -->

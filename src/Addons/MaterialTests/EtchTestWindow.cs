@@ -81,7 +81,7 @@ public sealed class EtchTestWindow : Window
                 _plan,
                 Hint("Run it round by round (the job bar's Passes setting) so every circle cools between passes. Put scrap under the material: circles that go through keep burning into what's below. Stay with it: deep passes can flare up."),
                 add,
-                Hint("Adding the test closes this window so you can move it, frame it and send it. When that job finishes, this window opens again on Read the results (or open it with Laser → Etch rate)."),
+                Hint("Adding the test closes this window so you can move it, frame it and send it. When that job finishes, this window opens again on Read the results (or open it with Materials & Tests → Tests → Etch rate)."),
             },
         };
 
@@ -171,7 +171,7 @@ public sealed class EtchTestWindow : Window
         var photo = _photo();
         // The photo only lines up where the camera is calibrated for the material's height.
         _photoNote.Text = photo is { DistanceMm: { } dist } && _cameraFor(dist) is { Exact: false } cam
-            ? $"⚠ The photo may show the wrong spot: the camera is {cam.Description}. Calibrate the camera at this material's height (Camera → Calibrate), or at a second height so any height can be worked out."
+            ? $"⚠ The photo may show the wrong spot: the camera is {cam.Description}. Calibrate the camera at this material's height (Machine → Calibrate camera), or at a second height so any height can be worked out."
             : "";
         foreach (var (layer, passes, bounds) in Circles())
         {

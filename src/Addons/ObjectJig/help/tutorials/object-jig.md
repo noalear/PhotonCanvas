@@ -17,9 +17,9 @@ This needs the machine connected and the camera calibrated (the
 Put the design over the object's camera picture where you want it marked, and select it.
 
 ## Open Object jig
-<!-- target: ribbon:Camera/Object jig -->
+<!-- target: ribbon:Placement/Object jig -->
 <!-- wait: window:Object jig -->
-Click **Object jig** on the **Camera** tab.
+Click **Object jig** on the **Placement** tab.
 
 ## Find the object
 <!-- target: button:Take photo and find the object -->
@@ -38,6 +38,6 @@ Click **Make the jig**. New pages are added: one to cut the jig, and one with th
 object.
 
 ## Cut, fill, mark
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Ship the cut page and leave the sheet where it is. Put the objects in, show the objects page,
 measure the focus on an object, and **Ship It** again.

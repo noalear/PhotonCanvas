@@ -38,6 +38,9 @@ public partial class HelpTests
             if (groups.TryGetValue(m.Groups[1].Value, out var tab)) o.Add($"{tab}/{m.Groups[2].Value}");
         foreach (Match m in Regex.Matches(text, @"Tool(?:Large|Small)\((\w+), ""([^""]+)"""))
             if (groups.TryGetValue(m.Groups[1].Value, out var tab)) o.Add($"{tab}/{m.Groups[2].Value}");
+        // The program's own tests: listed in the Tests window, reached as "Tests/Label".
+        foreach (Match m in Regex.Matches(Sources.Value["MainWindow.axaml.cs"], @"\bAddTest\(""[^""]+"", ""([^""]+)"""))
+            o.Add($"Tests/{m.Groups[1].Value}");
         foreach (Match m in Regex.Matches(text, @"(\w+)\.Icons\(\d+,(.*?)\);", RegexOptions.Singleline))
             if (groups.TryGetValue(m.Groups[1].Value, out var tab))
                 foreach (Match t in Regex.Matches(m.Groups[2].Value, @"\(""Ic\w+"", ""([^""]+)"""))
@@ -100,7 +103,7 @@ public partial class HelpTests
             Why it's useful.
 
             ## Open it
-            <!-- target: ribbon:Laser/Cut test -->
+            <!-- target: ribbon:Tests/Cut test -->
             <!-- wait: window:Cut test -->
             Click **Cut test**.
 
@@ -111,7 +114,7 @@ public partial class HelpTests
         Assert.Equal(("mat-cut-test", "Cut test", "Materials and tests", "Find the cut."), (t.Id, t.Title, t.Category, t.Summary));
         Assert.Equal("materials-and-tests.md#cut-test", t.Page);
         Assert.Equal(["Cut test", "Open it", "Set the speeds"], t.Steps.Select(s => s.Title));
-        Assert.Equal(("ribbon:Laser/Cut test", "window:Cut test"), (t.Steps[1].Target, t.Steps[1].Wait));
+        Assert.Equal(("ribbon:Tests/Cut test", "window:Cut test"), (t.Steps[1].Target, t.Steps[1].Wait));
         Assert.Null(t.Steps[0].Target);
     }
 

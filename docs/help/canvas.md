@@ -33,7 +33,7 @@ and the laser as a red dot (see [Running a job](running-jobs.md)).
 ### Processing order
 
 View → **Processing order** colours the job's paths by when they run. It's the same switch as the
-**Order** chip in the job bar and Laser → **Show order**.
+**Order** chip in the job bar and View → **Processing order**.
 
 ![The work area with the processing order shown, and its key at the top](images/processing-order.png)
 
@@ -58,7 +58,7 @@ order is chosen is explained in [Layer settings](layer-settings.md) and
 View → **Pictures as burned** shows pictures as they'll come out on their material, not as the
 picture file looks.
 
-- It works for pictures on a layer whose material has been measured with a tone test (Laser →
+- It works for pictures on a layer whose material has been measured with a tone test (Materials & Tests → Tests →
   **Tone test**). Such a picture is drawn with its own adjustments, then the tone correction, in the
   material's own colours, from the bare material to its darkest burn. See-through parts show as
   bare material.
@@ -173,9 +173,10 @@ spacing out are on the Arrange tab: see [Arranging](arrange.md).
 
 ## Cut, copy, paste, duplicate and delete
 
-The **Clipboard** group on the **Home** tab, and **Delete** in its **Select** group:
+These are on the keys and on the right-click menu (right-click a shape, or empty space for
+**Paste**), not on the ribbon:
 
-| Button | Shortcut | What it does |
+| Command | Shortcut | What it does |
 |---|---|---|
 | **Cut** | `Ctrl+X` | Copies the selection and removes it. |
 | **Copy** | `Ctrl+C` | Copies the selection. |
@@ -186,7 +187,7 @@ The **Clipboard** group on the **Home** tab, and **Delete** in its **Select** gr
 - What you copy stays ready to paste until you copy something else or close the program, so it
   can go onto another page or into another design.
 - `Ctrl+V` also pastes a picture, or SVG text, copied in another program: it comes in as if you'd
-  imported a file (see [Files](files.md)). The **Paste** button does the same.
+  imported a file (see [Files](files.md)). **Paste** on the right-click menu does the same.
 - Copying in PhotonCanvas replaces what's on your computer's clipboard (with a short note saying
   the shapes are PhotonCanvas's), so `Ctrl+V` then pastes your shapes, not something copied earlier
   elsewhere.

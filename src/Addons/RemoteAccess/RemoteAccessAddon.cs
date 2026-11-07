@@ -2,14 +2,14 @@ using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.RemoteAccess;
 
-/// <summary>Laser → Machine → Remote access: the phone remote's server, QR code and settings.</summary>
+/// <summary>Machine → Settings → Remote access: the phone remote's server, QR code and settings.</summary>
 public sealed class RemoteAccessAddon : IAddon
 {
     RemoteAccessWindow? _open;
 
     public void Start(IAddonHost host)
     {
-        host.AddRibbonButton(new RibbonButton("Laser", "Machine", "Remote access", "IcPhone", () =>
+        host.AddRibbonButton(new RibbonButton("Machine", "Settings", "Remote access", "IcPhone", () =>
         {
             if (_open is { IsVisible: true }) { _open.Activate(); return; }
             _open = new RemoteAccessWindow();

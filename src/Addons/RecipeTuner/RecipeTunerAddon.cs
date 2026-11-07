@@ -5,7 +5,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.RecipeTuner;
 
 /// <summary>
-/// Laser → Materials → Recipe tuner: suggests the next settings to try from the ratings in the
+/// Materials & Tests → Tests → Recipe tuner: suggests the next settings to try from the ratings in the
 /// material library, puts them in the design as a round of tries, and takes the ratings back. When
 /// a round finishes burning, the tuner opens on its rating tab. Never sends or burns anything itself.
 /// </summary>
@@ -19,10 +19,11 @@ public sealed class RecipeTunerAddon : IAddon
     {
         _host = host;
         _store = TriesStore.Load(host.DataFolder);
-        host.AddRibbonButton(new RibbonButton("Laser", "Materials", "Recipe tuner", "IcBulb", () => Open(false))
+        host.AddRibbonButton(new RibbonButton("Tests", "Find the settings", "Recipe tuner", "IcBulb", () => Open(false))
         {
             Large = true,
             Tip = "Suggests the next settings to try: learns from the stars on your recipes (this material's and similar ones'), makes a small round of tries, and takes your ratings back",
+            Order = 0,
         });
         host.AddCommand(new AddonCommand("recipe-tuner.open", "Materials", "Recipe tuner…", "", () => Open(false)));
         host.JobFinished += Finished;

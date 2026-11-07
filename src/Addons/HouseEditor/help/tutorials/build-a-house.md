@@ -7,9 +7,9 @@ The building editor lets you draw a building floor by floor, like building a hou
 game, and turns it into pieces to cut.
 
 ## Open the building editor
-<!-- target: ribbon:Designer/Build -->
+<!-- target: ribbon:Mini-Designer/Build -->
 <!-- wait: window:Building editor -->
-Click **Build** on the **Designer** tab (in the **Buildings** group).
+Click **Build** on the **Mini-Designer** tab (in the **Buildings** group).
 
 ## Drag out a room
 <!-- target: button:Room -->

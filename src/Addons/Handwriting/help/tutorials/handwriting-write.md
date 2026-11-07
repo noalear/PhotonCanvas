@@ -7,9 +7,9 @@ Once you've made a handwriting font, anything you type comes out in your writing
 that engrave quickly. No font yet? Do [Make a font from your handwriting](tutorial:handwriting-font) first.
 
 ## Open Handwriting
-<!-- target: ribbon:Home/Handwriting -->
+<!-- target: ribbon:Import/Handwriting -->
 <!-- wait: window:Handwriting -->
-Click **Handwriting** on the **Home** tab.
+Click **Handwriting** on the **Import** tab.
 
 ## Type the words
 <!-- target: field:Words -->

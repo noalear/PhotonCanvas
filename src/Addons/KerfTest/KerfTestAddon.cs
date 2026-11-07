@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.KerfTest;
 
-/// <summary>Laser → Tests → Kerf gauge (and its command), opening <see cref="KerfGaugeWindow"/>.</summary>
+/// <summary>Machine → Calibrate → Kerf gauge (and its command), opening <see cref="KerfGaugeWindow"/>.</summary>
 public sealed class KerfTestAddon : IAddon
 {
     /// <summary>A frame with a tapered slot and a key half way in.</summary>
@@ -15,9 +15,8 @@ public sealed class KerfTestAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Laser", "Tests", "Kerf gauge", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Machine", "Calibrate", "Kerf gauge", Icon, Open)
         {
-            GroupAfter = "Materials",
             Order = 10,
             Tip = "Fits first time: cut a tiny tapered-slot gauge, push its keys in, and a close-up photo reads the kerf and the slot fit, saved on the material for finger joints, slices, dowels and inlays",
         });

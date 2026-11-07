@@ -1,6 +1,6 @@
 # Centre-line trace
 
-An add-on (Settings → Add-ons → **Centre-line trace**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Edit → Centre-line trace**.
+An add-on (Settings → Add-ons → **Centre-line trace**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Trace → Centre-line trace**.
 
 ## Centre-line trace
 

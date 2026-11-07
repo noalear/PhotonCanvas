@@ -210,7 +210,7 @@ public sealed class FlipPictureWindow : Window
         if (k < 0 || k >= _tests.Count)
         {
             foreach (var r in _rows) r.Power = null;
-            _testNote.Text = _tests.Count == 0 ? "No grating tests in the library yet: run Laser → Colour test (Diffraction gratings), then Measure colours in Gratings mode." : "";
+            _testNote.Text = _tests.Count == 0 ? "No grating tests in the library yet: run Materials & Tests → Tests → Colour test (Diffraction gratings), then Measure colours in Gratings mode." : "";
             Later();
             return;
         }

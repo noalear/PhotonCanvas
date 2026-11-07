@@ -37,7 +37,7 @@ public static class PhoneStart
     /// <summary>What the phone is told when it tries to start a job while this is off.</summary>
     public const string OffMessage =
         "Starting jobs from the phone is turned off. Press the machine's button to start, or turn on " +
-        "\"Allow starting jobs from the phone\" in PhotonCanvas on the computer (Laser → Remote access).";
+        "\"Allow starting jobs from the phone\" in PhotonCanvas on the computer (Machine → Remote access).";
 
     /// <summary>Shown before it is turned on; the user must confirm.</summary>
     public const string Warning =

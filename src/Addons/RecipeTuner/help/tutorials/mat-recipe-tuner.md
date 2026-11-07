@@ -8,9 +8,9 @@ trying. You need the material in the library (a rated recipe or two helps, from 
 or the library) and a scrap of it in the machine.
 
 ## Open the tuner
-<!-- target: ribbon:Laser/Recipe tuner -->
+<!-- target: ribbon:Tests/Recipe tuner -->
 <!-- wait: window:Recipe tuner -->
-Click **Recipe tuner** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Recipe tuner** in the list and click **Open**.
 
 ## Choose the material
 <!-- target: field:Material -->
@@ -34,7 +34,7 @@ Each suggestion says what it expects and why. The best guess comes first; the ot
 Click **Add the tries to the design**: one small square per try, numbered, each on its own layer.
 
 ## Burn the tries
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Send them with **Ship It** and press the machine's button. When the job finishes, the tuner opens to rate them.
 
 ## Rate each try

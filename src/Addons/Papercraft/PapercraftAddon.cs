@@ -2,7 +2,7 @@ using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.Papercraft;
 
-/// <summary>Fold-up papercraft: one button (Home → Bring in) and a command that open the papercraft window.</summary>
+/// <summary>Fold-up papercraft: one button (Import → 3D &amp; maps) and a command that open the papercraft window.</summary>
 public sealed class PapercraftAddon : IAddon
 {
     IAddonHost? _host;
@@ -12,7 +12,7 @@ public sealed class PapercraftAddon : IAddon
     {
         _host = host;
         const string tip = "Unfold a 3D model (STL, OBJ, STEP) into flat pieces of card with cut lines, fold lines, glue tabs and numbered edges, to fold up into the model";
-        host.AddRibbonButton(new RibbonButton("Home", "Bring in", "3D to papercraft", "IcPrism", Open) { Tip = tip });
+        host.AddRibbonButton(new RibbonButton("Import", "3D & maps", "3D to papercraft", "IcPrism", Open) { Tip = tip, Order = 11 });
         host.AddCommand(new AddonCommand("papercraft.open", "Shapes", "3D to papercraft…", "", Open));
     }
 

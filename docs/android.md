@@ -1,7 +1,7 @@
 # PhotonCanvas Remote for Android
 
 The phone app: everything the phone page does (machine state, camera, pause/stop, designs, load and
-start, history), as an app that scans the QR code from **Laser → Remote access** itself. It talks to
+start, history), as an app that scans the QR code from **Machine → Remote access** itself. It talks to
 the remote server on the user's computer (`docs/remote-api.md`).
 
 | Project | What it is |

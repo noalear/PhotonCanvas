@@ -1,11 +1,11 @@
 # Ruins and rubble
 
-An add-on (Settings → Add-ons → **Ruins and rubble maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Terrain → Ruins**, and **Edit ruins…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Ruins and rubble maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Mini-Designer → Terrain → Ruins**, and **Edit ruins…** is on the right-click menu of the pieces it made.
 
 **Ruins** makes broken scenery for tabletop games, dioramas and model buildings, cut from sheet
 material: sections of wall broken down from the top, with holes knocked through, stones missing and
 cracks; rubble piles stacked from layers of the sheet; loose bricks and stones; broken-off chunks of
-wall; and broken pillars. They use the same textures as the wall maker (**Designer → Buildings → Walls**):
+wall; and broken pillars. They use the same textures as the wall maker (**Mini-Designer → Buildings → Walls**):
 brick, stone, wood and metal, at the same sizes, so ruins stand beside whole walls and match them.
 A broken wall can keep whole ends that slide into the wall maker's columns, or crumble at both ends
 and stand on a base of its own.
@@ -19,7 +19,7 @@ and stand on a base of its own.
 
 ![The ruins maker making a broken brick wall with two holes knocked through, knocked-out bricks and cracks, shown as built](images/window-ruins-wall.png)
 
-Click **Ruins** on the **Designer** tab (in the **Terrain** group). The **Ruins and rubble** window opens.
+Click **Ruins** on the **Mini-Designer** tab (in the **Terrain** group). The **Ruins and rubble** window opens.
 The settings are on the left in tabs; the preview on the right updates as you change things. **Show**
 picks what it shows: **As built** shows the wall's face, and each pile, base and pillar from above
 with its layers stacked (higher layers lighter); **Pieces to cut** shows one of each piece, flat. Under

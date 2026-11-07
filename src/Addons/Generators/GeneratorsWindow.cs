@@ -164,7 +164,7 @@ public sealed class GeneratorsWindow : Window
         if (c.M.ThicknessMm is { } t) _bt.Value = (decimal)Math.Clamp(t, 0.5, 20);
         _boxCutNote.Text = c.R.Settings.KerfMm > 0
             ? $"On a cut layer \"{c.M.Label}\" with a {c.R.Settings.KerfMm:0.###} mm kerf: the fingers press together snugly."
-            : "These settings have no kerf measured yet, so the fingers will be loose: measure it first (Laser → Kerf gauge, or Cut test).";
+            : "These settings have no kerf measured yet, so the fingers will be loose: measure it first (Machine → Kerf gauge, or Cut test).";
     }
 
     Layer LayerFor(ref DocState s, LayerMode mode, string name)

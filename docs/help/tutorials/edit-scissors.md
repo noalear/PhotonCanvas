@@ -16,6 +16,6 @@ Click **Scissors**.
 Click a shape's outline where it should be cut. A closed outline opens there; a line becomes two.
 
 ## Separate the pieces
-<!-- target: ribbon:Home/Break apart -->
+<!-- target: ribbon:Arrange/Break apart -->
 The pieces are still one shape. Press `Esc`, select it and click **Break apart** to make them
 separate shapes.

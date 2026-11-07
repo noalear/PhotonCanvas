@@ -1,6 +1,6 @@
 # Work area: rotary, curved, layer by layer, sections, pieces
 
-The **Work area** group on the **Laser** tab changes where and how a job is marked: on a rotary
+The **Work area** group on the **Machine** tab changes where and how a job is marked: on a rotary
 attachment or the conveyor instead of the flat bed, on a curved piece, one layer at a time, one
 section at a time for a design bigger than the bed, or across several pieces that go together.
 
@@ -12,10 +12,11 @@ section at a time for a design bigger than the bed, or across several pieces tha
 | **Layer by layer** | Mark one layer at a time, with a stop between to change the screen, colour or material. |
 | **Sections** | Mark a design bigger than the work area, moving the material between sections. |
 | **Split onto pieces** | Mark one design across several pieces (four boards making one picture): a page per piece, lined up by the camera. From the Split onto pieces add-on, which has its own page under **Add-ons**. |
+| **Carve to model** | Engrave rotary stock down to a 3D model. From the Carve stock to a model add-on, with its own page under **Add-ons**. |
 
 In a narrow window, the small buttons show only their icons: hover over one for its name.
 
-![The Laser tab, with the Work area group near the right (Work mode is hidden here: no attachment is ticked)](images/ribbon-laser.png)
+![The Machine tab, with the Work area group in the middle (Work mode is hidden here: no attachment is ticked)](images/ribbon-machine.png)
 
 ## Work mode
 
@@ -133,7 +134,7 @@ it.
 
 ![Scan the part: the stock model of a glued stack, and one place along it end-on](images/window-rotary-scan.png)
 
-**Scan the part** (Laser tab, Work area group, in the rotary work mode) measures a part held in the
+**Scan the part** (Machine tab, Work area group, in the rotary work mode) measures a part held in the
 rotary before you mark or carve it: a glued stack of slices, a branch, a turned blank that isn't quite
 round. The part is turned a step at a time, and at each step the height of its top is measured along
 the laser line. Together the readings make a model of the stock: how far the surface reaches from the
@@ -285,7 +286,7 @@ While the window is open the rest of the program waits, so focus on the piece be
 
 Measuring uses the red pointer and the close-up camera: the pointer comes in at a slant, so its dot
 lands in a different place in the close-up picture as the surface rises or falls. Calibrating once
-records that. It's kept for good, and **Focus on selection** on the Camera tab uses it too.
+records that. It's kept for good, and **Focus on selection** on the Machine tab uses it too.
 
 1. Put a flat, matt board under the head, covering the middle of the bed. Type its thickness in
    **Board (mm)** (0.5 to 150; it starts at the current focus distance).

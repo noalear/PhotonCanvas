@@ -8,8 +8,8 @@ them. Use it to check holes are cut before their outlines and to see what a laye
 setting does. Have something in the design.
 
 ## Show the order
-<!-- target: ribbon:Laser/Show order -->
-Click **Show order**. Paths turn from blue (first) through green and yellow to red (last); thin
+<!-- target: ribbon:View/Processing order -->
+Click **Processing order** on the **View** tab. Paths turn from blue (first) through green and yellow to red (last); thin
 dashed lines are the travel moves.
 
 ## Read the key

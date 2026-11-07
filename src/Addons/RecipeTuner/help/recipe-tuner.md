@@ -1,6 +1,6 @@
 # Recipe tuner
 
-An add-on (Settings → Add-ons → **Recipe tuner**): on when PhotonCanvas is installed, and can be turned off. Its button is **Laser → Materials → Recipe tuner**, and **Recipe tuner…** is in the command search.
+An add-on (Settings → Add-ons → **Recipe tuner**): on when PhotonCanvas is installed, and can be turned off. Its button is **Materials & Tests → Tests → Recipe tuner**, and **Recipe tuner…** is in the command search.
 
 ## Recipe tuner
 
@@ -72,7 +72,7 @@ isn't right.
 - **Take the tries out of the design** removes the tries, their layers and their numbers (`Ctrl+Z`
   brings them back).
 
-The tries are ordinary layers: **Laser → Record results** reads them too.
+The tries are ordinary layers: **Materials & Tests → Tests → Record results** reads them too.
 
 ### How it learns
 

@@ -228,11 +228,11 @@ public sealed class LayerEditor : UserControl
         ToolTip.SetTip(_scanReverse, "Fill from the far side back (bottom to top): keeps the smoke away from what's still to engrave, depending on how your air flows.");
         ToolTip.SetTip(_spread, "Burn every few lines first, then the ones between, so no line is burned straight after the one beside it and the heat has time to leave: " +
                                 "less scorching, less warping of thin plastic, more even colours on metal. Hardly any slower on a galvo. " +
-                                "On wood pictures it can leave visible rows (lines burned beside already-charred ones come out darker); Laser → Line test shows both.");
+                                "On wood pictures it can leave visible rows (lines burned beside already-charred ones come out darker); Materials & Tests → Tests → Line test shows both.");
         ToolTip.SetTip(_deepestFirst, "Engrave the deepest (smallest) slices first and the widest last: often a smoother floor (noise reduction).");
         _grayRow = Field("Lightest power %", _grayMin, tip: "Power for the palest tones that still burn; the darkest tones get the layer's power.");
         _rampRow = Field("Ramp (mm)", _ramp, tip: "Threshold only: power climbs from the lightest power at each edge to full power this far in, so the sides slope (rubber stamps, cleaner edges). 0 = off.");
-        ToolTip.SetTip(_bidirPic, "Off: every row burns left to right and the head goes back unlit. Slower, but rows can't be shifted against each other by the direction (a woven look). Laser → Line test compares both.");
+        ToolTip.SetTip(_bidirPic, "Off: every row burns left to right and the head goes back unlit. Slower, but rows can't be shifted against each other by the direction (a woven look). Materials & Tests → Tests → Line test compares both.");
         ToolTip.SetTip(_bidir, "Off: every line burns in the same direction and the beam returns unlit. More even on some materials, a little slower.");
         ToolTip.SetTip(_together, "Scan all of this layer's shapes in one go instead of one shape at a time: fewer jumps for lots of small shapes. Where shapes overlap they cancel out.");
         ToolTip.SetTip(_passThrough, "Engrave the picture's own pixels, one dot each, with no resampling (for pictures already prepared at the right size). Never closer together than the resolution above: a picture with more pixels than that is resampled down, so it can't put in more heat than you set.");
@@ -407,7 +407,7 @@ public sealed class LayerEditor : UserControl
         _scanReverse.IsCheckedChanged += (_, _) => EditLayers("Scan direction", l => l with { ScanReverse = _scanReverse.IsChecked == true }, _scanReverse.IsChecked.HasValue);
         _spread.IsCheckedChanged += (_, _) => EditLayers("Spread lines", l => l with { SpreadLines = _spread.IsChecked == true }, _spread.IsChecked.HasValue);
         _scatter.IsCheckedChanged += (_, _) => EditLayers("Scatter lines", l => l with { SpreadScatter = _scatter.IsChecked == true }, _scatter.IsChecked.HasValue);
-        ToolTip.SetTip(_scatter, "Spread the lines in no set order (each still away from the last), so there's no repeating pattern of early and late lines to show as rows. Laser → Line test compares it.");
+        ToolTip.SetTip(_scatter, "Spread the lines in no set order (each still away from the last), so there's no repeating pattern of early and late lines to show as rows. Materials & Tests → Tests → Line test compares it.");
         _deepestFirst.IsCheckedChanged += (_, _) => EditLayers("Deepest slice first", l => l with { Slices = l.Slices with { DeepestFirst = _deepestFirst.IsChecked == true } }, _deepestFirst.IsChecked.HasValue);
         _bidir.IsCheckedChanged += (_, _) => EditLayers("Both directions", l => l with { Bidirectional = _bidir.IsChecked == true }, _bidir.IsChecked.HasValue);
         _picAngle.ValueChanged += (_, _) => EditLayers("Scan angle", l => l with { FillAngleDeg = (double)_picAngle.Value!.Value }, _picAngle.Value.HasValue, "fangle");

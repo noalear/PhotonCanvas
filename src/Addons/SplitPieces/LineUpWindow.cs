@@ -127,7 +127,7 @@ public sealed class LineUpWindow : Window
         if (Piece() is not { } p)
         {
             _title.Text = "NO PIECE ON THIS PAGE";
-            _how.Text = "This page has no piece to line up. Lay out the pieces as material outlines, put the design over them, select it all and use Laser → Split onto pieces; then open a piece's page.";
+            _how.Text = "This page has no piece to line up. Lay out the pieces as material outlines, put the design over them, select it all and use Machine → Split onto pieces; then open a piece's page.";
             return;
         }
         _title.Text = names[s.PageIndex].ToUpperInvariant();
@@ -179,7 +179,7 @@ public sealed class LineUpWindow : Window
         bool ok = false;
         if (!_machine.IsConnected) _heightState.Text = "⚠ Connect to the machine first.";
         else if (DistanceValue is not { } d) _heightState.Text = "⚠ Enter the distance, or click Auto-focus now.";
-        else if (_machine.CameraMapFor(d) is not { } choice) _heightState.Text = "⚠ The camera isn't calibrated yet (Camera tab → Calibrate).";
+        else if (_machine.CameraMapFor(d) is not { } choice) _heightState.Text = "⚠ The camera isn't calibrated yet (Machine → Calibrate camera).";
         else
         {
             ok = choice.Exact;

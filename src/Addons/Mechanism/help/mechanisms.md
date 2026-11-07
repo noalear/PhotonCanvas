@@ -1,6 +1,6 @@
 # Mechanisms
 
-An add-on (Settings → Add-ons → **Mechanism maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Toys → Mechanisms**, and **Edit mechanism…** is on the right-click menu of a mechanism's parts.
+An add-on (Settings → Add-ons → **Mechanism maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Import → Generate → Mechanisms**, and **Edit mechanism…** is on the right-click menu of a mechanism's parts.
 
 **Mechanisms** makes things that move, cut from sheet material: a train of gears, a rack and
 pinion, planetary gears, a cam and follower, or an automaton box with a handle, cams and platforms
@@ -15,7 +15,7 @@ on a cut layer with your material's kerf, ready to cut.
 ## The Mechanism maker window
 <!-- windows: MechanismWindow -->
 
-Click **Mechanisms** on the **Designer** tab (in the **Toys** group). The **Mechanism maker** opens
+Click **Mechanisms** on the **Import** tab (in the **Generate** group). The **Mechanism maker** opens
 over the program.
 
 ![The Mechanism maker with a pair of gears: settings on the left, the gears turning on the right, the check's results under them](images/window-mechanism-gears.png)
@@ -235,7 +235,7 @@ The box is held together by tabs in slots: the slots are the sheet's **Thickness
 The laser burns away a thin line as it cuts (the kerf), so a part cut on its line comes out smaller
 by half the kerf all round: gears get more play and holes get bigger. With your material's cut
 settings picked, the cut layer's **Kerf** moves each cut out by half of it, so parts come out at
-their drawn size and the play is what you set. **Laser → Tests → Cut test** measures the kerf and the
+their drawn size and the play is what you set. **Materials & Tests → Tests → Cut test** measures the kerf and the
 slot fit and saves them with the material (see Materials and tests in the guide).
 
 ## Put it in the design

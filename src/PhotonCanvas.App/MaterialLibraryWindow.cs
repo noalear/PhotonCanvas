@@ -38,7 +38,7 @@ public sealed class MaterialLibraryWindow : Window
     readonly List<(Image Image, TextBlock Label, Bitmap[] Frames, string[] Names)> _players = [];
     int _tick;
     readonly Control _details;
-    readonly TextBlock _empty = Hint("Pick a material on the left, or make a new one. Recipes come from Save to library on a layer, or from a material test (Laser → Record results).");
+    readonly TextBlock _empty = Hint("Pick a material on the left, or make a new one. Recipes come from Save to library on a layer, or from a material test (Materials & Tests → Tests → Record results).");
     readonly TextBlock _status = Hint();
     List<Material> _shown = [];
     Material? _current;

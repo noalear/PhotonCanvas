@@ -2,7 +2,7 @@
 
 An add-on (Settings → Add-ons → **Carve stock to a model**): on when PhotonCanvas is installed, and can be
 turned off. It needs **Finish stacks on the rotary**, whose engraving it shares. Its button is
-**Laser → Work area → Carve to model**.
+**Machine → Work area → Carve to model**.
 
 You have a rough part in the rotary's chuck (a blank, a glued stack, a piece of branch) and a 3D model
 of what it should become. **Carve to model** lines the model up inside the part as it was scanned,
@@ -17,10 +17,10 @@ to the model's shape as it turns, moving the focus as the surface comes nearer t
 
 ## Carve a scanned part to a model
 
-1. Fit the part in the rotary's chuck and scan it (Laser → **Scan the part**, in rotary mode; see
+1. Fit the part in the rotary's chuck and scan it (Machine → **Scan the part**, in rotary mode; see
    [Scan the part](work-area.md#scan-the-part)). For standard stock (a square bar, say) choose its
    shape there, so the stock is its exact shape. Leave it in the chuck.
-2. Click **Carve to model** on the **Laser** tab. The last scan's stock model is the stock. (Or click **Stock
+2. Click **Carve to model** on the **Machine** tab. The last scan's stock model is the stock. (Or click **Stock
    model…** for a 3D model of the stock, below.)
 3. Click **Open a 3D model…** and choose the shape to carve (STL, OBJ or STEP). It's laid with its
    longest side along the axis, in the middle of the stock.
@@ -29,7 +29,7 @@ to the model's shape as it turns, moving the focus as the surface comes nearer t
    material there. The summary says how far it sticks out, or how much room there is to spare.
 5. Choose the engrave settings under **Carve**, and click **Put the engraving in the design**. A page
    "… carved on the rotary" is added, with a layer for each focus height.
-6. Set Laser → **Work mode** → **Rotary** to the **Object Ø** the summary gives (the job check says so
+6. Set Machine → **Work mode** → **Rotary** to the **Object Ø** the summary gives (the job check says so
    if it's different). Turn the part back to where the scan started, focus on its top at the X the
    summary names, then frame and send it.
 
@@ -96,7 +96,7 @@ The picture shows the cut from above, the machine's back at the top: grey is whe
 is what's kept (the model's outline, a little oversize, and the bar to the chuck), and the lines are the
 cut, a colour a focus height. Each view's cut only goes where there's still material, and only as deep as
 there is material, so later views are quicker. The camera check needs the camera calibrated near the
-height of the part's top (Camera tab → Calibrate); without it, look at the part yourself.
+height of the part's top (Machine → Calibrate camera); without it, look at the part yourself.
 
 ## Placing the model
 
@@ -133,7 +133,7 @@ layer for the focus height it's at.
 
 | Setting | Range (default) | What it does |
 |---|---|---|
-| **Engrave with** | your library's engrave settings with a measured depth (Default engrave settings) | The settings every focus height engraves with. Measure the depth a pass first with the etch rate test (Laser tab). |
+| **Engrave with** | your library's engrave settings with a measured depth (Default engrave settings) | The settings every focus height engraves with. Measure the depth a pass first with the etch rate test (Materials & Tests → Tests). |
 | **Depth a pass (mm)** | 0.01 to 2 (0.1, or the chosen settings' depth) | How deep one pass goes on a flat piece with those settings. Nearer the axis the passes go deeper; that's allowed for. |
 | **Focus band (mm)** | 0.2 to 5 (1) | How far the surface may be from the focus. Smaller is sharper, with more focus heights. |
 | **Deepest (mm)** | 0.2 to 30 (5) | The most taken off anywhere. Spots that need more are left (the summary says how much). |

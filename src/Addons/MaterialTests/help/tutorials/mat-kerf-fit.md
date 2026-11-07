@@ -8,7 +8,7 @@ measured with calipers gives that kerf, and a comb of slots shows how tight slot
 cut test first, keep it in the design, and have calipers ready.
 
 ## Open the cut test
-<!-- target: ribbon:Laser/Cut test -->
+<!-- target: ribbon:Tests/Cut test -->
 <!-- wait: window:Cut test -->
 With the burned cut test still in the design, click **Cut test**: it opens on **Read the results**.
 
@@ -23,7 +23,7 @@ it's the one to test (if the program was closed in between, click the squares ag
 A square and a comb of slots are added below the grid, and the window closes.
 
 ## Cut it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Cut test -->
 Frame it, **Ship It** and press the machine's button. When it's done, the window opens again.
 

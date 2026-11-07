@@ -34,13 +34,13 @@ public sealed class BurnPreviewAddon : IAddon
             Tip = "See the finished piece before you burn it: your design drawn on the camera's picture of the material, " +
                   "each layer as dark and in the colour your own test grids say it comes out",
         });
-        host.AddRibbonButton(new RibbonButton("View", "Show", "Burned on canvas", "IcPalette", () => SetCanvas(!_onCanvas))
+        host.AddRibbonButton(new RibbonButton("View", "Show", "Burned look on work area", "IcPalette", () => SetCanvas(!_onCanvas))
         {
-            Tip = "Draw the work area as it will look burned, in place of the camera picture (turn Camera on work area on to see the material)",
+            Tip = "Show the finished piece right on the work area: your design drawn onto the camera's picture of the material as dark and in the colours your tests say it comes out, while you keep editing (turn Camera on work area on to see the material). Click again for the plain picture",
             Checked = () => _onCanvas,
         });
         host.AddCommand(new AddonCommand("burn-preview.open", "View", "See it burned…", "", Open));
-        host.AddCommand(new AddonCommand("burn-preview.canvas", "View", "Burned on canvas", "", () => SetCanvas(!_onCanvas)));
+        host.AddCommand(new AddonCommand("burn-preview.canvas", "View", "Burned look on work area", "", () => SetCanvas(!_onCanvas)));
         host.AddCanvasOverlay(new BedOverlay(this));
         host.AddCanvasOverlay(new BadgeOverlay(this));
         host.DocumentChanged += Changed;
@@ -146,9 +146,9 @@ public sealed class BurnPreviewAddon : IAddon
         public void Draw(DrawingContext ctx, CanvasDrawInfo info)
         {
             if (!owner._onCanvas) return;
-            string text = owner._canvas is null ? "Burned on canvas: working…"
-                : owner._canvas.Value.AllMeasured ? "Burned on canvas · from your tests"
-                : "Burned on canvas · some layers guessed (See it burned says which)";
+            string text = owner._canvas is null ? "Burned look: working…"
+                : owner._canvas.Value.AllMeasured ? "Burned look · from your tests"
+                : "Burned look · some layers guessed (See it burned says which)";
             var ft = new FormattedText(text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Inter"), 11.5, Brushes.White);
             var corner = info.ToScreen(new Vec2(info.Visible.MinX, info.Visible.MaxY));
             var box = new Rect(corner.X + 28, corner.Y - ft.Height - 22, ft.Width + 16, ft.Height + 8);

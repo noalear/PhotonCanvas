@@ -7,9 +7,9 @@ Walls cut from sheet with a texture etched on make quick, sturdy scenery for tab
 wall is a box that stands up on its own, and columns join the walls into rooms.
 
 ## Open the wall maker
-<!-- target: ribbon:Designer/Walls -->
+<!-- target: ribbon:Mini-Designer/Walls -->
 <!-- wait: window:Textured walls -->
-Click **Walls** on the **Designer** tab (in the **Buildings** group).
+Click **Walls** on the **Mini-Designer** tab (in the **Buildings** group).
 
 ## Pick a theme
 <!-- target: field:Theme -->

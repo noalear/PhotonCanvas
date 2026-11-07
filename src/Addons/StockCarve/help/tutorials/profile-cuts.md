@@ -6,9 +6,9 @@
 Profile cuts take the bulk of the waste off a part in the rotary before the carving: the part is turned to each view and cut straight down through round the model's outline.
 
 ## Open Carve to model
-<!-- target: ribbon:Laser/Carve to model -->
+<!-- target: ribbon:Machine/Carve to model -->
 <!-- wait: window:Carve stock to a model -->
-Click **Carve to model** on the **Laser** tab and place the model in the stock (or click **Best fit**).
+Click **Carve to model** on the **Machine** tab and place the model in the stock (or click **Best fit**).
 
 ## Open the profile cuts
 <!-- target: button:Profile cuts first… -->

@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 // Not ...Addon.Generators: inside that namespace "Generators" would mean it, not the Doc class that draws the projects.
 namespace PhotonCanvas.Addon.ReadyMade;
 
-/// <summary>Home → Draw → Generators (and its command), opening <see cref="GeneratorsWindow"/>.</summary>
+/// <summary>Import → Generate → Generators (and its command), opening <see cref="GeneratorsWindow"/>.</summary>
 public sealed class GeneratorsAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -12,10 +12,11 @@ public sealed class GeneratorsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Generators", "IcTestGrid", Open)
+        host.AddRibbonButton(new RibbonButton("Import", "Generate", "Generators", "IcGenerators", Open)
         {
             Large = true,
             Tip = "Finger-jointed boxes, keychains and tags, living hinges, earrings, and the selection in several sizes",
+            Order = 10,
         });
         host.AddCommand(new AddonCommand("generators.open", "Shapes", "Generators…", "", Open));
     }

@@ -31,21 +31,39 @@ a tab's name for what the tab holds.
 
 | Tab | Groups | Explained in |
 |---|---|---|
-| **Home** | Clipboard, Select, Draw, Serial & codes, Group, Shape builder, Outline, Bring in | [Working on the canvas](canvas.md) (Clipboard, Select), [Drawing](drawing.md), [Editing shapes](editing-shapes.md), [Files](files.md) |
-| **Arrange** | Align, Flip & rotate, Order, Repeat, Transform | [Arranging](arrange.md) |
-| **Picture** | Add, Turn it into, Shape, Edit, Relief, Clean up | [Pictures](pictures.md) |
-| **Camera** | Place, Set up | [Camera](camera.md) |
-| **Laser** | Materials, Job, Work area, Machine (and the add-ons' Tests and Colour on metal) | [Materials and tests](materials-and-tests.md), [Running a job](running-jobs.md), [Work area](work-area.md), [The machine and settings](machine.md) |
+| **Home** | Select, Draw, Serial & codes, Shape builder, Outline, Cut lines | [Working on the canvas](canvas.md) (Select), [Drawing](drawing.md), [Editing shapes](editing-shapes.md) |
+| **Arrange** | Align, Flip & rotate, Order, Group, Repeat, Transform | [Arranging](arrange.md) |
+| **Import** | Files, 3D & maps, Generate | [Files](files.md), the add-ons' pages |
+| **Picture** | Edit, Trace, Effects, Mask | [Pictures](pictures.md) |
+| **Mini-Designer** | Buildings, Town, Terrain, Furniture & props, Accessories, Mechanical (all from add-ons) | Each maker's own page |
+| **Placement** | Onto pieces, Jigs, From the photo, Check the burn | [Camera](camera.md) |
+| **Materials & Tests** | Library, Tests | [Materials and tests](materials-and-tests.md), [The material library](material-library.md) |
+| **Machine** | Job, Focus, Work area, Calibrate, Settings | [Running a job](running-jobs.md), [Work area](work-area.md), [Camera](camera.md) (Calibrate), [The machine and settings](machine.md) |
 | **View** | Zoom, Grid & snapping, Measure & history, Show | [The View tab](#the-view-tab) below |
 
+Where things are, in short:
+
+- **Home** is for making and changing shapes. Cut, copy, paste, duplicate and delete aren't on the
+  ribbon: use their keys (`Ctrl+X`, `Ctrl+C`, `Ctrl+V`, `Ctrl+D`, `Delete`) or right-click the work
+  area or a shape (see [Working on the canvas](canvas.md#cut-copy-paste-duplicate-and-delete)).
+- **Import** is for everything that brings a design in: files and pictures, 3D models and maps,
+  and the generators that make one for you (boxes, gears and cams, a font of your handwriting).
+- **Picture** works on a selected picture once it's in: edit it, trace it, turn it into something
+  else.
+- **Placement** uses the camera's picture of the bed to put a design onto real pieces, outline
+  things lying on the bed, and check a burn afterwards.
+- **Materials & Tests** has the material library and one **Tests** button: every test is picked
+  from a list in the Tests window.
+- **Machine** has what runs on the machine: the job, focusing, the work area (rotary, curved
+  pieces, sections), calibration done once for the machine, and the machine's settings.
+
 - A button that can't do anything right now is greyed out. **Group** needs two or more shapes
-  selected, most of the **Picture** tab's commands need a picture selected, and so on. **Paste** is
-  always on, since a picture or SVG copied in another program can be pasted too.
+  selected, the **Picture** tab's commands need a picture selected, and so on.
 - When a picture is selected, the **Picture** tab's name lights up.
 - Some buttons and groups only appear when you have the equipment, or have chosen to show the
-  feature, in Settings → Equipment: **Work mode** (a rotary or the conveyor), the
-  **Colour on metal** group and button, **Diffraction**, and **Console**. See
-  [The machine and settings](machine.md).
+  feature, in Settings → Equipment: **Work mode** (a rotary or the conveyor), **Colour on metal**,
+  **Diffraction**, and **Console**. See [The machine and settings](machine.md).
+- The **Mini-Designer** tab only shows while at least one of its maker add-ons is on.
 - The ribbon opens on the tab you used last, also after a restart.
 
 ### Folding the ribbon
@@ -288,7 +306,7 @@ Along the bottom of the window, from left to right:
 - **Messages**: what's selected ("1 of 7 shapes selected"), or the design ("7 shapes · 5 layers"),
   what the tool in use expects next, and the result of the last command (for example a
   measurement). With an empty design it says how to start: "Draw with the Home tab, or drag a
-  file in (SVG, DXF, PDF, pictures). New material? Laser → Test grid."
+  file in (SVG, DXF, PDF, pictures). New material? Materials & Tests → Tests → Test grid."
 
 ## The Help menu
 

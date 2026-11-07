@@ -18,10 +18,10 @@ each shape, so press `E` (or click **Ellipse**) again and draw a smaller circle 
 Press `V` for **Select** and drag a box round both circles.
 
 ## Combine them
-<!-- target: ribbon:Home/Combine -->
+<!-- target: ribbon:Arrange/Combine -->
 Click **Combine** (`Ctrl+K`). They're one shape now, and the small circle is its hole.
 
 ## Break it apart
-<!-- target: ribbon:Home/Break apart -->
+<!-- target: ribbon:Arrange/Break apart -->
 With the combined shape selected, click **Break apart** (`Ctrl+Shift+K`): each circle is a shape of
 its own again.

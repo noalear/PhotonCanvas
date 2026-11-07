@@ -8,9 +8,9 @@ machines and equipment you have, colours and units, updates and tools. Changes s
 them.
 
 ## Open it
-<!-- target: ribbon:Laser/Machine settings -->
+<!-- target: ribbon:Machine/Machine settings -->
 <!-- wait: window:Settings -->
-Click **Machine settings** on the **Laser** tab (or the gear at the top right).
+Click **Machine settings** on the **Machine** tab (or the gear at the top right).
 
 ## The Machine page
 <!-- target: window:Settings -->

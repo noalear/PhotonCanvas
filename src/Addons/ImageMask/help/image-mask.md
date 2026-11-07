@@ -1,6 +1,6 @@
 # Image mask
 
-An add-on (Settings → Add-ons → **Image mask**): on when PhotonCanvas is installed, and can be turned off. Its buttons are **Picture → Shape → Image mask** and **Remove mask**. A picture masked before keeps its mask (it's shown and engraved masked) while the add-on is off.
+An add-on (Settings → Add-ons → **Image mask**): on when PhotonCanvas is installed, and can be turned off. Its buttons are **Picture → Mask → Image mask** and **Remove mask**. A picture masked before keeps its mask (it's shown and engraved masked) while the add-on is off.
 
 ## Image mask
 

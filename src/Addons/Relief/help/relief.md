@@ -1,6 +1,6 @@
 # 3D model relief
 
-This add-on adds the Picture tab's **Relief** group: **3D model** brings in an STL file as a depth map to carve as a relief, and **Relief preview** shows a depth map as the lit relief it makes.
+This add-on adds two buttons: **3D model** (Import tab, in **3D & maps**) brings in an STL file as a depth map to carve as a relief, and **Relief preview** (Picture tab, in **Effects**) shows a depth map as the lit relief it makes.
 
 ## 3D model relief
 <!-- windows: StlWindow -->

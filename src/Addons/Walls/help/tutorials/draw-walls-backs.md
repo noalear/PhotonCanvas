@@ -8,9 +8,9 @@ The front is engraved and cut as usual; then you turn the pieces over and run a 
 only engraves their backs.
 
 ## Open the wall maker
-<!-- target: ribbon:Designer/Walls -->
+<!-- target: ribbon:Mini-Designer/Walls -->
 <!-- wait: window:Textured walls -->
-Click **Walls** on the **Designer** tab (in the **Buildings** group).
+Click **Walls** on the **Mini-Designer** tab (in the **Buildings** group).
 
 ## Make it a single panel
 <!-- target: field:Build it as -->
@@ -35,7 +35,7 @@ it, "backs (turn the pieces over)", holds each piece's back, mirrored, with its 
 layer that isn't burned.
 
 ## Cut, turn over and line up
-<!-- target: ribbon:Camera/Fit to piece -->
+<!-- target: ribbon:Placement/Fit to piece -->
 Run the sheet. Turn the pieces over left to right and lay them on the bed, then show the backs page.
 Drag each piece's group onto its piece in the camera picture, select it and click **Fit to piece**:
 only the outline is matched, and the engraving moves with it. Then run the backs page.

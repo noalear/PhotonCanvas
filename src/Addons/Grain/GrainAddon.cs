@@ -21,10 +21,11 @@ public sealed class GrainAddon : IAddon
         _host = host;
         host.AddJobHook(new GrainHook());
         host.AddCanvasOverlay(_overlay);
-        host.AddRibbonButton(new RibbonButton("Picture", "Wood", "Grain", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Grain", Icon, Open)
         {
             Large = true,
             Tip = "Grain-aware engraving: map the wood's grain from the camera picture and even out the engraving, or bring the grain out",
+            Order = 17,
         });
         host.AddCommand(new AddonCommand("grain.open", "Picture", "Grain-aware engraving…", "", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Place on the grain…", Open) { Visible = () => host.SelectedPicture is not null });

@@ -7,9 +7,9 @@ Bend to shape makes a panel with slits only where it has to bend, closer where i
 Draw the curve seen from above first, a rounded rectangle for example, and select it.
 
 ## Open Bend to shape
-<!-- target: ribbon:Home/Bend to shape -->
+<!-- target: ribbon:Import/Bend to shape -->
 <!-- wait: window:Bend to shape -->
-Click **Bend to shape** on the **Home** tab.
+Click **Bend to shape** on the **Import** tab.
 
 ## Choose the curve
 <!-- target: field:Curve -->

@@ -288,10 +288,10 @@ Check the material hasn't moved, choose **Carry on**, and press the machine's bu
 ### The camera isn't calibrated
 
 **Calibrate first**: *The camera needs calibrating before its picture can be placed accurately on
-the work area.*, or *The camera isn't calibrated yet (Camera tab → Calibrate).*, or *Not calibrated
+the work area.*, or *The camera isn't calibrated yet (Machine → Calibrate camera).*, or *Not calibrated
 yet* on the Settings window's Machine page. **Photo** stays grey until it is.
 
-Calibrate once for each material height you use: **Camera → Calibrate** (about 5 minutes and a
+Calibrate once for each material height you use: **Machine → Calibrate camera** (about 5 minutes and a
 scrap sheet). See [Camera](camera.md).
 
 ### The picture is dark or old
@@ -333,7 +333,7 @@ ffmpeg, which it doesn't come with. Install it so it's on the PATH; the photos a
 ### The console says Not connected
 
 *Not connected: connect the machine first (right end of the ribbon).* Connect, then send again. No
-**Console** on the **Laser** tab: tick **G-code console** in **Settings → Equipment**.
+**Console** on the **Machine** tab: tick **G-code console** in **Settings → Equipment**.
 
 ### A GRBL machine
 

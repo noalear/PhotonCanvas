@@ -254,13 +254,34 @@ public sealed class Ribbon : UserControl
 
     internal void Register(string tab, string label, Control c) => _named.TryAdd($"{tab}/{label}", c);
 
+    readonly Dictionary<string, Control> _aliases = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A command that isn't a button of its own but is reached through one ("Tests/Cut test" is picked in the
+    /// Tests window, opened by the Tests button): <see cref="Show"/> finds that button for it.
+    /// </summary>
+    internal void Alias(string tab, string label, Control button) => _aliases[$"{tab}/{label}"] = button;
+
+    internal void Unalias(string tab, string label) => _aliases.Remove($"{tab}/{label}");
+
+    /// <summary>Commands reached through another button (<see cref="Alias"/>), by "Tab/Label".</summary>
+    public IReadOnlyDictionary<string, Control> Aliases => _aliases;
+
     /// <summary>A command's button, after switching to its tab so it can be seen; null if there's no such command.</summary>
     public Control? Show(string tab, string label)
     {
-        if (!_named.TryGetValue($"{tab}/{label}", out var c)) return null;
+        if (!_named.TryGetValue($"{tab}/{label}", out var c) && !_aliases.TryGetValue($"{tab}/{label}", out c)) return null;
         if (_folded) Fold(false);
-        Select(tab);
+        // The tab the button is on (an alias's button is on another tab than the one it's named by).
+        if (_tabs.FirstOrDefault(t => Within(c, t.Panel)) is { } on) Select(on.Name);
+        else Select(tab);
         return c;
+    }
+
+    static bool Within(StyledElement e, Control panel)
+    {
+        for (var p = e.Parent; p is not null; p = p.Parent) if (p == panel) return true;
+        return false;
     }
 
     /// <summary>A tab's header button.</summary>
@@ -376,8 +397,18 @@ public sealed class RibbonTab
     /// <summary>Kept in its place when empty, only hidden (<see cref="Ribbon.AddonTab"/>).</summary>
     internal bool Kept { get; set; }
 
-    /// <summary>The order its groups go in, when they are named here (<see cref="Ribbon.AddonTab"/>).</summary>
+    /// <summary>The order its groups go in, when they are named here (<see cref="Ribbon.AddonTab"/>, <see cref="Order"/>).</summary>
     internal string[] GroupOrder { get; set; } = [];
+
+    /// <summary>
+    /// Where groups go, the program's and add-ons', whichever comes first: a group named here that an
+    /// add-on makes goes before the first group that comes after it.
+    /// </summary>
+    public RibbonTab Order(params string[] groups)
+    {
+        GroupOrder = groups;
+        return this;
+    }
 
     /// <summary>The group with this title, made (at the end) if there isn't one.</summary>
     internal RibbonGroup GroupFor(string title, string? after = null)
@@ -420,8 +451,9 @@ public sealed class RibbonTab
     }
 
     /// <summary>
-    /// 0 = every label. 1…n = the last 1…n groups lose their small-button labels; n+1…2n = the
-    /// last groups lose their big-button labels too. -1 forgets the current level.
+    /// 0 = every label. 1…n = n groups lose their small-button labels; n+1…2n = they lose their
+    /// big-button labels too. Groups give up their labels in <see cref="LabelsGoFirst"/> order, then
+    /// from the right. -1 forgets the current level.
     /// </summary>
     internal void SetLevel(int level)
     {
@@ -430,8 +462,32 @@ public sealed class RibbonTab
         if (level < 0) return;
         int n = Groups.Count;
         int smallOff = Math.Min(level, n), largeOff = Math.Max(0, level - n);
+        var order = DropOrder();
         for (int i = 0; i < n; i++)
-            Groups[i].ShowLabels(small: i < n - smallOff, large: i < n - largeOff);
+        {
+            int rank = order.IndexOf(Groups[i]);
+            Groups[i].ShowLabels(small: rank >= smallOff, large: rank >= largeOff);
+        }
+    }
+
+    string[] _labelsFirst = [];
+
+    /// <summary>
+    /// The groups whose labels go first when the tab doesn't fit, because their icons say enough
+    /// (the shapes in Draw): the rest keep theirs longer, giving way from the right as before.
+    /// </summary>
+    public RibbonTab LabelsGoFirst(params string[] groups)
+    {
+        _labelsFirst = groups;
+        Widths = null;
+        return this;
+    }
+
+    List<RibbonGroup> DropOrder()
+    {
+        var first = _labelsFirst.Select(t => Groups.FirstOrDefault(g => string.Equals(g.Title, t, StringComparison.OrdinalIgnoreCase)))
+            .OfType<RibbonGroup>().ToList();
+        return [.. first, .. Enumerable.Reverse(Groups).Where(g => !first.Contains(g))];
     }
 
     internal RibbonTab(Ribbon ribbon, string name, ToggleButton header)

@@ -7,9 +7,9 @@ The box generator draws every panel of a box with finger joints that slot togeth
 inside measurements and your material's thickness. Cut the panels, push them together and glue.
 
 ## Open the generators
-<!-- target: ribbon:Home/Generators -->
+<!-- target: ribbon:Import/Generators -->
 <!-- wait: window:Generators -->
-Click **Generators** on the **Home** tab.
+Click **Generators** on the **Import** tab.
 
 ## Choose Box
 <!-- target: tabitem:Box -->

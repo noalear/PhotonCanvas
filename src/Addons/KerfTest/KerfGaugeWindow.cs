@@ -40,7 +40,7 @@ public sealed class KerfGaugeWindow : Window
     // Reading it
     readonly GaugeView _view = new() { Height = 330, Margin = new(0, 4, 0, 0) };
     readonly TextBlock _prompt = new() { TextWrapping = TextWrapping.Wrap };
-    readonly Button _closeUp = Button("Close-up photo", "IcZoomIn", "A close-up photo of the gauge, laid on the bed: the sharpest reading. Needs the close-up camera's position at this focus height (Camera → Close-up position). Nothing moves.");
+    readonly Button _closeUp = Button("Close-up photo", "IcZoomIn", "A close-up photo of the gauge, laid on the bed: the sharpest reading. Needs the close-up camera's position at this focus height (Machine → Close-up position). Nothing moves.");
     readonly Button _overview = Button("Camera photo", "IcCamera", "A fresh overview camera photo. Coarser than a close-up: check the markers.");
     readonly Button _file = Button("Open a photo…", "IcOpen", "Any photo of the gauge taken square on (a phone held over it works): then click the top slot's mouth and its closed end.");
     readonly NumericUpDown _kerfRead = Number(-0.05m, 0.5m, 0.005m, "0.000"), _fitRead = Number(-1, 0.4m, 0.01m, "+0.00;−0.00;0.00");
@@ -98,7 +98,7 @@ public sealed class KerfGaugeWindow : Window
                 _plan,
                 Hint("Cut on the honeycomb, in the material the parts will be made from, and stay with it. The scales are marked lightly first."),
                 _add,
-                Hint("Adding the gauge closes this window so you can frame it and send it. When the job finishes, this window opens again on Read it (or open Laser → Kerf gauge)."),
+                Hint("Adding the gauge closes this window so you can frame it and send it. When the job finishes, this window opens again on Read it (or open Machine → Kerf gauge)."),
             },
         };
 

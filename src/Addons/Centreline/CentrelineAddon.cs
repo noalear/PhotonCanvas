@@ -4,7 +4,7 @@ using PhotonCanvas.Doc.Tracing;
 
 namespace PhotonCanvas.Addon.CentrelineTrace;
 
-/// <summary>Picture → Edit → Centre-line trace: one line down the middle of each dark stroke, on a Score layer.</summary>
+/// <summary>Picture → Trace → Centre-line trace: one line down the middle of each dark stroke, on a Score layer.</summary>
 public sealed class CentrelineAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -12,10 +12,11 @@ public sealed class CentrelineAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Edit", "Centre-line trace", "IcPen", () => { if (host.SelectedPicture is { } im) _ = host.Guard(() => Trace(im)); })
+        host.AddRibbonButton(new RibbonButton("Picture", "Trace", "Centre-line trace", "IcPen", () => { if (host.SelectedPicture is { } im) _ = host.Guard(() => Trace(im)); })
         {
             Tip = TipText,
             Enabled = () => host.SelectedPicture is not null,
+            Order = 10,
         });
     }
 

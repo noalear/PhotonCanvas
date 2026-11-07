@@ -8,11 +8,11 @@ send later, or its G-code as text, to read exactly what the laser will do. Have 
 design.
 
 ## Export the job package
-<!-- target: ribbon:Laser/Export .xf -->
+<!-- target: ribbon:Machine/Export .xf -->
 Click **Export .xf** and choose where to save it. It's exactly the file **Ship It** uploads.
 
 ## Export the G-code
-<!-- target: ribbon:Laser/Export G-code -->
+<!-- target: ribbon:Machine/Export G-code -->
 Click **Export G-code** for the motion G-code as plain text, to read or check.
 
 ## From the job bar

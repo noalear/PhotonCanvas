@@ -82,7 +82,7 @@ public sealed class StockCarveWindow : Window
         _with.ItemsSource = _etches.Select(x => $"{x.M.Label} · {x.R.Title} ({x.R.EtchMmPerPass:0.###} mm a pass)").Prepend("Default engrave settings").ToList();
         _with.SelectedIndex = _etches.Count > 0 ? 1 : 0;
 
-        var openStock = UiKit.Button("Last scan", tip: "The part as Laser → Scan the part last measured it, in the rotary now.");
+        var openStock = UiKit.Button("Last scan", tip: "The part as Machine → Scan the part last measured it, in the rotary now.");
         var stockFile = UiKit.Button("Stock model…", tip: "A 3D model of the stock in the rotary's frame (the STL Scan the part saves): X along the axis, the axis at Y = Z = 0, +Z up at the start.");
         var openModel = UiKit.Button("Open a 3D model…", tip: "The shape to carve out of the stock (STL, OBJ or STEP).");
         openStock.Click += (_, _) => UseLastScan();
@@ -120,7 +120,7 @@ public sealed class StockCarveWindow : Window
                     Row(_fit, _keepSize),
                     Field("Room to spare (mm)", _spare, tip: "Best fit tries to keep at least this much stock over the model everywhere.")),
                 Explained("Carve", "The engraving that takes the stock down to the model.",
-                    Field("Engrave with", _with, tip: "Settings from the material library with a measured depth a pass (Laser → Etch rate test). Every focus height uses them."),
+                    Field("Engrave with", _with, tip: "Settings from the material library with a measured depth a pass (Materials & Tests → Tests → Etch rate test). Every focus height uses them."),
                     Field("Depth a pass (mm)", _pass, tip: "How deep one pass goes on a flat piece with these settings. Nearer the axis the lines are closer together, so the passes go deeper there: that's allowed for."),
                     Field("Focus band (mm)", _band, tip: "How far the surface may be from the focus. The part isn't round, so its surface is split into bands by how far out it is, each with its own focus height."),
                     Field("Deepest (mm)", _deepest, tip: "Never engraves deeper than this anywhere; spots that need more are left."),
@@ -314,7 +314,7 @@ public sealed class StockCarveWindow : Window
 
     string Summary()
     {
-        if (_stock is null) return "No stock yet: click Last scan (after Laser → Scan the part), or open a model of the stock.";
+        if (_stock is null) return "No stock yet: click Last scan (after Machine → Scan the part), or open a model of the stock.";
         if (_model is null || _report is null) return "Open the model to carve out of the stock.";
         var r = _report;
         string s;

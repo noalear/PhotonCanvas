@@ -13,7 +13,7 @@ Put the board in the machine and click **Photo** in the machine panel at the rig
 camera calibrated). The photo lies under your design.
 
 ## Outline the board
-<!-- target: ribbon:Home/Pick piece -->
+<!-- target: ribbon:Placement/Pick piece -->
 <!-- wait: shapes:+1 -->
 Choose **Pick piece** and click inside the board on the photo. Without a camera, draw the board with
 **Rectangle** at its real size and place instead.
@@ -24,9 +24,9 @@ Right-click the outline and choose **Use as material outline**. It moves to the 
 layer, which is never sent.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->
