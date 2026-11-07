@@ -45,7 +45,7 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 |---|---|---|---|
 | **Attachment** | the ones you have: RA2 Pro · rollers, RA2 Pro · chuck, RA3 · rollers, RA3 · chuck, Your own rotary | the first | Which attachment and how it holds the object. |
 | **Object Ø (mm)** | 2 to 200 | 60 | The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale. |
-| **Laser line (mm from back)** | 1 to 219 | 110 | Where the laser draws across the object, measured from the back edge of the 220 mm field (110 is the middle). Put it over the top of the object, along the rotary's axis. **Frame** a job to see the line, and change the number until the line sits there. |
+| **Laser line (mm)** | 1 to 219 | 110 | Where the laser draws across the object, measured from the back edge of the 220 mm field (110 is the middle). Put it over the top of the object, along the rotary's axis. **Frame** a job to see the line, and change the number until the line sits there. |
 
 - The work area becomes the field's width (220 mm) × once round the object. The window shows
   "Once round": π × the diameter. Only the first 375 mm can be used (xTool Studio's limit).

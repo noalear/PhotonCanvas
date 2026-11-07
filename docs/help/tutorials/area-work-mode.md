@@ -32,6 +32,7 @@ Click **Work mode** on the **Laser** tab.
 Click **Rotary** or **Conveyor** at the top.
 - Rotary: pick the **Attachment** and type the **Object Ø (mm)** where it's marked. For
   **Your own rotary**, also say how it **Holds the object** and its scale (correct it from a test turn).
+  If the laser doesn't land over your rotary, change **Laser line (mm)**.
 - Conveyor: **Belt calibration %** and **Angle**, or **Read from the machine**.
 
 ## Use it
@@ -41,5 +42,5 @@ Click **OK**. The work area changes size: once round the object, or 610 mm of be
 
 ## Try it on scrap
 <!-- target: ribbon:Laser/Ship It -->
-Fit the attachment as xTool describes. **Frame** only traces a thin line across the middle; ship a
-small test mark first. **Work mode** → **Flat bed** goes back to the bed.
+Fit the attachment as xTool describes. **Frame** only traces a thin line where the laser will draw
+(the **Laser line**); ship a small test mark first. **Work mode** → **Flat bed** goes back to the bed.
