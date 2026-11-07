@@ -95,8 +95,8 @@ def test_verdict(seen, expected):
     assert verdict(seen) == expected
 
 
-def test_the_measuring_instructions_make_five_whole_turns_within_the_limit():
-    assert CHECK_AMOUNT * CHECK_PRESSES == 5 * UNITS_PER_TURN and MIN_MM <= CHECK_AMOUNT <= MAX_MM
+def test_the_measuring_instructions_make_four_whole_turns_within_the_limit():
+    assert CHECK_AMOUNT * CHECK_PRESSES == pytest.approx(4 * UNITS_PER_TURN) and MIN_MM <= CHECK_AMOUNT <= MAX_MM
 
 
 def _window(tmp_path):
@@ -121,11 +121,27 @@ def test_turn_is_only_offered_while_the_motor_is_held_and_counts_from_hold(tmp_p
         assert str(turn["state"]) == "normal"
         _accepted(window, "turn")
         _accepted(window, "turn")
-        assert window.total == 16 and "16 units, about 136°" in window.count["text"]
+        assert window.total == 16 and "16 units, about 134°" in window.count["text"]
         _accepted(window, "free")
         assert str(turn["state"]) == "disabled"
         _accepted(window, "hold")
         assert window.total == 0
+    finally:
+        root.destroy()
+
+
+def test_hold_must_be_pressed_again_after_the_machine_sleeps_or_the_link_drops(tmp_path):
+    root, window = _window(tmp_path)
+    try:
+        turn = window.rows["turn"]["button"]
+        _accepted(window, "hold")
+        window._handle(("mode", "192.0.2.1", "P_SLEEP"))
+        window._handle(("mode", "192.0.2.1", "P_IDLE"))
+        assert str(turn["state"]) == "disabled"
+        _accepted(window, "hold")
+        window._handle(("status", "Lost the machine. Trying again...", False))
+        window._handle(("mode", "192.0.2.1", "P_IDLE"))
+        assert str(turn["state"]) == "disabled"
     finally:
         root.destroy()
 

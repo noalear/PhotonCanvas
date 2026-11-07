@@ -34,10 +34,10 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# Measured by eye against a tape mark: 5 presses of 8.5 stop just short of one full turn. Five turns
-# (25 presses) make any error five times easier to see, which is what the window asks for next.
-UNITS_PER_TURN = 42.5
-CHECK_AMOUNT, CHECK_PRESSES = 8.5, 25
+# Measured on a 32.5 mm rod: 170 units stopped about 4.2 mm short of four full turns (102.1 mm round).
+# 20 presses of 8.588 is four turns at this figure, so the window asks for that to confirm it.
+UNITS_PER_TURN = 42.94
+CHECK_AMOUNT, CHECK_PRESSES = 8.588, 20
 
 
 @dataclass(frozen=True)
@@ -285,7 +285,7 @@ class Window:
         measure.grid(sticky="ew", pady=(0, 8))
         ttk.Label(measure, wraplength=840, text=(
             f"To pin it down: put a tape mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT:g} and press "
-            f"Turn {CHECK_PRESSES} times, about a second apart. That's five full turns, so any error shows five "
+            f"Turn {CHECK_PRESSES} times, about a second apart. That's four full turns, so any error shows four "
             f"times over: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
         self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
@@ -401,6 +401,7 @@ class Window:
         kind = event[0]
         if kind == "status":
             self.mode = None
+            self.held = False
             self.log.write(f"status: {event[1]}")
             self.status.config(text=event[1], fg=self.WARN)
             self.refresh()
@@ -409,6 +410,8 @@ class Window:
             if mode != self.mode:
                 self.log.write(f"machine {ip} is {mode}")
             self.mode = mode
+            if mode != IDLE:
+                self.held = False  # it may have let go (sleep, say): a turn would be accepted and ignored
             text = f"Connected to {ip}. Machine is {describe_mode(mode)}."
             if mode != IDLE:
                 text += " The test can't start until it is ready."
