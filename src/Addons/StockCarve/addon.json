@@ -1,0 +1,10 @@
+{
+  "id": "stock-carve",
+  "name": "Carve stock to a model",
+  "version": "1.0.0",
+  "description": "Line a 3D model up inside a scanned part in the rotary (move, turn, size, best fit), see where it sticks out, and engrave the part down to the model's shape.",
+  "category": "Laser",
+  "apiVersion": 1,
+  "requires": ["rotary-finish"],
+  "onByDefault": true
+}

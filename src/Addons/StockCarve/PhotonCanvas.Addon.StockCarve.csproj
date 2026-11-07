@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>stock-carve</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The rotary finish (addon.json "requires" it): its carving engine and rotary page are shared. Compile against it, never copy it. -->
+    <ProjectReference Include="..\RotaryFinish\PhotonCanvas.Addon.RotaryFinish.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>

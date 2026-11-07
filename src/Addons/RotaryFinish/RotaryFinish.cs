@@ -37,6 +37,18 @@ public sealed record RotaryPrep(Vec2 Axis, IReadOnlyList<Tri> Mesh, double SlabM
 /// <param name="Passes">What each pass in the band engraves (design mm), in order.</param>
 public sealed record RotaryBand(int Index, double RadiusMm, double FocusOffsetMm, IReadOnlyList<PathGeometry> Passes);
 
+/// <summary>
+/// A map of a turning surface for <see cref="RotaryFinish.Carve"/>: <see cref="NT"/> rows round the axis by
+/// <see cref="NZ"/> columns along it, indexed [row × NZ + column]. Row j is design Y (j + ½) of the way round
+/// in NT (the middle row, NT/2, faces the laser at the start); column k runs along design X.
+/// </summary>
+/// <param name="Stock">How far out the material is there now (mm from the axis; 0 = none).</param>
+/// <param name="Floor">How far out it should end (never taken below this).</param>
+public sealed record RotaryGrid(int NT, int NZ, float[] Stock, float[] Floor);
+
+/// <summary>How the passes are made: the depth a flat pass goes, how deep a focus band is, and the most taken off anywhere (mm).</summary>
+public sealed record RotaryCarve(double PassDepthMm, double FocusBandMm, double MaxDepthMm);
+
 /// <summary>The engraving that takes a glued stack down to the model's shape, turning on its dowel.</summary>
 public sealed record RotaryPlan
 {
@@ -54,6 +66,8 @@ public sealed record RotaryPlan
     /// <summary>Focus here before starting: on this slice (1 = bottom), on the start line, this far from the dowel's centre.</summary>
     public int FocusSlice { get; init; }
     public double FocusRadiusMm { get; init; }
+    /// <summary>Where along the design (X, mm) to focus, when it's set by place rather than by slice (carving scanned stock).</summary>
+    public double FocusX { get; init; }
     /// <summary>The focus heights, outermost first (empty: nothing to take off).</summary>
     public IReadOnlyList<RotaryBand> Bands { get; init; } = [];
     /// <summary>The most taken off anywhere (mm), and the most passes anywhere.</summary>
@@ -162,7 +176,6 @@ public static class RotaryFinish
             Crossings(sliceLoops[i], a, dirs, aBase, sgn, dT, outer[i], inner[i]);
         }
         double keep = o.DowelMm / 2 + o.WallMm;
-        double band = o.FocusBandMm, step = o.PassDepthMm;
         // The focus: set on the stack's highest point at the start line.
         int j0 = nT / 2, focusSlice = 0;
         double focusR = 0;
@@ -171,10 +184,9 @@ public static class RotaryFinish
                 if (outer[i][j] > focusR) { focusR = outer[i][j]; focusSlice = i; }
         if (focusR <= 0) focusR = rMax;
 
-        var masks = new Dictionary<(int Band, int Pass), bool[]>();
+        var stock = new float[nZ * nT];
+        var floor = new float[nZ * nT];
         var model = new float[nT];
-        double deepest = 0, engraved = 0, tooDeep = 0;
-        int most = 0;
         for (int k = 0; k < nZ; k++)
         {
             ct.ThrowIfCancellationRequested();
@@ -186,17 +198,50 @@ public static class RotaryFinish
             int col = o.BottomOnRight ? nZ - 1 - k : k;
             for (int j = 0; j < nT; j++)
             {
-                double r0 = outer[i][j];
-                if (r0 <= 0) continue;
+                stock[j * nZ + col] = outer[i][j];
                 // Down to the model, never through the material there into a hole or the hollow.
-                double target = Math.Max(model[j], Math.Max(inner[i][j] + o.WallMm, keep));
+                floor[j * nZ + col] = (float)Math.Max(model[j], Math.Max(inner[i][j] + o.WallMm, keep));
+            }
+        }
+
+        double startX = (fieldW - length) / 2;
+        var carved = Carve(new RotaryGrid(nT, nZ, stock, floor), new RotaryCarve(o.PassDepthMm, o.FocusBandMm, o.MaxDepthMm), rMax, focusR, dia, length, startX, ct);
+        return carved with { Axis = a, BottomOnRight = o.BottomOnRight, FocusSlice = focusSlice + 1 };
+    }
+
+    /// <summary>
+    /// The passes that take a turning surface down from <see cref="RotaryGrid.Stock"/> to <see cref="RotaryGrid.Floor"/>
+    /// (both radii from the axis, mm, on the same map), sorted into focus bands by how far out each pass is.
+    /// <paramref name="rMax"/>: the furthest out anything swings (the first band starts there); <paramref name="focusR"/>:
+    /// how far out the surface is where the focus is set; <paramref name="dia"/>: the object Ø the design goes once round at;
+    /// <paramref name="length"/> and <paramref name="startX"/>: how long the map is along the axis and where its first column starts on the design.
+    /// </summary>
+    public static RotaryPlan Carve(RotaryGrid g, RotaryCarve c, double rMax, double focusR, double dia, double length, double startX, CancellationToken ct = default)
+    {
+        if (!(c.PassDepthMm > 0)) throw new ArgumentException("The depth a pass must be more than zero.");
+        if (!(c.FocusBandMm > 0)) throw new ArgumentException("The focus band must be more than zero.");
+        int nT = g.NT, nZ = g.NZ;
+        double rRef = dia / 2, circ = Math.PI * dia;
+        double dT = 2 * Math.PI / nT, dz = length / nZ;
+        double band = c.FocusBandMm, step = c.PassDepthMm;
+        var masks = new Dictionary<(int Band, int Pass), bool[]>();
+        double deepest = 0, engraved = 0, tooDeep = 0;
+        int most = 0;
+        for (int j = 0; j < nT; j++)
+        {
+            ct.ThrowIfCancellationRequested();
+            for (int col = 0; col < nZ; col++)
+            {
+                double r0 = g.Stock[j * nZ + col];
+                if (!(r0 > 0)) continue;
+                double target = g.Floor[j * nZ + col];
                 double excess = r0 - target;
                 if (excess < step / 2) continue;
-                double depth = Math.Min(excess, o.MaxDepthMm);
+                double depth = Math.Min(excess, c.MaxDepthMm);
                 double area = dz * r0 * dT;
-                if (excess > o.MaxDepthMm + step / 2) tooDeep += area;
+                if (excess > c.MaxDepthMm + step / 2) tooDeep += area;
                 // A pass at radius r goes deeper than on the flat by rRef / r: the lines are drawn
-                // rRef apart a radian, so they're closer together on the surface nearer the dowel.
+                // rRef apart a radian, so they're closer together on the surface nearer the axis.
                 double r = r0;
                 int pass = 0;
                 while (r0 - r + Step(r) / 2 < depth && pass < 10000)
@@ -216,16 +261,15 @@ public static class RotaryFinish
         double Step(double r) => step * rRef / Math.Max(1, r);
 
         // Each band a layer: its passes in order, traced into shapes on the unrolled surface.
-        double startX = (fieldW - length) / 2;
         var toDesign = Affine.Scale(dz, circ / nT).Then(Affine.Translate(startX, 0));
         var within = PathGeometry.Rect(startX - 1, 1e-3, length + 2, circ - 2e-3);
         var trace = new TraceOptions { Smoothness = 1, CornerAngle = 60, MinAreaPx = 3 };
         var bands = new List<RotaryBand>();
-        foreach (var g in masks.GroupBy(kv => kv.Key.Band).OrderBy(g => g.Key))
+        foreach (var grp in masks.GroupBy(kv => kv.Key.Band).OrderBy(grp => grp.Key))
         {
             ct.ThrowIfCancellationRequested();
             var passes = new List<PathGeometry>();
-            foreach (var kv in g.OrderBy(kv => kv.Key.Pass))
+            foreach (var kv in grp.OrderBy(kv => kv.Key.Pass))
             {
                 var shape = Tracer.TraceMask(kv.Value, nZ, nT, trace);
                 // (Kept to once round: the fitted curves can bulge a hair past the seam.)
@@ -233,13 +277,13 @@ public static class RotaryFinish
                 if (!shape.IsEmpty) passes.Add(shape);
             }
             if (passes.Count == 0) continue;
-            double mid = rMax - (g.Key + 0.5) * band;
+            double mid = rMax - (grp.Key + 0.5) * band;
             bands.Add(new RotaryBand(bands.Count, mid, Math.Round(focusR - mid, 3), passes));
         }
         return new RotaryPlan
         {
-            Axis = a, DiameterMm = dia, WidestMm = 2 * rMax, LengthMm = length, StartX = startX, BottomOnRight = o.BottomOnRight,
-            FocusSlice = focusSlice + 1, FocusRadiusMm = focusR, Bands = bands,
+            DiameterMm = dia, WidestMm = 2 * rMax, LengthMm = length, StartX = startX,
+            FocusRadiusMm = focusR, Bands = bands,
             DeepestMm = deepest, MostPasses = most, EngravedMm2 = engraved, TooDeepMm2 = tooDeep,
         };
     }
