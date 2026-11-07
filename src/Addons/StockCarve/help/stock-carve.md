@@ -33,6 +33,71 @@ to the model's shape as it turns, moving the focus as the surface comes nearer t
    if it's different). Turn the part back to where the scan started, focus on its top at the X the
    summary names, then frame and send it.
 
+## Profile cuts: take the bulk off first
+
+Engraving a big part down to a model a tenth of a millimetre a pass takes a long time when most of the
+stock has to go. **Profile cuts first…** cuts the waste off in chunks first, the way a bandsaw cuts a
+model's front and side profiles out of a block. The part is held still in the rotary, turned to a view,
+and the laser cuts straight down through it round the model's outline as seen from above. Everything
+outside the outline drops away. Then the part turns to the next view: the model's top and its side (0°
+and 90°), then the 45s, then the 22.5s. What's left is the model's shape seen every way round, a little
+oversize, and **Carve what's left** hands it back to Carve to model to engrave the rest.
+
+<!-- windows: ProfileCutWindow -->
+
+> **Warning:** Not yet tried on the machine. Before the first cut, check three things with a scrap part:
+> **Turn by (°)** +10 in Work mode moves the top of the part toward the back of the machine (if it goes
+> toward the front, tick **It turns the other way** for your own rotary, or the cuts come out mirrored); the motor still holds the part during a
+> flat job (mark the chuck and the part with a pencil line and look after the first cut); and the waste
+> has room to drop without jamming the chuck. Stay by the machine.
+
+1. Place the model in **Carve to model** (or **Best fit** it), then click **Profile cuts first…**. The part
+   should be turned to where the scan started (the window starts at 0°; change **Turned (°)** if it isn't).
+2. Choose the cut settings under **Cut** and how deep a pass of them cuts.
+3. Click **Turn …° to it**. The part turns to the view (the laser stays off). Focus on the top of the part at
+   the X the window names, on the laser line.
+4. Click **Send the cut**. It goes to the machine as a flat job (Work mode stays on the rotary): the head
+   comes down a focus step at a time as the cut goes deeper. Press the machine's start button.
+5. Cutting from both sides, the first side goes just past the middle. When its job finishes the window moves
+   on to the other side (**This side's done** does that by hand): turn the part half a turn and cut it.
+6. When the cut that finishes a view is done, the camera photographs the part (nothing moves, the laser's
+   off) and compares it with the photo from just before the cut: where the waste was, the part has dropped
+   away if the cut went through. It says **Looks through**, **Partly through** or **Not through yet**.
+   Click **More passes** to cut the deepest two focus heights again, or **It's through: next** for the next
+   view.
+7. After the views (or whenever you like), click **Carve what's left**: Carve to model's stock becomes what's
+   left, so its engraving only takes off what the cuts couldn't.
+
+The window remembers where it had got to for the same model in the same place, so you can close it
+between cuts.
+
+| Setting | Range (default) | What it does |
+|---|---|---|
+| **Views** | Top and side / and the 45s / and the 22.5s (all) | How many views round half a turn are cut: 2, 4 or 8. |
+| **Cut each view from both sides** | on | Each view is cut from above and, half a turn on, from below, each cut going just past the middle: half as deep as cutting right through. |
+| **First view (°)** | −360 to 360 (the model's top) | Which way round the first view looks, from where the scan started. **The model's top** sets it to look down on the model's top as it's placed. |
+| **Chuck holds** | Left end / Right end (left) | Which end of the stock is in the chuck. A bar is kept from that end to the model so it stays held; the stock past the model's other end is cut off. |
+| **Bar across (mm)** | 1 to 60 (8) | How wide and deep the bar kept from the chuck to the model is. |
+| **Keep a bar to the other end too** | off | For a part held at both ends (a tailstock or support). |
+| **Cut with** | your library's cut settings (Default cut settings) | The settings every focus height cuts with. |
+| **Depth a pass (mm)** | 0.01 to 5 (0.25) | About how deep one pass of them cuts. Each focus height gets enough passes to cut its depth. |
+| **Focus step (mm)** | 0.2 to 10 (2) | How far the focus comes down between focus heights. |
+| **Cut width (mm)** | 0.1 to 6 (1.2) | Lines side by side round the outline, out into the waste (never into the model), so a deep cut is wide enough for the beam to reach the bottom. |
+| **Line gap (mm)** | 0.02 to 1 (0.15) | How far apart those lines are. |
+| **Leave on (mm)** | 0 to 5 (0.5) | Left outside the model's outline, for the carving to take off. |
+| **Past the middle (mm)** | 0 to 5 (1) | Cutting from both sides: how far past the middle each side's cut goes, so the two meet. |
+| **Turned (°)** | (0) | Which way the part is turned now, from where the scan started. The window keeps it up to date as it turns the part; change it if you turned it by hand. |
+
+A deep cut brings the head down a long way (as far as the cut goes below where you focused). The job
+check refuses a cut that would bring the head within 3 mm of the part's top, from the focus distance the
+machine measured; cutting from both sides halves how far it comes down.
+
+The picture shows the cut from above, the machine's back at the top: grey is where the part is now, green
+is what's kept (the model's outline, a little oversize, and the bar to the chuck), and the lines are the
+cut, a colour a focus height. Each view's cut only goes where there's still material, and only as deep as
+there is material, so later views are quicker. The camera check needs the camera calibrated near the
+height of the part's top (Camera tab → Calibrate); without it, look at the part yourself.
+
 ## Placing the model
 
 | Setting | Range (default) | What it does |

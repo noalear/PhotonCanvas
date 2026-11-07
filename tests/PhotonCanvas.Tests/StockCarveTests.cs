@@ -10,7 +10,7 @@ namespace PhotonCanvas.Tests;
 public class StockCarveTests
 {
     /// <summary>A convex solid from its corners and faces (each face turned to face out).</summary>
-    static List<Tri> Convex(V3[] c, params int[][] faces)
+    internal static List<Tri> Convex(V3[] c, params int[][] faces)
     {
         var mid = new V3(c.Average(p => p.X), c.Average(p => p.Y), c.Average(p => p.Z));
         var o = new List<Tri>();
@@ -27,7 +27,7 @@ public class StockCarveTests
     }
 
     /// <summary>A prism along X from x0 to x1, its cross-section a convex outline in (Y, Z).</summary>
-    static List<Tri> Prism(IReadOnlyList<(double Y, double Z)> outline, double x0, double x1)
+    internal static List<Tri> Prism(IReadOnlyList<(double Y, double Z)> outline, double x0, double x1)
     {
         int n = outline.Count;
         var c = new V3[2 * n];
@@ -41,12 +41,12 @@ public class StockCarveTests
         return Convex(c, [.. faces]);
     }
 
-    static List<(double, double)> Circle(double r, double cy = 0, double cz = 0, int sides = 96) =>
+    internal static List<(double, double)> Circle(double r, double cy = 0, double cz = 0, int sides = 96) =>
         [.. Enumerable.Range(0, sides).Select(i => { double t = 2 * Math.PI * i / sides; return (cy + r * Math.Cos(t), cz + r * Math.Sin(t)); })];
 
-    static List<Tri> Rod(double r, double x0, double x1, double cy = 0, double cz = 0) => Prism(Circle(r, cy, cz), x0, x1);
+    internal static List<Tri> Rod(double r, double x0, double x1, double cy = 0, double cz = 0) => Prism(Circle(r, cy, cz), x0, x1);
 
-    static List<Tri> Box(double y0, double z0, double y1, double z1, double x0, double x1) => Prism([(y0, z0), (y1, z0), (y1, z1), (y0, z1)], x0, x1);
+    internal static List<Tri> Box(double y0, double z0, double y1, double z1, double x0, double x1) => Prism([(y0, z0), (y1, z0), (y1, z1), (y0, z1)], x0, x1);
 
     [Fact]
     public void A_stock_model_is_read_by_angle_and_place()
