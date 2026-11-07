@@ -50,14 +50,17 @@ build_addons() { # the published program's folder (ending in /)
   rm -rf "$tmp"
 }
 
+# --force: restore every time. The add-ons' build (below) restores the program again without a
+# platform, so in a folder that has built before, its restore record can lack win-x64 and the next
+# publish stops with NETSDK1047 (seen on Windows) unless restore runs afresh.
 for rid in "${TARGETS[@]}"; do
   out="dist/$rid"
   rm -rf "$out"
   echo "== $rid"
-  dotnet publish src/PhotonCanvas.App -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
+  dotnet publish src/PhotonCanvas.App -c Release -r "$rid" --force --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin" -nologo -v q
   # The remote server for the phone, in its own folder beside the program (Laser → Remote access starts it).
-  dotnet publish src/PhotonCanvas.Server -c Release -r "$rid" --self-contained true -p:Version="$VERSION" \
+  dotnet publish src/PhotonCanvas.Server -c Release -r "$rid" --force --self-contained true -p:Version="$VERSION" \
     -p:PublishSingleFile=false -p:DebugType=none -o "$out/bin/server" -nologo -v q
   # The add-ons that come with the program, each in addons/<id> beside it (docs/addons.md). All in one
   # build (a throwaway solution listing them), so the program they compile against is checked once and
