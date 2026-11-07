@@ -34,7 +34,7 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# Measured by eye against a tape mark: 5 presses of 8.5 land almost exactly on one full turn. Five turns
+# Measured by eye against a tape mark: 5 presses of 8.5 stop just short of one full turn. Five turns
 # (25 presses) make any error five times easier to see, which is what the window asks for next.
 UNITS_PER_TURN = 42.5
 CHECK_AMOUNT, CHECK_PRESSES = 8.5, 25
