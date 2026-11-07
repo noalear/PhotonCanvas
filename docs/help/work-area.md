@@ -131,6 +131,8 @@ it.
 
 <!-- windows: RotaryScanWindow -->
 
+![Scan the part: the stock model of a glued stack, and one place along it end-on](images/window-rotary-scan.png)
+
 **Scan the part** (Laser tab, Work area group, in the rotary work mode) measures a part held in the
 rotary before you mark or carve it: a glued stack of slices, a branch, a turned blank that isn't quite
 round. The part is turned a step at a time, and at each step the height of its top is measured along
@@ -160,6 +162,9 @@ How it measures:
 | **Angles** | 2 to 360 | 24 | How many angles to measure at. 24 over a whole turn is every 15°. |
 | **From (°)** / **To (°)** | −3600 to 3600 | 0 / 360 | The span of the turn, from where the part is now. Positive is the way a design runs down the page. 0 to 360 is a whole turn (360 itself isn't measured again). |
 | **Wait after a turn (s)** | 0 to 10 | 0.5 | Extra wait after each turn, for the part to stop moving. The machine doesn't say when a turn is done, so the wait is worked out from its length, plus this. |
+| **Stock** | As scanned, Round rod, Square bar, Rectangular bar, Hexagon bar | As scanned | What the model is. **As scanned** uses what was measured. A standard stock (a 2" square bar, a round rod) is taken to be exactly that shape: the scan only works out how it sits in the chuck, and the model is the exact shape (see below). |
+| **Size** / **Units** | 0.01 to 1000, mm or inches | 2 inches | The standard stock's size: a rod's diameter, a bar's width, a hexagon across the flats. |
+| **Height** | 0.01 to 1000 | 2 inches | A rectangular bar's other side. |
 | **I know the axis height** / **Axis height (mm)** | −200 to 200 | off | How high the rotary's axis is above the bed, the way you'd type a focus height. A part's top height minus this is how far it reaches from the axis. The 3D model needs it. |
 | **Rod Ø (mm)** | 1 to 200 | 20 | For **It was a round rod**: the diameter of a round rod you scanned. |
 
@@ -173,10 +178,27 @@ How it measures:
   until the rotary is moved.
 - **Turn the high side up** turns the part (the shorter way) so the highest point read is on top,
   under the laser line.
+- The stock model as it stands (the fitted standard stock, or the scan) is kept for other tools to work
+  from, with the axis height it was made with.
 - **Save as CSV…** saves the readings as a spreadsheet, one row an angle and one column a place
   (distances from the axis, gaps filled, when the axis height is known; top heights otherwise).
   **Save as STL…** saves the stock model as a 3D file (needs a whole turn, two or more places and
   the axis height): X along the axis, the axis at 0, what faced the laser at the start on top (+Z).
+
+#### Standard stock
+
+When the part is a standard stock, choose it under **Stock** and type its size (for a 2" × 2" square
+bar: **Square bar**, **Size** 2, **Units** inches). The readings are then only used to find how the
+stock sits: how far it's turned in the chuck, how far its middle is off the axis, and (if **I know the
+axis height** is off) the axis height too, which is then filled in. The model is the exact shape in
+that place, so a few readings are enough: the auto-focus at every 15° does. The readings show as dots
+on the end-on view, over the fitted outline, and the words say how closely they fit; a loose fit
+(over ±0.5 mm) means the size is wrong or the stock isn't that shape. **Turn the high side up** becomes
+**Turn a flat face up**, which turns the bar (the shorter way) until the face nearest the top lies
+level on top. The same shape is used all along the part, so a bar held crooked in the chuck fits
+loosely.
+
+![Scan the part with a standard stock: a 2" square bar fitted to the scan](images/window-rotary-scan-square.png)
 
 What it shows:
 

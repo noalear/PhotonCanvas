@@ -29,8 +29,17 @@ public sealed record RotaryScan
     /// <summary>The laser line it was measured along (mm from the back of the field).</summary>
     public double LineY { get; init; }
 
-    /// <summary>How it was measured ("pointer" or "autofocus").</summary>
+    /// <summary>How it was measured ("pointer" or "autofocus"), or "standard" for an ideal standard stock fitted to a scan.</summary>
     public string Method { get; init; } = "";
+
+    /// <summary>For a standard stock (<see cref="Method"/> "standard"): what it is ("2" × 2" square bar"). Null for a measured scan.</summary>
+    public string? Stock { get; init; }
+
+    /// <summary>
+    /// The rotary's axis height (mm above the bed) this was saved with as a stock model, or null (a plain scan, or not
+    /// known). The axis isn't part of a measurement: it's a setting of the rotary.
+    /// </summary>
+    public double? AxisHeightMm { get; init; }
 
     public DateTimeOffset When { get; init; }
 

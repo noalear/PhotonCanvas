@@ -20,6 +20,11 @@ public sealed class RotaryScanWindow : Window
     readonly AppSettings _settings;
     readonly MachinePanel _machine;
     RotaryScan? _scan;
+    // What's shown and saved as the stock: the scan itself, or the standard stock fitted to it.
+    RotaryScan? _model;
+    StockFit? _fit;
+    bool _updating;
+    string _savedStockKey = "";
     CancellationTokenSource? _cts;
     // How far from where the last scan started the part was left by a scan that was stopped (kept while the program runs).
     static double _leftDeg;
@@ -28,6 +33,11 @@ public sealed class RotaryScanWindow : Window
     readonly NumericUpDown _x0 = Number(0, 220, 1, "0.#"), _x1 = Number(0, 220, 1, "0.#"), _points = Number(1, 60, 1, "0");
     readonly NumericUpDown _stops = Number(2, 360, 1, "0"), _from = Number(-3600, 3600, 15, "0.#"), _to = Number(-3600, 3600, 15, "0.#");
     readonly NumericUpDown _settle = Number(0, 10, 0.25m, "0.##");
+    readonly ComboBox _stockKind = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "As scanned", "Round rod", "Square bar", "Rectangular bar", "Hexagon bar" } };
+    readonly ComboBox _units = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "mm", "inches" } };
+    readonly NumericUpDown _stockW = Number(0.01m, 1000, 0.5m, "0.###"), _stockH = Number(0.01m, 1000, 0.5m, "0.###");
+    readonly Control _stockSize, _stockHField;
+    bool Inches => _units.SelectedIndex == 1;
     readonly CheckBox _axisKnown = new() { Content = "I know the axis height" };
     readonly NumericUpDown _axis = Number(-200, 200, 0.5m, "0.##"), _rod = Number(1, 200, 0.5m, "0.##");
     readonly TextBlock _methodNote = Hint(), _status = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap }, _results = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
@@ -41,6 +51,17 @@ public sealed class RotaryScanWindow : Window
     readonly Slider _slice = new() { Minimum = 0, Maximum = 0, SmallChange = 1, LargeChange = 1, IsSnapToTickEnabled = true, TickFrequency = 1 };
 
     static string ScanFile => Path.Combine(AppIdentity.DataDir, "rotary-scan.json");
+    static string StockFile => Path.Combine(AppIdentity.DataDir, "rotary-stock.json");
+
+    /// <summary>
+    /// The stock model to work from: the last scan, or the standard stock fitted to it when a standard stock was chosen,
+    /// with <see cref="RotaryScan.AxisHeightMm"/> the axis height it was made with (null if unknown). Null if none.
+    /// </summary>
+    public static RotaryScan? LoadStock()
+    {
+        try { return File.Exists(StockFile) ? RotaryScan.FromJson(File.ReadAllText(StockFile)) : null; }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return null; }
+    }
 
     /// <summary>The last scan saved (null if none, or it can't be read).</summary>
     public static RotaryScan? LoadLast()
@@ -83,6 +104,15 @@ public sealed class RotaryScanWindow : Window
         _axisKnown.IsChecked = settings.RotaryAxisHeightMm is not null;
         _axis.Value = (decimal)Math.Clamp(settings.RotaryAxisHeightMm ?? 20, -200, 200);
         _rod.Value = 20;
+        _stockKind.SelectedIndex = (int)settings.RotaryStockKind;
+        _units.SelectedIndex = settings.RotaryStockInches ? 1 : 0;
+        _stockW.Value = (decimal)Math.Round(settings.RotaryStockWidthMm / (settings.RotaryStockInches ? 25.4 : 1), 3);
+        _stockH.Value = (decimal)Math.Round(settings.RotaryStockHeightMm / (settings.RotaryStockInches ? 25.4 : 1), 3);
+        ToolTip.SetTip(_stockKind, "As scanned: the model is what was measured. A standard stock (a 2\" square bar, a round rod): the scan only finds how it sits in the chuck (turned, off-centre, and the axis height if you don't know it), and the model is the exact shape.");
+        ToolTip.SetTip(_stockW, "The stock's size: a rod's diameter, a bar's width, a hexagon across the flats.");
+        ToolTip.SetTip(_stockH, "A rectangular bar's other side.");
+        _stockHField = Field("Height", _stockH);
+        _stockSize = new StackPanel { Spacing = 8, Children = { Field("Size", _stockW), Field("Units", _units), _stockHField } };
 
         ToolTip.SetTip(_method, "The pointer reads many places along the laser line at each step (calibrate it once in Curved surface). The auto-focus reads one place, where the machine focuses, but reaches any height.");
         ToolTip.SetTip(_x0, "Where along the rotary's axis to start measuring (the work area's X, mm).");
@@ -122,7 +152,7 @@ public sealed class RotaryScanWindow : Window
             Spacing = 8,
             Children =
             {
-                Row(Field("From X (mm)", _x0), Field("To X (mm)", _x1)),
+                Field("From X (mm)", _x0), Field("To X (mm)", _x1),
                 Field("Places along it", _points),
                 fromSel,
             },
@@ -140,17 +170,19 @@ public sealed class RotaryScanWindow : Window
                 _alongPanel,
                 new TextBlock { Text = "ROUND THE PART", Classes = { "h" } },
                 Field("Angles", _stops),
-                Row(Field("From (°)", _from), Field("To (°)", _to)),
+                Field("From (°)", _from), Field("To (°)", _to),
                 Field("Wait after a turn (s)", _settle),
                 Row(_scanBtn, stop),
                 _returnBtn,
                 _busy,
                 _status,
                 new TextBlock { Text = "STOCK MODEL", Classes = { "h" } },
+                Field("Stock", _stockKind),
+                _stockSize,
                 _axisKnown,
                 Field("Axis height (mm)", _axis),
                 Hint("Don't know it? Scan a round rod (a drill blank, a dowel), type its diameter here and click It was a round rod."),
-                Row(Field("Rod Ø (mm)", _rod), setRod),
+                Field("Rod Ø (mm)", _rod), setRod,
                 _results,
                 _highBtn,
                 Row(csv, stl),
@@ -158,6 +190,21 @@ public sealed class RotaryScanWindow : Window
         };
         _method.SelectionChanged += (_, _) => Update();
         _axisKnown.IsCheckedChanged += (_, _) => Update();
+        _stockKind.SelectionChanged += (_, _) => Update();
+        _stockW.ValueChanged += (_, _) => Update();
+        _stockH.ValueChanged += (_, _) => Update();
+        int unitsWas = _units.SelectedIndex;
+        _units.SelectionChanged += (_, _) =>
+        {
+            // Keep the size, in the new units.
+            double k = unitsWas == 1 && _units.SelectedIndex == 0 ? 25.4 : unitsWas == 0 && _units.SelectedIndex == 1 ? 1 / 25.4 : 1;
+            unitsWas = _units.SelectedIndex;
+            _updating = true;
+            _stockW.Value = (decimal)Math.Round((double)(_stockW.Value ?? 1) * k, 3);
+            _stockH.Value = (decimal)Math.Round((double)(_stockH.Value ?? 1) * k, 3);
+            _updating = false;
+            Update();
+        };
         _axis.ValueChanged += (_, _) => Update();
         _slice.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Update(); };
 
@@ -193,9 +240,19 @@ public sealed class RotaryScanWindow : Window
 
     double? AxisHeight => _axisKnown.IsChecked == true ? (double)(_axis.Value ?? 0) : null;
 
+    /// <summary>The axis height the model uses: typed, or found by fitting a standard stock.</summary>
+    double? ModelAxis => AxisHeight ?? (_fit is { } f && _model?.Method == "standard" ? f.AxisHeightMm : null);
+
+    StockShape Shape()
+    {
+        double k = Inches ? 25.4 : 1;
+        return new StockShape((StockKind)Math.Max(0, _stockKind.SelectedIndex), (double)(_stockW.Value ?? 1) * k, (double)(_stockH.Value ?? 1) * k);
+    }
+
     void Show(RotaryScan? scan)
     {
         _scan = scan;
+        _axisFound = null;
         int nx = scan?.Xs.Length ?? 0;
         _slice.Maximum = Math.Max(0, nx - 1);
         if (_slice.Value > _slice.Maximum || nx > 0 && _slice.Value == 0) _slice.Value = Math.Max(0, (nx - 1) / 2);
@@ -204,7 +261,27 @@ public sealed class RotaryScanWindow : Window
 
     void Update()
     {
+        if (_updating) return;
         bool pointer = Pointer;
+        var shape = Shape();
+        _stockSize.IsVisible = shape.Kind != StockKind.Scanned;
+        _stockHField.IsVisible = shape.Kind == StockKind.Rectangle;
+        _fit = null;
+        _model = _scan;
+        if (shape.IsStandard && _scan is { Read: > 0 } raw && StockFitter.Fit(raw, shape, AxisHeight) is { } fit)
+        {
+            _fit = fit;
+            _model = fit.ToScan(raw.Xs, raw.LineY, 2, raw.When, Inches);
+            if (AxisHeight is null)
+            {
+                // Found from the fit: keep it, so the stock model (and anything carved from it) has it.
+                _updating = true;
+                _axisKnown.IsChecked = true;
+                _axis.Value = (decimal)Math.Clamp(Math.Round(fit.AxisHeightMm, 2), -200, 200);
+                _updating = false;
+                _axisFound = fit.AxisHeightMm;
+            }
+        }
         _alongPanel.IsVisible = pointer;
         _axis.IsEnabled = _axisKnown.IsChecked == true;
         if (pointer)
@@ -220,19 +297,70 @@ public sealed class RotaryScanWindow : Window
         _returnBtn.IsVisible = Math.Abs(_leftDeg) > 0.05;
         _returnBtn.Content = $"Return to start ({-_leftDeg:0.#}°)";
         int xi = (int)Math.Round(_slice.Value);
-        _view.Show(_scan, AxisHeight, xi);
-        _chart.Show(_scan, AxisHeight, xi);
-        _results.Text = Describe(_scan, AxisHeight);
-        _highBtn.IsEnabled = _scan?.Highest() is not null;
+        double? axis = ModelAxis;
+        _axis.IsEnabled = _axisKnown.IsChecked == true;
+        _view.Show(_model, axis, xi);
+        _chart.Show(_model, axis, xi, _model == _scan ? null : _scan);
+        _results.Text = shape.IsStandard && _scan is { Read: > 0 }
+            ? (_fit is { } f2 ? DescribeFit(f2, Inches, _axisFound) + "\n" + Describe(_model, axis, readings: false) : $"Couldn't fit a {shape.Describe(Inches)} to the scan: it needs readings at three or more angles (four if the axis height isn't known).")
+            : Describe(_scan, axis);
+        bool flat = _fit is { Shape.Kind: not StockKind.Round };
+        _highBtn.Content = flat ? "Turn a flat face up" : "Turn the high side up";
+        ToolTip.SetTip(_highBtn, flat ? "Turn the stock so the flat face nearest the top lies level on top, under the laser line." : "Turn the part so its highest point is on top, under the laser line.");
+        _highBtn.IsEnabled = flat || _scan?.Highest() is not null;
+        SaveStock(axis);
+    }
+
+    double? _axisFound;
+
+    /// <summary>The stock model as it stands, for other tools to work from (only when it changed).</summary>
+    void SaveStock(double? axis)
+    {
+        if (_model is not { Read: > 0 } m) return;
+        string key = $"{m.When:O}|{m.Method}|{m.Stock}|{axis}|{(_fit is { } f ? $"{f.TurnDeg:0.###}|{f.Centre}" : "")}";
+        if (key == _savedStockKey) return;
+        _savedStockKey = key;
+        try
+        {
+            Directory.CreateDirectory(AppIdentity.DataDir);
+            File.WriteAllText(StockFile, (m with { AxisHeightMm = axis }).ToJson());
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>How a standard stock sits, in words.</summary>
+    internal static string DescribeFit(StockFit f, bool inches, double? axisFound)
+    {
+        string U(double mm) => inches ? $"{mm / 25.4:0.###}\"" : $"{mm:0.##} mm";
+        var o = new List<string>
+        {
+            $"Fits a {f.Shape.Describe(inches)} to within ±{U(f.RmsMm)} ({f.Readings} readings)." +
+            (f.RmsMm > 0.5 ? " ⚠ That's a loose fit: check the size, or that the stock really is that shape." : ""),
+        };
+        string where = f.OffAxisMm < 0.05 ? "on the axis" : $"{U(f.OffAxisMm)} off the axis (towards {((Math.Atan2(f.Centre.X, f.Centre.Y) * 180 / Math.PI) + 360) % 360:0}°)";
+        o.Add(f.Shape.Kind == StockKind.Round ? $"Its middle is {where}." : $"It's turned {f.TurnDeg:0.#}° in the chuck and its middle is {where}.");
+        if (axisFound is { } a) o.Add($"The axis height ({a:0.##} mm) was found from the fit and set below the stock.");
+        return string.Join("\n", o);
     }
 
     static double Reach(Core.Camera.PointerCalibration cal) => cal.Depths.Count == 0 ? 8 : Math.Min(Math.Abs(cal.Depths.Min()), Math.Abs(cal.Depths.Max()));
 
     /// <summary>What a scan found, in words.</summary>
-    internal static string Describe(RotaryScan? s, double? axis)
+    internal static string Describe(RotaryScan? s, double? axis, bool readings = true)
     {
         if (s is null || s.Read == 0) return "No scan yet.";
-        var lines = new List<string> { $"Read {s.Read} of {s.Total} points ({s.AnglesDeg.Length} angles × {s.Xs.Length} places)." };
+        var lines = new List<string>();
+        if (readings) lines.Add($"Read {s.Read} of {s.Total} points ({s.AnglesDeg.Length} angles × {s.Xs.Length} places).");
+        else
+        {
+            if (axis is { } ax0)
+            {
+                var r0 = s.Radii(ax0).SelectMany(row => row).OfType<double>().ToList();
+                if (r0.Count > 0)
+                    lines.Add($"From the axis: {r0.Min():0.##}–{r0.Max():0.##} mm, so it needs a {2 * r0.Max():0.#} mm circle to turn in.");
+            }
+            return string.Join("\n", lines);
+        }
         if (s.Highest() is { } hi && s.Lowest() is { } lo)
             lines.Add($"Top heights {lo.H:0.##}–{hi.H:0.##} mm. Highest at {hi.Deg:0.#}° (X {hi.X:0.#}).");
         var fits = Enumerable.Range(0, s.Xs.Length).Select(i => (i, f: s.FitRound(i))).Where(p => p.f is not null).ToList();
@@ -263,6 +391,11 @@ public sealed class RotaryScanWindow : Window
         _settings.RotaryScanToDeg = (double)(_to.Value ?? 360);
         _settings.RotaryScanSettleS = (double)(_settle.Value ?? 0.5m);
         _settings.RotaryAxisHeightMm = AxisHeight;
+        var shape = Shape();
+        _settings.RotaryStockKind = shape.Kind;
+        _settings.RotaryStockInches = Inches;
+        _settings.RotaryStockWidthMm = shape.WidthMm;
+        _settings.RotaryStockHeightMm = shape.HeightMm;
         _settings.Save();
     }
 
@@ -406,6 +539,15 @@ public sealed class RotaryScanWindow : Window
 
     async Task HighSideUp()
     {
+        if (_fit is { Shape.Kind: not StockKind.Round } fit)
+        {
+            double t = fit.FlatUpDeg() - _leftDeg;
+            t = ((t % 360) + 540) % 360 - 180;
+            if (!await Dialogs.Confirm(this, "Turn a flat face up", $"Turn the stock {t:0.#}° so a flat face lies level on top? Keep hands clear of the chuck.", "Turn it", "Cancel"))
+                return;
+            await TurnBy(t, $"Turned {t:0.#}°: a flat face is on top. (Turn it {-t:0.#}° to go back to where the scan started.)");
+            return;
+        }
         if (_scan?.Highest() is not { } hi) return;
         // A finished scan leaves the part where it started; one stopped part way leaves it _leftDeg on.
         double turn = hi.Deg - _leftDeg;
@@ -435,14 +577,14 @@ public sealed class RotaryScanWindow : Window
             DefaultExtension = "csv",
             SuggestedFileName = $"rotary-scan_{_scan.When.LocalDateTime:yyyyMMdd_HHmm}.csv",
         });
-        if (file?.TryGetLocalPath() is { } path) await File.WriteAllTextAsync(path, _scan.ToCsv(AxisHeight));
+        if (file?.TryGetLocalPath() is { } path) await File.WriteAllTextAsync(path, (_model ?? _scan).ToCsv(ModelAxis));
     }
 
     async Task SaveStl()
     {
         if (_scan is null || _scan.Read == 0) { _status.Text = "Nothing scanned yet."; return; }
-        if (AxisHeight is not { } ax) { _status.Text = "Set the axis height first."; return; }
-        if (_scan.ToStl(ax) is not { } bytes) { _status.Text = "A 3D file needs a whole turn (0 to 360°) and at least two places along the axis."; return; }
+        if (ModelAxis is not { } ax) { _status.Text = "Set the axis height first."; return; }
+        if ((_model ?? _scan).ToStl(ax) is not { } bytes) { _status.Text = "A 3D file needs a whole turn (0 to 360°) and at least two places along the axis."; return; }
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
             Title = "Save the stock model",

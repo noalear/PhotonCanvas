@@ -62,6 +62,16 @@ public sealed class StockView : Model3DView
                 Tri(p00, p01, p11);
                 Tri(p00, p11, p10);
             }
+        // End caps, so it reads as a solid (only on a whole turn).
+        if (wrap)
+            foreach (int x in new[] { 0, cols - 1 })
+            {
+                var loop = Enumerable.Range(0, na).Select(a => At(xs[x], R(a, x), scan.AnglesDeg[a])).ToArray();
+                var n = new Vec3(x == 0 ? -1 : 1, 0, 0);
+                // Facing outwards along the axis: wound the right way for that side.
+                if (x == 0) Array.Reverse(loop);
+                Scene.AddFace([loop], n, Scene3D.Shade(Stock, 0.6 + 0.4 * Math.Max(0, n.Dot(Light))));
+            }
         // The axis, and what faced the laser at the start.
         double rMax = Math.Max(1, r.SelectMany(row => row).OfType<double>().DefaultIfEmpty(1).Max());
         Scene.AddEdge(new Vec3(xs[0] - rMax * 0.3, 0, 0), new Vec3(xs[^1] + rMax * 0.3, 0, 0), Color.FromRgb(0x60, 0x70, 0x80), LineWidth.Px(1));
@@ -95,13 +105,15 @@ public sealed class StockView : Model3DView
 /// </summary>
 public sealed class ScanChart : Control
 {
-    RotaryScan? _scan;
+    RotaryScan? _scan, _readings;
     double? _axis;
     int _x;
 
-    public void Show(RotaryScan? scan, double? axisHeight, int xi)
+    /// <summary>Show place <paramref name="xi"/> of <paramref name="scan"/>; <paramref name="readings"/> (a standard stock's scan) are drawn as dots over it.</summary>
+    public void Show(RotaryScan? scan, double? axisHeight, int xi, RotaryScan? readings = null)
     {
         _scan = scan;
+        _readings = readings;
         _axis = axisHeight;
         _x = xi;
         InvalidateVisual();
@@ -140,7 +152,11 @@ public sealed class ScanChart : Control
             }
             ctx.DrawGeometry(null, line, geo);
             ctx.DrawLine(new Pen(new SolidColorBrush(Color.FromRgb(0xF5, 0x9E, 0x0B)), 2), c, P(s.AnglesDeg[0], rMax));
-            Write(ctx, $"At X {s.Xs[_x]:0.#} mm, seen from the left end. Ring: {rMax:0.#} mm from the axis. Orange: what faced the laser at the start.", new Point(8, 4), text);
+            if (_readings is { } raw && _x < raw.Xs.Length)
+                foreach (var (deg, h) in raw.Column(_x))
+                    ctx.DrawEllipse(Brush("Warn"), null, P(deg, Math.Max(0, h - ax)), 3, 3);
+            Write(ctx, $"At X {s.Xs[_x]:0.#} mm, seen from the left end. Ring: {rMax:0.#} mm from the axis. Orange: what faced the laser at the start." +
+                       (_readings is null ? "" : " Dots: the readings."), new Point(8, 4), text);
         }
         else
         {

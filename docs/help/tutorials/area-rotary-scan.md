@@ -33,6 +33,12 @@ and **To X (mm)**. Leave **From (°)** 0 and **To (°)** 360 for a whole turn.
 Click **Scan** and confirm. Keep hands clear of the chuck: **Stop** stops at once, and **Return to
 start** then turns it back.
 
+## Standard stock?
+<!-- target: field:Stock -->
+If the part is a standard stock, say so: for a 2" × 2" square bar choose **Square bar**, type 2 under
+**Size** and choose inches. The scan then only finds how the bar sits in the chuck (and the axis
+height), and the model is the exact square.
+
 ## Set the axis height
 <!-- target: field:Axis height (mm) -->
 The 3D model needs the height of the rotary's axis. If you don't know it, scan a round rod first, type

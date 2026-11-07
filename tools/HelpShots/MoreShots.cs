@@ -60,7 +60,23 @@ static class MoreShots
             for (int i = 0; i < 10; i++) settle(100);
             save(scanWin.CaptureRenderedFrame(), "window-rotary-scan", "Scan the part: the stock model of a glued stack, and one place along it end-on");
             scanWin.Close();
+            // A 2" square bar, turned a little in the chuck and a touch off-centre: fitted as standard stock.
+            var bar = new PhotonCanvas.Core.StockShape(PhotonCanvas.Core.StockKind.Square, 50.8);
+            var barHeights = angles.Select(a => xs.Select(x => bar.RadiusAt(a, 17, new Vec2(0.8, -0.5)) is { } r ? (double?)(12 + r + 0.04 * Math.Sin(a * 7 + x)) : null).ToArray()).ToArray();
+            File.WriteAllText(Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "rotary-scan.json"), (scan with { Heights = barHeights, Method = "autofocus" }).ToJson());
             settings.RotaryAxisHeightMm = null;
+            settings.RotaryStockKind = PhotonCanvas.Core.StockKind.Square;
+            settings.RotaryStockWidthMm = settings.RotaryStockHeightMm = 50.8;
+            settings.RotaryStockInches = true;
+            var barWin = new RotaryScanWindow(doc, settings, F<MachinePanel>(w, "_machine"));
+            barWin.Show(w);
+            for (int i = 0; i < 10; i++) settle(100);
+            if (F<TextBlock>(barWin, "_results").FindAncestorOfType<ScrollViewer>() is { } barSide) { barSide.ScrollToEnd(); settle(400); }
+            save(barWin.CaptureRenderedFrame(), "window-rotary-scan-square", "Scan the part with a standard stock: a 2\" square bar fitted to the scan");
+            barWin.Close();
+            settings.RotaryStockKind = PhotonCanvas.Core.StockKind.Scanned;
+            settings.RotaryAxisHeightMm = null;
+            File.Delete(Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "rotary-stock.json"));
             File.Delete(Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "rotary-scan.json"));
         }
 

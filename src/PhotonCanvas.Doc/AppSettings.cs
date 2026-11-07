@@ -239,6 +239,14 @@ public sealed class AppSettings
     public double RotaryScanX0 { get; set; } = 95;
     public double RotaryScanX1 { get; set; } = 125;
     public int RotaryScanPoints { get; set; } = 7;
+    /// <summary>
+    /// Scan the part: the stock is a standard shape (a square bar, a round rod…), so the scan only finds how it sits
+    /// and the model is that exact shape; <see cref="StockKind.Scanned"/> uses what was measured. Sizes in mm.
+    /// </summary>
+    public StockKind RotaryStockKind { get; set; } = StockKind.Scanned;
+    public double RotaryStockWidthMm { get; set; } = 50.8;
+    public double RotaryStockHeightMm { get; set; } = 50.8;
+    public bool RotaryStockInches { get; set; } = true;
     /// <summary>Scan the part: extra wait after each turn for the part to settle (seconds).</summary>
     public double RotaryScanSettleS { get; set; } = 0.5;
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
