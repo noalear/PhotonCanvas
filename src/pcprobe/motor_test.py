@@ -34,8 +34,8 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10000.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# 32 (this rotary's units a turn in jobs) / 0.7459 (the machine's stored ConveyorURate). 28 turns of it
-# landed only slightly short. One long turn makes any remaining error far easier to see.
+# 32 (this rotary's units a turn in jobs) / 0.7459 (the machine's stored ConveyorURate). One press of
+# 100 turns (4290.1 units) landed spot on, judged by eye.
 UNITS_PER_TURN = 42.901
 CHECK_TURNS = 100
 CHECK_AMOUNT = CHECK_TURNS * UNITS_PER_TURN
