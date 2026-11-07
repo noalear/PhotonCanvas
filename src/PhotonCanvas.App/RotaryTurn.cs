@@ -29,7 +29,7 @@ static class RotaryTurn
             await Dialogs.Message(owner, "A job is running", "Wait for the job on the machine to finish (or stop it) first.");
             return false;
         }
-        double u = motorUnits * RotaryReturn.NowScale(settings);
+        double u = motorUnits * await NowScaleAsync(settings, machine);
         if (!double.IsFinite(u) || Math.Abs(u) > Job.MaxTurnMm)
         {
             await Dialogs.Message(owner, "Can't turn it", "That's a very long way to turn. Turn it by hand instead.");
@@ -50,6 +50,25 @@ static class RotaryTurn
             await Dialogs.Message(owner, "Couldn't turn it", e.Message);
             return false;
         }
+    }
+
+    // The machine's own belt factor, read once a session (the feed is scaled by it).
+    static double? _machineRate;
+
+    /// <summary>
+    /// The feed's units per motor unit: the one-turn check's when there is one, else 1 ÷ the belt factor
+    /// stored on the machine (ConveyorURate), else 1 ÷ the conveyor setting here.
+    /// </summary>
+    static async Task<double> NowScaleAsync(AppSettings settings, MachinePanel machine)
+    {
+        if (settings.RotaryNowScale > 0) return settings.RotaryNowScale;
+        if (_machineRate is null)
+        {
+            var configs = await machine.GetConfigsAsync();
+            if (configs?["ConveyorURate"] is { } n && double.TryParse(n.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var r) && r is > 0.1 and < 10)
+                _machineRate = r;
+        }
+        return _machineRate is { } rate ? 1 / rate : RotaryReturn.NowScale(settings);
     }
 
     /// <summary>The turn as a laser-off job that starts as soon as it arrives, after a confirm.</summary>

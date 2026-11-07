@@ -505,6 +505,14 @@ public sealed class MachinePanel : UserControl
         await c.AccessoryAsync("goto", u, speed);
     }
 
+    /// <summary>Stop a turn part way (seen to work on the F2 Ultra).</summary>
+    public async Task StopRotaryAsync()
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        Log("Stopping the rotary.");
+        await c.AccessoryAsync("stop");
+    }
+
     /// <summary>Let the rotary's motor go limp, so it can be turned by hand.</summary>
     public async Task FreeRotaryAsync()
     {

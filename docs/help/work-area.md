@@ -73,6 +73,7 @@ the turn goes as a short laser-off job instead, which starts as soon as it arriv
   back to the mark, type how many turns it made under **It made (turns)** (a quarter past is 1.25, a
   quarter short 0.75) and click **Correct**. Turning outside a job uses the machine's conveyor feed,
   which has its own scale, so this check matters even when jobs already turn the right amount.
+- **Stop turning** stops a turn part way.
 - **Let the motor go** lets the motor go limp, so you can turn the object by hand.
 
 The rotary has no home: each job starts wherever the object is, and turns it back to there at the

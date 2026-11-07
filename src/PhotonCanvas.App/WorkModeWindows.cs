@@ -94,6 +94,12 @@ public sealed class WorkModeWindow : Window
             try { await _machine.FreeRotaryAsync(); }
             catch (PhotonCanvas.Device.DeviceException e) { await Dialogs.Message(this, "Couldn't let it go", e.Message); }
         };
+        var stopTurn = Button("Stop turning", tip: "Stop a turn part way.");
+        stopTurn.Click += async (_, _) =>
+        {
+            try { await _machine.StopRotaryAsync(); }
+            catch (PhotonCanvas.Device.DeviceException e) { await Dialogs.Message(this, "Couldn't stop it", e.Message); }
+        };
         var fixNow = Button("Correct", tip: "Change the turning scale so one turn comes out right next time.");
         fixNow.Click += (_, _) =>
         {
@@ -121,7 +127,7 @@ public sealed class WorkModeWindow : Window
                 {
                     new TextBlock { Text = "TURN THE ROTARY", Classes = { "h" } },
                     Hint("These turn the object straight away, with the laser off. Keep hands clear of the chuck. After a turn the motor holds it still."),
-                    _leftNote, _returnBtn, turnRow,
+                    _leftNote, _returnBtn, turnRow, stopTurn,
                     Hint("Check the turning once: put a tape mark on the chuck, click Turn once, and say how many turns it really made."),
                     Row(turnOnce, letGo), madeRow, _nowNote,
                 },
