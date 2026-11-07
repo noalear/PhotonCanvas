@@ -218,9 +218,23 @@ PhotonCanvas is free to use, for personal or commercial work, on any number of y
 and devices. All rights reserved: it may not be sold, rented, redistributed or published in a
 modified form without written permission. The full terms are in [LICENSE](LICENSE). The program is
 published as ready-to-run builds on the
-[releases page](https://github.com/noalear/PhotonCanvas/releases): every change to `master` is
-built, tested and released by `.github/workflows/release.yml`, and the program downloads and puts
-in new versions by itself (Settings → Updates).
+[releases page](https://github.com/noalear/PhotonCanvas/releases), and the program downloads and
+puts in new versions by itself (Settings → Updates).
+
+### Publishing a new version
+
+Double-click **`Publish update.cmd`** in the project folder. It builds the latest `master` in a
+copy of its own (`%LOCALAPPDATA%\PhotonCanvas-publish`, so the project folder and the PhotonCanvas
+you're running are left alone) and puts it up as the next release, without using any of GitHub's
+build minutes. It takes a few minutes, and says so if `master` is already published. The first
+time, it asks for a GitHub key that can make releases (it opens the page to make one: this
+repository only, Contents: Read and write) and keeps it, encrypted for your Windows account; if
+the GitHub CLI is signed in, it uses that instead. It needs Git for Windows and the .NET 10 SDK.
+`tools/publish-update.ps1 -DryRun` builds and shows what would go up without publishing.
+
+`.github/workflows/release.yml` makes the same release on GitHub's machines when run by hand
+(Actions → Release → Run workflow); it no longer runs on every change, as the minutes for a
+private repository run out.
 
 PhotonCanvas includes third-party open-source components, each under its own licence; they are
 listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
