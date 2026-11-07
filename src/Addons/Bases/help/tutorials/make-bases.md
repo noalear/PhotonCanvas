@@ -7,9 +7,9 @@ Laser-cut bases with the ground already etched on take a few minutes to paint, a
 cut to fit them moves the whole unit in one go.
 
 ## Open the base maker
-<!-- target: ribbon:Designer/Bases -->
+<!-- target: ribbon:Mini-Designer/Bases -->
 <!-- wait: window:Miniature bases -->
-Click **Bases** on the **Designer** tab (in the **Minis & games** group).
+Click **Bases** on the **Mini-Designer** tab (in the **Accessories** group).
 
 ## Choose the bases
 <!-- target: tabitem:Bases -->

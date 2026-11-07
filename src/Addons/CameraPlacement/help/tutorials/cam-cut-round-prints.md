@@ -17,9 +17,9 @@ To look at only part of the bed, select a shape drawn round that part. With noth
 whole bed is searched.
 
 ## Find the prints
-<!-- target: ribbon:Camera/Cut round prints -->
+<!-- target: ribbon:Placement/Cut round prints -->
 <!-- wait: window:Cut round prints -->
-Click **Cut round prints** on the **Camera** tab.
+Click **Cut round prints** on the **Placement** tab.
 
 ## Set the margin
 <!-- target: window:Cut round prints -->
@@ -32,5 +32,5 @@ The cuts are on the "Print cut" layer (made if there isn't one). Set its power f
 just through the sticker layer for a kiss cut.
 
 ## Frame and ship
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 **Frame** to check, then **Ship It** and press the machine's start button.

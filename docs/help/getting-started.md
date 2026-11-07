@@ -131,15 +131,15 @@ A small square cut from 3 mm wood or card, start to finish. The tutorial
    [Layer settings](layer-settings.md).
 4. **Set power and speed.** In **Layer settings**, set **Power %**, **Speed mm/s** and **Passes**
    for your material. A new layer starts at 70% and 40 mm/s with the blue diode. Don't know the
-   right numbers? Laser → **Library** has settings that worked, and Laser → **Test grid** or
-   Laser → **Cut test** finds them on a scrap: see [Materials and tests](materials-and-tests.md).
+   right numbers? Materials & Tests → **Library** has settings that worked, and Materials & Tests → Tests → **Test grid** or
+   Materials & Tests → Tests → **Cut test** finds them on a scrap: see [Materials and tests](materials-and-tests.md).
 5. **Place the material and focus.** Put the material under the head and click **Auto-focus**
    at the right end of the ribbon: the machine measures it and moves to the right height.
-6. **Frame.** Click **Frame** (in the job bar under the work area, or Laser → **Frame**). The first
+6. **Frame.** Click **Frame** (in the job bar under the work area, or Machine → **Frame**). The first
    time, confirm with **Start framing**. The head traces around the job with a faint laser dot,
    over and over. Move the material (or the design) until it's where you want it, then click
    **Stop framing**.
-7. **Ship It.** Click **Ship It** (job bar, or Laser → **Ship It**). A summary lists each layer's
+7. **Ship It.** Click **Ship It** (job bar, or Machine → **Ship It**). A summary lists each layer's
    settings, the size, the time and anything worth checking. Click **Ship It** in it to upload.
 8. **Start.** The job bar says "Uploaded. Press the start button on the machine to begin". Close
    the lid and press the machine's start button. The job bar follows the job; **Pause** and

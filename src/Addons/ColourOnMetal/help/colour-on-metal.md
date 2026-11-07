@@ -1,6 +1,6 @@
 # Colour on metal
 
-This add-on is for the MOPA laser on stainless steel and titanium. It adds the **Colour on metal** group to the Laser tab (**Colour test** and **Measure colours**) and **Colour on metal** to the Picture tab's **Turn it into** group. Settings → Equipment → Features to show can still hide them on a machine without a MOPA.
+This add-on is for the MOPA laser on stainless steel and titanium. It adds **Colour test** and **Measure colours** to the Tests window (**Materials & Tests → Tests**, under *Colour on metal*) and **Colour on metal** to the Picture tab's **Turn it into** group. Settings → Equipment → Features to show can still hide them on a machine without a MOPA.
 
 ## Colour tests and palettes
 
@@ -115,7 +115,7 @@ the colours your plate really made. Each pixel becomes the nearest measured colo
 neighbouring colours mixed in for the shades between, and each colour becomes one Engrave layer
 with the settings that made it.
 
-It needs a measured palette first: burn a **Colour test** (Laser tab), read it with **Measure
+It needs a measured palette first: burn a **Colour test** (Materials & Tests → Tests), read it with **Measure
 colours** and save the palette (see [Colour tests and palettes](#colour-tests-and-palettes)). Until then the
 window says there are no palettes and **Add colour layers** stays grey.
 

@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.HouseEditor;
 
 /// <summary>
-/// Designer → Buildings → Build, its command and "Edit in the building editor…" on the right-click menu, opening
+/// Mini-Designer → Buildings → Build, its command and "Edit in the building editor…" on the right-click menu, opening
 /// <see cref="HouseEditorWindow"/>: a building drawn floor by floor on a grid, its walls, columns, floors
 /// and tiles made by the wall maker and the whole-building kits. It only adds shapes to the design;
 /// nothing is sent to the machine.
@@ -19,7 +19,7 @@ public sealed class HouseEditorAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Build", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Buildings", "Build", Icon, Open)
         {
             Tip = "Draw a building floor by floor, like a house in a life-sim game: rooms, walls at any angle, doors and windows anywhere, then cut every piece",
             Large = true,

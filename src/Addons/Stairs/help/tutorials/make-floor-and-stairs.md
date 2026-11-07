@@ -7,9 +7,9 @@ A floor plate on top of a room of walls makes a second storey; stairs or a ladde
 opening in it take figures up. Make the walls first with **Walls**, so the floor can be fitted to them.
 
 ## Open the floor and stairs maker
-<!-- target: ribbon:Designer/Stairs & floors -->
+<!-- target: ribbon:Mini-Designer/Stairs & floors -->
 <!-- wait: window:Floors and stairs -->
-Click **Stairs & floors** on the **Designer** tab (in the **Buildings** group).
+Click **Stairs & floors** on the **Mini-Designer** tab (in the **Buildings** group).
 
 ## Fit it to your walls
 <!-- target: button:Match the walls in the design -->

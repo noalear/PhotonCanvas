@@ -1,6 +1,6 @@
 # Quote and cost
 
-An add-on (Settings → Add-ons → **Quote and cost**): on when PhotonCanvas is installed, and can be turned off. Its button is **Laser → Job → Quote**; **Quote and cost…** is also in the command search.
+An add-on (Settings → Add-ons → **Quote and cost**): on when PhotonCanvas is installed, and can be turned off. Its button is **Machine → Job → Quote**; **Quote and cost…** is also in the command search.
 
 ## Quote
 

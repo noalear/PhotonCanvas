@@ -191,6 +191,9 @@ public interface IAddonHost
 /// A ribbon button. <paramref name="Tab"/> and <paramref name="Group"/> are names as shown ("Home",
 /// "Draw"); a new tab or group is made at the end if there isn't one. <paramref name="Icon"/> is
 /// one of the program's icon keys (Icons.axaml, e.g. "IcDepth") or SVG path data for a 24×24 box.
+/// A test goes on the tab "Tests": it isn't a ribbon button then but an entry in the Tests window
+/// (Materials &amp; Tests → Tests), listed under <paramref name="Group"/> ("Find the settings", "Pictures"…).
+/// Buttons made for the tabs before November 2026 (Laser, Picture, Camera, Designer) land where those went.
 /// </summary>
 public sealed record RibbonButton(string Tab, string Group, string Label, string Icon, Action Run)
 {

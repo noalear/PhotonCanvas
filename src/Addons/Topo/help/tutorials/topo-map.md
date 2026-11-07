@@ -8,9 +8,9 @@ place, choose the area and how many layers, and the slicer cuts the terrain into
 layers. Finding a place needs the internet.
 
 ## Open Topo map
-<!-- target: ribbon:Home/Topo map -->
+<!-- target: ribbon:Import/Topo map -->
 <!-- wait: window:Topo map -->
-Click **Topo map** in the **Bring in** group of the **Home** tab.
+Click **Topo map** in the **3D & maps** group of the **Import** tab.
 
 ## Find the place
 <!-- target: button:Find -->

@@ -11,9 +11,9 @@ it. Use it when **Pick piece** can't tell the piece from what's around it, or fo
 This needs the machine connected and the camera calibrated. Put the piece on the bed and click **Show** in the machine panel at the right end of the ribbon.
 
 ## Choose Trace edge
-<!-- target: ribbon:Home/Trace edge -->
+<!-- target: ribbon:Placement/Trace edge -->
 <!-- wait: tool:Magnetic -->
-Click the lasso icon, **Trace edge**, on the **Home** tab (or press `M`).
+Click the lasso icon, **Trace edge**, on the **Placement** tab (or press `M`).
 
 ## Click along the edge
 <!-- target: canvas -->

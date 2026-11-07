@@ -7,9 +7,9 @@ A round tower is stacked from rings of the same sheet: the stonework is cut into
 its storeys lift apart so figures can go inside. Walls from Walls slide into slots up its side.
 
 ## Open the tower maker
-<!-- target: ribbon:Designer/Towers -->
+<!-- target: ribbon:Mini-Designer/Towers -->
 <!-- wait: window:Round towers -->
-Click **Towers** on the **Designer** tab (in the **Buildings** group).
+Click **Towers** on the **Mini-Designer** tab (in the **Buildings** group).
 
 ## Pick a theme
 <!-- target: field:Theme -->

@@ -23,5 +23,5 @@ Tick **…in no set pattern (no rows)** to burn them in no regular order, each s
 last, so no repeating rows can show.
 
 ## Compare on scrap
-Laser → **Line test** (from the Material tests add-on) burns the same patch with and without spreading, side by side, so you can
+Materials & Tests → Tests → **Line test** (from the Material tests add-on) burns the same patch with and without spreading, side by side, so you can
 see which looks better on your material.

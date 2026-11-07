@@ -8,9 +8,9 @@ macros. It's for advanced use: commands run at once and can move the head and fi
 need the machine connected (**Connect** at the right end of the ribbon). Not yet tried on the machine.
 
 ## Open the console
-<!-- target: ribbon:Laser/Console -->
+<!-- target: ribbon:Machine/Console -->
 <!-- wait: window:G-code console -->
-Click **Console** on the **Laser** tab. Not there? Tick **G-code console** in
+Click **Console** on the **Machine** tab. Not there? Tick **G-code console** in
 **Settings → Equipment**.
 
 ## Send a command

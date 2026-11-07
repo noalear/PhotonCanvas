@@ -10,7 +10,7 @@ Not yet tried on the machine.
 ## Connect and calibrate the pointer
 <!-- target: panel:Machine -->
 This needs the machine connected (see [The machine and settings](machine.md)) and the red pointer
-calibrated once, in **Laser → Curved surface** (the
+calibrated once, in **Machine → Curved surface** (the
 [Calibrate the red pointer](tutorial:area-calibrate-pointer) tutorial).
 
 ## Focus near the spot
@@ -25,8 +25,8 @@ Select the part of the design to focus on. With nothing selected, it focuses on 
 bed.
 
 ## Focus on it
-<!-- target: ribbon:Camera/Focus on selection -->
-Click **Focus on selection** on the **Camera** tab. The pointer is aimed at the middle of the
+<!-- target: ribbon:Machine/Focus on selection -->
+Click **Focus on selection** on the **Machine** tab. The pointer is aimed at the middle of the
 selection and the head moves to the height it reads.
 
 ## Read the result

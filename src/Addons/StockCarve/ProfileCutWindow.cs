@@ -449,7 +449,7 @@ public sealed class ProfileCutWindow : Window
     {
         if (!_host.IsConnected) throw new InvalidOperationException("Not connected to the machine.");
         if (_host.FocusDistanceMm is not { } d) throw new InvalidOperationException("Focus on the part first, so the camera knows how far away its top is.");
-        if (!_host.CameraCalibratedFor(d)) throw new InvalidOperationException($"The camera isn't calibrated near {d:0.#} mm yet (Camera tab → Calibrate).");
+        if (!_host.CameraCalibratedFor(d)) throw new InvalidOperationException($"The camera isn't calibrated near {d:0.#} mm yet (Machine → Calibrate camera).");
         var box = Rect2.Bounds(StackSliceLoops(plan.Shadow).SelectMany(l => l).Select(p => new Vec2(p.X, LineY - p.Y)));
         var field = MachineProfile.F2Ultra;
         double x0 = Math.Max(0, box.MinX - 6), y0 = Math.Max(0, box.MinY - 6), x1 = Math.Min(field.FieldW, box.MaxX + 6), y1 = Math.Min(field.FieldH, box.MaxY + 6);

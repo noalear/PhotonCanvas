@@ -12,7 +12,7 @@ design ready to run. Not yet tried on the machine.
 Set up the design as for any job. Only layers with output on are moved and sent.
 
 ## Turn it on
-<!-- target: ribbon:Laser/Quick on lid close -->
+<!-- target: ribbon:Machine/Quick on lid close -->
 Click **Quick on lid close**. It stays on until you click it again.
 
 ## Put the material in and close the lid
@@ -24,5 +24,5 @@ loads the job.
 Check the placement on the work area. If it's right, press the machine's button.
 
 ## Turn it off when done
-<!-- target: ribbon:Laser/Quick on lid close -->
+<!-- target: ribbon:Machine/Quick on lid close -->
 Click **Quick on lid close** again.

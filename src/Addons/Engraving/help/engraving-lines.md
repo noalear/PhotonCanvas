@@ -1,6 +1,6 @@
 # Engraving lines
 
-An add-on (Settings → Add-ons → **Engraving lines**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Turn it into → Engraving**.
+An add-on (Settings → Add-ons → **Engraving lines**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Effects → Engraving**.
 
 ## Engraving lines
 <!-- windows: EngravingWindow -->

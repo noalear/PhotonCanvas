@@ -172,7 +172,18 @@ static class HelpSim
             }
             else Console.WriteLine($"  no menu item among [{string.Join(", ", names)}] for {target}");
         }
-        else if (target.StartsWith("ribbon:") || target.StartsWith("header:")) Click(c);
+        else if (target.StartsWith("ribbon:") || target.StartsWith("header:"))
+        {
+            Click(c);
+            // A test opens through the Tests window, with the step's test already picked: click Open.
+            if (target.StartsWith("ribbon:Tests/") && step.Wait is { } w && w != "window:Tests" && TopLevel.GetTopLevel(c) is Window main)
+            {
+                Settle(400);
+                if (main.OwnedWindows.OfType<TestsWindow>().FirstOrDefault() is { } tests
+                    && tests.GetVisualDescendants().OfType<Avalonia.Controls.Button>().FirstOrDefault(b => b.Content as string == "Open") is { } open)
+                    Click(open);
+            }
+        }
         else if (c is TabItem ti) ti.IsSelected = true;
         else if (target.StartsWith("text:") && c.FindAncestorOfType<ListBoxItem>() is { } li && li.FindAncestorOfType<ListBox>() is { } lb)
             lb.SelectedItem = lb.ItemFromContainer(li) ?? li;

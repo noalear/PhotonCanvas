@@ -1,9 +1,10 @@
 # Pictures
 
 Photos, scans and artwork are pictures: grids of pixels, not outlines. A picture on a Picture layer
-is engraved dot by dot. The **Picture** tab also turns pictures into other things: outlines to cut
-or score, banknote-style engraving lines, colours or rainbow gratings on metal, and depth maps
-carved as a relief.
+is engraved dot by dot. Pictures come in from the **Import** tab (**Picture**, `Ctrl+J`), and the
+**Picture** tab works on them: edit them, trace them into outlines to cut or score, or turn them
+into banknote-style engraving lines, colours or rainbow gratings on metal, and depth maps carved as
+a relief.
 
 ![The Picture tab of the ribbon](images/ribbon-picture.png)
 
@@ -15,21 +16,20 @@ other shapes doesn't count, except for **Image mask**.
 
 | Group | Buttons |
 |---|---|
-| Add | [Import picture](#import-a-picture) |
-| Turn it into | [Trace](#trace) |
-| Shape | [Shapes to picture](#shapes-to-picture) |
-| Edit | [Filters](#filters), [Eraser](#eraser), [Crop](#crop) |
+| Edit | [Filters](#filters), [Crop](#crop), [Eraser](#eraser), [Shapes to picture](#shapes-to-picture); add-on: **Remove background** |
+| Trace | [Trace](#trace); add-ons: **Centre-line trace**, **Depth outlines** |
+| Effects | Add-ons: **Engraving**, **Depthmap**, **Relief preview**, **Colour on metal**, **Diffraction**, **Flip picture**, **CMYK split**, **Grain** |
+| Mask | Add-ons: **Image mask**, **Remove mask** |
 
-Add-ons add more buttons to the tab while they're on: **Colour on metal**, **Engraving**,
-**Diffraction** and **Depthmap** in Turn it into, **Image mask** and **Remove mask** in Shape, **CMYK split** and
-**Centre-line trace** in Edit, a **Relief** group (**3D model**, **Relief preview**, **Depth
-outlines**) and **Remove background** in **Clean up**. Each has its own page under **Add-ons** in
-the contents; turn them on or off in Settings → Add-ons.
+Bringing a picture in is on the **Import** tab, with the other ways in (files, 3D models, maps and
+the generators): see [Import a picture](#import-a-picture) and [Files](files.md). The groups whose
+buttons all come from add-ons only show while one of those add-ons is on. Each add-on has its own
+page under **Add-ons** in the contents; turn them on or off in Settings → Add-ons.
 
 **Colour on metal** and **Diffraction** (both add-ons) are MOPA-only features. While their add-ons
 are on they show by default; to hide or show them, open **Settings** (the gear at the top right) → **Equipment** and tick or untick
 **Colour on metal** and **Diffraction gratings** under **Features to show**. Unticking **Colour on
-metal** also hides the **Colour test** and **Measure colours** buttons on the Laser tab. Hiding a
+metal** also takes **Colour test** and **Measure colours** out of the Tests window. Hiding a
 feature only takes it out of the ribbon: nothing is lost. See [The machine and settings](machine.md).
 
 Right-clicking a picture also offers **Trace picture…**, and the add-ons' own items, such as
@@ -38,7 +38,7 @@ Right-clicking a picture also offers **Trace picture…**, and the add-ons' own 
 ## Import a picture
 
 **Import picture** (`Ctrl+J`) opens a file chooser; pick one picture or several. Formats: PNG, JPG,
-BMP, GIF, WebP and TIFF. **Home → Picture**, **File → Import picture…** and dragging picture files
+BMP, GIF, WebP and TIFF. **Import → Picture**, **File → Import picture…** and dragging picture files
 onto the window do the same. A picture copied in another program can be pasted with `Ctrl+V`: it
 lands the same way. To
 turn a drawing (SVG, PDF…) into a picture, see **Import as one picture…** in [Files](files.md).
@@ -118,7 +118,7 @@ under it (such as **Remove background…** and **Depthmap…**).
 material: with their tone settings, corrected for the material, in the material's own colours (bare
 wood to its darkest burn, for example). See-through parts show as bare material.
 
-It needs a tone test: a picture layer gets its correction from **Laser → Tone test**, or when you
+It needs a tone test: a picture layer gets its correction from **Materials & Tests → Tests → Tone test**, or when you
 choose a material whose library settings have one. Pictures on layers without one are drawn as
 usual. The setting is remembered. See [Materials and tests](materials-and-tests.md).
 

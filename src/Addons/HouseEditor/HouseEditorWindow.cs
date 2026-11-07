@@ -508,7 +508,7 @@ public sealed class HouseEditorWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: slots come out a little loose. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf)."
+            ? "No kerf allowance: slots come out a little loose. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf)."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer."
             : $"{r.M.Label}: no kerf measured yet, so slots come out a little loose (run a cut test).";
         LookChanged();

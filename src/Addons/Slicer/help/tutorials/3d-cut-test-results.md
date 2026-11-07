@@ -3,14 +3,14 @@
 <!-- summary: Take the material's thickness, kerf and slot fit from your cut test, so parts and slots come out the right size. -->
 <!-- page: 3d-slices.md#using-your-cut-test-thickness-kerf-and-slot-fit -->
 <!-- order: 40 -->
-The cut test (Laser → Cut test) finds the settings that cut your material and measures the kerf
+The cut test (Materials & Tests → Tests → Cut test) finds the settings that cut your material and measures the kerf
 and the slot fit, saved with the material in the library. Run one on your sheet first, and the
 slicer uses it so pins fit and slots slide together (not yet tried on the machine).
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

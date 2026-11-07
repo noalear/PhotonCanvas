@@ -649,7 +649,7 @@ public static class StockCarve
     /// <summary>What the plan means, in a few lines.</summary>
     public static string Describe(RotaryPlan p, CarveOptions o)
     {
-        var s = $"Set Laser → Work mode → Rotary to Object Ø {p.DiameterMm:0} mm (the stock swings {p.WidestMm:0.#} mm across). " +
+        var s = $"Set Machine → Work mode → Rotary to Object Ø {p.DiameterMm:0} mm (the stock swings {p.WidestMm:0.#} mm across). " +
                 $"Focus on the top of the part at X {p.FocusX:0.#} mm before starting, with the part turned back to where the scan started.";
         if (p.Bands.Count == 0) return s + " Nothing needs taking off: the stock is already the model's shape there.";
         s += $" Up to {p.DeepestMm:0.##} mm comes off, in up to {p.MostPasses} pass{(p.MostPasses == 1 ? "" : "es")}, at {p.Bands.Count} focus height{(p.Bands.Count == 1 ? "" : "s")} {o.FocusBandMm:0.##} mm apart.";

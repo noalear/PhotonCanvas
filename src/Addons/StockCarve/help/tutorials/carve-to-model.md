@@ -6,9 +6,9 @@
 A rough part in the rotary's chuck, scanned, can be engraved down to a 3D model's shape as it turns.
 
 ## Open Carve to model
-<!-- target: ribbon:Laser/Carve to model -->
+<!-- target: ribbon:Machine/Carve to model -->
 <!-- wait: window:Carve stock to a model -->
-Click **Carve to model** on the **Laser** tab. The last scan of the part is the stock.
+Click **Carve to model** on the **Machine** tab. The last scan of the part is the stock.
 
 ## Open the model
 <!-- target: button:Open a 3D model… -->

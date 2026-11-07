@@ -9,13 +9,13 @@ the real piece, the focus set on it, and the machine connected.
 
 ## Show the colour tools
 <!-- target: header:Settings -->
-If there's no **Colour on metal** group on the Laser tab, tick **Colour on metal** in **Settings →
+If **Colour test** isn't in the Tests window's list, tick **Colour on metal** in **Settings →
 Equipment**.
 
 ## Open the colour test
-<!-- target: ribbon:Laser/Colour test -->
+<!-- target: ribbon:Tests/Colour test -->
 <!-- wait: window:Colour test -->
-Click **Colour test** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Colour test** in the list and click **Open**.
 
 ## Choose the kind
 <!-- target: field:Test -->
@@ -41,9 +41,9 @@ block cools much faster.
 The grid goes at the top-left of the work area. **Heat** in the job bar now reads **Heat: spread**.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Keep the same focus for everything you'll mark with these colours.
 
 ## Measure it
-<!-- target: ribbon:Laser/Measure colours -->
+<!-- target: ribbon:Tests/Measure colours -->
 Next, **Measure colours** reads each square and saves a palette.

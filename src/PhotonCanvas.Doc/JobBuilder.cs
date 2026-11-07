@@ -12,7 +12,7 @@ public sealed record JobOptions
     /// False: stock behaviour, each path repeats its passes before the next starts.
     /// </summary>
     public bool WholeJobPasses { get; init; } = true;
-    /// <summary>How far the MOPA lands from the blue laser (mm, from Camera → Align MOPA): MOPA work is moved back by it.</summary>
+    /// <summary>How far the MOPA lands from the blue laser (mm, from Machine → Align lasers): MOPA work is moved back by it.</summary>
     public Vec2 MopaOffset { get; init; }
     /// <summary>Exhaust fan gear (1–4) and purifier speed (%) for the job: see <see cref="Job.FanGear"/>.</summary>
     public int FanGear { get; init; } = 3;

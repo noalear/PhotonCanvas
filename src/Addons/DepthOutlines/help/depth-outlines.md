@@ -1,7 +1,7 @@
 # Depth outlines
 <!-- windows: DepthOutlinesWindow -->
 
-An add-on (Settings → Add-ons → **Depth outlines**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Relief → Depth outlines**.
+An add-on (Settings → Add-ons → **Depth outlines**): on when PhotonCanvas is installed, and can be turned off. Its button is **Picture → Trace → Depth outlines**.
 
 
 **Depth outlines** finds the edges in a depthmap, the places where the surface steps or bends

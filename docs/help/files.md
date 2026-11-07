@@ -188,10 +188,11 @@ into that folder shows up as a template too.
 ## Importing
 
 Importing brings drawings and pictures from other programs into the design you have open, as
-ordinary shapes you can edit. The buttons are in the **Bring in** group, near the right end of the
-**Home** tab. **Import**, **Picture** and **By colour** are also in the **File** menu.
+ordinary shapes you can edit. The buttons are in the **Files** group at the left of the **Import**
+tab, which also holds the add-ons that bring in 3D models and maps and the generators. **Import**,
+**Picture** and **By colour** are also in the **File** menu.
 
-![The Home tab: the Bring in group is near its right end](images/ribbon-home.png)
+![The Import tab: the Files group is at its left](images/ribbon-import.png)
 
 | Button | Keys | What it does |
 |---|---|---|
@@ -401,7 +402,7 @@ the design and the job bar's settings. If it can't be built, a **Can't export** 
 - **Export G-code (.gcode)…** saves only the marking G-code (`motion.gcode` above), as plain text, to
   read or compare.
 
-The same exports are **Export .xf** and **Export G-code** on the **Laser** tab, and the job bar's
+The same exports are **Export .xf** and **Export G-code** on the **Machine** tab, and the job bar's
 export menu: see [Running a job](running-jobs.md).
 
 Both are written in the G-code of the xTool machines. For a GRBL machine added in

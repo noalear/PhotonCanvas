@@ -51,7 +51,7 @@ Score doesn't run first by itself: layers run in list order, so keep score layer
 | **MOPA** | The 60 W, 1064 nm MOPA fiber laser. | Metals (including colour on stainless steel and titanium) and some plastics. |
 
 Choosing **MOPA** shows **Pulse width** and **Frequency**. The card adds " · MOPA". MOPA work is
-moved by the offset measured with **Align MOPA** on the Camera tab, so both lasers land in the
+moved by the offset measured with **Align lasers** (Machine → Calibrate), so both lasers land in the
 same place (see [Camera](camera.md)).
 
 ## Power, speed and passes
@@ -169,7 +169,7 @@ longer jobs and more heat (thin sheet can warp)."
 
 ## Picture settings
 
-On Picture layers. The picture's own brightness, contrast and the rest are set on the Picture tab
+On Picture layers. The picture's own brightness, contrast and the rest are set in the Selection panel and on the Picture tab
 (see [Pictures](pictures.md)); these say how it's burned.
 
 ![Layer settings of a picture layer](images/layer-settings-picture.png)
@@ -182,7 +182,7 @@ dpi. In Depth slices mode it sets the size of the depth cells instead. A picture
 40 million dots: make it smaller or lower the resolution if the job says it needs more.
 
 > **Tip:** On basswood, finer dots at proportionally lower power (the same energy) came out lighter
-> with a smoother gradient in the first Line tests. Laser → **Line test** compares settings side
+> with a smoother gradient in the first Line tests. Materials & Tests → Tests → **Line test** compares settings side
 > by side (see [Materials and tests](materials-and-tests.md)).
 
 ### Picture mode
@@ -312,7 +312,7 @@ way.
 
 - Open paths are cut as drawn; the checks say how many.
 - An outline narrower than the kerf disappears; the checks say how many were left out.
-- Laser → **Cut test** measures the kerf of your material and saves it with it (see
+- Materials & Tests → Tests → **Cut test** measures the kerf of your material and saves it with it (see
   [Materials and tests](materials-and-tests.md)).
 
 ### Tabs
@@ -483,7 +483,7 @@ the head more than 10 mm.
   the checks say so, so it can't put in more heat than you set.
 - **Burn rows in both directions**: on to start. Off: every row burns left to right and the head
   goes back unlit. Slower, but rows can't be shifted against each other by the direction (a woven
-  look). Laser → **Line test** compares both.
+  look). Materials & Tests → Tests → **Line test** compares both.
 - **Scan angle (°)**: the direction the rows run, −180 to 180 (0 = left to right).
 - **Turn per pass (°)**: with several passes, each one runs its rows this much further round, so no
   row lies on top of another and the row pattern averages out. Pull the power back so all the
@@ -531,7 +531,7 @@ mm).
 The fill line settings also apply to each slice: **Scan angle (°)**, **Overscan (mm)**, **Dot width
 (mm)**, **Turn per pass (°)** (each slice turned further; 37° when you switch to this mode) and
 **Keep turning from run to run**. Depth slices haven't been burned on the machine yet: start with a
-small test on scrap. Laser → **Etch rate** measures how deep one pass goes (see
+small test on scrap. Materials & Tests → Tests → **Etch rate** measures how deep one pass goes (see
 [Materials and tests](materials-and-tests.md)); 3D models and stacked slices makes
 depth maps from 3D models.
 
@@ -549,7 +549,7 @@ on metal. Hardly any slower on a galvo. Lines about 0.4 mm apart are burned in e
 
 On the machine: confirmed that it takes picture rows out of order. On basswood pictures, spreading
 left visible rows (lines burned beside already-charred ones come out darker); with it off there
-were no rows but the picture was darker and blotchier. Try it with Laser → **Line test** before
+were no rows but the picture was darker and blotchier. Try it with Materials & Tests → Tests → **Line test** before
 using it on wood pictures. Its effect on thin acrylic and on colours on steel is still to be
 compared.
 

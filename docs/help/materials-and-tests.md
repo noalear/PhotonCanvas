@@ -1,17 +1,49 @@
 # Materials and tests
 
 Every material takes the laser differently, and the numbers that work on one board may scorch the
-next. The tests on the **Laser** tab burn small, labelled samples on a scrap of your material and
-help you read them, so you can pick settings from what really happened. What you find goes into the
+next. The tests burn small, labelled samples on a scrap of your material and help you read them, so
+you can pick settings from what really happened. What you find goes into the
 [Material library](material-library.md), ready to put on a layer.
 
-The **Test grid** and **Record results** are part of the program. The other tests come with add-ons
-that are on unless you turn them off in Settings → Add-ons: the **Material tests** add-on (the
-**Tests** group: Etch rate, Cut test, Exact depth, Tone test, Line test, Inlay, Bevel test, Graphene
-test) and the **Colour on metal** add-on (Colour test, Measure colours). Each has its own page under
-**Add-ons** in the contents, with the details and tutorials.
+All of them are on the **Materials & Tests** tab: **Library** opens the material library, and
+**Tests** opens the Tests window, where every test is picked from one list (see
+[The Tests window](#the-tests-window)).
 
-![The Laser tab: the Materials group on the left](images/ribbon-laser.png)
+The **Test grid** and **Record results** are part of the program. The other tests come with add-ons
+that are on unless you turn them off in Settings → Add-ons: the **Material tests** add-on (Etch
+rate, Cut test, Exact depth, Tone test, Line test, Inlay, Bevel test, Graphene test), the **Recipe
+tuner** add-on and the **Colour on metal** add-on (Colour test, Measure colours). Each has its own
+page under **Add-ons** in the contents, with the details and tutorials.
+
+Calibration done once for the machine rather than per material is on **Machine → Calibrate**: the
+camera, the close-up position, lining the two lasers up, and the **Kerf gauge** add-on.
+
+![The Materials & Tests tab](images/ribbon-materials-tests.png)
+
+## The Tests window
+
+<!-- windows: TestsWindow -->
+
+**Tests** (Materials & Tests tab) opens the **Tests** window. Pick a test from the **Test** list:
+under it, the window says what the test finds out. Click **Open** to start it; its own window opens
+as before. The window opens on the test you used last.
+
+The list is in groups:
+
+| Group | Tests |
+|---|---|
+| Find the settings | **Test grid**, **Record results** (rate a burned test grid), **Cut test**, **Etch rate**, **Recipe tuner** |
+| Pictures | **Tone test**, **Line test** |
+| Colour on metal | **Colour test**, **Measure colours** (read a burned colour test) |
+| Use your results | **Exact depth**, **Inlay** |
+| Machine checks | **Bevel test** |
+| Experimental | **Graphene test** |
+
+A test that needs something first (a selection, a burned test, a connected machine) shows a note
+and **Open** stays grey until it's there. Tests from add-ons are only listed while their add-on is
+on.
+
+▶ [Find the right test](tutorial:mat-tests-window)
 
 ## Which test answers which question
 
@@ -77,11 +109,11 @@ The **Bevel test** is done once for the machine, not per material.
 
 **Update photo** in a test window takes a fresh photo with the overview camera, the same as
 **Photo** in the machine panel: it needs the machine connected and the camera calibrated
-(**Camera → Calibrate**, see [Camera](camera.md)). The photo is straightened onto the bed, and
+(**Machine → Calibrate camera**, see [Camera](camera.md)). The photo is straightened onto the bed, and
 each square, circle or patch is cut out of it where its shape is. A camera calibrated at another
 height than the material's shows the wrong spot; **Etch rate** warns when that may be so.
 
-The close-up camera in the head gives sharper photos. Once **Camera → Close-up position** has
+The close-up camera in the head gives sharper photos. Once **Machine → Close-up position** has
 taught PhotonCanvas where it looks at the current focus height (within 0.5 mm), the **Tone test**
 and **Line test** offer to place the test where it sees, the work area outlines that spot while
 such a test is in the design, and **Close-up photo** reads the results from a straightened close-up

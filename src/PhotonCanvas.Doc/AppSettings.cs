@@ -76,7 +76,7 @@ public sealed class AppSettings
     public bool QuickProcessing { get; set; }
     /// <summary>The auto-focus distance measured on the empty bed (mm): material thickness is the difference from it.</summary>
     public double? BedFocusMm { get; set; }
-    /// <summary>How far the MOPA lands from the blue laser (mm), measured with Camera → Align MOPA.</summary>
+    /// <summary>How far the MOPA lands from the blue laser (mm), measured with Machine → Align lasers.</summary>
     public double MopaOffsetX { get; set; }
     public double MopaOffsetY { get; set; }
     /// <summary>The galvo's pivot heights (mm), measured with the bevel test: for slopes across (edges running down the field) and down (edges running across).</summary>
@@ -121,6 +121,8 @@ public sealed class AppSettings
     public bool ShowGrid { get; set; } = true;
     /// <summary>Draw pictures as they'll come out on their layer's material (where it has a tone test).</summary>
     public bool PicturesAsBurned { get; set; }
+    /// <summary>The test last opened from the Tests window (Materials &amp; Tests → Tests), picked again next time.</summary>
+    public string? LastTest { get; set; }
     public bool SnapToObjects { get; set; } = true;
     public bool SnapToGrid { get; set; }
     public double SnapDistancePx { get; set; } = 8;

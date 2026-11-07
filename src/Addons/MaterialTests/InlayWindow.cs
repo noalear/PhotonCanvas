@@ -85,7 +85,7 @@ public sealed class InlayWindow : Window
         int passes = Inlay.Passes(o);
         _plan.Text = $"Pocket: {passes} pass{(passes == 1 ? "" : "es")} of {o.EtchMmPerPass:0.###} mm, about {passes * o.EtchMmPerPass:0.##} mm deep for {o.VeneerMm:0.##} mm of veneer, {o.GapMm:0.##} mm bigger each side. " +
                      $"Piece: cut at the drawn size (kerf {(double)(_kerf.Value ?? 0):0.###} mm allowed for)." +
-                     (Etch() is null ? "\nThe depth a pass is a guess without an etch-rate test (Laser → Etch rate): the piece may sit proud or sunk." : "");
+                     (Etch() is null ? "\nThe depth a pass is a guess without an etch-rate test (Materials & Tests → Tests → Etch rate): the piece may sit proud or sunk." : "");
     }
 
     void Make()

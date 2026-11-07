@@ -18,9 +18,9 @@ of the bed.
 Select the design to put on each piece.
 
 ## Open Every piece
-<!-- target: ribbon:Camera/Every piece -->
+<!-- target: ribbon:Placement/Every piece -->
 <!-- wait: window:Place on every piece -->
-Click **Every piece** on the **Camera** tab.
+Click **Every piece** on the **Placement** tab.
 
 ## Set the height
 <!-- target: field:Distance (mm) -->

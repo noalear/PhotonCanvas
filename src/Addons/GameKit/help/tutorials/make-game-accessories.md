@@ -7,9 +7,9 @@ Dice towers, card stands, initiative trackers and gauges all slot together from 
 whole table's worth is one job on the laser.
 
 ## Open the game accessories maker
-<!-- target: ribbon:Designer/Game kit -->
+<!-- target: ribbon:Mini-Designer/Game kit -->
 <!-- wait: window:Game accessories -->
-Click **Game kit** on the **Designer** tab (in the **Minis & games** group).
+Click **Game kit** on the **Mini-Designer** tab (in the **Accessories** group).
 
 ## Set the sheet
 <!-- target: tabitem:Sheet -->

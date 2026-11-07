@@ -242,7 +242,7 @@ public sealed class MeasureColourWindow : Window
 
         if (_cells.Count == 0)
         {
-            _step.Text = "There's no colour test in this design. Add one with Laser → Colour test, burn it, then come back here with a scan or photo of it.";
+            _step.Text = "There's no colour test in this design. Add one with Materials & Tests → Tests → Colour test, burn it, then come back here with a scan or photo of it.";
             open.IsEnabled = cam.IsEnabled = closeUp.IsEnabled = false;
         }
         ModeChanged();

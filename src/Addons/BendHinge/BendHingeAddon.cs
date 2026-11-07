@@ -2,7 +2,7 @@ using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.BendHinge;
 
-/// <summary>"Bend to shape": a button in Home → Draw that opens the bend-to-shape hinge window.</summary>
+/// <summary>"Bend to shape": a button in Import → Generate that opens the bend-to-shape hinge window.</summary>
 public sealed class BendHingeAddon : IAddon
 {
     /// <summary>An arch with slits in it.</summary>
@@ -14,10 +14,11 @@ public sealed class BendHingeAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Home", "Draw", "Bend to shape", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Import", "Generate", "Bend to shape", Icon, Open)
         {
             Large = true,
             Tip = "A living hinge that bends a flat panel into the selected curve: slits only where it bends, closer where it bends tighter",
+            Order = 13,
         });
         host.AddCommand(new AddonCommand("bendhinge.open", "Shapes", "Bend to shape…", "", Open));
     }

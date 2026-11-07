@@ -7,7 +7,7 @@ Drawings are often made with a colour per operation: red to cut, blue to score, 
 Importing by colour puts each colour on its own layer, so each gets its settings in one place.
 
 ## Click By colour
-<!-- target: ribbon:Home/By colour -->
+<!-- target: ribbon:Import/By colour -->
 <!-- wait: shapes:+1 -->
 Click **By colour** (`Ctrl+Shift+I`) and choose the drawing in the window that opens.
 

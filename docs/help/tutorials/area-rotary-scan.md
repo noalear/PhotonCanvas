@@ -8,14 +8,14 @@ to see its shape and how it sits on the axis. The laser isn't fired, but the rot
 head moves. Experimental: not yet tried on the machine.
 
 ## Choose the rotary
-<!-- target: ribbon:Laser/Work mode -->
+<!-- target: ribbon:Machine/Work mode -->
 Scan the part shows in the rotary work mode. Click **Work mode**, choose **Rotary**, check the
 **Laser line (mm)** sits over the top of the part, and click **OK**.
 
 ## Open Scan the part
-<!-- target: ribbon:Laser/Scan the part -->
+<!-- target: ribbon:Machine/Scan the part -->
 <!-- wait: window:Scan the part -->
-Click **Scan the part** on the **Laser** tab.
+Click **Scan the part** on the **Machine** tab.
 
 ## Choose how it measures
 <!-- target: field:Measure with -->

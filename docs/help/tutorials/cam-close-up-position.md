@@ -13,9 +13,9 @@ This needs the machine connected (see [The machine and settings](machine.md)). P
 the head and focus on it at the height you'll use.
 
 ## Open Close-up position
-<!-- target: ribbon:Camera/Close-up position -->
+<!-- target: ribbon:Machine/Close-up position -->
 <!-- wait: window:Close-up camera position -->
-Click **Close-up position** on the **Camera** tab.
+Click **Close-up position** on the **Machine** tab.
 
 ## See what the camera sees
 <!-- target: button:Take a look -->
@@ -32,12 +32,12 @@ spare.
 Click **Add the dots to the design**. They go on a "Close-up marks" layer, and the window closes.
 
 ## Check where they land
-<!-- target: ribbon:Laser/Frame -->
+<!-- target: ribbon:Machine/Frame -->
 Click **Frame** and watch the close-up camera live (**Close-up** in the machine panel, then **Live**): the red light
 should trace the dots well inside the picture. Move them if not.
 
 ## Burn them
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Set the "Close-up marks" layer's power so the dots come out dark, click **Ship It** and press the
 machine's start button.
 

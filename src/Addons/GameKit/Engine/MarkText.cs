@@ -6,7 +6,7 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.GameKit;
 
 /// <summary>
-/// The handwriting fonts made with the Handwriting to font add-on (Home → Draw → Handwriting), read
+/// The handwriting fonts made with the Handwriting to font add-on (Import → Generate → Handwriting), read
 /// straight from its data folder: single-line fonts, so numbers written in them are scored, one pass
 /// of the beam down each pen stroke. Nothing here needs that add-on to be on.
 /// </summary>
@@ -177,7 +177,7 @@ public sealed class Ink(Markings marks, string sheetFont, Maker? maker = null)
             string name = FontName[HandFonts.Prefix.Length..];
             var f = HandFonts.Find(name);
             if (f is null && maker is not null && !maker.Findings.Any(x => x.Text.Contains(name, StringComparison.Ordinal)))
-                maker.Warn($"The handwriting font \"{name}\" isn't on this computer (make it with Home → Draw → Handwriting): the numbers are in {(string.IsNullOrWhiteSpace(sheetFont) ? "Arial" : sheetFont)} instead.");
+                maker.Warn($"The handwriting font \"{name}\" isn't on this computer (make it with Import → Generate → Handwriting): the numbers are in {(string.IsNullOrWhiteSpace(sheetFont) ? "Arial" : sheetFont)} instead.");
             return f;
         }
     }

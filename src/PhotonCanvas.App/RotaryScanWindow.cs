@@ -288,7 +288,7 @@ public sealed class RotaryScanWindow : Window
         {
             var cal = SurfaceProbe.LoadCalibration();
             _methodNote.Text = cal is null
-                ? "⚠ The pointer isn't calibrated yet: calibrate it once in Laser → Curved surface (a flat board), then come back."
+                ? "⚠ The pointer isn't calibrated yet: calibrate it once in Machine → Curved surface (a flat board), then come back."
                 : $"Focus on the top of the part first: the head starts there. It reads about {Reach(cal):0} mm either side of where it's focused and tries other heights for places it misses. " +
                   $"The close-up camera was calibrated over X {cal.Aims.Min(a => a.X):0}–{cal.Aims.Max(a => a.X):0} and Y {cal.Aims.Min(a => a.Y):0}–{cal.Aims.Max(a => a.Y):0} mm: places outside that may not be read.";
         }
@@ -438,14 +438,14 @@ public sealed class RotaryScanWindow : Window
     {
         SaveFields();
         if (_machine.Client is not { IsConnected: true } client) { _status.Text = "Connect to the machine first."; return; }
-        if (WorkModes.From(_settings) is not WorkMode.Rotary) { _status.Text = "Choose the rotary in Laser → Work mode first."; return; }
+        if (WorkModes.From(_settings) is not WorkMode.Rotary) { _status.Text = "Choose the rotary in Machine → Work mode first."; return; }
         if (_machine.Mode is "P_WORKING" or "P_PAUSE" or "P_FRAMING" or "P_WORK") { _status.Text = "The machine has a job on it. Wait for it to finish (or stop it) first."; return; }
         var plan = Plan();
         Core.Camera.PointerCalibration? cal = null;
         double startFocus = 0;
         if (Pointer)
         {
-            if ((cal = SurfaceProbe.LoadCalibration()) is null) { _status.Text = "Calibrate the pointer first (Laser → Curved surface → Calibrate the pointer)."; return; }
+            if ((cal = SurfaceProbe.LoadCalibration()) is null) { _status.Text = "Calibrate the pointer first (Machine → Curved surface → Calibrate the pointer)."; return; }
             if (_machine.Distance is not { } focus) { _status.Text = "Focus on the top of the part first (auto-focus, or type its height in the machine panel)."; return; }
             startFocus = focus;
         }
@@ -521,7 +521,7 @@ public sealed class RotaryScanWindow : Window
         try
         {
             double u = await RotaryTurn.FeedUnitsAsync(_settings, _machine, degrees)
-                       ?? throw new InvalidOperationException("Choose the rotary in Laser → Work mode first.");
+                       ?? throw new InvalidOperationException("Choose the rotary in Machine → Work mode first.");
             await _machine.TurnRotaryNowAsync(u);
             _status.Text = done;
         }

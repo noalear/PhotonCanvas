@@ -6,7 +6,7 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
-/// Laser → Tests: etch rate, cut test (kerf and slot fit), exact depth, tone, line, bevel and
+/// Materials & Tests → Tests: etch rate, cut test (kerf and slot fit), exact depth, tone, line, bevel and
 /// graphene tests, and Inlay (built on the etch and cut results). A burned test opens its results
 /// when the job finishes.
 /// </summary>
@@ -18,43 +18,51 @@ public sealed class MaterialTestsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        Add(new RibbonButton("Laser", "Tests", "Etch rate", "IcDepth", () => _ = host.Guard(() => Etch(HasEtch())))
+        Add(new RibbonButton("Tests", "Find the settings", "Etch rate", "IcDepth", () => _ = host.Guard(() => Etch(HasEtch())))
         {
             Large = true,
             Tip = "How deep one pass goes: circles burned 1, 2, 3 … passes until one goes right through; saved with the material",
+            Order = -9,
         });
-        Add(new RibbonButton("Laser", "Tests", "Cut test", "IcTestGrid", () => _ = host.Guard(() => Cut(CutTestWindow.InDesign(Doc.State))))
+        Add(new RibbonButton("Tests", "Find the settings", "Cut test", "IcTestGrid", () => _ = host.Guard(() => Cut(CutTestWindow.InDesign(Doc.State))))
         {
             Large = true,
             Tip = "Find the cut: small squares at different speeds and passes, see which drop out; then the kerf and the slot fit at that setting; saved with the material",
+            Order = -10,
         });
-        Add(new RibbonButton("Laser", "Tests", "Exact depth", "IcDepth", () => _ = host.Guard(ExactDepth))
+        Add(new RibbonButton("Tests", "Use your results", "Exact depth", "IcDepth", () => _ = host.Guard(ExactDepth))
         {
             Large = true,
             Tip = "Engrave the selected shapes to an exact depth: the red pointer measures the surface, then the depth after each round of passes, and works out the next round",
+            Order = 0,
         });
-        Add(new RibbonButton("Laser", "Tests", "Tone test", "IcPalette", () => _ = host.Guard(() => Tone(ToneTestWindow.InDesign(Doc.State))))
+        Add(new RibbonButton("Tests", "Pictures", "Tone test", "IcPalette", () => _ = host.Guard(() => Tone(ToneTestWindow.InDesign(Doc.State))))
         {
             Large = true,
             Tip = "Photos that come out as they look: grey patches burned with a picture layer's settings, read by the camera, and that layer's pictures corrected for the material",
+            Order = 0,
         });
-        Add(new RibbonButton("Laser", "Tests", "Line test", "IcLine", () => _ = host.Guard(() => Line(LineTestWindow.InDesign(Doc.State))))
+        Add(new RibbonButton("Tests", "Pictures", "Line test", "IcLine", () => _ = host.Guard(() => Line(LineTestWindow.InDesign(Doc.State))))
         {
             Large = true,
             Tip = "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side",
+            Order = 1,
         });
-        Add(new RibbonButton("Laser", "Tests", "Inlay", "IcLayers", () => _ = host.Guard(Inlay))
+        Add(new RibbonButton("Tests", "Use your results", "Inlay", "IcLayers", () => _ = host.Guard(Inlay))
         {
             Tip = "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)",
             Enabled = () => SelectedPaths().Count > 0,
+            Order = 1,
         });
-        Add(new RibbonButton("Laser", "Tests", "Bevel test", "IcMeasure", () => _ = host.Guard(() => Bevel(PhotonCanvas.Doc.Bevel.InDesign(Doc.State))))
+        Add(new RibbonButton("Tests", "Machine checks", "Bevel test", "IcMeasure", () => _ = host.Guard(() => Bevel(PhotonCanvas.Doc.Bevel.InDesign(Doc.State))))
         {
             Tip = "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges",
+            Order = 0,
         });
-        Add(new RibbonButton("Laser", "Tests", "Graphene test", "IcBolt", () => _ = host.Guard(() => Graphene(GrapheneTestWindow.InDesign(Doc.State))))
+        Add(new RibbonButton("Tests", "Experimental", "Graphene test", "IcBolt", () => _ = host.Guard(() => Graphene(GrapheneTestWindow.InDesign(Doc.State))))
         {
             Tip = "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter",
+            Order = 0,
         });
 
         // Tone and line tests are read from the close-up camera: show where it looks while one is in the design.
@@ -73,7 +81,7 @@ public sealed class MaterialTestsAddon : IAddon
     List<PathShape> SelectedPaths() => Doc.State.Shapes.Where(s => Doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList();
 
     /// <summary>The Tests group goes just after Materials.</summary>
-    void Add(RibbonButton b) => _host.AddRibbonButton(b with { GroupAfter = "Materials" });
+    void Add(RibbonButton b) => _host.AddRibbonButton(b);
 
     /// <summary>A burned test: straight to its results (one at a time, as before).</summary>
     void Finished(string? from)

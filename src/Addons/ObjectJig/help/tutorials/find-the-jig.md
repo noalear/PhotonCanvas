@@ -17,9 +17,9 @@ Lay the jig on the bed with the objects in it and nothing touching it, and measu
 top.
 
 ## Open Find the jig
-<!-- target: ribbon:Camera/Find the jig -->
+<!-- target: ribbon:Placement/Find the jig -->
 <!-- wait: window:Find the jig -->
-Click **Find the jig** on the **Camera** tab.
+Click **Find the jig** on the **Placement** tab.
 
 ## Find it
 <!-- target: button:Take photo and find the jig -->

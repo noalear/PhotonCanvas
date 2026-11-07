@@ -20,7 +20,7 @@ public static class RotaryTurn
     {
         if (WorkModes.From(settings) is not WorkMode.Rotary mode)
         {
-            await Dialogs.Message(owner, "Not on the rotary", "Choose the rotary in Laser → Work mode first.");
+            await Dialogs.Message(owner, "Not on the rotary", "Choose the rotary in Machine → Work mode first.");
             return false;
         }
         if (Math.Abs(degrees) < 0.05) return true;

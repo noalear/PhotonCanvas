@@ -8,9 +8,9 @@ becomes a tested recipe with a photo of that square. You need the burned grid st
 the machine connected and the camera calibrated.
 
 ## Open Record results
-<!-- target: ribbon:Laser/Record results -->
+<!-- target: ribbon:Tests/Record results -->
 <!-- wait: window:Record material test results -->
-Click **Record results** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Record results** in the list and click **Open**.
 
 ## Pick the material
 <!-- target: field:Material -->

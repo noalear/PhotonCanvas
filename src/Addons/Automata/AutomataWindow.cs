@@ -307,10 +307,10 @@ public sealed class AutomataWindow : Window
         if (Cut() is not { } c)
         {
             _cutNote.Text = Kind == 1
-                ? "Pick your card's cut settings so the holes come out their drawn size (Laser → Tests → Cut test measures the kerf)."
+                ? "Pick your card's cut settings so the holes come out their drawn size (Materials & Tests → Tests → Cut test measures the kerf)."
                 : Kind == 2
-                ? "Pick your spring steel's cut settings so the tines come out their drawn width (Laser → Tests → Cut test measures the kerf). The clamp bars go on a page of their own, on a layer for the thicker plate."
-                : "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out looser and holes bigger. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for parts at their drawn size.";
+                ? "Pick your spring steel's cut settings so the tines come out their drawn width (Materials & Tests → Tests → Cut test measures the kerf). The clamp bars go on a page of their own, on a layer for the thicker plate."
+                : "No kerf allowance: the laser burns each edge back by half its kerf, so slots come out looser and holes bigger. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for parts at their drawn size.";
             return;
         }
         var notes = new List<string>();

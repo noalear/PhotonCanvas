@@ -23,9 +23,9 @@ Tick **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
 **My own rotary (homemade or another make)** or **Conveyor feeder**, then close Settings.
 
 ## Open Work mode
-<!-- target: ribbon:Laser/Work mode -->
+<!-- target: ribbon:Machine/Work mode -->
 <!-- wait: window:Work mode -->
-Click **Work mode** on the **Laser** tab.
+Click **Work mode** on the **Machine** tab.
 
 ## Choose the mode
 <!-- target: window:Work mode -->
@@ -41,7 +41,7 @@ Click **Rotary** or **Conveyor** at the top.
 Click **OK**. The work area changes size: once round the object, or 610 mm of belt.
 
 ## Try it on scrap
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Fit the attachment as xTool describes. **Frame** only traces a thin line where the laser will draw
 (the **Laser line**); ship a small test mark first. If you stop a rotary job part way, the object
 stays turned: click the **Rotary** chip in the job bar (or **Return rotary to start** in Work mode)

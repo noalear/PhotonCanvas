@@ -7,9 +7,9 @@ Photos and artwork are engraved dot by dot from a Picture layer. This brings one
 you want it and adjusts its tones before it's engraved.
 
 ## Import a picture
-<!-- target: ribbon:Picture/Import picture -->
+<!-- target: ribbon:Import/Picture -->
 <!-- wait: picture-selected -->
-Click **Import picture** (`Ctrl+J`) and choose a photo. It lands in the middle of the work area,
+Click **Picture** on the **Import** tab (`Ctrl+J`) and choose a photo. It lands in the middle of the work area,
 selected, on a Picture layer.
 
 ## The Picture tab lights up

@@ -4,7 +4,7 @@
 <!-- page: layer-settings.md#power-speed-and-passes -->
 <!-- order: 70 -->
 Power, speed and passes decide how deep and how dark a layer burns. Find good values for a
-material with a test (Laser → **Test grid** or **Cut test**), then set them here.
+material with a test (Materials & Tests → Tests → **Test grid** or **Cut test**), then set them here.
 
 ## Choose the laser
 <!-- target: button:Diode · blue -->

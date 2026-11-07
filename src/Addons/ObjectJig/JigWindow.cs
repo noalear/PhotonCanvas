@@ -258,7 +258,7 @@ public sealed class JigWindow : Window
         if (!_host.IsConnected) text = "Connect to the machine to photograph the object (or select its drawn outline).";
         else if (_distance.Value is not { } d) text = "Enter the distance to the bed the object lies on.";
         else if (PhotoDistance((double)d) is not { } at || at <= 0) text = "The object is taller than the distance: check both.";
-        else if (!_host.CameraCalibratedFor(at)) text = $"The camera isn't calibrated near {at:0.#} mm (halfway up the object) yet: Camera tab → Calibrate.";
+        else if (!_host.CameraCalibratedFor(at)) text = $"The camera isn't calibrated near {at:0.#} mm (halfway up the object) yet: Machine → Calibrate camera.";
         else { ok = true; text = $"Camera ready (lined up at {at:0.#} mm, halfway up the object)."; }
         _cameraState.Text = (ok ? "✓ " : "⚠ ") + text;
         _cameraState.Foreground = Brush(ok ? "Ok" : "Warn");
@@ -419,7 +419,7 @@ public sealed class JigWindow : Window
             _host.Document.Commit("Object jig", s);
             _host.Status(_cutPages.IsChecked == true
                 ? $"\"{o.Title}\" is on new pages: cut the jig from the first, leave it on the bed, put the objects in, then mark them from \"{o.Title} · objects\"."
-                : $"\"{o.Title} · objects\" is ready: lay the jig on the bed and use Find the jig (Camera tab) to line the design up with it.");
+                : $"\"{o.Title} · objects\" is ready: lay the jig on the bed and use Find the jig (Placement tab) to line the design up with it.");
             Close();
         }
         catch (InvalidOperationException e) { _summary.Text = e.Message; }

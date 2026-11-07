@@ -8,9 +8,9 @@ deepest. It goes on a depth-slices layer to be carved down step by step. Carving
 tried on the machine yet.
 
 ## Open 3D model
-<!-- target: ribbon:Picture/3D model -->
+<!-- target: ribbon:Import/3D model -->
 <!-- wait: window:3D model to relief -->
-Click **3D model** on the **Picture** tab.
+Click **3D model** on the **Import** tab.
 
 ## Open the model
 <!-- target: button:Open STL -->

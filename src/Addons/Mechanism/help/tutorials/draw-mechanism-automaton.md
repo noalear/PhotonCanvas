@@ -8,9 +8,9 @@ platform that its own cam lifts. You need your material's real thickness, a squa
 shaft and a round one for the handle.
 
 ## Open the mechanism maker
-<!-- target: ribbon:Designer/Mechanisms -->
+<!-- target: ribbon:Import/Mechanisms -->
 <!-- wait: window:Mechanism maker -->
-Click **Mechanisms** on the **Designer** tab (in the **Toys** group).
+Click **Mechanisms** on the **Import** tab (in the **Generate** group).
 
 ## Choose Automaton box
 <!-- target: tabitem:Automaton box -->

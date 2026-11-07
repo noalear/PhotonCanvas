@@ -5,12 +5,12 @@
 <!-- order: 60 -->
 On polished stainless the MOPA's pulses can form tiny diffraction gratings that split light into
 rainbows. This turns a picture into grating pixels that light up as the plate tilts. Run a grating
-test first (Laser → Colour test, Diffraction gratings) to find your power and green pitch.
+test first (Materials & Tests → Tests → Colour test, Diffraction gratings) to find your power and green pitch.
 
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Diffraction
 <!-- target: ribbon:Picture/Diffraction -->

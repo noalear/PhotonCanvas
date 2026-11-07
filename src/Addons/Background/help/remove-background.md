@@ -1,6 +1,6 @@
 # Remove background
 
-This add-on makes a picture's backdrop see-through so it isn't engraved, on your computer with nothing sent online. It adds **Remove background** to the Picture tab (in **Clean up**), to the right-click menu and to the Selection panel's Picture settings.
+This add-on makes a picture's backdrop see-through so it isn't engraved, on your computer with nothing sent online. It adds **Remove background** to the Picture tab (in its **Edit** group), to the right-click menu and to the Selection panel's Picture settings.
 
 ## Remove background
 <!-- windows: BackgroundWindow -->

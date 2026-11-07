@@ -179,7 +179,7 @@ static class MoreShots
         browser.Close();
         settle(200);
         if (ownFolder) try { Directory.Delete(models, true); } catch (Exception) { }
-        // The pawn as a relief (Picture → 3D model), seen from the front.
+        // The pawn as a relief (Import → 3D & maps → 3D model), seen from the front.
         var relief = new PhotonCanvas.Addon.Relief.StlWindow();
         relief.Show(w);
         settle(300);
@@ -648,7 +648,7 @@ static class MoreShots
     {
         reset();
         var ribbon = F<Ribbon>(w, "_ribbon");
-        if (!ribbon.Commands.TryGetValue("Home/Handwriting", out var button)) { Console.WriteLine("no Home/Handwriting button (add-on not built?)"); return; }
+        if (!ribbon.Commands.TryGetValue("Import/Handwriting", out var button)) { Console.WriteLine("no Import/Handwriting button (add-on not built?)"); return; }
         Window? Opened<T>() => w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == typeof(T).Name);
         click(button);
         settle(800);

@@ -8,9 +8,9 @@ place. The slicer can number them, mark where the next one sits, and cut holes f
 that hold them in line while the glue dries.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

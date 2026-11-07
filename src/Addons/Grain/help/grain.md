@@ -21,13 +21,12 @@ Open it with **Grain** on the **Picture** tab. The window stays open beside the 
 ## Map the grain
 
 1. Put the board on the bed and close the lid. Calibrate the camera at about the board's height first
-   if you haven't (**Camera → Calibrate**), so the picture lines up with the bed.
+   if you haven't (**Machine → Calibrate camera**), so the picture lines up with the bed.
 2. Click **Take a camera picture**. Nothing moves and the laser stays off.
 3. Choose what to map in **Map over**:
    - **Around the design**: under the layers' shapes and 10 mm round them. Enough to even out an
      engraving.
-   - **The selected shapes (the board's outline)**: select the board's outline first (**Home → Pick
-     piece** outlines it from the camera picture with one click). Only the board is mapped, nothing round it.
+   - **The selected shapes (the board's outline)**: select the board's outline first (**Placement → Pick piece** outlines it from the camera picture with one click). Only the board is mapped, nothing round it.
      Use this before placing a picture on the grain.
    - **The whole camera picture**: everything the camera sees.
 4. Click **Map the grain**. The line above the buttons says how strongly the grain shows (how much

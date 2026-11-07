@@ -1,6 +1,6 @@
 # Building editor
 
-An add-on (Settings → Add-ons → **Building editor**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors**, **Roofs and towers** and **Whole-building kits** add-ons, which make its pieces. Its button is **Designer → Buildings → Build**, and **Edit in the building editor…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Building editor**): on when PhotonCanvas is installed, and can be turned off. It needs the **Textured wall maker**, **Mini furniture maker**, **Floor tile maker**, **Stairs, ladders and floors**, **Roofs and towers** and **Whole-building kits** add-ons, which make its pieces. Its button is **Mini-Designer → Buildings → Build**, and **Edit in the building editor…** is on the right-click menu of the pieces it made.
 
 **Build** lets you draw a building yourself, floor by floor, the way you build a house in a
 life-sim game: drag out rooms, draw walls along the grid or corner to corner, drop doors and windows
@@ -24,7 +24,7 @@ go into slotted columns, floors that lie on the walls, and jigsaw floor tiles to
 
 ![A two-storey house in the building editor: the ground floor's plan on the left, the house in 3D with the near walls cut away in the middle](images/window-houseeditor-ground.png)
 
-Click **Build** on the **Designer** tab (in the **Buildings** group). The **Building editor** opens on the
+Click **Build** on the **Mini-Designer** tab (in the **Buildings** group). The **Building editor** opens on the
 last building you drew (a small two-room house the first time). Along the top are the tools, the
 floors, and **Save…** and **Saved buildings…** ([Saved buildings](#saved-buildings)); on the left is the **Plan**, the floor you're on seen from above on a grid of squares; in the
 middle, **Put together** shows the whole building in 3D and **Pieces** shows every piece flat; down
@@ -96,8 +96,7 @@ rooms says which way on the plan each side faces.
   the design** adds a page after the walls' sheet, "… · backs (turn the pieces over)", with each
   piece's back on **Building · back etch** and its outline on **Building · back outline (guide)**,
   which isn't burned. The outline is named with the piece's number. Cut the sheet, turn those pieces
-  over left to right, select each piece's group on the backs page and use **Camera** → **Fit to
-  piece**: only the outline is matched, and the engraving moves with it. Then run the page. See
+  over left to right, select each piece's group on the backs page and use **Placement** → **Fit to piece**: only the outline is matched, and the engraving moves with it. Then run the page. See
   [The back of a single panel](walls.md#the-back-of-a-single-panel).
 - **Box walls**: the back face is a piece of its own, so it simply gets the other side's texture.
 

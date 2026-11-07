@@ -5,7 +5,7 @@
 <!-- order: 200 -->
 A picture is burned row by row, and the rows can show: shifted against each other, or darker where
 the heat built up. These settings change how the rows are laid down. You need a picture on a
-Picture layer (Home → **Picture** imports one).
+Picture layer (Import → **Picture** imports one).
 
 ## Select the picture
 <!-- target: canvas -->
@@ -33,4 +33,4 @@ For a picture already prepared at the right size, tick **Pass-through (the file'
 one dot per pixel, never denser than the **Resolution**.
 
 ## Compare on scrap
-Laser → **Line test** (from the Material tests add-on) burns the same patch with one change each, side by side.
+Materials & Tests → Tests → **Line test** (from the Material tests add-on) burns the same patch with one change each, side by side.

@@ -37,7 +37,7 @@ sealed class RotaryPageCheck : IJobHook
         if (RotaryPage.MadeFor(state) is not { } d) yield break;
         if (options.Mode is not WorkMode.Rotary r)
         {
-            yield return $"this page is for the rotary: choose Laser → Work mode → Rotary (a chuck on the dowel), Object Ø {d:0.#} mm.";
+            yield return $"this page is for the rotary: choose Machine → Work mode → Rotary (a chuck on the dowel), Object Ø {d:0.#} mm.";
             yield break;
         }
         double want = Math.Min(Math.PI * d, WorkModes.MaxCircumferenceMm);
@@ -80,7 +80,7 @@ sealed class RotaryFinishPanel : StackPanel
             Children =
             {
                 Field("Centre dowel Ø", _dowel, tip: "The dowel the rotary's chuck holds, up the middle of the stack. Glue it in. A notch in its hole points to the side that faces the laser at the start."),
-                Field("Engrave with", _with, tip: "Settings from the material library with a measured depth a pass (Laser → Etch rate test). Every focus height uses them."),
+                Field("Engrave with", _with, tip: "Settings from the material library with a measured depth a pass (Materials & Tests → Tests → Etch rate test). Every focus height uses them."),
                 Field("Depth a pass (mm)", _pass, tip: "How deep one pass goes on a flat piece with these settings. Nearer the dowel the lines are closer together, so the passes there go deeper: that's allowed for."),
                 Field("Focus band (mm)", _band, tip: "How far the surface may be from the focus. The stack isn't round, so the surface is split into bands by how far it is from the dowel, and each band gets its own focus height."),
                 Field("Deepest (mm)", _deepest, tip: "Never engraves deeper than this anywhere; spots that need more are left to sand."),

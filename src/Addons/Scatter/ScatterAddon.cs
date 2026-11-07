@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Scatter;
 
 /// <summary>
-/// Designer → Furniture & props → Scatter, its command and "Edit scatter terrain…" on the right-click menu, opening
+/// Mini-Designer → Furniture & props → Scatter, its command and "Edit scatter terrain…" on the right-click menu, opening
 /// <see cref="ScatterWindow"/>: barrels, fences, carts, market stalls, wells and gravestones for
 /// tabletop games. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class ScatterAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Furniture & props", "Scatter", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Furniture & props", "Scatter", Icon, Open)
         {
             Tip = "Barrels, fences, carts, market stalls, wells and gravestones that slot together, for tabletop games and models",
             Large = true,

@@ -8,7 +8,7 @@ changing the picture itself. The mask can be taken off again at any time.
 
 ## Put a shape over a picture
 <!-- target: canvas -->
-Draw a closed shape over a picture (Home tab). No picture yet? **Picture → Import picture**
+Draw a closed shape over a picture (Home tab). No picture yet? **Import → Picture**
 (`Ctrl+J`). The shape's outline shows on top of the picture, so you can see where it goes.
 
 ## Select both

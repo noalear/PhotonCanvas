@@ -1,6 +1,6 @@
 # Miniature bases
 
-An add-on (Settings → Add-ons → **Miniature bases and movement trays**): on when PhotonCanvas is installed, and can be turned off. It uses the floor tile maker's paving and the wall maker's own textures, so **Floor tile maker** and **Textured wall maker** have to be on too. Its button is **Designer → Minis & games → Bases**, and **Edit bases…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Miniature bases and movement trays**): on when PhotonCanvas is installed, and can be turned off. It uses the floor tile maker's paving and the wall maker's own textures, so **Floor tile maker** and **Textured wall maker** have to be on too. Its button is **Mini-Designer → Accessories → Bases**, and **Edit bases…** is on the right-click menu of the pieces it made.
 
 **Bases** makes bases for tabletop figures, cut from sheet material with ground etched on the top:
 cracked earth, rocks, gravel, grass, sand, swamp, forest floor, lava or ice, the same flagstones,
@@ -19,7 +19,7 @@ a hole for a magnet. It also makes **movement trays** that carry a unit of bases
 
 ![The base maker making ten 25 mm round bases and five 40 mm bases with cracked earth etched on, two layers each](images/window-bases-earth.png)
 
-Click **Bases** on the **Designer** tab (in the **Minis & games** group). The **Miniature bases** window opens. The
+Click **Bases** on the **Mini-Designer** tab (in the **Accessories** group). The **Miniature bases** window opens. The
 settings are on the left in tabs; the preview on the right shows one base of each size with its
 layers stacked (and how many of it there are) and the movement tray with bases sitting in it, and
 updates as you change things. Under it are the number of pieces and any problems: a red ✕ has to be
@@ -121,7 +121,7 @@ a bottom plate.
 
 The pieces go on three layers, run in this order: **Bases · lines** (light scoring) and **Bases ·
 etch** (the texture, a Fill layer) first, while the sheet is whole, then **Bases · cut**. Set the etch
-layer's power and speed for the depth you want (Laser → Tests → Material test helps). Glue each base's
+layer's power and speed for the depth you want (Materials & Tests → Tests → Material test helps). Glue each base's
 layers lined up on their middles, the textured one on top; with magnets, glue the magnets into the
 bottom layers first, all the same way up.
 

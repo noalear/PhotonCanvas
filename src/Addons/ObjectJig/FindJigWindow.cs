@@ -89,7 +89,7 @@ public sealed class FindJigWindow : Window
         string text;
         if (!_host.IsConnected) text = "Connect to the machine first.";
         else if (_distance.Value is not { } d) text = "Enter the distance to the top of the jig.";
-        else if (!_host.CameraCalibratedFor((double)d)) text = "The camera isn't calibrated near this height yet (Camera tab → Calibrate).";
+        else if (!_host.CameraCalibratedFor((double)d)) text = "The camera isn't calibrated near this height yet (Machine → Calibrate camera).";
         else { ok = true; text = "Camera ready."; }
         _cameraState.Text = (ok ? "✓ " : "⚠ ") + text;
         _cameraState.Foreground = Brush(ok ? "Ok" : "Warn");

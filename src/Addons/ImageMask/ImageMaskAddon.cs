@@ -3,7 +3,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.ImageMask;
 
-/// <summary>Picture → Shape → Image mask and Remove mask: set or clear a picture's <see cref="ImageShape.Clip"/>.</summary>
+/// <summary>Picture → Mask → Image mask and Remove mask: set or clear a picture's <see cref="ImageShape.Clip"/>.</summary>
 public sealed class ImageMaskAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -11,17 +11,18 @@ public sealed class ImageMaskAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Shape", "Image mask", "IcIntersect", Mask)
+        host.AddRibbonButton(new RibbonButton("Picture", "Mask", "Image mask", "IcIntersect", Mask)
         {
             Tip = "Select a picture and a closed shape: the shape masks the picture, so only the part inside it is shown and engraved",
             Large = true,
-            GroupAfter = "Turn it into",
             Enabled = () => host.SelectedPicture is not null || Selected().OfType<ImageShape>().Any(),
+            Order = 10,
         });
-        host.AddRibbonButton(new RibbonButton("Picture", "Shape", "Remove mask", "IcExclude", Unmask)
+        host.AddRibbonButton(new RibbonButton("Picture", "Mask", "Remove mask", "IcExclude", Unmask)
         {
             Tip = "Take the image mask off: the whole picture is shown and engraved again",
             Enabled = () => host.SelectedPicture is { Clip: not null },
+            Order = 11,
         });
     }
 

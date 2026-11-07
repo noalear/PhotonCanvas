@@ -7,7 +7,7 @@ Photos, scans and logos saved as pictures are engraved line by line from their p
 Importing one puts it on a picture layer, ready to size and set up.
 
 ## Click Picture
-<!-- target: ribbon:Home/Picture -->
+<!-- target: ribbon:Import/Picture -->
 <!-- wait: shapes:+1 -->
 Click **Picture** (`Ctrl+J`) and choose a PNG, JPG or other picture in the window that opens.
 

@@ -8,9 +8,9 @@ with two keys pushed into tapered slots and a photo, then saves it on your mater
 slices and inlays.
 
 ## Open the kerf gauge
-<!-- target: ribbon:Laser/Kerf gauge -->
+<!-- target: ribbon:Machine/Kerf gauge -->
 <!-- wait: window:Kerf gauge -->
-Click **Kerf gauge** on the **Laser** tab.
+Click **Kerf gauge** on the **Machine** tab.
 
 ## Choose the cut settings
 <!-- target: field:Cut with -->
@@ -26,7 +26,7 @@ Type what the sheet is sold as. The bottom slot is drawn around it.
 Click **Add the gauge to the design**, then frame and send it as usual.
 
 ## Push the keys in
-<!-- target: ribbon:Laser/Kerf gauge -->
+<!-- target: ribbon:Machine/Kerf gauge -->
 <!-- wait: window:Kerf gauge -->
 Lift out the window piece and the keys without moving the sheet. Push one key lying flat into the top slot, and slide the other, standing on its edge, along the bottom slot until each stops. Then open **Kerf gauge** again.
 

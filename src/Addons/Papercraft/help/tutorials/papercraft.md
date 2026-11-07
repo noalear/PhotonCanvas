@@ -7,9 +7,9 @@ A 3D model can be built from card: unfolded into flat pieces, cut and scored on 
 folded and glued. You need a model file (STL, OBJ or STEP); simple, faceted models work best.
 
 ## Open 3D to papercraft
-<!-- target: ribbon:Home/3D to papercraft -->
+<!-- target: ribbon:Import/3D to papercraft -->
 <!-- wait: window:Fold-up papercraft -->
-Click **3D to papercraft** on the **Home** tab. The **Fold-up papercraft** window opens.
+Click **3D to papercraft** on the **Import** tab. The **Fold-up papercraft** window opens.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

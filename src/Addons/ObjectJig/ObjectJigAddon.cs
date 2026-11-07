@@ -4,7 +4,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.ObjectJig;
 
 /// <summary>
-/// The object jig maker as an add-on: Camera → Place → Object jig and Find the jig, and two commands, all
+/// The object jig maker as an add-on: Placement → Jigs → Object jig and Find the jig, and two commands, all
 /// gone again when it's turned off. Only the camera is used (photos of the bed): it never moves the
 /// head or fires the laser; the jig and the objects are marked with the program's own Ship It.
 /// </summary>
@@ -16,16 +16,16 @@ public sealed class ObjectJigAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Object jig", "IcFitPiece", Open)
+        host.AddRibbonButton(new RibbonButton("Placement", "Jigs", "Object jig", "IcJig", Open)
         {
             Large = true,
-            Order = 40,
+            Order = 10,
             Tip = "Photograph an odd-shaped object (a pen, a phone case, a knife handle): cut a jig that holds it, with the design lined up on a page of its own",
         });
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Find the jig", "IcFrame", Find)
+        host.AddRibbonButton(new RibbonButton("Placement", "Jigs", "Find the jig", "IcFindJig", Find)
         {
             Large = true,
-            Order = 41,
+            Order = 11,
             Enabled = () => JigMaker.GuideOn(host.Document.State) is not null,
             Tip = "On a jig's objects page: photograph the bed, find the jig wherever it lies and line the design up with it",
         });

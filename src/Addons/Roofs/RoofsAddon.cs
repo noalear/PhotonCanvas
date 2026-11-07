@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Roofs;
 
 /// <summary>
-/// Designer → Buildings → Roofs and Towers, their commands and "Edit roof or tower…" on the right-click menu,
+/// Mini-Designer → Buildings → Roofs and Towers, their commands and "Edit roof or tower…" on the right-click menu,
 /// opening <see cref="RoofsWindow"/>: roofs that lift off the wall maker's buildings, and round towers
 /// stacked from rings. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -20,13 +20,13 @@ public sealed class RoofsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Roofs", RoofIcon, () => Open(tower: false))
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Buildings", "Roofs", RoofIcon, () => Open(tower: false))
         {
             Tip = "Pitched, hipped, lean-to and cone roofs with shingles, slates, tiles or thatch etched on, made to lift off buildings from Walls",
             Large = true,
             Order = 13,
         });
-        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Towers", TowerIcon, () => Open(tower: true))
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Buildings", "Towers", TowerIcon, () => Open(tower: true))
         {
             Tip = "Round towers stacked from rings, with stonework, floors, a door, windows, battlements or a cone roof, and slots for walls",
             Large = true,

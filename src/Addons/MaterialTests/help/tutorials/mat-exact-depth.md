@@ -5,8 +5,7 @@
 <!-- order: 34 -->
 Guessing the passes for a precise depth rarely works: each pass takes off less as the hole deepens.
 Exact depth measures the depth with the red pointer after each round and works out the next. You need
-the machine connected, the focus set on the material, and the pointer calibrated once (**Laser →
-Curved surface → Calibrate the pointer…**).
+the machine connected, the focus set on the material, and the pointer calibrated once (**Machine → Curved surface → Calibrate the pointer…**).
 
 ## Select the shapes
 <!-- target: canvas -->
@@ -14,9 +13,9 @@ Curved surface → Calibrate the pointer…**).
 Select the closed shapes to engrave deep. Holes narrower than about 5 mm can't be measured.
 
 ## Open Exact depth
-<!-- target: ribbon:Laser/Exact depth -->
+<!-- target: ribbon:Tests/Exact depth -->
 <!-- wait: window:Exact depth -->
-Click **Exact depth** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Exact depth** in the list and click **Open**.
 
 ## Set the depth
 <!-- target: field:Depth (mm) -->

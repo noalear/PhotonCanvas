@@ -120,7 +120,7 @@ public sealed class ColourPictureWindow : Window
 
         using (var ms = new MemoryStream(picture.Source.Pixels.EncodePng(900))) _before.Source = new Avalonia.Media.Imaging.Bitmap(ms);
         if (_palettes.Count == 0)
-            _summary.Text = "There are no measured colour palettes yet. Burn a colour test (Laser → Colour test), measure it (Laser → Measure colours) and save the palette first.";
+            _summary.Text = "There are no measured colour palettes yet. Burn a colour test (Materials & Tests → Tests → Colour test), measure it (Materials & Tests → Tests → Measure colours) and save the palette first.";
         else Update();
     }
 

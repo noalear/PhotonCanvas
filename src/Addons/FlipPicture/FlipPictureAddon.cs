@@ -15,11 +15,12 @@ public sealed class FlipPictureAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Turn it into", "Flip picture", "IcPrism", Open)
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Flip picture", "IcPrism", Open)
         {
             Large = true,
             Tip = "Two to four pictures in one polished stainless plate, each seen from its own tilt (MOPA): select 2–4 pictures",
             Enabled = () => SelectedPictures().Count is >= 2 and <= FlipOptions.MaxViews,
+            Order = 15,
         });
         host.AddCommand(new AddonCommand("flip-picture.open", "Pictures", "Flip picture…", "", Open));
     }

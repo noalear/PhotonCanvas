@@ -4,7 +4,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.Relief;
 
-/// <summary>Picture → Relief: a 3D model (STL) as a depth map on its own slices layer, and Relief preview.</summary>
+/// <summary>Import → 3D &amp; maps → 3D model: a 3D model (STL) as a depth map on its own slices layer, and Picture → Effects → Relief preview.</summary>
 public sealed class ReliefAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -13,17 +13,17 @@ public sealed class ReliefAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Relief", "3D model", "IcDepth", () => _ = host.Guard(AddModel))
+        host.AddRibbonButton(new RibbonButton("Import", "3D & maps", "3D model", "IcDepth", () => _ = host.Guard(AddModel))
         {
             Tip = "A 3D model (STL) as a depth map, on a depth-slices layer",
             Large = true,
-            GroupAfter = "Edit",
+            Order = 12,
         });
-        host.AddRibbonButton(new RibbonButton("Picture", "Relief", "Relief preview", "IcEye", Preview)
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Relief preview", "IcEye", Preview)
         {
             Tip = "See a depth map as the lit relief it will carve",
             Enabled = () => host.SelectedPicture is not null,
-            GroupAfter = "Edit",
+            Order = 12,
         });
         host.AddCommand(new AddonCommand("picture.stl", "Shapes", "3D model relief…", "", () => _ = host.Guard(AddModel)));
     }

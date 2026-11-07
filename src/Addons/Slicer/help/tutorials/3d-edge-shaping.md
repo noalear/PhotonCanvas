@@ -5,13 +5,13 @@
 <!-- order: 30 -->
 Stacked slices come out stepped. Edge shaping engraves each slice's top down, a pass a step, where
 the model slopes away, so there's far less to sand (not yet tried on the machine). It needs the
-depth one engrave pass takes off: run Laser → Etch rate on your material first and save it to the
+depth one engrave pass takes off: run Materials & Tests → Tests → Etch rate on your material first and save it to the
 library.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

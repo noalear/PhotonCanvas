@@ -8,9 +8,9 @@ measures how much, once for the machine, for bevelled edges later. You need a bo
 thick, settings that cut through it, calipers, and the machine connected.
 
 ## Open the bevel test
-<!-- target: ribbon:Laser/Bevel test -->
+<!-- target: ribbon:Tests/Bevel test -->
 <!-- wait: window:Bevel test -->
-Put the board on the bed, then click **Bevel test** on the **Laser** tab.
+Put the board on the bed, then click **Tests** on the **Materials & Tests** tab, pick **Bevel test** in the list and click **Open**.
 
 ## Choose the cut
 <!-- target: field:Cut with -->
@@ -22,7 +22,7 @@ A cut layer or library recipe that cuts right through the board cleanly.
 Four bars go in an L along the bottom and right of the bed.
 
 ## Cut it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Bevel test -->
 Cut it, let the bars drop out and leave the board where it is. The window opens again on
 **Measurements**.

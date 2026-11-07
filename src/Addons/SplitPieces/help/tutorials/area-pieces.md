@@ -28,9 +28,9 @@ Place the design over the pieces where you want it, on the layers you'll mark wi
 Drag a box round the design and the pieces.
 
 ## Split
-<!-- target: ribbon:Laser/Split onto pieces -->
+<!-- target: ribbon:Machine/Split onto pieces -->
 <!-- wait: window:Line up the pieces -->
-Click **Split onto pieces** on the **Laser** tab. A page for each piece appears above the work area,
+Click **Split onto pieces** on the **Machine** tab. A page for each piece appears above the work area,
 and **Line up the pieces** opens.
 
 ## Check a page
@@ -48,7 +48,7 @@ Put piece 1 on the bed under its outline. While it's following, the camera moves
 Wait for "✓ Lined up and steady".
 
 ## Ship it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Click **Ship It** and press the machine's start button.
 
 ## The next piece
@@ -57,5 +57,5 @@ Click **Next piece**. Lay piece 2 under its outline with piece 1 beside it as th
 wait for steady, take piece 1 away if it's in the laser's way, and ship. Do the same for each piece.
 
 ## Line up later
-<!-- target: ribbon:Camera/Line up pieces -->
-Closed the window? **Line up pieces** on the **Camera** tab opens it again on the page shown.
+<!-- target: ribbon:Placement/Line up pieces -->
+Closed the window? **Line up pieces** on the **Placement** tab opens it again on the page shown.

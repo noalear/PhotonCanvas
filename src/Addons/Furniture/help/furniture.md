@@ -1,6 +1,6 @@
 # Mini furniture
 
-An add-on (Settings → Add-ons → **Mini furniture maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Furniture & props → Furniture**, and **Edit furniture…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Mini furniture maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Mini-Designer → Furniture & props → Furniture**, and **Edit furniture…** is on the right-click menu of the pieces it made.
 
 **Furniture** makes flat-pack furniture for tabletop games, dioramas and model rooms: tables,
 benches, stools, chairs, bookshelves, chests, crates and beds; cabinets of every kind (wardrobes,
@@ -10,7 +10,7 @@ and sarcophagi, candle stands, screens, stocks, rugs and wall hangings, all cut 
 Nearly 200 of them come **ready-made** for each theme and room. The pieces slot
 together with tabs and finger joints, so they stand up square on their own (a drop of glue keeps
 them that way). Wood grain and planks are etched and scored on the faces that show. It also makes a
-**door for a wall** that hangs in a doorway from the wall maker (**Designer → Buildings → Walls**) and swings
+**door for a wall** that hangs in a doorway from the wall maker (**Mini-Designer → Buildings → Walls**) and swings
 open, and a **wall shelf** whose brackets plug into the walls' mount points.
 
 > **Note:** The furniture has been checked on screen and in tests (every piece is put together in
@@ -24,7 +24,7 @@ open, and a **wall shelf** whose brackets plug into the walls' mount points.
 
 ![The furniture maker with a tavern's worth on the list: four chairs selected, its settings on the left and the chair put together on the right](images/window-furniture-chair.png)
 
-Click **Furniture** on the **Designer** tab (in the **Furniture & props** group). The **Mini furniture** window opens.
+Click **Furniture** on the **Mini-Designer** tab (in the **Furniture & props** group). The **Mini furniture** window opens.
 On the left, the **Furniture** tab has the list of what to cut and the settings of the one picked;
 the **Sheet** tab has the sheet it's all cut from. On the right, **Put together** shows the piece of
 furniture picked in 3D (drag it to turn it round; scroll to zoom in on a part, middle-drag or the arrow keys to move it, and press **F** or the first button in its corner to see it all again) and **Pieces** shows its pieces flat, one of each,

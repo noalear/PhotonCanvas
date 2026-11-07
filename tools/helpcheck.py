@@ -1,7 +1,7 @@
 """Check the help guide and tutorials (docs/help) against the program's source, without building it.
 
     python tools/helpcheck.py                  # everything
-    python tools/helpcheck.py --area Laser     # also: which buttons of the Laser tab aren't documented / have no tutorial
+    python tools/helpcheck.py --area Machine   # also: which buttons of the Machine tab aren't documented / have no tutorial
     python tools/helpcheck.py --files a.md b.md  # problems in these pages / tutorials only
 
 Checks: every link goes to a page and section that exist, every picture exists, every tutorial has
@@ -60,6 +60,8 @@ def ribbon_commands(src):
     for m in re.finditer(r'Tool(?:Large|Small)\((\w+), "([^"]+)"', text):
         if m.group(1) in groups:
             cmds[f"{groups[m.group(1)][0]}/{m.group(2)}"] = groups[m.group(1)][1]
+    for m in re.finditer(r'\bAddTest\("([^"]+)", "([^"]+)"', text):
+        cmds[f"Tests/{m.group(2)}"] = m.group(1)  # entries in the Tests window (Materials & Tests → Tests)
     for m in re.finditer(r'(\w+)\.Icons\(\d+,(.*?)\);', text, re.S):
         if m.group(1) in groups:
             for t in re.finditer(r'\("Ic\w+", "([^"]+)"', m.group(2)):

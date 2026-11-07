@@ -18,9 +18,9 @@ Turn on **Show** in the machine panel at the right end of the ribbon, then selec
 and drag it roughly over the piece.
 
 ## Open Fit to piece
-<!-- target: ribbon:Camera/Fit to piece -->
+<!-- target: ribbon:Placement/Fit to piece -->
 <!-- wait: window:Fit to piece in camera -->
-Click **Fit to piece** on the **Camera** tab.
+Click **Fit to piece** on the **Placement** tab.
 
 ## Set the height
 <!-- target: field:Distance (mm) -->

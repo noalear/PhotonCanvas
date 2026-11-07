@@ -8,9 +8,9 @@ the tools where they lie, so lay them on the bed the way you want them in the dr
 connected machine with a calibrated camera.
 
 ## Open the shadow board maker
-<!-- target: ribbon:Laser/Shadow board -->
+<!-- target: ribbon:Placement/Shadow board -->
 <!-- wait: window:Shadow board -->
-Click **Shadow board** on the **Laser** tab.
+Click **Shadow board** on the **Placement** tab.
 
 ## The tools' height
 <!-- target: field:Distance (mm) -->

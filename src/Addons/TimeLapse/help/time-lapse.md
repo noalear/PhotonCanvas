@@ -1,10 +1,10 @@
 # Time-lapse
 
-This add-on adds **Time-lapse** to the Laser tab's **Job** group: a switch that films your jobs with the overview camera.
+This add-on adds **Time-lapse** to the Machine tab's **Job** group: a switch that films your jobs with the overview camera.
 
 ## Time-lapse
 
-**Laser → Time-lapse** (a switch, off to begin with) takes an overview camera photo every 5
+**Machine → Time-lapse** (a switch, off to begin with) takes an overview camera photo every 5
 seconds while a job runs, and makes a video of them when the job ends. To change how often, set
 `TimeLapseSeconds` in `app.json` (1–120 seconds); there's no setting for it in the program.
 

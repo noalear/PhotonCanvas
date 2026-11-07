@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Stairs;
 
 /// <summary>
-/// Designer → Buildings → Stairs &amp; floors, its command and "Edit floor and stairs…" on the right-click menu,
+/// Mini-Designer → Buildings → Stairs &amp; floors, its command and "Edit floor and stairs…" on the right-click menu,
 /// opening <see cref="StairsWindow"/>: an upper floor that sits on the wall maker's walls, and stairs or
 /// a ladder up to it. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class StairsAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Buildings", "Stairs & floors", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Buildings", "Stairs & floors", Icon, Open)
         {
             Tip = "An upper floor that sits on your walls, with an opening, and stairs (open, solid or spiral) or a ladder up to it",
             Large = true,

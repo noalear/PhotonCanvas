@@ -365,7 +365,7 @@ public sealed class BasesWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: the laser burns each edge back by half its kerf, so bases come out a little small and pockets a little big. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for pieces at their drawn size."
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so bases come out a little small and pockets a little big. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for pieces at their drawn size."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so bases and pockets come out their drawn size."
             : $"{r.M.Label}: no kerf measured yet, so bases come out a little small (run a cut test).";
         Changed();

@@ -32,7 +32,7 @@ Implemented in `src/pcprobe/`.
 
   The live view is therefore built on snapshot polling (`pcprobe view`).
 - **Not found (404):** `/v1/camera`, `/v1/camera/resolution`, `/v1/platform/camera/resolution`.
-- **Close-up camera field (Camera → Close-up position, 2026-10-20, 21.1 mm focus):** found from 10 burned dots to within 0.03 mm.
+- **Close-up camera field (Machine → Close-up position, 2026-10-20, 21.1 mm focus):** found from 10 burned dots to within 0.03 mm.
   - It sees a turned, slightly keystoned area about 155 × 118 mm, centred near the middle of the bed. Its corners on the bed are (147, 201), (12, 125), (77, 26) and (199, 96).
   - About 27 px/mm in the middle of its 4000 × 3000 picture. That shows 0.4 mm patterns, but not single 0.05 mm lines.
   - The picture is turned −151.8° to look straight. The largest straight rectangle inside it is 83 × 74 mm: (67, 75) to (150, 149).

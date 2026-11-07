@@ -31,7 +31,7 @@ public sealed class TouchUpWindow : Window
     readonly TextBlock _photoNote = new() { TextWrapping = TextWrapping.Wrap };
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeight.SemiBold };
     readonly TextBlock _details = new() { TextWrapping = TextWrapping.Wrap };
-    readonly Button _closeUp = Button("Close-up photo", "IcZoomIn", "Photograph the engraving with the close-up camera in the head: sharp enough to see single dots and lines. Needs the close-up camera's position at this focus height (Camera → Close-up position).");
+    readonly Button _closeUp = Button("Close-up photo", "IcZoomIn", "Photograph the engraving with the close-up camera in the head: sharp enough to see single dots and lines. Needs the close-up camera's position at this focus height (Machine → Close-up position).");
     readonly Button _overview = Button("Overview photo", "IcCamera", "Photograph the whole bed with the overview camera: for engravings bigger than the close-up camera sees (coarser, so only bigger light patches are found).");
     readonly Button _sameLights = new() { IsVisible = false };
     readonly Button _add = new() { Content = "Add the touch-up page", Classes = { "primary" }, IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
@@ -164,7 +164,7 @@ public sealed class TouchUpWindow : Window
             return;
         }
         if (_design is null || TouchUpAnalysis.Extent(_design, Chosen()) is not { IsEmpty: false } ext) { _viewNote.Text = ""; return; }
-        if (sees is not { } v) _viewNote.Text = "Where the close-up camera looks isn't known at this focus height (Camera → Close-up position), so only the overview photo can be used.";
+        if (sees is not { } v) _viewNote.Text = "Where the close-up camera looks isn't known at this focus height (Machine → Close-up position), so only the overview photo can be used.";
         else if (v.Contains(ext)) _viewNote.Text = $"The close-up camera sees all of it ({ext.Width:0.#} × {ext.Height:0.#} mm): use the close-up photo.";
         else if (v.Intersects(ext)) _viewNote.Text = $"The close-up camera sees only part of it ({v.Width:0} × {v.Height:0} mm of the {ext.Width:0} × {ext.Height:0} mm): that part is checked. Use the overview photo for all of it, more coarsely.";
         else _viewNote.Text = "The close-up camera doesn't see the engraving from where the head is: use the overview photo.";

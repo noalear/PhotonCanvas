@@ -18,9 +18,9 @@ Put the piece on the bed and auto-focus on its middle (right end of the ribbon).
 measured from there, up to 8 mm either way.
 
 ## Open Curved surface
-<!-- target: ribbon:Laser/Curved surface -->
+<!-- target: ribbon:Machine/Curved surface -->
 <!-- wait: window:Curved surface -->
-Click **Curved surface** on the **Laser** tab.
+Click **Curved surface** on the **Machine** tab.
 
 ## Measure, or type it in
 <!-- target: field:The surface -->
@@ -52,5 +52,5 @@ Tick **Mark the design on this surface**. **Height steps (mm)**: 0.2 is what xTo
 Click **Apply**. The surface is kept with the design.
 
 ## Test on scrap
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 The job bar says the head follows the surface. Ship a small test on scrap first.

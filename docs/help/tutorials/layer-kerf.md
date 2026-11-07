@@ -8,7 +8,7 @@ half that width all round, and a hole bigger. Setting the kerf moves the cut out
 inward on holes, so both come out at the size you drew.
 
 ## Measure your kerf
-Laser → **Cut test** (from the Material tests add-on) finds the settings that cut your material and measures the kerf, and saves it
+Materials & Tests → Tests → **Cut test** (from the Material tests add-on) finds the settings that cut your material and measures the kerf, and saves it
 with the material. Or cut a square and measure it: the kerf is how much narrower it came out than
 drawn.
 

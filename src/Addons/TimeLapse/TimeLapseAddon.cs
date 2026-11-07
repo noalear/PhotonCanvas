@@ -2,7 +2,7 @@ using PhotonCanvas.App.Addons;
 
 namespace PhotonCanvas.Addon.TimeLapse;
 
-/// <summary>Laser → Job → Time-lapse: a camera photo every few seconds while a job runs, made into a video.</summary>
+/// <summary>Machine → Job → Time-lapse: a camera photo every few seconds while a job runs, made into a video.</summary>
 public sealed class TimeLapseAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -12,7 +12,7 @@ public sealed class TimeLapseAddon : IAddon
     {
         _host = host;
         var s = host.AppSettings;
-        host.AddRibbonButton(new RibbonButton("Laser", "Job", "Time-lapse", "IcCamera", () =>
+        host.AddRibbonButton(new RibbonButton("Machine", "Job", "Time-lapse", "IcCamera", () =>
         {
             s.TimeLapse = !s.TimeLapse;
             host.SaveAppSettings();
@@ -21,6 +21,7 @@ public sealed class TimeLapseAddon : IAddon
         {
             Tip = $"Take a camera photo every {s.TimeLapseSeconds:0} s while a job runs and make a video of it (needs ffmpeg for the video; otherwise the photos are kept). Saved in Pictures.",
             Checked = () => s.TimeLapse,
+            Order = 21,
         });
         host.JobStarted += name =>
         {

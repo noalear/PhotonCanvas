@@ -9,7 +9,7 @@ Before and after show side by side, and `Ctrl+Z` brings the original back.
 ## Select a picture
 <!-- target: canvas -->
 <!-- wait: picture-selected -->
-Click a picture on the work area. No picture yet? **Picture → Import picture** (`Ctrl+J`).
+Click a picture on the work area. No picture yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Filters
 <!-- target: ribbon:Picture/Filters -->

@@ -7,9 +7,9 @@ One window turns a floor plan into tabletop terrain: textured walls with doorway
 they slide into, doors and jigsaw floor tiles.
 
 ## Open the map maker
-<!-- target: ribbon:Designer/Map to terrain -->
+<!-- target: ribbon:Mini-Designer/Map to terrain -->
 <!-- wait: window:Map to terrain -->
-Click **Map to terrain** on the **Designer** tab (in the **Town** group). It opens with a small dungeon to start from.
+Click **Map to terrain** on the **Mini-Designer** tab (in the **Town** group). It opens with a small dungeon to start from.
 
 ## Pick a look
 <!-- target: field:Look -->

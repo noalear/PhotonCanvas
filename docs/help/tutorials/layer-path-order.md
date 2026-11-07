@@ -20,8 +20,8 @@ Open the **Order** list, under power and speed:
 - **Spread the heat**: for thin sheet metal that warps.
 
 ## See the order
-<!-- target: ribbon:Laser/Show order -->
-Turn on **Show order**: the paths are coloured from first (blue) to last (red), with the travel
+<!-- target: ribbon:View/Processing order -->
+Turn on **Processing order** (View tab): the paths are coloured from first (blue) to last (red), with the travel
 moves dashed.
 
 ## Start where the laser is

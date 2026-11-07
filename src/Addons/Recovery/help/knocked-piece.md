@@ -9,7 +9,7 @@ the rest of the job on a new page, moved to line up. You check it over the camer
 it with **Ship It** as usual.
 
 It's an add-on: turn it on or off in **Settings → Add-ons**. While it's on, its button is on the
-**Camera** tab, in the **Place** group.
+**Placement** tab, in the **Onto pieces** group.
 
 | Needs | Why |
 |---|---|
@@ -25,7 +25,7 @@ It's an add-on: turn it on or off in **Settings → Add-ons**. While it's on, it
 
 1. Pause or stop the job on the machine. Leave the piece exactly where it is now: don't push it
    back.
-2. Click **Knocked piece** on the **Camera** tab.
+2. Click **Knocked piece** on the **Placement** tab.
 3. Click **Take a photo**. The machine's lights are off while a job runs, so pause or stop it
    first or the photo comes out dark.
 4. Choose **What moved**, and how far it may have gone. Then click **Find the piece**.

@@ -31,6 +31,6 @@ Tick **Show on the canvas** to draw the burned look on the work area, under your
 you keep editing.
 
 ## Or from the ribbon
-<!-- target: ribbon:View/Burned on canvas -->
-**Burned on canvas** on the **View** tab does the same, with or without the window open. Click it
+<!-- target: ribbon:View/Burned look on work area -->
+**Burned look on work area** on the **View** tab does the same, with or without the window open. Click it
 again to see the camera picture as it is.

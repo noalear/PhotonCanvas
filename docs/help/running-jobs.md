@@ -32,15 +32,15 @@ In a narrow window the secondary labels (**Passes**, *estimated*) are dropped an
 **Heat** and **Export** show only their icons (**Heat** adds *On* when it's on), so the timeline
 keeps its room.
 
-The same commands are on the ribbon's **Laser** tab, in the **Job** group: **Frame**, **Ship It**,
-**Export .xf**, **Export G-code**, **Preview run** and **Show order** (and **Time-lapse**, from its
-add-on). **Frame** and
+The same commands are on the ribbon's **Machine** tab, in the **Job** group: **Frame**, **Ship It**,
+**Export .xf**, **Export G-code** and **Preview run** (and **Quote** and **Time-lapse**, from their
+add-ons). The processing order is shown with **View → Processing order**. **Frame** and
 **Ship It** have no keyboard shortcut to begin with; you can give them one in
 [Keyboard shortcuts](keyboard-shortcuts.md).
 
 ## Ship It
 
-**Ship It** (the big button at the left of the job bar, or **Laser → Ship It**) uploads the job.
+**Ship It** (the big button at the left of the job bar, or **Machine → Ship It**) uploads the job.
 It's greyed out until the machine is connected and the job can be built; the caption under the
 timeline says which: *Connect the machine (right end of the ribbon) to send or frame.*,
 *Fix the problem in Checks to send.* or *Ready to send.* With a GRBL machine chosen in
@@ -105,7 +105,7 @@ once and send again.
 
 ### Quick processing
 
-**Laser → Quick on lid close** (off to begin with) turns on quick processing. With it on, the
+**Machine → Quick on lid close** (off to begin with) turns on quick processing. With it on, the
 machine connected and *Ready* or *Job finished*, and something on a layer that's sent, closing the
 lid does this by itself:
 
@@ -271,10 +271,9 @@ Everything that stops a job, and what to do about it, is in [Troubleshooting](tr
 
 ## Order
 
-**Order** in the job bar, **Laser → Show order** and **View → Processing order** are the same
-switch: they show on the work area the order the job runs in.
+**Order** in the job bar and **View → Processing order** are the same switch: they show on the work area the order the job runs in.
 
-![Show order: each path coloured from first (blue) to last (red), with the key at the top](images/processing-order.png)
+![Processing order: each path coloured from first (blue) to last (red), with the key at the top](images/processing-order.png)
 
 - Each path is coloured by when it's first marked, from blue (first) through cyan, green, yellow
   and orange to red (last). Later passes of the same path aren't drawn again.
@@ -290,7 +289,7 @@ see what a layer's **Order** setting does.
 
 ## Export
 
-**Export** in the job bar (or **Laser → Export .xf** and **Laser → Export G-code**, or the same two
+**Export** in the job bar (or **Machine → Export .xf** and **Machine → Export G-code**, or the same two
 in the **File** menu) saves the job instead of sending it. The job is built again from the design
 as it is now; if it can't be, *Can't export* says why. The file is named after the design (*job*
 if it isn't saved).
@@ -339,7 +338,7 @@ The cameras are dark while a job runs, because the machine turns its lights off.
 - A short sound plays (two beeps on Windows).
 - The job goes into the [job history](#job-history).
 - If the job was a test (etch rate, cut test, tone test, line test, close-up position, bevel test,
-  Align MOPA), its window opens on the results. After a round of
+  Align lasers), its window opens on the results. After a round of
   [Exact depth](materials-and-tests.md), its window opens to measure.
 - Serial numbers and spreadsheet rows move on for the next run, if the design is still the one
   you sent: *Ready for the next run: … (Ctrl+Z goes back.)* When marking in sections, they move on
@@ -358,7 +357,7 @@ jobs only). A job that was cancelled before it started isn't listed.
 ## Preview run
 <!-- windows: RunPreviewWindow -->
 
-**Laser → Preview run** plays the job back on the work area, sped up: what's marked when. Use it
+**Machine → Preview run** plays the job back on the work area, sped up: what's marked when. Use it
 to check the order of a long job, or to see when a part will be done.
 
 ![The Run preview window: a time slider, Play, the speed and the time](images/window-laser-preview-run.png)
@@ -377,7 +376,7 @@ After changing the design, close it and open it again. Closing it clears the mar
   [Settings → Equipment](machine.md#equipment), go at the start of every job, as xTool Studio
   does it. Experimental: not yet heard on the machine.
 - The MOPA offset: once the MOPA laser has been lined up with the blue one
-  (**Camera → Align MOPA**, see [Camera](camera.md)), every MOPA layer's work is moved by the
+  (**Machine → Align lasers**, see [Camera](camera.md)), every MOPA layer's work is moved by the
   measured difference, so it lands where the design says.
 
 ## Try it

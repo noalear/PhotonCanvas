@@ -13,7 +13,7 @@ Click the arrow beside **Frame** in the job bar. **Rectangle around everything**
 **Snug outline (round or angled designs)** hugs the design. **Power %** and **mm/s** set the dot.
 
 ## Start framing
-<!-- target: ribbon:Laser/Frame -->
+<!-- target: ribbon:Machine/Frame -->
 Click **Frame**. The first time, **Start framing?** asks: click **Start framing**. The head starts
 tracing straight away, without the machine's button.
 
@@ -23,6 +23,6 @@ Drag the design on the work area until the dot traces where you want it on the m
 follows each change.
 
 ## Stop framing
-<!-- target: ribbon:Laser/Frame -->
+<!-- target: ribbon:Machine/Frame -->
 Click **Frame** again (it says **Stop framing** in the job bar). The machine's button also stops
 it, and so does shipping the job.

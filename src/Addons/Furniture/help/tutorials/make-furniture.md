@@ -7,9 +7,9 @@ Flat-pack furniture cut from thin sheet slots together without tools, so a whole
 job on the laser.
 
 ## Open the furniture maker
-<!-- target: ribbon:Designer/Furniture -->
+<!-- target: ribbon:Mini-Designer/Furniture -->
 <!-- wait: window:Mini furniture -->
-Click **Furniture** on the **Designer** tab (in the **Furniture & props** group).
+Click **Furniture** on the **Mini-Designer** tab (in the **Furniture & props** group).
 
 ## Set the sheet
 <!-- target: tabitem:Sheet -->

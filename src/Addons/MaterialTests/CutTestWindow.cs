@@ -116,7 +116,7 @@ public sealed class CutTestWindow : Window
                 _plan,
                 Hint("Cut on the honeycomb or pins (with air assist on, if you have it), and stay with it: slow cuts can flare up. The numbers are only lightly marked."),
                 add,
-                Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Laser → Cut test)."),
+                Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Materials & Tests → Tests → Cut test)."),
             },
         };
 

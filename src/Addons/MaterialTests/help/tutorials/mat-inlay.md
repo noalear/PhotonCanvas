@@ -13,9 +13,9 @@ for the size. Run those two tests on your board and veneer first.
 Select the closed shapes to inlay.
 
 ## Open Inlay
-<!-- target: ribbon:Laser/Inlay -->
+<!-- target: ribbon:Tests/Inlay -->
 <!-- wait: window:Inlay -->
-Click **Inlay** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Inlay** in the list and click **Open**.
 
 ## Veneer thickness
 <!-- target: field:Veneer (mm) -->

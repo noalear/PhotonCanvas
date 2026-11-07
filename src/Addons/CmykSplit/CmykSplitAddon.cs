@@ -4,7 +4,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.CmykSplit;
 
-/// <summary>Picture → Edit → CMYK split: four ink plates, each on its own halftone layer.</summary>
+/// <summary>Picture → Effects → CMYK split: four ink plates, each on its own halftone layer.</summary>
 public sealed class CmykSplitAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -12,10 +12,11 @@ public sealed class CmykSplitAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Edit", "CMYK split", "IcLayers", () => { if (host.SelectedPicture is { } im) Split(im); })
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "CMYK split", "IcLayers", () => { if (host.SelectedPicture is { } im) Split(im); })
         {
             Tip = TipText,
             Enabled = () => host.SelectedPicture is not null,
+            Order = 16,
         });
     }
 
@@ -38,7 +39,7 @@ public sealed class CmykSplitAddon : IAddon
             made.Add(plate);
         }
         doc.Commit("CMYK split", Ops.AddShapes(state, made), made.Select(m => m.Id));
-        _host.Status("Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Laser → Layer by layer can ship them one layer at a time.");
+        _host.Status("Four ink layers added (halftone at the usual screen angles). Mark each on its own screen; Machine → Layer by layer can ship them one layer at a time.");
     }
 
     public void Stop() { }

@@ -1,6 +1,6 @@
 # Toys and automata
 
-An add-on (Settings → Add-ons → **Toys and automata**): on when PhotonCanvas is installed, and can be turned off. It uses the [mechanism maker](mechanisms.md)'s cams and motion check, so that add-on must be on too. Its button is **Designer → Toys → Automata**, and **Edit toy…** is on the right-click menu of a toy's parts.
+An add-on (Settings → Add-ons → **Toys and automata**): on when PhotonCanvas is installed, and can be turned off. It uses the [mechanism maker](mechanisms.md)'s cams and motion check, so that add-on must be on too. Its button is **Mini-Designer → Mechanical → Automata**, and **Edit toy…** is on the right-click menu of a toy's parts.
 
 **Automata** makes two kinds of toy, cut from sheet material:
 
@@ -27,7 +27,7 @@ Then it puts the parts in the design, named and marked, on a cut layer with your
 ## The Toys and automata window
 <!-- windows: AutomataWindow -->
 
-Click **Automata** on the **Designer** tab (in the **Toys** group). The **Toys and automata** window
+Click **Automata** on the **Mini-Designer** tab (in the **Mechanical** group). The **Toys and automata** window
 opens over the program.
 
 ![The Toys and automata window: a bobbing fish, a pecking bird and a spinning dancer on a crank box, moving on the right](images/window-automata-figures.png)
@@ -312,7 +312,7 @@ Fiber lasers cut thin metal by taking off a little with each pass. For the comb:
   temper (tempered steel softens past about 300 °C).
 - **Start from:** 100% power, about 100 mm/s, 30 to 40 kHz, and the longest pulse your laser has
   (on a MOPA laser, 350 to 500 ns). Add passes until it drops through: about 20 to 40 for 0.5 mm.
-  Run a cut test on an offcut first (**Laser → Tests → Cut test**), and pick its settings under
+  Run a cut test on an offcut first (**Materials & Tests → Tests → Cut test**), and pick its settings under
   **Cut with**, so the kerf is allowed for and the tines come out their drawn width.
 - **Raise the sheet** on spacers or a honeycomb so it's clear of the bed, and hold it flat at the
   edges with magnets or tape: molten metal under a sheet lying on the bed can weld it down.
@@ -340,7 +340,7 @@ With **Tuning allowance** every tine starts flat, so you only ever file the tips
 ## Material and kerf
 
 **Cut with** lists the cut settings in your material library. Picking one brings its thickness and,
-from your cut test (Laser → Tests → **Cut test**, see [Materials and tests](materials-and-tests.md)), its kerf and slot fit; the kerf is set on the
+from your cut test (Materials & Tests → Tests → **Cut test**, see [Materials and tests](materials-and-tests.md)), its kerf and slot fit; the kerf is set on the
 cut layer so parts come out their drawn size. **Thickness** and **Slot fit** (moving figures only)
 set the slots for the box's tabs, the cross joints and the posts. **Engrave the parts' names and
 marks** engraves names, numbers, the cams' turning arrows and lining-up ticks, and the coin circles

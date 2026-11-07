@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.Furniture;
 
 /// <summary>
-/// Designer → Furniture & props → Furniture, its command and "Edit furniture…" on the right-click menu, opening
+/// Mini-Designer → Furniture & props → Furniture, its command and "Edit furniture…" on the right-click menu, opening
 /// <see cref="FurnitureWindow"/>: flat-pack furniture for tabletop games and models. It only adds
 /// shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class FurnitureAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Furniture & props", "Furniture", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Furniture & props", "Furniture", Icon, Open)
         {
             Tip = "Tables, benches, stools, chairs, bookshelves, chests, crates and beds that slot together, and doors and shelves for walls, for tabletop games and models",
             Large = true,

@@ -306,7 +306,7 @@ public sealed class MechanismWindow : Window
     {
         if (Cut() is not { } c)
         {
-            _cutNote.Text = "No kerf allowance: the laser burns each edge back by half its kerf, so gears get a little more play and slots come out looser. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf) for parts at their drawn size.";
+            _cutNote.Text = "No kerf allowance: the laser burns each edge back by half its kerf, so gears get a little more play and slots come out looser. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf) for parts at their drawn size.";
             return;
         }
         var notes = new List<string>();

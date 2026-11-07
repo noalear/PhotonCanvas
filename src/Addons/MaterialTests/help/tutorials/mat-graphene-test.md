@@ -8,9 +8,9 @@ pads and simple sensors. This test finds out whether the blue diode does it on y
 need the material on the bed, the machine connected, a multimeter and good ventilation.
 
 ## Open the graphene test
-<!-- target: ribbon:Laser/Graphene test -->
+<!-- target: ribbon:Tests/Graphene test -->
 <!-- wait: window:Graphene test -->
-Click **Graphene test** on the **Laser** tab.
+Click **Tests** on the **Materials & Tests** tab, pick **Graphene test** in the list and click **Open**.
 
 ## Choose the powers
 <!-- target: field:Powers (%) -->
@@ -30,11 +30,11 @@ Graphene usually wants a wider, softer spot than engraving.
 The strips go near the top-left of the bed, each numbered.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Look for a black, velvety burn: grey ash is too much power, brown too little.
 
 ## Open the readings
-<!-- target: ribbon:Laser/Graphene test -->
+<!-- target: ribbon:Tests/Graphene test -->
 <!-- wait: window:Graphene test -->
 Click **Graphene test** again: it opens on **Readings**.
 

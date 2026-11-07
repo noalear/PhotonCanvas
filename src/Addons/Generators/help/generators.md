@@ -2,7 +2,7 @@
 <!-- windows: GeneratorsWindow -->
 
 An add-on (Settings → Add-ons → **Generators**): on when PhotonCanvas is installed, and can be
-turned off or removed. Its button is **Home → Draw → Generators**, after the program's own drawing
+turned off or removed. Its button is **Import → Generate → Generators**, after the program's own drawing
 tools.
 
 **Generators** opens a window with five tabs that draw ready-to-cut projects. **Box**, **Keychain /

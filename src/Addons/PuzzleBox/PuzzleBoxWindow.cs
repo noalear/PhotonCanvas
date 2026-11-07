@@ -261,7 +261,7 @@ public sealed class PuzzleBoxWindow : Window
             _loading = false;
         }
         _cutNote.Text = CutRecipe is not { } r
-            ? "No kerf allowance: the laser burns each edge back by half its kerf, so sliding parts come out looser than drawn. Pick your material's cut settings (Laser → Tests → Cut test measures the kerf)."
+            ? "No kerf allowance: the laser burns each edge back by half its kerf, so sliding parts come out looser than drawn. Pick your material's cut settings (Materials & Tests → Tests → Cut test measures the kerf)."
             : r.R.Settings.KerfMm > 0 ? $"{r.M.Label}: kerf {r.R.Settings.KerfMm:0.###} mm, allowed for on the cut layer so the pieces come out their drawn size."
             : $"{r.M.Label}: no kerf measured yet, so sliding parts come out a little loose (run a cut test).";
         Changed(sheet: true);

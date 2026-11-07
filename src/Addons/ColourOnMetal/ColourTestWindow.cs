@@ -13,7 +13,7 @@ namespace PhotonCanvas.Addon.ColourOnMetal;
 
 /// <summary>
 /// Makes a colour test grid for the MOPA laser on metal: one setting across, another down, the
-/// rest fixed. Burn it on the plate you'll use, then measure it (Laser → Measure colours) to
+/// rest fixed. Burn it on the plate you'll use, then measure it (Materials & Tests → Tests → Measure colours) to
 /// see which colours that plate really gives.
 /// </summary>
 public sealed class ColourTestWindow : Window

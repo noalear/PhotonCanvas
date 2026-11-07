@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.GameKit;
 
 /// <summary>
-/// Designer → Minis & games → Game kit, its command and "Edit game accessories…" on the right-click menu, opening
+/// Mini-Designer → Accessories → Game kit, its command and "Edit game accessories…" on the right-click menu, opening
 /// <see cref="GameKitWindow"/>: dice towers, card stands, deck trays, initiative trackers, movement
 /// gauges, rulers and templates for tabletop games. It only adds shapes to the design; nothing is sent
 /// to the machine.
@@ -19,7 +19,7 @@ public sealed class GameKitAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Minis & games", "Game kit", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Accessories", "Game kit", Icon, Open)
         {
             Tip = "Dice towers, card stands, deck trays, initiative trackers, movement gauges, range rulers and area templates for tabletop games",
             Large = true,

@@ -1,6 +1,6 @@
 # Camera placement
 
-This add-on adds two buttons to the Camera tab's **Place** group: **Cut round prints** finds printed stickers and labels on the bed and cuts round each one, and **Every piece** puts a copy of the selected design on every piece the camera finds. Both need a connected machine and a calibrated camera (see [Camera](camera.md)).
+This add-on adds two buttons to the **Onto pieces** group of the **Placement** tab: **Cut round prints** finds printed stickers and labels on the bed and cuts round each one, and **Every piece** puts a copy of the selected design on every piece the camera finds. Both need a connected machine and a calibrated camera (see [Camera](camera.md)).
 
 ## Every piece
 

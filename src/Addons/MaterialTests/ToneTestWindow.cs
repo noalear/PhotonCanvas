@@ -102,13 +102,13 @@ public sealed class ToneTestWindow : Window
                 _plan,
                 Hint("Use the material you'll engrave the pictures on, flat and in the camera's view. Keep the patches clear of knots and grain lines."),
                 _add,
-                Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Laser → Tone test)."),
+                Hint("Adding the test closes this window so you can move it, frame it and send it. When the job finishes, this window opens again on Read the results (or open it with Materials & Tests → Tests → Tone test)."),
             },
         };
 
         var update = Button("Update photo", "IcCamera", "A fresh camera photo of the burned test.");
         update.Click += async (_, _) => { update.IsEnabled = false; try { await _updatePhoto(); } finally { update.IsEnabled = true; } _closeUp = null; ReadPhoto(); };
-        var closeUp = Button("Close-up photo", "IcZoomIn", "Read the results from a close-up photo: sharp enough to see single rows. Needs the close-up camera's position (Camera → Close-up position).");
+        var closeUp = Button("Close-up photo", "IcZoomIn", "Read the results from a close-up photo: sharp enough to see single rows. Needs the close-up camera's position (Machine → Close-up position).");
         closeUp.IsEnabled = _closeUpSees() is not null;
         closeUp.Click += async (_, _) =>
         {

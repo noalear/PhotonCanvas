@@ -25,7 +25,7 @@ is, not how deep.
   lands on the same spots only if the piece hasn't moved. (A small shift of the camera's placement,
   up to a millimetre, is found and allowed for.)
 - **The close-up camera** gives the best results: it's sharp enough to see single dots and lines.
-  It needs its position at this focus height (**Camera → Close-up position**), and it only sees a
+  It needs its position at this focus height (**Machine → Close-up position**), and it only sees a
   small patch under the head, so it suits engravings up to about the size of that patch. For bigger
   work use the **overview photo**: it covers the whole bed but is coarser, so only bigger light
   patches are found.
@@ -37,7 +37,7 @@ is, not how deep.
 ## Using it
 
 1. Burn the engraving as usual and leave the piece where it is.
-2. **Camera → Touch up.** The window opens on the design page (if you're on a touch-up page, it
+2. **Placement → Touch up.** The window opens on the design page (if you're on a touch-up page, it
    compares with the design page before it).
 3. Under **What to check**, tick the layers to compare: every engraving and picture layer is ticked.
 4. Click **Close-up photo** (or **Overview photo**). The photo is compared with the design and three

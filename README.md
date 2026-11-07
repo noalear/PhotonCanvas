@@ -89,12 +89,12 @@ These work with the MOPA on stainless steel (and titanium). Results depend on th
 its finish and the focus height, so everything starts from a test on your own plate.
 
 **Oxide colours.** A thin oxide layer's thickness, set by the energy put in, decides the colour.
-1. Laser → **Colour test**: a grid sweeping two settings (by default frequency across, power down,
+1. Materials & Tests → Tests → **Colour test**: a grid sweeping two settings (by default frequency across, power down,
    at 6 ns, 800 mm/s, lines 0.002 mm apart). Focus on the plate first and keep that focus.
-2. Laser → **Measure colours**: take a **close-up photo** (the truest colour), set the lights so
+2. Materials & Tests → Tests → **Measure colours**: take a **close-up photo** (the truest colour), set the lights so
    there's no glare stripe, click the four corner squares (named by the labels burned on the plate).
    Big grids can be measured in sections. Save the result as a palette on the material.
-3. Picture → **Colour on metal**: the picture in the palette's colours, dithered for the shades
+3. Import → **Colour on metal**: the picture in the palette's colours, dithered for the shades
    between, one layer per colour with the settings that made it.
 
 The palette shows how many clearly different colours your plate gives. Colours shift with the
@@ -102,11 +102,11 @@ viewing angle; expect tens of usable colours, not a full spectrum.
 
 **Diffraction gratings.** The laser's pulses land a set distance apart (speed ÷ frequency:
 300 mm/s at 300 kHz = 1 µm), and a row of them splits light into colours like a grating.
-1. Laser → Colour test → **Diffraction gratings** on polished stainless: pitch across, power down.
+1. Materials & Tests → Tests → Colour test → **Diffraction gratings** on polished stainless: pitch across, power down.
 2. Measure colours in **Gratings** mode: five fixed views (straight, and 45° from each side, the
    lamp kept still). The views play together as an animation (saved as a GIF) and the strongest
    squares are ranked.
-3. Picture → **Diffraction**: *Shimmer* (brightness → grating direction), *Colour* (hue → pitch, for
+3. Import → **Diffraction**: *Shimmer* (brightness → grating direction), *Colour* (hue → pitch, for
    one viewing angle), or *3D* (a depth map → arcs that seem to float; experimental).
 
 The grating and colour methods follow those published by Ben Krasnow (Applied Science):
@@ -144,7 +144,7 @@ Markdown files in [`docs/help`](docs/help) (readable here on GitHub too).
 PhotonCanvas can turn a picture into a relief depthmap with **DepthCharge**, a separate
 local app that runs depth models (DA3, Depth Pro) on your graphics card. Install DepthCharge
 first (its `DepthCharge-Setup.exe`, or a set-up folder in Documents). Then select a picture and
-click Picture → **Depthmap** (or right-click it → Depthmap with DepthCharge…). PhotonCanvas starts
+click Import → **Depthmap** (or right-click it → Depthmap with DepthCharge…). PhotonCanvas starts
 DepthCharge in the background if needed, talks to it on 127.0.0.1 only, and stops it again on
 exit if it started it. Crops and masks made in DepthCharge's own editor (**Open in DepthCharge**)
 are used too. DepthCharge is not part of PhotonCanvas; its models keep their own licences

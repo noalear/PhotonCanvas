@@ -32,7 +32,7 @@ public sealed class HandwritingFontWindow : Window
     readonly Control _mergeRow;
     readonly Button _save = new() { Content = "Save font", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
     readonly Button _bed = Button("Photograph it on the bed", tip: "Lay the filled-in sheet flat in the machine: this takes an overview camera photo (nothing moves, the laser stays off)");
-    readonly Button _picture = Button("Use the selected picture", tip: "A photo of the sheet already in the design (Picture → Import picture)");
+    readonly Button _picture = Button("Use the selected picture", tip: "A photo of the sheet already in the design (Import → Picture)");
     readonly WrapPanel _tiles = new() { Orientation = Orientation.Horizontal };
     readonly DispatcherTimer _later = new() { Interval = TimeSpan.FromMilliseconds(300) };
     readonly HashSet<int> _skipped = [];

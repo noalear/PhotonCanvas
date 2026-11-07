@@ -4,8 +4,8 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addon.ColourOnMetal;
 
 /// <summary>
-/// Colour on metal (MOPA on stainless or titanium): Laser → Colour test and Measure colours, and
-/// Picture → Turn it into → Colour on metal, which uses the measured palettes.
+/// Colour on metal (MOPA on stainless or titanium): Materials & Tests → Tests → Colour test and Measure colours, and
+/// Picture → Effects → Colour on metal, which uses the measured palettes.
 /// </summary>
 public sealed class ColourOnMetalAddon : IAddon
 {
@@ -16,7 +16,7 @@ public sealed class ColourOnMetalAddon : IAddon
         _host = host;
         // Settings → Equipment can still hide them on machines without a MOPA.
         bool Shown() => host.AppSettings.ShowColourOnMetal;
-        host.AddRibbonButton(new RibbonButton("Picture", "Turn it into", "Colour on metal", "IcPalette", () =>
+        host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Colour on metal", "IcPalette", () =>
         {
             if (host.SelectedPicture is { } im) _ = host.Guard(() => MakePicture(im));
         })
@@ -25,20 +25,21 @@ public sealed class ColourOnMetalAddon : IAddon
             Large = true,
             Enabled = () => host.SelectedPicture is not null,
             Visible = Shown,
+            Order = 13,
         });
-        host.AddRibbonButton(new RibbonButton("Laser", "Colour on metal", "Colour test", "IcPalette", () => _ = host.Guard(AddTest))
+        host.AddRibbonButton(new RibbonButton("Tests", "Colour on metal", "Colour test", "IcPalette", () => _ = host.Guard(AddTest))
         {
             Tip = "Add a MOPA colour test grid: one setting across, another down, to see which colours your plate really gives",
             Large = true,
             Visible = Shown,
-            GroupAfter = "Tests|Materials",
+            Order = 0,
         });
-        host.AddRibbonButton(new RibbonButton("Laser", "Colour on metal", "Measure colours", "IcEyedropper", () => _ = host.Guard(Measure))
+        host.AddRibbonButton(new RibbonButton("Tests", "Colour on metal", "Measure colours", "IcEyedropper", () => _ = host.Guard(Measure))
         {
             Tip = "Read the colours of a burned colour test from a scan or photo, and save them as a palette",
             Large = true,
             Visible = Shown,
-            GroupAfter = "Tests|Materials",
+            Order = 1,
         });
     }
 

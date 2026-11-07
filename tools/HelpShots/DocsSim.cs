@@ -156,12 +156,12 @@ static class DocsSim
             // Every window a ribbon button opens.
             var skip = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                "Home/Import", "Home/Picture", "Home/By colour", "Home/Import as…", "Home/Select by…", "Home/More…", "Home/Paste",
-                "Picture/Import picture", "Picture/Depthmap", "Picture/3D model", "Picture/Depth outlines",
-                "Camera/Calibrate", "Camera/Focus on selection",
-                "Camera/Thickness", "Camera/Cut round prints",
-                "Laser/Split onto pieces", "Camera/Line up pieces", // set up in MoreShots
-                "Laser/Frame", "Laser/Ship It", "Laser/Export .xf", "Laser/Export G-code", "Laser/Time-lapse", "Laser/Quick on lid close", "Laser/Console",
+                "Import/Import", "Import/Picture", "Import/By colour", "Import/Import as…", "Home/Select by…", "Home/More…",
+                "Picture/Depthmap", "Import/3D model", "Picture/Depth outlines",
+                "Machine/Calibrate camera", "Machine/Focus on selection",
+                "Machine/Thickness", "Placement/Cut round prints",
+                "Machine/Split onto pieces", "Placement/Line up pieces", // set up in MoreShots
+                "Machine/Frame", "Machine/Ship It", "Machine/Export .xf", "Machine/Export G-code", "Machine/Time-lapse", "Machine/Quick on lid close", "Machine/Console",
                 "View/Reset panels",
             };
             foreach (var (key, control) in ribbon.Commands.ToList())
@@ -244,7 +244,7 @@ static class DocsSim
             }
             Task Call(string method, params object[] args) => (typeof(MainWindow).GetMethod(method, Any)!.Invoke(w, args) as Task) ?? Task.CompletedTask;
             Capture("window-circles-by-size", "Home → Select by… → Circles by size…", () => new CirclesWindow(doc).Show(w));
-            Capture("window-console", "Laser → Console", () => _ = Call("ShowConsole"));
+            Capture("window-console", "Machine → Console", () => _ = Call("ShowConsole"));
             Capture("window-save-to-library", "Layer settings → Save to library…", () =>
             {
                 var save = editor.GetVisualDescendants().OfType<Avalonia.Controls.Button>().FirstOrDefault(b => (b.Content as string ?? "").StartsWith("Save to library"));

@@ -7,9 +7,9 @@ A keychain or gift tag with its ring hole and, if you like, engraved words, read
 can hold a serial number or a name from a spreadsheet, so each tag can be different.
 
 ## Open the generators
-<!-- target: ribbon:Home/Generators -->
+<!-- target: ribbon:Import/Generators -->
 <!-- wait: window:Generators -->
-Click **Generators** on the **Home** tab.
+Click **Generators** on the **Import** tab.
 
 ## Choose Keychain / tag
 <!-- target: tabitem:Keychain / tag -->

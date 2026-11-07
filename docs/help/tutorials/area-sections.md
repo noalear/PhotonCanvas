@@ -11,9 +11,9 @@ marks each in the middle of the work area, and tells you how far to slide the ma
 The design may run off the work area. The work mode must be the flat bed.
 
 ## Open Sections
-<!-- target: ribbon:Laser/Sections -->
+<!-- target: ribbon:Machine/Sections -->
 <!-- wait: window:Mark in sections -->
-Click **Sections** on the **Laser** tab. It says how big the design is and how many sections that
+Click **Sections** on the **Machine** tab. It says how big the design is and how many sections that
 makes.
 
 ## Set the section size
@@ -25,11 +25,11 @@ makes.
 Set the material against a fence or stop. Section 1 is picked: the canvas outlines it.
 
 ## Frame it
-<!-- target: ribbon:Laser/Frame -->
+<!-- target: ribbon:Machine/Frame -->
 Click **Frame** to see where the section lands, and move the material until it's right.
 
 ## Ship it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Click **Ship It** and press the machine's start button.
 
 ## The next section

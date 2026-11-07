@@ -9,9 +9,9 @@ still where it was burned, and the machine connected (the close-up camera's posi
 close-up photos).
 
 ## Open Touch up
-<!-- target: ribbon:Camera/Touch up -->
+<!-- target: ribbon:Placement/Touch up -->
 <!-- wait: window:Touch up -->
-Leave the piece where it is, then click **Touch up** on the **Camera** tab.
+Leave the piece where it is, then click **Touch up** on the **Placement** tab.
 
 ## Choose what to check
 <!-- target: text:What to check -->
@@ -38,6 +38,6 @@ differences under** if wood grain shows up as red.
 The touch-up goes on a page of its own after the design, and is shown.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 **Ship It** sends just the touch-up page. Start it on the machine, then open **Touch up** again to
 look once more.

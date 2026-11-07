@@ -11,7 +11,7 @@ Importing brings the drawing in at its real size as shapes you can edit, set up 
 Click the layer the drawing should go on. A plain import lands on this layer (files that name their own layers make their own).
 
 ## Click Import
-<!-- target: ribbon:Home/Import -->
+<!-- target: ribbon:Import/Import -->
 <!-- wait: shapes:+1 -->
 Click **Import** (`Ctrl+I`) and choose one or more files in the window that opens. The drawing comes in where the file puts it, or in the middle if it wouldn't fit.
 

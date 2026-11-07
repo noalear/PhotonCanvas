@@ -5,7 +5,7 @@
 <!-- order: 210 -->
 In Depth slices mode a picture is read as a depth map, dark meaning deep, and carved away in thin
 slices from the surface down: a relief, on metal with the MOPA or on wood. Not yet tried on the
-machine, so start small on scrap. You need a depth map picture (Picture → **3D model** makes one
+machine, so start small on scrap. You need a depth map picture (Import → **3D model** makes one
 from a model).
 
 ## Select the depth map
@@ -42,5 +42,5 @@ depth those slices take off.
 next slices cut cleanly. Its power, speed and lines appear under it.
 
 ## Measure the depth per pass
-Laser → **Etch rate** (from the Material tests add-on) measures how deep one pass goes on your material, to choose the slices and
+Materials & Tests → Tests → **Etch rate** (from the Material tests add-on) measures how deep one pass goes on your material, to choose the slices and
 the focus drop.

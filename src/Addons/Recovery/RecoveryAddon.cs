@@ -15,10 +15,11 @@ public sealed class RecoveryAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Knocked piece", "IcFitPiece", Open)
+        host.AddRibbonButton(new RibbonButton("Placement", "Onto pieces", "Knocked piece", "IcKnocked", Open)
         {
             Large = true,
             Tip = "The material moved during a job? The camera finds what's already marked on it, and the rest of the job is moved to line up, on a new page",
+            Order = 12,
         });
         host.AddCommand(new AddonCommand("recovery.open", "Camera", "Knocked piece…", "", Open));
     }

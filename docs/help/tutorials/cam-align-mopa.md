@@ -1,7 +1,7 @@
 # Line the MOPA up with the blue laser
 <!-- category: Camera -->
 <!-- summary: Both lasers burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match. -->
-<!-- page: camera.md#align-mopa -->
+<!-- page: camera.md#align-lasers -->
 <!-- order: 100 -->
 When one design uses both lasers, the MOPA's work should land exactly where the blue laser's does.
 This measures the difference with the close-up camera and corrects every job from then on.
@@ -13,9 +13,9 @@ coated metal or wood), and the close-up position known at that height (the
 [Close-up position](tutorial:cam-close-up-position) tutorial).
 
 ## Open Align MOPA
-<!-- target: ribbon:Camera/Align MOPA -->
+<!-- target: ribbon:Machine/Align lasers -->
 <!-- wait: window:Align MOPA to blue -->
-Click **Align MOPA** on the **Camera** tab.
+Click **Align lasers** on the **Machine** tab.
 
 ## Add the dots
 <!-- target: button:Add the dots to the design -->
@@ -28,7 +28,7 @@ Click **Add the dots to the design**: two grids of nine dots, on the "Align · b
 Check each layer's power marks your scrap dark (see the Layer settings panel).
 
 ## Burn them
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 Click **Ship It** and press the machine's start button. Don't move the scrap afterwards.
 
 ## Measure

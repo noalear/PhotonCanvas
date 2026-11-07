@@ -8,7 +8,7 @@ look closed but aren't, so they can't be engraved and get no kerf or tabs. Tidy 
 up.
 
 ## Import the drawing
-<!-- target: ribbon:Home/Import -->
+<!-- target: ribbon:Import/Import -->
 Bring in a DXF or other drawing with **Import** (`Ctrl+I`), or use one you have.
 
 ## Select it, or nothing

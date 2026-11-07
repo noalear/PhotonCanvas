@@ -6,7 +6,7 @@ using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Addon.CameraPlacement;
 
-/// <summary>Camera → Place: Cut round prints (print-then-cut) and Every piece (a copy of the design on each piece the camera finds).</summary>
+/// <summary>Placement → Onto pieces: Cut round prints (print-then-cut) and Every piece (a copy of the design on each piece the camera finds).</summary>
 public sealed class CameraPlacementAddon : IAddon
 {
     IAddonHost _host = null!;
@@ -14,18 +14,18 @@ public sealed class CameraPlacementAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Cut round prints", "IcCut", () => _ = host.Guard(CutRoundPrints))
+        host.AddRibbonButton(new RibbonButton("Placement", "Onto pieces", "Cut round prints", "IcCut", () => _ = host.Guard(CutRoundPrints))
         {
             Tip = "Print-then-cut: the camera finds printed art on paper (stickers, labels) and a cut goes round each one, a margin outside. Select a shape first to look only inside it",
             Large = true,
-            Order = 10,
+            Order = 11,
         });
-        host.AddRibbonButton(new RibbonButton("Camera", "Place", "Every piece", "IcGrid", () => _ = host.Guard(PlaceOnEveryPiece))
+        host.AddRibbonButton(new RibbonButton("Placement", "Onto pieces", "Every piece", "IcEveryPiece", () => _ = host.Guard(PlaceOnEveryPiece))
         {
             Tip = "Photograph the bed, find each piece on it and put a copy of the selected design on every one (with the next serial number or spreadsheet row on each)",
             Large = true,
             Enabled = () => SelectedOutline().Count > 0,
-            Order = 30,
+            Order = 10,
         });
     }
 
@@ -55,7 +55,7 @@ public sealed class CameraPlacementAddon : IAddon
         CameraPhoto? photo = null;
         if (_host.CloseUpSees() is { } sees && sees.Contains(within.TopLeft) && sees.Contains(within.BottomRight)) photo = await _host.CloseUpPhotoAsync();
         photo ??= await _host.TakePhotoAsync();
-        if (photo is null) { _host.Status("No camera photo: calibrate the camera first (Camera → Calibrate)."); return; }
+        if (photo is null) { _host.Status("No camera photo: calibrate the camera first (Machine → Calibrate camera)."); return; }
         var cuts = await Task.Run(() => PrintCut.Find(photo.Image, photo.Area, photo.MmPerPx, within, new PrintCutOptions { MarginMm = margin }));
         int n = cuts.Subpaths.Length;
         if (n == 0) { _host.Status("No print found there: is it on white paper, in the camera's view and well lit?"); return; }

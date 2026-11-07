@@ -30,8 +30,7 @@ already.
 
 ## Set the laser
 <!-- target: field:Power % -->
-Type the **Power %**, **Speed mm/s** and **Passes** for your material. Not sure? Laser →
-**Library** has settings that worked, and Laser → **Cut test** finds them on a scrap.
+Type the **Power %**, **Speed mm/s** and **Passes** for your material. Not sure? Materials & Tests → **Library** has settings that worked, and Materials & Tests → Tests → **Cut test** finds them on a scrap.
 
 ## Focus on the material
 <!-- target: button:Auto-focus -->
@@ -39,13 +38,13 @@ Put the material under the head, then click **Auto-focus**: the machine measures
 to the right height.
 
 ## Frame it
-<!-- target: ribbon:Laser/Frame -->
+<!-- target: ribbon:Machine/Frame -->
 Click **Frame** (the first time, confirm with **Start framing**). A faint dot traces around the
 job. Move the material until it's right, then click **Stop framing** in the job bar under the
 work area (or **Frame** on the ribbon again).
 
 ## Ship it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Ship it to the machine -->
 Click **Ship It**. A summary opens: each layer's settings, the size and the time.
 

@@ -6,7 +6,7 @@ The material library keeps the settings that worked, material by material: each 
 burned, notes and a photo of the result. Tests save their results here, layers take their settings
 from here, and you can share it or bring in xTool Studio's settings.
 
-Open it with **Library** on the Laser tab, or **Settings → Materials → Material library…**.
+Open it with **Library** on the Materials & Tests tab, or **Settings → Materials → Material library…**.
 
 ![The Material library with two example materials, none picked yet](images/window-laser-library.png)
 

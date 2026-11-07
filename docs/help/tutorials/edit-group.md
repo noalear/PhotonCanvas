@@ -12,7 +12,7 @@ any of them picks them all, so they move, turn and resize as one, and Nest keeps
 Draw two shapes if you have none. With **Select**, drag a box round them, or `Shift`+click each.
 
 ## Group them
-<!-- target: ribbon:Home/Group -->
+<!-- target: ribbon:Arrange/Group -->
 Click **Group** (`Ctrl+G`). Now clicking any one of them selects them all.
 
 ## Pick one out
@@ -20,6 +20,6 @@ Click **Group** (`Ctrl+G`). Now clicking any one of them selects them all.
 Hold `Alt` and click one of them: it's selected on its own, still in the group.
 
 ## Ungroup
-<!-- target: ribbon:Home/Ungroup -->
+<!-- target: ribbon:Arrange/Ungroup -->
 Click one shape of the group (without `Alt`) and click **Ungroup** (`Ctrl+Shift+G`). They're
 separate shapes again.

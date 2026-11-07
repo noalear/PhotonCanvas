@@ -196,7 +196,7 @@ public partial class MainWindow : Window
         if (_doc.InEdit) return;
         int n = _doc.State.Shapes.Count, sel = _doc.Selection.Count;
         StatusText.Text = sel > 0 ? $"{sel} of {n} shapes selected" : n == 0
-            ? "Draw with the Home tab, or drag a file in (SVG, DXF, PDF, pictures). New material? Laser → Test grid."
+            ? "Draw with the Home tab, or drag a file in (SVG, DXF, PDF, pictures). New material? Materials & Tests → Tests → Test grid."
             : $"{n} shapes · {_doc.State.Layers.Count} layers";
         _ribbon.Refresh();
         _ribbon.Highlight("Picture", SelectedPicture() is not null);
@@ -490,18 +490,15 @@ public partial class MainWindow : Window
         _ribbon.Track(_redoButton, () => _doc.CanRedo);
 
         // ---- Home: everyday drawing and editing ----
-        var home = _ribbon.Tab("Home", "Draw, select, combine and edit");
-        var clip = home.Group("Clipboard");
-        // Always on: what another program copied (a picture, SVG) can be pasted too.
-        clip.Large("Paste", "IcPaste", Paste, "Paste (Ctrl+V): shapes copied here, or a picture or SVG copied in another program");
-        clip.Small("Cut", "IcCut", CutSel, "Cut (Ctrl+X)", HasSel);
-        clip.Small("Copy", "IcCopy", CopySel, "Copy (Ctrl+C)", HasSel);
-        clip.Small("Duplicate", "IcDuplicate", DuplicateSel, "Duplicate, offset a little (Ctrl+D)", HasSel);
+        // (Cut, copy, paste, duplicate and delete are on the keys and the right-click menu, not here.)
+        var home = _ribbon.Tab("Home", "Select, draw, combine and outline shapes")
+            .Order("Select", "Draw", "Serial & codes", "Shape builder", "Outline", "Cut lines", "Sewing")
+            // When it doesn't fit, the shapes' and selecting's labels go first (their icons say what they are), Outline's last.
+            .LabelsGoFirst("Draw", "Select", "Shape builder", "Serial & codes", "Sewing");
         var select = home.Group("Select");
         ToolLarge(select, "Select", "IcCursor", Tool.Select, "Select and move (V). Drag left→right to select inside, right→left to select touching.");
         ToolSmall(select, "Edit points", "IcNodes", Tool.Nodes, "Edit a shape's points and curves (N, or double-click a shape)");
         ToolSmall(select, "Pan", "IcHand", Tool.Pan, "Pan the view (H, or hold Space / middle mouse)");
-        select.Small("Delete", "IcTrash", DeleteSel, "Delete (Del)", HasSel);
         select.Small("All", "IcCursor", SelectAll, "Select everything (Ctrl+A)");
         select.Small("Active layer", "IcLayers", SelectActiveLayer, "Select everything on the active layer you can pick (Ctrl+Shift+A)");
         var selectBy = select.Small("Select by…", "IcCircles", () => { }, "Select open lines, shapes the same size, shapes inside another, circles by size…");
@@ -526,34 +523,25 @@ public partial class MainWindow : Window
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
-        ToolSmall(draw, "Pick piece", "IcWand", Tool.Wand, "Click inside a piece on the camera picture to outline it (W)");
-        ToolSmall(draw, "Trace edge", "IcLasso", Tool.Magnetic, "Magnetic pen: click along an edge on the camera picture; the line hugs the edge (M)");
         var codes = home.Group("Serial & codes");
         codes.Large("Code", "IcCode", () => _ = Guard(() => EditCode(null)), "QR code, Data Matrix or barcode. It can hold a serial number, the date or a spreadsheet column, new on every run");
         codes.Small("Variables", "IcVariables", () => _ = Guard(ShowVariables), "Serial number and spreadsheet (CSV) that fill in {fields} in text and codes, moving on after each run");
         codes.Small("Number copies", "IcArrayGrid", NumberCopies, "Selected copies (groups or single shapes) each mark the next serial number or spreadsheet row, back to front and left to right; select one to set it back", HasSel);
-        var grp = home.Group("Group");
-        grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
-        grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", () => _doc.State.Shapes.Any(x => _doc.Selection.Contains(x.Id) && x.GroupId is not null));
-        grp.Small("Combine", "IcCombine", Combine, "Combine into one compound shape: overlapping parts make holes (Ctrl+K)", Many);
-        grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", () => SelectedPaths().Any(p => p.Geometry.Subpaths.Length > 1));
         var boolean = home.Group("Shape builder");
         boolean.Large("Weld", "IcWeld", () => BooleanSel(BoolOp.Union), "Weld: merge overlapping shapes into one outline (Ctrl+Shift+U)", TwoPaths);
         boolean.Small("Subtract", "IcSubtract", () => BooleanSel(BoolOp.Subtract), "Subtract: the bottom shape minus the ones above it (Ctrl+Shift+M)", TwoPaths);
         boolean.Small("Intersect", "IcIntersect", () => BooleanSel(BoolOp.Intersect), "Intersect: keep only where they overlap", TwoPaths);
         boolean.Small("Exclude", "IcExclude", () => BooleanSel(BoolOp.Exclude), "Exclude: remove where they overlap", TwoPaths);
         boolean.Small("Mask with shape", "IcIntersect", () => _ = Guard(MaskSel), "Cut the selected shapes to the inside (or outside) of one of them: lines past its edge and the parts of filled shapes outside it are removed", TwoPaths);
+        // Outline: change the shape of a line (new outline, rounder, fewer points, tidier).
         var outline = home.Group("Outline");
-        outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: a new outline a set distance outside or inside (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
-        outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round the sharp corners of the selected shapes", () => SelectedPaths().Count > 0);
-        outline.Small("Text on path", "IcTextPath", TextOnPath, "Select a text and a line or shape: the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
-        ToolSmall(outline, "Trim", "IcTrim", Tool.Trim, "Trim: click a piece of a line between where it crosses others to cut it away");
-        outline.Small("Simplify", "IcNodes", () => _ = Guard(SimplifySel), "Fewer points: imported and traced shapes followed closely with far fewer lines and curves", () => SelectedPaths().Any(p => p is not (TextShape or CodeShape)));
-        outline.Small("Cut shapes", "IcBreak", CutShapesSel, "Cut overlapping shapes into separate pieces where they cross", TwoPaths);
-        ToolSmall(outline, "Scissors", "IcCut", Tool.Scissors, "Scissors: click a line or outline to cut it there");
-        ToolSmall(outline, "Place tabs", "IcBreak", Tool.Tabs, "Click outlines to put tabs exactly where you want them (Shift+click removes one); used on Cut layers");
-        ToolSmall(outline, "Start point", "IcPen", Tool.Start, "Click an outline where its cut should start (Shift+click clears it)");
-        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Extend lines, remove overlapping lines, tangent circles, shadows");
+        outline.Large("Offset", "IcOffset", () => _ = Guard(OffsetSel), "Offset: draw a new outline a set distance outside or inside the selected shapes, e.g. a border round a design or a smaller copy (Ctrl+Shift+O)", () => SelectedPaths().Count > 0);
+        outline.Small("Round corners", "IcRound", () => _ = Guard(RoundCornersSel), "Round corners: turn the sharp corners of the selected shapes into curves of a radius you choose", () => SelectedPaths().Count > 0);
+        outline.Small("Simplify", "IcSimplify", () => _ = Guard(SimplifySel), "Simplify: redraw imported or traced shapes with far fewer points, so they cut smoother and faster, staying close to the original", () => SelectedPaths().Any(p => p is not (TextShape or CodeShape)));
+        outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy lines: repair imported drawings by joining ends that nearly meet, closing nearly-closed shapes and deleting lines lying on top of each other");
+        outline.Small("Text on path", "IcTextPath", TextOnPath, "Text on path: select a text and a line or shape, and the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
+        outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Text to paths: turn text into ordinary shapes whose points you can edit; the words can't be retyped after (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
+        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Extend lines, remove overlapping lines, tangent circles, drop and 3D shadows, clear guides");
         moreOutline.Flyout = new MenuFlyout
         {
             Items =
@@ -566,25 +554,17 @@ public partial class MainWindow : Window
                 Item("Clear all guides", () => { if (_doc.State.Guides.Count > 0) _doc.Commit("Clear guides", _doc.State with { Guides = [] }); }),
             },
         };
-        outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy up imported drawings: join ends that nearly meet, close nearly-closed shapes, delete lines lying on top of each other");
-        outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Turn text into ordinary shapes (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
-        var import = home.Group("Bring in");
-        import.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
-        import.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
-        import.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
-        var importMore = import.Small("Import as…", "IcMore", () => { }, "Import a drawing grouped, in separate pieces, or as one picture");
-        importMore.Flyout = new MenuFlyout
-        {
-            Items =
-            {
-                AsyncItem("Import, each file grouped…", () => ImportAny(false, ImportHow.Grouped)),
-                AsyncItem("Import with every piece separate…", () => ImportAny(false, ImportHow.Pieces)),
-                AsyncItem("Import as one picture…", () => ImportAny(false, ImportHow.Picture)),
-            },
-        };
+        // Cut lines: split lines apart, and say where a cut starts and where it leaves tabs.
+        var cutLines = home.Group("Cut lines");
+        ToolSmall(cutLines, "Trim", "IcTrim", Tool.Trim, "Trim tool: click a piece of a line between where it crosses other lines to delete just that piece");
+        ToolSmall(cutLines, "Scissors", "IcCut", Tool.Scissors, "Scissors tool: click a line or outline to split it into two at that point");
+        cutLines.Small("Cut shapes", "IcCutShapes", CutShapesSel, "Cut shapes: split overlapping shapes into separate pieces wherever they cross", TwoPaths);
+        ToolSmall(cutLines, "Place tabs", "IcTabs", Tool.Tabs, "Place tabs tool: click outlines to leave small uncut bridges there, so pieces don't drop out (Shift+click removes one; used on Cut layers)");
+        ToolSmall(cutLines, "Start point", "IcStartPoint", Tool.Start, "Start point tool: click an outline where its cut should start and end (Shift+click clears it)");
 
-        // ---- Arrange: position, align, order, repeat ----
-        var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate, order and repeat");
+        // ---- Arrange: position, align, order, group, repeat ----
+        var arrange = _ribbon.Tab("Arrange", "Align, distribute, flip, rotate, order, group and repeat")
+            .Order("Align", "Flip & rotate", "Order", "Group", "Repeat", "Transform");
         var align = arrange.Group("Align");
         align.Icons(3,
             ("IcAlignLeft", "Align left edges", () => AlignSel(Align.Left), Many),
@@ -605,6 +585,11 @@ public partial class MainWindow : Window
         var order = arrange.Group("Order");
         order.Small("To front", "IcFront", () => _doc.Commit("Bring to front", Ops.BringToFront(_doc.State, _doc.Selection)), "Bring to front (drawn last on its layer)", HasSel);
         order.Small("To back", "IcBack", () => _doc.Commit("Send to back", Ops.SendToBack(_doc.State, _doc.Selection)), "Send to back", HasSel);
+        var grp = arrange.Group("Group");
+        grp.Large("Group", "IcGroup", GroupSel, "Group: select and move them as one (Ctrl+G)", Many);
+        grp.Small("Ungroup", "IcUngroup", UngroupSel, "Ungroup (Ctrl+Shift+G)", () => _doc.State.Shapes.Any(x => _doc.Selection.Contains(x.Id) && x.GroupId is not null));
+        grp.Small("Combine", "IcCombine", Combine, "Combine into one compound shape: overlapping parts make holes (Ctrl+K)", Many);
+        grp.Small("Break apart", "IcBreak", BreakApart, "Break a compound shape into its pieces (Ctrl+Shift+K)", () => SelectedPaths().Any(p => p.Geometry.Subpaths.Length > 1));
         var repeat = arrange.Group("Repeat");
         repeat.Small("Grid array", "IcArrayGrid", () => _ = Guard(() => ArraySel(circular: false)), "Copies in rows and columns", HasSel);
         repeat.Small("Circular array", "IcArrayCircle", () => _ = Guard(() => ArraySel(circular: true)), "Copies around a centre", HasSel);
@@ -614,61 +599,91 @@ public partial class MainWindow : Window
         shapeIt.Small("Lock", "IcLock", () => LockSel(true), "Lock the selected shapes: they stay put and can't be picked until unlocked (still marked)", HasSel);
         shapeIt.Small("Unlock all", "IcUnlock", () => LockSel(false), "Unlock every locked shape", () => _doc.State.Shapes.Any(s => s.Locked));
 
-        // ---- Picture: photos and artwork ----
-        var picture = _ribbon.Tab("Picture", "Trace, filters, crop and what add-ons bring (lights up when a picture is selected)");
-        var pin = picture.Group("Add");
-        pin.Large("Import picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
-        var pwork = picture.Group("Turn it into");
-        pwork.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
-        var pclip = picture.Group("Shape");
+        // ---- Import: everything that brings a design in ----
+        var import = _ribbon.Tab("Import", "Bring designs in: drawings and pictures, 3D models and maps, and generated ones (boxes, gears, a font of your handwriting)")
+            .Order("Files", "3D & maps", "Generate");
+        var files = import.Group("Files");
+        files.Large("Import", "IcImport", () => _ = Guard(() => ImportAny(false)), "Import drawings and pictures: SVG, DXF, PDF, AI, xTool projects, PNG, JPG… (Ctrl+I)");
+        files.Small("Picture", "IcImage", () => _ = Guard(ImportImage), "Import a picture onto an Image layer (Ctrl+J)");
+        files.Small("By colour", "IcLayers", () => _ = Guard(() => ImportAny(true)), "Import a drawing with one layer per colour (Ctrl+Shift+I)");
+        var importMore = files.Small("Import as…", "IcMore", () => { }, "Import a drawing grouped, in separate pieces, or as one picture");
+        importMore.Flyout = new MenuFlyout
+        {
+            Items =
+            {
+                AsyncItem("Import, each file grouped…", () => ImportAny(false, ImportHow.Grouped)),
+                AsyncItem("Import with every piece separate…", () => ImportAny(false, ImportHow.Pieces)),
+                AsyncItem("Import as one picture…", () => ImportAny(false, ImportHow.Picture)),
+            },
+        };
+
+        // ---- Picture: what's done to a picture once it's in (lights up when one is selected) ----
+        var picture = _ribbon.Tab("Picture", "Edit a picture, trace it into outlines, or turn it into something else (lights up when a picture is selected)")
+            .Order("Edit", "Trace", "Effects", "Mask");
         var pedit = picture.Group("Edit");
         pedit.Large("Filters", "IcPalette", () => { if (SelectedPicture() is { } im) _ = Guard(() => FilterPicture(im)); }, "Greyscale, saturation, pencil sketch, emboss, comic, black and white, mosaic", HasPicture);
-        ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
         pedit.Small("Crop", "IcFrame", () => { if (SelectedPicture() is { } im) _ = Guard(() => CropPicture(im)); }, "Cut the picture down to a part of it (free, square, 4:3…)", HasPicture);
-        pclip.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
+        ToolSmall(pedit, "Eraser", "IcExclude", Tool.Eraser, "Rub out parts of a picture by dragging over them (they turn white and aren't engraved)");
+        pedit.Small("Shapes to picture", "IcImage", () => _ = Guard(ShapesToPicture), "Turn the selected shapes into a picture (filled shapes and lines), e.g. to engrave them with a picture style", () => SelectedPaths().Count > 0);
+        var ptrace = picture.Group("Trace");
+        ptrace.Large("Trace", "IcTrace", () => { if (SelectedPicture() is { } im) _ = Guard(() => Trace(im)); }, "Trace the picture into cut or engrave outlines (Ctrl+T)", HasPicture);
 
-        // ---- Designer: the add-ons that make whole things (terrain, buildings, toys) ----
+        // ---- Mini-Designer: the add-ons that make whole things (terrain, buildings, towns) ----
         // Empty here: the maker add-ons put their buttons on it, and it hides while none are on.
-        _ribbon.AddonTab("Designer", "Makers for tabletop terrain, buildings, towns, furniture, figures' bases, game kits and toys",
-            "Buildings", "Town", "Terrain", "Furniture & props", "Minis & games", "Toys");
+        _ribbon.AddonTab("Mini-Designer", "Makers for tabletop miniatures: buildings, towns, terrain, furniture, figures' bases, game accessories and moving toys",
+            "Buildings", "Town", "Terrain", "Furniture & props", "Accessories", "Mechanical");
 
-        // ---- Camera: what the machine sees ----
-        var camera = _ribbon.Tab("Camera", "Use the machine's camera: fit designs to pieces, calibration (photo, live view and close-up are in the machine panel at the right)");
-        var fit = camera.Group("Place");
-        fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Snap the selected design onto the real piece the camera sees: moves, turns and resizes it to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
-        var cal = camera.Group("Set up");
-        cal.Large("Calibrate", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
-        cal.Small("Focus on selection", "IcFocus", () => _ = Guard(FocusByPointer), "Aimed focus: the red pointer is aimed at the middle of the selection (or of the bed), the close-up camera reads the height there from where its dot lands, and the head moves to focus on it. Nothing touches the material; needs the pointer calibrated (Curved surface)");
-        cal.Small("Thickness", "IcMeasure", () => _ = Guard(MeasureThickness), "Measure the material's thickness: auto-focus on it and compare with the empty bed (measured once)");
-        cal.Small("Align MOPA", "IcCalibrate", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)), "Line the MOPA (fiber) laser up with the blue one: both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
-        cal.Large("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
+        // ---- Placement: using the camera to put designs on real pieces ----
+        var place = _ribbon.Tab("Placement", "Use the camera's picture of the bed: put designs exactly on real pieces, outline things lying there, and check a burn (the photo, live view and close-up are in the machine panel at the right)")
+            .Order("Onto pieces", "Jigs", "From the photo", "Check the burn");
+        var fit = place.Group("Onto pieces");
+        fit.Large("Fit to piece", "IcFitPiece", () => _ = Guard(FitToCamera), "Fit to piece: snap the selected design onto the real piece the camera sees; it moves, turns and resizes to match (Ctrl+Shift+F)", () => SelectedOutline().Count > 0);
+        var fromPhoto = place.Group("From the photo");
+        ToolSmall(fromPhoto, "Pick piece", "IcWand", Tool.Wand, "Pick piece tool: click inside a piece on the camera picture to draw its outline (W)");
+        ToolSmall(fromPhoto, "Trace edge", "IcLasso", Tool.Magnetic, "Trace edge tool: click along an edge on the camera picture and the line hugs the edge (M)");
 
-        // ---- Laser: materials and the job ----
-        var laser = _ribbon.Tab("Laser", "Materials, tests, framing and shipping the job");
-        var mat = laser.Group("Materials");
-        mat.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
-        mat.Large("Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material");
-        mat.Large("Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library");
-        mat.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
+        // ---- Materials & Tests: what works on each material, and the tests that find it out ----
+        var materials = _ribbon.Tab("Materials & Tests", "Your material library and every test in one place: find the settings that work, then save them with the material")
+            .Order("Library", "Tests");
+        var lib = materials.Group("Library");
+        lib.Large("Library", "IcMaterial", () => _ = Guard(ShowLibrary), "Your material and cutting library: settings that worked, with photos; share and import");
+        var tests = materials.Group("Tests");
+        _testsButton = tests.Large("Tests", "IcTests", () => _ = Guard(() => ShowTests(null)),
+            "Every test in one window: pick one from the list (test grid, cut test, etch rate, tone test…) to see what it finds out, then open it");
+        AddTest("Find the settings", "Test grid", "IcTestGrid", () => _ = Guard(AddMaterialTest), "Add a test grid: power × speed, focus, line spacing or any two settings, to find what works on a material", order: -20);
+        AddTest("Find the settings", "Record results", "IcRecord", () => _ = Guard(RecordTestResults), "Rate the squares of a burned test grid and save the good ones to the library", order: -19);
+
+        // ---- Machine: the job, focus, work area, calibration and the machine's own settings ----
+        var laser = _ribbon.Tab("Machine", "Run the job, focus, the work area (rotary, curved, sections), calibration and the machine's settings")
+            .Order("Job", "Focus", "Work area", "Calibrate", "Settings");
         var job = laser.Group("Job");
         job.Large("Frame", "IcFrame", () => _ = Guard(_job.ToggleFrame), "Trace around the job with a faint dot to see where it lands (click again to stop)", () => _job.CanFrame);
         job.Large("Ship It", "IcSend", () => _ = Guard(() => _job.Send()), "Upload the job; the machine waits for its start button", () => _job.CanSend);
         job.Small("Export .xf", "IcExport", () => _ = Guard(() => _job.Export(xf: true)), "Save the job package the machine runs");
         job.Small("Export G-code", "IcExport", () => _ = Guard(() => _job.Export(xf: false)), "Save the motion G-code as text");
         job.Small("Preview run", "IcPreview", () => { if (_job.CurrentJob is { } bj) new RunPreviewWindow(bj, Canvas).Show(this); }, "Play the job back on the work area, sped up: what's marked when", () => _job.CurrentJob is not null);
-        job.SmallToggle("Show order", "IcPreview", on => _job.ShowOrder = on, "Show the processing order on the work area", null, () => _job.ShowOrder);
+        var focus = laser.Group("Focus");
+        focus.Small("Focus on selection", "IcFocus", () => _ = Guard(FocusByPointer), "Aimed focus: the red pointer is aimed at the middle of the selection (or of the bed), the close-up camera reads the height there from where its dot lands, and the head moves to focus on it. Nothing touches the material; needs the pointer calibrated (Curved surface)");
+        focus.Small("Thickness", "IcMeasure", () => _ = Guard(MeasureThickness), "Measure the material's thickness: auto-focus on it and compare with the empty bed (measured once)");
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
         work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         _ribbon.ShowWhen(work.Small("Scan the part", "IcRotary", ShowRotaryScan, "Turn the part in the rotary a step at a time and measure its top at each step, to see its shape and how it sits (experimental; the laser isn't fired)"), () => _settings.WorkMode == "Rotary" && WorkModes.Usable(_settings));
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");
-        var machine = laser.Group("Machine");
-        _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
+        var cal = laser.Group("Calibrate");
+        cal.Large("Calibrate camera", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
+        cal.Small("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
+        cal.Small("Align lasers", "IcAlignLasers", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)),
+            "Line the two lasers up with each other: the blue (diode) laser is the one the camera is calibrated to, so the MOPA (fiber) is measured against it. Both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
+        var machine = laser.Group("Settings");
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
+        _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
+        machine.SmallToggle("Quick on lid close", "IcBolt", on => { _settings.QuickProcessing = on; _settings.Save(); }, "Quick processing: closing the lid focuses on the material, photographs the bed, centres the design on the piece and loads the job. The machine's button still starts it", null, () => _settings.QuickProcessing);
 
         // ---- View ----
-        var view = _ribbon.Tab("View", "Zoom, grid and snapping");
+        var view = _ribbon.Tab("View", "Zoom, grid and snapping, measuring, and what the work area shows")
+            .Order("Zoom", "Grid & snapping", "Measure & history", "Show");
         var zoom = view.Group("Zoom");
         zoom.Large("Fit bed", "IcFitBed", Canvas.FitField, "Show the whole work area (Home)");
         zoom.Small("Fit selection", "IcFit", Canvas.FitSelection, "Zoom to the selection, or the design (F)");
@@ -691,9 +706,9 @@ public partial class MainWindow : Window
         panels.Small("Reset panels", "IcLayers", () => _docking.Reset(), "Put the layers, selection and layer settings panels back where they started (each panel's title bar moves, floats or folds it)");
         panels.SmallToggle("Processing order", "IcPreview", on => _job.ShowOrder = on, "Colour the paths by when they run: blue first, through green and yellow, to red last (a key shows at the top of the work area)", null, () => _job.ShowOrder);
         panels.SmallToggle("Pictures as burned", "IcPalette", on => { _settings.PicturesAsBurned = on; _settings.Save(); Canvas.PicturesAsBurned = on; },
-            "Show pictures as they'll come out on their layer's material: corrected, in the material's own colours. Needs a tone test on that material (Laser → Tone test).", null, () => _settings.PicturesAsBurned);
+            "Show pictures as they'll come out on their layer's material: corrected, in the material's own colours. Needs a tone test on that material (Materials & Tests → Tests → Tone test).", null, () => _settings.PicturesAsBurned);
 
-        _ribbon.Select(_settings.RibbonTab);
+        _ribbon.Select(RibbonPlaces.Tab(_settings.RibbonTab));
         _ribbon.TabSelected += t => { _settings.RibbonTab = t; _settings.Save(); };
         RefreshRecent();
         _ribbon.Refresh();
@@ -1252,7 +1267,7 @@ public partial class MainWindow : Window
         [
             Do("Cut", CutSel, gesture: "Ctrl+X"),
             Do("Copy", CopySel, gesture: "Ctrl+C"),
-            new MenuItem { Header = "Paste", IsEnabled = _clipboard.Count > 0, InputGesture = KeyGesture.Parse("Ctrl+V"), Command = null }.With(m => m.Click += (_, _) => Paste()),
+            new MenuItem { Header = "Paste", InputGesture = KeyGesture.Parse("Ctrl+V") }.With(m => m.Click += (_, _) => Paste()),
             Do("Duplicate", DuplicateSel, gesture: "Ctrl+D"),
             Do($"Delete {what}", DeleteSel, gesture: "Delete"),
             new Separator(),
@@ -1399,7 +1414,8 @@ public partial class MainWindow : Window
             foreach (var c in ShapeActions(_doc.Selection)) menu.Items.Add(c);
         else
         {
-            var paste = new MenuItem { Header = "Paste", IsEnabled = _clipboard.Count > 0, InputGesture = KeyGesture.Parse("Ctrl+V") };
+            // Always on: a picture or SVG copied in another program can be pasted too (Paste is no longer on the ribbon).
+            var paste = new MenuItem { Header = "Paste", InputGesture = KeyGesture.Parse("Ctrl+V") };
             paste.Click += (_, _) => Paste();
             var all = new MenuItem { Header = "Select all", InputGesture = KeyGesture.Parse("Ctrl+A") };
             all.Click += (_, _) => SelectAll();
@@ -2066,7 +2082,7 @@ public partial class MainWindow : Window
         if (_machine.Client is not { IsConnected: true } client) { await Dialogs.Message(this, "Focus on selection", "Connect the machine first."); return; }
         if (SurfaceProbe.LoadCalibration() is not { } cal)
         {
-            await Dialogs.Message(this, "Focus on selection", "The red pointer needs calibrating once first: Laser → Curved surface → Calibrate the pointer (on a flat board).");
+            await Dialogs.Message(this, "Focus on selection", "The red pointer needs calibrating once first: Machine → Curved surface → Calibrate the pointer (on a flat board).");
             return;
         }
         if (_machine.Distance is not { } now) { await Dialogs.Message(this, "Focus on selection", "Focus once first (auto-focus, or type the height in the machine panel): the pointer reads heights near the focus."); return; }

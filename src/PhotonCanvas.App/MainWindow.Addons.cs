@@ -143,6 +143,12 @@ public partial class MainWindow : IAddonServices
 
     IDisposable IAddonServices.AddRibbonButton(RibbonButton b)
     {
+        // An add-on made for where a button used to be lands where it is now.
+        var (tab, group) = RibbonPlaces.Map(b.Tab, b.Group);
+        b = b with { Tab = tab, Group = group };
+        // Tests aren't ribbon buttons: they're listed in the Tests window.
+        if (tab == RibbonPlaces.Tests)
+            return AddTest(group, b.Label, b.Icon, b.Run, b.Tip, b.Enabled, b.Visible, b.Order, b.AddonId);
         var undo = _ribbon.AddExtra(b.Tab, b.Group, g =>
         {
             Control c = (b.Large, b.Checked is not null) switch

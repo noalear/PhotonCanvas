@@ -7,9 +7,9 @@ Round things, like heads, vases and pumpkins, can be built from upright fins sta
 held by flat rings at a few heights. Not yet tried on the machine.
 
 ## Open 3D to slices
-<!-- target: ribbon:Home/3D to slices -->
+<!-- target: ribbon:Import/3D to slices -->
 <!-- wait: window:Stacked slices -->
-Click **3D to slices** on the **Home** tab.
+Click **3D to slices** on the **Import** tab.
 
 ## Open a model
 <!-- target: button:Open a 3D model… -->

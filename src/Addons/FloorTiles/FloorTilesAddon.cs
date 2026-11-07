@@ -3,7 +3,7 @@ using PhotonCanvas.App.Addons;
 namespace PhotonCanvas.Addon.FloorTiles;
 
 /// <summary>
-/// Designer → Terrain → Floor tiles, its command and "Edit floor tiles…" on the right-click menu, opening
+/// Mini-Designer → Terrain → Floor tiles, its command and "Edit floor tiles…" on the right-click menu, opening
 /// <see cref="FloorTilesWindow"/>: textured floor tiles for tabletop games that lock together on a
 /// square grid. It only adds shapes to the design; nothing is sent to the machine.
 /// </summary>
@@ -18,7 +18,7 @@ public sealed class FloorTilesAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Designer", "Terrain", "Floor tiles", Icon, Open)
+        host.AddRibbonButton(new RibbonButton("Mini-Designer", "Terrain", "Floor tiles", Icon, Open)
         {
             Tip = "Floor tiles for tabletop games with flagstones, floorboards, cobbles or your own texture etched on, that lock together on a square grid",
             Large = true,

@@ -9,9 +9,9 @@ and corrects that layer's pictures. You need a picture layer, the material on th
 connected and the camera calibrated.
 
 ## Open the tone test
-<!-- target: ribbon:Laser/Tone test -->
+<!-- target: ribbon:Tests/Tone test -->
 <!-- wait: window:Tone test -->
-Put the material flat in the camera's view, then click **Tone test** on the **Laser** tab.
+Put the material flat in the camera's view, then click **Tests** on the **Materials & Tests** tab, pick **Tone test** in the list and click **Open**.
 
 ## Choose the layer
 <!-- target: field:Settings of -->
@@ -28,7 +28,7 @@ How many greys, black to white, and how big.
 The strip goes in the middle of the bed, and the window closes.
 
 ## Burn it
-<!-- target: ribbon:Laser/Ship It -->
+<!-- target: ribbon:Machine/Ship It -->
 <!-- wait: window:Tone test -->
 Keep the strip clear of knots and grain lines, then **Ship It**. When it's done, the window opens
 again.

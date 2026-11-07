@@ -60,7 +60,11 @@ public partial class MainWindow : ITutorialHost
         {
             case "ribbon":
                 int slash = value.IndexOf('/');
-                return slash < 0 ? null : _ribbon.Show(value[..slash].Trim(), value[(slash + 1)..].Trim());
+                if (slash < 0) return null;
+                string tab = value[..slash].Trim(), label = value[(slash + 1)..].Trim();
+                // A test is picked in the Tests window: ring the Tests button, and open the window on it.
+                if (tab == RibbonPlaces.Tests) _testWanted = label;
+                return _ribbon.Show(tab, label);
             case "tab":
                 return _ribbon.TabHeader(value);
             case "header":

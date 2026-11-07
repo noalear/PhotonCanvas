@@ -2,7 +2,7 @@
 <!-- windows: KerfGaugeWindow -->
 
 An add-on (Settings → Add-ons → **Fits first time (kerf gauge)**): on when PhotonCanvas is installed,
-and can be turned off or removed. Its button is **Laser → Tests → Kerf gauge**.
+and can be turned off or removed. Its button is **Machine → Calibrate → Kerf gauge**.
 
 The beam takes a little material away along every cut: the **kerf**. A part comes out half a kerf
 smaller all round and a hole half a kerf bigger, so a finger joint, a dowel hole or an inlay drawn to

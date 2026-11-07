@@ -5,12 +5,12 @@
 <!-- order: 61 -->
 Weave two to four pictures into one mirror stainless plate as diffraction gratings with different
 directions: tilt it one way and you see one picture, the other way another. Run a grating test first
-(Laser → Colour test, Diffraction gratings) to find your power and pitch.
+(Materials & Tests → Tests → Colour test, Diffraction gratings) to find your power and pitch.
 
 ## Select the pictures
 <!-- target: canvas -->
 Shift-click two to four pictures of the same shape. The one you added first is picture A: the plate
-goes where it is. No pictures yet? **Picture → Import picture** (`Ctrl+J`).
+goes where it is. No pictures yet? **Import → Picture** (`Ctrl+J`).
 
 ## Open Flip picture
 <!-- target: ribbon:Picture/Flip picture -->

@@ -11,12 +11,12 @@ PhotonCanvas compares that with the empty bed, measured once.
 This needs the machine connected (see [The machine and settings](machine.md)).
 
 ## Measure the empty bed (first time only)
-<!-- target: ribbon:Camera/Thickness -->
-Clear the bed under the head, click **Thickness** on the **Camera** tab, and choose
+<!-- target: ribbon:Machine/Thickness -->
+Clear the bed under the head, click **Thickness** on the **Machine** tab, and choose
 **Measure the empty bed**. The head moves to focus on the bed.
 
 ## Measure the material
-<!-- target: ribbon:Camera/Thickness -->
+<!-- target: ribbon:Machine/Thickness -->
 Put the material under the head and click **Thickness** again. The machine focuses on it.
 
 ## Read it

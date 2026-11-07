@@ -6,7 +6,7 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.Addons.ShadowBoard;
 
 /// <summary>
-/// The shadow board maker as an add-on: a button on the Laser tab and a command, both gone again
+/// The shadow board maker as an add-on: a button on the Placement tab and a command, both gone again
 /// when it's turned off. Only the camera is used (a photo of the bed): it never moves the head or
 /// fires the laser.
 /// </summary>
@@ -18,11 +18,11 @@ public sealed class ShadowBoardAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Laser", "Make", "Shadow board", "IcFitPiece", Open)
+        host.AddRibbonButton(new RibbonButton("Placement", "From the photo", "Shadow board", "IcShadowBoard", Open)
         {
             Large = true,
-            GroupAfter = "Tests|Materials",
             Tip = "Lay your tools on the bed: the camera outlines them and makes a drawer insert with a pocket, finger notches and a label for each",
+            Order = 10,
         });
         host.AddCommand(new AddonCommand("shadowboard.open", "Shapes", "Shadow board…", "", Open));
     }
@@ -55,7 +55,7 @@ public sealed class ShadowBoardAddon : IAddon
 
         public (bool Ready, string Status) CameraStatus(double distanceMm) =>
             !h.IsConnected ? (false, "Connect to the machine first.")
-            : !h.CameraCalibratedFor(distanceMm) ? (false, "The camera isn't calibrated near this height yet (Camera tab → Calibrate).")
+            : !h.CameraCalibratedFor(distanceMm) ? (false, "The camera isn't calibrated near this height yet (Machine → Calibrate camera).")
             : (true, "Camera ready.");
 
         public async Task<RasterImage> PhotographBedAsync(Rect2 area, double mmPerPx, double distanceMm)

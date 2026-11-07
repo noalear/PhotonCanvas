@@ -7,9 +7,9 @@ A cam is a shaped wheel that lifts a follower as it turns. You say what the foll
 by step; the mechanism maker shapes the cam and checks the follower really does it.
 
 ## Open the mechanism maker
-<!-- target: ribbon:Designer/Mechanisms -->
+<!-- target: ribbon:Import/Mechanisms -->
 <!-- wait: window:Mechanism maker -->
-Click **Mechanisms** on the **Designer** tab (in the **Toys** group).
+Click **Mechanisms** on the **Import** tab (in the **Generate** group).
 
 ## Choose Cam and follower
 <!-- target: tabitem:Cam and follower -->

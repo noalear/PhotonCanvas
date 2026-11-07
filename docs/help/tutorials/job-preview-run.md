@@ -8,9 +8,9 @@ up. It's handy for long jobs, to check the order or see when a part will be done
 the design.
 
 ## Open the preview
-<!-- target: ribbon:Laser/Preview run -->
+<!-- target: ribbon:Machine/Preview run -->
 <!-- wait: window:Run preview -->
-Click **Preview run** on the **Laser** tab.
+Click **Preview run** on the **Machine** tab.
 
 ## Play it
 <!-- target: button:Play -->

@@ -19,7 +19,7 @@ design while the window is open: change a layer's power and the picture changes 
 - **New camera photo**: takes a fresh overview picture of the bed (the camera only: the head stays
   where it is and the laser stays off). Needs the machine connected. Without a camera picture the
   piece is drawn on a plain stand-in in the colour of the material.
-- **Show on the canvas**: the same as **Burned on canvas** on the ribbon (below).
+- **Show on the canvas**: the same as **Burned look on work area** on the ribbon (below).
 - **Layers**: each layer that's sent, with a swatch of its mark on the bare material, and where its
   look came from (next section).
 
@@ -44,10 +44,12 @@ show through. Cuts that go right through show the dark bed beneath, with a littl
 on wood, paper and leather. Lines thinner than a pixel of the camera picture come out faint, as they
 would in a photo.
 
-## Burned on canvas
+## Burned look on work area
 
-**Burned on canvas** on the **View** tab draws the burned look on the work area in place of the camera picture,
-under your outlines, so you can zoom in on it and keep editing. Turn **Camera on work area** on to
+**Burned look on work area** on the **View** tab (it used to be called *Burned on canvas*) shows
+the finished piece right on the work area: your design drawn onto the camera's picture of the
+material, as dark and in the colours your tests say it comes out, under your outlines, so you can
+zoom in on it and keep editing. It's the same picture **See it burned** shows in its own window. Turn **Camera on work area** on to
 see it on the real material. A label in the bottom corner says it's on, and whether any layer is a
 guess. Click the button again to see the camera picture as it is.
 

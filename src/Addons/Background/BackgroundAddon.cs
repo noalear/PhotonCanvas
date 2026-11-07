@@ -5,7 +5,7 @@ using static PhotonCanvas.App.UiKit;
 namespace PhotonCanvas.Addon.Background;
 
 /// <summary>
-/// Picture → Clean up → Remove background, the right-click item and the Selection panel's button:
+/// Picture → Edit → Remove background, the right-click item and the Selection panel's button:
 /// makes a picture's backdrop see-through (<see cref="BackgroundWindow"/>).
 /// </summary>
 public sealed class BackgroundAddon : IAddon
@@ -15,7 +15,7 @@ public sealed class BackgroundAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        host.AddRibbonButton(new RibbonButton("Picture", "Clean up", "Remove background", "IcRemoveBg", () =>
+        host.AddRibbonButton(new RibbonButton("Picture", "Edit", "Remove background", "IcRemoveBg", () =>
         {
             if (host.SelectedPicture is { } im) _ = host.Guard(() => Remove(im));
         })
@@ -23,7 +23,7 @@ public sealed class BackgroundAddon : IAddon
             Tip = "Make the backdrop see-through so it isn't engraved",
             Large = true,
             Enabled = () => host.SelectedPicture is not null,
-            GroupAfter = "Relief",
+            Order = 10,
         });
         host.AddContextMenuItem(new ContextMenuEntry("Remove picture background…", () =>
         {

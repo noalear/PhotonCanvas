@@ -1,6 +1,6 @@
 # Textured walls
 
-An add-on (Settings → Add-ons → **Textured wall maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Designer → Buildings → Walls**, and **Edit walls…** is on the right-click menu of the pieces it made.
+An add-on (Settings → Add-ons → **Textured wall maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Mini-Designer → Buildings → Walls**, and **Edit walls…** is on the right-click menu of the pieces it made.
 
 **Walls** makes walls for tabletop games, dioramas and model buildings, cut from sheet material with
 a texture etched on: brick, stone, wood, metal, or a pattern of your own. A wall is built as a
@@ -19,7 +19,7 @@ accessories. Columns cut from the same sheet join the walls: straight on, at cor
 
 ![The wall maker making a boxed stone castle wall: settings on the left, and on the right the wall put together with battlements, a walkway, arrow slits, a door and corner columns](images/window-walls-castle.png)
 
-Click **Walls** on the **Designer** tab (in the **Buildings** group). The **Textured walls** window opens. The
+Click **Walls** on the **Mini-Designer** tab (in the **Buildings** group). The **Textured walls** window opens. The
 settings are on the left in tabs; the preview on the right updates as you change things:
 
 - **Put together** shows one wall built, in 3D, with a column at each end (the first kind of column
@@ -192,7 +192,7 @@ grouped.
 1. Run the sheet's page as usual: the front texture, then the cut.
 2. Turn the pieces over left to right (the top edge stays at the top) and lay them on the bed.
 3. Show the backs page. With the camera picture on, drag each piece's group roughly onto its piece.
-4. Select the group and click **Camera** → **Fit to piece**. Because the group has its outline on a
+4. Select the group and click **Placement** → **Fit to piece**. Because the group has its outline on a
    guide layer, only that outline is matched to the piece's edges, and the whole engraving moves
    with it. **Apply**, then do the next piece.
 5. Run the backs page.
@@ -403,7 +403,7 @@ etch** (the texture, a Fill layer) first, while the sheet is whole, then **Walls
 panels engraved on the back too get a page of their own for the backs (see
 [The back of a single panel](#the-back-of-a-single-panel)); its etch layer takes the same **Etch
 with** settings. Set the
-etch layer's power and speed for the depth you want (Laser → Tests → Material test helps); a deeper
+etch layer's power and speed for the depth you want (Materials & Tests → Tests → Material test helps); a deeper
 etch shows more but takes longer.
 
 ## Try it
