@@ -25,9 +25,10 @@ public sealed class WorkModeWindow : Window
     readonly CheckBox _reverse = new() { Content = "It turns the other way" };
     readonly TextBlock _calNote = Hint();
     // Turning the rotary by hand from here (a laser-off job), and turning back what a stopped job left.
-    readonly NumericUpDown _turnDeg = Number(-3600, 3600, 15, "0.#");
+    readonly NumericUpDown _turnDeg = Number(-3600, 3600, 15, "0.#"), _nowMade = Number(0.05m, 20, 0.05m, "0.##");
+    readonly TextBlock _nowNote = Hint();
     readonly TextBlock _leftNote = Hint();
-    readonly Button _returnBtn = Button("Return rotary to start", tip: "Turn the object back to where the stopped job started, with a short laser-off job.");
+    readonly Button _returnBtn = Button("Return rotary to start", tip: "Turn the object back to where the stopped job started (laser off).");
     readonly TextBlock _info = Hint();
 
     public WorkModeWindow(AppSettings settings, MachinePanel machine)
@@ -83,6 +84,39 @@ public sealed class WorkModeWindow : Window
         turn.VerticalAlignment = VerticalAlignment.Bottom;
         turn.MinWidth = 90;
         turnRow.Children.Add(turn);
+        _nowMade.Value = 1;
+        ToolTip.SetTip(_nowMade, "How many turns the object really made when you clicked Turn once (a quarter past is 1.25, a quarter short 0.75).");
+        var turnOnce = Button("Turn once", tip: "Turn the object one whole turn, to check the turning scale against a tape mark.");
+        turnOnce.Click += async (_, _) => await TurnOnce();
+        var letGo = Button("Let the motor go", tip: "After a turn the motor holds the object still. This lets it go limp so you can turn it by hand.");
+        letGo.Click += async (_, _) =>
+        {
+            try { await _machine.FreeRotaryAsync(); }
+            catch (PhotonCanvas.Device.DeviceException e) { await Dialogs.Message(this, "Couldn't let it go", e.Message); }
+        };
+        var stopTurn = Button("Stop turning", tip: "Stop a turn part way.");
+        stopTurn.Click += async (_, _) =>
+        {
+            try { await _machine.StopRotaryAsync(); }
+            catch (PhotonCanvas.Device.DeviceException e) { await Dialogs.Message(this, "Couldn't stop it", e.Message); }
+        };
+        var fixNow = Button("Correct", tip: "Change the turning scale so one turn comes out right next time.");
+        fixNow.Click += (_, _) =>
+        {
+            double was = RotaryReturn.NowScale(_settings), made = (double)(_nowMade.Value ?? 1);
+            _settings.RotaryNowScale = Math.Round(RotaryReturn.CorrectedNowScale(_settings, 1, made), 5);
+            _settings.Save();
+            _nowNote.IsVisible = true;
+            _nowNote.Text = Math.Abs(made - 1) < 1e-9 ? "Nothing to correct: it made one turn." : $"Corrected ({was:0.####} → {_settings.RotaryNowScale:0.####}). Turn once again to check.";
+            _nowMade.Value = 1;
+        };
+        _nowNote.IsVisible = false;
+        var madeRow = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8 };
+        madeRow.Children.Add(Field("It made (turns)", _nowMade));
+        Grid.SetColumn(fixNow, 1);
+        fixNow.VerticalAlignment = VerticalAlignment.Bottom;
+        fixNow.MinWidth = 90;
+        madeRow.Children.Add(fixNow);
         var turnPanel = new Border
         {
             Background = Brush("Bg2"), CornerRadius = new(6), Padding = new(12, 10),
@@ -92,8 +126,10 @@ public sealed class WorkModeWindow : Window
                 Children =
                 {
                     new TextBlock { Text = "TURN THE ROTARY", Classes = { "h" } },
-                    Hint("The machine only turns the rotary inside a job, so these send a short job with the laser off that starts straight away."),
-                    _leftNote, _returnBtn, turnRow,
+                    Hint("These turn the object straight away, with the laser off. Keep hands clear of the chuck. After a turn the motor holds it still."),
+                    _leftNote, _returnBtn, turnRow, stopTurn,
+                    Hint("Check the turning once: put a tape mark on the chuck, click Turn once, and say how many turns it really made."),
+                    Row(turnOnce, letGo), madeRow, _nowNote,
                 },
             },
         };
@@ -203,7 +239,7 @@ public sealed class WorkModeWindow : Window
         if (Math.Abs(deg) < 0.1) return;
         double circ = Math.PI * Math.Max(1, _settings.RotaryDiameterMm);
         double u = RotaryReturn.UFor(deg, mode, circ);
-        bool sent = await RotaryTurn.SendAsync(this, _machine, mode, u,
+        bool sent = await RotaryTurn.TurnAsync(this, _settings, _machine, RotaryReturn.UnitsFor(deg, mode, circ), mode, u,
             $"Turn the object {Math.Abs(deg):0.#}° {(deg > 0 ? "forward (the way a design runs down the page)" : "back (against the way a design runs down the page)")}.");
         // Turning by hand from here moves the object relative to where a stopped job started too.
         if (sent && _settings.RotaryLeftU is not null && _settings.RotaryLeftScale > 0)
@@ -212,6 +248,19 @@ public sealed class WorkModeWindow : Window
             _settings.Save();
             UpdateLeft();
         }
+    }
+
+    /// <summary>One whole turn, for checking the turning scale against a tape mark.</summary>
+    async Task TurnOnce()
+    {
+        Save();
+        if (WorkModes.From(_settings) is not WorkMode.Rotary mode)
+        {
+            await Dialogs.Message(this, "Not on the rotary", "Choose Rotary above (and a machine that has one) first.");
+            return;
+        }
+        double circ = Math.PI * Math.Max(1, _settings.RotaryDiameterMm);
+        await RotaryTurn.TurnAsync(this, _settings, _machine, RotaryReturn.UnitsFor(360, mode, circ), mode, RotaryReturn.UFor(360, mode, circ), "Turn the object once.");
     }
 
     void Update()

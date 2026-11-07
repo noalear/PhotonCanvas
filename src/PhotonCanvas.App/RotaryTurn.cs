@@ -6,13 +6,18 @@ using PhotonCanvas.Doc;
 namespace PhotonCanvas.App;
 
 /// <summary>
-/// Turning the rotary from the app: the F2 Ultra ignores U moves sent on their own, so each turn is a
-/// tiny laser-off job that starts as soon as it arrives (after the user confirms).
+/// Turning the rotary from the app. First choice: straight away, outside a job (the port's motor set
+/// to hold, then turned, the way xTool Studio's conveyor feed buttons work). If the machine refuses
+/// that, a tiny laser-off job that starts as soon as it arrives (after the user confirms).
 /// </summary>
 static class RotaryTurn
 {
-    /// <summary>Turn the rotary by <paramref name="uMm"/> (the job's own U units). Returns true once the job is on its way.</summary>
-    public static async Task<bool> SendAsync(Window owner, MachinePanel machine, WorkMode.Rotary mode, double uMm, string what)
+    /// <summary>
+    /// Turn the rotary by <paramref name="motorUnits"/> (a job's U × its scale). <paramref name="mode"/> and
+    /// <paramref name="jobU"/> are the same turn as a job, for when turning straight away is refused.
+    /// Returns true once it's turning (or the job is on its way).
+    /// </summary>
+    public static async Task<bool> TurnAsync(Window owner, AppSettings settings, MachinePanel machine, double motorUnits, WorkMode.Rotary mode, double jobU, string what)
     {
         if (!machine.IsConnected)
         {
@@ -24,6 +29,51 @@ static class RotaryTurn
             await Dialogs.Message(owner, "A job is running", "Wait for the job on the machine to finish (or stop it) first.");
             return false;
         }
+        double u = motorUnits * await NowScaleAsync(settings, machine);
+        if (!double.IsFinite(u) || Math.Abs(u) > Job.MaxTurnMm)
+        {
+            await Dialogs.Message(owner, "Can't turn it", "That's a very long way to turn. Turn it by hand instead.");
+            return false;
+        }
+        try
+        {
+            await machine.TurnRotaryNowAsync(u);
+            return true;
+        }
+        catch (DeviceException e) when (!e.IsConnectionProblem)
+        {
+            // Older firmware may not take the feed request: fall back to a job.
+            return await SendJobAsync(owner, machine, mode, jobU, what + $"\n\n(Turning straight away didn't work: {e.Message} So it goes as a short job instead.)");
+        }
+        catch (DeviceException e)
+        {
+            await Dialogs.Message(owner, "Couldn't turn it", e.Message);
+            return false;
+        }
+    }
+
+    // The machine's own belt factor, read once a session (the feed is scaled by it).
+    static double? _machineRate;
+
+    /// <summary>
+    /// The feed's units per motor unit: the one-turn check's when there is one, else 1 ÷ the belt factor
+    /// stored on the machine (ConveyorURate), else 1 ÷ the conveyor setting here.
+    /// </summary>
+    static async Task<double> NowScaleAsync(AppSettings settings, MachinePanel machine)
+    {
+        if (settings.RotaryNowScale > 0) return settings.RotaryNowScale;
+        if (_machineRate is null)
+        {
+            var configs = await machine.GetConfigsAsync();
+            if (configs?["ConveyorURate"] is { } n && double.TryParse(n.ToString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var r) && r is > 0.1 and < 10)
+                _machineRate = r;
+        }
+        return _machineRate is { } rate ? 1 / rate : RotaryReturn.NowScale(settings);
+    }
+
+    /// <summary>The turn as a laser-off job that starts as soon as it arrives, after a confirm.</summary>
+    static async Task<bool> SendJobAsync(Window owner, MachinePanel machine, WorkMode.Rotary mode, double uMm, string what)
+    {
         byte[] xf;
         try { xf = RotaryReturn.TurnJob(mode, uMm); }
         catch (JobException e)
@@ -48,13 +98,13 @@ static class RotaryTurn
         }
     }
 
-    /// <summary>Turn back what a stopped job left, and forget it once it's sent.</summary>
+    /// <summary>Turn back what a stopped job left, and forget it once it's turning.</summary>
     public static async Task<bool> ReturnAsync(Window owner, AppSettings settings, MachinePanel machine)
     {
         if (settings.RotaryLeftU is not { } left) return false;
         double deg = Math.Abs(RotaryReturn.Degrees(left, settings.RotaryLeftCircumferenceMm));
-        bool sent = await SendAsync(owner, machine, RotaryReturn.ReturnMode(settings), -left,
-            $"Turn the object back about {deg:0}° to where the stopped job started. That's worked out from how far the job had got, so check your mark afterwards and fine-tune with Turn by in Laser → Work mode.");
+        bool sent = await TurnAsync(owner, settings, machine, RotaryReturn.UnitsBack(settings), RotaryReturn.ReturnMode(settings), -left,
+            $"Turn the object back about {deg:0}° to where the stopped job started.");
         if (sent)
         {
             settings.RotaryLeftU = null;
@@ -63,7 +113,7 @@ static class RotaryTurn
         return sent;
     }
 
-    /// <summary>"85° round": a left-over turn for the job bar.</summary>
+    /// <summary>"85°": a left-over turn for the job bar.</summary>
     public static string Describe(AppSettings s) =>
         s.RotaryLeftU is { } u ? $"{Math.Abs(RotaryReturn.Degrees(u, s.RotaryLeftCircumferenceMm)):0}°" : "";
 }

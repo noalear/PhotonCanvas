@@ -482,6 +482,45 @@ public sealed class MachinePanel : UserControl
         catch (DeviceException) { return null; }
     }
 
+    /// <summary>
+    /// Turn the rotary straight away, outside a job: the port's motor is set to hold, then turned by
+    /// <paramref name="u"/> (the conveyor's units; the machine scales them by its belt factor). The
+    /// motor is left holding, so the object stays put. Throws <see cref="DeviceException"/>.
+    /// </summary>
+    public async Task TurnRotaryNowAsync(double u, double speed = 1200)
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        if (Mode is "P_WORKING" or "P_PAUSE" or "P_FRAMING")
+            throw new DeviceException(DeviceException.BusyCode, "The machine is busy. Wait for it to finish, or stop it, first.");
+        // Asleep, it answers but doesn't move (seen 2026-11-07): wake it first, as leaving focus mode does.
+        if (Mode == "P_SLEEP")
+        {
+            Log("The machine is asleep: waking it before turning the rotary.");
+            await c.ReturnToIdleAsync();
+            await Task.Delay(1500);
+        }
+        Log($"Turning the rotary {u:0.###} (hold, then turn).");
+        // Hold every time: the motor may have been let go (or by a sleep) since the last turn.
+        await c.AccessoryAsync("lock");
+        await c.AccessoryAsync("goto", u, speed);
+    }
+
+    /// <summary>Stop a turn part way (seen to work on the F2 Ultra).</summary>
+    public async Task StopRotaryAsync()
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        Log("Stopping the rotary.");
+        await c.AccessoryAsync("stop");
+    }
+
+    /// <summary>Let the rotary's motor go limp, so it can be turned by hand.</summary>
+    public async Task FreeRotaryAsync()
+    {
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        Log("Letting the rotary's motor go.");
+        await c.AccessoryAsync("free");
+    }
+
     public Task PauseJobAsync() => _client?.PauseJobAsync() ?? Task.CompletedTask;
     public Task ResumeJobAsync() => _client?.ResumeJobAsync() ?? Task.CompletedTask;
     public Task StopJobAsync() => _client?.StopJobAsync() ?? Task.CompletedTask;

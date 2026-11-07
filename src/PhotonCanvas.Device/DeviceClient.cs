@@ -1002,6 +1002,23 @@ public sealed class DeviceClient : IAsyncDisposable
         }
     }
 
+    // ---- rotary / conveyor port outside a job ----------------------------------------
+
+    /// <summary>
+    /// The rotary/conveyor port's motor, outside a job (<c>PUT /v1/peripheral/param?type=conveyor</c>,
+    /// the request behind xTool Studio's conveyor feed buttons). Seen on the F2 Ultra (fw 40.54.021,
+    /// 2026-11-07) turning a rotary on the same port: <c>lock</c> first (the motor holds), then
+    /// <c>goto</c> turns it; without the lock nothing moves. <c>type=rotary</c> is refused. The
+    /// distance is in the conveyor's mm, which the machine scales by its stored belt factor.
+    /// </summary>
+    public Task AccessoryAsync(string action, double? u = null, double? speed = null, CancellationToken cancellationToken = default)
+    {
+        var data = new JsonObject { ["action"] = action };
+        if (u is { } d) data["u"] = Math.Round(d, 3);
+        if (speed is { } s) data["speed"] = Math.Round(s);
+        return RequestAsync("PUT", "/v1/peripheral/param", data, new JsonObject { ["type"] = "conveyor" }, cancellationToken: cancellationToken);
+    }
+
     // ---- running job ---------------------------------------------------------------
 
     /// <summary>Pause the running job (the machine keeps it; resume with the button or <see cref="ResumeJobAsync"/>).</summary>
