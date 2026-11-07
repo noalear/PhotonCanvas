@@ -212,6 +212,37 @@ public class WorkModeTests
     }
 
     [Fact]
+    public void RotaryLineIsOnTheFieldNotTheUnrolledObject()
+    {
+        // The app builds rotary jobs on the unrolled work area (220 × once round): a 25 mm dowel is 78.5 mm
+        // round, but the laser line still belongs at the middle of the 220 mm field, not 39 mm from the back.
+        var area = M with { FieldH = 78.54 };
+        var mode = new WorkMode.Rotary(128 / 78.54, 1, 78.54);
+        var g = JobBuilder.Build(Design(LayerMode.Cut, 30, 20), new JobOptions { Machine = area, Mode = mode }).Motion.Split('\n');
+        Assert.Contains("G0Y110.000", g);
+        Assert.DoesNotContain("G0Y39.270", g);
+        // The galvo goes to the line before U mode is switched on, as well as after.
+        int park = Array.IndexOf(g, "G0Y110.000"), u = Array.IndexOf(g, "G100");
+        Assert.True(park >= 0 && u > park, "the line comes before G100");
+        // A rotary that sits elsewhere: the line is the user's.
+        var moved = JobBuilder.Build(Design(LayerMode.Cut, 30, 20), new JobOptions { Machine = area, Mode = mode with { LineY = 62.5 } }).Motion;
+        Assert.Contains("G0Y62.500", moved);
+        Assert.DoesNotContain("G0Y110.000", moved);
+        // Framing traces the same line.
+        var frame = JobBuilder.Build(Design(LayerMode.Cut, 30, 20), new JobOptions { Machine = area, Mode = mode with { LineY = 62.5 } });
+        Assert.Contains("Y62", frame.Border);
+    }
+
+    [Fact]
+    public void ConveyorParksTheGalvoInsideTheField()
+    {
+        var area = M with { FieldW = 610 };
+        var g = JobBuilder.Build(Design(LayerMode.Fill, 300, 30), new JobOptions { Machine = area, Mode = new WorkMode.Conveyor(0.74592, 0) }).Motion;
+        Assert.Contains("G0X110.000", g);
+        Assert.DoesNotContain("G0X305.000", g);
+    }
+
+    [Fact]
     public void ConveyorRunsLinesAcrossTheBelt()
     {
         var job = JobBuilder.Build(Design(LayerMode.Fill, 300, 30), new JobOptions { Mode = new WorkMode.Conveyor(0.74592, 0) });

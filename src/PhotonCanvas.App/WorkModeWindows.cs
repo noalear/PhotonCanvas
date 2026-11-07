@@ -17,7 +17,7 @@ public sealed class WorkModeWindow : Window
     readonly List<string> _modes = ["Flat"];
     readonly List<int> _attachments;
     readonly ComboBox _attach = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
-    readonly NumericUpDown _diameter = Number(2, 200, 1, "0.##"), _rate = Number(90, 105, 0.1m, "0.##"), _angle = Number(-10, 10, 0.01m, "0.###");
+    readonly NumericUpDown _diameter = Number(2, 200, 1, "0.##"), _rate = Number(90, 105, 0.1m, "0.##"), _angle = Number(-10, 10, 0.01m, "0.###"), _line = Number(1, 219, 1, "0.#");
     readonly Control _rotary, _conveyor, _custom;
     // The user's own rotary: chuck or rollers, its scale, which way it turns, and correcting the scale from a test.
     readonly Segmented _customKind = new([("Chuck", (string?)null), ("Rollers", null)]);
@@ -45,6 +45,7 @@ public sealed class WorkModeWindow : Window
         _mode.SelectedIndex = Math.Max(0, _modes.IndexOf(WorkModes.Usable(settings) ? settings.WorkMode : "Flat"));
         _attach.SelectedIndex = Math.Max(0, _attachments.IndexOf(settings.RotaryAttachment));
         _diameter.Value = (decimal)settings.RotaryDiameterMm;
+        _line.Value = (decimal)Math.Clamp(settings.RotaryLineMm, 1, 219);
         _rate.Value = (decimal)Math.Round(100 * 0.74592 / Math.Max(0.01, settings.ConveyorUMultiple), 2);
         _angle.Value = (decimal)settings.ConveyorAngle;
         _customKind.SelectedIndex = settings.CustomRotaryChuck ? 0 : 1;
@@ -59,6 +60,7 @@ public sealed class WorkModeWindow : Window
         ToolTip.SetTip(_seen, "How many turns the object really made (put a tape flag on it and count; a quarter is 0.25).");
         var correct = Button("Correct the scale", tip: "Change the scale so the asked-for turns come out right next time.");
         correct.Click += (_, _) => Correct();
+        ToolTip.SetTip(_line, "Where the laser draws across the object, in mm from the back edge of the work field (110 is the middle). Set it over the top of the object, along the rotary's axis: frame a job to see the line, and move it until it sits there.");
         ToolTip.SetTip(_diameter, "The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale.");
         ToolTip.SetTip(_rate, "The belt's calibration from xTool Studio (Conveyor calibration, 90–105 %, normally 100).");
         ToolTip.SetTip(_angle, "The belt's angle compensation from xTool Studio's conveyor calibration (0 if never calibrated).");
@@ -73,7 +75,7 @@ public sealed class WorkModeWindow : Window
                 Field("Units a turn", _turnUnits),
                 Field("Roller scale", _rollerScale),
                 _reverse,
-                Hint("Test it on scrap: a design as tall as the work area should turn the object exactly once. If it doesn't, type how far it turned and correct the scale."),
+                Hint("Test it on scrap: a design as tall as the work area should turn the object exactly once. Count only the slow turn while it draws: the quick turns before and after just go to the start and back. If it doesn't turn exactly once, type how far it turned and correct the scale."),
                 Row(Field("Turns asked", _asked), Field("Turns made", _seen)),
                 correct, _calNote,
             },
@@ -84,7 +86,7 @@ public sealed class WorkModeWindow : Window
             Children =
             {
                 Field("Attachment", _attach),
-                Field("Object Ø (mm)", _diameter),
+                Row(Field("Object Ø (mm)", _diameter), Field("Laser line (mm from back)", _line)),
                 _custom,
                 Hint("The work area becomes the field's width × once round the object. Design Y goes round it; the middle of the design faces the laser at the start."),
             },
@@ -156,6 +158,7 @@ public sealed class WorkModeWindow : Window
         _settings.WorkMode = _modes[Math.Max(0, _mode.SelectedIndex)];
         if (_attach.SelectedIndex >= 0 && _attach.SelectedIndex < _attachments.Count) _settings.RotaryAttachment = _attachments[_attach.SelectedIndex];
         _settings.RotaryDiameterMm = (double)(_diameter.Value ?? 60);
+        _settings.RotaryLineMm = (double)(_line.Value ?? 110);
         _settings.CustomRotaryChuck = _customKind.SelectedIndex != 1;
         _settings.CustomRotaryTurnUnits = (double)(_turnUnits.Value ?? 128);
         _settings.CustomRotaryRollerScale = (double)(_rollerScale.Value ?? 0.59917m);
