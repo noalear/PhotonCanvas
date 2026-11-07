@@ -1,5 +1,5 @@
 """Machine keys, supplied by the user (the desktop app's Settings → Connection finds them in
-the user's own xTool Studio and saves them to %APPDATA%/PhotonCanvas/keys.json).
+the user's own xTool Studio and saves them to %USERPROFILE%/PhotonCanvas/keys.json).
 
 Environment variables override the file: PHOTONCANVAS_DISCOVERY_REQUEST_KEY,
 PHOTONCANVAS_DISCOVERY_REPLY_KEY, PHOTONCANVAS_PAIRING_KEY.
@@ -11,6 +11,10 @@ from pathlib import Path
 
 
 def _default_path() -> Path:
+    # The desktop app keeps its data in the home folder now; the old AppData copy is the fallback.
+    current = Path.home() / "PhotonCanvas" / "keys.json"
+    if current.exists():
+        return current
     base = os.environ.get("APPDATA") or str(Path.home() / ".config")
     return Path(base) / "PhotonCanvas" / "keys.json"
 

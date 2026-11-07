@@ -236,6 +236,8 @@ There is no signing or encryption. Integrity checks are the MD5 on file transfer
 - `POST /v1/cnc/cmd` with `{cmd: "<one G-code line>"}` as the **query parameters** (not the body) runs one command at once, outside a job, for example pointing the galvo (`G0X…Y…F60000`) or stopping the U axis (`M108U0`). PhotonCanvas's console uses it, only for what the user types or runs.
 - `GET /v1/device/configs` returns the machine's stored settings, e.g. `ConveyorURate` (0.7459 × 100 ÷ calibration %) and `ConveyorAngleCompensate`.
 - Conveyor belt moves outside a job: `PUT /v1/peripheral/param?type=conveyor` `{u: mm, action: "goto" | "stop" | "lock" | "free", speed: 9600}` (not used by PhotonCanvas yet).
+  - Tried on firmware 40.54.021 with the rotary on the "snake 1" port (2026-11-06): `lock`, `goto`, `stop` and `free` all answer code 0 with `type=conveyor`, and -1 `"invalid type"` with `type=rotary`. `GET` with either type answers -3 `"error action type !"`. Code 0 only means accepted: whether the motor turns is not confirmed yet. `python -m pcprobe.motor_test` (or `tools/motor-test.cmd`) is a window for checking this by eye; it saves commands, answers and what was seen to `%USERPROFILE%\PhotonCanvas\motor-test`.
+  - The machine can report `P_SLEEP` on the first connection and `P_IDLE` on the next, so check again before refusing to run.
 
 ## Camera
 
