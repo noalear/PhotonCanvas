@@ -79,6 +79,11 @@ public sealed class JobBar : UserControl
     string? _sentTaskId;
     double? _machineElapsed;
     DateTime _machineElapsedAt;
+    // The machine's own progress (0–1) at its last report, while it gives one.
+    double? _machineFraction;
+    // A stopped rotary job left the object turned: how far, and the button that turns it back.
+    readonly Button _rotaryBack = new() { Classes = { "chip" }, IsVisible = false };
+    readonly TextBlock _rotaryBackSays = new() { TextWrapping = TextWrapping.Wrap, FontSize = 12, Width = 300 };
 
     /// <summary>
     /// The job sent from here while it's the one on the machine; null once the machine has another
@@ -269,8 +274,30 @@ public sealed class JobBar : UserControl
         _heatSheet.SelectionChanged += (_, _) => HeatChanged();
         _heatHeld.SelectionChanged += (_, _) => HeatChanged();
         foreach (var n in new[] { _heatThick, _heatLimit, _heatCool }) n.ValueChanged += (_, _) => HeatChanged();
-        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _checks, _order, _heat, more } };
-        foreach (var c in new Control[] { _checks, _order, _heat, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
+        var turnBack = new Button { Content = "Turn it back", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var already = new Button { Content = "It's already back", HorizontalAlignment = HorizontalAlignment.Stretch };
+        _rotaryBack.Flyout = new Flyout
+        {
+            Placement = PlacementMode.TopEdgeAlignedRight,
+            Content = new StackPanel { Spacing = 8, Children = { _rotaryBackSays, Row(already, turnBack) } },
+        };
+        turnBack.Click += async (_, _) =>
+        {
+            _rotaryBack.Flyout.Hide();
+            if (TopLevel.GetTopLevel(this) is Window w) await RotaryTurn.ReturnAsync(w, _settings, _machine);
+            UpdateRotaryBack();
+        };
+        already.Click += (_, _) =>
+        {
+            _rotaryBack.Flyout.Hide();
+            _settings.RotaryLeftU = null;
+            _settings.Save();
+            UpdateRotaryBack();
+        };
+        ToolTip.SetTip(_rotaryBack, "A rotary job was stopped part way, so the object is still turned. Click to turn it back to where that job started.");
+        UpdateRotaryBack();
+        var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _rotaryBack, _checks, _order, _heat, more } };
+        foreach (var c in new Control[] { _rotaryBack, _checks, _order, _heat, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
 
         var title = new TextBlock { Text = "JOB", Classes = { "h" }, Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         var head = new DockPanel();
@@ -702,10 +729,12 @@ public sealed class JobBar : UserControl
                     }
                     if (finished && OwnJob is not null && !_sentMidSections) RunFinished?.Invoke(_sentFrom);
                 }
+                if (_startedAt is not null && mode is not ("P_WORK_DONE" or "P_FINISH")) NoteRotaryLeft();
                 if (_startedAt is not null) RunEnded?.Invoke(mode is "P_WORK_DONE" or "P_FINISH");
                 _follow.Stop();
                 _canvas.ShowRun(null, null);
                 _machineElapsed = null;
+                _machineFraction = null;
                 ShowRunning(false);
                 _runTimer.Stop();
                 _runTimes = "";
@@ -727,6 +756,7 @@ public sealed class JobBar : UserControl
             if (await _machine.GetJobProgressAsync() is { } prog)
             {
                 fraction = prog.Fraction;
+                if (fraction is { } mf) _machineFraction = mf;
                 if (prog.ElapsedS is { } e && e > 0)
                 {
                     elapsed = e;
@@ -753,6 +783,36 @@ public sealed class JobBar : UserControl
         if (_machineElapsed is { } m)
             return m + (_pausedAt is null ? (DateTime.Now - _machineElapsedAt).TotalSeconds : 0);
         return (DateTime.Now - start).TotalSeconds - paused;
+    }
+
+    /// <summary>
+    /// A rotary job of ours ended part way: the object is left turned (the job's end, which turns it
+    /// back, didn't run). Where it got to: the machine's own progress if it gives one, else the time.
+    /// </summary>
+    void NoteRotaryLeft()
+    {
+        if (OwnJob is not { Job.Mode: WorkMode.Rotary rot } job) return;
+        double? u = _machineFraction is { } f and > 0
+            ? RotaryReturn.UAtFraction(job, f)
+            : RotaryReturn.UAt(job, RunningSeconds() / Math.Clamp(TimeScale(), 0.3, 5));
+        if (u is not { } left || Math.Abs(left) < RotaryReturn.MinTurnMm) return;
+        RotaryReturn.NoteLeft(_settings, left, rot);
+        _settings.Save();
+        UpdateRotaryBack();
+        if (_settings.RotaryLeftU is not null)
+            _sendState = $"The job ended. The rotary is still turned about {RotaryTurn.Describe(_settings)}: click Rotary {RotaryTurn.Describe(_settings)} to turn it back.";
+    }
+
+    /// <summary>Show or hide the "turn the rotary back" chip.</summary>
+    void UpdateRotaryBack()
+    {
+        _rotaryBack.IsVisible = _settings.RotaryLeftU is not null;
+        if (!_rotaryBack.IsVisible) return;
+        string deg = RotaryTurn.Describe(_settings);
+        _rotaryBack.Content = ChipText("IcRotary", $"Rotary {deg}", "Warn");
+        _rotaryBackSays.Text = $"A rotary job was stopped part way, so the object is still turned about {deg} from where it started " +
+            "(worked out from how far the job had got, so it can be a little out). Turn it back with a short laser-off job, " +
+            "or say it's already back if you turned it by hand.";
     }
 
     /// <summary>Move the "laser is here" marker on the work area.</summary>

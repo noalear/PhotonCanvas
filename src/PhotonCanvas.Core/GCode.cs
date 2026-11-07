@@ -903,6 +903,28 @@ public sealed class Job
         return string.Join("\n", lines);
     }
 
+    /// <summary>Furthest one turning job may move the rotary (mm round the object: a few turns of the largest object).</summary>
+    public const double MaxTurnMm = 2000;
+
+    /// <summary>
+    /// A job that only turns the rotary by <paramref name="uMm"/> (U, mm round the object, the same
+    /// units and sign as the jobs' own U words) with the laser off: the usual head and U mode, one
+    /// <c>G0 U</c>, and the tail without its <c>G0 U0</c> (that would turn it straight back). Used to
+    /// bring the object back to where a stopped job started, since the F2 Ultra ignores U moves sent
+    /// outside a job.
+    /// </summary>
+    public string TurnRotary(double uMm)
+    {
+        if (Mode is not WorkMode.Rotary) throw new JobException("Turning the rotary needs the rotary work mode.");
+        if (!double.IsFinite(uMm)) throw new JobException("The turn is not a valid number.");
+        if (Math.Abs(uMm) > MaxTurnMm) throw new JobException($"That's a long way to turn ({Math.Abs(uMm):0} mm round the object). Turn it by hand instead.");
+        var tag = Machine.GcodeTag;
+        var lines = Header();
+        lines.AddRange(["# turn the rotary, laser off", $"G0U{Fixed3(uMm)}", "# MUST", ""]);
+        lines.AddRange(["# END", $"# {tag} TAIL", "G101", "G90", "G0 S0", "G1 F180000", "M536 U0", "M6 P1", ""]);
+        return string.Join("\n", lines);
+    }
+
     // Timings measured on the F2 Ultra against the job history (Oct 2026).
     /// <summary>Moves with the laser off: galvo jumps, and the moves between a fill's or a picture's pieces (mm/s).</summary>
     const double Jump = 3000;

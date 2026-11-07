@@ -45,7 +45,7 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 |---|---|---|---|
 | **Attachment** | the ones you have: RA2 Pro · rollers, RA2 Pro · chuck, RA3 · rollers, RA3 · chuck, Your own rotary | the first | Which attachment and how it holds the object. |
 | **Object Ø (mm)** | 2 to 200 | 60 | The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale. |
-| **Laser line (mm from back)** | 1 to 219 | 110 | Where the laser draws across the object, measured from the back edge of the 220 mm field (110 is the middle). Put it over the top of the object, along the rotary's axis. **Frame** a job to see the line, and change the number until the line sits there. |
+| **Laser line (mm)** | 1 to 219 | 110 | Where the laser draws across the object, measured from the back edge of the 220 mm field (110 is the middle). Put it over the top of the object, along the rotary's axis. **Frame** a job to see the line, and change the number until the line sits there. |
 
 - The work area becomes the field's width (220 mm) × once round the object. The window shows
   "Once round": π × the diameter. Only the first 375 mm can be used (xTool Studio's limit).
@@ -56,6 +56,27 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
   finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
 - On the rotary a layer's **Focus offset (mm)** can go up to 60 mm either way (10 mm on the flat
   bed), for surfaces much nearer the middle than where you focused.
+
+#### Turning the rotary
+
+The machine only turns the rotary inside a job, so the **Turn the rotary** box in the rotary
+settings sends a short job with the laser off. It starts as soon as it reaches the machine, without
+its button, after you confirm. Keep hands clear of the chuck.
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Turn by (°)** | −3600 to 3600 | 90 | How far to turn the object, in degrees. Positive turns it the way a design runs down the page; negative the other way. Click **Turn**. It saves the settings above first. |
+
+The rotary has no home: each job starts wherever the object is, and turns it back to there at the
+end. A job that is stopped part way (Stop, or a long press on the machine's button) skips that, so
+the object is left turned and the next job starts in the wrong place. When a rotary job sent from
+PhotonCanvas is stopped, the program works out how far the object had turned. It uses the
+machine's own progress when it reports one, and the time otherwise. It then shows a **Rotary 85°**
+chip (with the angle) in the job bar, and **Return rotary to start** in the Turn the rotary box.
+Click it to turn the object back with a laser-off job, or click **It's already back** if you turned
+it by hand. The angle is worked out, not measured, so it can be a little out. A pencil line across the
+chuck and the object shows what's left, and **Turn by (°)** takes up the rest. If you stop again
+before turning back, the turns add up. The program only knows while it's open and connected.
 
 #### Your own rotary
 

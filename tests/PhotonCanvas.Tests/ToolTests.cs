@@ -306,3 +306,97 @@ public class SectionTests
         Assert.Throws<OutsideWorkAreaException>(() => JobBuilder.Build(s, new JobOptions()));
     }
 }
+
+public class RotaryReturnTests
+{
+    static readonly MachineProfile M = MachineProfile.F2Ultra;
+
+    static DocState Design(LayerMode mode)
+    {
+        var s = DocState.New();
+        var layer = Layer.Default(1, mode);
+        s = Ops.AddLayer(s, layer);
+        return Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(20, 20, 30, 30) }]);
+    }
+
+    [Fact]
+    public void TurningJobOnlyTurnsTheRotaryWithTheLaserOff()
+    {
+        var job = new Job(M, []) { Mode = new WorkMode.Rotary(128 / 78.54, 1, 78.54, LineY: 90) };
+        var g = job.TurnRotary(-12.5).Split('\n');
+        Assert.Contains(g, l => l.StartsWith("M535U1.6297"));
+        Assert.Contains("G100", g);
+        Assert.Contains("G0U-12.500", g);
+        Assert.Contains("G0Y90.000", g);
+        Assert.Contains("G101", g);
+        // No tail turn back: that would undo the turn.
+        Assert.DoesNotContain("G0 U0", g);
+        // Nothing that could fire: no G1 moves with power, no M3.
+        Assert.DoesNotContain(g, l => l.StartsWith("G1") && l.Contains('S') && !l.Contains("S0"));
+        Assert.DoesNotContain(g, l => l.StartsWith("M3"));
+        // The tail after the turn.
+        Assert.True(Array.IndexOf(g, "G0U-12.500") < Array.IndexOf(g, "G101"));
+    }
+
+    [Fact]
+    public void TurningNeedsTheRotaryAndASaneDistance()
+    {
+        Assert.Throws<JobException>(() => new Job(M, []).TurnRotary(10));
+        var rot = new Job(M, []) { Mode = new WorkMode.Rotary(1, 1, 100) };
+        Assert.Throws<JobException>(() => rot.TurnRotary(double.NaN));
+        Assert.Throws<JobException>(() => rot.TurnRotary(Job.MaxTurnMm + 1));
+    }
+
+    [Fact]
+    public void TurnJobPackagesAsARotaryJob()
+    {
+        var xf = RotaryReturn.TurnJob(new WorkMode.Rotary(1.5, 1, 100), 25);
+        var files = XfPackage.Read(xf);
+        Assert.Contains(files, f => System.Text.Encoding.UTF8.GetString(f.Data).Contains("G0U25.000"));
+        Assert.Contains(files, f => System.Text.Encoding.UTF8.GetString(f.Data).Contains("LASER_CYLINDER"));
+    }
+
+    [Fact]
+    public void StoppedJobPositionFollowsTheRunMarker()
+    {
+        var area = M with { FieldH = 188.5 };
+        var job = JobBuilder.Build(Design(LayerMode.Cut), new JobOptions { Machine = area, Mode = new WorkMode.Rotary(0.59917, -1, 188.5) });
+        var rot = (WorkMode.Rotary)job.Job.Mode;
+        Assert.Equal(35, rot.OriginY, 6); // the middle of the design faces the laser at the start
+        // Not started marking, or finished (the end turns it back): nothing left over.
+        Assert.Equal(0, RotaryReturn.UAt(job, 0));
+        Assert.Equal(0, RotaryReturn.UAt(job, job.Timeline[^1].End + 1));
+        // Part way round the square: where the marker is, round the object from the start, with the direction.
+        double mid = job.Timeline[0].Start + job.Timeline[0].PassSeconds * 0.4;
+        var head = RunTracker.At(job, mid).Head!.Value;
+        double u = RotaryReturn.UAt(job, mid)!.Value;
+        Assert.Equal(-(head.Y - 35), u, 6);
+        Assert.InRange(Math.Abs(u), 0, 15.0001);
+        // The machine's own progress gives the same answer at the same point.
+        Assert.Equal(u, RotaryReturn.UAtFraction(job, mid / job.Timeline[^1].End)!.Value, 6);
+        // A flat job has no rotary to turn back.
+        Assert.Null(RotaryReturn.UAt(JobBuilder.Build(Design(LayerMode.Cut), new JobOptions()), mid));
+    }
+
+    [Fact]
+    public void LeftOverTurnsAddUpInTheFirstJobsScale()
+    {
+        var s = new AppSettings();
+        RotaryReturn.NoteLeft(s, 10, new WorkMode.Rotary(2, 1, 100));
+        Assert.Equal(10, s.RotaryLeftU);
+        Assert.Equal(2, s.RotaryLeftScale);
+        // A second stop with a scale twice as big turns twice as far per mm.
+        RotaryReturn.NoteLeft(s, 5, new WorkMode.Rotary(4, 1, 100));
+        Assert.Equal(20, s.RotaryLeftU!.Value, 6);
+        // Back to the start: nothing left.
+        RotaryReturn.NoteLeft(s, -10, new WorkMode.Rotary(4, 1, 100));
+        Assert.Null(s.RotaryLeftU);
+        Assert.Equal(90, RotaryReturn.Degrees(25, 100), 6);
+        Assert.Equal(-25, RotaryReturn.UFor(90, new WorkMode.Rotary(1, -1, 100), 100), 6);
+        // The return uses the stopped job's scale.
+        s.RotaryLeftU = 7; s.RotaryLeftScale = 3; s.RotaryLeftCircumferenceMm = 120;
+        var back = RotaryReturn.ReturnMode(s);
+        Assert.Equal(3, back.UMultiple);
+        Assert.Equal(120, back.CircumferenceMm);
+    }
+}

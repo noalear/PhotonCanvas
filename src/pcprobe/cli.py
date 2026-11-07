@@ -7,8 +7,9 @@
     python -m pcprobe view <ip> [--stream 0|1]     live camera window
     python -m pcprobe get <ip> /v1/some/url
     python -m pcprobe capture <ip> [-o captures/jobs]     save every job sent by the stock app
+    python -m pcprobe turn <ip> [--read-only]      try turning the rotary/conveyor port outside a job
 
-Nothing here moves the head or fires the laser.
+Nothing here moves the head or fires the laser. `turn` moves the rotary/conveyor motor only.
 """
 import argparse
 import asyncio
@@ -256,6 +257,61 @@ async def cmd_timing(args):
         await dev.close()
 
 
+async def cmd_turn(args):
+    """Try turning the U axis (conveyor or rotary port) outside a job: lock, goto, stop, free.
+
+    The laser is not involved. Each step is announced with a countdown so whoever is watching the
+    motor can match what it did to the step. Answers are printed as they come back.
+    """
+    dev = await _connected(args)
+    try:
+        mode = (await dev.get("/v1/device/runtime-infos"))["curMode"]["mode"]
+        if mode != "P_IDLE":
+            sys.exit(f"machine is busy ({mode}); not turning anything")
+
+        async def show(label, method, ptype, data=None):
+            try:
+                resp = await dev.request(method, "/v1/peripheral/param", data=data, params={"type": ptype}, raise_on_error=False)
+            except asyncio.TimeoutError:
+                resp = "no answer (timed out)"
+            print(f"  {label}: {json.dumps(resp, ensure_ascii=False)}", flush=True)
+            return resp
+
+        print("Reading only (nothing moves):")
+        for t in args.types:
+            await show(f"GET type={t}", "GET", t)
+        try:
+            cfg = await dev.request("GET", "/v1/device/configs", data={"alias": "config", "type": "user"}, raise_on_error=False)
+            print("  configs:", json.dumps(cfg, ensure_ascii=False)[:3000], flush=True)
+        except asyncio.TimeoutError:
+            print("  configs: no answer", flush=True)
+        if args.read_only:
+            return
+
+        step = 0
+        for t in args.types:
+            plan = [
+                ("lock (motor should hold, may hum)", {"action": "lock"}),
+                (f"goto u={args.mm} at speed {args.speed} (should turn a little)", {"u": args.mm, "action": "goto", "speed": args.speed}),
+                (f"goto u={args.mm} again (if goto is relative it turns again; absolute: nothing)", {"u": args.mm, "action": "goto", "speed": args.speed}),
+                (f"goto u=0 (back, if absolute)", {"u": 0, "action": "goto", "speed": args.speed}),
+                ("stop", {"action": "stop"}),
+                ("free (motor should go limp: try turning the chuck by hand)", {"action": "free"}),
+            ]
+            for label, data in plan:
+                step += 1
+                print(f"\nSTEP {step} [type={t}] {label}", flush=True)
+                for n in range(3, 0, -1):
+                    print(f"  in {n}...", flush=True)
+                    await asyncio.sleep(1)
+                print(f"  {time.strftime('%H:%M:%S')} NOW", flush=True)
+                await show("answer", "PUT", t, data)
+                await asyncio.sleep(args.gap)
+        print("\nDone. Note which STEP numbers made the motor hold, turn or go limp.", flush=True)
+    finally:
+        await dev.close()
+
+
 async def cmd_get(args):
     if not args.url.startswith("/v1/"):
         sys.exit("only GET /v1/... URLs are allowed here")
@@ -289,6 +345,10 @@ def main(argv=None):
     s.add_argument("ip"); s.add_argument("state", nargs="?", choices=("on", "off"))
     s = sub.add_parser("timing", help="measure the pause between passes (0% power)")
     s.add_argument("ip"); s.add_argument("--passes", type=int, default=2); s.add_argument("--delay", type=float, default=10)
+    s = sub.add_parser("turn", help="try turning the rotary/conveyor port outside a job (moves the motor, laser off)")
+    s.add_argument("ip"); s.add_argument("--mm", type=float, default=5); s.add_argument("--speed", type=float, default=1200)
+    s.add_argument("--gap", type=float, default=4, help="seconds to watch after each step")
+    s.add_argument("--types", nargs="+", default=["conveyor", "rotary"]); s.add_argument("--read-only", action="store_true")
     s = sub.add_parser("capture"); s.add_argument("ip"); s.add_argument("-o", "--out", default="captures/jobs"); s.add_argument("--save-existing", action="store_true")
 
     args = p.parse_args(argv)
@@ -300,6 +360,6 @@ def main(argv=None):
         Viewer(args.ip, args.stream).run()
         return
     try:
-        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture, "smiley": cmd_smiley, "lid-open": cmd_lid_open, "timing": cmd_timing}[args.cmd](args))
+        asyncio.run({"info": cmd_info, "watch": cmd_watch, "snap": cmd_snap, "get": cmd_get, "capture": cmd_capture, "smiley": cmd_smiley, "lid-open": cmd_lid_open, "timing": cmd_timing, "turn": cmd_turn}[args.cmd](args))
     except KeyboardInterrupt:
         pass

@@ -159,6 +159,7 @@ Both swap one galvo axis for the mechanical **U** axis; the machine coordinates 
 - **Z moves** leave and re-enter U mode: `G101`, the usual Z block, `G100`.
 - `description.json`: `mode` `LASER_CYLINDER` / `CONVEYOR_EXTENSION`, `axis` `U`.
 - Framing with an attachment only traces the galvo's own direction (a thin box mid-field).
+- **Turning the rotary on its own**: the F2 Ultra ignores `G0 U…` sent from the console outside a job (seen 2026-11-07), and U starts from 0 at each job. So a turn is its own laser-off job, uploaded with `autoStart: 1`: the usual header and rotary head, one `G0U<mm>`, then the tail **without** `G0 U0` (that would turn it straight back). PhotonCanvas uses this to turn the object back after a stopped job (the stopped job's tail never ran). Not yet run on a machine.
 
 ## Still to capture
 

@@ -24,6 +24,10 @@ public sealed class WorkModeWindow : Window
     readonly NumericUpDown _turnUnits = Number(1, 100000, 1, "0.####"), _rollerScale = Number(0.001m, 1000, 0.01m, "0.#####"), _asked = Number(0.1m, 100, 1, "0.##"), _seen = Number(0.01m, 100, 0.05m, "0.##");
     readonly CheckBox _reverse = new() { Content = "It turns the other way" };
     readonly TextBlock _calNote = Hint();
+    // Turning the rotary by hand from here (a laser-off job), and turning back what a stopped job left.
+    readonly NumericUpDown _turnDeg = Number(-3600, 3600, 15, "0.#");
+    readonly TextBlock _leftNote = Hint();
+    readonly Button _returnBtn = Button("Return rotary to start", tip: "Turn the object back to where the stopped job started, with a short laser-off job.");
     readonly TextBlock _info = Hint();
 
     public WorkModeWindow(AppSettings settings, MachinePanel machine)
@@ -37,7 +41,7 @@ public sealed class WorkModeWindow : Window
         _attachments = [.. Enumerable.Range(0, WorkModes.Attachments.Length).Where(i => WorkModes.Owned(settings, i))];
         _attach.ItemsSource = _attachments.Select(i => WorkModes.Attachments[i]).ToList();
         Title = "Work mode";
-        Width = 460;
+        Width = 500;
         SizeToContent = SizeToContent.Height;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -60,34 +64,76 @@ public sealed class WorkModeWindow : Window
         ToolTip.SetTip(_seen, "How many turns the object really made (put a tape flag on it and count; a quarter is 0.25).");
         var correct = Button("Correct the scale", tip: "Change the scale so the asked-for turns come out right next time.");
         correct.Click += (_, _) => Correct();
-        ToolTip.SetTip(_line, "Where the laser draws across the object, in mm from the back edge of the work field (110 is the middle). Set it over the top of the object, along the rotary's axis: frame a job to see the line, and move it until it sits there.");
+        ToolTip.SetTip(_line, "Where the laser draws across the object, in mm from the back edge of the 220 mm work field (110 is the middle). Set it over the top of the object, along the rotary's axis: frame a job to see the line, and move it until it sits there.");
         ToolTip.SetTip(_diameter, "The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale.");
         ToolTip.SetTip(_rate, "The belt's calibration from xTool Studio (Conveyor calibration, 90–105 %, normally 100).");
         ToolTip.SetTip(_angle, "The belt's angle compensation from xTool Studio's conveyor calibration (0 if never calibrated).");
         var read = Button("Read from the machine", tip: "Use the calibration stored on the machine (needs a connection).");
         read.Click += async (_, _) => await ReadCalibration();
+        correct.HorizontalAlignment = HorizontalAlignment.Stretch;
+        _calNote.IsVisible = false; // until a correction has something to say
+        _turnDeg.Value = 90;
+        ToolTip.SetTip(_turnDeg, "Degrees round the object. Positive turns it the way a design runs down the page; negative the other way.");
+        var turn = Button("Turn", tip: "Turn the rotary by this much now, with the laser off (it saves the settings above first).");
+        turn.Click += async (_, _) => await TurnBy();
+        _returnBtn.Click += async (_, _) => { Save(); await RotaryTurn.ReturnAsync(this, _settings, _machine); UpdateLeft(); };
+        var turnRow = new Grid { ColumnDefinitions = new("*,Auto"), ColumnSpacing = 8 };
+        turnRow.Children.Add(Field("Turn by (°)", _turnDeg));
+        Grid.SetColumn(turn, 1);
+        turn.VerticalAlignment = VerticalAlignment.Bottom;
+        turn.MinWidth = 90;
+        turnRow.Children.Add(turn);
+        var turnPanel = new Border
+        {
+            Background = Brush("Bg2"), CornerRadius = new(6), Padding = new(12, 10),
+            Child = new StackPanel
+            {
+                Spacing = 8,
+                Children =
+                {
+                    new TextBlock { Text = "TURN THE ROTARY", Classes = { "h" } },
+                    Hint("The machine only turns the rotary inside a job, so these send a short job with the laser off that starts straight away."),
+                    _leftNote, _returnBtn, turnRow,
+                },
+            },
+        };
         _custom = new StackPanel
         {
-            Spacing = 8,
+            Spacing = 10,
             Children =
             {
                 Field("Holds the object", _customKind),
                 Field("Units a turn", _turnUnits),
                 Field("Roller scale", _rollerScale),
                 _reverse,
-                Hint("Test it on scrap: a design as tall as the work area should turn the object exactly once. Count only the slow turn while it draws: the quick turns before and after just go to the start and back. If it doesn't turn exactly once, type how far it turned and correct the scale."),
-                Row(Field("Turns asked", _asked), Field("Turns made", _seen)),
-                correct, _calNote,
+                new Border
+                {
+                    Background = Brush("Bg2"), CornerRadius = new(6), Padding = new(12, 10),
+                    Child = new StackPanel
+                    {
+                        Spacing = 8,
+                        Children =
+                        {
+                            new TextBlock { Text = "CHECK THE SCALE", Classes = { "h" } },
+                            Hint("Run a design as tall as the work area on scrap: it should turn the object exactly once. Count only the slow turn while it draws (the quick turns before and after just go to the start and back)."),
+                            Field("Turns asked", _asked),
+                            Field("Turns made", _seen),
+                            correct, _calNote,
+                        },
+                    },
+                },
             },
         };
         _rotary = new StackPanel
         {
-            Spacing = 8,
+            Spacing = 10,
             Children =
             {
                 Field("Attachment", _attach),
-                Row(Field("Object Ø (mm)", _diameter), Field("Laser line (mm from back)", _line)),
+                Field("Object Ø (mm)", _diameter),
+                Field("Laser line (mm)", _line),
                 _custom,
+                turnPanel,
                 Hint("The work area becomes the field's width × once round the object. Design Y goes round it; the middle of the design faces the laser at the start."),
             },
         };
@@ -107,8 +153,8 @@ public sealed class WorkModeWindow : Window
             Child = new TextBlock
             {
                 TextWrapping = TextWrapping.Wrap,
-                Text = "Attachment work modes are experimental: the commands follow xTool Studio's own (mechanical axis U), but haven't been run on your machine yet. " +
-                       "Fit the attachment as xTool describes, and try a small mark on scrap first.",
+                Text = "Attachment work modes are new: the commands follow xTool Studio's own (mechanical axis U). " +
+                       "Try a small mark on scrap first.",
             },
         };
         var ok = new Button { Content = "OK", Classes = { "primary" }, IsDefault = true, MinWidth = 100 };
@@ -133,6 +179,39 @@ public sealed class WorkModeWindow : Window
             },
         };
         Update();
+        UpdateLeft();
+    }
+
+    /// <summary>What a stopped job left turned, and the button that turns it back.</summary>
+    void UpdateLeft()
+    {
+        bool left = _settings.RotaryLeftU is not null;
+        _leftNote.IsVisible = _returnBtn.IsVisible = left;
+        _leftNote.Text = left ? $"A stopped job left the object turned about {RotaryTurn.Describe(_settings)} from where it started (worked out from how far it had got, so check your mark)." : "";
+    }
+
+    /// <summary>Turn the rotary by the degrees asked, with the settings in this window.</summary>
+    async Task TurnBy()
+    {
+        Save();
+        if (WorkModes.From(_settings) is not WorkMode.Rotary mode)
+        {
+            await Dialogs.Message(this, "Not on the rotary", "Choose Rotary above (and a machine that has one) first.");
+            return;
+        }
+        double deg = (double)(_turnDeg.Value ?? 0);
+        if (Math.Abs(deg) < 0.1) return;
+        double circ = Math.PI * Math.Max(1, _settings.RotaryDiameterMm);
+        double u = RotaryReturn.UFor(deg, mode, circ);
+        bool sent = await RotaryTurn.SendAsync(this, _machine, mode, u,
+            $"Turn the object {Math.Abs(deg):0.#}° {(deg > 0 ? "forward (the way a design runs down the page)" : "back (against the way a design runs down the page)")}.");
+        // Turning by hand from here moves the object relative to where a stopped job started too.
+        if (sent && _settings.RotaryLeftU is not null && _settings.RotaryLeftScale > 0)
+        {
+            RotaryReturn.NoteLeft(_settings, u, mode);
+            _settings.Save();
+            UpdateLeft();
+        }
     }
 
     void Update()
@@ -175,6 +254,7 @@ public sealed class WorkModeWindow : Window
         var field = _customKind.SelectedIndex == 0 ? _turnUnits : _rollerScale;
         double was = (double)(field.Value ?? 0), now = WorkModes.Calibrated(was, asked, seen);
         field.Value = Math.Clamp((decimal)Math.Round(now, 5), field.Minimum, field.Maximum);
+        _calNote.IsVisible = true;
         _calNote.Text = Math.Abs(now - was) < 1e-9 ? "Nothing to correct: it turned as asked." : $"Changed from {was:0.#####} to {now:0.#####}. Press OK to keep it, then run the test again to check.";
         _asked.Value = 1; _seen.Value = 1;
     }

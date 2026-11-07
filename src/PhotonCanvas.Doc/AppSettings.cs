@@ -211,6 +211,14 @@ public sealed class AppSettings
     /// elsewhere needs its own (frame the job to see the line).
     /// </summary>
     public double RotaryLineMm { get; set; } = 110;
+    /// <summary>
+    /// A rotary job was stopped part way and left the object turned this far from where it started
+    /// (U, mm round the object, as the job wrote it); null once it's back. Kept with the scale and
+    /// circumference of that job, so turning it back uses the same ones.
+    /// </summary>
+    public double? RotaryLeftU { get; set; }
+    public double RotaryLeftScale { get; set; }
+    public double RotaryLeftCircumferenceMm { get; set; }
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
     public double ConveyorUMultiple { get; set; } = 0.74592;
     public double ConveyorAngle { get; set; }
