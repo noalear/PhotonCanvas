@@ -1,30 +1,31 @@
-# Publishes a new version of PhotonCanvas every time master changes, as a GitHub release that the
-# program finds, downloads and puts in by itself (Settings → Updates; src/PhotonCanvas.App/Updater.cs).
+# Publishes a new version of PhotonCanvas as a GitHub release that the program finds, downloads and
+# puts in by itself (Settings → Updates; src/PhotonCanvas.App/Updater.cs).
 #
-#   Version   <major.minor from Directory.Build.props>.<this workflow's run number>, e.g. 0.1.42.
-#   Builds    win-x64 on every push. Run it by hand (Actions → Release → Run workflow) for others,
-#             e.g. "win-x64 osx-arm64 linux-x64".
+#   When      by hand only (Actions → Release → Run workflow). It used to run on every change to
+#             master, but GitHub's build minutes for a private repository ran out, so new versions
+#             are now published from your own computer: double-click "Publish update.cmd" in the
+#             project folder (tools/publish-update.ps1), which makes the same release for free.
+#             To have GitHub do it on every change again, put the push trigger back (below).
+#   Version   <major.minor from Directory.Build.props>.<one past the highest v<major.minor>.* tag>,
+#             e.g. 0.1.42, the same numbering as tools/publish-update.ps1, so the two never clash.
+#   Builds    win-x64 unless you name others, e.g. "win-x64 osx-arm64 linux-x64".
 #   Where     this repository's releases. To publish somewhere else (say a public, releases-only
 #             repository), set the RELEASES_REPO variable to "owner/name" and the RELEASES_TOKEN
 #             secret to a token that can write releases there. Copies built from then on update
 #             from there (it's written into their update.json).
 #   Checked   every change runs the full test suite before it's merged, so a release doesn't run it
-#             again (it had grown past the job's time limit and was stopping releases). Run the
-#             workflow by hand with "Run the tests" ticked to have GitHub run them too.
+#             again (it had grown past the job's time limit and was stopping releases). Tick "Run
+#             the tests" to have GitHub run them too.
 #   Safe      every download is listed in SHA256SUMS, and the program refuses a file that doesn't match.
 #   Small     PhotonCanvas-<build>.files.txt lists every file's SHA-256, so the program downloads only
 #             the files that changed, read straight out of the zip.
 name: Release
 
+# By hand only (see above). The automatic trigger it had, to put back if wanted:
+#   push:
+#     branches: [master]
+#     paths-ignore: ['README.md', 'docs/*.md', 'requirements.txt', 'tools/RemoteProbe/**', 'src/PhotonCanvas.Remote.Android/**']
 on:
-  push:
-    branches: [master]
-    paths-ignore:
-      - 'README.md'
-      - 'docs/*.md'
-      - 'requirements.txt'
-      - 'tools/RemoteProbe/**'
-      - 'src/PhotonCanvas.Remote.Android/**'
   workflow_dispatch:
     inputs:
       platforms:
@@ -76,6 +77,8 @@ jobs:
       version: ${{ steps.v.outputs.version }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -92,7 +95,9 @@ jobs:
         id: v
         run: |
           base=$(sed -n 's|.*<Version>\([0-9]*\.[0-9]*\)\.[0-9]*</Version>.*|\1|p' Directory.Build.props)
-          echo "version=${base:-0.1}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          base=${base:-0.1}
+          last=$(git tag --list "v$base.*" | sed "s|^v$base\.||" | grep -E '^[0-9]+$' | sort -n | tail -1)
+          echo "version=$base.$(( ${last:-0} + 1 ))" >> "$GITHUB_OUTPUT"
 
       - name: Build
         env:

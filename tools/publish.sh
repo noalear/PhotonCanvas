@@ -27,8 +27,13 @@ pack_tar() { # folder to pack, archive
 }
 pack_zip() { # folder to pack, archive
   if command -v zip >/dev/null; then local dest; dest="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; (cd "$(dirname "$1")" && zip -qry "$dest" "$(basename "$1")")
-  else powershell -NoProfile -Command "Compress-Archive -Force -Path '$(cygpath -w "$1")' -DestinationPath '$(cygpath -w "$2")'"; fi
+  # No zip command (Windows): .NET packs it, with "/" between folder names as the updater expects
+  # (PowerShell's Compress-Archive can write "\" and skips hidden files).
+  elif [ "$ON_WINDOWS" = 1 ]; then dotnet run tools/zipdir.cs -- "$(cygpath -w "$1")" "$(cygpath -w "$2")"
+  else dotnet run tools/zipdir.cs -- "$1" "$2"; fi
 }
+# A full path the build tools understand: C:/Users/… on Windows, not Git Bash's /c/Users/….
+full_path() { if [ "$ON_WINDOWS" = 1 ]; then cygpath -m "$PWD/$1"; else echo "$PWD/$1"; fi; }
 write_hashes() { # the version's folder, where to write: each file's SHA-256, so an update can fetch only the files that changed
   (cd "$1" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$2"
 }
@@ -57,7 +62,7 @@ for rid in "${TARGETS[@]}"; do
   # The add-ons that come with the program, each in addons/<id> beside it (docs/addons.md). All in one
   # build (a throwaway solution listing them), so the program they compile against is checked once and
   # the add-ons build side by side, not one after another.
-  build_addons "$PWD/$out/bin/"
+  build_addons "$(full_path "$out/bin")/"
   # Where this copy gets new versions from, and which build it is.
   printf '{\n  "repo": "%s",\n  "platform": "%s",\n  "version": "%s"\n}\n' "$RELEASE_REPO" "$rid" "$VERSION" > "$out/bin/update.json"
 
