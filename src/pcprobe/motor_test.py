@@ -34,9 +34,9 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# What a chuck's full turn is inside a job (M535U = 128 / circumference, docs/gcode-f2-ultra.md).
-# Whether the same holds for these commands is what the count in the window is there to check.
-UNITS_PER_CHUCK_TURN = 128
+# One full turn should take very roughly 36 to 43 of these units: about 50 degrees per 5 by eye.
+# That isn't measured, so the window asks for this total and for where a tape mark ends up.
+CHECK_AMOUNT, CHECK_TOTAL = 8, 40
 
 
 @dataclass(frozen=True)
@@ -283,9 +283,9 @@ class Window:
         measure = ttk.LabelFrame(top, text="How far is one full turn?", padding=8)
         measure.grid(sticky="ew", pady=(0, 8))
         ttk.Label(measure, wraplength=840, text=(
-            f"No rod needed. Put a tape mark on the chuck, press Hold, set the amount to 8 and press Turn "
-            f"{UNITS_PER_CHUCK_TURN // 8} times, about a second apart. If a full turn is {UNITS_PER_CHUCK_TURN} "
-            f"units here, as it is inside a job, the mark ends up back where it started."
+            f"No rod needed. Put a tape mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT} and press "
+            f"Turn {CHECK_TOTAL // CHECK_AMOUNT} times, about a second apart. That should be close to one full "
+            f"turn, but it isn't measured yet: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
         self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
         self.count.grid(sticky="w", pady=(4, 0))
@@ -347,7 +347,7 @@ class Window:
             row["button"].config(state="normal" if usable else "disabled")
         self.stop_button.config(state="normal" if self.mode else "disabled")
         self._draw_ruler(mm if settings else None)
-        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} of {UNITS_PER_CHUCK_TURN} units")
+        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} of {CHECK_TOTAL} units")
         self.result.config(text=verdict(self.seen))
 
     def _draw_ruler(self, mm):

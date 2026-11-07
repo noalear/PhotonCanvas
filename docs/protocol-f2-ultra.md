@@ -238,7 +238,7 @@ There is no signing or encryption. Integrity checks are the MD5 on file transfer
 - Conveyor belt moves outside a job: `PUT /v1/peripheral/param?type=conveyor` `{u: mm, action: "goto" | "stop" | "lock" | "free", speed: 9600}` (not used by PhotonCanvas yet).
   - Tried on firmware 40.54.021 with the rotary on the "snake 1" port (2026-11-06): `lock`, `goto`, `stop` and `free` all answer code 0 with `type=conveyor`, and -1 `"invalid type"` with `type=rotary`. `GET` with either type answers -3 `"error action type !"`.
   - **Confirmed by eye on the chuck (2026-11-06): the motor turns outside a job with no job loaded, but only after `lock`.** After `free` a `goto` still answers code 0 and nothing moves, so code 0 only means accepted.
-  - `goto` is relative: each `u:5` turned it again, and `u:0` did nothing. `u` is called mm but the machine doesn't know the object, so it is really motor units. How far a unit turns the chuck is not measured yet; inside a job a full chuck turn is 128 units, which would make `u:5` about 14°.
+  - `goto` is relative: each `u:5` turned it again, and `u:0` did nothing. `u` is called mm but the machine doesn't know the object, so it is really motor units. How far a unit turns the chuck is not measured yet: `u:5` looked like roughly 50° (a rough guess by eye), so a full turn may take around 36 units. This rotary is calibrated at 32 units a turn inside jobs, not xTool's default 128.
   - `python -m pcprobe.motor_test` (or `tools/motor-test.cmd`) is a window for checking this by eye; it saves commands, answers and what was seen to `%USERPROFILE%\PhotonCanvas\motor-test`.
   - The machine can report `P_SLEEP` on the first connection and `P_IDLE` on the next, so check again before refusing to run.
 

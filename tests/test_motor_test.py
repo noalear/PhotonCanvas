@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import tkinter as tk
 
 from pcprobe import keys
-from pcprobe.motor_test import (MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_CHUCK_TURN, Answer, Link, ResultLog, Step, Window,
+from pcprobe.motor_test import (CHECK_AMOUNT, CHECK_TOTAL, MAX_MM, MAX_SPEED, MIN_MM, STOP, Answer, Link, ResultLog, Step, Window,
                                 make_steps, parse_settings, send_step, verdict)
 
 
@@ -95,8 +95,8 @@ def test_verdict(seen, expected):
     assert verdict(seen) == expected
 
 
-def test_the_measuring_instructions_add_up_to_one_turn():
-    assert UNITS_PER_CHUCK_TURN % 8 == 0 and MIN_MM <= 8 <= MAX_MM
+def test_the_measuring_instructions_add_up_and_stay_within_the_limit():
+    assert CHECK_TOTAL % CHECK_AMOUNT == 0 and MIN_MM <= CHECK_AMOUNT <= MAX_MM
 
 
 def _window(tmp_path):
@@ -121,7 +121,7 @@ def test_turn_is_only_offered_while_the_motor_is_held_and_counts_from_hold(tmp_p
         assert str(turn["state"]) == "normal"
         _accepted(window, "turn")
         _accepted(window, "turn")
-        assert window.total == 16 and "16 of 128" in window.count["text"]
+        assert window.total == 16 and "16 of 40" in window.count["text"]
         _accepted(window, "free")
         assert str(turn["state"]) == "disabled"
         _accepted(window, "hold")
