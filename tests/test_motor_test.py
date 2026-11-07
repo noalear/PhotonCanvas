@@ -7,9 +7,11 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
+import tkinter as tk
+
 from pcprobe import keys
-from pcprobe.motor_test import (MAX_MM, MAX_SPEED, STOP, Link, ResultLog, Step, make_steps, parse_settings, send_step,
-                                verdict)
+from pcprobe.motor_test import (MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_CHUCK_TURN, Answer, Link, ResultLog, Step, Window,
+                                make_steps, parse_settings, send_step, verdict)
 
 
 class FakeDevice:
@@ -31,8 +33,8 @@ def test_steps_only_send_motor_commands_to_the_conveyor_type():
     dev = FakeDevice()
     for step in make_steps(5, 1200) + (STOP,):
         assert asyncio.run(send_step(dev, step)).accepted
-    assert [s[2].get("action") for s in dev.sent] == ["lock", "goto", "goto", "goto", "free", "stop"]
-    assert [s[2].get("u") for s in dev.sent] == [None, 5, 5, 0, None, None]
+    assert [s[2].get("action") for s in dev.sent] == ["lock", "goto", "free", "stop"]
+    assert [s[2].get("u") for s in dev.sent] == [None, 5, None, None]
     assert {(s[0], s[1], s[3]["type"]) for s in dev.sent} == {("PUT", "/v1/peripheral/param", "conveyor")}
 
 
@@ -85,13 +87,47 @@ def test_acceptance_is_not_reported_as_movement():
     ({}, "Nothing recorded yet."),
     ({"turn": "unsure"}, "Nothing recorded yet."),
     ({"turn": "still"}, "No turn seen so far, even though the machine accepted the command."),
-    ({"turn": "turned", "again": "turned"}, "Yes: the motor turns outside a job. Each command moves it by that distance (relative)."),
-    ({"turn": "turned", "again": "still"}, "Yes: the motor turns outside a job. The number is a fixed position (absolute)."),
+    ({"turn": "turned"}, "Yes: the motor turns outside a job."),
     ({"hold": "held", "free": "limp"}, "Hold works. Let go works."),
     ({"hold": "no_change", "free": "no_change"}, "Hold made no visible change. Let go made no visible change."),
 ])
 def test_verdict(seen, expected):
     assert verdict(seen) == expected
+
+
+def test_the_measuring_instructions_add_up_to_one_turn():
+    assert UNITS_PER_CHUCK_TURN % 8 == 0 and MIN_MM <= 8 <= MAX_MM
+
+
+def _window(tmp_path):
+    root = tk.Tk()
+    root.withdraw()
+    window = Window(root, Link("192.0.2.1"), ResultLog(tmp_path))
+    window._handle(("mode", "192.0.2.1", "P_IDLE"))
+    return root, window
+
+
+def _accepted(window, key):
+    step = next(s for s in make_steps(8, 1200) if s.key == key)
+    window._handle(("answer", step, Answer(True, "accepted", "{}")))
+
+
+def test_turn_is_only_offered_while_the_motor_is_held_and_counts_from_hold(tmp_path):
+    root, window = _window(tmp_path)
+    try:
+        turn = window.rows["turn"]["button"]
+        assert str(turn["state"]) == "disabled" and "Hold" in window.rows["turn"]["does"]["text"]
+        _accepted(window, "hold")
+        assert str(turn["state"]) == "normal"
+        _accepted(window, "turn")
+        _accepted(window, "turn")
+        assert window.total == 16 and "16 of 128" in window.count["text"]
+        _accepted(window, "free")
+        assert str(turn["state"]) == "disabled"
+        _accepted(window, "hold")
+        assert window.total == 0
+    finally:
+        root.destroy()
 
 
 def test_log_is_written_as_it_goes(tmp_path):

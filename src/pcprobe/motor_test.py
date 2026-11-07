@@ -4,8 +4,12 @@
 
 Nothing moves until a button is pressed. It only ever sends PUT /v1/peripheral/param with
 type=conveyor (the machine refuses type=rotary with "invalid type"), so the laser and the head
-are not involved. A machine answer of "Success" only means the command was accepted, so the window
-asks what the chuck actually did and saves commands, answers and observations to a text file.
+are not involved. A machine answer of "Success" only means the command was accepted (a turn sent
+while the motor isn't held is accepted and ignored), so the window asks what the chuck actually did
+and saves commands, answers and observations to a text file.
+
+The machine calls u millimetres, but it knows nothing about the object, so here they are motor units.
+Each goto turns the motor by u more; it is not a position.
 """
 import argparse
 import asyncio
@@ -30,6 +34,9 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
+# What a chuck's full turn is inside a job (M535U = 128 / circumference, docs/gcode-f2-ultra.md).
+# Whether the same holds for these commands is what the count in the window is there to check.
+UNITS_PER_CHUCK_TURN = 128
 
 
 @dataclass(frozen=True)
@@ -45,7 +52,7 @@ class Step:
 
 def check_settings(mm, speed):
     if not MIN_MM <= mm <= MAX_MM:
-        raise ValueError(f"distance must be {MIN_MM:g} to {MAX_MM:g} mm, not {mm:g}")
+        raise ValueError(f"amount must be {MIN_MM:g} to {MAX_MM:g} units, not {mm:g}")
     if not MIN_SPEED <= speed <= MAX_SPEED:
         raise ValueError(f"speed must be {MIN_SPEED} to {MAX_SPEED}, not {speed:g}")
 
@@ -62,20 +69,13 @@ def parse_settings(mm_text, speed_text):
 
 def make_steps(mm, speed):
     check_settings(mm, speed)
-    goto = lambda u: {"u": u, "action": "goto", "speed": speed}
-    turned = (("turned", "It turned"), ("still", "It stayed still"), UNSURE)
     return (
-        Step("hold", "Hold the motor", "Locks the motor in place.",
+        Step("hold", "Hold the motor", "Locks the motor. It only turns while it's held. Pressing this starts the count again.",
              "Listen for a faint hum and try the chuck by hand: it should resist.",
              {"action": "lock"}, (("held", "It held"), ("no_change", "No change"), UNSURE)),
-        Step("turn", f"Turn to {mm:g} mm", f"Asks the motor to turn to {mm:g} mm at speed {speed:g}.",
-             "The chuck should turn a little.", goto(mm), turned),
-        Step("again", f"Turn to {mm:g} mm again", "Sends exactly the same command a second time.",
-             "Turns again: the number is a distance to move. Stays still: it is a fixed position.",
-             goto(mm), turned),
-        Step("back", "Turn to 0 mm", "Asks the motor to turn to 0 mm.",
-             "Turns back: the number is a fixed position. Stays still: it is a distance.",
-             goto(0), turned),
+        Step("turn", f"Turn {mm:g} units", f"Turns the motor {mm:g} units at speed {speed:g}. Each press turns it again.",
+             "The chuck should turn a little.",
+             {"u": mm, "action": "goto", "speed": speed}, (("turned", "It turned"), ("still", "It stayed still"), UNSURE)),
         Step("free", "Let the motor go", "Releases the motor. It stays released when you close this window.",
              "The chuck should now turn freely by hand.",
              {"action": "free"}, (("limp", "It went limp"), ("no_change", "No change"), UNSURE)),
@@ -87,16 +87,11 @@ STOP = Step("stop", "Stop the motor", "Stops any turn in progress.", "", {"actio
 
 def verdict(seen):
     """Plain sentences from what the person watching recorded, keyed by step."""
-    turn, again, back = seen.get("turn"), seen.get("again"), seen.get("back")
     lines = []
-    if "turned" in (turn, again, back):
+    if seen.get("turn") == "turned":
         lines.append("Yes: the motor turns outside a job.")
-    elif turn == "still":
+    elif seen.get("turn") == "still":
         lines.append("No turn seen so far, even though the machine accepted the command.")
-    if turn == "turned" and again == "turned":
-        lines.append("Each command moves it by that distance (relative).")
-    elif turn == "turned" and again == "still":
-        lines.append("The number is a fixed position (absolute).")
     if seen.get("hold") == "held":
         lines.append("Hold works.")
     elif seen.get("hold") == "no_change":
@@ -232,6 +227,8 @@ class Window:
         self.seen = {}
         self.rows = {}
         self.choice_vars = {}
+        self.held = False
+        self.total = 0.0
         root.title("PhotonCanvas motor test")
         root.report_callback_exception = self._crashed
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -257,10 +254,10 @@ class Window:
         self.status = tk.Label(top, anchor="w", font=("Segoe UI", 10, "bold"), text="Starting...")
         self.status.grid(sticky="w", pady=(0, 8))
 
-        box = ttk.LabelFrame(top, text="How far to turn", padding=8)
+        box = ttk.LabelFrame(top, text="How much to turn", padding=8)
         box.grid(sticky="ew", pady=(0, 8))
         box.columnconfigure(2, weight=1)
-        ttk.Label(box, text=f"Distance, mm ({MIN_MM:g} to {MAX_MM:g})").grid(row=0, column=0, sticky="w", padx=(0, 12))
+        ttk.Label(box, text=f"Amount, motor units ({MIN_MM:g} to {MAX_MM:g})").grid(row=0, column=0, sticky="w", padx=(0, 12))
         ttk.Label(box, text=f"Speed ({MIN_SPEED} to {MAX_SPEED})").grid(row=0, column=1, sticky="w", padx=(0, 12))
         ttk.Spinbox(box, from_=MIN_MM, to=MAX_MM, increment=0.5, width=8, textvariable=self.mm).grid(
             row=1, column=0, sticky="w")
@@ -282,6 +279,16 @@ class Window:
         self.stop_button = stop
         self.stop_answer = ttk.Label(top, text="Use this at any time if the motor keeps turning.")
         self.stop_answer.grid(sticky="w", pady=(0, 8))
+
+        measure = ttk.LabelFrame(top, text="How far is one full turn?", padding=8)
+        measure.grid(sticky="ew", pady=(0, 8))
+        ttk.Label(measure, wraplength=840, text=(
+            f"No rod needed. Put a tape mark on the chuck, press Hold, set the amount to 8 and press Turn "
+            f"{UNITS_PER_CHUCK_TURN // 8} times, about a second apart. If a full turn is {UNITS_PER_CHUCK_TURN} "
+            f"units here, as it is inside a job, the mark ends up back where it started."
+        )).grid(sticky="w")
+        self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
+        self.count.grid(sticky="w", pady=(4, 0))
 
         result = ttk.LabelFrame(top, text="Result so far", padding=8)
         result.grid(sticky="ew")
@@ -328,14 +335,19 @@ class Window:
         ready = self.mode == IDLE
         for step in make_steps(mm, speed):
             row = self.rows[step.key]
-            blocked = settings is None and step.data["action"] == "goto"
-            row["button"].config(text="Turn (fix the numbers)" if blocked else step.button)
-            row["does"].config(text=f"Enter a distance of {MIN_MM:g} to {MAX_MM:g} mm and a speed of "
-                                    f"{MIN_SPEED} to {MAX_SPEED} first." if blocked else step.does)
-            usable = ready and not blocked and step.key not in self.pending
+            turning = step.data["action"] == "goto"
+            why_not = None
+            if turning and settings is None:
+                why_not = f"Enter an amount of {MIN_MM:g} to {MAX_MM:g} units and a speed of {MIN_SPEED} to {MAX_SPEED} first."
+            elif turning and not self.held:
+                why_not = "Press Hold the motor first: it won't turn otherwise."
+            row["button"].config(text="Turn (fix the numbers)" if turning and settings is None else step.button)
+            row["does"].config(text=why_not or step.does)
+            usable = ready and why_not is None and step.key not in self.pending
             row["button"].config(state="normal" if usable else "disabled")
         self.stop_button.config(state="normal" if self.mode else "disabled")
         self._draw_ruler(mm if settings else None)
+        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} of {UNITS_PER_CHUCK_TURN} units")
         self.result.config(text=verdict(self.seen))
 
     def _draw_ruler(self, mm):
@@ -353,7 +365,7 @@ class Window:
         if mm is not None:
             x = x0 + mm * scale
             c.create_line(x0, y, x, y, fill=self.GOOD, width=3, arrow="last")
-            c.create_text(min(max(x, x0 + 50), x1 - 50), y - 16, text=f"Turn to {mm:g} mm", fill=self.GOOD,
+            c.create_text(min(max(x, x0 + 50), x1 - 50), y - 16, text=f"Turn {mm:g} units", fill=self.GOOD,
                           font=("Segoe UI", 9, "bold"))
 
     # ---- actions ----------------------------------------------------------
@@ -410,7 +422,19 @@ class Window:
             if answer.accepted and step.key != STOP.key:
                 for r in self.rows[step.key]["radios"]:
                     r.config(state="normal")
+            if answer.accepted:
+                self._count(step)
             self.refresh()
+
+    def _count(self, step):
+        action = step.data["action"]
+        if action == "lock":
+            self.held, self.total = True, 0.0
+        elif action == "free":
+            self.held = False
+        elif action == "goto":
+            self.total += step.data["u"]
+            self.log.write(f"TOTAL since Hold: {self.total:g} units")
 
     def _crashed(self, *exc):
         self.log.write("WINDOW ERROR: " + "".join(traceback.format_exception(*exc)))
