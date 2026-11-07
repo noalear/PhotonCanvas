@@ -73,7 +73,8 @@ public static class WorkModes
             case "Rotary":
                 double circ = Math.PI * Math.Max(1, s.RotaryDiameterMm);
                 var (scale, dir) = RotaryScale(s, s.RotaryAttachment, s.RotaryDiameterMm);
-                return new WorkMode.Rotary(scale, dir, Math.Min(circ, MaxCircumferenceMm));
+                return new WorkMode.Rotary(scale, dir, Math.Min(circ, MaxCircumferenceMm),
+                    LineY: Math.Clamp(s.RotaryLineMm, 1, MachineProfile.F2Ultra.FieldH - 1));
             case "Conveyor":
                 return new WorkMode.Conveyor(s.ConveyorUMultiple, s.ConveyorAngle);
             default:

@@ -46,11 +46,12 @@ public abstract record WorkMode
 
     /// <summary>
     /// Rotary attachment: design X is the galvo's X; design Y goes round the object (U, in mm of
-    /// its surface, 0 at <paramref name="OriginY"/>). The galvo's Y stays at the middle of the field.
+    /// its surface, 0 at <paramref name="OriginY"/>). The galvo's Y stays on one line across the object.
     /// </summary>
     /// <param name="UMultiple">Firmware scale (roller 0.59917 on an RA2, ×4 on an RA3; chuck 128 ÷ circumference).</param>
     /// <param name="Direction">+1 or −1: which way the object turns for increasing design Y.</param>
-    public sealed record Rotary(double UMultiple, int Direction, double CircumferenceMm, double OriginY = 0) : WorkMode;
+    /// <param name="LineY">The galvo's Y for that line (mm from the back of the field); null = the middle.</param>
+    public sealed record Rotary(double UMultiple, int Direction, double CircumferenceMm, double OriginY = 0, double? LineY = null) : WorkMode;
 
     /// <summary>
     /// Conveyor feeder: design X moves the belt (U, mm; the middle of the field is U 0), design Y is
@@ -58,7 +59,8 @@ public abstract record WorkMode
     /// </summary>
     /// <param name="UMultiple">Firmware scale: 0.74592 × 100 ÷ the belt calibration (%).</param>
     /// <param name="AngleCompensate">The belt's angle compensation from the machine's own calibration.</param>
-    public sealed record Conveyor(double UMultiple, double AngleCompensate, double LengthMm = 610, double SpeedMmMin = 9600) : WorkMode;
+    /// <param name="LineX">The galvo's X for the line it draws along (mm from the left of the field); null = the middle.</param>
+    public sealed record Conveyor(double UMultiple, double AngleCompensate, double LengthMm = 610, double SpeedMmMin = 9600, double? LineX = null) : WorkMode;
 }
 
 public abstract record Block(LaserSettings Laser)
@@ -490,6 +492,18 @@ public sealed class Job
 
     bool Flat => Mode is WorkMode.Flat;
 
+    /// <summary>
+    /// With an attachment, where the galvo holds its other axis: Y across the rotary, X along the belt.
+    /// The galvo field is square, and the work area's other side is the unrolled object or the belt,
+    /// so the field's middle is taken from the side that is still the field.
+    /// </summary>
+    double AttachmentLine => Mode switch
+    {
+        WorkMode.Rotary r => r.LineY ?? Machine.FieldW / 2,
+        WorkMode.Conveyor c => c.LineX ?? Machine.FieldH / 2,
+        _ => 0,
+    };
+
     /// <summary>A design position as G-code words: X/Y on the bed, X/U on the rotary, U/Y on the conveyor.</summary>
     string Pos(Vec2 p, Func<double, string> f) => Mode switch
     {
@@ -840,8 +854,9 @@ public sealed class Job
     /// <summary>Entering U mode with an attachment, and parking the galvo's other axis in the middle.</summary>
     IEnumerable<string> ModeHead() => Mode switch
     {
-        WorkMode.Rotary r => [$"M535U{JsRounded(r.UMultiple, 5)}", "G100", $"G0Y{Fixed3(Machine.FieldH / 2)}"],
-        WorkMode.Conveyor c => [$"G100 F{JsNumber(c.SpeedMmMin)}", $"M535U{JsRounded(c.UMultiple, 5)}", $"M536U{JsRounded(c.AngleCompensate, 5)}", $"G0X{Fixed3(Machine.FieldW / 2)}"],
+        // The galvo goes to its line before U mode too: once U is on, it may not take a Y (or X) on its own.
+        WorkMode.Rotary r => [$"G0Y{Fixed3(AttachmentLine)}", $"M535U{JsRounded(r.UMultiple, 5)}", "G100", $"G0Y{Fixed3(AttachmentLine)}"],
+        WorkMode.Conveyor c => [$"G0X{Fixed3(AttachmentLine)}", $"G100 F{JsNumber(c.SpeedMmMin)}", $"M535U{JsRounded(c.UMultiple, 5)}", $"M536U{JsRounded(c.AngleCompensate, 5)}", $"G0X{Fixed3(AttachmentLine)}"],
         _ => [],
     };
 
@@ -866,9 +881,9 @@ public sealed class Job
         if (!Flat)
         {
             // With an attachment the frame only shows the galvo's own direction: a thin box across
-            // the middle of the field (the object or belt doesn't move while framing).
+            // the attachment's line (the object or belt doesn't move while framing).
             var box = Rect2.Bounds(outline);
-            double mid = Mode is WorkMode.Rotary ? Machine.FieldH / 2 : Machine.FieldW / 2;
+            double mid = AttachmentLine;
             outline = Mode is WorkMode.Rotary
                 ? [new(box.MinX, mid - 0.5), new(box.MaxX, mid - 0.5), new(box.MaxX, mid + 0.5), new(box.MinX, mid + 0.5), new(box.MinX, mid - 0.5)]
                 : [new(mid - 0.5, box.MinY), new(mid + 0.5, box.MinY), new(mid + 0.5, box.MaxY), new(mid - 0.5, box.MaxY), new(mid - 0.5, box.MinY)];
@@ -1668,7 +1683,7 @@ public sealed class Job
             {
                 // The attachment moves first, then the galvo fires on its own axis.
                 int u = at.IndexOf('U');
-                string galvo = Mode is WorkMode.Rotary ? at[..u] + $"Y{Fixed3(Machine.FieldH / 2)}" : $"X{Fixed3(Machine.FieldW / 2)}" + at[(at.IndexOf('Y'))..];
+                string galvo = Mode is WorkMode.Rotary ? at[..u] + $"Y{Fixed3(AttachmentLine)}" : $"X{Fixed3(AttachmentLine)}" + at[(at.IndexOf('Y'))..];
                 body.Add($"G0{at[u..].Split('Y')[0]}");
                 body.Add($"G25{galvo}" + (first ? $"S{l.SValue}" : ""));
             }
@@ -1700,7 +1715,7 @@ public sealed class Job
         long lastS = l.SValue;
         var levels = b.Levels;
         int lines = rotary ? b.Bitmap.Height : b.Bitmap.Width, along = rotary ? b.Bitmap.Width : b.Bitmap.Height;
-        string park = Fixed3(rotary ? Machine.FieldH / 2 : Machine.FieldW / 2);
+        string park = Fixed3(AttachmentLine);
         var idx = new List<int>();
         // Rows spread out and one way, as on the flat bed.
         foreach (int k in SpreadOrder(lines, b.Spread, b.Scatter))

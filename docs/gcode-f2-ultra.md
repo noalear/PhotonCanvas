@@ -152,7 +152,7 @@ These use only the commands above, put together in ways the captures don't show 
 
 Both swap one galvo axis for the mechanical **U** axis; the machine coordinates the moves.
 
-- **Rotary** (`LASER_CYLINDER`): design X → galvo `X`, design Y → `U` in mm of the object's surface (we put U 0 at the design's middle row). Head after `G0 X0 Y0`: `M535U<scale>` (rollers 0.59917 on an RA2, ×4 on an RA3; chuck 128 ÷ circumference), `G100`, then the galvo Y parked mid-field. `# gc` keys `["x","u"]`, `rm` −1 for rollers, +1 for the chuck. Moves are `G1X…U…`.
+- **Rotary** (`LASER_CYLINDER`): design X → galvo `X`, design Y → `U` in mm of the object's surface (we put U 0 at the design's middle row). Head after `G0 X0 Y0`: `M535U<scale>` (rollers 0.59917 on an RA2, ×4 on an RA3; chuck 128 ÷ circumference), `G100`, with the galvo Y parked on the rotary line both before and after `G100` (the Laser line setting, default 110 = mid-field; it's the real field's Y, not the unrolled height). `# gc` keys `["x","u"]`, `rm` −1 for rollers, +1 for the chuck. Moves are `G1X…U…`.
 - **Conveyor** (`CONVEYOR_EXTENSION`, up to 610 mm): design X → `U` (U 0 = mid-field), design Y → galvo `Y`, galvo X parked mid-field. Head: `G100 F9600`, `M535U<0.74592 × 100 ÷ calibration %>`, `M536U<angle compensation>`. Engraving lines run along Y.
 - **Tail** (both): `G0 U0`, `G101` straight after `# … TAIL`, then the usual lines.
 - **Dots**: the attachment steps with `G0U…` between rows; the galvo fires `G25` along its own axis.

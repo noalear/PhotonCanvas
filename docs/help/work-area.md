@@ -45,6 +45,7 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 |---|---|---|---|
 | **Attachment** | the ones you have: RA2 Pro · rollers, RA2 Pro · chuck, RA3 · rollers, RA3 · chuck, Your own rotary | the first | Which attachment and how it holds the object. |
 | **Object Ø (mm)** | 2 to 200 | 60 | The object's diameter where it's marked. With rollers it sets how far round the design goes; with the chuck it also sets the scale. |
+| **Laser line (mm from back)** | 1 to 219 | 110 | Where the laser draws across the object, measured from the back edge of the 220 mm field (110 is the middle). Put it over the top of the object, along the rotary's axis. **Frame** a job to see the line, and change the number until the line sits there. |
 
 - The work area becomes the field's width (220 mm) × once round the object. The window shows
   "Once round": π × the diameter. Only the first 375 mm can be used (xTool Studio's limit).
@@ -70,7 +71,8 @@ settings:
 | **It turns the other way** | off | off | Tick if a test mark comes out mirrored round the object (the motor turns the other way from xTool's). |
 
 To check the scale, make a design as tall as the work area (once round), mark a line across it, and
-put a tape flag on the object. Run it on scrap and count how far the object turned. If it isn't one
+put a tape flag on the object. Run it on scrap and count how far the object turned while it drew the
+line. Only count that slow turn: the quick turns before and after just go to the start and back. If it isn't one
 whole turn, type 1 under **Turns asked** and what it made under **Turns made** (a quarter is 0.25),
 and click **Correct the scale**: the number is multiplied by asked ÷ made. Click **OK** to keep it,
 and run the test again to check.

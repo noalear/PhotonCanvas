@@ -205,6 +205,12 @@ public sealed class AppSettings
     public double CustomRotaryRollerScale { get; set; } = 0.59917;
     /// <summary>The user's own rotary turns the other way from xTool's (a motor wired the other way round).</summary>
     public bool CustomRotaryReverse { get; set; }
+    /// <summary>
+    /// Rotary: where the laser draws across the object, in mm from the back (top) edge of the galvo
+    /// field. The middle (110) suits xTool's rotaries on their marked lines; a rotary that sits
+    /// elsewhere needs its own (frame the job to see the line).
+    /// </summary>
+    public double RotaryLineMm { get; set; } = 110;
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
     public double ConveyorUMultiple { get; set; } = 0.74592;
     public double ConveyorAngle { get; set; }
