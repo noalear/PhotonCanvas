@@ -67,6 +67,7 @@ the turn goes as a short laser-off job instead, which starts as soon as it arriv
 | Setting | Range | Default | What it does |
 |---|---|---|---|
 | **Turn by (°)** | −3600 to 3600 | 90 | How far to turn the object, in degrees. Positive turns it the way a design runs down the page; negative the other way. Click **Turn**. It saves the settings above first. |
+| **Turn scale** | 1 to 100000 | worked out | The machine's units for one whole turn when it turns the rotary straight away. It starts from your scale and the belt factor stored on the machine (32 ÷ 0.7459 = 42.901 for a 32-a-turn chuck). If you've measured it over many turns, type the exact figure; it's kept when you click **OK**, **Turn** or **Turn once**. |
 | **It made (turns)** | 0.05 to 20 | 1 | For the one-turn check: how many turns the object really made when you clicked **Turn once**. |
 
 - **Turn once** turns the object one whole turn. Put a tape mark on the chuck first. If it doesn't come
