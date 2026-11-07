@@ -71,6 +71,10 @@ static class RotaryTurn
         return _machineRate is { } rate ? 1 / rate : RotaryReturn.NowScale(settings);
     }
 
+    /// <summary>The scale turns use now, as far as is known without asking the machine.</summary>
+    public static double KnownNowScale(AppSettings s) =>
+        s.RotaryNowScale > 0 ? s.RotaryNowScale : _machineRate is { } r ? 1 / r : RotaryReturn.NowScale(s);
+
     /// <summary>The turn as a laser-off job that starts as soon as it arrives, after a confirm.</summary>
     static async Task<bool> SendJobAsync(Window owner, MachinePanel machine, WorkMode.Rotary mode, double uMm, string what)
     {

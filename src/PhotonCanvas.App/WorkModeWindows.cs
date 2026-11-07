@@ -25,7 +25,9 @@ public sealed class WorkModeWindow : Window
     readonly CheckBox _reverse = new() { Content = "It turns the other way" };
     readonly TextBlock _calNote = Hint();
     // Turning the rotary by hand from here (a laser-off job), and turning back what a stopped job left.
-    readonly NumericUpDown _turnDeg = Number(-3600, 3600, 15, "0.#"), _nowMade = Number(0.05m, 20, 0.05m, "0.##");
+    readonly NumericUpDown _turnDeg = Number(-3600, 3600, 15, "0.#"), _nowMade = Number(0.05m, 20, 0.05m, "0.###"), _perTurn = Number(1, 100000, 0.001m, "0.####");
+    // The units a turn shown when the window opened (or last saved): only a change is kept.
+    double _perTurnShown;
     readonly TextBlock _nowNote = Hint();
     readonly TextBlock _leftNote = Hint();
     readonly Button _returnBtn = Button("Return rotary to start", tip: "Turn the object back to where the stopped job started (laser off).");
@@ -103,9 +105,11 @@ public sealed class WorkModeWindow : Window
         var fixNow = Button("Correct", tip: "Change the turning scale so one turn comes out right next time.");
         fixNow.Click += (_, _) =>
         {
-            double was = RotaryReturn.NowScale(_settings), made = (double)(_nowMade.Value ?? 1);
-            _settings.RotaryNowScale = Math.Round(RotaryReturn.CorrectedNowScale(_settings, 1, made), 5);
+            Save();
+            double was = RotaryTurn.KnownNowScale(_settings), made = (double)(_nowMade.Value ?? 1);
+            _settings.RotaryNowScale = was * 1 / made;
             _settings.Save();
+            ShowPerTurn();
             _nowNote.IsVisible = true;
             _nowNote.Text = Math.Abs(made - 1) < 1e-9 ? "Nothing to correct: it made one turn." : $"Corrected ({was:0.####} → {_settings.RotaryNowScale:0.####}). Turn once again to check.";
             _nowMade.Value = 1;
@@ -117,6 +121,7 @@ public sealed class WorkModeWindow : Window
         fixNow.VerticalAlignment = VerticalAlignment.Bottom;
         fixNow.MinWidth = 90;
         madeRow.Children.Add(fixNow);
+        ToolTip.SetTip(_perTurn, "The machine's units for one whole turn when it turns the rotary outside a job (straight away). It's worked out from your scale and the machine's belt factor; type the exact figure if you've measured it over many turns.");
         var turnPanel = new Border
         {
             Background = Brush("Bg2"), CornerRadius = new(6), Padding = new(12, 10),
@@ -130,6 +135,7 @@ public sealed class WorkModeWindow : Window
                     _leftNote, _returnBtn, turnRow, stopTurn,
                     Hint("Check the turning once: put a tape mark on the chuck, click Turn once, and say how many turns it really made."),
                     Row(turnOnce, letGo), madeRow, _nowNote,
+                    Field("Turn scale", _perTurn),
                 },
             },
         };
@@ -201,21 +207,45 @@ public sealed class WorkModeWindow : Window
         _attach.SelectionChanged += (_, _) => Update();
         _diameter.ValueChanged += (_, _) => Update();
         _customKind.Changed += _ => Update();
-        Content = new Border
+        // The rotary's settings are tall: they scroll above the buttons on a short screen.
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Margin = new(18, 10, 18, 18), Children = { cancel, ok } };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        Content = new DockPanel
         {
-            Padding = new Thickness(18),
-            Child = new StackPanel
+            Children =
             {
-                Spacing = 10,
-                Children =
+                buttons,
+                new ScrollViewer
                 {
-                    _mode, _rotary, _conveyor, warn, _info,
-                    new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, ok } },
+                    HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+                    Content = new StackPanel
+                    {
+                        Spacing = 10,
+                        Margin = new(18, 18, 18, 0),
+                        Children = { _mode, _rotary, _conveyor, warn, _info },
+                    },
                 },
             },
         };
+        Opened += (_, _) =>
+        {
+            if (Screens.ScreenFromWindow(this) is { } sc) MaxHeight = Math.Max(400, sc.WorkingArea.Height / sc.Scaling - 60);
+        };
         Update();
         UpdateLeft();
+        ShowPerTurn();
+    }
+
+    /// <summary>The motor units of one turn with the saved settings (null off the rotary).</summary>
+    double? UnitsPerTurn() => WorkModes.From(_settings) is WorkMode.Rotary m
+        ? RotaryReturn.UnitsPerTurn(m, Math.PI * Math.Max(1, _settings.RotaryDiameterMm)) : null;
+
+    /// <summary>Show the units a turn outside jobs, from the scale turns use now.</summary>
+    void ShowPerTurn()
+    {
+        if (UnitsPerTurn() is not { } upt) return;
+        _perTurnShown = Math.Round(upt * RotaryTurn.KnownNowScale(_settings), 4);
+        _perTurn.Value = Math.Clamp((decimal)_perTurnShown, _perTurn.Minimum, _perTurn.Maximum);
     }
 
     /// <summary>What a stopped job left turned, and the button that turns it back.</summary>
@@ -293,6 +323,12 @@ public sealed class WorkModeWindow : Window
         _settings.CustomRotaryReverse = _reverse.IsChecked == true;
         _settings.ConveyorUMultiple = 100 * 0.74592 / Math.Max(1, (double)(_rate.Value ?? 100));
         _settings.ConveyorAngle = (double)(_angle.Value ?? 0);
+        // A typed units a turn outside jobs becomes the turning scale for this rotary.
+        if (_perTurn.Value is { } pt && Math.Abs((double)pt - _perTurnShown) > 1e-6 && UnitsPerTurn() is { } upt && upt > 0)
+        {
+            _settings.RotaryNowScale = (double)pt / upt;
+            _perTurnShown = (double)pt;
+        }
         _settings.Save();
     }
 
