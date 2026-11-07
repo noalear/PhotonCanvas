@@ -43,4 +43,6 @@ Click **OK**. The work area changes size: once round the object, or 610 mm of be
 ## Try it on scrap
 <!-- target: ribbon:Laser/Ship It -->
 Fit the attachment as xTool describes. **Frame** only traces a thin line where the laser will draw
-(the **Laser line**); ship a small test mark first. **Work mode** → **Flat bed** goes back to the bed.
+(the **Laser line**); ship a small test mark first. If you stop a rotary job part way, the object
+stays turned: click the **Rotary** chip in the job bar (or **Return rotary to start** in Work mode)
+to turn it back. **Work mode** → **Flat bed** goes back to the bed.

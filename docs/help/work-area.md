@@ -57,6 +57,27 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 - On the rotary a layer's **Focus offset (mm)** can go up to 60 mm either way (10 mm on the flat
   bed), for surfaces much nearer the middle than where you focused.
 
+#### Turning the rotary
+
+The machine only turns the rotary inside a job, so the **Turn the rotary** box in the rotary
+settings sends a short job with the laser off. It starts as soon as it reaches the machine, without
+its button, after you confirm. Keep hands clear of the chuck.
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Turn by (°)** | −3600 to 3600 | 90 | How far to turn the object, in degrees. Positive turns it the way a design runs down the page; negative the other way. Click **Turn**. It saves the settings above first. |
+
+The rotary has no home: each job starts wherever the object is, and turns it back to there at the
+end. A job that is stopped part way (Stop, or a long press on the machine's button) skips that, so
+the object is left turned and the next job starts in the wrong place. When a rotary job sent from
+PhotonCanvas is stopped, the program works out how far the object had turned. It uses the
+machine's own progress when it reports one, and the time otherwise. It then shows a **Rotary 85°**
+chip (with the angle) in the job bar, and **Return rotary to start** in the Turn the rotary box.
+Click it to turn the object back with a laser-off job, or click **It's already back** if you turned
+it by hand. The angle is worked out, not measured, so it can be a little out. A pencil line across the
+chuck and the object shows what's left, and **Turn by (°)** takes up the rest. If you stop again
+before turning back, the turns add up. The program only knows while it's open and connected.
+
 #### Your own rotary
 
 **Your own rotary** is a rotary you made (or another make) plugged into the machine's rotary port.

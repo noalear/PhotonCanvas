@@ -1358,8 +1358,11 @@ public sealed class MachinePanel : UserControl
         SetFraming(false);
     }
 
-    /// <summary>Upload a job. The machine then waits for its start button. Returns the job's id on the machine.</summary>
-    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job")
+    /// <summary>
+    /// Upload a job. The machine then waits for its start button (with <paramref name="autoStart"/> it starts
+    /// straight away: only for laser-off jobs such as turning the rotary). Returns the job's id on the machine.
+    /// </summary>
+    public async Task<string> UploadJobAsync(byte[] xf, IProgress<double>? progress, CancellationToken ct, bool replaceLoadedJob = false, string name = "Job", bool autoStart = false)
     {
         if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
         var resume = await PauseLive();
@@ -1372,7 +1375,7 @@ public sealed class MachinePanel : UserControl
             SetFraming(false); // the upload stops a frame that is tracing
             _settings.SentJobs.Insert(0, sent);
             if (_settings.SentJobs.Count > 50) _settings.SentJobs.RemoveRange(50, _settings.SentJobs.Count - 50);
-            try { await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob, taskId); }
+            try { await c.UploadJobAsync(xf, progress, ct, replaceLoadedJob, taskId, autoStart); }
             catch (Exception e) when (e is DeviceException or OperationCanceledException)
             {
                 _settings.SentJobs.Remove(sent);
@@ -1383,7 +1386,7 @@ public sealed class MachinePanel : UserControl
             LoadedTaskId = taskId;
             if (Mode == "P_WORK") ShowStatus(Mode, Distance);
             LoadedJobChanged?.Invoke();
-            Log($"Job \"{name}\" uploaded. Press the start button on the machine.");
+            Log(autoStart ? $"Job \"{name}\" uploaded and starting." : $"Job \"{name}\" uploaded. Press the start button on the machine.");
             return taskId;
         }
         finally { resume(); }
