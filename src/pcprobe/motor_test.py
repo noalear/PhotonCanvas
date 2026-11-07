@@ -52,8 +52,8 @@ class Step:
 
 
 def check_settings(mm, speed):
-    if not MIN_MM <= mm <= MAX_MM:
-        raise ValueError(f"amount must be {MIN_MM:g} to {MAX_MM:g} units, not {mm:g}")
+    if not MIN_MM <= abs(mm) <= MAX_MM:
+        raise ValueError(f"amount must be {MIN_MM:g} to {MAX_MM:g} units either way, not {mm:g}")
     if not MIN_SPEED <= speed <= MAX_SPEED:
         raise ValueError(f"speed must be {MIN_SPEED} to {MAX_SPEED}, not {speed:g}")
 
@@ -75,7 +75,7 @@ def make_steps(mm, speed):
              "Listen for a faint hum and try the chuck by hand: it should resist.",
              {"action": "lock"}, (("held", "It held"), ("no_change", "No change"), UNSURE)),
         Step("turn", f"Turn {mm:g} units", f"Turns the motor {mm:g} units at speed {speed:g}. Each press turns it again.",
-             "The chuck should turn a little.",
+             "The chuck should turn a little. A minus amount should turn it the other way.",
              {"u": mm, "action": "goto", "speed": speed}, (("turned", "It turned"), ("still", "It stayed still"), UNSURE)),
         Step("free", "Let the motor go", "Releases the motor. It stays released when you close this window.",
              "The chuck should now turn freely by hand.",
@@ -258,9 +258,9 @@ class Window:
         box = ttk.LabelFrame(top, text="How much to turn", padding=8)
         box.grid(sticky="ew", pady=(0, 8))
         box.columnconfigure(2, weight=1)
-        ttk.Label(box, text=f"Amount, motor units ({MIN_MM:g} to {MAX_MM:g})").grid(row=0, column=0, sticky="w", padx=(0, 12))
+        ttk.Label(box, text=f"Amount, motor units ({MIN_MM:g} to {MAX_MM:g}, minus for the other way)").grid(row=0, column=0, sticky="w", padx=(0, 12))
         ttk.Label(box, text=f"Speed ({MIN_SPEED} to {MAX_SPEED})").grid(row=0, column=1, sticky="w", padx=(0, 12))
-        ttk.Spinbox(box, from_=MIN_MM, to=MAX_MM, increment=0.5, width=8, textvariable=self.mm).grid(
+        ttk.Spinbox(box, from_=-MAX_MM, to=MAX_MM, increment=0.5, width=8, textvariable=self.mm).grid(
             row=1, column=0, sticky="w")
         ttk.Spinbox(box, from_=MIN_SPEED, to=MAX_SPEED, increment=100, width=8, textvariable=self.speed).grid(
             row=1, column=1, sticky="w")
@@ -288,6 +288,10 @@ class Window:
             f"Turn {CHECK_PRESSES} times, about a second apart. That's four full turns, so any error shows four "
             f"times over: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
+        ttk.Label(measure, wraplength=840, text=(
+            f"To test turning back: put a tape mark on the chuck, press Hold, set the amount to {MAX_MM:g} and press "
+            f"Turn once, then set it to -{MAX_MM:g} and press Turn once. The mark should land back where it started."
+        )).grid(sticky="w", pady=(4, 0))
         self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
         self.count.grid(sticky="w", pady=(4, 0))
 
@@ -339,7 +343,7 @@ class Window:
             turning = step.data["action"] == "goto"
             why_not = None
             if turning and settings is None:
-                why_not = f"Enter an amount of {MIN_MM:g} to {MAX_MM:g} units and a speed of {MIN_SPEED} to {MAX_SPEED} first."
+                why_not = f"Enter an amount of {MIN_MM:g} to {MAX_MM:g} units, either way, and a speed of {MIN_SPEED} to {MAX_SPEED} first."
             elif turning and not self.held:
                 why_not = "Press Hold the motor first: it won't turn otherwise."
             row["button"].config(text="Turn (fix the numbers)" if turning and settings is None else step.button)
@@ -348,7 +352,7 @@ class Window:
             row["button"].config(state="normal" if usable else "disabled")
         self.stop_button.config(state="normal" if self.mode else "disabled")
         self._draw_ruler(mm if settings else None)
-        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} units, about {self.total * 360 / UNITS_PER_TURN:.0f}°")
+        self.count.config(text=f"Net turn since you pressed Hold: {self.total:g} units, about {self.total * 360 / UNITS_PER_TURN:.0f}°")
         self.result.config(text=verdict(self.seen))
 
     def _draw_ruler(self, mm):
@@ -356,16 +360,17 @@ class Window:
         c.delete("all")
         c.config(bg=self.root.cget("bg"))
         x0, x1, y = 16, 396, 34
-        scale = (x1 - x0) / MAX_MM
+        scale = (x1 - x0) / (2 * MAX_MM)
+        mid = (x0 + x1) / 2
         c.create_line(x0, y, x1, y, fill="#57606a")
-        for n in range(int(MAX_MM) + 1):
-            x = x0 + n * scale
+        for n in range(-int(MAX_MM), int(MAX_MM) + 1):
+            x = mid + n * scale
             c.create_line(x, y - 3, x, y + 3, fill="#57606a")
             if n % 5 == 0:
                 c.create_text(x, y + 14, text=f"{n}", fill="#57606a", font=("Segoe UI", 8))
         if mm is not None:
-            x = x0 + mm * scale
-            c.create_line(x0, y, x, y, fill=self.GOOD, width=3, arrow="last")
+            x = mid + mm * scale
+            c.create_line(mid, y, x, y, fill=self.GOOD, width=3, arrow="last")
             c.create_text(min(max(x, x0 + 50), x1 - 50), y - 16, text=f"Turn {mm:g} units", fill=self.GOOD,
                           font=("Segoe UI", 9, "bold"))
 

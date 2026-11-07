@@ -38,6 +38,21 @@ def test_steps_only_send_motor_commands_to_the_conveyor_type():
     assert {(s[0], s[1], s[3]["type"]) for s in dev.sent} == {("PUT", "/v1/peripheral/param", "conveyor")}
 
 
+def test_a_minus_amount_is_sent_as_a_minus_u_and_nets_off_the_count(tmp_path):
+    assert parse_settings("-5", "1200") == (-5, 1200)
+    dev = FakeDevice()
+    assert asyncio.run(send_step(dev, make_steps(-5, 1200)[1])).accepted
+    assert dev.sent[0][2] == {"u": -5, "action": "goto", "speed": 1200}
+    root, window = _window(tmp_path)
+    try:
+        _accepted(window, "hold")
+        _accepted(window, "turn")
+        window._handle(("answer", make_steps(-5, 1200)[1], Answer(True, "accepted", "{}")))
+        assert window.total == 3
+    finally:
+        root.destroy()
+
+
 def test_anything_else_is_refused_before_it_reaches_the_machine():
     dev = FakeDevice()
     with pytest.raises(ValueError):
@@ -45,7 +60,7 @@ def test_anything_else_is_refused_before_it_reaches_the_machine():
     assert dev.sent == []
 
 
-@pytest.mark.parametrize("mm,speed", [(MAX_MM + 0.1, 1200), (0, 1200), (-5, 1200), (5, MAX_SPEED + 1), (5, 0)])
+@pytest.mark.parametrize("mm,speed", [(MAX_MM + 0.1, 1200), (-MAX_MM - 0.1, 1200), (0, 1200), (0.1, 1200), (-0.1, 1200), (5, MAX_SPEED + 1), (5, 0)])
 def test_limits(mm, speed):
     with pytest.raises(ValueError):
         make_steps(mm, speed)
@@ -99,8 +114,14 @@ def test_the_measuring_instructions_make_four_whole_turns_within_the_limit():
     assert CHECK_AMOUNT * CHECK_PRESSES == pytest.approx(4 * UNITS_PER_TURN) and MIN_MM <= CHECK_AMOUNT <= MAX_MM
 
 
+_tk = []  # Creating a second Tk in one process intermittently fails on Windows, so the tests share one.
+
+
 def _window(tmp_path):
-    root = tk.Tk()
+    if not _tk:
+        _tk.append(tk.Tk())
+        _tk[0].withdraw()
+    root = tk.Toplevel(_tk[0])
     root.withdraw()
     window = Window(root, Link("192.0.2.1"), ResultLog(tmp_path))
     window._handle(("mode", "192.0.2.1", "P_IDLE"))
