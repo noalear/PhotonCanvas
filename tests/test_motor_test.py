@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import tkinter as tk
 
 from pcprobe import keys
-from pcprobe.motor_test import (CHECK_AMOUNT, CHECK_PRESSES, MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_TURN, Answer, Link, ResultLog, Step, Window,
+from pcprobe.motor_test import (BACK_CHECK_AMOUNT, CHECK_AMOUNT, CHECK_PRESSES, MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_TURN, Answer, Link, ResultLog, Step, Window,
                                 make_steps, parse_settings, send_step, verdict)
 
 
@@ -51,6 +51,15 @@ def test_a_minus_amount_is_sent_as_a_minus_u_and_nets_off_the_count(tmp_path):
         assert window.total == 3
     finally:
         root.destroy()
+
+
+def test_the_limit_is_100_units_either_way():
+    assert parse_settings("100", "1200") == (100, 1200) and parse_settings("-100", "1200") == (-100, 1200)
+    assert parse_settings("100.5", "1200") is None and parse_settings("-100.5", "1200") is None
+
+
+def test_the_turn_back_check_stays_short_of_a_full_turn():
+    assert MIN_MM <= BACK_CHECK_AMOUNT < UNITS_PER_TURN / 2
 
 
 def test_anything_else_is_refused_before_it_reaches_the_machine():

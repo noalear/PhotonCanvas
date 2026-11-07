@@ -31,13 +31,15 @@ URL = "/v1/peripheral/param"
 PORT_TYPE = "conveyor"
 ACTIONS = ("lock", "goto", "stop", "free")
 IDLE = "P_IDLE"
-MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
+MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 100.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
 # Measured on a 32.5 mm rod: 170 units stopped about 4.2 mm short of four full turns (102.1 mm round).
 # 20 presses of 8.588 is four turns at this figure, so the window asks for that to confirm it.
 UNITS_PER_TURN = 42.94
 CHECK_AMOUNT, CHECK_PRESSES = 8.588, 20
+# Well short of a full turn, so the mark only comes back if a minus amount really turns it the other way.
+BACK_CHECK_AMOUNT = 10
 
 
 @dataclass(frozen=True)
@@ -289,8 +291,8 @@ class Window:
             f"times over: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
         ttk.Label(measure, wraplength=840, text=(
-            f"To test turning back: put a tape mark on the chuck, press Hold, set the amount to {MAX_MM:g} and press "
-            f"Turn once, then set it to -{MAX_MM:g} and press Turn once. The mark should land back where it started."
+            f"To test turning back: put a tape mark on the chuck, press Hold, set the amount to {BACK_CHECK_AMOUNT} and press "
+            f"Turn once, then set it to -{BACK_CHECK_AMOUNT} and press Turn once. The mark should land back where it started."
         )).grid(sticky="w", pady=(4, 0))
         self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
         self.count.grid(sticky="w", pady=(4, 0))
@@ -363,10 +365,11 @@ class Window:
         scale = (x1 - x0) / (2 * MAX_MM)
         mid = (x0 + x1) / 2
         c.create_line(x0, y, x1, y, fill="#57606a")
-        for n in range(-int(MAX_MM), int(MAX_MM) + 1):
+        step = int(MAX_MM) // 10
+        for n in range(-int(MAX_MM), int(MAX_MM) + 1, step):
             x = mid + n * scale
             c.create_line(x, y - 3, x, y + 3, fill="#57606a")
-            if n % 5 == 0:
+            if n % (5 * step) == 0:
                 c.create_text(x, y + 14, text=f"{n}", fill="#57606a", font=("Segoe UI", 8))
         if mm is not None:
             x = mid + mm * scale
