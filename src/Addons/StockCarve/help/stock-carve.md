@@ -18,8 +18,9 @@ to the model's shape as it turns, moving the focus as the surface comes nearer t
 ## Carve a scanned part to a model
 
 1. Fit the part in the rotary's chuck and scan it (Laser → **Scan the part**, in rotary mode; see
-   [Work area](work-area.md#your-own-rotary) for the rotary itself). Leave it in the chuck.
-2. Click **Carve to model** on the **Laser** tab. The last scan is the stock. (Or click **Stock
+   [Scan the part](work-area.md#scan-the-part)). For standard stock (a square bar, say) choose its
+   shape there, so the stock is its exact shape. Leave it in the chuck.
+2. Click **Carve to model** on the **Laser** tab. The last scan's stock model is the stock. (Or click **Stock
    model…** for a 3D model of the stock, below.)
 3. Click **Open a 3D model…** and choose the shape to carve (STL, OBJ or STEP). It's laid with its
    longest side along the axis, in the middle of the stock.

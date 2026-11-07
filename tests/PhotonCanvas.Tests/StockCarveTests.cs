@@ -1,5 +1,6 @@
 using PhotonCanvas.Addon.RotaryFinish;
 using PhotonCanvas.Addon.StockCarve;
+using PhotonCanvas.Core;
 using PhotonCanvas.Doc;
 using Tri = PhotonCanvas.Doc.Import.StlDepth.Triangle;
 using V3 = PhotonCanvas.Doc.Import.StlDepth.Vec3;
@@ -261,6 +262,28 @@ public class StockCarveTests
         Assert.InRange(b.Min(r => r.MinY), circ / 2 - half - 1.5, circ / 2);
         Assert.InRange(b.Max(r => r.MaxY), circ / 2, circ / 2 + half + 1.5);
         Assert.InRange(plan.DeepestMm, 1.6, 2.2);
+    }
+
+    [Fact]
+    public void A_square_bar_from_the_scan_window_is_read_as_its_exact_shape()
+    {
+        // A 2" square bar, flat face up, its middle on the axis (60 mm above the bed), as Scan the part saves it.
+        var fit = new StockFit(new StockShape(StockKind.Square, 50.8), 60, new Vec2(0, 0), 0, 0, 100);
+        var scan = fit.ToScan([20, 60, 100, 140], 110) with { AxisHeightMm = 60 };
+        var stock = ScanLink.FromScan(scan, scan.AxisHeightMm!.Value);
+        Assert.True(stock.WholeTurn);
+        Assert.Equal(25.4, stock.RadiusAt(0, 80), 1);
+        Assert.Equal(25.4, stock.RadiusAt(90, 80), 1);
+        // The corners, between the scan's 2° steps (a hair under the sharp corner itself).
+        Assert.InRange(stock.RadiusAt(45, 80), 35.2, 35.95);
+        Assert.InRange(stock.RadiusAt(315, 30), 35.2, 35.95);
+        // A 40 mm round rod fits; best fit leaves it in the middle with ~5 mm all round.
+        var model = new TargetModel(Rod(20, 0, 60));
+        var placed = StockCarve.BestFit(stock, model, new Placement { AlongMm = 80, UpMm = 2 });
+        var r = StockCarve.Compare(stock, model.Placed(placed));
+        Assert.True(r.Fits);
+        Assert.InRange(r.WorstMm, -5.5, -5.0);
+        Assert.Equal(80, placed.AlongMm, 0);
     }
 
     [Fact]
