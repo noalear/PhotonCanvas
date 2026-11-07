@@ -89,7 +89,7 @@ def make_steps(mm, speed):
              "Listen for a faint hum and try the chuck by hand: it should resist.",
              {"action": "lock"}, (("held", "It held"), ("no_change", "No change"), UNSURE)),
         Step("turn", f"Turn {mm:g} units", f"Turns the motor {mm:g} units at speed {speed:g}: {describe_turn(mm, speed)}. Each press turns it again.",
-             "The chuck should turn a little. A minus amount should turn it the other way.",
+             "The chuck should turn. A minus amount should turn it the other way.",
              {"u": mm, "action": "goto", "speed": speed}, (("turned", "It turned"), ("still", "It stayed still"), UNSURE)),
         Step("free", "Let the motor go", "Releases the motor. It stays released when you close this window.",
              "The chuck should now turn freely by hand.",
@@ -374,7 +374,7 @@ class Window:
         c = self.ruler
         c.delete("all")
         c.config(bg=self.root.cget("bg"))
-        x0, x1, y = 16, 396, 34
+        x0, x1, y = 34, 386, 34
         scale = (x1 - x0) / (2 * MAX_MM)
         mid = (x0 + x1) / 2
         c.create_line(x0, y, x1, y, fill="#57606a")
