@@ -34,9 +34,10 @@ IDLE = "P_IDLE"
 MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# One full turn should take very roughly 36 to 43 of these units: about 50 degrees per 5 by eye.
-# That isn't measured, so the window asks for this total and for where a tape mark ends up.
-CHECK_AMOUNT, CHECK_TOTAL = 8, 40
+# Measured by eye against a tape mark: 5 presses of 8.5 land almost exactly on one full turn. Five turns
+# (25 presses) make any error five times easier to see, which is what the window asks for next.
+UNITS_PER_TURN = 42.5
+CHECK_AMOUNT, CHECK_PRESSES = 8.5, 25
 
 
 @dataclass(frozen=True)
@@ -280,12 +281,12 @@ class Window:
         self.stop_answer = ttk.Label(top, text="Use this at any time if the motor keeps turning.")
         self.stop_answer.grid(sticky="w", pady=(0, 8))
 
-        measure = ttk.LabelFrame(top, text="How far is one full turn?", padding=8)
+        measure = ttk.LabelFrame(top, text=f"One full turn is about {UNITS_PER_TURN:g} units", padding=8)
         measure.grid(sticky="ew", pady=(0, 8))
         ttk.Label(measure, wraplength=840, text=(
-            f"No rod needed. Put a tape mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT} and press "
-            f"Turn {CHECK_TOTAL // CHECK_AMOUNT} times, about a second apart. That should be close to one full "
-            f"turn, but it isn't measured yet: note how far short of or past the starting point the mark ends up."
+            f"To pin it down: put a tape mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT:g} and press "
+            f"Turn {CHECK_PRESSES} times, about a second apart. That's five full turns, so any error shows five "
+            f"times over: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
         self.count = ttk.Label(measure, font=("Segoe UI", 10, "bold"))
         self.count.grid(sticky="w", pady=(4, 0))
@@ -347,7 +348,7 @@ class Window:
             row["button"].config(state="normal" if usable else "disabled")
         self.stop_button.config(state="normal" if self.mode else "disabled")
         self._draw_ruler(mm if settings else None)
-        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} of {CHECK_TOTAL} units")
+        self.count.config(text=f"Turned since you pressed Hold: {self.total:g} units, about {self.total * 360 / UNITS_PER_TURN:.0f}°")
         self.result.config(text=verdict(self.seen))
 
     def _draw_ruler(self, mm):
