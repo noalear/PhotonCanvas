@@ -10,8 +10,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 import tkinter as tk
 
 from pcprobe import keys
-from pcprobe.motor_test import (BACK_CHECK_AMOUNT, CHECK_AMOUNT, CHECK_PRESSES, MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_TURN, Answer, Link, ResultLog, Step, Window,
-                                make_steps, parse_settings, send_step, verdict)
+from pcprobe.motor_test import (BACK_CHECK_AMOUNT, CHECK_AMOUNT, CHECK_TURNS, MAX_MM, MAX_SPEED, MIN_MM, STOP, UNITS_PER_TURN, Answer, Link, ResultLog, Step, Window,
+                                describe_turn, make_steps, parse_settings, send_step, verdict)
 
 
 class FakeDevice:
@@ -53,9 +53,49 @@ def test_a_minus_amount_is_sent_as_a_minus_u_and_nets_off_the_count(tmp_path):
         root.destroy()
 
 
-def test_the_limit_is_100_units_either_way():
-    assert parse_settings("100", "1200") == (100, 1200) and parse_settings("-100", "1200") == (-100, 1200)
-    assert parse_settings("100.5", "1200") is None and parse_settings("-100.5", "1200") is None
+def test_the_limit_is_10000_units_either_way():
+    assert parse_settings("10000", "1200") == (10000, 1200) and parse_settings("-10000", "1200") == (-10000, 1200)
+    assert parse_settings("10000.5", "1200") is None and parse_settings("-10000.5", "1200") is None
+
+
+def test_a_turn_says_how_long_it_will_take():
+    assert describe_turn(42.901, 1200) == "about 1.0 turns, about 2 seconds"
+    assert describe_turn(-10000, 1200) == "about 233.1 turns, about 8.3 minutes"
+    assert "8.3 minutes" in make_steps(10000, 1200)[1].does
+
+
+def _sent_steps(window):
+    steps = []
+    while not window.link.events.empty():
+        event = window.link.events.get_nowait()
+        if event[0] == "answer":
+            steps.append(event[1])
+    return steps
+
+
+def test_closing_during_a_turn_stops_the_motor(tmp_path):
+    root, window = _window(tmp_path)
+    try:
+        step = make_steps(5000, 1200)[1]
+        window._handle(("answer", step, Answer(True, "accepted", "{}")))
+        window.close()
+        assert _sent_steps(window) == [STOP]
+        assert "stopping the motor" in window.log.path.read_text(encoding="utf-8")
+    finally:
+        if root.winfo_exists():
+            root.destroy()
+
+
+def test_closing_after_a_stop_or_a_finished_turn_sends_nothing(tmp_path):
+    root, window = _window(tmp_path)
+    window._handle(("answer", make_steps(5000, 1200)[1], Answer(True, "accepted", "{}")))
+    window._handle(("answer", STOP, Answer(True, "accepted", "{}")))
+    window.close()
+    assert _sent_steps(window) == []
+    root2, window2 = _window(tmp_path)
+    window2.turning_until = 0.0
+    window2.close()
+    assert _sent_steps(window2) == []
 
 
 def test_the_turn_back_check_stays_short_of_a_full_turn():
@@ -119,8 +159,8 @@ def test_verdict(seen, expected):
     assert verdict(seen) == expected
 
 
-def test_the_measuring_instructions_make_four_whole_turns_within_the_limit():
-    assert CHECK_AMOUNT * CHECK_PRESSES == pytest.approx(4 * UNITS_PER_TURN) and MIN_MM <= CHECK_AMOUNT <= MAX_MM
+def test_the_measuring_instructions_stay_within_the_limit():
+    assert CHECK_AMOUNT == pytest.approx(CHECK_TURNS * UNITS_PER_TURN) and MIN_MM <= CHECK_AMOUNT <= MAX_MM
 
 
 _tk = []  # Creating a second Tk in one process intermittently fails on Windows, so the tests share one.

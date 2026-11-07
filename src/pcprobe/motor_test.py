@@ -31,13 +31,14 @@ URL = "/v1/peripheral/param"
 PORT_TYPE = "conveyor"
 ACTIONS = ("lock", "goto", "stop", "free")
 IDLE = "P_IDLE"
-MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 100.0, 5.0
+MIN_MM, MAX_MM, DEFAULT_MM = 0.5, 10000.0, 5.0
 MIN_SPEED, MAX_SPEED, DEFAULT_SPEED = 100, 1200, 1200
 UNSURE = ("unsure", "Not sure")
-# Measured on a 32.5 mm rod: 170 units stopped about 4.2 mm short of four full turns (102.1 mm round).
-# 20 presses of 8.588 is four turns at this figure, so the window asks for that to confirm it.
-UNITS_PER_TURN = 42.94
-CHECK_AMOUNT, CHECK_PRESSES = 8.588, 20
+# 32 (this rotary's units a turn in jobs) / 0.7459 (the machine's stored ConveyorURate). 28 turns of it
+# landed only slightly short. One long turn makes any remaining error far easier to see.
+UNITS_PER_TURN = 42.901
+CHECK_TURNS = 100
+CHECK_AMOUNT = CHECK_TURNS * UNITS_PER_TURN
 # Well short of a full turn, so the mark only comes back if a minus amount really turns it the other way.
 BACK_CHECK_AMOUNT = 10
 
@@ -60,6 +61,17 @@ def check_settings(mm, speed):
         raise ValueError(f"speed must be {MIN_SPEED} to {MAX_SPEED}, not {speed:g}")
 
 
+def turn_seconds(mm, speed):
+    """Roughly how long a turn takes, taking speed as units a minute (42.9 at 1200 fits about 2 s)."""
+    return abs(mm) / speed * 60
+
+
+def describe_turn(mm, speed):
+    seconds = turn_seconds(mm, speed)
+    time_text = f"{seconds:.0f} seconds" if seconds < 90 else f"{seconds / 60:.1f} minutes"
+    return f"about {abs(mm) / UNITS_PER_TURN:.1f} turns, about {time_text}"
+
+
 def parse_settings(mm_text, speed_text):
     """(mm, speed), or None when either box doesn't hold an allowed number."""
     try:
@@ -76,7 +88,7 @@ def make_steps(mm, speed):
         Step("hold", "Hold the motor", "Locks the motor. It only turns while it's held. Pressing this starts the count again.",
              "Listen for a faint hum and try the chuck by hand: it should resist.",
              {"action": "lock"}, (("held", "It held"), ("no_change", "No change"), UNSURE)),
-        Step("turn", f"Turn {mm:g} units", f"Turns the motor {mm:g} units at speed {speed:g}. Each press turns it again.",
+        Step("turn", f"Turn {mm:g} units", f"Turns the motor {mm:g} units at speed {speed:g}: {describe_turn(mm, speed)}. Each press turns it again.",
              "The chuck should turn a little. A minus amount should turn it the other way.",
              {"u": mm, "action": "goto", "speed": speed}, (("turned", "It turned"), ("still", "It stayed still"), UNSURE)),
         Step("free", "Let the motor go", "Releases the motor. It stays released when you close this window.",
@@ -232,6 +244,7 @@ class Window:
         self.choice_vars = {}
         self.held = False
         self.total = 0.0
+        self.turning_until = 0.0
         root.title("PhotonCanvas motor test")
         root.report_callback_exception = self._crashed
         root.protocol("WM_DELETE_WINDOW", self.close)
@@ -262,7 +275,7 @@ class Window:
         box.columnconfigure(2, weight=1)
         ttk.Label(box, text=f"Amount, motor units ({MIN_MM:g} to {MAX_MM:g}, minus for the other way)").grid(row=0, column=0, sticky="w", padx=(0, 12))
         ttk.Label(box, text=f"Speed ({MIN_SPEED} to {MAX_SPEED})").grid(row=0, column=1, sticky="w", padx=(0, 12))
-        ttk.Spinbox(box, from_=-MAX_MM, to=MAX_MM, increment=0.5, width=8, textvariable=self.mm).grid(
+        ttk.Spinbox(box, from_=-MAX_MM, to=MAX_MM, increment=0.5, width=10, textvariable=self.mm).grid(
             row=1, column=0, sticky="w")
         ttk.Spinbox(box, from_=MIN_SPEED, to=MAX_SPEED, increment=100, width=8, textvariable=self.speed).grid(
             row=1, column=1, sticky="w")
@@ -286,9 +299,9 @@ class Window:
         measure = ttk.LabelFrame(top, text=f"One full turn is about {UNITS_PER_TURN:g} units", padding=8)
         measure.grid(sticky="ew", pady=(0, 8))
         ttk.Label(measure, wraplength=840, text=(
-            f"To pin it down: put a tape mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT:g} and press "
-            f"Turn {CHECK_PRESSES} times, about a second apart. That's four full turns, so any error shows four "
-            f"times over: note how far short of or past the starting point the mark ends up."
+            f"To pin it down: put a mark on the chuck, press Hold, set the amount to {CHECK_AMOUNT:g} and press Turn "
+            f"once. That's {CHECK_TURNS} full turns, {describe_turn(CHECK_AMOUNT, DEFAULT_SPEED).split(', ')[1]}, so "
+            f"any error shows {CHECK_TURNS} times over: note how far short of or past the starting point the mark ends up."
         )).grid(sticky="w")
         ttk.Label(measure, wraplength=840, text=(
             f"To test turning back: put a tape mark on the chuck, press Hold, set the amount to {BACK_CHECK_AMOUNT} and press "
@@ -444,8 +457,11 @@ class Window:
             self.held, self.total = True, 0.0
         elif action == "free":
             self.held = False
+        elif action == "stop":
+            self.turning_until = 0.0
         elif action == "goto":
             self.total += step.data["u"]
+            self.turning_until = max(self.turning_until, time.monotonic()) + turn_seconds(step.data["u"], step.data["speed"])
             self.log.write(f"TOTAL since Hold: {self.total:g} units")
 
     def _crashed(self, *exc):
@@ -454,6 +470,15 @@ class Window:
 
     def close(self):
         self.log.write(f"window closed. RESULT: {verdict(self.seen)}")
+        if time.monotonic() < self.turning_until:
+            self.log.write("closed during a turn: stopping the motor")
+            self.link.send(STOP)
+            self.root.withdraw()
+            self.root.after(800, self._finish_close)  # time for the stop to go out
+        else:
+            self._finish_close()
+
+    def _finish_close(self):
         self.link.stop()
         self.root.destroy()
 
