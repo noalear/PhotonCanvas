@@ -22,7 +22,14 @@ public sealed class MaskShapesWindow : Window
     readonly ComboBox _mask = new() { HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly RadioButton _inside = new() { Content = "Keep what's inside the mask", GroupName = "keep", IsChecked = true };
     readonly RadioButton _outside = new() { Content = "Keep what's outside the mask", GroupName = "keep" };
-    readonly CheckBox _keepMask = new() { Content = "Keep the mask shape too", IsChecked = true };
+    /// <summary>What happens to the mask shape: onto the mask layer (never burned), left where it is, or deleted.</summary>
+    readonly ComboBox _after = new()
+    {
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        ItemsSource = new[] { "Moves to the mask layer (never burned)", "Stays on its own layer (burned with it)", "Is deleted" },
+        SelectedIndex = 0,
+    };
+    const int AfterMaskLayer = 0, AfterStays = 1, AfterDeleted = 2;
     readonly Preview _preview = new() { Height = 460 };
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly Button _ok = new() { Content = "Mask", Classes = { "primary" }, MinWidth = 120 };
@@ -47,7 +54,7 @@ public sealed class MaskShapesWindow : Window
         _mask.SelectedIndex = first is null ? -1 : _candidates.IndexOf(first);
         _mask.SelectionChanged += (_, _) => Make();
         _inside.IsCheckedChanged += (_, _) => Make();
-        _keepMask.IsCheckedChanged += (_, _) => Make();
+        _after.SelectionChanged += (_, _) => Make();
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 100 };
         cancel.Click += (_, _) => Close();
         _ok.Click += (_, _) => Apply();
@@ -60,7 +67,7 @@ public sealed class MaskShapesWindow : Window
                 new TextBlock { TextWrapping = TextWrapping.Wrap, Text = "Cuts the other selected shapes to the mask's outline: everything past its edge is removed. Lines are cut where they cross the edge; filled shapes are cut to the mask's shape." },
                 Field("Mask", _mask, tip: "The shape whose outline does the cutting. Only its closed outlines count."),
                 new StackPanel { Spacing = 4, Children = { _inside, _outside } },
-                _keepMask,
+                Field("The mask afterwards", _after, tip: "Moves to the mask layer (default): kept on the work area to line things up with and to mask again, but never cut or marked. Stays: left on its layer, so it's cut or marked with it (a frame you also want cut). Is deleted: gone once it has done the cutting."),
                 _summary,
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8, Children = { cancel, _ok } },
                 Hint("Text and codes aren't cut (they can be the mask). Pictures have their own Image mask on the Picture tab."),
@@ -106,7 +113,12 @@ public sealed class MaskShapesWindow : Window
             : $"Cuts {targets.Count} shape{(targets.Count == 1 ? "" : "s")} to the {(outside ? "outside" : "inside")} of \"{(string.IsNullOrWhiteSpace(mask.Name) ? "the mask" : mask.Name)}\": "
               + $"{before:N0} piece{(before == 1 ? "" : "s")} become {after:N0}"
               + (gone > 0 ? $", and {gone} shape{(gone == 1 ? " is" : "s are")} left with nothing and removed." : ".")
-              + (_keepMask.IsChecked == true ? " The mask stays." : " The mask is deleted.");
+              + (_after.SelectedIndex switch
+              {
+                  AfterDeleted => " The mask is deleted.",
+                  AfterStays => " The mask stays on its layer, so it's burned too.",
+                  _ => $" The mask moves to the \"{MaskLayer.LayerName}\" layer: kept, but never burned.",
+              });
         _ok.IsEnabled = targets.Count > 0;
     }
 
@@ -122,8 +134,9 @@ public sealed class MaskShapesWindow : Window
             s = Ops.Replace(s, new PathShape { Id = shape.Id, Name = shape.Name, LayerId = shape.LayerId, GroupId = shape.GroupId, Geometry = result });
             kept.Add(shape.Id);
         }
-        if (_keepMask.IsChecked != true) gone.Add(mask.Id);
+        if (_after.SelectedIndex == AfterDeleted) gone.Add(mask.Id);
         if (gone.Count > 0) s = Ops.Delete(s, gone);
+        if (_after.SelectedIndex == AfterMaskLayer) s = MaskLayer.Mark(s, new HashSet<Guid> { mask.Id });
         _doc.Commit("Mask with shape", s, kept);
         Close();
     }

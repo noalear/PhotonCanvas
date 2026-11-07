@@ -190,7 +190,7 @@ public static class JobBuilder
     }
 
     /// <summary>Layers that will be processed, in order.</summary>
-    public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible);
+    public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible && !MaskLayer.IsMask(s, l));
 
     /// <exception cref="JobException">The job cannot be made; the message says why.</exception>
     /// <summary>What the heat order needs from a layer: its sheet, and the laser as it will cut.</summary>
@@ -246,6 +246,9 @@ public static class JobBuilder
 
         foreach (var shiny in layers.Where(l => l.Reflective && s.ShapesFor(l).Any()).Take(1))
             warnings.Add($"\"{shiny.Name}\" is on highly reflective material and may throw reflections. Put it near the exhaust fan, or coat it with anti-reflective black marking spray.");
+
+        foreach (var (mask, on, picture) in MaskLayer.LeftOnOutput(s, layers).Take(3))
+            warnings.Add($"\"{Label(mask)}\" on layer \"{on.Name}\" is where the picture \"{Label(picture)}\" is masked, so it will be {(on.Mode == LayerMode.Cut ? "cut" : "marked")}. If it's only there as the mask, right-click it → Put on the mask layer (never burned).");
 
         foreach (var hidden in s.Layers.Where(l => l.Output && !l.Visible && s.ShapesFor(l).Any()))
             warnings.Add($"Layer \"{hidden.Name}\" is hidden, so it will not be processed.");

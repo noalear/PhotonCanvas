@@ -18,8 +18,9 @@ Click the picture, then `Shift`+click the shape.
 
 ## Mask it
 <!-- target: ribbon:Picture/Image mask -->
-Click **Image mask**. Only the part inside is shown and engraved; the shape stays as a guide. The
-rest of the picture may hang outside the work area: only the masked part has to fit.
+Click **Image mask**. Only the part inside is shown and engraved. The shape moves to the **Mask
+(never burned)** layer: it stays as a guide but is never cut or marked. The rest of the picture may
+hang outside the work area: only the masked part has to fit.
 
 ## Take the mask off
 <!-- target: ribbon:Picture/Remove mask -->

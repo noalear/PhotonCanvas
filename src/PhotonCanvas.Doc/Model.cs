@@ -95,8 +95,14 @@ public sealed record Layer
     public bool Visible { get; init; } = true;
     /// <summary>Shapes cannot be selected or edited on the canvas.</summary>
     public bool Locked { get; init; }
-    /// <summary>Included when the job is sent. Off = reference/guide layer.</summary>
-    public bool Output { get; init; } = true;
+    /// <summary>Included when the job is sent. Off = reference/guide layer. Always off on a <see cref="Mask"/> layer.</summary>
+    public bool Output { get => _output && !Mask; init => _output = value; }
+    readonly bool _output = true;
+    /// <summary>
+    /// The mask layer (see <see cref="MaskLayer"/>): it holds the shapes that mask pictures and
+    /// other shapes, and is never sent to the laser. Its output can't be turned on.
+    /// </summary>
+    public bool Mask { get; init; }
     public LayerMode Mode { get; init; } = LayerMode.Cut;
     public LaserSettings Laser { get; init; } = LaserSettings.Blue(70, 40);
     /// <summary>Fill only: scan lines per centimetre.</summary>

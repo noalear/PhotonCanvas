@@ -114,7 +114,8 @@ shape's layer.
 menu) cuts the selected shapes to the outline of one of them, the mask: everything past the mask's
 edge is removed. Use it to keep depth outlines, a traced pattern or
 hatching only inside a frame or some lettering. Unlike **Intersect**, it keeps open lines (they're
-cut where they cross the mask's edge), keeps each shape on its own layer, and leaves the mask alone.
+cut where they cross the mask's edge), keeps each shape on its own layer, and puts the mask on the
+mask layer, where it's kept but never burned.
 
 Select the shapes to cut and the mask together, then click **Mask with shape**. A window shows the
 result before anything changes: the shapes as they were in faint brown, what's kept in dark brown,
@@ -126,7 +127,7 @@ and the mask's outline dashed in blue.
 |---|---|
 | **Mask** | The shape whose outline does the cutting, listed by name and size. Only its closed outlines count. It starts on the simplest closed shape selected (the one with the fewest outlines, so a frame or some lettering rather than a thousand traced lines); pick another if that's wrong. |
 | **Keep what's inside the mask** / **Keep what's outside the mask** | Which side survives. Inside is the default. |
-| **Keep the mask shape too** | Ticked (default): the mask stays as it is. Unticked: it's deleted once it has done the cutting. |
+| **The mask afterwards** | **Moves to the mask layer (never burned)** (default): the mask is kept on the **Mask (never burned)** layer, to line things up with and mask with again, but it's never cut or marked (see [The mask layer](layers.md#the-mask-layer)). **Stays on its own layer (burned with it)**: for a frame you want cut as well. **Is deleted**: it's gone once it has done the cutting. |
 
 The line under the settings says how many shapes are cut, how many pieces they had and will have,
 and which shapes are left with nothing (they're removed). **Mask** applies it as one undo step.

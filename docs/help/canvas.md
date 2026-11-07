@@ -386,7 +386,8 @@ do with the selection opens. Items that don't apply are greyed.
 
 - **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete it** (or **Delete these 3**…)
 - **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**,
-  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**
+  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**,
+  **Put on the mask layer (never burned)**
 - **Shape operations**: **Offset…**, **Round corners…**, **Text on path**
   (or **Straighten text**), **Copy along path…**, **Tidy lines…**, **Weld (union)**,
   **Subtract (bottom minus the rest)**, **Intersect (keep the overlap)**,

@@ -252,6 +252,7 @@ the job. The common ones:
 | *Layer "…" is a Cut layer, so its picture won't be engraved.* | Move the picture to a Picture layer, or trace it. |
 | *Layer "…" is hidden, so it will not be processed.* | Show the layer, or leave it hidden on purpose. |
 | *"…" and "…" are the same size and in the same place, so both will be processed.* | Delete the old copy. |
+| *"…" on layer "…" is where the picture "…" is masked, so it will be cut.* | If the shape is only the mask, right-click it → **Put on the mask layer (never burned)**. |
 | *"…" runs after the cut layer "…". Parts may move or drop before it is processed.* | Move that layer above the cut layer. |
 | *… open path(s) can't be filled and were skipped.* | Close them, or put them on a Cut or Score layer. |
 | *… mm of lines lying on top of each other will be cut only once.* | Nothing: overlapping lines are removed for you. |

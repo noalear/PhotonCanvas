@@ -23,8 +23,9 @@ Make sure the right shape is the mask. It starts on the simplest one selected; p
 
 ## Inside or outside
 <!-- target: button:Keep what's inside the mask -->
-Keep what's inside the mask, or what's outside it. Untick **Keep the mask shape too** to delete the
-mask afterwards.
+Keep what's inside the mask, or what's outside it. **The mask afterwards** says what happens to the
+mask: it moves to the mask layer, where it's kept but never burned (the default), stays on its own
+layer to be burned too, or is deleted.
 
 ## Apply it
 <!-- target: button:Mask -->

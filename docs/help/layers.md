@@ -97,6 +97,19 @@ all layers**.
 > **Tip:** Use Output off rather than Hide for a reference you want to see but never burn. Hide is
 > for getting things out of the way while you work.
 
+## The mask layer
+
+**Mask (never burned)** holds the shapes that mask things: **Image mask** (Picture tab) and **Mask
+with shape** (Home tab) put their mask there once it has done its job, and right-click →
+**Put on the mask layer (never burned)** puts any shape there. It's made, in purple, the first time
+it's needed.
+
+- Its shapes stay on the work area, drawn faded, to line things up with and to mask with again.
+- It's never sent to the laser. Its output switch can't be turned on, and it can't have sub-layers.
+  To burn a shape that's on it, move the shape to another layer.
+- A shape left on a layer that is sent, in the same place as a picture's mask, gets a warning when
+  the job is checked: *"…" on layer "…" is where the picture "…" is masked, so it will be cut.*
+
 ## The active layer, and editing several layers together
 
 - **Click** a card: it becomes the active layer, and the only selected one. Its settings show in
@@ -174,7 +187,7 @@ the whole selection. The menu has:
 **Rename** (one shape only) and **Select its whole group** (grouped shapes only), then the same menu
 as right-clicking shapes on the work area: **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete**,
 **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**, **Convert text to
-paths**, **Lock** / **Unlock**, **Use as material outline**,
+paths**, **Lock** / **Unlock**, **Use as material outline**, **Put on the mask layer (never burned)**,
 **Shape operations**, **Array**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
 camera…**, **Trace picture…**,

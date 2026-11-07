@@ -806,6 +806,7 @@ public partial class MainWindow : Window
         new("shape.tidy", "Shapes", "Tidy lines…", "", () => _ = Guard(TidyPaths)),
         new("shape.along", "Shapes", "Copy along a path…", "", () => _ = Guard(CopyAlongSel)),
         new("shape.material", "Shapes", "Use as material outline", "", MaterialSel),
+        new("shape.masklayer", "Shapes", "Put on the mask layer (never burned)", "", MaskLayerSel),
         new("shape.lock", "Shapes", "Lock", "Ctrl+Alt+L", () => LockSel(true)),
         new("shape.unlock", "Shapes", "Unlock all", "Ctrl+Alt+Shift+L", () => LockSel(false)),
         new("camera.fit", "Shapes", "Fit to piece in camera…", "Ctrl+Shift+F", () => { if (SelectedOutline().Count > 0) _ = Guard(FitToCamera); }),
@@ -1251,6 +1252,7 @@ public partial class MainWindow : Window
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked), shapes.Select(s => s.Id).ToHashSet())),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
+            Do("Put on the mask layer (never burned)", MaskLayerSel, paths.Count > 0 && (MaskLayer.Layer(_doc.State) is not { } maskLayer || paths.Any(p => p.LayerId != maskLayer.Id))),
             Sub("Shape operations",
                 DoAsync("Offset…", OffsetSel, paths.Count > 0, "Ctrl+Shift+O"),
                 DoAsync("Round corners…", RoundCornersSel, paths.Count > 0),
@@ -1959,6 +1961,18 @@ public partial class MainWindow : Window
         if (ids.Count == 0) { StatusText.Text = "Select the closed outline of your material (drawn, or picked from the camera)."; return; }
         _doc.Commit("Use as material outline", MaterialOutline.Mark(_doc.State, ids), ids);
         StatusText.Text = $"Material outline{(ids.Count == 1 ? "" : "s")} set: on the Material layer, which is never sent. Nest and 3D to slices now fill {(ids.Count == 1 ? "it" : "them")}.";
+    }
+
+    /// <summary>
+    /// The selected shapes go onto the mask layer: kept on the work area (to line things up with,
+    /// or mask with again), never cut or marked. Image mask and Mask with shape put their masks there.
+    /// </summary>
+    void MaskLayerSel()
+    {
+        var ids = SelectedPaths().Select(p => p.Id).ToHashSet();
+        if (ids.Count == 0) { StatusText.Text = "Select the shapes to put on the mask layer."; return; }
+        _doc.Commit("Put on the mask layer", MaskLayer.Mark(_doc.State, ids), ids);
+        StatusText.Text = $"On the \"{MaskLayer.LayerName}\" layer: {(ids.Count == 1 ? "it stays" : "they stay")} on the work area but {(ids.Count == 1 ? "is" : "are")} never cut or marked.";
     }
 
     void CutShapesSel()
