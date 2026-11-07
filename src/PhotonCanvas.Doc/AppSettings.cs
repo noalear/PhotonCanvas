@@ -219,6 +219,12 @@ public sealed class AppSettings
     public double? RotaryLeftU { get; set; }
     public double RotaryLeftScale { get; set; }
     public double RotaryLeftCircumferenceMm { get; set; }
+    /// <summary>
+    /// Turning the rotary outside a job (the conveyor's feed request): its units for one of the
+    /// motor's units in a job (the U scale × mm). 0 = not checked yet, so 1 ÷ the conveyor factor
+    /// is assumed (the machine scales the feed by its belt factor). Corrected from a one-turn check.
+    /// </summary>
+    public double RotaryNowScale { get; set; }
     /// <summary>Conveyor: the firmware scale (0.74592 at 100 % calibration) and angle compensation.</summary>
     public double ConveyorUMultiple { get; set; } = 0.74592;
     public double ConveyorAngle { get; set; }

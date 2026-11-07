@@ -55,6 +55,31 @@ public static class RotaryReturn
     public static WorkMode.Rotary ReturnMode(AppSettings s) =>
         new(s.RotaryLeftScale, 1, Math.Max(1, s.RotaryLeftCircumferenceMm), LineY: Math.Clamp(s.RotaryLineMm, 1, MachineProfile.F2Ultra.FieldH - 1));
 
+    /// <summary>
+    /// Turning outside a job (the conveyor's feed request): its units for one motor unit of a job
+    /// (U × the job's scale). Until a one-turn check sets it, 1 ÷ the conveyor factor, since the
+    /// machine scales the feed by its belt factor (on Kyle's F2 Ultra 5 of them turned a 32-a-turn
+    /// chuck about 45°, as that predicts).
+    /// </summary>
+    public static double NowScale(AppSettings s) => s.RotaryNowScale > 0 ? s.RotaryNowScale : 1 / Math.Max(0.01, s.ConveyorUMultiple);
+
+    /// <summary>The motor units of one whole turn of the object: the U scale × once round it.</summary>
+    public static double UnitsPerTurn(WorkMode.Rotary mode, double circumferenceMm) => mode.UMultiple * circumferenceMm;
+
+    /// <summary>Motor units to turn the object <paramref name="degrees"/> (positive: the way a design runs down the page).</summary>
+    public static double UnitsFor(double degrees, WorkMode.Rotary mode, double circumferenceMm) =>
+        degrees / 360 * UnitsPerTurn(mode, circumferenceMm) * mode.Direction;
+
+    /// <summary>Motor units that turn back what a stopped job left (0 if nothing is left).</summary>
+    public static double UnitsBack(AppSettings s) => s.RotaryLeftU is { } u ? -u * s.RotaryLeftScale : 0;
+
+    /// <summary>
+    /// After a one-turn check: <paramref name="asked"/> turns were asked for and it made <paramref name="made"/>.
+    /// The scale that would have made it right.
+    /// </summary>
+    public static double CorrectedNowScale(AppSettings s, double asked, double made) =>
+        asked > 0 && made > 0 ? NowScale(s) * asked / made : NowScale(s);
+
     /// <summary>A turn in degrees of the object, for <paramref name="uMm"/> round an object <paramref name="circumferenceMm"/> round.</summary>
     public static double Degrees(double uMm, double circumferenceMm) => circumferenceMm > 0 ? uMm / circumferenceMm * 360 : 0;
 

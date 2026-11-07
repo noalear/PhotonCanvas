@@ -811,7 +811,7 @@ public sealed class JobBar : UserControl
         string deg = RotaryTurn.Describe(_settings);
         _rotaryBack.Content = ChipText("IcRotary", $"Rotary {deg}", "Warn");
         _rotaryBackSays.Text = $"A rotary job was stopped part way, so the object is still turned about {deg} from where it started " +
-            "(worked out from how far the job had got, so it can be a little out). Turn it back with a short laser-off job, " +
+            "(worked out from how far the job had got, so it can be a little out). Turn it back now (laser off), " +
             "or say it's already back if you turned it by hand.";
     }
 

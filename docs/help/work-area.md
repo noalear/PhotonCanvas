@@ -59,13 +59,21 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 
 #### Turning the rotary
 
-The machine only turns the rotary inside a job, so the **Turn the rotary** box in the rotary
-settings sends a short job with the laser off. It starts as soon as it reaches the machine, without
-its button, after you confirm. Keep hands clear of the chuck.
+The **Turn the rotary** box in the rotary settings turns the object straight away, with the laser
+off. The rotary's motor is set to hold first, then turned, and it keeps holding the object still
+afterwards. Keep hands clear of the chuck. If the machine won't turn it that way (older firmware),
+the turn goes as a short laser-off job instead, which starts as soon as it arrives, after you confirm.
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
 | **Turn by (°)** | −3600 to 3600 | 90 | How far to turn the object, in degrees. Positive turns it the way a design runs down the page; negative the other way. Click **Turn**. It saves the settings above first. |
+| **It made (turns)** | 0.05 to 20 | 1 | For the one-turn check: how many turns the object really made when you clicked **Turn once**. |
+
+- **Turn once** turns the object one whole turn. Put a tape mark on the chuck first. If it doesn't come
+  back to the mark, type how many turns it made under **It made (turns)** (a quarter past is 1.25, a
+  quarter short 0.75) and click **Correct**. Turning outside a job uses the machine's conveyor feed,
+  which has its own scale, so this check matters even when jobs already turn the right amount.
+- **Let the motor go** lets the motor go limp, so you can turn the object by hand.
 
 The rotary has no home: each job starts wherever the object is, and turns it back to there at the
 end. A job that is stopped part way (Stop, or a long press on the machine's button) skips that, so
@@ -73,10 +81,10 @@ the object is left turned and the next job starts in the wrong place. When a rot
 PhotonCanvas is stopped, the program works out how far the object had turned. It uses the
 machine's own progress when it reports one, and the time otherwise. It then shows a **Rotary 85°**
 chip (with the angle) in the job bar, and **Return rotary to start** in the Turn the rotary box.
-Click it to turn the object back with a laser-off job, or click **It's already back** if you turned
-it by hand. The angle is worked out, not measured, so it can be a little out. A pencil line across the
-chuck and the object shows what's left, and **Turn by (°)** takes up the rest. If you stop again
-before turning back, the turns add up. The program only knows while it's open and connected.
+Click it to turn the object back, or click **It's already back** if you turned it by hand. The angle
+is worked out, not measured, so it can be a little out. A pencil line across the chuck and the
+object shows what's left, and **Turn by (°)** takes up the rest. If you stop again before turning
+back, the turns add up. The program only knows while it's open and connected.
 
 #### Your own rotary
 

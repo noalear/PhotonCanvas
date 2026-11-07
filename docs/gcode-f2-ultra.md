@@ -159,7 +159,7 @@ Both swap one galvo axis for the mechanical **U** axis; the machine coordinates 
 - **Z moves** leave and re-enter U mode: `G101`, the usual Z block, `G100`.
 - `description.json`: `mode` `LASER_CYLINDER` / `CONVEYOR_EXTENSION`, `axis` `U`.
 - Framing with an attachment only traces the galvo's own direction (a thin box mid-field).
-- **Turning the rotary on its own**: the F2 Ultra ignores `G0 U…` sent from the console outside a job (seen 2026-11-07), and U starts from 0 at each job. So a turn is its own laser-off job, uploaded with `autoStart: 1`: the usual header and rotary head, one `G0U<mm>`, then the tail **without** `G0 U0` (that would turn it straight back). PhotonCanvas uses this to turn the object back after a stopped job (the stopped job's tail never ran). Not yet run on a machine.
+- **Turning the rotary on its own**: `G0 U…` sent from the console outside a job does nothing. What works (Kyle's F2 Ultra, 2026-11-07) is the conveyor feed request `PUT /v1/peripheral/param?type=conveyor`: `{action:"lock"}` first (the motor holds; without it nothing moves), then `{action:"goto", u, speed}` turns it **by** u each time (not to a position: a second `goto 5` turns again, `goto 0` does nothing), `"stop"`, `"free"` (limp). `type=rotary` is refused ("invalid type"). u is in the feed's units: 5 turned a 32-units-a-turn chuck about 45°, so the machine seems to scale the feed by its belt factor (≈ 0.746). PhotonCanvas turns this way and corrects the scale from a one-turn check; if refused, it falls back to a laser-off job uploaded with `autoStart: 1` (header, rotary head, one `G0U<mm>`, the tail without `G0 U0`).
 
 ## Still to capture
 

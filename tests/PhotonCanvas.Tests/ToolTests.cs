@@ -379,6 +379,30 @@ public class RotaryReturnTests
     }
 
     [Fact]
+    public void TurningStraightAwayIsScaledFromTheMotorUnits()
+    {
+        // Until checked: 1 ÷ the conveyor factor (the machine scales the feed by it).
+        var s = new AppSettings { ConveyorUMultiple = 0.74592 };
+        Assert.Equal(1 / 0.74592, RotaryReturn.NowScale(s), 9);
+        // Kyle's chuck: 32 units a turn. A quarter turn is 8 motor units; reversed, the other way.
+        var chuck = new WorkMode.Rotary(32 / 100.0, 1, 100);
+        Assert.Equal(32, RotaryReturn.UnitsPerTurn(chuck, 100), 9);
+        Assert.Equal(8, RotaryReturn.UnitsFor(90, chuck, 100), 9);
+        Assert.Equal(-8, RotaryReturn.UnitsFor(90, chuck with { Direction = -1 }, 100), 9);
+        // 5 of the feed's units at the assumed scale: about 42° on that chuck (Kyle saw 40–50°).
+        Assert.InRange(5 / RotaryReturn.NowScale(s) / 32 * 360, 40, 45);
+        // A one-turn check that made 1.25 turns: the scale comes down to match.
+        Assert.Equal(RotaryReturn.NowScale(s) / 1.25, RotaryReturn.CorrectedNowScale(s, 1, 1.25), 9);
+        s.RotaryNowScale = 1.1;
+        Assert.Equal(1.1, RotaryReturn.NowScale(s));
+        // Turning back what a stopped job left: the left-over U × that job's scale, the other way.
+        s.RotaryLeftU = 10; s.RotaryLeftScale = 0.32;
+        Assert.Equal(-3.2, RotaryReturn.UnitsBack(s), 9);
+        s.RotaryLeftU = null;
+        Assert.Equal(0, RotaryReturn.UnitsBack(s));
+    }
+
+    [Fact]
     public void LeftOverTurnsAddUpInTheFirstJobsScale()
     {
         var s = new AppSettings();
