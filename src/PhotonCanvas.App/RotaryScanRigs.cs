@@ -1,0 +1,85 @@
+using PhotonCanvas.Core;
+using PhotonCanvas.Core.Camera;
+using PhotonCanvas.Device;
+using PhotonCanvas.Doc;
+
+namespace PhotonCanvas.App;
+
+/// <summary>
+/// Turning the rotary for a scan: straight away (the conveyor feed request, the motor held first), then waiting long
+/// enough for the turn to finish, since the machine doesn't say when it has.
+/// </summary>
+abstract class RotaryScanRigBase(AppSettings settings, MachinePanel machine, double settleS) : IRotaryScanRig
+{
+    /// <summary>The speed turns are asked for (the feed's units a minute), as Work mode's turns.</summary>
+    const double Speed = 1200;
+
+    protected MachinePanel Machine => machine;
+
+    public async Task TurnAsync(double degrees, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        double u = await RotaryTurn.FeedUnitsAsync(settings, machine, degrees)
+            ?? throw new InvalidOperationException("Choose the rotary in Work mode first.");
+        if (!double.IsFinite(u) || Math.Abs(u) > Job.MaxTurnMm)
+            throw new InvalidOperationException("That turn is far too long: check the rotary's scale in Work mode.");
+        // Still in focus mode after measuring: back to idle first, as the stock app does when it leaves it.
+        if (machine.Mode is "P_AUTOFOCUS" or "P_MEASURE" && machine.Client is { } c) await c.ReturnToIdleAsync();
+        await machine.TurnRotaryNowAsync(u, Speed);
+        // How long the turn takes at that speed, plus time for the part to stop swinging.
+        double s = Math.Abs(u) / (Speed / 60) * 1.15 + Math.Max(0, settleS);
+        await Task.Delay(TimeSpan.FromSeconds(s), ct);
+    }
+
+    public abstract Task<double?[]> MeasureAsync(IReadOnlyList<double> xs, IReadOnlyList<double?> guesses, CancellationToken ct);
+}
+
+/// <summary>
+/// Measuring along the laser line with the red pointer and the close-up camera (calibrated once on a flat board).
+/// Each head height reads the surface within about 8 mm of it, so places it can't read are tried again from
+/// other heights, starting near what the last angle read there.
+/// </summary>
+sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double settleS, SurfaceProbe probe, PointerCalibration cal,
+    double lineY, double startFocus, IProgress<string> progress) : RotaryScanRigBase(settings, machine, settleS)
+{
+    /// <summary>How far from the head's focus the calibration reads (mm either way).</summary>
+    readonly double _reach = cal.Depths.Count == 0 ? 8 : Math.Min(Math.Abs(cal.Depths.Min()), Math.Abs(cal.Depths.Max()));
+    double _focus = startFocus;
+
+    public override async Task<double?[]> MeasureAsync(IReadOnlyList<double> xs, IReadOnlyList<double?> guesses, CancellationToken ct)
+    {
+        var got = new double?[xs.Count];
+        var tried = new List<double>();
+        double hi = DeviceClient.MaxHeadZ - MachineProfile.F2Ultra.ZOffset;
+        while (true)
+        {
+            var pending = Enumerable.Range(0, xs.Count).Where(i => got[i] is null).ToList();
+            if (pending.Count == 0) break;
+            if (RotaryScanner.NextFocus([.. pending.Select(i => guesses[i])], tried, _focus, _reach, 0, hi) is not { } f) break;
+            tried.Add(f);
+            var aims = pending.Select(i => new Vec2(xs[i], lineY)).ToList();
+            var h = await probe.ReadAtAsync(aims, f, cal, progress, ct);
+            for (int k = 0; k < pending.Count; k++) got[pending[k]] = h[k];
+        }
+        // Start the next angle from the middle of what was read here.
+        var read = got.OfType<double>().Order().ToList();
+        if (read.Count > 0) _focus = read[read.Count / 2];
+        return got;
+    }
+}
+
+/// <summary>
+/// Measuring with the machine's own auto-focus: one reading an angle, wherever the machine measures (the middle of
+/// the field). The head moves to the part's height each time.
+/// </summary>
+sealed class AutoFocusScanRig(AppSettings settings, MachinePanel machine, double settleS) : RotaryScanRigBase(settings, machine, settleS)
+{
+    public override async Task<double?[]> MeasureAsync(IReadOnlyList<double> xs, IReadOnlyList<double?> guesses, CancellationToken ct)
+    {
+        if (Machine.Client is not { IsConnected: true } c) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        double z = await c.AutoFocusAsync(cancellationToken: ct);
+        var o = new double?[xs.Count];
+        o[0] = z - MachineProfile.F2Ultra.ZOffset;
+        return o;
+    }
+}

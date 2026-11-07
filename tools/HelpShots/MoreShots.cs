@@ -40,6 +40,30 @@ static class MoreShots
             settle(600);
         }
 
+        // --- Scan the part: a lumpy glued stack in the rotary, as if scanned with the pointer over a whole turn.
+        {
+            var angles = Enumerable.Range(0, 24).Select(i => i * 15.0).ToArray();
+            var xs = PhotonCanvas.Core.RotaryScanPlan.Places(90, 130, 9);
+            var heights = angles.Select(a => xs.Select(x =>
+            {
+                double t = a * Math.PI / 180, along = (x - 110) / 20;
+                double r = 14 + 2.5 * Math.Cos(t - 1.2) + 1.2 * Math.Cos(3 * t + along) - 3 * along * along;
+                return (double?)(30 + r);
+            }).ToArray()).ToArray();
+            heights[7][8] = null; heights[8][8] = null; // a couple the camera missed
+            var scan = new PhotonCanvas.Core.RotaryScan { AnglesDeg = angles, Xs = xs, Heights = heights, LineY = 110, Method = "pointer", When = new DateTimeOffset(2026, 11, 7, 10, 30, 0, TimeSpan.Zero) };
+            Directory.CreateDirectory(PhotonCanvas.Core.AppIdentity.DataDir);
+            File.WriteAllText(Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "rotary-scan.json"), scan.ToJson());
+            settings.RotaryAxisHeightMm = 30;
+            var scanWin = new RotaryScanWindow(doc, settings, F<MachinePanel>(w, "_machine"));
+            scanWin.Show(w);
+            for (int i = 0; i < 10; i++) settle(100);
+            save(scanWin.CaptureRenderedFrame(), "window-rotary-scan", "Scan the part: the stock model of a glued stack, and one place along it end-on");
+            scanWin.Close();
+            settings.RotaryAxisHeightMm = null;
+            File.Delete(Path.Combine(PhotonCanvas.Core.AppIdentity.DataDir, "rotary-scan.json"));
+        }
+
         // --- 3D models, made here: a chess pawn, a vase and an egg, in a models folder for the browser.
         var models = @"C:\3D models";
         bool ownFolder = !Directory.Exists(models);
