@@ -10,8 +10,24 @@ namespace PhotonCanvas.App;
 /// to hold, then turned, the way xTool Studio's conveyor feed buttons work). If the machine refuses
 /// that, a tiny laser-off job that starts as soon as it arrives (after the user confirms).
 /// </summary>
-static class RotaryTurn
+public static class RotaryTurn
 {
+    /// <summary>
+    /// Turn the object <paramref name="degrees"/> straight away (+ the way a design runs down the page), with the rotary
+    /// as set in Work mode, as Work mode's Turn by does. False if it isn't turning (the person has been told why).
+    /// </summary>
+    public static async Task<bool> TurnDegreesAsync(Window owner, AppSettings settings, MachinePanel machine, double degrees, string what)
+    {
+        if (WorkModes.From(settings) is not WorkMode.Rotary mode)
+        {
+            await Dialogs.Message(owner, "Not on the rotary", "Choose the rotary in Laser → Work mode first.");
+            return false;
+        }
+        if (Math.Abs(degrees) < 0.05) return true;
+        double circ = Math.PI * Math.Max(1, settings.RotaryDiameterMm);
+        return await TurnAsync(owner, settings, machine, RotaryReturn.UnitsFor(degrees, mode, circ), mode, RotaryReturn.UFor(degrees, mode, circ), what);
+    }
+
     /// <summary>
     /// Turn the rotary by <paramref name="motorUnits"/> (a job's U × its scale). <paramref name="mode"/> and
     /// <paramref name="jobU"/> are the same turn as a job, for when turning straight away is refused.

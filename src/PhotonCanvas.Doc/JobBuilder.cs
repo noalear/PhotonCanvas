@@ -38,6 +38,12 @@ public sealed record JobOptions
     public Guid? OnlyLayer { get; init; }
     /// <summary>Spread the heat across layers and objects; null = as the design says (<see cref="DocState.Spread"/>).</summary>
     public SpreadHeat? Spread { get; init; }
+    /// <summary>
+    /// How far the focus may move either way (mm); null = the work mode's own (<see cref="Job.FocusLimitMm"/>). Set for a
+    /// part held up in the rotary and cut on the flat bed (profile cuts), where the cut goes down through the part.
+    /// At most <see cref="Job.MaxRotaryFocusOffsetMm"/>.
+    /// </summary>
+    public double? FocusLimitMm { get; init; }
 }
 
 /// <summary>One section of a design bigger than the work area.</summary>
@@ -269,7 +275,7 @@ public static class JobBuilder
             try
             {
                 layer.Laser.Validate(opt.Machine, layer.Reflective);
-                ValidateExtras(layer, Job.FocusLimitMm(opt.Mode));
+                ValidateExtras(layer, Job.FocusLimitFor(opt.Mode, opt.FocusLimitMm));
                 if (layer.Mode == LayerMode.Image && layer.ImageMode == ImageEngraveMode.Slices && layer.Slices.CleanupEvery > 0)
                 {
                     try { CleanupLaser(layer).Validate(opt.Machine, layer.Reflective); }
@@ -713,6 +719,7 @@ public static class JobBuilder
             PassMode = opt.WholeJobPasses ? new PassMode.Rounds(opt.PassDelayS) : new PassMode.PerBlock(),
             Created = (now ?? DateTimeOffset.Now).ToString("yyyy_MM_dd_HH_mm_ss"),
             Mode = mode,
+            FocusLimitOverrideMm = opt.FocusLimitMm,
             FanGear = opt.FanGear,
             PurifierSpeed = opt.PurifierSpeed,
             SurfaceHeight = surface is null ? null : surface.HeightAt,

@@ -455,6 +455,18 @@ public sealed class Job
     /// <summary>Furthest the focus may move either way in this job's work mode (mm).</summary>
     public static double FocusLimitMm(WorkMode mode) => mode is WorkMode.Rotary ? MaxRotaryFocusOffsetMm : MaxFocusOffsetMm;
 
+    /// <summary>The limit for a job: <paramref name="overrideMm"/> when set (never past the rotary's), else the work mode's.</summary>
+    public static double FocusLimitFor(WorkMode mode, double? overrideMm) =>
+        overrideMm is { } o && double.IsFinite(o) && o > 0 ? Math.Min(o, MaxRotaryFocusOffsetMm) : FocusLimitMm(mode);
+
+    /// <summary>
+    /// A wider focus limit for this job (mm, null = the work mode's): a part held up in the rotary and cut on the
+    /// flat, the cut going down through it. Never past <see cref="MaxRotaryFocusOffsetMm"/>.
+    /// </summary>
+    public double? FocusLimitOverrideMm { get; init; }
+
+    double FocusLimit => FocusLimitFor(Mode, FocusLimitOverrideMm);
+
     public MachineProfile Machine { get; }
     public IReadOnlyList<Block> Blocks { get; }
     public PassMode PassMode { get; init; } = new PassMode.PerBlock();
@@ -542,8 +554,8 @@ public sealed class Job
             var block = Blocks[i];
             block.Laser.Validate(Machine);
             var ctx = $" (item {i + 1})";
-            if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > FocusLimitMm(Mode) + 1e-9)
-                throw new JobException($"The focus can move at most {FocusLimitMm(Mode):0} mm either way{(Mode is WorkMode.Rotary ? " on the rotary" : "")} (asked for {block.FocusOffsetMm:0.##} mm).");
+            if (!double.IsFinite(block.FocusOffsetMm) || Math.Abs(block.FocusOffsetMm) > FocusLimit + 1e-9)
+                throw new JobException($"The focus can move at most {FocusLimit:0} mm either way{(Mode is WorkMode.Rotary ? " on the rotary" : "")} (asked for {block.FocusOffsetMm:0.##} mm).");
             foreach (var z in HeadHeights(block))
                 if (!double.IsFinite(z) || z < MinHeadZ - 1e-9 || z > MaxHeadZ + 1e-9)
                     throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");

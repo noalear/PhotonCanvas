@@ -61,6 +61,8 @@ public sealed class StockCarveWindow : Window
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
     readonly Button _make = new() { Content = "Put the engraving in the design", Classes = { "primary" }, MinWidth = 200 };
+    readonly Button _profile = UiKit.Button("Profile cuts first…", tip: "Takes the bulk of the waste off first: the part turned to each view (top, side, the 45s, the 22.5s) and cut straight down through round the model's outline, the camera checking each cut went through.");
+    ProfileCutWindow? _profileWindow;
     readonly DispatcherTimer _debounce = new() { Interval = TimeSpan.FromMilliseconds(150) };
 
     static NumericUpDown Angle() => Number(-360, 360, 5, "0.#");
@@ -143,13 +145,15 @@ public sealed class StockCarveWindow : Window
         Grid.SetRow(sumScroll, 1);
         right.Children.Add(sumScroll);
 
-        var bottom = new Grid { ColumnDefinitions = new("*,Auto,Auto"), Margin = new Thickness(14, 8, 14, 14), ColumnSpacing = 12 };
+        var bottom = new Grid { ColumnDefinitions = new("*,Auto,Auto,Auto"), Margin = new Thickness(14, 8, 14, 14), ColumnSpacing = 12 };
         bottom.Children.Add(_status);
-        Grid.SetColumn(_make, 1);
+        Grid.SetColumn(_profile, 1);
+        bottom.Children.Add(_profile);
+        Grid.SetColumn(_make, 2);
         bottom.Children.Add(_make);
         var close = new Button { Content = "Close", IsCancel = true, MinWidth = 100 };
         close.Click += (_, _) => Close();
-        Grid.SetColumn(close, 2);
+        Grid.SetColumn(close, 3);
         bottom.Children.Add(close);
 
         var body = new Grid { ColumnDefinitions = new("Auto,*"), RowDefinitions = new("*,Auto") };
@@ -170,7 +174,8 @@ public sealed class StockCarveWindow : Window
         _with.SelectionChanged += (_, _) => { if (Etch() is { R.EtchMmPerPass: { } e }) _pass.Value = (decimal)e; Save(); };
         _fit.Click += async (_, _) => await BestFit();
         _make.Click += async (_, _) => await Make();
-        Closed += (_, _) => { _work?.Cancel(); Save(); };
+        _profile.Click += (_, _) => OpenProfileCuts();
+        Closed += (_, _) => { _work?.Cancel(); _profileWindow?.Close(); Save(); };
 
         Load();
     }
@@ -288,7 +293,23 @@ public sealed class StockCarveWindow : Window
         _view.Show(_stock, _placed, _report?.StickOut, message);
         _summary.Text = Summary();
         _make.IsEnabled = _stock is not null && _model is not null;
-        _fit.IsEnabled = _make.IsEnabled;
+        _fit.IsEnabled = _profile.IsEnabled = _make.IsEnabled;
+    }
+
+    /// <summary>The profile cuts for the model where it's placed now, in the stock as it is now.</summary>
+    void OpenProfileCuts()
+    {
+        if (_stock is not { } stock || _model is not { } model) return;
+        if (_profileWindow is { } w) { w.Activate(); return; }
+        if (!stock.WholeTurn)
+        {
+            _status.Text = "Profile cuts need the stock all the way round: scan a whole turn, or pick the standard bar it is.";
+            return;
+        }
+        var p = Placement();
+        _profileWindow = new ProfileCutWindow(_host, stock, model.Placed(p), p, _modelFile, (rest, note) => SetStock(rest, null, note));
+        _profileWindow.Closed += (_, _) => _profileWindow = null;
+        _profileWindow.Show(this);
     }
 
     string Summary()
