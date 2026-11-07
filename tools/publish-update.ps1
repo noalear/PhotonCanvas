@@ -2,7 +2,8 @@
 # the latest master and put it up as a GitHub release, which PhotonCanvas finds and puts in by itself
 # (Settings > Updates). The same release the Release workflow (.github/workflows/release.yml) makes.
 #
-#   Double-click "Publish update.cmd" in the project folder, or:
+#   Double-click "Publish update.cmd" (in the project folder; a copy anywhere else works too: it
+#   finds the project in %USERPROFILE%\YTool Studio, and always runs this script as it is on master), or:
 #   tools/publish-update.ps1            # build master and publish it, if it isn't published yet
 #   tools/publish-update.ps1 -Force     # publish it again under a new number even if it is
 #   tools/publish-update.ps1 -DryRun    # build it and show what would go up, publish nothing
@@ -13,6 +14,7 @@
 # .NET 10 SDK. To publish it needs a GitHub key that can write releases: the GitHub CLI's if it's
 # signed in, otherwise it asks for one once and keeps it, encrypted for your Windows account.
 #
+# -ProjectDir: the project's git folder (default: the one this script is in). -ApiUrl: for tests.
 # Kept to plain ASCII: Windows PowerShell 5.1 reads a script without a BOM as ANSI.
 [CmdletBinding()]
 param(
@@ -21,7 +23,9 @@ param(
     [string]$Repo = $(if ($env:RELEASE_REPO) { $env:RELEASE_REPO } else { 'noalear/PhotonCanvas' }),
     [string]$Branch = 'master',
     [string]$Platforms = 'win-x64',
-    [string]$WorkDir
+    [string]$WorkDir,
+    [string]$ProjectDir,
+    [string]$ApiUrl = 'https://api.github.com'
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'   # Windows PowerShell's progress bar slows uploads to a crawl
@@ -29,7 +33,7 @@ try { [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::S
 
 $OnWindows = $env:OS -eq 'Windows_NT'
 $Arrow = [string][char]0x2192
-$Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+$Root = if ($ProjectDir) { (Resolve-Path $ProjectDir).Path } else { (Resolve-Path (Join-Path $PSScriptRoot '..')).Path }
 if (-not $WorkDir) {
     $base = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { Join-Path $HOME '.cache' }
     $WorkDir = Join-Path $base 'PhotonCanvas-publish'
@@ -52,7 +56,7 @@ function Run-Program([string]$exe, [string[]]$arguments, [switch]$Quiet) {
     @($out | ForEach-Object { "$_" })
 }
 
-function Git {
+function Run-Git {
     $out = Run-Program git $args
     if ($LASTEXITCODE -ne 0) { Stop-With "git $($args -join ' ') failed (above)." }
     $out
@@ -72,7 +76,7 @@ function Find-Gh {
 function Read-SavedKey {
     if (-not (Test-Path $KeyFile)) { return $null }
     try {
-        $secure = Get-Content $KeyFile -Raw | ConvertTo-SecureString
+        $secure = (Get-Content $KeyFile -Raw).Trim() | ConvertTo-SecureString
         [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure))
     } catch { $null }
 }
@@ -108,7 +112,7 @@ function Get-Key {
     if ($saved) { return @{ Key = $saved; From = 'saved' } }
     $gh = Find-Gh
     if ($gh) {
-        $t = Run-Program $gh @('auth', 'token') -Quiet
+        $t = @(Run-Program $gh @('auth', 'token') -Quiet)
         if ($LASTEXITCODE -eq 0 -and $t.Count -gt 0 -and $t[0].Trim()) { return @{ Key = $t[0].Trim(); From = 'gh' } }
     }
     @{ Key = (Ask-ForKey); From = 'new' }
@@ -141,23 +145,23 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Stop-With 'Git isn''
 if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) { Stop-With 'The .NET SDK isn''t installed (https://dotnet.microsoft.com/download/dotnet/10.0).' }
 
 Step "Getting the latest $Branch"
-Git -C $Root fetch --quiet --force --tags origin $Branch | Out-Null
+Run-Git -C $Root fetch --quiet --force --tags origin $Branch | Out-Null
 if (-not (Test-Path (Join-Path $BuildDir '.git'))) {
     if (Test-Path $BuildDir) { Remove-Item -Recurse -Force $BuildDir }
     New-Item -ItemType Directory -Force -Path $WorkDir | Out-Null
-    Git -C $Root worktree prune | Out-Null
-    Git -C $Root worktree add --quiet --detach $BuildDir "origin/$Branch" | Out-Null
+    Run-Git -C $Root worktree prune | Out-Null
+    Run-Git -C $Root worktree add --quiet --detach $BuildDir "origin/$Branch" | Out-Null
 } else {
-    Git -C $BuildDir checkout --quiet --force --detach "origin/$Branch" | Out-Null
+    Run-Git -C $BuildDir checkout --quiet --force --detach "origin/$Branch" | Out-Null
 }
 # Builds from before stay (they make the next one quicker); the last one's output doesn't.
 $dist = Join-Path $BuildDir 'dist'
 if (Test-Path $dist) { Remove-Item -Recurse -Force $dist }
-$sha = (Git -C $BuildDir rev-parse HEAD | Select-Object -First 1).Trim()
-$subject = (Git -C $BuildDir log -1 --format=%s | Select-Object -First 1)
+$sha = (Run-Git -C $BuildDir rev-parse HEAD | Select-Object -First 1).Trim()
+$subject = (Run-Git -C $BuildDir log -1 --format=%s | Select-Object -First 1)
 Say "Latest: $($sha.Substring(0, 9)) $subject"
 
-$already = @(Git -C $BuildDir tag --points-at HEAD --list 'v*') | Where-Object { $_ }
+$already = @(@(Run-Git -C $BuildDir tag --points-at HEAD --list 'v*') | Where-Object { $_ })
 if ($already.Count -gt 0 -and -not $Force) {
     Say ''
     Say "That's already published, as $($already[0]). Nothing new to publish."
@@ -170,7 +174,7 @@ $props = Get-Content (Join-Path $BuildDir 'Directory.Build.props') -Raw
 $m = [regex]::Match($props, '<Version>(\d+)\.(\d+)\.\d+</Version>')
 $majorMinor = if ($m.Success) { "$($m.Groups[1].Value).$($m.Groups[2].Value)" } else { '0.1' }
 $highest = 0
-foreach ($t in @(Git -C $BuildDir tag --list "v$majorMinor.*")) {
+foreach ($t in @(Run-Git -C $BuildDir tag --list "v$majorMinor.*")) {
     $n = 0
     if ([int]::TryParse(("$t".Trim()).Substring($majorMinor.Length + 2), [ref]$n) -and $n -gt $highest) { $highest = $n }
 }
@@ -182,7 +186,7 @@ $script:Key = $null
 if (-not $DryRun) {
     $k = Get-Key
     $script:Key = $k.Key
-    try { Api GET "https://api.github.com/repos/$Repo" | Out-Null }
+    try { Api GET "$ApiUrl/repos/$Repo" | Out-Null }
     catch {
         if ($k.From -eq 'saved') { Remove-Item -Force $KeyFile }
         Stop-With "GitHub didn't accept the key for $Repo ($(Status-Of $_)). Run it again to give a new one."
@@ -221,9 +225,10 @@ $sumsPath = Join-Path $dist 'SHA256SUMS'
 $files += Get-Item $sumsPath
 
 # What's new: the changes since the last release.
-$last = Run-Program git @('-C', $BuildDir, 'describe', '--tags', '--match', 'v*', '--abbrev=0', 'HEAD') -Quiet
+$last = @(Run-Program git @('-C', $BuildDir, 'describe', '--tags', '--match', 'v*', '--abbrev=0', 'HEAD') -Quiet)
 $range = if ($LASTEXITCODE -eq 0 -and $last.Count -gt 0) { "$($last[0].Trim())..HEAD" } else { 'HEAD' }
-$changes = @(Git -C $BuildDir log --no-merges '--format=- %s' $range) | Select-Object -First 60
+$changes = @(@(Run-Git -C $BuildDir log --no-merges '--format=- %s' $range) | Select-Object -First 60)
+if ($changes.Count -eq 0) { $changes = @('- The same as the last version, built again.') }
 $notes = (@("What's new in ${Version}:", '') + $changes + @('',
     "PhotonCanvas downloads this version by itself and puts it in when you close it (Settings $Arrow Updates). To install it by hand, unpack the file for your computer in place of the old one: your designs, settings and material library are kept in your PhotonCanvas folder, not with the program.",
     '',
@@ -242,7 +247,7 @@ if ($DryRun) {
 Step "Publishing v$Version"
 # A draft first, so nobody's copy sees the release until every file is up.
 try {
-    $release = Api POST "https://api.github.com/repos/$Repo/releases" @{
+    $release = Api POST "$ApiUrl/repos/$Repo/releases" @{
         tag_name = "v$Version"; target_commitish = $sha; name = "PhotonCanvas $Version"; body = $notes; draft = $true }
 } catch {
     $code = Status-Of $_
@@ -259,13 +264,13 @@ try {
         $type = if ($f.Name -like '*.zip') { 'application/zip' } elseif ($f.Name -like '*.gz') { 'application/gzip' } else { 'text/plain' }
         Api POST "${uploads}?name=$([Uri]::EscapeDataString($f.Name))" $null $f.FullName $type | Out-Null
     }
-    $done = Api PATCH "https://api.github.com/repos/$Repo/releases/$($release.id)" @{ draft = $false; make_latest = 'true' }
+    $done = Api PATCH "$ApiUrl/repos/$Repo/releases/$($release.id)" @{ draft = $false; make_latest = 'true' }
 } catch {
     $why = $_.Exception.Message
-    try { Api DELETE "https://api.github.com/repos/$Repo/releases/$($release.id)" | Out-Null } catch { }
+    try { Api DELETE "$ApiUrl/repos/$Repo/releases/$($release.id)" | Out-Null } catch { }
     Stop-With "The upload failed, so nothing was published: $why"
 }
-Git -C $Root fetch --quiet --tags origin | Out-Null
+Run-Git -C $Root fetch --quiet --tags origin | Out-Null
 
 Write-Host ''
 Write-Host "Published PhotonCanvas $Version" -ForegroundColor Green
