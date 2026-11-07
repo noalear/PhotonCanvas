@@ -48,6 +48,7 @@ public static class DocFile
                 ["visible"] = l.Visible,
                 ["locked"] = l.Locked,
                 ["output"] = l.Output,
+                ["mask"] = l.Mask ? true : null,
                 ["mode"] = l.Mode.ToString().ToLowerInvariant(),
                 ["laser"] = new JsonObject
                 {
@@ -305,6 +306,7 @@ public static class DocFile
                     Visible = n["visible"]?.GetValue<bool>() ?? true,
                     Locked = n["locked"]?.GetValue<bool>() ?? false,
                     Output = n["output"]?.GetValue<bool>() ?? true,
+                    Mask = n["mask"]?.GetValue<bool>() ?? false,
                     Mode = Enum.TryParse<LayerMode>(n["mode"]?.GetValue<string>(), true, out var m) ? m : LayerMode.Cut,
                     Laser = laser,
                     LinesPerCm = n["linesPerCm"]?.GetValue<double>() ?? 100,

@@ -70,6 +70,7 @@ one page, with only the first key of a command that has more than one.
 | Tidy lines… | — |
 | Copy along a path… | — |
 | Use as material outline | — |
+| Put on the mask layer (never burned) | — |
 | Lock | `Ctrl+Alt+L` |
 | Unlock all | `Ctrl+Alt+Shift+L` |
 | Fit to piece in camera… | `Ctrl+Shift+F` |

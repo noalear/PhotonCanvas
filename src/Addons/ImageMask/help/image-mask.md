@@ -20,8 +20,10 @@ circle, a heart, a frame. The picture itself isn't changed.
   when its rows are turned to an angle (**Split onto pieces** relies on this).
 - Pictures are always drawn under lines and shapes, so the outline you line a picture up with stays
   in sight.
-- The shape itself stays, as a guide. Delete it, or turn its layer's output off, if it shouldn't be
-  marked.
+- The shape moves to the **Mask (never burned)** layer (made the first time), so it stays on the
+  work area as a guide but is never cut or marked, even if it was drawn on a cut layer. To cut round
+  the picture as well, duplicate the shape and move the copy to a cut layer. See
+  [The mask layer](layers.md#the-mask-layer).
 - The picture's own engraving (dots or depth slices) and **Engraving** lines follow the mask.
   **Trace**, **Centre-line trace**, **Colour on metal**, **Diffraction**, **Depthmap** and **CMYK
   split** use the whole picture.

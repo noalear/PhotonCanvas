@@ -39,8 +39,13 @@ public sealed class ImageMaskAddon : IAddon
             return;
         }
         if (pic is null || outline is null) { _host.Status("Select a picture and the closed shape to mask it with."); return; }
-        doc.Commit("Image mask", Ops.Replace(doc.State, pic.WithClip(new PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed)))), [pic.Id]);
-        _host.Status("Image mask: only the part inside the shape is shown and engraved. The shape is still there (delete it or turn its layer's output off if it shouldn't be marked).");
+        // The shape has done its job: it goes onto the mask layer, kept as a guide but never cut or marked.
+        var state = Ops.Replace(doc.State, pic.WithClip(new PathGeometry(outline.World.Subpaths.Where(sp => sp.Closed))));
+        bool moved = MaskLayer.Layer(state) is not { } ml || outline.LayerId != ml.Id;
+        doc.Commit("Image mask", MaskLayer.Mark(state, new HashSet<Guid> { outline.Id }), [pic.Id]);
+        _host.Status(moved
+            ? $"Image mask: only the part inside the shape is shown and engraved. The shape moved to the \"{MaskLayer.LayerName}\" layer, so it's never cut or marked (to cut along it too, duplicate it and move the copy to a cut layer)."
+            : "Image mask: only the part inside the shape is shown and engraved.");
     }
 
     void Unmask()

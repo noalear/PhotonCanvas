@@ -173,7 +173,9 @@ public sealed class LayersPanel : UserControl
         bool active = l.Id == _doc.ActiveLayer;
         bool selected = _selected.Contains(l.Id);
         var colour = Color.FromRgb((byte)(l.Color >> 16), (byte)(l.Color >> 8), (byte)l.Color);
-        bool live = l.Output && l.Visible;
+        // The mask layer (and any sub-layer of it) is never sent, whatever its switch says.
+        bool mask = MaskLayer.IsMask(_doc.State, l);
+        bool live = l.Output && l.Visible && !mask;
 
         var bar = new Border
         {
@@ -231,8 +233,10 @@ public sealed class LayersPanel : UserControl
         eye.Click += (_, _) => ToggleOn(l, x => x with { Visible = !x.Visible }, l.Visible ? "Hide layer" : "Show layer");
         var lck = Toggle(l.Locked ? "IcLock" : "IcUnlock", !l.Locked, l.Locked ? "Unlock" : "Lock (can't select or move its shapes)");
         lck.Click += (_, _) => ToggleOn(l, x => x with { Locked = !x.Locked }, l.Locked ? "Unlock layer" : "Lock layer");
-        var outp = Toggle("IcBolt", l.Output, l.Output ? "Output on: this layer is sent to the laser" : "Output off: shown as a guide, never sent");
-        outp.Click += (_, _) => ToggleOn(l, x => x with { Output = !x.Output }, l.Output ? "Disable layer output" : "Enable layer output");
+        var outp = mask
+            ? Toggle("IcBolt", false, "The mask layer: never sent to the laser, and its output can't be turned on. Move a shape to another layer to burn it.")
+            : Toggle("IcBolt", l.Output, l.Output ? "Output on: this layer is sent to the laser" : "Output off: shown as a guide, never sent");
+        if (!mask) outp.Click += (_, _) => ToggleOn(l, x => x with { Output = !x.Output }, l.Output ? "Disable layer output" : "Enable layer output");
 
         bool shapesOpen = _expanded.Contains(l.Id);
         var chevron = new Button
@@ -755,7 +759,7 @@ public sealed class LayersPanel : UserControl
                 Item($"Move selected shapes here ({sel.Count})", () => _doc.Commit("Move to layer", Ops.MoveToLayer(_doc.State, sel, l.Id)), sel.Count > 0),
                 new Separator(),
                 l.ParentId is null
-                    ? Item("Add sub-layer (another operation on these shapes)", () => AddSubLayer(l))
+                    ? Item("Add sub-layer (another operation on these shapes)", () => AddSubLayer(l), !l.Mask)
                     : Item("Make it a normal layer (with no shapes)", () => _doc.Commit("Make normal layer", Ops.UpdateLayers(_doc.State, new HashSet<Guid> { l.Id }, x => x with { ParentId = null }))),
                 Item("Copy settings", () => { _copiedSettings = Doc.Materials.ProcessSettings.From(l); }),
                 Item("Paste settings", () => { if (_copiedSettings is { } ps) _doc.Commit("Paste settings", Ops.UpdateLayers(_doc.State, _selected.Contains(l.Id) ? _selected : new HashSet<Guid> { l.Id }, x => ps.ApplyTo(x))); }, _copiedSettings is not null),
@@ -809,7 +813,7 @@ public sealed class LayersPanel : UserControl
     public void AddSubLayer(Layer parent)
     {
         var state = _doc.State;
-        if (parent.ParentId is not null) return;
+        if (parent.ParentId is not null || parent.Mask) return;
         var mode = parent.Mode switch { LayerMode.Fill => LayerMode.Score, LayerMode.Image => LayerMode.Image, _ => LayerMode.Fill };
         var used = state.Layers.Select(l => l.Color).ToHashSet();
         var layer = Layer.Default(state.Layers.Count, mode) with
