@@ -920,10 +920,11 @@ public sealed class Job
 
     /// <summary>
     /// The rotary's speed limit, in turns of the object a second. The machine's rapid (<c>G0 F180000</c>, 3 m/s) is
-    /// fine for the galvo but would spin a rotary dozens of turns a second (a homemade direct-drive chuck took off,
-    /// 2026-11-08), so on the rotary every move that turns it is held to this.
+    /// fine for the galvo but would spin a small rod about 30 turns a second (a homemade direct-drive chuck took off,
+    /// 2026-11-08), so on the rotary every move that turns it is held to this. (Half a turn a second at first;
+    /// Kyle raised it to 10, since half a turn is slow on a thin rod.)
     /// </summary>
-    public const double MaxRotaryTurnsPerS = 0.5;
+    public const double MaxRotaryTurnsPerS = 10;
 
     /// <summary>The fastest feed (mm/min round the object) that keeps the rotary within <see cref="MaxRotaryTurnsPerS"/>.</summary>
     public static long RotaryFeedCap(WorkMode.Rotary r) => Math.Max(60, (long)Math.Floor(MaxRotaryTurnsPerS * r.CircumferenceMm * 60));

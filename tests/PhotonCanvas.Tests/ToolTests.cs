@@ -335,10 +335,10 @@ public class RotaryReturnTests
         double circ = Math.PI * 32.7;
         var rot = new WorkMode.Rotary(32 / circ, 1, circ);
         long cap = Job.RotaryFeedCap(rot);
-        Assert.Equal((long)Math.Floor(0.5 * circ * 60), cap); // half a turn a second
+        Assert.Equal((long)Math.Floor(10 * circ * 60), cap); // 10 turns a second
         var s = DocState.New();
-        var cut = Layer.Default(1, LayerMode.Cut) with { Laser = LaserSettings.Blue(90, 400) };
-        var fill = Layer.Default(2, LayerMode.Fill) with { Laser = LaserSettings.Blue(30, 400) };
+        var cut = Layer.Default(1, LayerMode.Cut) with { Laser = LaserSettings.Blue(90, 1500) };
+        var fill = Layer.Default(2, LayerMode.Fill) with { Laser = LaserSettings.Blue(30, 1500) };
         s = Ops.AddLayer(Ops.AddLayer(s, cut), fill);
         s = Ops.AddShapes(s, [
             new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(20, 10, 30, 30) },
@@ -353,11 +353,42 @@ public class RotaryReturnTests
         // While U is on, no feed of any move is past the cap.
         foreach (var line in g[on..off].Where(l => l.StartsWith("G0") || l.StartsWith("G1")))
             foreach (var f in Feeds(line)) Assert.True(f <= cap, $"{line} is faster than {cap}");
-        Assert.Contains(job.Warnings, w => w.Contains("half a turn a second"));
+        Assert.Contains(job.Warnings, w => w.Contains("10 turns a second"));
         // A flat job keeps the machine's rapid and the layer's speed.
         var flat = JobBuilder.Build(s, new JobOptions()).Motion;
-        Assert.Contains("F24000", flat);
+        Assert.Contains("F90000", flat);
         Assert.DoesNotContain($"G0F{cap}", flat);
+        // A 40 mm/s cut is well under the limit and keeps its own speed.
+        var slow = Ops.UpdateLayers(s, new HashSet<Guid> { cut.Id, fill.Id }, l => l with { Laser = l.Laser with { Speed = 40 } });
+        var slowJob = JobBuilder.Build(slow, new JobOptions { Machine = M with { FieldH = Math.Round(circ, 2) }, Mode = rot });
+        Assert.Contains("F2400", slowJob.Motion);
+        Assert.DoesNotContain(slowJob.Warnings, w => w.Contains("10 turns a second"));
+    }
+
+    [Fact]
+    public void MaterialOutlinesAreNeverSentEvenThroughASubLayer()
+    {
+        // Kyle (2026-11-08) wondered if a material outline got into a rotary job. The material layer is
+        // never sent; a sub-layer of it would go over its shapes again, so that isn't sent either.
+        double circ = Math.PI * 32.7;
+        var rot = new WorkMode.Rotary(32 / circ, 1, circ);
+        var s = DocState.New();
+        var cut = Layer.Default(1, LayerMode.Cut);
+        s = Ops.AddLayer(s, cut);
+        var outline = new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(5, 5, 200, 100) };
+        var line = new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(40, 30, 10, 10) };
+        s = Ops.AddShapes(s, [outline, line]);
+        s = MaterialOutline.Mark(s, new HashSet<Guid> { outline.Id });
+        var material = MaterialOutline.Layer(s)!;
+        var under = Layer.Default(5, LayerMode.Cut) with { ParentId = material.Id, Output = true };
+        s = Ops.AddLayer(s, under);
+        Assert.True(MaterialOutline.IsUnder(s, under));
+        Assert.False(MaterialOutline.IsUnder(s, material));
+        Assert.DoesNotContain(JobBuilder.OutputLayers(s), l => l.Id == material.Id || l.Id == under.Id);
+        var job = JobBuilder.Build(s, new JobOptions { Machine = M with { FieldH = Math.Round(circ, 2) }, Mode = rot });
+        // Only the small square: nothing out at the outline's far corner (x 205).
+        Assert.DoesNotContain("X205", job.Motion);
+        Assert.True(job.Bounds.MaxX <= 50.5 && job.Bounds.MinX >= 39.5, $"{job.Bounds}");
     }
 
     [Fact]
