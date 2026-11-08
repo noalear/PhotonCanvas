@@ -13,6 +13,12 @@ public static class MaterialOutline
     /// <summary>The page's material layer, if it has one.</summary>
     public static Layer? Layer(DocState s) => s.Layers.FirstOrDefault(l => l.Name == LayerName && !l.Output);
 
+    /// <summary>
+    /// A sub-layer of the material layer: it would go over the material outlines again with its own
+    /// settings, so it's never sent either, whatever its switch says.
+    /// </summary>
+    public static bool IsUnder(DocState s, Doc.Layer l) => l.ParentId is not null && Layer(s) is { } m && s.Owner(l.Id) == m.Id;
+
     /// <summary>The page's material layer, made if it isn't there yet (grey, never sent).</summary>
     public static (DocState State, Layer Layer) Ensure(DocState s)
     {

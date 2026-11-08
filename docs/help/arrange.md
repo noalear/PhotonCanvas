@@ -82,6 +82,8 @@ is shown but never sent to the laser). **Sheet** in the Nest window then starts 
 **3D to slices** fills it too (3D models and stacked slices). A hole in the outline
 (a knot, a cut-out) is kept clear.
 
+- The Material layer can't have sub-layers (they would go over the outlines with the laser). One
+  left over from before is never sent either: its output switch is greyed out.
 - The outline must be a closed shape; text can't be one. Outlines whose box is 25 mm² or less
   (5 × 5 mm) are ignored.
 - Not yet tried on the machine with a real offcut.

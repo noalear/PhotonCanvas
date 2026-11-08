@@ -196,7 +196,7 @@ public static class JobBuilder
     }
 
     /// <summary>Layers that will be processed, in order.</summary>
-    public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible && !MaskLayer.IsMask(s, l));
+    public static IEnumerable<Layer> OutputLayers(DocState s) => s.Layers.Where(l => l.Output && l.Visible && !MaskLayer.IsMask(s, l) && !MaterialOutline.IsUnder(s, l));
 
     /// <exception cref="JobException">The job cannot be made; the message says why.</exception>
     /// <summary>What the heat order needs from a layer: its sheet, and the laser as it will cut.</summary>
@@ -669,7 +669,7 @@ public static class JobBuilder
             _ => opt.Mode,
         };
         if (mode is WorkMode.Rotary rot && blocks.Any(b => b is not DotBlock && b.Laser.FValue > Job.RotaryFeedCap(rot)))
-            warnings.Add($"On the rotary, moves that turn it are held to half a turn a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
+            warnings.Add($"On the rotary, moves that turn it are held to 10 turns a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
         if (mode is WorkMode.Conveyor)
         {
             // Lines run along the galvo's Y and step along the belt, so the belt doesn't shuttle back and forth.
