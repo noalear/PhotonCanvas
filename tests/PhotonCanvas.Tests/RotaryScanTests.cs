@@ -98,15 +98,67 @@ public class RotaryScanTests
     }
 
     [Fact]
-    public void NextFocusStartsAtTheGuessesThenStepsOutAndGivesUp()
+    public void TheHeadStepsUpThroughOneSweep()
     {
-        Assert.Equal(20, RotaryScanner.NextFocus([18, 20, 40], [], 10, 8, 0, 150));
-        // Already tried near there: step out from the start.
-        Assert.Equal(10, RotaryScanner.NextFocus([20], [20], 10, 8, 0, 150));
-        // 22 is too close to 20; −2 is clamped to the bottom of the head's travel.
-        Assert.Equal(0, RotaryScanner.NextFocus([20], [20, 10], 10, 8, 0, 150));
-        Assert.Equal(34, RotaryScanner.NextFocus([], [10, 22, 0], 10, 8, 0, 150));
-        Assert.Null(RotaryScanner.NextFocus([], [1, 2, 3, 4, 5, 6], 10, 8, 0, 150));
+        // First angle, nothing known: from well below the focused top to just above it, lowest first.
+        var first = RotaryScanner.FocusSweep([null, null], 100, 8, 0, 150);
+        Assert.Equal(first.Order(), first);
+        Assert.True(first[0] - 8 <= 100 - 40 + 0.01, $"starts at {first[0]}");
+        Assert.True(first[^1] + 8 >= 108 - 0.01, $"ends at {first[^1]}");
+        for (int i = 1; i < first.Count; i++) Assert.InRange(first[i] - first[i - 1], 8, 16); // overlapping reaches
+        // Later angles: only round what was read, in one height if it fits.
+        Assert.Equal([94], RotaryScanner.FocusSweep([90, 92, null], 100, 8, 0, 150));
+        var wide = RotaryScanner.FocusSweep([80, 120], 100, 8, 0, 150);
+        Assert.Equal(wide.Order(), wide);
+        Assert.True(wide[0] - 8 <= 76 && wide[^1] + 8 >= 124);
+        // Never more than asked, and within the head's travel.
+        var capped = RotaryScanner.FocusSweep([0, 150], 75, 8, 0, 150, maxLevels: 4);
+        Assert.Equal(4, capped.Count);
+        Assert.All(capped, l => Assert.InRange(l, 0, 150));
+        Assert.Equal([5], RotaryScanner.FocusSweep([1], 1, 8, 0, 150)); // near the bottom of the travel
+    }
+
+    /// <summary>Runs posted work on the thread pool, as itself: stands in for the UI thread's dispatcher.</summary>
+    sealed class PumpContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state) =>
+            ThreadPool.QueueUserWorkItem(_ => { SetSynchronizationContext(this); d(state); });
+    }
+
+    sealed class ContextCheckingRig(SynchronizationContext ui) : IRotaryScanRig
+    {
+        public int Wrong;
+        public async Task TurnAsync(double degrees, CancellationToken ct)
+        {
+            if (SynchronizationContext.Current != ui) Wrong++;
+            await Task.Delay(1, ct);
+        }
+
+        public async Task<double?[]> MeasureAsync(IReadOnlyList<double> xs, IReadOnlyList<double?> guesses, CancellationToken ct)
+        {
+            if (SynchronizationContext.Current != ui) Wrong++;
+            await Task.Delay(1, ct);
+            return [.. xs.Select(_ => (double?)10)];
+        }
+    }
+
+    [Fact]
+    public async Task AScanStaysOnTheCallersThread()
+    {
+        var ui = new PumpContext();
+        var rig = new ContextCheckingRig(ui);
+        var done = new TaskCompletionSource();
+        ui.Post(async _ =>
+        {
+            try
+            {
+                await RotaryScanner.RunAsync(new RotaryScanPlan(0, 360, 6, [110], 110, "pointer"), rig, null, _ => { });
+                done.SetResult();
+            }
+            catch (Exception e) { done.SetException(e); }
+        }, null);
+        await done.Task.WaitAsync(TimeSpan.FromSeconds(20));
+        Assert.Equal(0, rig.Wrong);
     }
 
     [Fact]

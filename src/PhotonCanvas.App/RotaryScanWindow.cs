@@ -289,7 +289,7 @@ public sealed class RotaryScanWindow : Window
             var cal = SurfaceProbe.LoadCalibration();
             _methodNote.Text = cal is null
                 ? "⚠ The pointer isn't calibrated yet: calibrate it once in Machine → Curved surface (a flat board), then come back."
-                : $"Focus on the top of the part first: the head starts there. It reads about {Reach(cal):0} mm either side of where it's focused and tries other heights for places it misses. " +
+                : $"Focus on the top of the part first: the head starts there. It reads about {Reach(cal):0} mm either side of where it's focused, so at each angle the head steps up from below the part to just above it, and stops once every place is read. " +
                   $"The close-up camera was calibrated over X {cal.Aims.Min(a => a.X):0}–{cal.Aims.Max(a => a.X):0} and Y {cal.Aims.Min(a => a.Y):0}–{cal.Aims.Max(a => a.Y):0} mm: places outside that may not be read.";
         }
         else
@@ -350,7 +350,7 @@ public sealed class RotaryScanWindow : Window
     {
         if (s is null || s.Read == 0) return "No scan yet.";
         var lines = new List<string>();
-        if (readings) lines.Add($"Read {s.Read} of {s.Total} points ({s.AnglesDeg.Length} angles × {s.Xs.Length} places).");
+        if (readings) lines.Add($"Read {s.Read} of {s.Total} points ({s.AnglesDeg.Length} {(s.AnglesDeg.Length == 1 ? "angle" : "angles")} × {s.Xs.Length} {(s.Xs.Length == 1 ? "place" : "places")}).");
         else
         {
             if (axis is { } ax0)

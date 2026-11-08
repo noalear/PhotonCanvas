@@ -148,8 +148,11 @@ How it measures:
   laser line and the close-up camera reads how far below the head's focus each dot lands (laser
   triangulation, the same as [Curved surface](#curved-surface)). Calibrate the pointer once first
   (**Curved surface** → **Calibrate the pointer…**), and focus on the top of the part before you scan:
-  the head starts there. Each head height reads about 8 mm either side of it, so places it misses are
-  tried again from other heights (up to six an angle), starting near what the last angle read there.
+  the head starts there. Each head height reads about 8 mm either side of it, so at each angle the head
+  steps up through a few heights, lowest first, and stops as soon as every place is read. At the first
+  angle it goes from about 40 mm below where you focused to a little above it; after that it only covers
+  the heights the last angle read (a little either side), often in one height. Places that couldn't be
+  read at the first angle don't make later angles search wider.
   Only places the close-up camera can see are read: the window says the area it was calibrated over.
 - **The machine's auto-focus**: one reading an angle, wherever the machine focuses (the middle of the
   field), but it reaches any height. Put the part's axis under the middle of the field.
