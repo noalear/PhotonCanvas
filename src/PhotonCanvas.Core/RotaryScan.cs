@@ -359,6 +359,8 @@ public static class RotaryScanner
     /// Scan with <paramref name="rig"/>. When it finishes the part is turned back to where it started (the shorter way
     /// on a whole turn). If it's stopped or fails part way it is NOT turned back (so nothing moves after Stop):
     /// <paramref name="turned"/> then says how far from the start it was left, and what was read so far comes back.
+    /// <para>Everything stays on the caller's thread (no ConfigureAwait(false)): the rig drives the window's machine panel,
+    /// which may only be touched from the UI thread ("Call from invalid thread" on Kyle's first scan).</para>
     /// </summary>
     public static async Task<RotaryScan> RunAsync(RotaryScanPlan plan, IRotaryScanRig rig, IProgress<string>? progress, Action<double> turned,
         Action<RotaryScan>? partial = null, CancellationToken ct = default)
@@ -388,12 +390,12 @@ public static class RotaryScanner
                 if (Math.Abs(move) > 1e-6)
                 {
                     progress?.Report($"Turning to {angles[i]:0.#}° ({i + 1} of {angles.Length})…");
-                    await rig.TurnAsync(move, ct).ConfigureAwait(false);
+                    await rig.TurnAsync(move, ct);
                     at = angles[i];
                     turned(at);
                 }
                 progress?.Report($"Measuring at {angles[i]:0.#}° ({i + 1} of {angles.Length})…");
-                var h = await rig.MeasureAsync(xs, guesses, ct).ConfigureAwait(false);
+                var h = await rig.MeasureAsync(xs, guesses, ct);
                 for (int x = 0; x < xs.Length && x < h.Length; x++)
                 {
                     rows[i][x] = h[x];
@@ -408,7 +410,7 @@ public static class RotaryScanner
             if (Math.Abs(back) > 1e-6)
             {
                 progress?.Report("Turning back to where it started…");
-                await rig.TurnAsync(back, ct).ConfigureAwait(false);
+                await rig.TurnAsync(back, ct);
             }
             at = 0;
             turned(0);
@@ -421,28 +423,40 @@ public static class RotaryScanner
     }
 
     /// <summary>
-    /// The next head height to measure from (the material height it focuses on) for places still unread, or null when
-    /// it's tried enough. Each height reads the surface within ±<paramref name="reach"/> of it. Tries the middle of the
-    /// guesses first, then steps out either side of <paramref name="start"/>, never close to one already tried.
+    /// The head heights (the material height it focuses on) to measure from at one angle, lowest first, so the head
+    /// only ever moves up during an angle. Each height reads the surface within ±<paramref name="reach"/> of it; the
+    /// heights overlap a little and cover what the places are expected to be (<paramref name="guesses"/>, what the last
+    /// angle read at each, a little either side). With no guesses (the first angle) it covers from well below
+    /// <paramref name="start"/> (where the head was focused, on the top of the part) to a little above it. At most
+    /// <paramref name="maxLevels"/> heights, spread out to fit if need be; all within <paramref name="lo"/>–<paramref name="hi"/>.
     /// </summary>
-    public static double? NextFocus(IReadOnlyList<double?> guesses, IReadOnlyList<double> tried, double start, double reach, double lo, double hi, int maxTries = 6)
+    public static List<double> FocusSweep(IReadOnlyList<double?> guesses, double start, double reach, double lo, double hi, int maxLevels = 6)
     {
-        if (tried.Count >= maxTries || reach <= 0 || hi < lo) return null;
-        var cands = new List<double>();
-        var g = guesses.OfType<double>().Order().ToList();
-        if (g.Count > 0) cands.Add(g[g.Count / 2]);
-        double step = reach * 1.5;
-        for (int k = 0; k <= 8; k++)
+        var levels = new List<double>();
+        if (reach <= 0 || hi < lo || maxLevels < 1) return levels;
+        var g = guesses.OfType<double>().ToList();
+        double needLo, needHi;
+        if (g.Count > 0)
         {
-            cands.Add(start + k * step);
-            if (k > 0) cands.Add(start - k * step);
+            needLo = g.Min() - reach * 0.5;
+            needHi = g.Max() + reach * 0.5;
         }
-        foreach (var c0 in cands)
+        else
         {
-            double c = Math.Clamp(c0, lo, hi);
-            if (tried.All(t => Math.Abs(t - c) > reach * 0.5)) return Math.Round(c, 2);
+            needLo = start - 5 * reach;
+            needHi = start + reach;
         }
-        return null;
+        needLo = Math.Max(lo - reach, needLo);
+        needHi = Math.Min(hi + reach, needHi);
+        double span = Math.Max(0, needHi - needLo - 2 * reach), step = 1.6 * reach;
+        int n = (int)Math.Ceiling(span / step - 1e-9) + 1;
+        if (n > maxLevels) { n = maxLevels; step = Math.Min(2 * reach, span / Math.Max(1, n - 1)); }
+        for (int i = 0; i < n; i++)
+        {
+            double l = Math.Round(Math.Clamp(needLo + reach + i * step, lo, hi), 2);
+            if (levels.Count == 0 || l - levels[^1] > reach * 0.25) levels.Add(l);
+        }
+        return levels;
     }
 }
 

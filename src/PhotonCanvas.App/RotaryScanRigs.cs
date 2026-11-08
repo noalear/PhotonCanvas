@@ -36,34 +36,33 @@ abstract class RotaryScanRigBase(AppSettings settings, MachinePanel machine, dou
 
 /// <summary>
 /// Measuring along the laser line with the red pointer and the close-up camera (calibrated once on a flat board).
-/// Each head height reads the surface within about 8 mm of it, so places it can't read are tried again from
-/// other heights, starting near what the last angle read there.
+/// Each head height reads the surface within about 8 mm of it, so at each angle the head steps up through the
+/// heights the places are expected at (what the last angle read there), lowest first, and stops once every place
+/// is read. Places that couldn't be read at the first angle (out of the camera's sight) don't widen later angles.
 /// </summary>
 sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double settleS, SurfaceProbe probe, PointerCalibration cal,
     double lineY, double startFocus, IProgress<string> progress) : RotaryScanRigBase(settings, machine, settleS)
 {
     /// <summary>How far from the head's focus the calibration reads (mm either way).</summary>
     readonly double _reach = cal.Depths.Count == 0 ? 8 : Math.Min(Math.Abs(cal.Depths.Min()), Math.Abs(cal.Depths.Max()));
-    double _focus = startFocus;
+    bool _first = true;
 
     public override async Task<double?[]> MeasureAsync(IReadOnlyList<double> xs, IReadOnlyList<double?> guesses, CancellationToken ct)
     {
         var got = new double?[xs.Count];
-        var tried = new List<double>();
         double hi = DeviceClient.MaxHeadZ - MachineProfile.F2Ultra.ZOffset;
-        while (true)
+        // After the first angle, plan from the places that have been read (the rest are tried at the same heights).
+        var known = guesses.Where(g => g is not null).ToList();
+        var levels = RotaryScanner.FocusSweep(_first || known.Count == 0 ? [] : known, startFocus, _reach, 0, hi);
+        _first = false;
+        foreach (var f in levels)
         {
             var pending = Enumerable.Range(0, xs.Count).Where(i => got[i] is null).ToList();
             if (pending.Count == 0) break;
-            if (RotaryScanner.NextFocus([.. pending.Select(i => guesses[i])], tried, _focus, _reach, 0, hi) is not { } f) break;
-            tried.Add(f);
             var aims = pending.Select(i => new Vec2(xs[i], lineY)).ToList();
             var h = await probe.ReadAtAsync(aims, f, cal, progress, ct);
             for (int k = 0; k < pending.Count; k++) got[pending[k]] = h[k];
         }
-        // Start the next angle from the middle of what was read here.
-        var read = got.OfType<double>().Order().ToList();
-        if (read.Count > 0) _focus = read[read.Count / 2];
         return got;
     }
 }
