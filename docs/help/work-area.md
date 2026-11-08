@@ -265,7 +265,12 @@ In the job:
 
 ### The window
 
-The left side is a 3D view of the surface: a mesh over the area, the measured points (white; red
+Before anything is measured, the left side shows the bed from above (*Seen from above: what Measure
+will do*): the area to measure in blue with a white dot for each spot the pointer will be aimed at
+(red when the area runs off the bed), the square the pointer is calibrated on in green, and your
+design in orange, with grid lines every 20 mm.
+
+Once there's a surface, the left side is a 3D view of it: a mesh over the area, the measured points (white; red
 when they disagree with their neighbours) and your design's outline lying on it. Drag to turn it, scroll to zoom, middle-drag or the arrow keys to move
 it, and press **F** to see it all again.
 Heights are drawn taller than life so small curves show; the corner says by how much, and the range
@@ -280,7 +285,12 @@ of heights.
   closes without changing anything: points measured in the window are only kept by **Apply** (a
   pointer calibration is kept either way).
 
-While the window is open the rest of the program waits, so focus on the piece before opening it.
+While the window is open the rest of the program waits; the window has its own **Auto-focus**
+buttons for the board and the piece.
+
+With **Measure it with the pointer**, the right side is laid out as numbered steps: **1 · Calibrate
+the pointer (once)**, **2 · Focus on the piece**, **3 · Where to measure**, **4 · Measure** and
+**5 · Check the shape**.
 
 ### Calibrate the pointer
 
@@ -288,30 +298,47 @@ Measuring uses the red pointer and the close-up camera: the pointer comes in at 
 lands in a different place in the close-up picture as the surface rises or falls. Calibrating once
 records that. It's kept for good, and **Focus on selection** on the Machine tab uses it too.
 
-1. Put a flat, matt board under the head, covering the middle of the bed. Type its thickness in
-   **Board (mm)** (0.5 to 150; it starts at the current focus distance).
-2. Click **Calibrate the pointer…** and **Start**. The head moves up and down, 8 mm either side of
+This is step 1 in the window. Once it's done the step says *✓ Calibrated on a … mm board* with the
+date, and there's nothing more to do there; calibrate again only if the head or its camera gets
+knocked.
+
+1. Put a flat, matt board (plywood, MDF or card, not shiny) in the middle of the bed. The green
+   square in the picture on the left is where it has to be.
+2. Click **Auto-focus on the board**: its focus height becomes **Board thickness**. Or measure the
+   board with calipers and type it in (0.5 to 150 mm). It starts at the board used last time, else
+   3 mm. It must be right: any error in it is added to every height measured later.
+3. Click **Calibrate…** and **Start**. The head moves up and down, 8 mm either side of
    its focus on the board, in nine steps of 2 mm. At each step the pointer is aimed at 25 points over
    the middle 30 × 30 mm of the bed and photographed. The laser isn't fired. About two minutes.
 
 It fails if the dot was seen in fewer than a third of the photos: check the close-up camera sees the
-area, and that the board isn't shiny. The line above **Board (mm)** says whether the pointer is
-calibrated.
+area, and that the board isn't shiny. The calibration is saved with the board thickness and date.
 
 ### Measure it with the pointer
 
-Focus on the middle of the piece first (auto-focus, or type its height at the right end of the
-ribbon): heights are measured from the focus height, up to 8 mm above or below it.
+**2 · Focus on the piece**: put the piece in and focus on its middle (**Auto-focus now**, or type
+its height at the right end of the ribbon): heights are measured from the focus height, up to 8 mm
+above or below it. The step shows the focus height the machine has now.
+
+**3 · Where to measure** is a rectangle on the bed, in mm from the bed's top-left corner as it shows
+on the canvas. The pointer is aimed at **Rows** × **Columns** spots spread evenly over it.
 
 | Setting | Range | Default | What it does |
 |---|---|---|---|
-| **Area X**, **Area Y** | 0 to 220 mm | see below | The top-left corner of the area to measure. |
-| **Width**, **Height** | 2 to 220 mm | see below | Its size. It must be where the close-up camera can see the dot. |
+| **X (left edge)**, **Y (top edge)** | 0 to 220 mm | see below | The rectangle's top-left corner. |
+| **Width (mm)**, **Height (mm)** | 2 to 220 mm | see below | Its size. It must stay on the 220 × 220 mm bed, and where the close-up camera can see the dot. |
 | **Rows**, **Columns** | 3 to 40 | 9 × 9 | How many points. More follow the shape better: one every 5 mm or so for slats or tight curves. |
+
+Under them a line says how many spots that is, how far apart, and about how long measuring takes. It
+warns when the area runs off the bed (**Measure** then won't start), and when it reaches well
+outside the calibrated square: spots there are worked out by extending the calibration, so they may
+be less exact, or not read where the close-up camera can't see the dot.
 
 The area starts as the one measured last, else the design's area plus 3 mm, else a 50 mm square in the
 middle of the bed. **Use the design's area** sets it to the selection's area (or the whole design's)
 plus 3 mm round it.
+
+**4 · Measure**:
 
 - **Measure** checks the machine is idle, moves the head to the focus height, turns the fill lights
   off, and for each point aims the pointer and photographs it with the close-up camera (each photo is
@@ -320,9 +347,9 @@ plus 3 mm round it.
   isn't seen, or the surface there is more than 8 mm from the focus.
 - **Stop** stops measuring.
 - Points more than 0.6 mm from the smooth surface through the other points are shown red and left
-  out of the fit. **Measure the red points again** measures just those.
+  out of the fit. **Measure the red points again** measures just those (the button only shows when there are some).
 
-Then choose how the points become a surface:
+**5 · Check the shape**: choose how the points become a surface:
 
 | **Fit as** | For | Notes |
 |---|---|---|
