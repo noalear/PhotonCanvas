@@ -529,6 +529,8 @@ public sealed class Job
     {
         WorkMode.Flat => ZMove(mm),
         WorkMode.Conveyor c => ["G101", .. ZMove(mm), $"G100 F{JsNumber(c.SpeedMmMin)}"],
+        // The Z move puts the rapid back to full speed: held down again once U is back on.
+        WorkMode.Rotary r => ["G101", .. ZMove(mm), "G100", $"G0F{RotaryFeedCap(r)}"],
         _ => ["G101", .. ZMove(mm), "G100"],
     };
 
@@ -867,7 +869,8 @@ public sealed class Job
     IEnumerable<string> ModeHead() => Mode switch
     {
         // The galvo goes to its line before U mode too: once U is on, it may not take a Y (or X) on its own.
-        WorkMode.Rotary r => [$"G0Y{Fixed3(AttachmentLine)}", $"M535U{JsRounded(r.UMultiple, 5)}", "G100", $"G0Y{Fixed3(AttachmentLine)}"],
+        // The rapid is held down once U is on: every G0 from here may turn the rotary.
+        WorkMode.Rotary r => [$"G0Y{Fixed3(AttachmentLine)}", $"M535U{JsRounded(r.UMultiple, 5)}", "G100", $"G0F{RotaryFeedCap(r)}", $"G0Y{Fixed3(AttachmentLine)}"],
         WorkMode.Conveyor c => [$"G0X{Fixed3(AttachmentLine)}", $"G100 F{JsNumber(c.SpeedMmMin)}", $"M535U{JsRounded(c.UMultiple, 5)}", $"M536U{JsRounded(c.AngleCompensate, 5)}", $"G0X{Fixed3(AttachmentLine)}"],
         _ => [],
     };
@@ -914,6 +917,19 @@ public sealed class Job
         lines.AddRange(Tail(tag, true));
         return string.Join("\n", lines);
     }
+
+    /// <summary>
+    /// The rotary's speed limit, in turns of the object a second. The machine's rapid (<c>G0 F180000</c>, 3 m/s) is
+    /// fine for the galvo but would spin a rotary dozens of turns a second (a homemade direct-drive chuck took off,
+    /// 2026-11-08), so on the rotary every move that turns it is held to this.
+    /// </summary>
+    public const double MaxRotaryTurnsPerS = 0.5;
+
+    /// <summary>The fastest feed (mm/min round the object) that keeps the rotary within <see cref="MaxRotaryTurnsPerS"/>.</summary>
+    public static long RotaryFeedCap(WorkMode.Rotary r) => Math.Max(60, (long)Math.Floor(MaxRotaryTurnsPerS * r.CircumferenceMm * 60));
+
+    /// <summary>A layer's feed (mm/min) as written: on the rotary never past <see cref="RotaryFeedCap"/>.</summary>
+    long Feed(LaserSettings l) => Mode is WorkMode.Rotary r ? Math.Min(l.FValue, RotaryFeedCap(r)) : l.FValue;
 
     /// <summary>Furthest one turning job may move the rotary (mm round the object: a few turns of the largest object).</summary>
     public const double MaxTurnMm = 2000;
@@ -1150,7 +1166,7 @@ public sealed class Job
             $"G0{Pos(pts[0], Trim3)}",
         };
         for (int i = 1; i < pts.Count; i++)
-            body.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+            body.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{Feed(l)}" : ""));
         var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
@@ -1177,7 +1193,7 @@ public sealed class Job
         var drop = b.Drop!;
         var path = new List<string> { $"G0{Pos(pts[0], Trim3)}" };
         for (int i = 1; i < pts.Count; i++)
-            path.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+            path.Add($"G1{Pos(pts[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{Feed(l)}" : ""));
         var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
@@ -1537,7 +1553,7 @@ public sealed class Job
         double over = b.OverscanMm;
         var body = new List<string>
         {
-            BitmapCfg(l.Power / 100, b.LinesPerCm / 10, 0, s, "grayscale", over), "", "", $"G1F{l.FValue}S0",
+            BitmapCfg(l.Power / 100, b.LinesPerCm / 10, 0, s, "grayscale", over), "", "", $"G1F{Feed(l)}S0",
         };
         if (b.LineDwellMs > 0)
         {
@@ -1609,7 +1625,7 @@ public sealed class Job
         long s = l.SValue;
         var body = new List<string>
         {
-            BitmapCfg(l.Power / 100, b.SpacingMm > 0 ? 1 / b.SpacingMm : 10, 0, s, "grayscale"), "", "", $"G1F{l.FValue}S0",
+            BitmapCfg(l.Power / 100, b.SpacingMm > 0 ? 1 / b.SpacingMm : 10, 0, s, "grayscale"), "", "", $"G1F{Feed(l)}S0",
         };
         bool first = true;
         foreach (var loop in loops)
@@ -1702,7 +1718,7 @@ public sealed class Job
         var l = b.Laser;
         var body = new List<string>
         {
-            BitmapCfg(l.Power / 100, 1, 0, l.SValue, "Threshold"), "", "", $"G1F{l.FValue}S0", $"G25T{b.DotUs / 10}",
+            BitmapCfg(l.Power / 100, 1, 0, l.SValue, "Threshold"), "", "", $"G1F{Feed(l)}S0", $"G25T{b.DotUs / 10}",
         };
         bool first = true;
         foreach (var p in b.Points)

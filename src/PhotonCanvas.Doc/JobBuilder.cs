@@ -668,6 +668,8 @@ public static class JobBuilder
             WorkMode.Rotary r => r with { OriginY = s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (bounds.MinY + bounds.MaxY) / 2 },
             _ => opt.Mode,
         };
+        if (mode is WorkMode.Rotary rot && blocks.Any(b => b is not DotBlock && b.Laser.FValue > Job.RotaryFeedCap(rot)))
+            warnings.Add($"On the rotary, moves that turn it are held to half a turn a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
         if (mode is WorkMode.Conveyor)
         {
             // Lines run along the galvo's Y and step along the belt, so the belt doesn't shuttle back and forth.
