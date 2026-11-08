@@ -319,6 +319,63 @@ public class RotaryReturnTests
         return Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(20, 20, 30, 30) }]);
     }
 
+    static IEnumerable<long> Feeds(string line)
+    {
+        int i = line.IndexOf('F');
+        if (i < 0) yield break;
+        int j = i + 1;
+        while (j < line.Length && char.IsDigit(line[j])) j++;
+        if (j > i + 1) yield return long.Parse(line[(i + 1)..j]);
+    }
+
+    [Fact]
+    public void RotaryNeverSpinsAtTheMachinesRapid()
+    {
+        // Kyle's rod (2026-11-08): a cut's rapids at F180000 spun a direct-drive chuck dozens of turns a second.
+        double circ = Math.PI * 32.7;
+        var rot = new WorkMode.Rotary(32 / circ, 1, circ);
+        long cap = Job.RotaryFeedCap(rot);
+        Assert.Equal((long)Math.Floor(0.5 * circ * 60), cap); // half a turn a second
+        var s = DocState.New();
+        var cut = Layer.Default(1, LayerMode.Cut) with { Laser = LaserSettings.Blue(90, 400) };
+        var fill = Layer.Default(2, LayerMode.Fill) with { Laser = LaserSettings.Blue(30, 400) };
+        s = Ops.AddLayer(Ops.AddLayer(s, cut), fill);
+        s = Ops.AddShapes(s, [
+            new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(20, 10, 30, 30) },
+            new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(80, 60, 10, 10) },
+            new PathShape { LayerId = fill.Id, Geometry = PathGeometry.Rect(120, 20, 20, 20) }]);
+        var job = JobBuilder.Build(s, new JobOptions { Machine = M with { FieldH = Math.Round(circ, 2) }, Mode = rot });
+        var g = job.Motion.Split('\n');
+        int on = Array.IndexOf(g, "G100"), off = Array.LastIndexOf(g, "G101");
+        Assert.True(on > 0 && off > on);
+        // The rapid is held down straight after U goes on.
+        Assert.Equal($"G0F{cap}", g[on + 1]);
+        // While U is on, no feed of any move is past the cap.
+        foreach (var line in g[on..off].Where(l => l.StartsWith("G0") || l.StartsWith("G1")))
+            foreach (var f in Feeds(line)) Assert.True(f <= cap, $"{line} is faster than {cap}");
+        Assert.Contains(job.Warnings, w => w.Contains("half a turn a second"));
+        // A flat job keeps the machine's rapid and the layer's speed.
+        var flat = JobBuilder.Build(s, new JobOptions()).Motion;
+        Assert.Contains("F24000", flat);
+        Assert.DoesNotContain($"G0F{cap}", flat);
+    }
+
+    [Fact]
+    public void RotaryZMovesHoldTheRapidDownAgain()
+    {
+        var rot = new WorkMode.Rotary(1, 1, 100);
+        var s = DocState.New();
+        var cut = Layer.Default(1, LayerMode.Cut) with { FocusOffsetMm = 2 };
+        s = Ops.AddLayer(s, cut);
+        s = Ops.AddShapes(s, [new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Rect(20, 20, 30, 30) }]);
+        var g = JobBuilder.Build(s, new JobOptions { Machine = M with { FieldH = 100 }, Mode = rot }).Motion.Split('\n');
+        long cap = Job.RotaryFeedCap(rot);
+        // After each Z move the machine's rapid comes back; U on again, it's held down again before any move.
+        for (int i = 0; i < g.Length; i++)
+            if (g[i] == "G100") Assert.Equal($"G0F{cap}", g[i + 1]);
+        Assert.True(g.Count(l => l == "G100") >= 2, "the focus offset makes a Z move");
+    }
+
     [Fact]
     public void TurningJobOnlyTurnsTheRotaryWithTheLaserOff()
     {

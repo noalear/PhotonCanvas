@@ -56,6 +56,10 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
   line**: an orange guide across the page labelled "Rotary start: faces the laser". Then that line
   faces the laser at the start, whatever is drawn. Pages made for the rotary (a stacked model's
   finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
+- The rotary never turns faster than half a turn a second. Moves between paths, the turn to the start
+  and the turn back at the end are held to that, and so is a layer's speed where it turns the object
+  (a job check says when a layer is slowed down). The machine's own travel speed would spin a rotary
+  dozens of turns a second.
 - On the rotary a layer's **Focus offset (mm)** can go up to 60 mm either way (10 mm on the flat
   bed), for surfaces much nearer the middle than where you focused.
 
