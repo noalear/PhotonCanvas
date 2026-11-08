@@ -50,6 +50,15 @@ public class RotaryScanTests
     }
 
     [Fact]
+    public void TheAnglesAreSaidInWords()
+    {
+        Assert.Equal("4 angles, every 90°: 0, 90, 180, 270°", new RotaryScanPlan(0, 360, 4, [110], 110, "pointer").AnglesText());
+        Assert.Equal("5 angles, every 72°: 0, 72, 144, 216, 288°", new RotaryScanPlan(0, 360, 5, [110], 110, "pointer").AnglesText());
+        Assert.Equal("24 angles, every 15°: 0, 15, 30 … 345°", new RotaryScanPlan(0, 360, 24, [110], 110, "pointer").AnglesText());
+        Assert.Equal("3 angles, every 22.5°: -22.5, 0, 22.5°", new RotaryScanPlan(-22.5, 22.5, 3, [110], 110, "pointer").AnglesText());
+    }
+
+    [Fact]
     public async Task AScanMeasuresEveryAngleAndTurnsBackToTheStart()
     {
         var rod = new FakeRod(30, 10, 2, 80);

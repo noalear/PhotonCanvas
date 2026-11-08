@@ -334,6 +334,19 @@ public sealed record RotaryScanPlan(double FromDeg, double ToDeg, int Stops, IRe
         return [.. Enumerable.Range(0, n).Select(i => Math.Round(FromDeg + i * step, 6))];
     }
 
+    /// <summary>
+    /// The angles in words, for under the Angles box: "4 angles, every 90°: 0, 90, 180, 270°" (long lists shortened).
+    /// Kyle (2026-11-08) set 5 places along the part and got far more turns than he expected: show what Angles means.
+    /// </summary>
+    public string AnglesText()
+    {
+        var a = Angles();
+        string N(double d) => d.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+        string list = a.Length <= 8 ? string.Join(", ", a.Select(N)) : $"{N(a[0])}, {N(a[1])}, {N(a[2])} … {N(a[^1])}";
+        string step = a.Length > 1 ? $", every {N(a[1] - a[0])}°" : "";
+        return $"{a.Length} {(a.Length == 1 ? "angle" : "angles")}{step}: {list}°";
+    }
+
     /// <summary>Evenly spaced places from <paramref name="from"/> to <paramref name="to"/> (one in the middle for a count of 1).</summary>
     public static double[] Places(double from, double to, int count) =>
         count <= 1 ? [Math.Round((from + to) / 2, 3)] : [.. Enumerable.Range(0, count).Select(i => Math.Round(from + (to - from) * i / (count - 1), 3))];
