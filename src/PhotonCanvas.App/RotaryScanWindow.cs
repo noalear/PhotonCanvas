@@ -11,7 +11,7 @@ namespace PhotonCanvas.App;
 
 /// <summary>
 /// Scan the part: the part in the rotary is turned a step at a time and the height of its top is measured along the
-/// laser line at each step (the red pointer and close-up camera, or the machine's auto-focus). The readings make a
+/// laser line at each step (the pointer and close-up camera, or the machine's auto-focus). The readings make a
 /// model of the stock: how far its surface is from the axis all the way round. The laser is never fired.
 /// </summary>
 public sealed class RotaryScanWindow : Window
@@ -29,7 +29,7 @@ public sealed class RotaryScanWindow : Window
     // How far from where the last scan started the part was left by a scan that was stopped (kept while the program runs).
     static double _leftDeg;
 
-    readonly ComboBox _method = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Red pointer and close-up camera", "The machine's auto-focus" } };
+    readonly ComboBox _method = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Pointer and close-up camera", "The machine's auto-focus" } };
     readonly NumericUpDown _x0 = Number(0, 220, 1, "0.#"), _x1 = Number(0, 220, 1, "0.#"), _points = Number(1, 60, 1, "0");
     readonly NumericUpDown _stops = Number(2, 360, 1, "0"), _from = Number(-3600, 3600, 15, "0.#"), _to = Number(-3600, 3600, 15, "0.#");
     readonly NumericUpDown _settle = Number(0, 10, 0.25m, "0.##");
@@ -40,7 +40,7 @@ public sealed class RotaryScanWindow : Window
     bool Inches => _units.SelectedIndex == 1;
     readonly CheckBox _axisKnown = new() { Content = "I know the axis height" };
     readonly NumericUpDown _axis = Number(-200, 200, 0.5m, "0.##"), _rod = Number(1, 200, 0.5m, "0.##");
-    readonly TextBlock _methodNote = Hint(), _status = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap }, _results = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+    readonly TextBlock _methodNote = Hint(), _anglesNote = Hint(), _status = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap }, _results = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
     readonly ProgressBar _busy = new() { IsIndeterminate = true, IsVisible = false, Height = 4 };
     readonly Control _alongPanel;
     readonly Button _scanBtn = new() { Content = "Scan", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
@@ -171,6 +171,7 @@ public sealed class RotaryScanWindow : Window
                 new TextBlock { Text = "ROUND THE PART", Classes = { "h" } },
                 Field("Angles", _stops),
                 Field("From (°)", _from), Field("To (°)", _to),
+                _anglesNote,
                 Field("Wait after a turn (s)", _settle),
                 Row(_scanBtn, stop),
                 _returnBtn,
@@ -189,6 +190,9 @@ public sealed class RotaryScanWindow : Window
             },
         };
         _method.SelectionChanged += (_, _) => Update();
+        _stops.ValueChanged += (_, _) => ShowAngles();
+        _from.ValueChanged += (_, _) => ShowAngles();
+        _to.ValueChanged += (_, _) => ShowAngles();
         _axisKnown.IsCheckedChanged += (_, _) => Update();
         _stockKind.SelectionChanged += (_, _) => Update();
         _stockW.ValueChanged += (_, _) => Update();
@@ -259,9 +263,13 @@ public sealed class RotaryScanWindow : Window
         Update();
     }
 
+    /// <summary>Under the Angles box: how many times it turns, how far apart, and to which angles.</summary>
+    void ShowAngles() => _anglesNote.Text = $"Turns to {Plan().AnglesText()}, then back to the start.";
+
     void Update()
     {
         if (_updating) return;
+        ShowAngles();
         bool pointer = Pointer;
         var shape = Shape();
         _stockSize.IsVisible = shape.Kind != StockKind.Scanned;
@@ -452,7 +460,7 @@ public sealed class RotaryScanWindow : Window
         var angles = plan.Angles();
         string what = $"The part turns to {angles.Length} angles ({angles[0]:0.#}° to {angles[^1]:0.#}°" +
                       (angles.Length > 1 ? $", {angles[1] - angles[0]:0.#}° apart" : "") + ") and " +
-                      (Pointer ? $"the head moves up and down while the red pointer measures {plan.Xs.Count} places along the laser line at each."
+                      (Pointer ? $"the head moves up and down while the pointer measures {plan.Xs.Count} places along the laser line at each."
                                : "the machine auto-focuses on its top at each.") +
                       " Then it turns back to where it started.\n\nThe laser isn't fired. Keep hands clear of the chuck; Stop stops it where it is.";
         if (Math.Abs(_leftDeg) > 0.05)
@@ -461,6 +469,8 @@ public sealed class RotaryScanWindow : Window
 
         _cts?.Cancel();
         var cts = _cts = new CancellationTokenSource();
+        // Where the head was focused, to put it back afterwards however the scan ends.
+        double? focusBefore = _machine.Distance;
         _busy.IsVisible = true;
         _scanBtn.IsEnabled = false;
         var progress = new Progress<string>(s => _status.Text = s);
@@ -507,10 +517,33 @@ public sealed class RotaryScanWindow : Window
         }
         finally
         {
+            if (focusBefore is { } fb && _machine.IsConnected)
+            {
+                string done = _status.Text ?? "";
+                _status.Text = done + $" Putting the head back to {fb:0.#} mm…";
+                string? err = await FocusBackAsync(client, fb);
+                _status.Text = done + (err is null ? $" The head is back at {fb:0.#} mm." : $" Couldn't put the head back to {fb:0.#} mm: {err}");
+            }
             _busy.IsVisible = false;
             _scanBtn.IsEnabled = true;
             Update();
         }
+    }
+
+    /// <summary>The head back to focus at <paramref name="focusMm"/> (as the machine panel's own focus move). Returns an error, or null.</summary>
+    async Task<string?> FocusBackAsync(DeviceClient client, double focusMm)
+    {
+        try
+        {
+            // Measuring leaves the machine in focus mode: back to idle first, as the stock app does.
+            await client.ReturnToIdleAsync();
+            await Task.Delay(300);
+            if (await _machine.MoveFocusAsync(focusMm) is null) return null;
+            // The panel thinks the machine is busy (its mode can lag): move it directly.
+            await client.MoveFocusAsync(focusMm, MachineProfile.F2Ultra.ZOffset);
+            return null;
+        }
+        catch (Exception e) when (e is DeviceException or ArgumentOutOfRangeException or OperationCanceledException) { return e.Message; }
     }
 
     static void Dispatch(Action a) => Avalonia.Threading.Dispatcher.UIThread.Post(a);
@@ -522,6 +555,12 @@ public sealed class RotaryScanWindow : Window
         {
             double u = await RotaryTurn.FeedUnitsAsync(_settings, _machine, degrees)
                        ?? throw new InvalidOperationException("Choose the rotary in Machine → Work mode first.");
+            // A scan leaves the machine in focus mode, where it holds the rotary but won't turn it.
+            if (_machine.Client is { } c)
+            {
+                await c.ReturnToIdleAsync();
+                await Task.Delay(300);
+            }
             await _machine.TurnRotaryNowAsync(u);
             _status.Text = done;
         }

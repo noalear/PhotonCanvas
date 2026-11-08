@@ -3,51 +3,106 @@ using PhotonCanvas.Core.Imaging;
 namespace PhotonCanvas.Core.Camera;
 
 /// <summary>
-/// Measuring heights with the red pointer and the camera in the laser head (laser triangulation).
-/// The camera and the pointer's mirrors both ride on the head, so where the dot shows up in the
+/// Measuring heights with the pointer and the camera in the laser head (laser triangulation).
+/// The camera and the pointer's mirrors both ride on the head, so where the spot shows up in the
 /// picture depends only on how far the surface is below the head's focus. A calibration on any flat
-/// board records that: the head steps through known heights and the dot is photographed at each.
+/// board records that: the head steps through known heights and the spot is photographed at each.
+/// <para>
+/// The spot needn't be a round dot: the F2 Ultra's is a short line (seen 2026-11-08). The whole bright
+/// patch is found, its middle and which way it runs; a line is then read by where it crosses the
+/// calibrated track (<see cref="PointerCalibration.Depth(Vec2, PointerSpot)"/>), so how much of the line
+/// shows doesn't matter.
+/// </para>
 /// </summary>
 public static class DotFinder
 {
     /// <summary>
-    /// The pointer dot's centre (pixels) from a photo with it on and one with it off: only what
-    /// changed is left, so shiny, dark or patterned surfaces don't fool it. Null when no clear dot.
+    /// The pointer's spot from a photo with it on and one with it off: only what got brighter is left,
+    /// so shiny, dark or patterned surfaces don't fool it, whatever colour the pointer is. Null when
+    /// there's no clear spot.
     /// </summary>
-    public static (Vec2 Centre, double Strength)? Find(RasterImage on, RasterImage off)
+    public static PointerSpot? Find(RasterImage on, RasterImage off)
     {
         if (on.Width != off.Width || on.Height != off.Height) return null;
         int w = on.Width, h = on.Height;
-        var diff = new float[w * h];
-        float max = 0;
-        long sum = 0;
-        for (int i = 0; i < diff.Length; i++)
+        var raw = new float[w * h];
+        double rawSum = 0;
+        for (int i = 0; i < raw.Length; i++)
         {
             int k = i * 4;
-            // The red dot: more red than before, beyond any change in brightness overall.
+            // How much brighter it got, in whichever colour the pointer is.
             float dr = on.Rgba[k] - off.Rgba[k], dg = on.Rgba[k + 1] - off.Rgba[k + 1], db = on.Rgba[k + 2] - off.Rgba[k + 2];
-            float v = Math.Max(0, dr) + 0.5f * Math.Max(0, dr - (dg + db) / 2);
+            raw[i] = Math.Max(dr, Math.Max(dg, db));
+            rawSum += raw[i];
+        }
+        // Less any change over the whole picture (the camera's exposure).
+        float shift = (float)Math.Max(0, rawSum / raw.Length);
+        var diff = new float[raw.Length];
+        float max = 0;
+        double sum = 0;
+        for (int i = 0; i < raw.Length; i++)
+        {
+            float v = Math.Max(0, raw[i] - shift);
             diff[i] = v;
-            sum += (long)v;
+            sum += v;
             if (v > max) max = v;
         }
-        double mean = (double)sum / diff.Length;
-        // A dot stands far above the noise.
+        double mean = sum / diff.Length;
+        // A spot stands far above the noise.
         if (max < 25 || max < mean * 8) return null;
         int peak = Array.IndexOf(diff, max);
-        // Centroid of the bright patch round the peak (over half the peak, within a window).
-        int px = peak % w, py = peak / w, r = Math.Max(6, Math.Min(w, h) / 30);
-        double cx = 0, cy = 0, m = 0;
-        for (int y = Math.Max(0, py - r); y < Math.Min(h, py + r + 1); y++)
-            for (int x = Math.Max(0, px - r); x < Math.Min(w, px + r + 1); x++)
-            {
-                double v = diff[y * w + x] - max * 0.5;
-                if (v <= 0) continue;
-                cx += v * (x + 0.5); cy += v * (y + 0.5); m += v;
-            }
+
+        // The bright patch joined to the peak (over a third of it), however long it runs.
+        float cut = max * 0.35f;
+        int limit = Math.Max(64, w * h / 20);
+        var seen = new bool[diff.Length];
+        var stack = new Stack<int>();
+        stack.Push(peak);
+        seen[peak] = true;
+        double m = 0, cx = 0, cy = 0, sxx = 0, syy = 0, sxy = 0;
+        int count = 0;
+        while (stack.Count > 0 && count < limit)
+        {
+            int i = stack.Pop();
+            int x = i % w, y = i / w;
+            double v = diff[i] - cut;
+            double px = x + 0.5, py = y + 0.5;
+            m += v; cx += v * px; cy += v * py;
+            sxx += v * px * px; syy += v * py * py; sxy += v * px * py;
+            count++;
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if ((dx | dy) == 0 || nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+                    int j = ny * w + nx;
+                    if (seen[j] || diff[j] < cut) continue;
+                    seen[j] = true;
+                    stack.Push(j);
+                }
+        }
         if (m <= 0) return null;
-        return (new Vec2(cx / m, cy / m), max);
+        cx /= m; cy /= m;
+        double vxx = Math.Max(0, sxx / m - cx * cx), vyy = Math.Max(0, syy / m - cy * cy), vxy = sxy / m - cx * cy;
+        // Which way it runs: the long axis of the patch.
+        double tr = vxx + vyy, det = vxx * vyy - vxy * vxy, disc = Math.Sqrt(Math.Max(0, tr * tr / 4 - det));
+        double l1 = tr / 2 + disc, l2 = Math.Max(1e-6, tr / 2 - disc);
+        double angle = 0.5 * Math.Atan2(2 * vxy, vxx - vyy);
+        var along = new Vec2(Math.Cos(angle), Math.Sin(angle));
+        return new PointerSpot(new Vec2(cx, cy), max, along, Math.Sqrt(l1 / l2), 4 * Math.Sqrt(l1));
     }
+}
+
+/// <summary>The pointer's spot in a photo.</summary>
+/// <param name="Centre">The middle of the bright patch (pixels).</param>
+/// <param name="Strength">How much brighter its brightest pixel got.</param>
+/// <param name="Along">Which way it runs (a unit vector; either way round).</param>
+/// <param name="Elongation">Its length over its width: about 1 for a round dot, more for a line.</param>
+/// <param name="LengthPx">About how long it is (pixels).</param>
+public readonly record struct PointerSpot(Vec2 Centre, double Strength, Vec2 Along, double Elongation, double LengthPx)
+{
+    /// <summary>Long enough to be read as a line (by where it crosses the calibrated track).</summary>
+    public bool IsLine => Elongation >= 2.5;
 }
 
 /// <summary>
@@ -81,6 +136,37 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
         // Further from the track than the track's own spacing: not trusted.
         double spacing = TrackSpacing(track);
         return double.IsNaN(depth) || best > Math.Max(3, spacing * 1.5) ? null : depth;
+    }
+
+    /// <summary>
+    /// How far below the focus the surface is at <paramref name="aim"/>, from the spot seen. A round dot is read by
+    /// its middle (<see cref="Depth(Vec2, Vec2)"/>). A line is read by where it crosses the dot's calibrated track,
+    /// so it doesn't matter how much of the line shows or where along it the brightest pixel is; if the line runs
+    /// nearly along the track (it can't tell depth that way), its middle is used instead.
+    /// </summary>
+    public double? Depth(Vec2 aim, PointerSpot spot)
+    {
+        if (!spot.IsLine || Track(aim) is not { } track) return Depth(aim, spot.Centre);
+        var dir = spot.Along;
+        double best = double.PositiveInfinity, depth = double.NaN;
+        for (int i = 0; i + 1 < track.Count; i++)
+        {
+            if (track[i] is not { } a || track[i + 1] is not { } b) continue;
+            var ab = b - a;
+            double len = ab.Length;
+            if (len < 1e-9) continue;
+            double cr = ab.Cross(dir);
+            // Nearly along the track: this stretch can't tell.
+            if (Math.Abs(cr) < 0.5 * len) continue;
+            double t = (spot.Centre - a).Cross(dir) / cr;
+            if (t < -1e-9 || t > 1 + 1e-9) continue;
+            var at = a + ab * t;
+            double off = at.Dist(spot.Centre);
+            if (off < best) { best = off; depth = Depths[i] + (Depths[i + 1] - Depths[i]) * t; }
+        }
+        // The crossing must be on the line as seen (half its length, and a little).
+        if (double.IsNaN(depth) || best > spot.LengthPx * 0.75 + 3) return Depth(aim, spot.Centre);
+        return depth;
     }
 
     static double TrackSpacing(List<Vec2?> track)
