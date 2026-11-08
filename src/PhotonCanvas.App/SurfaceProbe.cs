@@ -19,7 +19,25 @@ public sealed class SurfaceProbe(DeviceClient client)
 
     static string CalibrationFile => Path.Combine(AppIdentity.DataDir, "pointer-calibration.json");
 
-    sealed record Saved(double[] Depths, double[][] Aims, double[]?[][] Seen);
+    sealed record Saved(double[] Depths, double[][] Aims, double[]?[][] Seen, double? BoardMm = null, DateTime? When = null);
+
+    /// <summary>The middle of the bed the pointer is calibrated over (the close-up camera surely sees it).</summary>
+    public static readonly Rect2 CalibrationSquare = new(95, 95, 125, 125);
+
+    /// <summary>About how long one pointer photo takes (aim, light, photograph), for time estimates.</summary>
+    public const double SecondsPerPhoto = 0.5;
+
+    /// <summary>The board thickness and date of the saved calibration, when it has them (older files don't).</summary>
+    public static (double? BoardMm, DateTime? When)? CalibrationInfo()
+    {
+        try
+        {
+            if (!File.Exists(CalibrationFile)) return null;
+            var s = JsonSerializer.Deserialize<Saved>(File.ReadAllText(CalibrationFile));
+            return s is null ? null : (s.BoardMm, s.When);
+        }
+        catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return null; }
+    }
 
     public static PointerCalibration? LoadCalibration()
     {
@@ -34,11 +52,11 @@ public sealed class SurfaceProbe(DeviceClient client)
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { return null; }
     }
 
-    static void SaveCalibration(PointerCalibration c)
+    static void SaveCalibration(PointerCalibration c, double boardMm)
     {
         Directory.CreateDirectory(AppIdentity.DataDir);
         var s = new Saved([.. c.Depths], [.. c.Aims.Select(a => new[] { a.X, a.Y })],
-            [.. c.Seen.Select(row => row.Select(p => p is { } v ? new[] { v.X, v.Y } : null).ToArray())]);
+            [.. c.Seen.Select(row => row.Select(p => p is { } v ? new[] { v.X, v.Y } : null).ToArray())], boardMm, DateTime.Now);
         File.WriteAllText(CalibrationFile, JsonSerializer.Serialize(s));
     }
 
@@ -82,7 +100,7 @@ public sealed class SurfaceProbe(DeviceClient client)
         if (found < aims.Count * depths.Length / 3)
             throw new InvalidOperationException($"The dot was only found in {found} of {aims.Count * depths.Length} photos. Check the close-up camera sees the area, and the board isn't shiny.");
         var cal = new PointerCalibration(depths, aims, [.. seen.Select(r => (IReadOnlyList<Vec2?>)r)]);
-        SaveCalibration(cal);
+        SaveCalibration(cal, boardMm);
         return cal;
     }
 

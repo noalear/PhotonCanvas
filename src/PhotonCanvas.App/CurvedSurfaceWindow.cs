@@ -38,7 +38,16 @@ public sealed class CurvedSurfaceWindow : Window
     readonly Slider _smooth = new() { Minimum = 0, Maximum = 1, Value = 0.3, HorizontalAlignment = HorizontalAlignment.Stretch };
     readonly NumericUpDown _sides = Number(3, 200, 1, "0");
     readonly TextBlock _calState = new() { TextWrapping = TextWrapping.Wrap };
-    readonly Control _measurePanel, _typedPanel, _fitPanel;
+    readonly TextBlock _calHow = Hint(
+        "What to do:\n" +
+        "1. Put a flat, matt board (plywood, MDF or card, not shiny) in the middle of the bed.\n" +
+        "2. Auto-focus on it, or measure it with calipers and type its thickness below.\n" +
+        "3. Press Calibrate. The head steps 8 mm up and down and the dot is photographed at 25 spots in the middle of the bed, at each height. About two minutes.");
+    readonly TextBlock _focusState = new() { TextWrapping = TextWrapping.Wrap };
+    readonly TextBlock _planInfo = new() { TextWrapping = TextWrapping.Wrap };
+    readonly Button _calibrate = new() { Content = "Calibrate…", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Button _again = Button("Measure the red points again");
+    readonly Control _measurePanel, _typedPanel, _fitPanel, _sidesField, _tSidesField;
     // Typed
     readonly ComboBox _tShape = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Cylinder", "Drum of flat slats" } };
     readonly ComboBox _axisDir = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Front to back (along Y)", "Left to right (along X)" } };
@@ -62,7 +71,9 @@ public sealed class CurvedSurfaceWindow : Window
         _ax.Value = (decimal)Math.Round(area.MinX, 1); _ay.Value = (decimal)Math.Round(area.MinY, 1);
         _aw.Value = (decimal)Math.Round(area.Width, 1); _ah.Value = (decimal)Math.Round(area.Height, 1);
         _rows.Value = 9; _cols.Value = 9;
-        _board.Value = (decimal)Math.Round(machine.Distance ?? 3, 1);
+        // The board used last time (it's usually the same one), else a typical 3 mm sheet. Not the
+        // current focus height: that's wherever the head was last focused, often not on a board.
+        _board.Value = (decimal)Math.Round(SurfaceProbe.CalibrationInfo()?.BoardMm ?? 3, 1);
         _on.IsChecked = _curve.On;
         _source.SelectedIndex = _curve.Typed ? 1 : 0;
         _shape.SelectedIndex = (int)_curve.Shape;
@@ -82,12 +93,28 @@ public sealed class CurvedSurfaceWindow : Window
             d = d.Inflate(3);
             _ax.Value = (decimal)Math.Round(d.MinX, 1); _ay.Value = (decimal)Math.Round(d.MinY, 1); _aw.Value = (decimal)Math.Round(d.Width, 1); _ah.Value = (decimal)Math.Round(d.Height, 1);
         };
-        var calibrate = Button("Calibrate the pointer…", tip: "Once: on a flat board, the head steps up and down and the dot is photographed at each height. About two minutes.");
-        calibrate.Click += async (_, _) => await Calibrate();
+        ToolTip.SetTip(_calibrate, "Needs the flat board in the middle of the bed. The head moves up and down and the red pointer is aimed and photographed; the laser never fires.");
+        _calibrate.Click += async (_, _) => await Calibrate();
+        var boardFocus = Button("Auto-focus on the board", tip: "Auto-focus on the board now: its focus height becomes the board thickness. The head moves; the laser doesn't fire.");
+        boardFocus.Click += async (_, _) =>
+        {
+            if (!_machine.IsConnected) { _status.Text = "Connect to the machine first."; return; }
+            _status.Text = "Auto-focusing on the board… the head will move.";
+            if (await _machine.AutoFocusNowAsync() is { } d) { _board.Value = (decimal)Math.Round(d, 1); _status.Text = $"The board's focus height is {d:0.0} mm: that's now the board thickness."; }
+            else _status.Text = "Auto-focus didn't finish (see the machine panel).";
+            Update();
+        };
+        var pieceFocus = Button("Auto-focus now", tip: "Auto-focus where the head is now (the middle of the bed). The head moves; the laser doesn't fire.");
+        pieceFocus.Click += async (_, _) =>
+        {
+            if (!_machine.IsConnected) { _status.Text = "Connect to the machine first."; return; }
+            _status.Text = "Auto-focusing… the head will move.";
+            _status.Text = await _machine.AutoFocusNowAsync() is { } d ? $"Focused at {d:0.0} mm." : "Auto-focus didn't finish (see the machine panel).";
+            Update();
+        };
         var measure = new Button { Content = "Measure", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
         measure.Click += async (_, _) => await Measure(null);
-        var again = Button("Measure the red points again");
-        again.Click += async (_, _) => await Measure(_suspect);
+        _again.Click += async (_, _) => await Measure(_suspect);
         var stop = Button("Stop");
         stop.Click += (_, _) => _cts?.Cancel();
         var axisOnSel = Button("Axis through the design's middle");
@@ -100,19 +127,35 @@ public sealed class CurvedSurfaceWindow : Window
 
         _measurePanel = new StackPanel
         {
-            Spacing = 8,
+            Spacing = 10,
             Children =
             {
-                Hint("Focus on the middle of the piece first (the focus height is where the head measures from). The area must be where the close-up camera can see the dot."),
-                Field("Area X", _ax), Field("Area Y", _ay), Field("Width", _aw), Field("Height", _ah),
-                fromDesign,
-                Field("Rows", _rows), Field("Columns", _cols),
-                Hint("More points follow the shape better: one every 5 mm or so for slats or tight curves."),
-                _calState,
-                Field("Board (mm)", _board, tip: "Thickness of the flat board used to calibrate the pointer."),
-                calibrate,
-                Row(measure, stop),
-                again,
+                Explained("1 · Calibrate the pointer (once)",
+                    "The red pointer shines in at a slant, so when a surface is higher or lower its dot lands a little to one side, and the close-up camera in the head sees it shift. " +
+                    "Calibrating measures how far it shifts for each mm, on a flat board. It's kept for good: do it again only if the head or its camera gets knocked.",
+                    _calState,
+                    _calHow,
+                    Field("Board thickness", _board, Hint("mm. Must be right: any error here is added to every height measured later."),
+                        tip: "How thick the flat calibration board is (its focus height as it lies on the bed). Auto-focusing on it gets this exactly."),
+                    boardFocus,
+                    _calibrate),
+                Explained("2 · Focus on the piece",
+                    "Put the curved piece in and focus on its middle (auto-focus there, or set it in the machine panel). Heights are read from that focus height, up to 8 mm above or below it.",
+                    _focusState,
+                    pieceFocus),
+                Explained("3 · Where to measure",
+                    "A rectangle on the bed, in mm from the bed's top-left corner as it shows on the canvas. The pointer is aimed at Rows × Columns spots spread evenly over it. The picture on the left shows it.",
+                    Field("X (left edge)", _ax, tip: "How far the rectangle's left edge is from the left of the bed, in mm."),
+                    Field("Y (top edge)", _ay, tip: "How far the rectangle's top edge is from the top (back) of the bed, in mm."),
+                    Field("Width (mm)", _aw), Field("Height (mm)", _ah),
+                    fromDesign,
+                    Field("Rows", _rows), Field("Columns", _cols),
+                    Hint("More spots follow the shape better: one every 5 mm or so for slats or tight curves."),
+                    _planInfo),
+                Explained("4 · Measure",
+                    "The head goes to the focus height and the red dot is aimed at each spot and photographed. The laser never fires.",
+                    Row(measure, stop),
+                    _again),
             },
         };
         _typedPanel = new StackPanel
@@ -122,7 +165,7 @@ public sealed class CurvedSurfaceWindow : Window
             {
                 Hint("A round object lying on its side. Measure it with calipers: it's far more exact than measuring with the pointer."),
                 Field("Shape", _tShape),
-                Field("Slats round it", _tSides),
+                (_tSidesField = Field("Slats round it", _tSides)),
                 Field("Axis runs", _axisDir),
                 Field("Axis X", _axisX), Field("Axis Y", _axisY),
                 axisOnSel,
@@ -130,14 +173,12 @@ public sealed class CurvedSurfaceWindow : Window
                 Field("Diameter", _dia, tip: "For slats: across the flats."),
             },
         };
-        _fitPanel = new StackPanel
-        {
-            Spacing = 8,
-            Children = { Field("Fit as", _shape), Field("Smoothing", _smooth), Field("Slats round it", _sides), _fitInfo },
-        };
+        _fitPanel = Explained("5 · Check the shape",
+            "The measured spots (white; red ones disagree with their neighbours and are left out) and the surface fitted through them, in 3D on the left. Then press Apply.",
+            Field("Fit as", _shape), Field("Smoothing", _smooth), _sidesField = Field("Slats round it", _sides), _fitInfo);
 
         foreach (var c in new Control[] { _shape, _tShape, _axisDir, _source }) if (c is ComboBox cb) cb.SelectionChanged += (_, _) => Update();
-        foreach (var n in new[] { _sides, _axisX, _axisY, _top, _dia, _tSides, _band, _ax, _ay, _aw, _ah }) n.ValueChanged += (_, _) => Update();
+        foreach (var n in new[] { _sides, _axisX, _axisY, _top, _dia, _tSides, _band, _ax, _ay, _aw, _ah, _rows, _cols, _board }) n.ValueChanged += (_, _) => Update();
         _smooth.PropertyChanged += (_, e) => { if (e.Property == Avalonia.Controls.Primitives.RangeBase.ValueProperty) Update(); };
 
         var apply = new Button { Content = "Apply", Classes = { "primary" }, MinWidth = 110 };
@@ -145,6 +186,10 @@ public sealed class CurvedSurfaceWindow : Window
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 100 };
         cancel.Click += (_, _) => Close();
         Closing += (_, _) => _cts?.Cancel();
+        // Keep "focused at …" up to date when the focus changes in the machine panel.
+        Action<string> machineChanged = _ => Avalonia.Threading.Dispatcher.UIThread.Post(ShowFocus);
+        _machine.StatusChanged += machineChanged;
+        Closed += (_, _) => _machine.StatusChanged -= machineChanged;
 
         var side = new StackPanel
         {
@@ -212,9 +257,19 @@ public sealed class CurvedSurfaceWindow : Window
         _measurePanel.IsVisible = !typed;
         _fitPanel.IsVisible = !typed;
         _typedPanel.IsVisible = typed;
-        _sides.IsVisible = _shape.SelectedIndex == 2;
-        _tSides.IsVisible = _tShape.SelectedIndex == 1;
-        _calState.Text = SurfaceProbe.LoadCalibration() is null ? "⚠ The pointer isn't calibrated yet: do that once first (a flat board of known thickness)." : "✓ Pointer calibrated.";
+        // The whole row, label and all.
+        _sidesField.IsVisible = _shape.SelectedIndex == 2;
+        _tSidesField.IsVisible = _tShape.SelectedIndex == 1;
+        var cal = SurfaceProbe.LoadCalibration();
+        var calInfo = cal is null ? null : SurfaceProbe.CalibrationInfo();
+        _calState.Text = cal is null ? "⚠ Not calibrated yet. Measuring needs this first."
+            : "✓ Calibrated" + (calInfo?.BoardMm is { } bmm ? $" on a {bmm:0.#} mm board" : "") + (calInfo?.When is { } when ? $", {when:d MMM yyyy}" : "") + ". Nothing more to do here.";
+        _calState.Foreground = Brush(cal is null ? "Warn" : "Ok");
+        _calHow.IsVisible = cal is null;
+        _calibrate.Content = cal is null ? "Calibrate…" : "Calibrate again…";
+        ShowFocus();
+        _again.IsVisible = _suspect.Count > 0;
+        if (!typed) _planInfo.Text = PlanText(cal);
         var c = Current();
         Surface? s = null;
         try { s = c.Build(); } catch (ArgumentException) { }
@@ -228,7 +283,36 @@ public sealed class CurvedSurfaceWindow : Window
         }
         var design = _doc.State.Shapes.OfType<PathShape>().SelectMany(p => p.Flat).Select(f => (IReadOnlyList<Vec2>)(f.Closed ? [.. f.Points, f.Points[0]] : f.Points)).ToList();
         var area = typed ? DesignBounds().Inflate(10) : Area;
+        _view.Plan = typed ? null : new SurfaceView.SurfacePlan(Bed, cal is null ? SurfaceProbe.CalibrationSquare : Rect2.Bounds(cal.Aims), Area, Aims());
         _view.Show(s, area, typed ? [] : _curve.Points, _suspect.ToHashSet(), design);
+    }
+
+    void ShowFocus()
+    {
+        _focusState.Text = _machine.Distance is { } focus
+            ? $"The machine is focused at {focus:0.0} mm now. If that isn't on this piece's middle, auto-focus again."
+            : _machine.IsConnected ? "⚠ Not focused yet." : "⚠ Not connected to the machine.";
+        _focusState.Foreground = Brush(_machine.Distance is null ? "Warn" : "TextMuted");
+    }
+
+    static readonly Rect2 Bed = new(0, 0, MachineProfile.F2Ultra.FieldW, MachineProfile.F2Ultra.FieldH);
+
+    List<Vec2> Aims() => SurfaceProbe.Grid(Area, (int)(_rows.Value ?? 9), (int)(_cols.Value ?? 9));
+
+    /// <summary>How many spots, how far apart, how long, and anything wrong with the area.</summary>
+    string PlanText(PointerCalibration? cal)
+    {
+        var a = Area;
+        int rows = (int)(_rows.Value ?? 9), cols = (int)(_cols.Value ?? 9), n = rows * cols;
+        var t = $"{n} spots, one every {a.Width / Math.Max(1, cols - 1):0.#} mm across and {a.Height / Math.Max(1, rows - 1):0.#} mm down. About {Duration(n * SurfaceProbe.SecondsPerPhoto + 5)}.";
+        if (!Bed.Contains(a))
+            return t + $"\n⚠ The area runs off the bed (it reaches X {a.MaxX:0.#}, Y {a.MaxY:0.#}; the bed is {Bed.Width:0} × {Bed.Height:0} mm). Make it smaller or move it, or use the design's area.";
+        if (cal is not null && !Rect2.Bounds(cal.Aims).Inflate(10).Contains(a))
+        {
+            var c = Rect2.Bounds(cal.Aims);
+            t += $"\nThe pointer was calibrated on the middle square (X {c.MinX:0}–{c.MaxX:0}, Y {c.MinY:0}–{c.MaxY:0} mm, green on the left). Spots well outside it are worked out from it: they may be less exact, or not read at all where the close-up camera can't see the dot.";
+        }
+        return t;
     }
 
     async Task Calibrate()
@@ -236,24 +320,25 @@ public sealed class CurvedSurfaceWindow : Window
         if (_machine.Client is not { IsConnected: true } client) { _status.Text = "Connect to the machine first."; return; }
         var owner = this;
         if (!await Dialogs.Confirm(owner, "Calibrate the pointer",
-                $"Put a flat, matt board {_board.Value:0.#} mm thick (change it below if not) under the head, covering the middle of the bed.\n\n" +
-                "The head moves up and down 8 mm either side of it and the red pointer is aimed at a grid of points; the laser is not fired. About two minutes.",
+                $"Is a flat, matt board {_board.Value:0.#} mm thick lying in the middle of the bed? (If it's a different thickness, press Cancel and change Board thickness first: every height measured later depends on it.)\n\n" +
+                "The head moves to 8 mm above and below the board's surface in 2 mm steps. At each step the red pointer is aimed at 25 spots in the middle of the bed and photographed with the close-up camera. The laser is not fired. About two minutes.",
                 "Start", "Cancel"))
             return;
         await Run(async (p, ct) =>
         {
-            var aims = SurfaceProbe.Grid(new Rect2(95, 95, 125, 125), 5, 5);
+            var aims = SurfaceProbe.Grid(SurfaceProbe.CalibrationSquare, 5, 5);
             await new SurfaceProbe(client).CalibrateAsync((double)(_board.Value ?? 3), aims, p, ct);
-            return "Pointer calibrated.";
+            return "Pointer calibrated. Next: put the curved piece in and focus on its middle (step 2).";
         });
     }
 
     async Task Measure(IReadOnlyCollection<int>? only)
     {
         if (_machine.Client is not { IsConnected: true } client) { _status.Text = "Connect to the machine first."; return; }
-        if (SurfaceProbe.LoadCalibration() is not { } cal) { _status.Text = "Calibrate the pointer first."; return; }
+        if (SurfaceProbe.LoadCalibration() is not { } cal) { _status.Text = "Calibrate the pointer first (step 1)."; return; }
+        if (only is not { Count: > 0 } && !Bed.Contains(Area)) { _status.Text = "The area runs off the bed: fix it in step 3 first."; return; }
         if (_machine.Distance is not { } focus) { _status.Text = "Set the focus on the piece first (auto-focus, or type its height in the machine panel)."; return; }
-        var aims = only is { Count: > 0 } ? [.. only.Select(i => _curve.Points[i].At)] : SurfaceProbe.Grid(Area, (int)(_rows.Value ?? 9), (int)(_cols.Value ?? 9));
+        var aims = only is { Count: > 0 } ? [.. only.Select(i => _curve.Points[i].At)] : Aims();
         await Run(async (p, ct) =>
         {
             var heights = await new SurfaceProbe(client).MeasureAsync(aims, focus, cal, p, ct);
