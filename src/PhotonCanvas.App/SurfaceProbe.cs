@@ -118,7 +118,7 @@ public sealed class SurfaceProbe(DeviceClient client)
 
     /// <summary>
     /// The heights at <paramref name="aims"/> with the head moved to focus at <paramref name="focusMm"/>, inside a
-    /// session (<see cref="RunAsync"/>) that has already darkened the lights. Null where the dot isn't read.
+    /// session (<see cref="RunAsync"/>) that has already turned the lights on. Null where the dot isn't read.
     /// </summary>
     public async Task<List<double?>> ReadAtAsync(IReadOnlyList<Vec2> aims, double focusMm, PointerCalibration cal, IProgress<string>? progress, CancellationToken ct)
     {
@@ -131,13 +131,13 @@ public sealed class SurfaceProbe(DeviceClient client)
             ct.ThrowIfCancellationRequested();
             progress?.Report($"Point {i + 1} of {aims.Count} (head at {focusMm:0.#} mm)");
             var on = await PhotoAsync(aims[i], ct);
-            heights.Add(DotFinder.Find(on, off) is { } dot && cal.Depth(aims[i], dot.Centre) is { } depth ? focusMm - depth : null);
+            heights.Add(DotFinder.Find(on, off) is { } dot && cal.Depth(aims[i], dot) is { } depth ? focusMm - depth : null);
         }
         return heights;
     }
 
     /// <summary>
-    /// Run <paramref name="run"/> as one measuring session: checks the machine is idle, darkens the fill lights, and
+    /// Run <paramref name="run"/> as one measuring session: checks the machine is idle, turns the fill lights on, and
     /// puts the lights and pointer back afterwards (even if it fails or is stopped).
     /// </summary>
     public Task RunAsync(Func<Task> run, CancellationToken ct) => Session(run, ct);
@@ -160,7 +160,10 @@ public sealed class SurfaceProbe(DeviceClient client)
         return RasterImage.Decode(jpg);
     }
 
-    /// <summary>Checks the machine is idle, darkens the fill lights, runs, then puts the lights and pointer back.</summary>
+    /// <summary>The fill lights (percent) while measuring, at least: on, so the close-up camera can see.</summary>
+    const int MeasureLight = 50;
+
+    /// <summary>Checks the machine is idle, turns the fill lights on, runs, then puts the lights and pointer back.</summary>
     async Task Session(Func<Task> run, CancellationToken ct)
     {
         var mode = await client.GetRuntimeModeAsync(ct);
@@ -170,7 +173,9 @@ public sealed class SurfaceProbe(DeviceClient client)
         var pointer = await client.GetFocusPowerAsync(ct);
         try
         {
-            await client.SetFillLightsAsync(0, 0, ct);
+            // The close-up camera needs light to see the part (Kyle, 2026-11-08: "make sure the light's on"). The spot is
+            // found from the difference between photos with the pointer on and off, so steady light doesn't hide it.
+            await client.SetFillLightsAsync(Math.Max(lights.Front, MeasureLight), Math.Max(lights.Back, MeasureLight), ct);
             await run();
         }
         finally

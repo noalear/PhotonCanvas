@@ -23,11 +23,18 @@ abstract class RotaryScanRigBase(AppSettings settings, MachinePanel machine, dou
             ?? throw new InvalidOperationException("Choose the rotary in Work mode first.");
         if (!double.IsFinite(u) || Math.Abs(u) > Job.MaxTurnMm)
             throw new InvalidOperationException("That turn is far too long: check the rotary's scale in Work mode.");
-        // Still in focus mode after measuring: back to idle first, as the stock app does when it leaves it.
-        if (machine.Mode is "P_AUTOFOCUS" or "P_MEASURE" && machine.Client is { } c) await c.ReturnToIdleAsync();
+        // Measuring (moving the focus, auto-focusing) leaves the machine in focus mode, where it holds the rotary
+        // but doesn't turn it (Kyle's scan, 2026-11-08: it held and buzzed). Always back to idle first, as the
+        // stock app does when it leaves focus mode, whatever the machine panel last heard the mode was.
+        AppLog.Write("scan", $"Turn {degrees:0.###}° = {u:0.###} feed units (panel mode {machine.Mode}).");
+        if (machine.Client is { } c)
+        {
+            await c.ReturnToIdleAsync();
+            await Task.Delay(400, ct);
+        }
         await machine.TurnRotaryNowAsync(u, Speed);
-        // How long the turn takes at that speed, plus time for the part to stop swinging.
-        double s = Math.Abs(u) / (Speed / 60) * 1.15 + Math.Max(0, settleS);
+        // How long the turn takes at that speed (with room to spare), plus time for the part to stop swinging.
+        double s = Math.Abs(u) / (Speed / 60) * 1.5 + 0.3 + Math.Max(0, settleS);
         await Task.Delay(TimeSpan.FromSeconds(s), ct);
     }
 

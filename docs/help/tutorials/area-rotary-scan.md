@@ -19,7 +19,7 @@ Click **Scan the part** on the **Machine** tab.
 
 ## Choose how it measures
 <!-- target: field:Measure with -->
-**Red pointer and close-up camera** reads several places along the laser line (calibrate the pointer
+**Pointer and close-up camera** reads several places along the laser line (calibrate the pointer
 once in **Curved surface**, and focus on the top of the part first). **The machine's auto-focus**
 reads one place, in the middle of the field.
 
