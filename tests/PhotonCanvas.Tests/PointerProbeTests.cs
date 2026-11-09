@@ -120,6 +120,15 @@ public class PointerProbeTests
         Assert.Equal(-5.2, cal.Depth(aim, Seen(aim, -5.2))!.Value, 1);
         // Seen nowhere near the track: not trusted.
         Assert.Null(cal.Depth(aim, new Vec2(10, 10)));
+        // Past the ends of the track (further from the focus than calibrated): not read as the end depth.
+        Assert.Equal(8, cal.Depth(aim, Seen(aim, 8.2))!.Value, 1);
+        Assert.Null(cal.Depth(aim, Seen(aim, 8.6)));
+        Assert.Null(cal.Depth(aim, Seen(aim, -9)));
+        // Calibrated over X/Y 90–130: read up to 5 mm outside, not beyond (no guessing 80 mm out).
+        Assert.True(cal.Covers(new Vec2(134, 110)));
+        Assert.False(cal.Covers(new Vec2(140, 110)));
+        var far = new Vec2(207.8, 110);
+        Assert.Null(cal.Depth(far, Seen(far, 1)));
     }
 
     [Fact]

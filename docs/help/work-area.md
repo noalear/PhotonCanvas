@@ -155,14 +155,24 @@ How it measures:
 
 - **Pointer and close-up camera**: at each step the pointer is aimed at several places along the
   laser line and the close-up camera reads how far below the head's focus each dot lands (laser
-  triangulation, the same as [Curved surface](#curved-surface)). Calibrate the pointer once first
-  (**Curved surface** → **Calibrate the pointer…**), and focus on the top of the part before you scan:
+  triangulation, the same as [Curved surface](#curved-surface)). Calibrate the pointer once first with
+  **Calibrate along the laser line…** (below), and focus on the top of the part before you scan:
   the head starts there. Each head height reads about 8 mm either side of it, so at each angle the head
   steps up through a few heights, lowest first, and stops as soon as every place is read. At the first
   angle it goes from about 40 mm below where you focused to a little above it; after that it only covers
   the heights the last angle read (a little either side), often in one height. Places that couldn't be
   read at the first angle don't make later angles search wider.
-  Only places the close-up camera can see are read: the window says the area it was calibrated over.
+  Only places within 5 mm of where the pointer was calibrated are read (X 80 to 185 mm along the laser
+  line after **Calibrate along the laser line…**), so put the part of the stock you want scanned there.
+  Places outside are skipped, and a warning under **Places along it** says how many. A spot further than
+  8 mm from the head's focus isn't read at that head height (it's past what was calibrated): the head
+  tries the next height up.
+- **Calibrate along the laser line…** (shown with the pointer) calibrates the pointer over the strip a
+  scan reads: X 85 to 180 mm, 10 mm either side of the laser line, 33 spots at each of 9 heights.
+  Take the part out of the chuck, lay a flat, matt board on the bed where it was (about 95 × 20 mm
+  along the line), and auto-focus on it: the focus is taken as the board's height. It takes about five
+  minutes and replaces the saved calibration, which [Curved surface](#curved-surface) uses too (its
+  calibrated area shows there). The head goes back to the board's focus afterwards.
   The pointer hops from place to place and stays on each for about half a second while it's
   photographed. If fewer than half the places are read, the status line says where the photos are
   (see [Measure it with the pointer](#measure-it-with-the-pointer)).
@@ -353,8 +363,8 @@ on the canvas. The pointer is aimed at **Rows** × **Columns** spots spread even
 
 Under them a line says how many spots that is, how far apart, and about how long measuring takes. It
 warns when the area runs off the bed (**Measure** then won't start), and when it reaches well
-outside the calibrated square: spots there are worked out by extending the calibration, so they may
-be less exact, or not read where the close-up camera can't see the dot.
+outside the calibrated area: spots up to 5 mm outside it are worked out by extending the
+calibration, so they may be less exact; spots further out aren't read.
 
 The area starts as the one measured last, else the design's area plus 3 mm, else a 50 mm square in the
 middle of the bed. **Use the design's area** sets it to the selection's area (or the whole design's)
@@ -363,7 +373,8 @@ plus 3 mm round it.
 **4 · Measure**:
 
 - **Measure** checks the machine is idle, moves the head to the focus height, turns the fill lights
-  on (to at least 50%, so the close-up camera can see the part), and for each point aims the pointer and photographs it with the close-up camera (each photo is
+  on (to at least 50%, so the close-up camera can see the part) and the red auto-focus dot off (so
+  it can't be mistaken for the pointer), and for each point aims the pointer and photographs it with the close-up camera (each photo is
   compared with one with the pointer off, so only the dot is left). The pointer is turned off while
   it moves to the next point, then held still on it for about half a second while it's photographed,
   so you see it hop from spot to spot rather than streak across. The lights and pointer are put

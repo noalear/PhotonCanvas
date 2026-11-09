@@ -24,6 +24,14 @@ public sealed class SurfaceProbe(DeviceClient client)
     /// <summary>The middle of the bed the pointer is calibrated over (the close-up camera surely sees it).</summary>
     public static readonly Rect2 CalibrationSquare = new(95, 95, 125, 125);
 
+    /// <summary>
+    /// The strip along the rotary's laser line (<paramref name="lineY"/>, mm from the back) that the pointer is calibrated
+    /// over for scanning a part: as far along the axis as the close-up camera sees the pointer (Kyle's photos, 2026-11-09:
+    /// X 87–178 at Y 110), 10 mm either side of the line.
+    /// </summary>
+    public static Rect2 LineStrip(double lineY) =>
+        new(85, Math.Clamp(lineY - 10, 0, 200), 180, Math.Clamp(lineY + 10, 20, 220));
+
     /// <summary>About how long one pointer photo takes (aim, light, photograph), for time estimates.</summary>
     public const double SecondsPerPhoto = 1.1;
 
@@ -215,11 +223,16 @@ public sealed class SurfaceProbe(DeviceClient client)
             throw new InvalidOperationException($"The machine is busy ({mode}). Try again when it's idle.");
         var lights = await client.GetFillLightsAsync(ct);
         var pointer = await client.GetFocusPowerAsync(ct);
+        bool irOff = false;
         try
         {
             // The close-up camera needs light to see the part (Kyle, 2026-11-08: "make sure the light's on"). The spot is
             // found from the difference between photos with the pointer on and off, so steady light doesn't hide it.
             await client.SetFillLightsAsync(Math.Max(lights.Front, MeasureLight), Math.Max(lights.Back, MeasureLight), ct);
+            // The auto-focus light (the red dot under the head) stays on otherwise, in every photo: where the pointer
+            // can't be seen, a flicker of it was the "spot" (Kyle's photos, 2026-11-09).
+            await client.SetIrLedAsync(false, ct);
+            irOff = true;
             ClearPhotos();
             await Task.Delay(1500, ct); // the camera's exposure settles after the lights change
             await run();
@@ -230,6 +243,7 @@ public sealed class SurfaceProbe(DeviceClient client)
             {
                 await client.SetFillLightsAsync(lights.Front, lights.Back, CancellationToken.None);
                 if (pointer is { } p) await client.SetPointerPowerAsync(p, CancellationToken.None);
+                if (irOff) await client.SetIrLedAsync(true, CancellationToken.None);
             }
             catch (DeviceException) { }
         }

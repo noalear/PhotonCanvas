@@ -67,7 +67,9 @@ sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double s
         var off = new double[xs.Count];
         foreach (var f in levels)
         {
-            var pending = Enumerable.Range(0, xs.Count).Where(i => got[i] is null || off[i] > _reach * 0.6).ToList();
+            // Places outside what the pointer was calibrated over can't be read: not even photographed.
+            var pending = Enumerable.Range(0, xs.Count)
+                .Where(i => cal.Covers(new Vec2(xs[i], lineY)) && (got[i] is null || off[i] > _reach * 0.6)).ToList();
             if (pending.Count == 0) break;
             var aims = pending.Select(i => new Vec2(xs[i], lineY)).ToList();
             var h = await probe.ReadAtAsync(aims, f, cal, progress, ct);
