@@ -310,7 +310,7 @@ public sealed class CurvedSurfaceWindow : Window
         if (cal is not null && !Rect2.Bounds(cal.Aims).Inflate(10).Contains(a))
         {
             var c = Rect2.Bounds(cal.Aims);
-            t += $"\nThe pointer was calibrated on the middle square (X {c.MinX:0}–{c.MaxX:0}, Y {c.MinY:0}–{c.MaxY:0} mm, green on the left). Spots well outside it are worked out from it: they may be less exact, or not read at all where the close-up camera can't see the dot.";
+            t += $"\nThe pointer was calibrated on the middle square (X {c.MinX:0}–{c.MaxX:0}, Y {c.MinY:0}–{c.MaxY:0} mm, green on the left). Spots up to {Core.Camera.PointerCalibration.Margin:0} mm outside it are worked out from it and may be less exact; spots further out aren't read.";
         }
         return t;
     }

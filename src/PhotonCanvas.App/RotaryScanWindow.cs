@@ -40,10 +40,11 @@ public sealed class RotaryScanWindow : Window
     bool Inches => _units.SelectedIndex == 1;
     readonly CheckBox _axisKnown = new() { Content = "I know the axis height" };
     readonly NumericUpDown _axis = Number(-200, 200, 0.5m, "0.##"), _rod = Number(1, 200, 0.5m, "0.##");
-    readonly TextBlock _methodNote = Hint(), _anglesNote = Hint(), _status = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap }, _results = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+    readonly TextBlock _methodNote = Hint(), _anglesNote = Hint(), _reachNote = Hint(), _status = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap }, _results = new() { TextWrapping = Avalonia.Media.TextWrapping.Wrap };
     readonly ProgressBar _busy = new() { IsIndeterminate = true, IsVisible = false, Height = 4 };
     readonly Control _alongPanel;
     readonly Button _scanBtn = new() { Content = "Scan", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
+    readonly Button _calBtn = Button("Calibrate along the laser line…", tip: "Calibrate the pointer over the strip a scan reads (X 85–180 along the laser line), on a flat board lying where the part goes.");
     readonly Button _returnBtn = Button("Return to start", tip: "Turn the part back to where the stopped scan started.");
     readonly Button _highBtn = Button("Turn the high side up", tip: "Turn the part so its highest point is on top, under the laser line.");
     readonly StockView _view = new() { MinHeight = 300 };
@@ -114,7 +115,7 @@ public sealed class RotaryScanWindow : Window
         _stockHField = Field("Height", _stockH);
         _stockSize = new StackPanel { Spacing = 8, Children = { Field("Size", _stockW), Field("Units", _units), _stockHField } };
 
-        ToolTip.SetTip(_method, "The pointer reads many places along the laser line at each step (calibrate it once in Curved surface). The auto-focus reads one place, where the machine focuses, but reaches any height.");
+        ToolTip.SetTip(_method, "The pointer reads many places along the laser line at each step (calibrate it once with Calibrate along the laser line). The auto-focus reads one place, where the machine focuses, but reaches any height.");
         ToolTip.SetTip(_x0, "Where along the rotary's axis to start measuring (the work area's X, mm).");
         ToolTip.SetTip(_x1, "Where along the axis to stop measuring.");
         ToolTip.SetTip(_points, "How many places to measure between them, at every step.");
@@ -125,6 +126,7 @@ public sealed class RotaryScanWindow : Window
         ToolTip.SetTip(_axis, "Height of the rotary's axis above the bed, the way you'd type a focus height. A part's top height minus this is how far it reaches from the axis.");
         ToolTip.SetTip(_rod, "Diameter of a round rod you scanned, measured with calipers.");
 
+        _calBtn.Click += async (_, _) => await CalibrateAlongLine();
         var fromSel = Button("Use the selection", tip: "Measure along the selected shapes, and round as far as they go on the rotary page.");
         fromSel.Click += (_, _) => UseSelection();
         _scanBtn.Click += async (_, _) => await Scan();
@@ -154,6 +156,7 @@ public sealed class RotaryScanWindow : Window
             {
                 Field("From X (mm)", _x0), Field("To X (mm)", _x1),
                 Field("Places along it", _points),
+                _reachNote,
                 fromSel,
             },
         };
@@ -166,6 +169,7 @@ public sealed class RotaryScanWindow : Window
                 new TextBlock { Text = "HOW IT MEASURES", Classes = { "h" } },
                 Field("Measure with", _method),
                 _methodNote,
+                _calBtn,
                 new TextBlock { Text = "ALONG THE AXIS", Classes = { "h" } },
                 _alongPanel,
                 new TextBlock { Text = "ROUND THE PART", Classes = { "h" } },
@@ -191,6 +195,9 @@ public sealed class RotaryScanWindow : Window
         };
         _method.SelectionChanged += (_, _) => Update();
         _stops.ValueChanged += (_, _) => ShowAngles();
+        _x0.ValueChanged += (_, _) => ShowAngles();
+        _x1.ValueChanged += (_, _) => ShowAngles();
+        _points.ValueChanged += (_, _) => ShowAngles();
         _from.ValueChanged += (_, _) => ShowAngles();
         _to.ValueChanged += (_, _) => ShowAngles();
         _axisKnown.IsCheckedChanged += (_, _) => Update();
@@ -264,7 +271,26 @@ public sealed class RotaryScanWindow : Window
     }
 
     /// <summary>Under the Angles box: how many times it turns, how far apart, and to which angles.</summary>
-    void ShowAngles() => _anglesNote.Text = $"Turns to {Plan().AnglesText()}, then back to the start.";
+    void ShowAngles()
+    {
+        var plan = Plan();
+        _anglesNote.Text = $"Turns to {plan.AnglesText()}, then back to the start.";
+        // The pointer only reads where it was calibrated (Kyle measured X 87–208 against a 95–125 calibration).
+        _reachNote.IsVisible = false;
+        if (Pointer && SurfaceProbe.LoadCalibration() is { } cal)
+        {
+            int outside = plan.Xs.Count(x => !cal.Covers(new Vec2(x, plan.LineY)));
+            if (outside > 0)
+            {
+                var c = cal.Covered;
+                double m = Core.Camera.PointerCalibration.Margin;
+                _reachNote.Text = $"⚠ {outside} of the {plan.Xs.Count} places can't be read: the pointer only reads from X {c.MinX - m:0} to {c.MaxX + m:0} mm" +
+                                  (plan.LineY < c.MinY - m || plan.LineY > c.MaxY + m ? $" and Y {c.MinY - m:0} to {c.MaxY + m:0} mm (the laser line is at Y {plan.LineY:0})" : "") +
+                                  ", where the close-up camera was calibrated. Set From X and To X inside that, or move the part so the area to scan is there.";
+                _reachNote.IsVisible = true;
+            }
+        }
+    }
 
     void Update()
     {
@@ -291,12 +317,13 @@ public sealed class RotaryScanWindow : Window
             }
         }
         _alongPanel.IsVisible = pointer;
+        _calBtn.IsVisible = pointer;
         _axis.IsEnabled = _axisKnown.IsChecked == true;
         if (pointer)
         {
             var cal = SurfaceProbe.LoadCalibration();
             _methodNote.Text = cal is null
-                ? "⚠ The pointer isn't calibrated yet: calibrate it once in Machine → Curved surface (a flat board), then come back."
+                ? "⚠ The pointer isn't calibrated yet: click Calibrate along the laser line (on a flat board where the part goes) first."
                 : $"Focus on the top of the part first: the head starts there. It reads about {Reach(cal):0} mm either side of where it's focused, so at each angle the head steps up from below the part to just above it, and stops once every place is read. " +
                   $"The close-up camera was calibrated over X {cal.Aims.Min(a => a.X):0}–{cal.Aims.Max(a => a.X):0} and Y {cal.Aims.Min(a => a.Y):0}–{cal.Aims.Max(a => a.Y):0} mm: places outside that may not be read.";
         }
@@ -457,7 +484,7 @@ public sealed class RotaryScanWindow : Window
         double startFocus = 0;
         if (Pointer)
         {
-            if ((cal = SurfaceProbe.LoadCalibration()) is null) { _status.Text = "Calibrate the pointer first (Machine → Curved surface → Calibrate the pointer)."; return; }
+            if ((cal = SurfaceProbe.LoadCalibration()) is null) { _status.Text = "Calibrate the pointer first: Calibrate along the laser line, above."; return; }
             if (_machine.Distance is not { } focus) { _status.Text = "Focus on the top of the part first (auto-focus, or type its height in the machine panel)."; return; }
             startFocus = focus;
         }
@@ -533,6 +560,53 @@ public sealed class RotaryScanWindow : Window
             }
             _busy.IsVisible = false;
             _scanBtn.IsEnabled = true;
+            Update();
+        }
+    }
+
+    /// <summary>
+    /// Calibrate the pointer over the strip along the laser line that scans read, on a flat board where the part goes, the
+    /// board's height being the focus the machine has now. Replaces the saved calibration (Curved surface uses it too).
+    /// </summary>
+    async Task CalibrateAlongLine()
+    {
+        if (_machine.Client is not { IsConnected: true } client) { _status.Text = "Connect to the machine first."; return; }
+        if (_machine.Mode is "P_WORKING" or "P_PAUSE" or "P_FRAMING" or "P_WORK") { _status.Text = "The machine has a job on it. Wait for it to finish (or stop it) first."; return; }
+        if (_machine.Distance is not { } board) { _status.Text = "Auto-focus on the board first (the machine panel's auto-focus): its height is taken from the focus."; return; }
+        double line = Math.Clamp(_settings.RotaryLineMm, 1, MachineProfile.F2Ultra.FieldH - 1);
+        var strip = SurfaceProbe.LineStrip(line);
+        var aims = SurfaceProbe.Grid(strip, 3, 11);
+        double minutes = Core.Camera.PointerCalibration.DefaultDepths.Length * (aims.Count + 1) * SurfaceProbe.SecondsPerPhoto / 60;
+        string what =
+            "This teaches the program where the blue pointer shows up in the close-up camera at each height, all along the strip a scan reads.\n\n" +
+            $"1. Take the part out of the chuck.\n2. Lay a flat, matt board (wood or card, not shiny) on the bed where the part was, covering X {strip.MinX:0} to {strip.MaxX:0} mm and Y {strip.MinY:0} to {strip.MaxY:0} mm along the laser line (about {strip.Width:0} × {strip.Height:0} mm).\n" +
+            $"3. Auto-focus on the board. The focus now is {board:0.##} mm: that's taken as the board's height, so if it isn't on the board, press Cancel and auto-focus first.\n\n" +
+            $"The head then steps from 8 mm above the board to 8 mm below it, and at each height the pointer stops on {aims.Count} spots along the strip for a photo. The laser isn't fired. About {Math.Ceiling(minutes):0} minutes.";
+        if (!await Dialogs.Confirm(this, "Calibrate along the laser line", what, "Start", "Cancel")) return;
+
+        _cts?.Cancel();
+        var cts = _cts = new CancellationTokenSource();
+        _busy.IsVisible = true;
+        _scanBtn.IsEnabled = _calBtn.IsEnabled = false;
+        var progress = new Progress<string>(s => _status.Text = s);
+        try
+        {
+            await client.ReturnToIdleAsync();
+            await Task.Delay(300, cts.Token);
+            var cal = await new SurfaceProbe(client).CalibrateAsync(board, aims, progress, cts.Token);
+            int found = cal.Seen.Sum(r => r.Count(p => p is not null)), all = aims.Count * cal.Depths.Count;
+            _status.Text = $"Calibrated: the pointer was seen in {found} of {all} photos. Put the part back, focus on its top, and scan.";
+        }
+        catch (OperationCanceledException) { _status.Text = "Stopped: the old calibration is kept."; }
+        catch (Exception e) when (e is DeviceException or InvalidOperationException or IOException or FormatException or ArgumentOutOfRangeException)
+        {
+            _status.Text = $"Calibrating stopped: {e.Message} The old calibration is kept.";
+        }
+        finally
+        {
+            if (_machine.IsConnected) await FocusBackAsync(client, board);
+            _busy.IsVisible = false;
+            _scanBtn.IsEnabled = _calBtn.IsEnabled = true;
             Update();
         }
     }

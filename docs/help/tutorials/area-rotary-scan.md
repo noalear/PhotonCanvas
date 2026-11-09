@@ -19,14 +19,20 @@ Click **Scan the part** on the **Machine** tab.
 
 ## Choose how it measures
 <!-- target: field:Measure with -->
-**Pointer and close-up camera** reads several places along the laser line (calibrate the pointer
-once in **Curved surface**, and focus on the top of the part first). **The machine's auto-focus**
-reads one place, in the middle of the field.
+**Pointer and close-up camera** reads several places along the laser line (focus on the top of the
+part first). **The machine's auto-focus** reads one place, in the middle of the field.
+
+## Calibrate the pointer once
+<!-- target: button:Calibrate along the laser line… -->
+The pointer needs calibrating once, along the strip a scan reads. Take the part out, lay a flat matt
+board on the bed where it was, auto-focus on the board, and click **Calibrate along the laser line…**.
+It takes about five minutes. Then put the part back.
 
 ## Say where to scan
 <!-- target: button:Use the selection -->
 Select the shapes that cover the area to scan and click **Use the selection**, or type **From X (mm)**
-and **To X (mm)**. Leave **From (°)** 0 and **To (°)** 360 for a whole turn.
+and **To X (mm)**. The pointer only reads from X 80 to 185 mm (where it was calibrated): a warning
+says when places are outside that. Leave **From (°)** 0 and **To (°)** 360 for a whole turn.
 
 ## Scan it
 <!-- target: button:Scan -->

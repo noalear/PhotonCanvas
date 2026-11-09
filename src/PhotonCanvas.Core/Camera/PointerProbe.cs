@@ -114,28 +114,55 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
     /// <summary>Depths the calibration steps through (mm below focus): ±8 mm in 2 mm steps.</summary>
     public static readonly double[] DefaultDepths = [-8, -6, -4, -2, 0, 2, 4, 6, 8];
 
+    /// <summary>How far outside the calibrated aims (mm) a spot is still worked out from them.</summary>
+    public const double Margin = 5;
+
+    /// <summary>How far past the end of a track (a fraction of its last step) a spot still reads as the end depth.</summary>
+    const double OverEnd = 0.15;
+
+    /// <summary>The area the pointer was calibrated over (the aims' bounds).</summary>
+    public Rect2 Covered => Aims.Count == 0 ? Rect2.Empty : Rect2.Bounds(Aims);
+
+    /// <summary>
+    /// Whether <paramref name="aim"/> can be read: within <see cref="Margin"/> of the calibrated area. Further out the
+    /// fitted map from aim to picture is a guess (Kyle's scan, 2026-11-09, read places 80 mm out of a 30 mm square
+    /// and they came back tens of mm wrong).
+    /// </summary>
+    public bool Covers(Vec2 aim)
+    {
+        var c = Covered;
+        return !c.IsEmpty && aim.X >= c.MinX - Margin && aim.X <= c.MaxX + Margin && aim.Y >= c.MinY - Margin && aim.Y <= c.MaxY + Margin;
+    }
+
     /// <summary>
     /// How far below the focus the surface is at <paramref name="aim"/>, from where the dot was seen.
     /// The dot's track for this aim (blended from the nearest calibrated aims) is followed to the
-    /// point nearest what was seen. Null outside the calibrated depths or aims.
+    /// point nearest what was seen. Null outside the calibrated depths, or more than <see cref="Margin"/> outside the calibrated aims.
     /// </summary>
     public double? Depth(Vec2 aim, Vec2 seen)
     {
         var track = Track(aim);
         if (track is null) return null;
-        double best = double.PositiveInfinity, depth = double.NaN;
+        double best = double.PositiveInfinity, depth = double.NaN, bestRaw = 0;
+        int bestSeg = -1, firstSeg = -1, lastSeg = -1;
         for (int i = 0; i + 1 < track.Count; i++)
         {
             if (track[i] is not { } a || track[i + 1] is not { } b) continue;
+            if (firstSeg < 0) firstSeg = i;
+            lastSeg = i;
             var ab = b - a;
             double len2 = ab.Dot(ab);
-            double t = len2 < 1e-12 ? 0 : Math.Clamp((seen - a).Dot(ab) / len2, 0, 1);
+            double raw = len2 < 1e-12 ? 0 : (seen - a).Dot(ab) / len2, t = Math.Clamp(raw, 0, 1);
             double d = seen.Dist(a + ab * t);
-            if (d < best) { best = d; depth = Depths[i] + (Depths[i + 1] - Depths[i]) * t; }
+            if (d < best) { best = d; depth = Depths[i] + (Depths[i + 1] - Depths[i]) * t; bestRaw = raw; bestSeg = i; }
         }
         // Further from the track than the track's own spacing: not trusted.
         double spacing = TrackSpacing(track);
-        return double.IsNaN(depth) || best > Math.Max(3, spacing * 1.5) ? null : depth;
+        if (double.IsNaN(depth) || best > Math.Max(3, spacing * 1.5)) return null;
+        // Past either end of the track: the surface is further from the focus than was calibrated. Not the end depth
+        // (Kyle's log, 2026-11-09: every such spot read as exactly 8 mm above or below the focus).
+        if (bestSeg == firstSeg && bestRaw < -OverEnd || bestSeg == lastSeg && bestRaw > 1 + OverEnd) return null;
+        return depth;
     }
 
     /// <summary>
@@ -186,7 +213,7 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
     /// </summary>
     List<Vec2?>? Track(Vec2 aim)
     {
-        if (Aims.Count == 0) return null;
+        if (!Covers(aim)) return null;
         var o = new List<Vec2?>();
         for (int d = 0; d < Depths.Count; d++)
         {
