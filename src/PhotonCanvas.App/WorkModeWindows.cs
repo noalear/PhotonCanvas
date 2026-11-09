@@ -176,7 +176,7 @@ public sealed class WorkModeWindow : Window
                 Field("Laser line (mm)", _line),
                 _custom,
                 turnPanel,
-                Hint("The work area becomes the field's width × once round the object. Design Y goes round it; the middle of the design faces the laser at the start."),
+                Hint("The work area becomes the field's width × once round the object. Design Y goes round it; the middle of the page faces the laser at the start, so moving a design up or down the page moves it round the object."),
             },
         };
         _conveyor = new StackPanel

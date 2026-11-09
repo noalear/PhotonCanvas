@@ -679,9 +679,9 @@ public static class JobBuilder
 
         var mode = opt.Mode switch
         {
-            // Round the object from the middle of the design: what faces the laser at the start is the design's middle row.
-            // (A rotary start line on the page says what faces it instead.)
-            WorkMode.Rotary r => r with { OriginY = WorkModes.RotaryOrigin(s, bounds, r.CircumferenceMm) },
+            // What faces the laser at the start is the page's middle row, where the canvas shows the laser line on the
+            // camera photo (a rotary start line on the page says what faces it instead).
+            WorkMode.Rotary r => r with { OriginY = WorkModes.RotaryOrigin(s, Math.Round(r.CircumferenceMm, 2)) },
             _ => opt.Mode,
         };
         // The design must fit once round (the job's own check allows a little more, for lines carried on past their start).

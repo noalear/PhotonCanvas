@@ -136,7 +136,7 @@ public partial class MainWindow : Window
         _machine.FramingChanged += _ribbon.Refresh;
         Canvas.Hint += h => StatusText.Text = h;
         Canvas.CameraOpacity = _machine.OverlayOpacity;
-        // Rotary: where the bed's photos go on the unrolled page (worked out again only when the design changes).
+        // Rotary: where the bed's photos go on the unrolled page (worked out again only when the page or settings change).
         (DocState? State, double Line, double Dia, double? Shift) bedShift = default;
         Canvas.BedShiftY = () =>
         {
