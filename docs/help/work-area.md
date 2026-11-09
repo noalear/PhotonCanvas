@@ -56,6 +56,11 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
   line**: an orange guide across the page labelled "Rotary start: faces the laser". Then that line
   faces the laser at the start, whatever is drawn. Pages made for the rotary (a stacked model's
   finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
+- A line drawn all the way round the object (from one edge of the area to the other, at the same
+  place across) is cut once round and then **2 mm further**, over where it started. Otherwise the
+  start and end meet at the one spot where the rotary is speeding up and slowing down, and a single
+  pass leaves a short stretch there not cut through. A Cut layer's **Overcut** is used instead when
+  it's longer (up to 10 mm). A line up to 1 mm short of round is closed the same way.
 - The rotary never turns faster than 10 turns a second. Moves between paths, the turn to the start
   and the turn back at the end are held to that, and so is a layer's speed where it turns the object
   (a job check says when a layer is slowed down). The machine's own travel speed would spin a thin
