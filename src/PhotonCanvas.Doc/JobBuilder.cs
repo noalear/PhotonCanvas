@@ -591,6 +591,9 @@ public static class JobBuilder
                             bounds = bounds.Union(Rect2.Bounds(p.Points));
                             continue;
                         }
+                        // All the way round the object: on past the start, so the seam is cut through.
+                        if (opt.Mode is WorkMode.Rotary round && !p.Closed && RotarySeam.GoesRound(p.Points, round.CircumferenceMm))
+                            pl = Polyline.Open(RotarySeam.CarryOn(p.Points, round.CircumferenceMm, Math.Min(Math.Max(RotarySeam.OverlapMm, layer.OvercutMm), RotarySeam.MaxOverlapMm)));
                         if (wobble) pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
                         int bm = blocks.Count, sm = steps.Count;
                         blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
@@ -668,6 +671,13 @@ public static class JobBuilder
             WorkMode.Rotary r => r with { OriginY = s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (bounds.MinY + bounds.MaxY) / 2 },
             _ => opt.Mode,
         };
+        // The design must fit once round (the job's own check allows a little more, for lines carried on past their start).
+        if (mode is WorkMode.Rotary fit && !bounds.IsEmpty)
+        {
+            double far = Math.Abs(bounds.MinY - fit.OriginY) > Math.Abs(bounds.MaxY - fit.OriginY) ? bounds.MinY : bounds.MaxY;
+            if (Math.Abs(far - fit.OriginY) > fit.CircumferenceMm / 2 + 1e-6)
+                throw new OutsideWorkAreaException(bounds.MinX, far, opt.Machine.FieldW, fit.CircumferenceMm, " (the rotary's area: the field across, once round the object)");
+        }
         if (mode is WorkMode.Rotary rot && blocks.Any(b => b is not DotBlock && b.Laser.FValue > Job.RotaryFeedCap(rot)))
             warnings.Add($"On the rotary, moves that turn it are held to 10 turns a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
         if (mode is WorkMode.Conveyor)
