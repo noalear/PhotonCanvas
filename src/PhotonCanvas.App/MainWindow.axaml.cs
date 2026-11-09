@@ -136,6 +136,15 @@ public partial class MainWindow : Window
         _machine.FramingChanged += _ribbon.Refresh;
         Canvas.Hint += h => StatusText.Text = h;
         Canvas.CameraOpacity = _machine.OverlayOpacity;
+        // Rotary: where the bed's photos go on the unrolled page (worked out again only when the design changes).
+        (DocState? State, double Line, double Dia, double? Shift) bedShift = default;
+        Canvas.BedShiftY = () =>
+        {
+            if (WorkModes.From(_settings) is not WorkMode.Rotary) return null;
+            if (!ReferenceEquals(bedShift.State, _doc.State) || bedShift.Line != _settings.RotaryLineMm || bedShift.Dia != _settings.RotaryDiameterMm)
+                bedShift = (_doc.State, _settings.RotaryLineMm, _settings.RotaryDiameterMm, WorkModes.BedShift(_settings, _doc.State));
+            return bedShift.Shift;
+        };
         _machine.OverlayOpacityChanged += o => Canvas.CameraOpacity = o;
         _machine.OverlayChanged += b =>
         {
@@ -717,7 +726,7 @@ public partial class MainWindow : Window
         focus.Small("Thickness", "IcMeasure", () => _ = Guard(MeasureThickness), "Measure the material's thickness: auto-focus on it and compare with the empty bed (measured once)");
         var work = laser.Group("Work area");
         _ribbon.ShowWhen(work.Large("Work mode", "IcRotary", () => _ = Guard(ShowWorkMode), "Flat bed, rotary attachment or conveyor (experimental), and their settings"), () => _settings.OwnsAttachment);
-        work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
+        work.Large("Curved surface", "IcDepth", () => _ = Guard(() => new CurvedSurfaceWindow(_doc, _machine, _settings).ShowDialog(this)), "Mark on a curved piece: measure it with the pointer, or type in a cylinder or slatted drum; the head follows it in height steps (experimental)");
         _ribbon.ShowWhen(work.Small("Scan the part", "IcRotary", ShowRotaryScan, "Turn the part in the rotary a step at a time and measure its top at each step, to see its shape and how it sits (experimental; the laser isn't fired)"), () => _settings.WorkMode == "Rotary" && WorkModes.Usable(_settings));
         work.Small("Layer by layer", "IcLayers", () => new LayerByLayerWindow(_doc, _job).Show(this), "Mark one layer at a time with a pause to change the screen, colour or material between them (screen printing)");
         work.Small("Sections", "IcSections", () => _ = Guard(ShowSections), "Mark a design bigger than the work area in sections, moving the material between them", () => _settings.WorkMode == "Flat");

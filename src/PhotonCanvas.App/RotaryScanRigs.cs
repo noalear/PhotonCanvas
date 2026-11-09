@@ -11,8 +11,11 @@ namespace PhotonCanvas.App;
 /// </summary>
 abstract class RotaryScanRigBase(AppSettings settings, MachinePanel machine, double settleS) : IRotaryScanRig
 {
-    /// <summary>The speed turns are asked for (the feed's units a minute), as Work mode's turns.</summary>
-    const double Speed = 1200;
+    /// <summary>
+    /// The speed turns are asked for (the feed's units a minute): a third of Work mode's, so a heavy bar on a
+    /// direct-drive chuck starts and stops gently instead of slipping (a quarter turn takes about 1.6 s).
+    /// </summary>
+    const double Speed = 400;
 
     protected MachinePanel Machine => machine;
 
@@ -42,10 +45,12 @@ abstract class RotaryScanRigBase(AppSettings settings, MachinePanel machine, dou
 }
 
 /// <summary>
-/// Measuring along the laser line with the red pointer and the close-up camera (calibrated once on a flat board).
-/// Each head height reads the surface within about 8 mm of it, so at each angle the head steps up through the
-/// heights the places are expected at (what the last angle read there), lowest first, and stops once every place
-/// is read. Places that couldn't be read at the first angle (out of the camera's sight) don't widen later angles.
+/// Measuring along the laser line with the blue pointer and the close-up camera (calibrated once on a flat board).
+/// Each head height reads the surface within about 8 mm of it. At each angle the machine's own auto-focus first
+/// finds the part's top in the middle of the field, then the head steps up through the heights around that and
+/// what the last angle read, lowest first, and stops once every place is read. (Kyle's scan, 2026-11-09: started
+/// from the board's focus, the head never got near the bar's top, so nothing was read.) If the auto-focus fails,
+/// or nothing reads around it, it searches the whole range.
 /// </summary>
 sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double settleS, SurfaceProbe probe, PointerCalibration cal,
     double lineY, double startFocus, IProgress<string> progress) : RotaryScanRigBase(settings, machine, settleS)
@@ -58,14 +63,26 @@ sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double s
     {
         var got = new double?[xs.Count];
         double hi = DeviceClient.MaxHeadZ - MachineProfile.F2Ultra.ZOffset;
-        // After the first angle, plan from the places that have been read (the rest are tried at the same heights).
-        var known = guesses.Where(g => g is not null).ToList();
-        var levels = RotaryScanner.FocusSweep(_first || known.Count == 0 ? [] : known, startFocus, _reach, 0, hi);
+        // Plan from the part's top where the machine focuses and the places the last angle read.
+        List<double?> known = _first ? [] : [.. guesses.Where(g => g is not null)];
         _first = false;
+        if (await MiddleTopAsync(ct) is { } top) known.Add(top);
+        var levels = RotaryScanner.FocusSweep(known, startFocus, _reach, 0, hi);
         // How far from the head's focus each place was read: readings near the edge of the reach are the least sure, so
         // such a place is tried again at the next height up and the reading nearest the focus is kept.
         var off = new double[xs.Count];
-        foreach (var f in levels)
+        await ReadAsync(levels);
+        if (known.Count > 0 && got.All(g => g is null))
+        {
+            // Nothing where it was expected (the auto-focus caught the chuck or the base, say): look everywhere.
+            AppLog.Write("scan", "Nothing read around the expected height: searching the whole range.");
+            await ReadAsync([.. RotaryScanner.FocusSweep(new double?[] { 0, hi }, startFocus, _reach, 0, hi, 12).Except(levels)]);
+        }
+        return got;
+
+        async Task ReadAsync(IEnumerable<double> heights)
+        {
+        foreach (var f in heights)
         {
             // Places outside what the pointer was calibrated over can't be read: not even photographed.
             var pending = Enumerable.Range(0, xs.Count)
@@ -81,7 +98,25 @@ sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double s
                 off[i] = Math.Abs(v - f);
             }
         }
-        return got;
+        }
+    }
+
+    /// <summary>The height of the part's top in the middle of the field by the machine's own auto-focus; null if it didn't work.</summary>
+    async Task<double?> MiddleTopAsync(CancellationToken ct)
+    {
+        if (Machine.Client is not { IsConnected: true } c) return null;
+        progress.Report("Auto-focusing on the part's top to find its height…");
+        try
+        {
+            double top = await c.AutoFocusAsync(cancellationToken: ct) - MachineProfile.F2Ultra.ZOffset;
+            AppLog.Write("scan", $"Auto-focus in the middle: the part's top is at {top:0.0} mm.");
+            return double.IsFinite(top) ? top : null;
+        }
+        catch (Exception e) when (e is DeviceException or TimeoutException or InvalidOperationException)
+        {
+            AppLog.Write("scan", $"Auto-focus in the middle didn't work ({e.Message}): searching by heights.");
+            return null;
+        }
     }
 }
 

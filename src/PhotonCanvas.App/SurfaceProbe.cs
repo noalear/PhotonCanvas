@@ -21,8 +21,15 @@ public sealed class SurfaceProbe(DeviceClient client)
 
     sealed record Saved(double[] Depths, double[][] Aims, double[]?[][] Seen, double? BoardMm = null, DateTime? When = null);
 
-    /// <summary>The middle of the bed the pointer is calibrated over (the close-up camera surely sees it).</summary>
-    public static readonly Rect2 CalibrationSquare = new(95, 95, 125, 125);
+    /// <summary>
+    /// The area Curved surface calibrates the pointer over: as far left and right as the close-up camera sees the
+    /// pointer (Kyle's photos, 2026-11-09: X 87–178), the middle 30 mm front to back. It was the middle 30 mm square,
+    /// which left most of a rotary part unreadable.
+    /// </summary>
+    public static readonly Rect2 CalibrationArea = new(85, 95, 180, 125);
+
+    /// <summary>Spots in <see cref="CalibrationArea"/> (rows, columns).</summary>
+    public const int CalibrationRows = 4, CalibrationCols = 11;
 
     /// <summary>
     /// The strip along the rotary's laser line (<paramref name="lineY"/>, mm from the back) that the pointer is calibrated
@@ -229,8 +236,8 @@ public sealed class SurfaceProbe(DeviceClient client)
             // The close-up camera needs light to see the part (Kyle, 2026-11-08: "make sure the light's on"). The spot is
             // found from the difference between photos with the pointer on and off, so steady light doesn't hide it.
             await client.SetFillLightsAsync(Math.Max(lights.Front, MeasureLight), Math.Max(lights.Back, MeasureLight), ct);
-            // The auto-focus light (the red dot under the head) stays on otherwise, in every photo: where the pointer
-            // can't be seen, a flicker of it was the "spot" (Kyle's photos, 2026-11-09).
+            // The auto-focus IR light, off for photos as the stock app does. (It isn't the red dot under the head,
+            // which stays on: Kyle, 2026-11-09. That's in both photos of a pair, so it cancels out.)
             await client.SetIrLedAsync(false, ct);
             irOff = true;
             ClearPhotos();

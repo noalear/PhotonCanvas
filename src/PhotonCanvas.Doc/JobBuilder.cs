@@ -681,7 +681,7 @@ public static class JobBuilder
         {
             // Round the object from the middle of the design: what faces the laser at the start is the design's middle row.
             // (A rotary start line on the page says what faces it instead.)
-            WorkMode.Rotary r => r with { OriginY = s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (bounds.MinY + bounds.MaxY) / 2 },
+            WorkMode.Rotary r => r with { OriginY = WorkModes.RotaryOrigin(s, bounds, r.CircumferenceMm) },
             _ => opt.Mode,
         };
         // The design must fit once round (the job's own check allows a little more, for lines carried on past their start).

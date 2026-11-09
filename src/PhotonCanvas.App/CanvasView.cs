@@ -169,6 +169,12 @@ public sealed partial class CanvasView : Control
         set { _camera = value; InvalidateVisual(); }
     }
 
+    /// <summary>
+    /// Page Y → bed Y (bed = page + this) when the page isn't the bed (the rotary), so bed photos are put where they
+    /// belong; null on the flat bed.
+    /// </summary>
+    public Func<double?>? BedShiftY { get; set; }
+
     double _cameraOpacity = 0.85;
     public double CameraOpacity
     {
@@ -442,20 +448,28 @@ public sealed partial class CanvasView : Control
         ctx.FillRectangle(BgBrush, b);
         var field = ToScreen(new Rect2(0, 0, _machine.FieldW, _machine.FieldH));
         ctx.FillRectangle(FieldBrush, field);
-        if (_camera is { } cam)
-            using (ctx.PushOpacity(_cameraOpacity))
-                ctx.DrawImage(cam, new Rect(0, 0, cam.PixelSize.Width, cam.PixelSize.Height), field);
-        if (_closeUp is { } cu)
+        // Photos are of the bed. On the rotary the page is the part unrolled, so they're shown at their true size with the
+        // laser line on the row that faces it (not squeezed into the page), and clipped to the page.
+        double? bedShift = BedShiftY?.Invoke();
+        Rect2 OnPage(Rect2 bed) => bedShift is { } dy ? new Rect2(bed.MinX, bed.MinY - dy, bed.MaxX, bed.MaxY - dy) : bed;
+        using (bedShift is null ? default(DrawingContext.PushedState?) : ctx.PushClip(field))
         {
-            // The close-up photo on top of the overview, where the camera really looks.
-            var r = ToScreen(cu.Area);
-            ctx.DrawImage(cu.Image, new Rect(0, 0, cu.Image.PixelSize.Width, cu.Image.PixelSize.Height), r);
-            ctx.DrawRectangle(new Pen(new SolidColorBrush(AccentColor), 1, new DashStyle([4, 3], 0)), r);
+            if (_camera is { } cam)
+                using (ctx.PushOpacity(_cameraOpacity))
+                    ctx.DrawImage(cam, new Rect(0, 0, cam.PixelSize.Width, cam.PixelSize.Height),
+                        bedShift is null ? field : ToScreen(OnPage(new Rect2(0, 0, MachineProfile.F2Ultra.FieldW, MachineProfile.F2Ultra.FieldH))));
+            if (_closeUp is { } cu)
+            {
+                // The close-up photo on top of the overview, where the camera really looks.
+                var r = ToScreen(OnPage(cu.Area));
+                ctx.DrawImage(cu.Image, new Rect(0, 0, cu.Image.PixelSize.Width, cu.Image.PixelSize.Height), r);
+                ctx.DrawRectangle(new Pen(new SolidColorBrush(AccentColor), 1, new DashStyle([4, 3], 0)), r);
+            }
         }
         if (_showGrid) DrawGrid(ctx, field);
         if (_closeUpArea is { } seen)
         {
-            var r = ToScreen(seen);
+            var r = ToScreen(OnPage(seen));
             var green = Color.Parse("#2FC27A");
             ctx.DrawRectangle(new Pen(new SolidColorBrush(green), 1.5, new DashStyle([6, 4], 0)), r);
             var label = new FormattedText("close-up camera sees this", System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, new Typeface("Inter"), 11, new SolidColorBrush(green));

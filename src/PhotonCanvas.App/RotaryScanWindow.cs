@@ -98,6 +98,15 @@ public sealed class RotaryScanWindow : Window
         _x0.Value = (decimal)Math.Clamp(settings.RotaryScanX0, 0, 220);
         _x1.Value = (decimal)Math.Clamp(settings.RotaryScanX1, 0, 220);
         _points.Value = Math.Clamp(settings.RotaryScanPoints, 1, 60);
+        if (!settings.RotaryScanWholeTurnSet)
+        {
+            // Once: a whole turn, every side of the stock (earlier versions started at 24 stops, or kept a short span).
+            settings.RotaryScanWholeTurnSet = true;
+            settings.RotaryScanFromDeg = 0;
+            settings.RotaryScanToDeg = 360;
+            settings.RotaryScanStops = RotaryScanPlan.StopsFor(settings.RotaryStockKind);
+            settings.Save();
+        }
         _stops.Value = Math.Clamp(settings.RotaryScanStops, 2, 360);
         _from.Value = (decimal)settings.RotaryScanFromDeg;
         _to.Value = (decimal)settings.RotaryScanToDeg;
@@ -119,7 +128,7 @@ public sealed class RotaryScanWindow : Window
         ToolTip.SetTip(_x0, "Where along the rotary's axis to start measuring (the work area's X, mm).");
         ToolTip.SetTip(_x1, "Where along the axis to stop measuring.");
         ToolTip.SetTip(_points, "How many places to measure between them, at every step.");
-        ToolTip.SetTip(_stops, "How many angles to measure at. 24 is every 15° over a whole turn.");
+        ToolTip.SetTip(_stops, "How many times it stops to measure on the way round (a count, not an angle): 4 over a whole turn is every 90°, 8 every 45°. Picking a stock sets it to see every side.");
         ToolTip.SetTip(_from, "First angle, in degrees from where the part is now. Positive is the way a design runs down the page.");
         ToolTip.SetTip(_to, "Last angle. From 0 to 360 is a whole turn (360 itself isn't measured again, it's where it started).");
         ToolTip.SetTip(_settle, "Extra wait after each turn, for the part to stop moving before it's measured.");
@@ -127,6 +136,8 @@ public sealed class RotaryScanWindow : Window
         ToolTip.SetTip(_rod, "Diameter of a round rod you scanned, measured with calipers.");
 
         _calBtn.Click += async (_, _) => await CalibrateAlongLine();
+        var wholeTurn = Button("Whole turn, every side", tip: "From 0° to 360°, with a stop at every side of the stock chosen below (4 for a rod, 8 for a square bar).");
+        wholeTurn.Click += (_, _) => WholeTurn();
         var fromSel = Button("Use the selection", tip: "Measure along the selected shapes, and round as far as they go on the rotary page.");
         fromSel.Click += (_, _) => UseSelection();
         _scanBtn.Click += async (_, _) => await Scan();
@@ -173,8 +184,9 @@ public sealed class RotaryScanWindow : Window
                 new TextBlock { Text = "ALONG THE AXIS", Classes = { "h" } },
                 _alongPanel,
                 new TextBlock { Text = "ROUND THE PART", Classes = { "h" } },
-                Field("Angles", _stops),
+                Field("How many stops", _stops),
                 Field("From (°)", _from), Field("To (°)", _to),
+                wholeTurn,
                 _anglesNote,
                 Field("Wait after a turn (s)", _settle),
                 Row(_scanBtn, stop),
@@ -201,7 +213,12 @@ public sealed class RotaryScanWindow : Window
         _from.ValueChanged += (_, _) => ShowAngles();
         _to.ValueChanged += (_, _) => ShowAngles();
         _axisKnown.IsCheckedChanged += (_, _) => Update();
-        _stockKind.SelectionChanged += (_, _) => Update();
+        _stockKind.SelectionChanged += (_, _) =>
+        {
+            // A standard stock: a whole turn with a stop at every face (and corner), unless the window is still filling in.
+            if (!_updating && IsLoaded) WholeTurn();
+            Update();
+        };
         _stockW.ValueChanged += (_, _) => Update();
         _stockH.ValueChanged += (_, _) => Update();
         int unitsWas = _units.SelectedIndex;
@@ -270,7 +287,7 @@ public sealed class RotaryScanWindow : Window
         Update();
     }
 
-    /// <summary>Under the Angles box: how many times it turns, how far apart, and to which angles.</summary>
+    /// <summary>Under the stops box: how many times it turns, how far apart, and to which angles.</summary>
     void ShowAngles()
     {
         var plan = Plan();
@@ -438,6 +455,14 @@ public sealed class RotaryScanWindow : Window
         _settings.Save();
     }
 
+    /// <summary>0° to 360°, stopping at every side of the stock chosen.</summary>
+    void WholeTurn()
+    {
+        _from.Value = 0;
+        _to.Value = 360;
+        _stops.Value = RotaryScanPlan.StopsFor((StockKind)Math.Max(0, _stockKind.SelectedIndex));
+    }
+
     /// <summary>The plan the fields describe.</summary>
     RotaryScanPlan Plan()
     {
@@ -462,8 +487,8 @@ public sealed class RotaryScanWindow : Window
         {
             // What faces the laser at the start of a job: the rotary start line, or the middle of the whole design.
             var all = _doc.State.Bounds(_doc.State.Shapes.Select(s => s.Id).ToHashSet());
-            double origin = _doc.State.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (all.MinY + all.MaxY) / 2;
             double circ = Math.PI * Math.Max(1, _settings.RotaryDiameterMm);
+            double origin = WorkModes.RotaryOrigin(_doc.State, all, circ);
             double from = (b.MinY - origin) / circ * 360, to = (b.MaxY - origin) / circ * 360;
             if (to - from >= 350) { from = 0; to = 360; }
             _from.Value = (decimal)Math.Round(from, 1);

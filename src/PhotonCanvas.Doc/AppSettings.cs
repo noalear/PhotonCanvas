@@ -243,7 +243,9 @@ public sealed class AppSettings
     /// <summary>Scan the part: measure with the pointer and close-up camera (true) or the machine's auto-focus.</summary>
     public bool RotaryScanPointer { get; set; } = true;
     /// <summary>Scan the part: angles to measure at, the span of the turn, and the places along the axis.</summary>
-    public int RotaryScanStops { get; set; } = 24;
+    public int RotaryScanStops { get; set; } = 4;
+    /// <summary>Scan the part: the window has reset the turn to a whole one once (Kyle, 2026-11-09: 0–360°, 4 stops).</summary>
+    public bool RotaryScanWholeTurnSet { get; set; }
     public double RotaryScanFromDeg { get; set; }
     public double RotaryScanToDeg { get; set; } = 360;
     public double RotaryScanX0 { get; set; } = 95;

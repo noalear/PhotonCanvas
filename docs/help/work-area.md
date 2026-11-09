@@ -56,6 +56,11 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
   line**: an orange guide across the page labelled "Rotary start: faces the laser". Then that line
   faces the laser at the start, whatever is drawn. Pages made for the rotary (a stacked model's
   finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
+- The camera photo on the canvas is a photo of the bed, so on the rotary it's shown at its real size
+  with the laser line on the row that faces the laser (the rotary start line, or the middle of the
+  design), and cut off at the edges of the work area. Directly round that row, what you see under
+  the design is what's under it on the part now; further round the page it's the part's far side, which
+  the photo can't show.
 - A line drawn all the way round the object (from one edge of the area to the other, at the same
   place across) is cut once round and then **2 mm further**, over where it started. Otherwise the
   start and end meet at the one spot where the rotary is speeding up and slowing down, and a single
@@ -156,12 +161,13 @@ How it measures:
 - **Pointer and close-up camera**: at each step the pointer is aimed at several places along the
   laser line and the close-up camera reads how far below the head's focus each dot lands (laser
   triangulation, the same as [Curved surface](#curved-surface)). Calibrate the pointer once first with
-  **Calibrate along the laser line…** (below), and focus on the top of the part before you scan:
-  the head starts there. Each head height reads about 8 mm either side of it, so at each angle the head
-  steps up through a few heights, lowest first, and stops as soon as every place is read. At the first
-  angle it goes from about 40 mm below where you focused to a little above it; after that it only covers
-  the heights the last angle read (a little either side), often in one height. Places that couldn't be
-  read at the first angle don't make later angles search wider.
+  **Calibrate along the laser line…** (below). You don't need to focus on the part first: at each angle
+  the machine's own auto-focus finds the height of the part's top in the middle of the field (so keep
+  part of the stock under X 110), then the pointer reads the places around that height. Each head height
+  reads about 8 mm either side of it, so the head steps up through the heights that the auto-focus and
+  the last angle found (a little either side), often in one height, and stops as soon as every place is
+  read. If the auto-focus doesn't work, or nothing is read around its height (it caught the chuck, say),
+  the head searches its whole range, which takes a minute or two longer.
   Only places within 5 mm of where the pointer was calibrated are read (X 80 to 185 mm along the laser
   line after **Calibrate along the laser line…**), so put the part of the stock you want scanned there.
   Places outside are skipped, and a warning under **Places along it** says how many. A spot further than
@@ -185,9 +191,10 @@ How it measures:
 | **From X (mm)** / **To X (mm)** | 0 to 220 | 95 / 125 | Where along the rotary's axis to measure (the work area's X). Pointer only. |
 | **Places along it** | 1 to 60 | 7 | How many places between them, at every step. |
 | **Use the selection** | | | Sets the X range to the selected shapes (all of them if none is selected) and, on a rotary page, the angles to how far round they reach from the job's start (the rotary start line, or the middle of the design). This is how to say which area needs scanning. |
-| **Angles** | 2 to 360 | 24 | How many angles to measure at (how many times it turns). 24 over a whole turn is every 15°; 4 is every 90°. The line under the box shows the step and the angles. |
+| **How many stops** | 2 to 360 | 4 | How many times it stops to measure on the way round. It's a count, not an angle: 4 over a whole turn is every 90°, 8 is every 45°. The line under the box shows the step and the angles. Choosing a **Stock** sets it to see every side: 4 for a rod or **As scanned**, 8 for a square or rectangular bar (each face and corner), 12 for a hexagon. |
 | **From (°)** / **To (°)** | −3600 to 3600 | 0 / 360 | The span of the turn, from where the part is now. Positive is the way a design runs down the page. 0 to 360 is a whole turn (360 itself isn't measured again). |
-| **Wait after a turn (s)** | 0 to 10 | 0.5 | Extra wait after each turn, for the part to stop moving. The machine doesn't say when a turn is done, so the wait is worked out from its length, plus this. |
+| **Whole turn, every side** | | | Sets 0° to 360° and the stops for the stock chosen. |
+| **Wait after a turn (s)** | 0 to 10 | 0.5 | Extra wait after each turn, for the part to stop moving. The machine doesn't say when a turn is done, so the wait is worked out from its length, plus this. Scan turns go at a third of the speed of Work mode's turns (a quarter turn takes about 1.6 s), so a heavy bar doesn't slip. |
 | **Stock** | As scanned, Round rod, Square bar, Rectangular bar, Hexagon bar | As scanned | What the model is. **As scanned** uses what was measured. A standard stock (a 2" square bar, a round rod) is taken to be exactly that shape: the scan only works out how it sits in the chuck, and the model is the exact shape (see below). |
 | **Size** / **Units** | 0.01 to 1000, mm or inches | 2 inches | The standard stock's size: a rod's diameter, a bar's width, a hexagon across the flats. |
 | **Height** | 0.01 to 1000 | 2 inches | A rectangular bar's other side. |
@@ -217,7 +224,7 @@ When the part is a standard stock, choose it under **Stock** and type its size (
 bar: **Square bar**, **Size** 2, **Units** inches). The readings are then only used to find how the
 stock sits: how far it's turned in the chuck, how far its middle is off the axis, and (if **I know the
 axis height** is off) the axis height too, which is then filled in. The model is the exact shape in
-that place, so a few readings are enough: the auto-focus at every 15° does. The readings show as dots
+that place, so a few readings are enough: 8 stops round a square bar do. The readings show as dots
 on the end-on view, over the fitted outline, and the words say how far the readings are from the
 shape on average. Readings far from what the rest agree on (a misread spot) are left out, up to a third
 of them, and the words say how many. Over 0.5 mm on average is a loose fit: the size is wrong or the
@@ -322,7 +329,7 @@ the pointer (once)**, **2 · Focus on the piece**, **3 · Where to measure**, **
 
 ### Calibrate the pointer
 
-Measuring uses the red pointer and the close-up camera: the pointer comes in at a slant, so its dot
+Measuring uses the pointer and the close-up camera: the camera looks at the pointer at a slant, so its spot
 lands in a different place in the close-up picture as the surface rises or falls. Calibrating once
 records that. The spot doesn't have to be a round dot: on the F2 Ultra it's a short line. The program
 finds the whole spot, its middle and which way it runs, and reads a line by where it crosses the path
@@ -334,14 +341,16 @@ This is step 1 in the window. Once it's done the step says *✓ Calibrated on a 
 date, and there's nothing more to do there; calibrate again only if the head or its camera gets
 knocked.
 
-1. Put a flat, matt board (plywood, MDF or card, not shiny) in the middle of the bed. The green
-   square in the picture on the left is where it has to be.
+1. Put a flat, matt board (plywood, MDF or card, not shiny) across the middle of the bed, about
+   95 × 30 mm. The green strip in the picture on the left is where it has to be. On the rotary, take
+   the part out and lay the board where it goes.
 2. Click **Auto-focus on the board**: its focus height becomes **Board thickness**. Or measure the
    board with calipers and type it in (0.5 to 150 mm). It starts at the board used last time, else
    3 mm. It must be right: any error in it is added to every height measured later.
 3. Click **Calibrate…** and **Start**. The head moves up and down, 8 mm either side of
-   its focus on the board, in nine steps of 2 mm. At each step the pointer is aimed at 25 points over
-   the middle 30 × 30 mm of the bed and photographed. The laser isn't fired. About four minutes.
+   its focus on the board, in nine steps of 2 mm. At each step the pointer stops on 44 spots over
+   X 85 to 180 and Y 95 to 125 (as far along as the close-up camera sees it) and is photographed. The
+   laser isn't fired. About seven minutes. Spots more than 5 mm outside the calibrated area aren't read.
 
 It fails if the dot was seen in fewer than a third of the photos: check the close-up camera sees the
 area, and that the board isn't shiny. The calibration is saved with the board thickness and date.
@@ -368,13 +377,15 @@ calibration, so they may be less exact; spots further out aren't read.
 
 The area starts as the one measured last, else the design's area plus 3 mm, else a 50 mm square in the
 middle of the bed. **Use the design's area** sets it to the selection's area (or the whole design's)
-plus 3 mm round it.
+plus 3 mm round it. In the rotary work mode the canvas is the part unrolled, not the bed, so the design's
+area is changed to where it is on the bed now: X as it is, and Y with the row that faces the laser on the
+laser line (Work mode's **Laser line**), so a design over the rod on the canvas is measured over the rod.
+The design drawn in the window's plan is moved the same way, and the line under the boxes says so.
 
 **4 · Measure**:
 
 - **Measure** checks the machine is idle, moves the head to the focus height, turns the fill lights
-  on (to at least 50%, so the close-up camera can see the part) and the red auto-focus dot off (so
-  it can't be mistaken for the pointer), and for each point aims the pointer and photographs it with the close-up camera (each photo is
+  on (to at least 50%, so the close-up camera can see the part), and for each point aims the pointer and photographs it with the close-up camera (each photo is
   compared with one with the pointer off, so only the dot is left). The pointer is turned off while
   it moves to the next point, then held still on it for about half a second while it's photographed,
   so you see it hop from spot to spot rather than streak across. The lights and pointer are put
@@ -476,7 +487,7 @@ numbers and spreadsheet rows only move on after the last section.
 ## Try it
 
 - [Mark on a rotary or the conveyor](tutorial:area-work-mode)
-- [Calibrate the red pointer](tutorial:area-calibrate-pointer)
+- [Calibrate the pointer](tutorial:area-calibrate-pointer)
 - [Scan a part in the rotary](tutorial:area-rotary-scan)
 - [Mark on a curved piece](tutorial:area-curved-surface)
 - [Mark one layer at a time](tutorial:area-layer-by-layer)

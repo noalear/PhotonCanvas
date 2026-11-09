@@ -82,6 +82,26 @@ public static class WorkModes
         }
     }
 
+    /// <summary>
+    /// Rotary mode: the row of the page that faces the laser when a job starts, the rotary start line if there is one,
+    /// else the middle of <paramref name="design"/> (what's sent). The page middle for an empty design.
+    /// </summary>
+    public static double RotaryOrigin(DocState s, Rect2 design, double pageH) =>
+        s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (design.IsEmpty ? pageH / 2 : (design.MinY + design.MaxY) / 2);
+
+    /// <summary>
+    /// How far a rotary page's Y is from the bed's Y under it before the part turns: the row facing the laser
+    /// (<paramref name="origin"/>) sits on the laser line, and the rest of the page runs on round the part from there,
+    /// so near the top bed Y = page Y + this. (Kyle, 2026-11-09: Curved surface took the page's Y as the bed's and
+    /// put the design 60 mm behind the rod.)
+    /// </summary>
+    public static double RotaryBedShift(AppSettings s, double origin) =>
+        Math.Clamp(s.RotaryLineMm, 1, MachineProfile.F2Ultra.FieldH - 1) - origin;
+
+    /// <summary>The page → bed shift for the whole design in the current work mode: null unless it's the rotary.</summary>
+    public static double? BedShift(AppSettings s, DocState d) =>
+        From(s) is WorkMode.Rotary r ? RotaryBedShift(s, RotaryOrigin(d, d.Bounds(d.Shapes.Select(x => x.Id).ToHashSet()), r.CircumferenceMm)) : null;
+
     /// <summary>The work area the canvas shows for the mode: the bed, the object unrolled, or the belt's length.</summary>
     public static MachineProfile Area(AppSettings s) => s.ActiveSetup() is { } m && m.Id != MachineSetup.F2Ultra.Id ? m.Profile : From(s) switch
     {
