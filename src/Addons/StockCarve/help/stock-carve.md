@@ -29,9 +29,12 @@ to the model's shape as it turns, moving the focus as the surface comes nearer t
    material there. The summary says how far it sticks out, or how much room there is to spare.
 5. Choose the engrave settings under **Carve**, and click **Put the engraving in the design**. A page
    "… carved on the rotary" is added, with a layer for each focus height.
-6. Set Machine → **Work mode** → **Rotary** to the **Object Ø** the summary gives (the job check says so
-   if it's different). Turn the part back to where the scan started, focus on its top at the X the
-   summary names, then frame and send it.
+6. The page is made for the **Object Ø** Machine → **Work mode** → **Rotary** is set to (when it's near
+   the stock's size), so leave Work mode as it is. If it was set to something far off, or not to the
+   rotary, the summary gives the Object Ø to set. If you change Object Ø later, make the page again (or
+   set it back): the job check says when they differ, and names the passes that run past once round.
+   Turn the part back to where the scan started, focus on its top at the X the summary names, then
+   frame and send it.
 
 ## Profile cuts: take the bulk off first
 

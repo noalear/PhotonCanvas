@@ -106,6 +106,9 @@ public sealed class JobBar : UserControl
 
     BuiltJob? _job;
     string? _error;
+    // The shapes the error is about (Checks offers to select them), and the checks found before the job stopped.
+    IReadOnlyList<Guid> _errorShapes = [];
+    IReadOnlyList<string> _errorWarnings = [];
     int _version;
     bool _sending;
     // Getting ready to ship (building the job if it isn't built yet): the button greyed, "Shipping it" with dots going round.
@@ -566,16 +569,20 @@ public sealed class JobBar : UserControl
         };
         BuiltJob? job = null;
         string? error = null;
+        IReadOnlyList<Guid> errorShapes = [];
+        IReadOnlyList<string> errorWarnings = [];
         var build = Task.Run(() => JobBuilder.Build(state, opt));
         _pending = (state, plain, build);
         try { job = await build; }
-        catch (JobException e) { error = e.Message; }
+        catch (JobException e) { error = e.Message; errorShapes = e.ShapeIds; errorWarnings = e.Warnings; }
         catch (OperationCanceledException) { return; }
         if (v != _version) return;
         ShowPlanning(null);
         _job = job;
         _jobFor = (state, plain);
         _error = error;
+        _errorShapes = errorShapes;
+        _errorWarnings = errorWarnings;
         Show();
         JobBuilt?.Invoke(job);
         if (_machine.IsFraming) _ = UpdateFrame();
@@ -619,6 +626,26 @@ public sealed class JobBar : UserControl
             _estimate.Text = "–";
             _summary.Text = "";
             _messages.Children.Add(Message(_error ?? "Nothing to process.", "Danger"));
+            var ids = _errorShapes.Where(id => _doc.State.FindShape(id) is not null).ToList();
+            if (ids.Count > 0)
+            {
+                var select = new Button
+                {
+                    Content = ids.Count == 1 ? "Select it" : $"Select them ({ids.Count})",
+                    Margin = new(21, 0, 0, 0),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                };
+                ToolTip.SetTip(select, "Selects the shapes this is about and zooms to them, so you can move, shrink or delete them (or see which layer they're on).");
+                select.Click += (_, _) =>
+                {
+                    _checks.Flyout?.Hide();
+                    _doc.Select(ids);
+                    _canvas.FitSelection();
+                };
+                _messages.Children.Add(select);
+            }
+            // What else was found before it stopped: an add-on's advice often says why (the page made for another Object Ø).
+            foreach (var w in _errorWarnings) _messages.Children.Add(Message(w, "Warn"));
             _checks.Content = _doc.State.Shapes.Count == 0 ? ChipText("IcCheck", "Empty", "TextMuted") : ChipText("IcWarn", "Can't build", "Danger");
         }
         if (_order.IsChecked == true) _canvas.Preview = _job;

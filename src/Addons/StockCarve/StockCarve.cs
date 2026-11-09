@@ -598,7 +598,14 @@ public static class StockCarve
     /// finish (<see cref="RotaryFinish.RotaryFinish.Carve"/>), mapped by angle round the axis and X along it, the passes
     /// split into focus heights.
     /// </summary>
-    public static RotaryPlan Plan(StockMap stock, IReadOnlyList<Tri> placed, CarveOptions o, CancellationToken ct = default)
+    /// <param name="objectDiameterMm">
+    /// The Object Ø Machine → Work mode is set to (null: not on the rotary). The page is made for it, so the passes go
+    /// once round at that size and fit the work area as it is: any size does, as the design goes by angle and the depth a
+    /// pass allows for how far apart the lines land. (Kyle, 2026-11-09: the page was made for Ø 36 mm while Work mode said
+    /// 32.7 mm, and the job stopped with a point "outside the work area".) Far off the stock's size it isn't used, as the
+    /// lines would land too far apart or too close together.
+    /// </param>
+    public static RotaryPlan Plan(StockMap stock, IReadOnlyList<Tri> placed, CarveOptions o, double? objectDiameterMm = null, CancellationToken ct = default)
     {
         if (!(o.PassDepthMm > 0)) throw new ArgumentException("The depth a pass must be more than zero.");
         if (!(o.FocusBandMm > 0)) throw new ArgumentException("The focus band must be more than zero.");
@@ -609,7 +616,7 @@ public static class StockCarve
         if (!(x1 - x0 > 0.05)) throw new ArgumentException("The model isn't over the stock: move it along the axis.");
         double rMax = stock.MaxRadius;
         if (!(rMax > 0)) throw new ArgumentException("The stock has no size.");
-        double dia = Math.Min(Math.Max(1, Math.Ceiling(2 * rMax - 0.05)), Math.Floor(WorkModes.MaxCircumferenceMm / Math.PI));
+        double dia = DiameterFor(rMax, objectDiameterMm);
         double circ = Math.PI * dia, length = x1 - x0;
         double cell = Math.Max(0.05, o.DetailMm);
         cell = Math.Max(cell, Math.Sqrt(circ * length / 1_500_000));
@@ -646,10 +653,29 @@ public static class StockCarve
         return plan with { FocusX = focusX };
     }
 
-    /// <summary>What the plan means, in a few lines.</summary>
-    public static string Describe(RotaryPlan p, CarveOptions o)
+    /// <summary>
+    /// The Object Ø a page is made for: the one Work mode is set to when it's within half to twice the stock's widest,
+    /// else the stock's widest in whole mm (as much as the rotary takes).
+    /// </summary>
+    public static double DiameterFor(double rMax, double? objectDiameterMm)
     {
-        var s = $"Set Machine → Work mode → Rotary to Object Ø {p.DiameterMm:0} mm (the stock swings {p.WidestMm:0.#} mm across). " +
+        double most = WorkModes.MaxCircumferenceMm / Math.PI;
+        if (objectDiameterMm is { } set && double.IsFinite(set) && set >= rMax && set <= 4 * rMax)
+            return Math.Min(set, most);
+        return Math.Min(Math.Max(1, Math.Ceiling(2 * rMax - 0.05)), Math.Floor(most));
+    }
+
+    /// <summary>The Object Ø Work mode is set to, when it's the rotary (else null).</summary>
+    public static double? WorkModeDiameter(AppSettings s) =>
+        WorkModes.From(s) is WorkMode.Rotary r ? r.CircumferenceMm / Math.PI : null;
+
+    /// <summary>What the plan means, in a few lines; <paramref name="objectDiameterMm"/>: the Object Ø Work mode is set to now.</summary>
+    public static string Describe(RotaryPlan p, CarveOptions o, double? objectDiameterMm = null)
+    {
+        bool matches = objectDiameterMm is { } set && Math.Abs(Math.PI * set - p.CircumferenceMm) <= 0.5;
+        var s = (matches
+                    ? $"Made for Object Ø {p.DiameterMm:0.##} mm, as Machine → Work mode is set now (keep it at that; the stock swings {p.WidestMm:0.#} mm across). "
+                    : $"Set Machine → Work mode → Rotary to Object Ø {p.DiameterMm:0.##} mm (the stock swings {p.WidestMm:0.#} mm across). ") +
                 $"Focus on the top of the part at X {p.FocusX:0.#} mm before starting, with the part turned back to where the scan started.";
         if (p.Bands.Count == 0) return s + " Nothing needs taking off: the stock is already the model's shape there.";
         s += $" Up to {p.DeepestMm:0.##} mm comes off, in up to {p.MostPasses} pass{(p.MostPasses == 1 ? "" : "es")}, at {p.Bands.Count} focus height{(p.Bands.Count == 1 ? "" : "s")} {o.FocusBandMm:0.##} mm apart.";

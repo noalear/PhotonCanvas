@@ -365,9 +365,10 @@ public sealed class StockCarveWindow : Window
         _status.Text = "Working out the engraving…";
         try
         {
-            var plan = await Task.Run(() => StockCarve.Plan(stock, placed, o, cts.Token));
+            double? dia = StockCarve.WorkModeDiameter(_host.AppSettings);
+            var plan = await Task.Run(() => StockCarve.Plan(stock, placed, o, dia, cts.Token));
             if (cts.IsCancellationRequested) return;
-            var text = StockCarve.Describe(plan, o);
+            var text = StockCarve.Describe(plan, o, dia);
             if (plan.Bands.Count == 0)
             {
                 _status.Text = text;

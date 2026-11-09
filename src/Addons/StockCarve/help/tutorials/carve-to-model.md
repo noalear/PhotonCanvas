@@ -24,4 +24,4 @@ With **Keep the model's size** ticked, Best fit never changes the model's size. 
 
 ## Make the engraving
 <!-- target: button:Put the engraving in the design -->
-Click **Put the engraving in the design**. A page with a layer for each focus height is added; the summary says the Object Ø to set and where to focus.
+Click **Put the engraving in the design**. A page with a layer for each focus height is added; it is made for the Object Ø Work mode is set to (the summary says if you need to change it) and says where to focus.

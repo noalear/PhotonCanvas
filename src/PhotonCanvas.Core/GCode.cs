@@ -566,7 +566,7 @@ public sealed class Job
                 case BandedVectorBlock b:
                     foreach (var piece in b.Pieces)
                     {
-                        foreach (var p in piece.Points) CheckPoint(p, ctx);
+                        foreach (var p in piece.Points) CheckPoint(p, ctx, i);
                         anyMotion |= piece.Points.Count >= 2;
                     }
                     break;
@@ -574,8 +574,8 @@ public sealed class Job
                     foreach (var (_, segs) in b.Bands)
                         foreach (var seg in segs)
                         {
-                            CheckPoint(seg.Start, ctx);
-                            CheckPoint(seg.End, ctx);
+                            CheckPoint(seg.Start, ctx, i);
+                            CheckPoint(seg.End, ctx, i);
                             anyMotion = true;
                         }
                     break;
@@ -591,7 +591,7 @@ public sealed class Job
                     }
                     var pts = b.Path.EmittedPoints();
                     anyMotion |= pts.Count >= 2;
-                    foreach (var p in pts) CheckPoint(p, ctx);
+                    foreach (var p in pts) CheckPoint(p, ctx, i);
                     break;
                 case FillBlock b:
                     JobException.CheckRange("line density", b.LinesPerCm, 1, FillBlock.MaxLinesPerCm, "lines/cm");
@@ -603,7 +603,7 @@ public sealed class Job
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
                         // Cut to a section: only the lines (checked below) need to be in the work area.
-                        if (b.ClipRect is null) CheckPoint(p, ctx);
+                        if (b.ClipRect is null) CheckPoint(p, ctx, i);
                     }
                     // Turned per pass, each pass has its own lines and run-ups: check every angle used.
                     var passFills = Enumerable.Range(1, Math.Max(1, b.Laser.Passes)).Select(b.ForPass)
@@ -611,8 +611,8 @@ public sealed class Job
                     if (b.ClipRect is not null)
                         foreach (var seg in passFills.SelectMany(FillLines))
                         {
-                            CheckPoint(seg.Start, ctx);
-                            CheckPoint(seg.End, ctx);
+                            CheckPoint(seg.Start, ctx, i);
+                            CheckPoint(seg.End, ctx, i);
                         }
                     if (b.Mask is { } mask && b.ClipRect is null)
                     {
@@ -621,8 +621,8 @@ public sealed class Job
                         var mb = mask.FilledBounds();
                         if (!mb.IsEmpty)
                         {
-                            CheckPoint(mb.TopLeft, ctx);
-                            CheckPoint(mb.BottomRight, ctx);
+                            CheckPoint(mb.TopLeft, ctx, i);
+                            CheckPoint(mb.BottomRight, ctx, i);
                         }
                     }
                     var lines = FillLines(b);
@@ -630,8 +630,8 @@ public sealed class Job
                         foreach (var seg in passFills.SelectMany(FillLines))
                         {
                             var (runUp, runOut) = Overscan(seg, b.OverscanMm);
-                            CheckPoint(runUp, $" (fill overscan, item {i + 1})");
-                            CheckPoint(runOut, $" (fill overscan, item {i + 1})");
+                            CheckPoint(runUp, $" (fill overscan, item {i + 1})", i);
+                            CheckPoint(runOut, $" (fill overscan, item {i + 1})", i);
                         }
                     anyMotion |= lines.Count > 0;
                     break;
@@ -642,7 +642,7 @@ public sealed class Job
                     foreach (var p in b.Points)
                     {
                         if (!p.IsFinite) throw new JobException("A dot position is not a valid number.");
-                        CheckPoint(p, ctx);
+                        CheckPoint(p, ctx, i);
                     }
                     anyMotion |= b.Points.Count > 0;
                     break;
@@ -650,7 +650,7 @@ public sealed class Job
                     foreach (var p in b.Loops.SelectMany(x => x))
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
-                        CheckPoint(p, ctx);
+                        CheckPoint(p, ctx, i);
                     }
                     anyMotion |= b.Loops.Any(l => l.Count >= 2);
                     break;
@@ -668,7 +668,7 @@ public sealed class Job
                     double pitch = 25.4 / b.Dpi;
                     // Each row's first and last burned dot bound every dot the head goes to.
                     foreach (var pb in b.PassBlocks ?? [b])
-                        foreach (var end in pb.RowEnds()) CheckPoint(end, ctx);
+                        foreach (var end in pb.RowEnds()) CheckPoint(end, ctx, i);
                     anyMotion |= b.Bitmap.Bits.Any(v => v);
                     break;
             }
@@ -676,21 +676,22 @@ public sealed class Job
         if (!anyMotion) throw new EmptyJobException();
     }
 
-    void CheckPoint(Vec2 p, string ctx)
+    /// <param name="item">Which block the point is in (0 = first), so the job's maker can name the shape.</param>
+    void CheckPoint(Vec2 p, string ctx, int? item = null)
     {
         switch (Mode)
         {
             case WorkMode.Rotary r:
                 if (p.X < 0 || p.X > Machine.FieldW || Math.Abs(p.Y - r.OriginY) > r.CircumferenceMm / 2 + RotarySeamSlackMm + 1e-6)
-                    throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, r.CircumferenceMm, ctx + " (the rotary's area: the field across, once round the object)");
+                    throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, r.CircumferenceMm, ctx + " (the rotary's area: the field across, once round the object)", r.OriginY - r.CircumferenceMm / 2, item);
                 return;
             case WorkMode.Conveyor c:
                 if (p.X < 0 || p.X > c.LengthMm || p.Y < 0 || p.Y > Machine.FieldH)
-                    throw new OutsideWorkAreaException(p.X, p.Y, c.LengthMm, Machine.FieldH, ctx + " (the conveyor's area)");
+                    throw new OutsideWorkAreaException(p.X, p.Y, c.LengthMm, Machine.FieldH, ctx + " (the conveyor's area)", item: item);
                 return;
         }
         if (!Machine.Contains(p.X, p.Y))
-            throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, Machine.FieldH, ctx);
+            throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, Machine.FieldH, ctx, item: item);
     }
 
     /// <summary>Every head height a block asks for (curved surfaces).</summary>
