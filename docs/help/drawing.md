@@ -9,8 +9,9 @@ on every run.
 
 The small buttons show only an icon; hold the mouse over one to see its name. In the Draw group,
 after **Text** and **Pen**, the first column of small icons is **Ellipse**, **Rectangle** and
-**Polygon**, the second **Star** and **Line**. After **Special Shapes** come **Pick piece** (the
-wand) and **Trace edge** (the lasso), then **Generators** when its add-on is on. In **Serial & codes**, **Variables** is
+**Polygon**, the second **Star**, **Line** and **Arc**, the third **Centreline**. After **Special
+Shapes** come **Pick piece** (the wand) and **Trace edge** (the lasso), then **Generators** when
+its add-on is on. In **Serial & codes**, **Variables** is
 the `{x}` icon and **Number copies** the four squares.
 
 ## Where new shapes go
@@ -24,8 +25,10 @@ the `{x}` icon and **Number copies** the four squares.
 - Corners and points snap to the grid and to other shapes when snapping is on (see
   [Working on the canvas](canvas.md)).
 - **Rectangle**, **Ellipse**, **Polygon**, **Star** and **Text** go back to **Select** after one
-  shape. **Line**, **Pen**, **Pick piece** and **Trace edge** stay on until you choose another tool
-  or press `Esc`.
+  shape. **Line**, **Arc**, **Centreline**, **Pen**, **Pick piece** and **Trace edge** stay on until
+  you choose another tool or press `Esc`.
+- Centrelines go on their own **Centrelines** layer, which isn't marked, unless **Mark centrelines**
+  is ticked (see [Centreline](#centreline)).
 - Points land on other shapes' ends, middles, centres and crossings with **Object snaps** on (a
   yellow marker shows which; see [Object snaps](canvas.md#object-snaps)).
 - `Ctrl+Z` undoes anything here.
@@ -39,12 +42,130 @@ the `{x}` icon and **Number copies** the four squares.
 | **Polygon** | `O` | Drag the box it fills. | `Shift` square box, `Alt` from the centre |
 | **Star** | `S` | Drag the box it fills. | `Shift` square box, `Alt` from the centre |
 | **Line** | `L` | Drag from one end to the other, or click each end (and carry on from there). | `Shift` 45° steps; type a length |
+| **Arc** | `A` | Click the start, a point on it and the end (or another way: see [Arc](#arc)). | Type a length or angle |
+| **Centreline** | `C` | Click both ends, two lines, or a circle (see [Centreline](#centreline)). | Type a length |
 | **Pen** | `P` | Click for corners, drag for curves. | See [Pen](#pen) |
 | **Text** | `T` | Click where the text starts. | |
 
 You can press or let go of `Shift` and `Alt` during the drag; the outline follows. A click without
 a drag makes nothing. The keys can be changed in **File → Keyboard shortcuts…** (see
 [Keyboard shortcuts](keyboard-shortcuts.md)).
+
+**Rectangle**, **Ellipse**, **Polygon**, **Star** and **Line** can also be drawn the ways a CAD
+program draws them, chosen in **Draw by** above the work area: see [Draw by](#draw-by-cad-style-ways-to-draw).
+
+## Draw by: CAD-style ways to draw
+
+Choosing **Rectangle**, **Ellipse**, **Polygon**, **Star**, **Line**, **Arc** or **Centreline**
+shows a bar above the work area. Its **Draw by** list says how the tool draws. The first choice is
+the usual way (drag a box, or click line by line); every other one is drawn **click by click**, as
+in a CAD program. Each tool remembers its choice between runs.
+
+![The Ellipse tool drawing a circle by tangent, tangent, radius: Draw by and Radius mm above the work area](images/tool-options-circle.png)
+
+Drawing click by click:
+
+- A label by the pointer says what the next click is for ("Centre", "A corner", "Width") and the size
+  it would give. The shape follows the pointer, dashed from the last point clicked.
+- Every click lands on object snaps (ends, middles, centres, crossings, tangent and perpendicular
+  points: see [Object snaps](canvas.md#object-snaps)) and the grid, like the other tools. Hold
+  `Ctrl` to click without snapping.
+- **Type a number** between clicks and press `Enter` for an exact size: the radius, the length of a
+  side, the width, in the units shown (an arc's end takes an angle in degrees). The label shows what
+  you're typing; `Backspace` takes back a character.
+- You can also press, drag and let go: letting go is the next point.
+- `Backspace` (with nothing typed) takes back the last click; `Esc` starts the shape again (and `Esc`
+  again goes back to **Select**).
+- Steps that touch another shape ("First line or circle to touch") want a click **on** a line, a
+  circle or an arc: it lights up under the pointer. Click near where the new shape should touch it.
+  A side of a rectangle or polygon counts as a straight line.
+- Rectangles, slots, ellipses, circles, polygons and stars come out as editable shapes (see
+  [Editable shapes](#editable-shapes)), turned to the angle you drew them at; type a size for them
+  afterwards and they keep that angle.
+
+### Rectangle
+
+| Draw by | Clicks | Typing a number gives |
+|---|---|---|
+| **2 corners (drag)** | Drag from corner to corner (`Shift` square, `Alt` from the centre). | |
+| **Centre and corner** | The centre, then a corner. `Shift` keeps it square. | the distance to the corner |
+| **3 points (any angle)** | Two corners, which set one side and its angle, then how wide. | the side's length, then the width |
+| **Centre, side middle, corner** | The centre, the middle of one side (sets the angle and the height), then a corner. | the distance to the side, then the side's length |
+| **Side middle, end, opposite side** | The middle of one side, one end of it, then where the opposite side goes. | the whole side's length, then the width |
+| **Slot: centre to centre, width** | The centres of the two round ends, then how wide. Makes a rectangle with fully rounded ends, still editable. | the distance between the centres, then the width |
+| **Parallelogram (3 corners)** | Three corners; the fourth is worked out. Makes a plain outline. | the first side's length |
+
+### Ellipse and circle
+
+| Draw by | Clicks | Typing a number gives |
+|---|---|---|
+| **Box (drag)** | Drag the box it fills (`Shift` circle, `Alt` from the centre). | |
+| **Circle: centre, radius** | The centre, then a point on the circle. | the radius |
+| **Circle: centre, diameter** | The centre, then how wide across (the circle doesn't go through that point). | the diameter |
+| **Circle: 2 points** | The two ends of a diameter. | the diameter |
+| **Circle: 3 points** | Three points it goes through (not in a straight line). | |
+| **Circle: tangent, tangent, radius** | Two lines or circles for it to touch, near where it should touch them. Set **Radius mm** in the bar first (default 10, remembered). | |
+| **Circle: tangent to 3** | Three lines or circles for it to touch, near where it should touch them. With three lines it's the circle inside (or outside) the triangle they make, depending on where you click. | |
+| **Ellipse: centre, axis, other axis** | The centre, the end of one axis (sets the angle), then how wide the other way. | half of each axis (like a radius) |
+| **Ellipse: axis ends, other axis** | Both ends of one axis, then how wide the other way. | the first axis's length, then the other axis's |
+
+When nothing can touch the shapes picked that way (a radius too small to reach both), the status
+line says so and nothing is drawn.
+
+### Polygon and Star
+
+| Draw by | Clicks | Typing a number gives |
+|---|---|---|
+| **Box (drag)** | Drag the box it fills (`Shift` square box, `Alt` from the centre). | |
+| **Centre and corner (inscribed)** | The centre, then a corner: the corners lie on that circle. | the distance to the corners |
+| **Centre and side middle (circumscribed)** | The centre, then the middle of a side: the sides touch that circle. | the distance to the sides |
+| **One side (2 corners)** | Both ends of one side. The polygon is built above it, on the left as you look from the first click to the second. | the side's length |
+| **Centre and point** (Star) | The centre, then the tip of one point. | the distance to the tips |
+
+**Sides**, **Points** and **Inner size %** in the same bar apply as usual.
+
+### Line
+
+| Draw by | Clicks | Typing a number gives |
+|---|---|---|
+| **2 points** | The usual Line tool (see [Line](#line)). | |
+| **From the middle** | The middle, then one end; the other end mirrors it. | the whole length |
+| **Tangent to 2 circles** | Two circles (or arcs), near where the line should touch them: along their outsides, or crossing between them. | |
+
+### Arc
+
+**Arc** (`A`) draws part of a circle, as an open line. It stays on for the next arc.
+
+| Draw by | Clicks | Typing a number gives |
+|---|---|---|
+| **3 points (start, on it, end)** | The start, a point the arc goes through, then the end. | |
+| **Start, end, point on it** | The start, the end, then a point it goes through (how far it bulges, and which side). | the distance between the ends |
+| **Centre, start, end** | The centre, the start (sets the radius), then the end. It goes counter-clockwise, as on paper; hold `Alt` for clockwise. The end only sets the angle, so it needn't be on the circle. | the radius, then the angle in degrees |
+
+To cut an arc as part of a closed outline, draw the rest with the Line tool from its ends (they snap)
+and join them with **Combine** or the [Pen](#pen).
+
+### Centreline
+
+**Centreline** (`C`) draws centrelines and centre marks, as in a technical drawing. They're drawn
+dash-dot and stay on until you choose another tool.
+
+![The Centreline tool's options: Draw by, Mark centrelines and Overshoot mm](images/tool-options-centreline.png)
+
+| Draw by | Clicks | What it draws |
+|---|---|---|
+| **2 points** | Both ends. | A centreline between them (typing gives its length). |
+| **Between 2 lines** | Two straight lines (a slot's sides, the edges of a part). | Midway between them when they're parallel; along the line halving the angle between them when they're not. It covers both lines and runs **Overshoot mm** past their ends. |
+| **Centre mark (circle or shape)** | A circle, an arc, or any other shape. | A cross through the circle's or arc's centre, or the middle of the shape's box, **Overshoot mm** past its edge. |
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Mark centrelines** | | off | Off: centrelines go on the **Centrelines** layer, which isn't marked: they're there to line things up with and to snap to. On: they go on the layer you're drawing on (the active one) and are marked like any line. |
+| **Overshoot mm** | 0–100 | 3 | How far **Between 2 lines** and **Centre mark** run past what they're drawn on. |
+
+The **Centrelines** layer is made, in grey, the first time a centreline needs it, with its output
+off (see [Layers](layers.md#the-centrelines-layer)). To mark the centrelines already drawn, turn
+its output on, or move them to another layer.
 
 ### Rectangle and Ellipse
 
@@ -108,8 +229,9 @@ points** (see [Edit points](canvas.md#edit-points)).
 
 ### Editable shapes
 
-Rectangles, ellipses, polygons and stars drawn with these tools remember what they are. Select one
-and the **Selection** panel shows a **Shape** card under the selection card:
+Rectangles, slots, ellipses, circles, polygons and stars drawn with these tools (any **Draw by**)
+remember what they are, and the angle they were drawn at. Select one and the **Selection** panel
+shows a **Shape** card under the selection card:
 
 | Setting | Shown for | Range | What it does |
 |---|---|---|---|

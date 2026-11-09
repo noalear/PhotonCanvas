@@ -169,8 +169,10 @@ here are kept between runs.
 
 | Tool | What the bar shows |
 |---|---|
-| **Polygon** | **Sides**: 3 to 64 (6 to start with). |
-| **Star** | **Points**: 3 to 64 (5 to start with), and **Inner size %**: 5 to 95 (50 to start with), how far in the inner corners are. |
+| **Rectangle**, **Ellipse**, **Line**, **Arc** | **Draw by**: how the tool draws (see [Draw by](drawing.md#draw-by-cad-style-ways-to-draw)), and a line saying how to draw that way. A circle by tangent, tangent, radius adds **Radius mm**. |
+| **Centreline** | **Draw by**, **Mark centrelines** and **Overshoot mm** (see [Centreline](drawing.md#centreline)). |
+| **Polygon** | **Draw by**, and **Sides**: 3 to 64 (6 to start with). |
+| **Star** | **Draw by**, **Points**: 3 to 64 (5 to start with), and **Inner size %**: 5 to 95 (50 to start with), how far in the inner corners are. |
 | **Pen**, **Text** | A line saying how the tool works. |
 | **Pick piece** | **Tolerance**, **Smoothness**, **Corners** and **Ignore under**: how the outline of a piece on the camera picture is found. |
 | **Trace edge** | **Smoothness** and **Corners**, and how the tool works. |

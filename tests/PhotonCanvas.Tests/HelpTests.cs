@@ -173,7 +173,7 @@ public partial class HelpTests
         foreach (var x in Directory.GetFiles(AppDir, "*.axaml"))
             foreach (Match m in Regex.Matches(File.ReadAllText(x), @"(?:Text|Content|Header|Watermark|Title)=""([^""]*)"""))
                 literals.Add(m.Groups[1].Value);
-        string[] tools = ["select", "rect", "ellipse", "polygon", "star", "line", "pen", "text", "nodes", "pan", "wand", "magnetic", "measure", "trim", "align2", "scissors", "tabs", "start", "eraser"];
+        string[] tools = ["select", "rect", "ellipse", "polygon", "star", "line", "pen", "text", "nodes", "pan", "wand", "magnetic", "measure", "trim", "align2", "scissors", "tabs", "start", "eraser", "arc", "centreline"];
         string[] modes = ["cut", "score", "fill", "image"];
         var problems = new List<string>();
         foreach (var t in Lib.Value.Tutorials)

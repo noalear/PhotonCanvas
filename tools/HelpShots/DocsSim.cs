@@ -126,14 +126,16 @@ static class DocsSim
             }
             if (more is not null) more.IsExpanded = false;
             layers.Activate(ids.Cut);
-            // The tool options bar for the star and for Pick piece.
-            foreach (var (tool, name) in new[] { (Tool.Star, "star"), (Tool.Polygon, "polygon"), (Tool.Wand, "pick-piece") })
+            // The tool options bar for the star, Pick piece, a circle by tangents and the centreline.
+            canvas.SetMethod(Tool.Ellipse, PhotonCanvas.Doc.Geometry.DrawMethod.CircleTanTanRadius);
+            foreach (var (tool, name) in new[] { (Tool.Star, "star"), (Tool.Polygon, "polygon"), (Tool.Wand, "pick-piece"), (Tool.Ellipse, "circle"), (Tool.Centreline, "centreline") })
             {
                 canvas.Tool = tool;
                 Settle(400);
                 if (w.FindControl<Border>("ToolOptions") is { IsVisible: true } bar) Save(Shot(bar), $"tool-options-{name}", $"The tool options bar above the work area, {name} tool");
             }
             canvas.Tool = Tool.Select;
+            canvas.SetMethod(Tool.Ellipse, PhotonCanvas.Doc.Geometry.DrawMethod.EllipseBox);
             // The layers after a CMYK split of the picture.
             doc.Select([ids.Picture]);
             Settle(200);

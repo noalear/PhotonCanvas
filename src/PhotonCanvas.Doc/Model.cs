@@ -103,6 +103,11 @@ public sealed record Layer
     /// other shapes, and is never sent to the laser. Its output can't be turned on.
     /// </summary>
     public bool Mask { get; init; }
+    /// <summary>
+    /// The centrelines layer (see <see cref="CentreLines"/>): centrelines and centre marks drawn
+    /// with the Centreline tool, shown dash-dot. Not sent until its output is turned on.
+    /// </summary>
+    public bool Centrelines { get; init; }
     public LayerMode Mode { get; init; } = LayerMode.Cut;
     public LaserSettings Laser { get; init; } = LaserSettings.Blue(70, 40);
     /// <summary>Fill only: scan lines per centimetre.</summary>
