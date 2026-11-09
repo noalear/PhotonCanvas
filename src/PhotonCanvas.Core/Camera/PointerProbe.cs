@@ -16,6 +16,9 @@ namespace PhotonCanvas.Core.Camera;
 /// </summary>
 public static class DotFinder
 {
+    /// <summary>How much brighter (0–255) the spot must make its brightest pixel.</summary>
+    public const float MinStrength = 110;
+
     /// <summary>
     /// The pointer's spot from a photo with it on and one with it off: only what got brighter is left,
     /// so shiny, dark or patterned surfaces don't fool it, whatever colour the pointer is. Null when
@@ -48,8 +51,9 @@ public static class DotFinder
             if (v > max) max = v;
         }
         double mean = sum / diff.Length;
-        // A spot stands far above the noise.
-        if (max < 25 || max < mean * 8) return null;
+        // A spot stands well clear of flickers too: the pointer reads about 200 on a part with the lights on, while
+        // where it can't be seen, flickers (the red dot under the head, which stays on) read 25–100 (Kyle's log).
+        if (max < MinStrength || max < mean * 8) return null;
         int peak = Array.IndexOf(diff, max);
 
         // The bright patch joined to the peak (over a third of it), however long it runs.

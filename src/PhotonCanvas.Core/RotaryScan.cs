@@ -335,7 +335,7 @@ public sealed record RotaryScanPlan(double FromDeg, double ToDeg, int Stops, IRe
     }
 
     /// <summary>
-    /// The angles in words, for under the Angles box: "4 angles, every 90°: 0, 90, 180, 270°" (long lists shortened).
+    /// The angles in words, for under the How many stops box: "4 angles, every 90°: 0, 90, 180, 270°" (long lists shortened).
     /// Kyle (2026-11-08) set 5 places along the part and got far more turns than he expected: show what Angles means.
     /// </summary>
     public string AnglesText()
@@ -346,6 +346,17 @@ public sealed record RotaryScanPlan(double FromDeg, double ToDeg, int Stops, IRe
         string step = a.Length > 1 ? $", every {N(a[1] - a[0])}°" : "";
         return $"{a.Length} {(a.Length == 1 ? "angle" : "angles")}{step}: {list}°";
     }
+
+    /// <summary>
+    /// How many stops a whole turn needs to see every side of the stock (Kyle, 2026-11-09): 4 for a round rod or an
+    /// unknown shape, 8 for a square or rectangular bar (each face and each corner), 12 for a hexagon.
+    /// </summary>
+    public static int StopsFor(StockKind kind) => kind switch
+    {
+        StockKind.Square or StockKind.Rectangle => 8,
+        StockKind.Hexagon => 12,
+        _ => 4,
+    };
 
     /// <summary>Evenly spaced places from <paramref name="from"/> to <paramref name="to"/> (one in the middle for a count of 1).</summary>
     public static double[] Places(double from, double to, int count) =>

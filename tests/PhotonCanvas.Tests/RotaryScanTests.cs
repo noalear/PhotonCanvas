@@ -1,4 +1,5 @@
 using PhotonCanvas.Core;
+using PhotonCanvas.Doc;
 
 namespace PhotonCanvas.Tests;
 
@@ -56,6 +57,36 @@ public class RotaryScanTests
         Assert.Equal("5 angles, every 72°: 0, 72, 144, 216, 288°", new RotaryScanPlan(0, 360, 5, [110], 110, "pointer").AnglesText());
         Assert.Equal("24 angles, every 15°: 0, 15, 30 … 345°", new RotaryScanPlan(0, 360, 24, [110], 110, "pointer").AnglesText());
         Assert.Equal("3 angles, every 22.5°: -22.5, 0, 22.5°", new RotaryScanPlan(-22.5, 22.5, 3, [110], 110, "pointer").AnglesText());
+    }
+
+    [Fact]
+    public void AWholeTurnStopsAtEverySideOfTheStock()
+    {
+        // Kyle, 2026-11-09: 4 stops measure each side; a square bar wants 8 (faces and corners).
+        Assert.Equal(4, RotaryScanPlan.StopsFor(StockKind.Scanned));
+        Assert.Equal(4, RotaryScanPlan.StopsFor(StockKind.Round));
+        Assert.Equal(8, RotaryScanPlan.StopsFor(StockKind.Square));
+        Assert.Equal(8, RotaryScanPlan.StopsFor(StockKind.Rectangle));
+        Assert.Equal(12, RotaryScanPlan.StopsFor(StockKind.Hexagon));
+        Assert.Equal(4, new AppSettings().RotaryScanStops);
+        Assert.Equal([0, 45, 90, 135, 180, 225, 270, 315], new RotaryScanPlan(0, 360, RotaryScanPlan.StopsFor(StockKind.Square), [110], 110, "pointer").Angles());
+    }
+
+    [Fact]
+    public void OnTheRotaryThePageIsPutOnTheBedWithItsStartRowOnTheLaserLine()
+    {
+        // Kyle, 2026-11-09: a design over the rod on the canvas (page Y 41–59) is at bed Y 101–119 with the line at 110.
+        var s = new AppSettings { OwnsCustomRotary = true, WorkMode = "Rotary", RotaryAttachment = WorkModes.CustomRotary, RotaryDiameterMm = 32, RotaryLineMm = 110 };
+        var d = DocState.New();
+        d = Ops.AddShapes(d, [new PathShape { LayerId = d.Layers[0].Id, Geometry = PathGeometry.Rect(60, 41, 60, 18) }]);
+        Assert.Equal(60, WorkModes.BedShift(s, d)!.Value, 6);
+        // A rotary start line faces the laser instead of the design's middle.
+        var withStart = d with { Guides = [new Guide(false, 30) { RotaryStart = true }] };
+        Assert.Equal(80, WorkModes.BedShift(s, withStart)!.Value, 6);
+        // An empty page: its middle.
+        Assert.Equal(110 - Math.PI * 32 / 2, WorkModes.BedShift(s, DocState.New())!.Value, 6);
+        // The flat bed is the bed.
+        Assert.Null(WorkModes.BedShift(new AppSettings(), d));
     }
 
     [Fact]
