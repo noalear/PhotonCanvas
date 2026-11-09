@@ -163,11 +163,12 @@ public sealed partial class CanvasView
     }
 
     /// <summary>A tool that picks points: the pointer shows where a click would land.</summary>
-    bool PicksPoints => _tool is Tool.Line or Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Pen or Tool.Measure or Tool.Align2;
+    bool PicksPoints => _tool is Tool.Line or Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Pen or Tool.Measure or Tool.Align2 or Tool.Arc or Tool.Centreline;
 
     /// <summary>Where the current point-picking tool's line starts (for perpendicular and tangent), or null.</summary>
     Vec2? PickFrom => _tool switch
     {
+        _ when ConstructMethod is not null => _cad.Count > 0 ? _cad[^1].At : null,
         Tool.Line => _lineFrom ?? (_drag == Drag.Create ? _pressWorld : null),
         Tool.Pen => _pen.Count > 0 ? _pen[^1].At : null,
         Tool.Measure => _measuring ? _measureA : null,
@@ -244,7 +245,9 @@ public sealed partial class CanvasView
     protected override void OnTextInput(TextInputEventArgs e)
     {
         base.OnTextInput(e);
-        if (!LineInProgress || string.IsNullOrEmpty(e.Text)) return;
+        if (string.IsNullOrEmpty(e.Text)) return;
+        if (ConstructText(e.Text)) { e.Handled = true; return; }
+        if (!LineInProgress) return;
         foreach (char ch in e.Text)
         {
             char c = ch == ',' ? '.' : ch;

@@ -10,7 +10,7 @@ using PathGeometry = PhotonCanvas.Doc.PathGeometry;
 
 namespace PhotonCanvas.App;
 
-public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors, Tabs, Start, Eraser }
+public enum Tool { Select, Rect, Ellipse, Polygon, Star, Line, Pen, Text, Nodes, Pan, Wand, Magnetic, Measure, Trim, Align2, Scissors, Tabs, Start, Eraser, Arc, Centreline }
 
 /// <summary>
 /// The design canvas: machine work area in millimetres (+Y down, origin top-left),
@@ -119,6 +119,7 @@ public sealed partial class CanvasView : Control
             _node = null;
             ResetPointTools();
             ResetSnaps();
+            ResetConstruct();
             _tool = value;
             if (value is Tool.Wand or Tool.Magnetic) PreparePhoto();
             CancelDrag();
@@ -476,6 +477,7 @@ public sealed partial class CanvasView : Control
                 if (_tool == Tool.Pen) DrawPen(ctx);
                 if (_tool == Tool.Wand) DrawWand(ctx);
                 if (_tool == Tool.Magnetic) DrawMagnetic(ctx);
+                DrawConstruct(ctx);
             }
             if (_preview is { } order) DrawOrderLegend(ctx, order);
             if (_tool == Tool.Nodes) DrawNodes(ctx);
@@ -488,6 +490,7 @@ public sealed partial class CanvasView : Control
             if (_drag != Drag.None || PicksPoints) DrawGuides(ctx);
             DrawLineInProgress(ctx);
             DrawSnaps(ctx);
+            DrawConstructLabel(ctx);
             DrawOverlays(ctx, Addons.CanvasLayer.Screen);
         }
         DrawRulers(ctx);
@@ -547,7 +550,8 @@ public sealed partial class CanvasView : Control
             double w = sel ? 2.2 : hov ? 2 : 1.25;
             if (_highlight == shape.Id)
                 ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(150, AccentColor.R, AccentColor.G, AccentColor.B)), 5 * px), geom);
-            ctx.DrawGeometry(fill, new Pen(new SolidColorBrush(LayerColor(layer, alpha)), w * px), geom);
+            // The centrelines layer's lines are dash-dot, as on a drawing.
+            ctx.DrawGeometry(fill, new Pen(new SolidColorBrush(LayerColor(layer, alpha)), w * px, layer.Centrelines ? CentreDash : null), geom);
             if (sel)
                 ctx.DrawGeometry(null, new Pen(new SolidColorBrush(Color.FromArgb(200, 255, 255, 255)), 0.8 * px, new DashStyle([3, 3], 0)), geom);
         }
@@ -888,7 +892,7 @@ public sealed partial class CanvasView : Control
     {
         StandardCursorType c = StandardCursorType.Arrow;
         if (_tool == Tool.Pan || _spaceHeld || _drag == Drag.Pan) c = _drag == Drag.Pan ? StandardCursorType.SizeAll : StandardCursorType.Hand;
-        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic or Tool.Measure or Tool.Align2) c = StandardCursorType.Cross;
+        else if (_tool is Tool.Rect or Tool.Ellipse or Tool.Polygon or Tool.Star or Tool.Line or Tool.Pen or Tool.Wand or Tool.Magnetic or Tool.Measure or Tool.Align2 or Tool.Arc or Tool.Centreline) c = StandardCursorType.Cross;
         else if (_tool is Tool.Trim or Tool.Scissors or Tool.Tabs or Tool.Start) c = StandardCursorType.Hand;
         else if (_tool == Tool.Eraser) c = StandardCursorType.Cross;
         else if (_tool == Tool.Text) c = StandardCursorType.Ibeam;
@@ -987,6 +991,7 @@ public sealed partial class CanvasView : Control
         if (_tool == Tool.Tabs) { TabPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
         if (_tool == Tool.Start) { StartPressed(p, e.KeyModifiers.HasFlag(KeyModifiers.Shift)); return; }
         if (_tool == Tool.Eraser) { if (ErasePressed(p)) e.Pointer.Capture(this); return; }
+        if (ConstructMethod is { } method) { ConstructPressed(method); return; }
         if (_tool == Tool.Line && _lineFrom is { } start)
         {
             // Click by click: this click ends the line, and the next one starts here.
@@ -1091,6 +1096,7 @@ public sealed partial class CanvasView : Control
                     var sel = d0.Selection;
                     _snapHit = FindObjectSnap(w, s => sel.Contains(s.Id), null, GrabKinds);
                 }
+                if (ConstructMethod is { } method) ConstructMoved(method, w);
                 if (_tool == Tool.Pen && _pen.Count > 0) InvalidateVisual();
                 if (_tool == Tool.Wand) ScheduleWandPreview(w);
                 if (_tool == Tool.Measure) MeasureMoved(w);
@@ -1198,6 +1204,7 @@ public sealed partial class CanvasView : Control
         if (_guideDrag is not null) { GuideReleased(p); return; }
         if (_tool == Tool.Eraser) { EraseReleased(); InvalidateVisual(); return; }
         if (_tool == Tool.Measure) MeasureReleased();
+        if (ConstructMethod is { } method) ConstructReleased(method, p);
         switch (drag)
         {
             case Drag.Move when _editStarted: _doc.EndEdit(_dragIds.Count == 1 ? "Move shape" : "Move shapes"); break;
@@ -1383,8 +1390,9 @@ public sealed partial class CanvasView : Control
             e.Handled = true;
             return;
         }
-        if (_drag == Drag.Create) { InvalidateVisual(); }
+        if (_drag == Drag.Create || ConstructMethod is not null) { InvalidateVisual(); }
         if (_tool == Tool.Pen && PenKey(e)) { e.Handled = true; return; }
+        if (ConstructKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Line && LineKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Magnetic && MagneticKey(e)) { e.Handled = true; return; }
         if (_tool == Tool.Nodes && NodesKey(e)) { e.Handled = true; return; }
@@ -1422,7 +1430,7 @@ public sealed partial class CanvasView : Control
             _spaceHeld = false;
             UpdateCursor(null);
         }
-        if (_drag == Drag.Create) InvalidateVisual();
+        if (_drag == Drag.Create || ConstructMethod is not null) InvalidateVisual();
     }
 
     protected override void OnPointerEntered(PointerEventArgs e)

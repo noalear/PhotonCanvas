@@ -107,6 +107,14 @@ public sealed class AppSettings
     public int PolygonSides { get; set; } = 6;
     public int StarPoints { get; set; } = 5;
     public double StarInnerPercent { get; set; } = 50;
+    /// <summary>How each drawing tool draws (its "Draw by" choice), by tool name: a <see cref="Geometry.DrawMethod"/> name.</summary>
+    public Dictionary<string, string> DrawMethods { get; set; } = [];
+    /// <summary>Circle by tangent, tangent, radius: the radius (mm).</summary>
+    public double TangentRadiusMm { get; set; } = 10;
+    /// <summary>Centrelines go on the layer being drawn on, to be marked, instead of the Centrelines layer (off by default).</summary>
+    public bool MarkCentrelines { get; set; }
+    /// <summary>How far centrelines and centre marks run past what they're drawn on (mm).</summary>
+    public double CentrelineOvershootMm { get; set; } = 3;
     /// <summary>Take a camera photo every few seconds while a job runs, and make a video of it.</summary>
     public bool TimeLapse { get; set; }
     public double TimeLapseSeconds { get; set; } = 5;

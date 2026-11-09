@@ -27,12 +27,27 @@
       <!-- Work area -->
       <DockPanel Grid.Column="2">
         <Border x:Name="ToolOptions" DockPanel.Dock="Top" Background="{DynamicResource Bg1}" BorderBrush="{DynamicResource Line}" BorderThickness="0,0,0,1" Padding="10,4" IsVisible="False">
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBlock x:Name="ToolOptionsLabel" VerticalAlignment="Center" Classes="muted" />
-            <NumericUpDown x:Name="ToolCorners" Minimum="3" Maximum="64" Increment="1" FormatString="0" Width="110" />
-            <TextBlock x:Name="ToolInnerLabel" Text="Inner size %" VerticalAlignment="Center" Classes="muted" />
-            <NumericUpDown x:Name="ToolInner" Minimum="5" Maximum="95" Increment="5" FormatString="0" Width="110" />
-            <StackPanel x:Name="WandPanel" Orientation="Horizontal" Spacing="6" IsVisible="False">
+          <DockPanel LastChildFill="True">
+            <StackPanel DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolMethodGroup" Orientation="Horizontal" Spacing="6" IsVisible="False" ToolTip.Tip="How this tool draws: by dragging a box, or click by click as in a CAD program (centre and radius, 3 points, touching other shapes…)">
+              <TextBlock Text="Draw by" VerticalAlignment="Center" Classes="muted" />
+              <ComboBox x:Name="ToolMethod" MinWidth="240" />
+            </StackPanel>
+            <TextBlock DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolOptionsLabel" VerticalAlignment="Center" Classes="muted" />
+            <NumericUpDown DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolCorners" Minimum="3" Maximum="64" Increment="1" FormatString="0" Width="110" />
+            <TextBlock DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolInnerLabel" Text="Inner size %" VerticalAlignment="Center" Classes="muted" />
+            <NumericUpDown DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolInner" Minimum="5" Maximum="95" Increment="5" FormatString="0" Width="110" />
+            <StackPanel DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolRadiusGroup" Orientation="Horizontal" Spacing="6" IsVisible="False" ToolTip.Tip="The radius of the circle that touches the two lines or circles you click.">
+              <TextBlock Text="Radius mm" VerticalAlignment="Center" Classes="muted" />
+              <NumericUpDown x:Name="ToolRadius" Minimum="0.01" Maximum="2000" Increment="1" FormatString="0.##" Width="120" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="ToolCentrelineGroup" Orientation="Horizontal" Spacing="10" IsVisible="False">
+              <CheckBox x:Name="ToolMarkCentrelines" Content="Mark centrelines" VerticalAlignment="Center" ToolTip.Tip="Off: centrelines go on the Centrelines layer, which isn't marked (they're there to line things up with). On: they go on the layer you're drawing on and are marked like any line." />
+              <StackPanel Orientation="Horizontal" Spacing="6" ToolTip.Tip="How far centrelines and centre marks run past the lines, circle or shape they're drawn on.">
+                <TextBlock Text="Overshoot mm" VerticalAlignment="Center" Classes="muted" />
+                <NumericUpDown x:Name="ToolOvershoot" Minimum="0" Maximum="100" Increment="0.5" FormatString="0.##" Width="110" />
+              </StackPanel>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Left" Margin="0,0,10,0" x:Name="WandPanel" Orientation="Horizontal" Spacing="6" IsVisible="False">
               <StackPanel x:Name="WandTolGroup" Orientation="Horizontal" Spacing="6" ToolTip.Tip="How different a colour can be and still count as the piece. Raise it if the outline stops short; lower it if it spills onto the bed.">
                 <TextBlock Text="Tolerance" VerticalAlignment="Center" Classes="muted" />
                 <Slider x:Name="WandTolerance" Minimum="1" Maximum="100" Width="90" VerticalAlignment="Center" />
@@ -54,8 +69,8 @@
                 <TextBlock x:Name="WandIgnoreText" MinWidth="44" VerticalAlignment="Center" />
               </StackPanel>
             </StackPanel>
-            <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" />
-          </StackPanel>
+            <TextBlock x:Name="ToolHint" VerticalAlignment="Center" Classes="hint" TextWrapping="Wrap" />
+          </DockPanel>
         </Border>
         <!-- The project's pages -->
         <ContentControl x:Name="PagesHost" DockPanel.Dock="Top" />

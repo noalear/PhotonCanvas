@@ -7,9 +7,10 @@ one page, with only the first key of a command that has more than one.
 - Shortcuts work in the main window. While you're typing in a box, only the **File** group's
   shortcuts work; the box keeps `Ctrl+Z`, `Ctrl+A`, `Delete`, the arrows and letters for itself.
 - While the **Pen** or **Edit points** tool is in use, `Delete`, `Backspace`, `Enter`, `Esc` and `S`
-  (without `Ctrl`) go to the tool. **Edit points** also keeps `R`, `Y` and `B`. **Trace edge**, and
-  the **Line** tool while a line is being drawn click by click, keep `Delete`, `Backspace`, `Enter`
-  and `Esc`. See [Keys inside tools](#keys-inside-tools).
+  (without `Ctrl`) go to the tool. **Edit points** also keeps `R`, `Y` and `B`. **Trace edge**, the
+  **Line** tool while a line is being drawn click by click, and any tool drawing a shape click by
+  click (see [Draw by](drawing.md#draw-by-cad-style-ways-to-draw)), keep `Delete`, `Backspace`,
+  `Enter` and `Esc`. See [Keys inside tools](#keys-inside-tools).
 - "—" below means no key to start with: you can give it one.
 - Add-ons add commands of their own while they're on (for example **Nest…** with `Ctrl+Alt+N`,
   **Warp…**, **3D to slices…**). They're listed with the rest in Settings → Shortcuts and can be
@@ -106,6 +107,8 @@ one page, with only the first key of a command that has more than one.
 | Line | `L` |
 | Polygon | `O` |
 | Star | `S` |
+| Arc | `A` |
+| Centreline | `C` |
 | Pen | `P` |
 | Text | `T` |
 | Edit points | `N` (with one shape selected) |
@@ -161,6 +164,7 @@ See [Working on the canvas](canvas.md) for all of them.
 | **Pen** | `Enter` finishes an open line; `Backspace` or `Delete` removes the last point; `Esc` throws away the line being drawn. See [Drawing](drawing.md). |
 | **Trace edge** | `Enter` finishes; `Backspace` or `Delete` takes back the last point; `Esc` throws away the line being traced. See [Drawing](drawing.md). |
 | **Rectangle**, **Ellipse**, **Polygon**, **Star** | Hold `Shift` for a square, a circle or an even shape; `Alt` to draw from the centre. See [Drawing](drawing.md). |
+| Any tool drawing click by click (a **Draw by** other than the first) | Digits, `.` and `-` type an exact size, `Enter` uses it; `Backspace` takes back a typed character, or with nothing typed the last click; `Esc` clears what's typed, then the clicks so far, then goes back to **Select**. `Shift` keeps a rectangle by its centre square; `Alt` turns an arc by its centre clockwise. See [Draw by](drawing.md#draw-by-cad-style-ways-to-draw). |
 | **Line** | `Shift` for 45° steps. Drawing click by click: type a length (or `25<30` for an angle) and `Enter` to place it; `Backspace` takes back a character; `Esc` clears what's typed, then stops; `Enter` or a right-click stops. See [Line](drawing.md#line). |
 | Any tool that picks points | Hold `Ctrl` for a point that doesn't snap. `F3` turns object snaps off and on. |
 | **Measure** | Hold `Shift` for 45° steps, `Ctrl` for no snapping. See [Measure](canvas.md#measure). |

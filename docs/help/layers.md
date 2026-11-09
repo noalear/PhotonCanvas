@@ -110,6 +110,17 @@ it's needed.
 - A shape left on a layer that is sent, in the same place as a picture's mask, gets a warning when
   the job is checked: *"…" on layer "…" is where the picture "…" is masked, so it will be cut.*
 
+## The centrelines layer
+
+**Centrelines** holds the centrelines and centre marks drawn with the **Centreline** tool (see
+[Centreline](drawing.md#centreline)) while **Mark centrelines** is off. It's made, in grey, the
+first time it's needed, as a Score layer with its output off.
+
+- Its lines are drawn dash-dot (and faded while its output is off), to line things up with and to
+  snap to.
+- Unlike the mask layer, its output can be turned on: then its centrelines are scored like any
+  other line, with its settings.
+
 ## The active layer, and editing several layers together
 
 - **Click** a card: it becomes the active layer, and the only selected one. Its settings show in

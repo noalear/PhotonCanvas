@@ -239,8 +239,55 @@ public partial class MainWindow : Window
             Canvas.StarInner = (double)v / 100;
             _settings.Save();
         };
+        // How each tool draws ("Draw by"), the tangent circle's radius and the centrelines' settings: remembered.
+        foreach (var t in Enum.GetValues<Tool>())
+            if (_settings.DrawMethods.TryGetValue(t.ToString(), out var name) && Enum.TryParse<Doc.Geometry.DrawMethod>(name, out var method))
+                Canvas.SetMethod(t, method);
+        Canvas.TangentRadiusMm = _settings.TangentRadiusMm;
+        Canvas.MarkCentrelines = _settings.MarkCentrelines;
+        Canvas.CentrelineOvershootMm = _settings.CentrelineOvershootMm;
+        ToolRadius.Value = (decimal)Math.Clamp(_settings.TangentRadiusMm, 0.01, 2000);
+        ToolMarkCentrelines.IsChecked = _settings.MarkCentrelines;
+        ToolOvershoot.Value = (decimal)Math.Clamp(_settings.CentrelineOvershootMm, 0, 100);
+        ToolRadius.ValueChanged += (_, _) =>
+        {
+            if (ToolRadius.Value is not { } v) return;
+            Canvas.TangentRadiusMm = _settings.TangentRadiusMm = (double)v;
+            _settings.Save();
+        };
+        ToolMarkCentrelines.IsCheckedChanged += (_, _) =>
+        {
+            Canvas.MarkCentrelines = _settings.MarkCentrelines = ToolMarkCentrelines.IsChecked == true;
+            _settings.Save();
+        };
+        ToolOvershoot.ValueChanged += (_, _) =>
+        {
+            if (ToolOvershoot.Value is not { } v) return;
+            Canvas.CentrelineOvershootMm = _settings.CentrelineOvershootMm = (double)v;
+            _settings.Save();
+        };
+        bool fillingMethods = false;
+        ToolMethod.SelectionChanged += (_, _) =>
+        {
+            if (fillingMethods || ToolMethod.SelectedItem is not ComboBoxItem { Tag: Doc.Geometry.DrawMethod m }) return;
+            var t = Canvas.Tool;
+            Canvas.SetMethod(t, m);
+            _settings.DrawMethods[t.ToString()] = m.ToString();
+            _settings.Save();
+            Options(t);
+        };
         void Options(Tool t)
         {
+            var methods = CanvasView.MethodsFor(t);
+            var method = Canvas.MethodFor(t);
+            bool cad = methods.Length > 0 && !Doc.Geometry.CadDraw.IsBox(method);
+            ToolMethodGroup.IsVisible = methods.Length > 0;
+            fillingMethods = true;
+            ToolMethod.ItemsSource = methods.Select(m => new ComboBoxItem { Content = Doc.Geometry.CadDraw.Label(m), Tag = m }).ToList();
+            ToolMethod.SelectedIndex = Array.IndexOf(methods, method);
+            fillingMethods = false;
+            ToolRadiusGroup.IsVisible = method == Doc.Geometry.DrawMethod.CircleTanTanRadius && t == Tool.Ellipse;
+            ToolCentrelineGroup.IsVisible = t == Tool.Centreline;
             bool poly = t is Tool.Polygon or Tool.Star;
             ToolCorners.IsVisible = poly;
             ToolInner.IsVisible = ToolInnerLabel.IsVisible = t == Tool.Star;
@@ -255,11 +302,12 @@ public partial class MainWindow : Window
                 Tool.Wand => "Click inside a piece on the camera picture to outline it. The sliders refine the last pick.",
                 Tool.Magnetic => "Click along an edge on the camera picture. Click the first point to close; Enter or double-click to finish; Backspace undoes a point.",
                 Tool.Nodes => "Drag points and handles. Double-click an edge to add a point; Delete removes the selected one; S smooth or sharp; Y symmetric; R rounds the corner; B breaks the path there. Alt-drag a handle to break a smooth point. Esc to finish.",
+                _ when cad => Doc.Geometry.CadDraw.Hint(method) + (Doc.Geometry.CadDraw.Steps(method).Any(st => st.Typed != Doc.Geometry.TypedMeaning.None) ? " Type a number + Enter for an exact size." : ""),
                 _ => "",
             };
             WandPanel.IsVisible = t is Tool.Wand or Tool.Magnetic;
             WandTolGroup.IsVisible = WandIgnoreGroup.IsVisible = t == Tool.Wand;
-            ToolOptions.IsVisible = poly || ToolHint.Text.Length > 0;
+            ToolOptions.IsVisible = poly || methods.Length > 0 || ToolHint.Text.Length > 0;
             Canvas.Focus();
         }
         Canvas.ToolChanged += Options;
@@ -517,11 +565,13 @@ public partial class MainWindow : Window
         var draw = home.Group("Draw");
         ToolLarge(draw, "Text", "IcText", Tool.Text, "Text (T) · click where the text should go");
         ToolLarge(draw, "Pen", "IcPen", Tool.Pen, "Pen (P) · click = corner · drag = curve · click the first point to close · Enter to finish");
-        ToolSmall(draw, "Ellipse", "IcEllipse", Tool.Ellipse, "Ellipse (E) · Shift = circle · Alt = from centre");
-        ToolSmall(draw, "Rectangle", "IcRect", Tool.Rect, "Rectangle (R) · Shift = square · Alt = from centre");
-        ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre");
+        ToolSmall(draw, "Ellipse", "IcEllipse", Tool.Ellipse, "Ellipse and circle (E) · Shift = circle · Alt = from centre · or by centre and radius, 2 or 3 points, touching lines and circles (Draw by, in the bar above the work area)");
+        ToolSmall(draw, "Rectangle", "IcRect", Tool.Rect, "Rectangle (R) · Shift = square · Alt = from centre · or by centre and corner, 3 points at any angle, a side's middle, slots (Draw by, in the bar above the work area)");
+        ToolSmall(draw, "Polygon", "IcPolygon", Tool.Polygon, "Polygon (O) · Shift = even · Alt = from centre · or by centre and corner or side, or one side (Draw by)");
         ToolSmall(draw, "Star", "IcStar", Tool.Star, "Star (S) · Shift = even · Alt = from centre");
         ToolSmall(draw, "Line", "IcLine", Tool.Line, "Line (L) · Shift = 45° steps");
+        ToolSmall(draw, "Arc", "IcArc", Tool.Arc, "Arc (A): by 3 points, start-end-point or centre-start-end (choose in the bar above the work area)");
+        ToolSmall(draw, "Centreline", "IcCentreline", Tool.Centreline, "Centreline (C): dash-dot centrelines between two points or two lines, and centre marks on circles. Not marked unless you tick Mark centrelines");
         draw.Large("Special Shapes", "IcHeart", ShowShapes, "Shape library (I): hearts, stars, badges, frames, living hinges and your own saved shapes");
         var codes = home.Group("Serial & codes");
         codes.Large("Code", "IcCode", () => _ = Guard(() => EditCode(null)), "QR code, Data Matrix or barcode. It can hold a serial number, the date or a spreadsheet column, new on every run");
@@ -842,6 +892,8 @@ public partial class MainWindow : Window
         new("tool.line", "Tools", "Line", "L", () => Canvas.Tool = Tool.Line),
         new("tool.polygon", "Tools", "Polygon", "O", () => Canvas.Tool = Tool.Polygon),
         new("tool.star", "Tools", "Star", "S", () => Canvas.Tool = Tool.Star),
+        new("tool.arc", "Tools", "Arc", "A", () => Canvas.Tool = Tool.Arc),
+        new("tool.centreline", "Tools", "Centreline", "C", () => Canvas.Tool = Tool.Centreline),
         new("tool.pen", "Tools", "Pen", "P", () => Canvas.Tool = Tool.Pen),
         new("tool.text", "Tools", "Text", "T", () => Canvas.Tool = Tool.Text),
         new("tool.nodes", "Tools", "Edit points", "N", () => { if (_doc.Selection.Count == 1) Canvas.Tool = Tool.Nodes; }),
@@ -880,6 +932,7 @@ public partial class MainWindow : Window
         // A pen with points down, point editing and the magnetic pen use these keys themselves (R rounds a point, it doesn't pick the rectangle).
         bool toolKeys = !ctrl && ((Canvas.PenInProgress || Canvas.Tool is Tool.Nodes) && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape or Key.S
             || Canvas.LineInProgress && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape
+            || Canvas.ConstructInProgress && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape
             || Canvas.Tool is Tool.Nodes && e.Key is Key.R or Key.Y or Key.B
             || Canvas.Tool is Tool.Magnetic && e.Key is Key.Delete or Key.Back or Key.Enter or Key.Escape);
         foreach (var c in Commands())

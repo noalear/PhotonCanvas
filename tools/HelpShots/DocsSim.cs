@@ -126,14 +126,16 @@ static class DocsSim
             }
             if (more is not null) more.IsExpanded = false;
             layers.Activate(ids.Cut);
-            // The tool options bar for the star and for Pick piece.
-            foreach (var (tool, name) in new[] { (Tool.Star, "star"), (Tool.Polygon, "polygon"), (Tool.Wand, "pick-piece") })
+            // The tool options bar for the star, Pick piece, a circle by tangents and the centreline.
+            canvas.SetMethod(Tool.Ellipse, PhotonCanvas.Doc.Geometry.DrawMethod.CircleTanTanRadius);
+            foreach (var (tool, name) in new[] { (Tool.Star, "star"), (Tool.Polygon, "polygon"), (Tool.Wand, "pick-piece"), (Tool.Ellipse, "circle"), (Tool.Centreline, "centreline") })
             {
                 canvas.Tool = tool;
                 Settle(400);
                 if (w.FindControl<Border>("ToolOptions") is { IsVisible: true } bar) Save(Shot(bar), $"tool-options-{name}", $"The tool options bar above the work area, {name} tool");
             }
             canvas.Tool = Tool.Select;
+            canvas.SetMethod(Tool.Ellipse, PhotonCanvas.Doc.Geometry.DrawMethod.EllipseBox);
             // A shape's own switches: the ring kept back as a guide, the text hidden, the hole locked.
             var cutShapes = doc.State.ShapesOn(ids.Cut).Select(x => x.Id).Where(id => id != ids.Outline).ToHashSet();
             var flagged = Ops.SetShapeFlags(doc.State, new HashSet<Guid> { ids.Ring }, output: false);
