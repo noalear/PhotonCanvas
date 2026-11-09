@@ -342,8 +342,12 @@ public sealed class RotaryScanWindow : Window
         string U(double mm) => inches ? $"{mm / 25.4:0.###}\"" : $"{mm:0.##} mm";
         var o = new List<string>
         {
-            $"Fits a {f.Shape.Describe(inches)} to within ±{U(f.RmsMm)} ({f.Readings} readings)." +
-            (f.RmsMm > 0.5 ? " ⚠ That's a loose fit: check the size, or that the stock really is that shape." : ""),
+            $"Fitted a {f.Shape.Describe(inches)} to {f.Readings} readings" +
+            (f.LeftOut > 0 ? $" ({f.LeftOut} more left out: too far from the rest to be right)" : "") +
+            $". On average the readings are {U(f.RmsMm)} from that shape." +
+            (f.RmsMm > 2
+                ? " ⚠ They don't match it, so this isn't a real result: most likely places were misread (the log says what the camera saw at each point). Check the size too, and scan again."
+                : f.RmsMm > 0.5 ? " ⚠ That's a loose fit: check the size, or that the stock really is that shape." : ""),
         };
         string where = f.OffAxisMm < 0.05 ? "on the axis" : $"{U(f.OffAxisMm)} off the axis (towards {((Math.Atan2(f.Centre.X, f.Centre.Y) * 180 / Math.PI) + 360) % 360:0}°)";
         o.Add(f.Shape.Kind == StockKind.Round ? $"Its middle is {where}." : $"It's turned {f.TurnDeg:0.#}° in the chuck and its middle is {where}.");

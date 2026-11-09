@@ -208,8 +208,11 @@ bar: **Square bar**, **Size** 2, **Units** inches). The readings are then only u
 stock sits: how far it's turned in the chuck, how far its middle is off the axis, and (if **I know the
 axis height** is off) the axis height too, which is then filled in. The model is the exact shape in
 that place, so a few readings are enough: the auto-focus at every 15° does. The readings show as dots
-on the end-on view, over the fitted outline, and the words say how closely they fit; a loose fit
-(over ±0.5 mm) means the size is wrong or the stock isn't that shape. **Turn the high side up** becomes
+on the end-on view, over the fitted outline, and the words say how far the readings are from the
+shape on average. Readings far from what the rest agree on (a misread spot) are left out, up to a third
+of them, and the words say how many. Over 0.5 mm on average is a loose fit: the size is wrong or the
+stock isn't that shape. Over 2 mm the readings don't match the shape at all, so it isn't a real result:
+places were misread, and the log says what the camera saw at each point. **Turn the high side up** becomes
 **Turn a flat face up**, which turns the bar (the shorter way) until the face nearest the top lies
 level on top. The same shape is used all along the part, so a bar held crooked in the chuck fits
 loosely.

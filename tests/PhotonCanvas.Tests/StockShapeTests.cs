@@ -75,6 +75,22 @@ public class StockShapeTests
     }
 
     [Fact]
+    public void MisreadsAreLeftOutOfTheFit()
+    {
+        // A 32.6 mm rod on a 58 mm axis, with a few places misread some 30 mm low (Kyle's scan, 2026-11-09).
+        var shape = new StockShape(StockKind.Round, 32.6);
+        var scan = ScanOf(shape, 58, new Vec2(0.5, 0), 0, noise: 0.1);
+        var heights = scan.Heights.Select(r => (double?[])r.Clone()).ToArray();
+        foreach (var (a, x) in new[] { (2, 0), (5, 1), (9, 2), (14, 0), (20, 1) }) heights[a][x] -= 30;
+        var fit = StockFitter.Fit(scan with { Heights = heights }, shape, 58)!;
+        Assert.Equal(5, fit.LeftOut);
+        Assert.True(fit.RmsMm < 0.2, $"rms {fit.RmsMm}");
+        Assert.Equal(0.5, fit.OffAxisMm, 1);
+        // Clean readings lose nothing.
+        Assert.Equal(0, StockFitter.Fit(scan, shape, 58)!.LeftOut);
+    }
+
+    [Fact]
     public void TooFewReadingsGiveNoFit()
     {
         var shape = new StockShape(StockKind.Square, 50.8);

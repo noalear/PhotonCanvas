@@ -102,6 +102,8 @@ public class PointerProbeTests
         Assert.Equal(-3.1, cal.Depth(aim, lengthwise)!.Value, 1);
         // A crossing far beyond the line's ends isn't trusted.
         Assert.Null(cal.Depth(aim, new PointerSpot(Seen(aim, 1) + new Vec2(0, -60), 200, new Vec2(0, 1), 6, 20)));
+        // Nor a long smear whose middle is far from the track, however long it is.
+        Assert.Null(cal.Depth(aim, new PointerSpot(Seen(aim, 1) + new Vec2(0, -60), 200, new Vec2(0, 1), 20, 300)));
     }
 
     [Fact]

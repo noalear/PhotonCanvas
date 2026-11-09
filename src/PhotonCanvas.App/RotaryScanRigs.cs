@@ -62,13 +62,22 @@ sealed class PointerScanRig(AppSettings settings, MachinePanel machine, double s
         var known = guesses.Where(g => g is not null).ToList();
         var levels = RotaryScanner.FocusSweep(_first || known.Count == 0 ? [] : known, startFocus, _reach, 0, hi);
         _first = false;
+        // How far from the head's focus each place was read: readings near the edge of the reach are the least sure, so
+        // such a place is tried again at the next height up and the reading nearest the focus is kept.
+        var off = new double[xs.Count];
         foreach (var f in levels)
         {
-            var pending = Enumerable.Range(0, xs.Count).Where(i => got[i] is null).ToList();
+            var pending = Enumerable.Range(0, xs.Count).Where(i => got[i] is null || off[i] > _reach * 0.6).ToList();
             if (pending.Count == 0) break;
             var aims = pending.Select(i => new Vec2(xs[i], lineY)).ToList();
             var h = await probe.ReadAtAsync(aims, f, cal, progress, ct);
-            for (int k = 0; k < pending.Count; k++) got[pending[k]] = h[k];
+            for (int k = 0; k < pending.Count; k++)
+            {
+                int i = pending[k];
+                if (h[k] is not { } v || got[i] is not null && Math.Abs(v - f) >= off[i]) continue;
+                got[i] = v;
+                off[i] = Math.Abs(v - f);
+            }
         }
         return got;
     }
