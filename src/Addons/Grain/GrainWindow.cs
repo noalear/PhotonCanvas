@@ -174,7 +174,7 @@ sealed class GrainWindow : Window
                 region = photo.Area;
                 break;
             default:
-                var ids = JobBuilder.OutputLayers(s).SelectMany(s.ShapesFor).Select(sh => sh.Id).ToList();
+                var ids = JobBuilder.OutputLayers(s).SelectMany(s.SentFor).Select(sh => sh.Id).ToList();
                 region = ids.Count == 0 ? photo.Area : s.Bounds(ids).Inflate(10);
                 break;
         }

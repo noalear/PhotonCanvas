@@ -454,7 +454,7 @@ public sealed class QuoteWindow : Window
     {
         // Only what goes to the laser, small enough for a page.
         var s = _state with { Layers = [.. _state.Layers.Select(l => l.Output ? l : l with { Visible = false })] };
-        var box = JobBuilder.OutputLayers(s).SelectMany(s.ShapesFor).Select(sh => sh.Bounds).Where(b => !b.IsEmpty).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+        var box = JobBuilder.OutputLayers(s).SelectMany(s.SentFor).Select(sh => sh.Bounds).Where(b => !b.IsEmpty).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
         if (box.IsEmpty) return null;
         double dpi = Math.Clamp(900 / (Math.Max(box.Width, box.Height) / 25.4), 10, 200);
         try { return DesignExport.Png(s, dpi); }

@@ -373,7 +373,8 @@ public sealed partial class CanvasView : Control
             _batchSelFor = null;
             var old = new Dictionary<Guid, List<(PathShape[] Members, StreamGeometry Geometry)>>(_batches);
             _batches.Clear();
-            foreach (var g in state.Shapes.OfType<PathShape>().GroupBy(x => x.LayerId))
+            // Only shapes shown and sent: a hidden one isn't drawn, one with its output off is drawn faded on its own.
+            foreach (var g in state.Shapes.OfType<PathShape>().Where(x => x.Sent).GroupBy(x => x.LayerId))
             {
                 var shapes = g.ToArray();
                 if (shapes.Length < BatchFrom) continue;
@@ -395,7 +396,7 @@ public sealed partial class CanvasView : Control
             _batchSelFor = doc.Selection;
             _batchSel.Clear();
             if (doc.Selection.Count > 0 && _batches.Count > 0)
-                foreach (var g in state.Shapes.OfType<PathShape>().Where(x => _batches.ContainsKey(x.LayerId) && doc.Selection.Contains(x.Id)).GroupBy(x => x.LayerId))
+                foreach (var g in state.Shapes.OfType<PathShape>().Where(x => x.Sent && _batches.ContainsKey(x.LayerId) && doc.Selection.Contains(x.Id)).GroupBy(x => x.LayerId))
                     _batchSel[g.Key] = [.. g.Chunk(ChunkSize).Select(Combine)];
         }
     }
@@ -502,7 +503,7 @@ public sealed partial class CanvasView : Control
         // Pictures first, whatever their layer: every line and shape shows on top of them, so a
         // picture can be lined up with the outlines under it.
         foreach (var shape in doc.State.Shapes)
-            if (shape is ImageShape im && layers.TryGetValue(im.LayerId, out var picLayer) && picLayer.Visible && im.Bounds.Intersects(viewWorld))
+            if (shape is ImageShape { Visible: true } im && layers.TryGetValue(im.LayerId, out var picLayer) && picLayer.Visible && im.Bounds.Intersects(viewWorld))
                 DrawPicture(ctx, im, picLayer, selected.Contains(im.Id), _hover == im.Id || _highlight == im.Id, px);
         foreach (var (id, chunks) in _batches)
         {
@@ -521,8 +522,8 @@ public sealed partial class CanvasView : Control
         }
         foreach (var shape in doc.State.Shapes)
         {
-            if (!layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
-            if (_batches.ContainsKey(shape.LayerId))
+            if (!shape.Visible || !layers.TryGetValue(shape.LayerId, out var layer) || !layer.Visible) continue;
+            if (shape.Output && _batches.ContainsKey(shape.LayerId))
             {
                 // Drawn with its layer; only the one under the pointer (or highlighted) on top.
                 if ((_hover == shape.Id || _highlight == shape.Id) && shape is PathShape hp && !selected.Contains(shape.Id))
@@ -537,8 +538,10 @@ public sealed partial class CanvasView : Control
             if (shape is not PathShape ps) continue;
             if (!ps.Bounds.Inflate(1).Intersects(viewWorld)) continue;
             var geom = GeometryFor(ps);
-            byte alpha = layer.Output ? (byte)255 : (byte)110;
-            IBrush? fill = layer.Mode == LayerMode.Fill ? new SolidColorBrush(LayerColor(layer, (byte)(layer.Output ? 60 : 25))) : null;
+            // A guide (its layer's output off, or its own) is drawn faded.
+            bool sent = layer.Output && ps.Output;
+            byte alpha = sent ? (byte)255 : (byte)110;
+            IBrush? fill = layer.Mode == LayerMode.Fill ? new SolidColorBrush(LayerColor(layer, (byte)(sent ? 60 : 25))) : null;
             bool sel = selected.Contains(shape.Id);
             bool hov = _hover == shape.Id && !sel;
             double w = sel ? 2.2 : hov ? 2 : 1.25;
@@ -558,7 +561,7 @@ public sealed partial class CanvasView : Control
         var t = im.Transform;
         using (ctx.PushTransform(new Matrix(t.A, t.B, t.C, t.D, t.E, t.F)))
         // A picture that isn't sent (another piece's share, a reference photo) is clearly dimmer than one that is.
-        using (ctx.PushOpacity(layer.Output ? 1 : 0.3))
+        using (ctx.PushOpacity(layer.Output && im.Output ? 1 : 0.3))
         {
             // A clipped picture shows only what's inside its outline.
             using var clip = im.Clip is { } c0 ? ctx.PushGeometryClip(ClipGeometry(c0)) : default(DrawingContext.PushedState?);
@@ -855,7 +858,7 @@ public sealed partial class CanvasView : Control
         Shape? hit = null, picture = null;
         foreach (var s in _doc.State.Shapes.Reverse())
         {
-            if (!layers.TryGetValue(s.LayerId, out var l) || !l.Visible || l.Locked || s.Locked) continue;
+            if (!s.Visible || !layers.TryGetValue(s.LayerId, out var l) || !l.Visible || l.Locked || s.Locked) continue;
             if (!s.HitTest(w, tol, insideCounts: l.Mode == LayerMode.Fill)) continue;
             if (_doc.Selection.Contains(s.Id)) return s;
             if (s is ImageShape) picture ??= s;

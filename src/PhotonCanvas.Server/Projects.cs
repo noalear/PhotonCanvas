@@ -171,7 +171,7 @@ public sealed class Projects(RemoteConfig config)
         using (var grey = new SKPaint { FilterQuality = SKFilterQuality.Medium, ColorFilter = SKColorFilter.CreateColorMatrix(
                    [0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0.299f, 0.587f, 0.114f, 0, 0, 0, 0, 0, 1, 0]) })
             foreach (var layer in JobBuilder.OutputLayers(b.State).Where(l => l.Mode == LayerMode.Image))
-                foreach (var img in b.State.ShapesFor(layer).OfType<ImageShape>())
+                foreach (var img in b.State.SentFor(layer).OfType<ImageShape>())
                 {
                     using var bmp = SKBitmap.Decode(img.Source.Encoded);
                     if (bmp is null) continue;

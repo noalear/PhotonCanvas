@@ -42,6 +42,7 @@
       <StreamGeometry x:Key="IcLock">M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1zM9 10h6V7a3 3 0 0 0-6 0z</StreamGeometry>
       <StreamGeometry x:Key="IcUnlock">M9 10V7a3 3 0 0 1 5.8-1h2.1A5 5 0 0 0 7 7v3H6a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V11a1 1 0 0 0-1-1z</StreamGeometry>
       <StreamGeometry x:Key="IcBolt">M13 2 4 14h6l-1 8 9-12h-6z</StreamGeometry>
+      <StreamGeometry x:Key="IcBoltOff">M13 2 4 14h6l-1 8 9-12h-6zM3.4 2 2 3.4 20.6 22 22 20.6z</StreamGeometry>
       <StreamGeometry x:Key="IcPlus">M11 4h2v7h7v2h-7v7h-2v-7H4v-2h7z</StreamGeometry>
       <StreamGeometry x:Key="IcTrash">M9 3h6l1 2h4v2H4V5h4zM6 9h12l-1 12H7z</StreamGeometry>
       <StreamGeometry x:Key="IcUp">M12 5 5 12l1.4 1.4L11 8.8V19h2V8.8l4.6 4.6L19 12z</StreamGeometry>

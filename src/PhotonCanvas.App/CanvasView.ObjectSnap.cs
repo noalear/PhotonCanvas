@@ -65,7 +65,7 @@ public sealed partial class CanvasView
         var near = new List<SnapFeatures>();
         foreach (var s in _doc.State.Shapes)
         {
-            if (!visible.Contains(s.LayerId) || which?.Invoke(s) == false || !s.Bounds.Inflate(tol).Contains(w)) continue;
+            if (!s.Visible || !visible.Contains(s.LayerId) || which?.Invoke(s) == false || !s.Bounds.Inflate(tol).Contains(w)) continue;
             if (FeaturesOf(s) is { } f) near.Add(f);
         }
         return ObjectSnap.Find(near, w, tol, kinds ?? ObjectSnaps, from);
