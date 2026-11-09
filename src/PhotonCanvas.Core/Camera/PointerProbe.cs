@@ -164,8 +164,12 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
             double off = at.Dist(spot.Centre);
             if (off < best) { best = off; depth = Depths[i] + (Depths[i + 1] - Depths[i]) * t; }
         }
-        // The crossing must be on the line as seen (half its length, and a little).
-        if (double.IsNaN(depth) || best > spot.LengthPx * 0.75 + 3) return Depth(aim, spot.Centre);
+        // The crossing must be near the middle of the spot: as near as a round dot must be to the track, plus a little
+        // for a line only partly seen (never more than two height steps' worth, however long the line). A long smear
+        // (the pointer far out of focus, or something else that changed) crossing the track somewhere along it isn't
+        // a reading: Kyle's scan (2026-11-09) read about 30 mm out.
+        double spacing = TrackSpacing(track);
+        if (double.IsNaN(depth) || best > Math.Max(3, spacing * 1.5) + Math.Min(spot.LengthPx * 0.5, spacing * 2)) return Depth(aim, spot.Centre);
         return depth;
     }
 

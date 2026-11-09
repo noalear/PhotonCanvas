@@ -112,10 +112,14 @@ public sealed record StockShape(StockKind Kind, double WidthMm, double HeightMm 
 /// <param name="Centre">Where the stock's middle is, end-on, from the axis (mm; +Y the top at the start of the scan).</param>
 /// <param name="TurnDeg">How far the shape is turned in the chuck (degrees, within one period of the shape).</param>
 /// <param name="RmsMm">How far the readings sit from the fitted shape (mm): big when the stock isn't that shape.</param>
-public sealed record StockFit(StockShape Shape, double AxisHeightMm, Vec2 Centre, double TurnDeg, double RmsMm, int Readings)
+public sealed record StockFit(StockShape Shape, double AxisHeightMm, Vec2 Centre, double TurnDeg, double RmsMm, int Readings, int LeftOut = 0)
 {
     /// <summary>How far the stock's middle is off the axis (mm).</summary>
     public double OffAxisMm => Centre.Length;
+
+    /// <summary>How far a reading (top height <paramref name="h"/> at angle <paramref name="deg"/>) is above the fitted shape's top (mm).</summary>
+    public double Residual(double deg, double h) =>
+        Shape.RadiusAt(deg, TurnDeg, Centre) is { } r ? h - (AxisHeightMm + r) : 4 * Math.Max(1, Shape.MeanRadius);
 
     /// <summary>The turn (the way a design runs down the page) that brings a flat face of the shape to the top, the shorter way.</summary>
     public double FlatUpDeg()
@@ -176,7 +180,27 @@ public static class StockFitter
         for (int x = 0; x < scan.Xs.Length; x++) pts.AddRange(scan.Column(x));
         int need = axisHeightMm is null ? 4 : 3;
         if (pts.Select(p => Math.Round(p.Deg, 3)).Distinct().Count() < need) return null;
+        var fit = FitPoints(pts, shape, axisHeightMm);
+        // Readings far from the rest (a misread spot) mustn't drag the shape about: leave out those well off what the
+        // others agree on, worst first, and fit again, a few rounds. At most a third are left out in all.
+        int all = pts.Count;
+        for (int round = 0; round < 4 && fit is not null; round++)
+        {
+            var res = pts.Select(p => Math.Abs(fit.Residual(p.Deg, p.H))).ToList();
+            double cut = Math.Max(1.0, 4 * res.OrderBy(r => r).ElementAt(res.Count / 2));
+            var drop = Enumerable.Range(0, pts.Count).Where(i => res[i] > cut).OrderByDescending(i => res[i])
+                .Take(pts.Count - (all * 2 + 2) / 3).ToHashSet();
+            if (drop.Count == 0) break;
+            var keep = pts.Where((_, i) => !drop.Contains(i)).ToList();
+            if (keep.Select(p => Math.Round(p.Deg, 3)).Distinct().Count() < need) break;
+            pts = keep;
+            fit = FitPoints(pts, shape, axisHeightMm);
+        }
+        return fit is null ? null : fit with { LeftOut = all - pts.Count };
+    }
 
+    static StockFit? FitPoints(List<(double Deg, double H)> pts, StockShape shape, double? axisHeightMm)
+    {
         double c0 = axisHeightMm ?? pts.Average(p => p.H) - shape.MeanRadius;
         double period = shape.PeriodDeg;
         double scale = Math.Max(1, shape.MeanRadius);
