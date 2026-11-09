@@ -408,7 +408,7 @@ public sealed class RotaryFinishSlices(RotaryFinishOptions options, Layer? engra
 public static class RotaryPage
 {
     /// <summary>The note each shape carries (so the job's check can find the page, and right-click help finds the add-on).</summary>
-    public const string NoteKey = "rotary-finish";
+    public const string NoteKey = JobBuilder.RepeatsOnPurposeKey;
 
     public static DesignPage Make(RotaryPlan plan, Layer engrave, string name)
     {

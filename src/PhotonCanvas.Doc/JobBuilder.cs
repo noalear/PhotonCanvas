@@ -180,12 +180,18 @@ public static class JobBuilder
     }
 
     /// <summary>
+    /// The note on a rotary finishing page's passes (the rotary finish add-on's): on round stock each pass is the
+    /// whole way round, so they're the same size and place on purpose, pass after pass.
+    /// </summary>
+    public const string RepeatsOnPurposeKey = "rotary-finish";
+
+    /// <summary>
     /// Pairs of processed shapes that sit exactly on top of each other (same size and place),
     /// e.g. an original and an edited copy: both get processed, usually by mistake.
     /// </summary>
     public static IEnumerable<(Shape A, Shape B)> StackedShapes(DocState s)
     {
-        var shapes = OutputLayers(s).SelectMany(l => s.ShapesOn(l.Id)).Where(sh => sh.Sent && !sh.Bounds.IsEmpty).ToList();
+        var shapes = OutputLayers(s).SelectMany(l => s.ShapesOn(l.Id)).Where(sh => sh.Sent && !sh.Bounds.IsEmpty && !sh.AddonData.ContainsKey(RepeatsOnPurposeKey)).ToList();
         static (long, long, long, long) Key(Rect2 b) =>
             ((long)Math.Round(b.MinX * 20), (long)Math.Round(b.MinY * 20), (long)Math.Round(b.MaxX * 20), (long)Math.Round(b.MaxY * 20));
         foreach (var g in shapes.GroupBy(sh => Key(sh.Bounds)).Where(g => g.Count() > 1))
@@ -216,8 +222,20 @@ public static class JobBuilder
 
     public static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now = null)
     {
-        JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
+        try { return Build(s, opt, now, warnings); }
+        catch (JobException e) when (e.Warnings.Count == 0)
+        {
+            // What was found before it stopped still shows (an add-on's check often says why: Kyle, 2026-11-09,
+            // only saw "outside the work area" while the advice to set Object Ø was thrown away).
+            e.Warnings = [.. warnings.Distinct()];
+            throw;
+        }
+    }
+
+    static BuiltJob Build(DocState s, JobOptions opt, DateTimeOffset? now, List<string> warnings)
+    {
+        JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         // Shapes hidden on their own, or with their own output off, aren't sent (a hidden one is said, as a hidden layer is).
         foreach (var owner in OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).Select(l => s.Owner(l.Id)).Distinct())
         {
@@ -689,7 +707,8 @@ public static class JobBuilder
         {
             double far = Math.Abs(bounds.MinY - fit.OriginY) > Math.Abs(bounds.MaxY - fit.OriginY) ? bounds.MinY : bounds.MaxY;
             if (Math.Abs(far - fit.OriginY) > fit.CircumferenceMm / 2 + 1e-6)
-                throw new OutsideWorkAreaException(bounds.MinX, far, opt.Machine.FieldW, fit.CircumferenceMm, " (the rotary's area: the field across, once round the object)");
+                throw Explain(new OutsideWorkAreaException(bounds.MinX, far, opt.Machine.FieldW, fit.CircumferenceMm, " (the rotary's area: the field across, once round the object)", fit.OriginY - fit.CircumferenceMm / 2),
+                    s, layers, null, fit, opt.Machine, opt.Section?.Shift ?? default);
         }
         if (mode is WorkMode.Rotary rot && blocks.Any(b => b is not DotBlock && b.Laser.FValue > Job.RotaryFeedCap(rot)))
             warnings.Add($"On the rotary, moves that turn it are held to 10 turns a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
@@ -750,7 +769,12 @@ public static class JobBuilder
             SurfaceHeight = surface is null ? null : surface.HeightAt,
             BandMm = s.Curve.BandMm,
         };
-        var motion = job.RenderText();
+        GcodeText motion;
+        try { motion = job.RenderText(); }
+        catch (OutsideWorkAreaException e)
+        {
+            throw Explain(e, s, layers, e.Item is int k && k >= 0 && k < blockLayer.Count ? blockLayer[k] : null, mode, opt.Machine, opt.Section?.Shift ?? default);
+        }
         Vec2[] frame = [bounds.TopLeft, new(bounds.MaxX, bounds.MinY), bounds.BottomRight, new(bounds.MinX, bounds.MaxY), bounds.TopLeft];
         var border = job.Border(frame);
 
@@ -956,6 +980,60 @@ public static class JobBuilder
     }
 
     static double FoldTo180(double deg) => ((deg % 180) + 180) % 180;
+
+    /// <summary>
+    /// A point outside the work area, said by the shapes that go there (and their layers), with those shapes to
+    /// select: "Point (169.944, 113.105) mm" alone doesn't say which of 141 shapes on 12 layers it is (Kyle, 2026-11-09).
+    /// <paramref name="layer"/>: the layer the point is in, when known; <paramref name="shift"/>: how far the job was moved from the design (one section of it).
+    /// </summary>
+    static OutsideWorkAreaException Explain(OutsideWorkAreaException e, DocState s, IReadOnlyList<Layer> layers, Layer? layer, WorkMode mode, MachineProfile machine, Vec2 shift)
+    {
+        // The work area in the design's own mm.
+        var area = mode switch
+        {
+            WorkMode.Rotary r => new Rect2(0, r.OriginY - r.CircumferenceMm / 2, machine.FieldW, r.OriginY + r.CircumferenceMm / 2),
+            WorkMode.Conveyor c => new Rect2(0, 0, c.LengthMm, machine.FieldH),
+            _ => new Rect2(0, 0, machine.FieldW, machine.FieldH),
+        };
+        area = new Rect2(area.MinX - shift.X, area.MinY - shift.Y, area.MaxX - shift.X, area.MaxY - shift.Y);
+        bool Outside(Rect2 b) => !b.IsEmpty && (b.MinX < area.MinX - 1e-6 || b.MaxX > area.MaxX + 1e-6 || b.MinY < area.MinY - 1e-6 || b.MaxY > area.MaxY + 1e-6);
+        IEnumerable<Layer> where = layer is null ? layers : [layer];
+        var onLayers = where.SelectMany(l => s.SentFor(l).Select(sh => (Shape: sh, Layer: l))).DistinctBy(x => x.Shape.Id).ToList();
+        var outside = onLayers.Where(x => Outside(x.Shape.Bounds)).ToList();
+        if (outside.Count == 0 && layer is not null)
+        {
+            // Inside itself, but something it adds goes out (a fill's run-up, a wobble): the shape on that layer nearest the point.
+            var p = new Vec2(e.X, e.Y) - shift;
+            static double Dist(Rect2 b, Vec2 p) => Math.Max(0, Math.Max(b.MinX - p.X, p.X - b.MaxX)) + Math.Max(0, Math.Max(b.MinY - p.Y, p.Y - b.MaxY));
+            if (onLayers.Where(x => !x.Shape.Bounds.IsEmpty).MinBy(x => Dist(x.Shape.Bounds, p)) is { Shape: not null } near) outside = [near];
+        }
+        if (outside.Count == 0) return e;
+
+        var first = outside[0];
+        int nLayers = outside.Select(x => x.Layer.Id).Distinct().Count();
+        string who = $"\"{Label(first.Shape)}\" on layer \"{first.Layer.Name}\"" + (outside.Count switch
+        {
+            1 => "",
+            2 => nLayers == 1 ? " and 1 more shape on it" : " and 1 more shape",
+            _ => nLayers == 1 ? $" and {outside.Count - 1} more shapes on it" : $" and {outside.Count - 1} more shapes on {nLayers - 1} other layer{(nLayers == 2 ? "" : "s")}",
+        });
+        string verb = outside.Count == 1 ? "goes" : "go";
+        var reach = Rect2.Bounds(outside.SelectMany(x => new[] { x.Shape.Bounds.TopLeft, x.Shape.Bounds.BottomRight }));
+        string text = mode switch
+        {
+            WorkMode.Rotary r =>
+                $"{who} {verb} past once round the object. At Object Ø {r.CircumferenceMm / Math.PI:0.##} mm (Machine → Work mode) once round is {r.CircumferenceMm:0.##} mm, " +
+                $"Y {area.MinY:0.#} to {area.MaxY:0.#} mm on this page, and {(outside.Count == 1 ? "it reaches" : "they reach")} Y {reach.MinY:0.#} to {reach.MaxY:0.#} mm" +
+                (reach.MinX < area.MinX || reach.MaxX > area.MaxX ? $", X {reach.MinX:0.#} to {reach.MaxX:0.#} mm (the field is {machine.FieldW:0} mm across)" : "") +
+                ". If the page was made for another Object Ø, set Work mode to it; else move or shrink the shape.",
+            WorkMode.Conveyor c =>
+                $"{who} {verb} outside the conveyor's area (X 0 to {c.LengthMm:0.#}, Y 0 to {machine.FieldH:0.#} mm): {(outside.Count == 1 ? "it reaches" : "they reach")} X {reach.MinX:0.#} to {reach.MaxX:0.#}, Y {reach.MinY:0.#} to {reach.MaxY:0.#} mm.",
+            _ =>
+                $"{who} {verb} outside the work area (X 0 to {machine.FieldW:0.#}, Y 0 to {machine.FieldH:0.#} mm): {(outside.Count == 1 ? "it reaches" : "they reach")} X {reach.MinX:0.#} to {reach.MaxX:0.#}, Y {reach.MinY:0.#} to {reach.MaxY:0.#} mm." +
+                (Outside(reach) ? "" : " (Its fill's run-up or wobble goes past the edge: move it in a little.)"),
+        };
+        return e.Explained(text, [.. outside.Select(x => x.Shape.Id)]);
+    }
 
     static string Label(Shape sh) => string.IsNullOrWhiteSpace(sh.Name) ? sh.GetType().Name.Replace("Shape", "") : sh.Name.Length > 30 ? sh.Name[..30] + "…" : sh.Name;
 

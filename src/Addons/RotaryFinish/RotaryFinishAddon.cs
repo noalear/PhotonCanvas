@@ -42,7 +42,7 @@ sealed class RotaryPageCheck : IJobHook
         }
         double want = Math.Min(Math.PI * d, WorkModes.MaxCircumferenceMm);
         if (Math.Abs(r.CircumferenceMm - want) > 0.5)
-            yield return $"the page was made for Object Ø {d:0.#} mm in Work mode (it's set to {r.CircumferenceMm / Math.PI:0.#} mm): set it to {d:0.#} mm, or the engraving lands at the wrong angles.";
+            yield return $"the page was made for Object Ø {d:0.#} mm in Work mode (it's set to {r.CircumferenceMm / Math.PI:0.#} mm): set it to {d:0.#} mm (or make the page again, for the size it's set to), or the engraving lands at the wrong angles and runs past once round.";
         if (r.Direction < 0)
             yield return "the rotary is set to rollers: this part isn't round, so hold it in a chuck (a glued stack by its dowel).";
         double drop = state.Layers.Where(l => l.Output && state.ShapesOn(l.Id).Any()).Select(l => l.FocusOffsetMm).DefaultIfEmpty(0).Max();
