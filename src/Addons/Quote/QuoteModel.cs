@@ -160,7 +160,7 @@ public static class QuoteMath
         var boxes = new Dictionary<string, (string Label, Rect2 Box)>();
         foreach (var l in JobBuilder.OutputLayers(s))
         {
-            var box = s.ShapesFor(l).Select(sh => sh.Bounds).Where(b => !b.IsEmpty).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
+            var box = s.SentFor(l).Select(sh => sh.Bounds).Where(b => !b.IsEmpty).Aggregate(Rect2.Empty, (a, b) => a.Union(b));
             if (box.IsEmpty) continue;
             string key = l.Material is { } m ? m.MaterialId.ToString("N") : OtherKey;
             string label = l.Material is { Label.Length: > 0 } m2 ? m2.Label : "Material";

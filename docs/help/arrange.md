@@ -180,8 +180,10 @@ knock by accident.
 
 **Unlock all** (`Ctrl+Alt+Shift+L`) unlocks every locked shape and selects them.
 
-- In the Layers panel a locked shape has a lock button beside it: click it to unlock just that one.
-  Right-clicking a locked shape there gives **Unlock** too.
+- In the Layers panel each shape's row has a padlock: click it to lock or unlock just that one
+  (beside it are the shape's own output and show switches, see
+  [A shape's own switches](layers.md#a-shapes-own-switches)). Right-clicking a locked shape there
+  gives **Unlock** too.
 - A locked shape can still be selected by clicking it in the Layers panel; commands and the
   arrow keys then act on it.
 - To lock everything on a layer, lock the layer instead ([Layers](layers.md)). More in

@@ -20,7 +20,7 @@ public static class DesignExport
     {
         var layers = s.Layers.ToDictionary(l => l.Id);
         foreach (var sh in s.Shapes)
-            if (layers.TryGetValue(sh.LayerId, out var l) && l.Visible) yield return (l, sh);
+            if (sh.Visible && layers.TryGetValue(sh.LayerId, out var l) && l.Visible) yield return (l, sh);
     }
 
     static string Hex(uint c) => $"#{c & 0xFFFFFF:x6}";

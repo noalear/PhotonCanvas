@@ -200,7 +200,7 @@ public sealed partial class CanvasView
         var w = ToWorld(p);
         var layers = _doc.State.Layers.ToDictionary(l => l.Id);
         var im = _doc.State.Shapes.Reverse().OfType<ImageShape>().FirstOrDefault(s =>
-            layers.TryGetValue(s.LayerId, out var l) && l.Visible && !l.Locked && !s.Locked && s.HitTest(w, 0, true));
+            s.Visible && layers.TryGetValue(s.LayerId, out var l) && l.Visible && !l.Locked && !s.Locked && s.HitTest(w, 0, true));
         if (im is null) { Hint?.Invoke("Drag over a picture to rub parts of it out (they turn white and aren't engraved)."); return false; }
         _erase = new EraseStroke(im, [w]);
         return true;
@@ -291,7 +291,7 @@ public sealed partial class CanvasView
         var w = ToWorld(screen);
         var visible = _doc.State.Layers.Where(l => l.Visible).Select(l => l.Id).ToHashSet();
         var cutters = _doc.State.Shapes.OfType<PathShape>()
-            .Where(s => s.Id != target.Id && visible.Contains(s.LayerId) && s.Bounds.Intersects(target.Bounds))
+            .Where(s => s.Id != target.Id && s.Visible && visible.Contains(s.LayerId) && s.Bounds.Intersects(target.Bounds))
             .SelectMany(s => PathTools.Polylines(s.World)).ToList();
         if (PathTools.Trim(target.World, w, cutters) is { } r) _trim = (target.Id, r.Result, r.Removed);
         InvalidateVisual();

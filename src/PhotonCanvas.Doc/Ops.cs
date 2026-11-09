@@ -25,6 +25,26 @@ public static class Ops
         return i < 0 || ReferenceEquals(s.Shapes[i], shape) ? s : s with { Shapes = s.Shapes.SetItem(i, shape) };
     }
 
+    /// <summary>
+    /// Shapes shown or hidden, locked or unlocked, sent or kept back as guides (null leaves that one
+    /// as it is). Shapes already set that way are kept as they are; nothing to change returns <paramref name="s"/>.
+    /// </summary>
+    public static DocState SetShapeFlags(DocState s, IReadOnlySet<Guid> ids, bool? visible = null, bool? locked = null, bool? output = null)
+    {
+        bool changed = false;
+        var shapes = s.Shapes.Select(x =>
+        {
+            if (!ids.Contains(x.Id)) return x;
+            var y = x;
+            if (visible is { } v && y.Visible != v) y = y.WithVisible(v);
+            if (locked is { } l && y.Locked != l) y = y.WithLocked(l);
+            if (output is { } o && y.Output != o) y = y.WithOutput(o);
+            changed |= !ReferenceEquals(x, y);
+            return y;
+        }).ToImmutableList();
+        return changed ? s with { Shapes = shapes } : s;
+    }
+
     public static DocState Delete(DocState s, IReadOnlySet<Guid> ids)
     {
         var next = s.Shapes.RemoveAll(x => ids.Contains(x.Id));

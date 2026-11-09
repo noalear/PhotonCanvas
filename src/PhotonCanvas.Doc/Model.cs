@@ -254,10 +254,24 @@ public abstract class Shape
     Affine _transform = Affine.Identity;
     Guid? _groupId;
     bool _locked;
+    bool _hidden;
+    bool _noOutput;
 
     public Guid Id { get => _id; init => _id = value; }
     /// <summary>Can't be picked or changed on the canvas (until unlocked); still marked.</summary>
     public bool Locked { get => _locked; init => _locked = value; }
+    /// <summary>
+    /// Shown on the canvas (on by default). A hidden shape can't be picked or snapped to, and is
+    /// never sent, like a shape on a hidden layer; it's shown again from the layers panel.
+    /// </summary>
+    public bool Visible { get => !_hidden; init => _hidden = !value; }
+    /// <summary>
+    /// Sent to the laser with its layer (on by default). Off, it stays on the canvas, faded, as a
+    /// guide; it's only sent when its layer's output is on too (never on the mask or material layer).
+    /// </summary>
+    public bool Output { get => !_noOutput; init => _noOutput = !value; }
+    /// <summary>Visible and output on: goes to the laser when its layer does.</summary>
+    public bool Sent => !_hidden && !_noOutput;
 
     /// <summary>
     /// For copies that each mark a different item: this copy's text and codes are this many steps
@@ -317,14 +331,32 @@ public abstract class Shape
         return c;
     }
 
+    /// <summary>A copy that is shown or hidden.</summary>
+    public Shape WithVisible(bool visible)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._hidden = !visible;
+        return c;
+    }
+
+    /// <summary>A copy that is sent to the laser or kept back as a guide.</summary>
+    public Shape WithOutput(bool output)
+    {
+        var c = (Shape)MemberwiseClone();
+        c._noOutput = !output;
+        return c;
+    }
+
     /// <summary>
     /// A shape rebuilt from this one (new words, filled-in fields, new settings) keeps what was set
-    /// on it by hand: its lock, its copy number, and its tabs and start point (kept where they were
+    /// on it by hand: its lock, whether it's shown and sent, its copy number, and its tabs and start point (kept where they were
     /// on the work area, even if the rebuild changed its own coordinates).
     /// </summary>
     protected internal T Keep<T>(T rebuilt) where T : Shape
     {
         rebuilt._locked = _locked;
+        rebuilt._hidden = _hidden;
+        rebuilt._noOutput = _noOutput;
         rebuilt.VarOffset = VarOffset;
         rebuilt._addonData = _addonData;
         if (this is PathShape from && rebuilt is PathShape to && (from.ManualTabs.Count > 0 || from.StartPoint is not null))
@@ -521,12 +553,28 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     /// <summary>The sub-layers of a layer, in order.</summary>
     public IEnumerable<Layer> SubLayers(Guid layerId) => Layers.Where(l => l.ParentId == layerId);
 
-    /// <summary>Shapes that can be picked on the canvas (layer visible and unlocked).</summary>
+    /// <summary>Shapes that can be picked on the canvas (shape and layer visible and unlocked).</summary>
     public IEnumerable<Shape> Editable()
     {
         var ok = Layers.Where(l => l.Visible && !l.Locked).Select(l => l.Id).ToHashSet();
-        return Shapes.Where(s => ok.Contains(s.LayerId) && !s.Locked);
+        return Shapes.Where(s => ok.Contains(s.LayerId) && !s.Locked && s.Visible);
     }
+
+    /// <summary>Shapes on the canvas: their own layer is shown and so are they (locked ones too).</summary>
+    public IEnumerable<Shape> Shown()
+    {
+        var ok = Layers.Where(l => l.Visible).Select(l => l.Id).ToHashSet();
+        return Shapes.Where(s => s.Visible && ok.Contains(s.LayerId));
+    }
+
+    /// <summary>
+    /// The shapes a layer sends to the laser: <see cref="ShapesFor"/> without the ones that are hidden
+    /// or have their own output off. (Whether the layer itself is sent is <c>JobBuilder.OutputLayers</c>.)
+    /// </summary>
+    public IEnumerable<Shape> SentFor(Layer l) => ShapesFor(l).Where(x => x.Sent);
+
+    /// <summary>This design without the shapes that are hidden or have their own output off: what a job is built from.</summary>
+    public DocState WithoutHeldBack() => Shapes.All(x => x.Sent) ? this : this with { Shapes = [.. Shapes.Where(x => x.Sent)] };
 
     public Rect2 Bounds(IEnumerable<Guid> ids)
     {

@@ -216,12 +216,17 @@ public sealed class LayersPanel : UserControl
             var title = new TextBlock { Text = l.Name, FontWeight = active ? FontWeight.SemiBold : FontWeight.Normal, TextTrimming = TextTrimming.CharacterEllipsis, Opacity = live ? 1 : 0.6, VerticalAlignment = VerticalAlignment.Center };
             var parent = l.ParentId is { } pid ? _doc.State.FindLayer(pid) : null;
             // Short, so the name keeps the room (the parent's name is in the tip; the card is indented under it).
+            // Shapes hidden on their own or with their own output off: not sent with the rest.
+            int held = parent is null && count > 0 ? _doc.State.ShapesOn(l.Id).Count(x => !x.Sent) : 0;
             var n = new TextBlock
             {
-                Text = parent is not null ? "↳ sub-layer" : count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes",
+                Text = (parent is not null ? "↳ sub-layer" : count == 0 ? "empty" : count == 1 ? "1 shape" : $"{count} shapes") + (held > 0 ? $" · {held} off" : ""),
                 Classes = { "hint" }, VerticalAlignment = VerticalAlignment.Center, Margin = new(6, 0, 0, 0), TextWrapping = TextWrapping.NoWrap,
             };
             if (parent is not null) ToolTip.SetTip(n, $"A sub-layer: another operation on the shapes of \"{parent.Name}\", with its own settings.");
+            else if (held > 0) ToolTip.SetTip(n, held == 1
+                ? "One of its shapes is hidden or has its own output off, so it isn't sent. Open the list (▸) to see which."
+                : $"{held} of its shapes are hidden or have their own output off, so they aren't sent. Open the list (▸) to see which.");
             var g = new Grid { ColumnDefinitions = new("Auto,Auto"), VerticalAlignment = VerticalAlignment.Center };
             g.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
             g.ColumnDefinitions[0].MaxWidth = 150;
@@ -357,7 +362,7 @@ public sealed class LayersPanel : UserControl
                 if (!emittedGroups.Add(g)) continue;
                 var members = shapes.Where(x => x.GroupId == g).ToList();
                 // Only one of the group on this layer (a group spread across layers): no header.
-                if (members.Count > 1) block.Children.Add(GroupRow(members));
+                if (members.Count > 1) block.Children.Add(GroupRow(members, l));
                 foreach (var m in members)
                 {
                     var row = ShapeRow(m, l, indent: members.Count > 1 ? 1 : 0);
@@ -387,24 +392,29 @@ public sealed class LayersPanel : UserControl
 
     static string Trim(string s, int n) => s.Length <= n ? s : s[..(n - 1)] + "…";
 
-    Control GroupRow(List<Shape> members)
+    Control GroupRow(List<Shape> members, Layer l)
     {
         bool all = members.All(m => _doc.Selection.Contains(m.Id));
+        var grid = new Grid { ColumnDefinitions = new("*,Auto") };
+        grid.Children.Add(new StackPanel
+        {
+            Orientation = Orientation.Horizontal, Spacing = 6,
+            Children =
+            {
+                new PathIcon { Data = (Geometry)Application.Current!.FindResource("IcCopy")!, Width = 11, Height = 11, Opacity = 0.7 },
+                new TextBlock { Text = $"Group of {members.Count}", FontSize = 12, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center },
+            },
+        });
+        var switches = ShapeSwitches(members, l, "the group");
+        Grid.SetColumn(switches, 1);
+        grid.Children.Add(switches);
         var row = new Border
         {
             Background = all ? Res("SelBg") : Brushes.Transparent,
             CornerRadius = new(4),
-            Margin = new(30, 0, 0, 0),
-            Padding = new(6, 2),
-            Child = new StackPanel
-            {
-                Orientation = Orientation.Horizontal, Spacing = 6,
-                Children =
-                {
-                    new PathIcon { Data = (Geometry)Application.Current!.FindResource("IcCopy")!, Width = 11, Height = 11, Opacity = 0.7 },
-                    new TextBlock { Text = $"Group of {members.Count}", FontSize = 12, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center },
-                },
-            },
+            Margin = new(30, 0, 2, 0),
+            Padding = new(6, 2, 4, 2),
+            Child = grid,
         };
         ToolTip.SetTip(row, "Click to select the whole group; drag it onto another layer to move it there");
         row.PointerPressed += (_, e) =>
@@ -461,19 +471,13 @@ public sealed class LayersPanel : UserControl
         grid.Children.Add(icon);
         Grid.SetColumn(name, 1); grid.Children.Add(name);
         Grid.SetColumn(size, 2); grid.Children.Add(size);
-        if (s.Locked)
-        {
-            // Locked shapes can't be picked on the canvas: unlock from here.
-            var unlock = new Button { Classes = { "icon" }, Padding = new(2), Margin = new(4, 0, 0, 0), Content = new PathIcon { Data = UiKit.Icon("IcLock"), Width = 11, Height = 11 } };
-            ToolTip.SetTip(unlock, "Locked: click to unlock");
-            unlock.Click += (_, e) =>
-            {
-                e.Handled = true;
-                if (_doc.State.FindShape(s.Id) is { } cur) _doc.Commit("Unlock", Ops.Replace(_doc.State, cur.WithLocked(false)));
-            };
-            Grid.SetColumn(unlock, 3);
-            grid.Children.Add(unlock);
-        }
+        // Its own output, show and lock switches (hidden and locked shapes can't be picked on the canvas: set them back from here).
+        var switches = ShapeSwitches([s], l, "this shape");
+        Grid.SetColumn(switches, 3);
+        grid.Children.Add(switches);
+        bool held = !s.Visible || !s.Output;
+        name.Opacity = held ? 0.55 : 1;
+        icon.Opacity = s.Visible ? 1 : 0.35;
         var row = new Border
         {
             Background = sel ? Res("SelBg") : Brushes.Transparent,
@@ -493,6 +497,58 @@ public sealed class LayersPanel : UserControl
         row.ContextRequested += (_, e) => { e.Handled = true; ShapeMenu(s).Open(row); };
         ContextHelp.Describe(row, () => ContextHelp.Shapes([s], "layers.md#right-click-on-a-shape"));
         return row;
+    }
+
+    /// <summary>
+    /// A shape's (or a group's) own switches, like a layer's: sent to the laser, shown, locked. Each is
+    /// faint while it's as usual, so the ones that have been changed stand out. Clicking one on a shape
+    /// that is part of a bigger selection sets the whole selection the same way.
+    /// </summary>
+    Control ShapeSwitches(IReadOnlyList<Shape> shapes, Layer l, string what)
+    {
+        // The mask layer is never sent, whatever a shape on it says.
+        bool neverSent = MaskLayer.IsMask(_doc.State, l);
+        bool allOut = shapes.All(x => x.Output), allShown = shapes.All(x => x.Visible), anyLocked = shapes.Any(x => x.Locked);
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new(4, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        Button Switch(string icon, bool usual, string tip)
+        {
+            var b = new Button
+            {
+                Classes = { "icon" }, MinWidth = 20, MinHeight = 20, Padding = new(3), VerticalAlignment = VerticalAlignment.Center,
+                Content = new PathIcon { Data = UiKit.Icon(icon), Width = 11, Height = 11 },
+                Opacity = usual ? 0.3 : 1,
+            };
+            ToolTip.SetTip(b, tip);
+            panel.Children.Add(b);
+            return b;
+        }
+        var outp = neverSent
+            ? Switch("IcBoltOff", true, "On the mask layer: never sent to the laser. Move it to another layer to burn it.")
+            : Switch(allOut ? "IcBolt" : "IcBoltOff", allOut, allOut
+                ? $"Output on: {what} is sent with its layer{(l.Output ? "" : " (the layer's output is off, so nothing on it is sent for now)")}. Click to keep it back as a guide."
+                : $"Output off: {what} stays on the work area, faded, but is never sent. Click to send it again.");
+        if (!neverSent) outp.Click += (_, e) => { e.Handled = true; SetShapes(shapes, output: !allOut); };
+        var eye = Switch(allShown ? "IcEye" : "IcEyeOff", allShown, allShown ? $"Hide {what} (hidden shapes are never sent)" : $"Hidden: click to show {what} again");
+        eye.Click += (_, e) => { e.Handled = true; SetShapes(shapes, visible: !allShown); };
+        var lck = Switch(anyLocked ? "IcLock" : "IcUnlock", !anyLocked, anyLocked ? $"Locked: click to unlock {what}" : $"Lock {what} (can't be picked or moved on the work area; still sent)");
+        lck.Click += (_, e) => { e.Handled = true; SetShapes(shapes, locked: !anyLocked); };
+        return panel;
+    }
+
+    /// <summary>Set the switch on the clicked shapes, or on the whole selection when a clicked shape is part of a bigger one.</summary>
+    void SetShapes(IReadOnlyList<Shape> clicked, bool? visible = null, bool? locked = null, bool? output = null)
+    {
+        IReadOnlySet<Guid> ids = clicked.Count == 1 && _doc.Selection.Contains(clicked[0].Id) && _doc.Selection.Count > 1
+            ? _doc.Selection
+            : clicked.Select(x => x.Id).ToHashSet();
+        var next = Ops.SetShapeFlags(_doc.State, ids, visible, locked, output);
+        if (ReferenceEquals(next, _doc.State)) return;
+        string label = visible is { } v ? (v ? "Show shape" : "Hide shape")
+            : locked is { } k ? (k ? "Lock" : "Unlock")
+            : output == true ? "Shape output on" : "Shape output off";
+        // Hidden and locked shapes can't be picked on the work area: they leave the selection.
+        IEnumerable<Guid>? select = visible == false || locked == true ? _doc.Selection.Where(id => !ids.Contains(id)).ToList() : null;
+        _doc.Commit(label, next, select);
     }
 
     void OnShapePressed(Shape s, Layer l, PointerPressedEventArgs e)

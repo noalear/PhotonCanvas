@@ -173,11 +173,42 @@ file name. Point at a row to see its size and position, and to highlight the sha
 | `Ctrl`+click | Adds it to the selection, or takes it out. |
 | `Shift`+click | Selects every shape on the layer from the one clicked before to this one. |
 | Double-click | Renames the shape (`Enter` to keep, `Esc` to cancel). |
-| Padlock on the row | The shape is locked (it can't be picked on the work area): click to unlock it. |
+| Lightning, eye and padlock on the row | The shape's own switches: see [A shape's own switches](#a-shapes-own-switches). |
 | **Group of N** row | Click to select the whole group; its shapes are listed under it. |
 
 At most 60 rows are shown; the rest are counted ("… and N more (use Select all shapes on this
 layer)").
+
+### A shape's own switches
+
+Each shape row has the same three switches as a layer's card, for that shape alone. They're faint
+while the shape is as usual (sent, shown, unlocked); one that has been changed stands out, so a
+long list shows at a glance which shapes are off.
+
+| Switch | Off | Back on |
+|---|---|---|
+| Lightning: **Output on: … Click to keep it back as a guide.** | **Output off**: the shape stays on the work area, drawn faded, and can still be picked and moved, but it is never sent. Its layer's other shapes are marked as usual. | Click it again: the shape is sent with its layer. |
+| Eye: **Hide this shape (hidden shapes are never sent)** | **Hidden**: the shape isn't drawn, can't be picked or snapped to, isn't exported, and isn't sent. If its output is on, the job's checks say "A shape on layer … is hidden, so it will not be processed." | Click the eye on its row. |
+| Padlock: **Lock this shape (can't be picked or moved on the work area; still sent)** | **Locked**: it can't be clicked, box-selected or dragged on the work area. It's still sent. | Click the padlock on its row. |
+
+- A shape is sent only when its layer is sent (shown, output on, not the mask layer) and the shape
+  itself is shown with its output on. The lightning can't send a shape on the mask layer.
+- Sub-layers work on their parent's shapes, so a shape with its output off is left out of every
+  sub-layer too.
+- Clicking a switch on a shape that is part of a bigger selection sets the whole selection the same
+  way. The **Group of N** row has switches too, for the whole group.
+- Hiding or locking a shape takes it out of the selection.
+- A layer's card counts the shapes that are off: "5 shapes · 2 off".
+- The right-click menu (here and on the work area) has **Show** / **Hide** and **Output off (keep
+  as a guide)** / **Output on (send to the laser)** too. A layer's right-click → **Its shapes**
+  sets them for everything on it.
+- They're saved in the project, and kept when a text or code is rebuilt.
+
+![A shape's own switches: the ring's output off, the text hidden, the hole locked](images/panel-layers-shape-switches.png)
+
+> **Tip:** Output off on a shape is for a guide that belongs with the rest of its layer (a jig
+> outline, the edge of the piece, a test mark you only want sometimes). For many guides, a layer
+> with its output off is tidier.
 
 ### Right-click on a shape
 
@@ -187,7 +218,8 @@ the whole selection. The menu has:
 **Rename** (one shape only) and **Select its whole group** (grouped shapes only), then the same menu
 as right-clicking shapes on the work area: **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete**,
 **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**, **Convert text to
-paths**, **Lock** / **Unlock**, **Use as material outline**, **Put on the mask layer (never burned)**,
+paths**, **Lock** / **Unlock**, **Show** / **Hide**, **Output off (keep as a guide)** / **Output on
+(send to the laser)**, **Use as material outline**, **Put on the mask layer (never burned)**,
 **Shape operations**, **Array**,
 **Align and distribute**, **Flip and rotate**, **Order**, **Move to layer**, **Fit to piece in
 camera…**, **Trace picture…**,

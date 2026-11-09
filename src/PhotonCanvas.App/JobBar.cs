@@ -477,7 +477,7 @@ public sealed class JobBar : UserControl
     void UpdatePassControls()
     {
         if (_pathRow is null) return; // still being built
-        var working = _doc.State.Layers.Where(l => l.Output && _doc.State.ShapesFor(l).Any()).ToList();
+        var working = _doc.State.Layers.Where(l => l.Output && _doc.State.SentFor(l).Any()).ToList();
         static bool Heat(Layer l) => l.Order == PathOrder.Heat && l.Mode is LayerMode.Cut or LayerMode.Score;
         var cutting = working.Where(l => l.Mode is LayerMode.Cut or LayerMode.Score).ToList();
         bool someHeat = cutting.Any(Heat);
@@ -1056,7 +1056,7 @@ public sealed class JobBar : UserControl
             // A section of a bigger design: the fields move on only after the last one.
             _sentMidSections = _section is { } s && s.Index < s.Count - 1
                 // Layer by layer: the piece is done after its last layer, not each one.
-                || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.ShapesFor(l).Any()).LastOrDefault()?.Id != onlyOne;
+                || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.SentFor(l).Any()).LastOrDefault()?.Id != onlyOne;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
         }
         catch (DeviceException e)

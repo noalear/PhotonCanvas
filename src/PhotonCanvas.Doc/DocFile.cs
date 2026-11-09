@@ -147,6 +147,8 @@ public static class DocFile
             };
             if (sh.GroupId is { } gid) o["group"] = gid.ToString();
             if (sh.Locked) o["locked"] = true;
+            if (!sh.Visible) o["hidden"] = true;
+            if (!sh.Output) o["noOutput"] = true;
             if (sh.VarOffset > 0) o["varOffset"] = sh.VarOffset;
             if (sh is PathShape { ManualTabs.Count: > 0 } mt) o["tabs"] = new JsonArray([.. mt.ManualTabs.Select(t => (JsonNode)new JsonArray(t.X, t.Y))]);
             if (sh is PathShape { StartPoint: { } sp }) o["start"] = new JsonArray(sp.X, sp.Y);
@@ -493,6 +495,13 @@ public static class DocFile
             var locked = (root["shapes"]?.AsArray() ?? []).Where(x => x?["locked"]?.GetValue<bool>() == true)
                 .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
             var all = shapes.Select(sh => locked.Contains(sh.Id) ? sh.WithLocked(true) : sh).ToImmutableList();
+            // Hidden shapes, and shapes kept back from the laser (saved per shape).
+            HashSet<Guid> Flagged(string key) => (root["shapes"]?.AsArray() ?? []).Where(x => x?[key]?.GetValue<bool>() == true)
+                .Select(x => Guid.TryParse(x!["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty).ToHashSet();
+            var hidden = Flagged("hidden");
+            var noOutput = Flagged("noOutput");
+            if (hidden.Count > 0 || noOutput.Count > 0)
+                all = [.. all.Select(sh => (hidden.Contains(sh.Id) ? sh.WithVisible(false) : sh) is var v && noOutput.Contains(sh.Id) ? v.WithOutput(false) : v)];
             // Copies numbered ahead (each marks a different item).
             var ahead = (root["shapes"]?.AsArray() ?? []).OfType<JsonNode>().Where(x => x["varOffset"] is not null)
                 .ToDictionary(x => Guid.TryParse(x["id"]?.GetValue<string>(), out var g) ? g : Guid.Empty, x => x["varOffset"]!.GetValue<int>());

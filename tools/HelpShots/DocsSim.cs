@@ -134,12 +134,26 @@ static class DocsSim
                 if (w.FindControl<Border>("ToolOptions") is { IsVisible: true } bar) Save(Shot(bar), $"tool-options-{name}", $"The tool options bar above the work area, {name} tool");
             }
             canvas.Tool = Tool.Select;
+            // A shape's own switches: the ring kept back as a guide, the text hidden, the hole locked.
+            var cutShapes = doc.State.ShapesOn(ids.Cut).Select(x => x.Id).Where(id => id != ids.Outline).ToHashSet();
+            var flagged = Ops.SetShapeFlags(doc.State, new HashSet<Guid> { ids.Ring }, output: false);
+            flagged = Ops.SetShapeFlags(flagged, new HashSet<Guid> { ids.Text }, visible: false);
+            flagged = Ops.SetShapeFlags(flagged, cutShapes, locked: true);
+            doc.Commit("Shape switches", flagged, [ids.Outline, ids.Ring]);
+            layers.Activate(ids.Score);
+            Settle(600);
+            Save(Shot(layers), "panel-layers-shape-switches", "The Layers panel with two layers' shapes listed: the ring's output off, the text hidden, the hole locked");
+            Reset();
             // The layers after a CMYK split of the picture.
             doc.Select([ids.Picture]);
             Settle(200);
-            typeof(MainWindow).GetMethod("SplitCmyk", Any)!.Invoke(w, [doc.State.Shapes.OfType<ImageShape>().First(x => x.Id == ids.Picture)]);
-            Settle(600);
-            Save(Shot(layers), "panel-layers-cmyk", "The Layers panel after CMYK split: one layer per ink");
+            // (Only while the split is the main window's own: it may have moved to an add-on.)
+            if (typeof(MainWindow).GetMethod("SplitCmyk", Any) is { } split)
+            {
+                split.Invoke(w, [doc.State.Shapes.OfType<ImageShape>().First(x => x.Id == ids.Picture)]);
+                Settle(600);
+                Save(Shot(layers), "panel-layers-cmyk", "The Layers panel after CMYK split: one layer per ink");
+            }
             Reset();
             layers.Activate(ids.Cut);
             Settle(300);

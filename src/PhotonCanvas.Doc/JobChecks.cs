@@ -38,7 +38,7 @@ public static class JobChecks
     public static JobReview Review(DocState state, BuiltJob job, JobOptions opt, AppSettings settings, double? focusDistanceMm)
     {
         var lines = new List<string>();
-        var sent = JobBuilder.OutputLayers(state).Where(l => state.ShapesFor(l).Any()).ToList();
+        var sent = JobBuilder.OutputLayers(state).Where(l => state.SentFor(l).Any()).ToList();
         static string Line(Layer l)
         {
             var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
