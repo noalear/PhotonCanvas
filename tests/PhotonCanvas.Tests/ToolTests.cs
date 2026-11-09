@@ -203,8 +203,8 @@ public class WorkModeTests
         Assert.Contains("\nG100\n", g);
         Assert.Contains("\"keys\":[\"x\",\"u\"],\"rm\":-1", g);
         Assert.Contains("G0Y110.000", g);
-        // The middle of the design faces the laser: its top edge is 15 mm round one way.
-        Assert.Contains(g.Split('\n'), l => l.StartsWith("G0X20U15") || l.StartsWith("G1X20U15") || l.Contains("U-15") || l.Contains("U15"));
+        // The middle of the page (94.25) faces the laser: the design's top edge (Y 20) is 74.25 mm round, turning backwards.
+        Assert.Contains(g.Split('\n'), l => l.Contains("X20U74.25") || l.Contains("X20.000U74.25"));
         Assert.Contains("G0 U0\nG101", g);
         Assert.Contains("\"axis\":\"U\"", System.Text.Encoding.UTF8.GetString(job.Xf));
         // A design taller than once round doesn't fit.
@@ -386,7 +386,7 @@ public class RotaryReturnTests
         var u = Us(job.Motion);
         // Once round, then 2 mm more over where it started.
         Assert.Equal(h + RotarySeam.OverlapMm, u.Max() - u.Min(), 2);
-        // Where it starts on the object is unchanged (the design's middle faces the laser).
+        // Where it starts on the object is unchanged (the page's middle faces the laser).
         Assert.Equal(h / 2, job.Job.Mode is WorkMode.Rotary r ? r.OriginY : 0, 2);
         // The cut layer's overcut, when longer, is used instead.
         var longer = Ops.UpdateLayers(s, new HashSet<Guid> { cut.Id }, l => l with { OvercutMm = 5 });
@@ -507,7 +507,7 @@ public class RotaryReturnTests
         var area = M with { FieldH = 188.5 };
         var job = JobBuilder.Build(Design(LayerMode.Cut), new JobOptions { Machine = area, Mode = new WorkMode.Rotary(0.59917, -1, 188.5) });
         var rot = (WorkMode.Rotary)job.Job.Mode;
-        Assert.Equal(35, rot.OriginY, 6); // the middle of the design faces the laser at the start
+        Assert.Equal(188.5 / 2, rot.OriginY, 6); // the middle of the page faces the laser at the start
         // Not started marking, or finished (the end turns it back): nothing left over.
         Assert.Equal(0, RotaryReturn.UAt(job, 0));
         Assert.Equal(0, RotaryReturn.UAt(job, job.Timeline[^1].End + 1));
@@ -515,8 +515,8 @@ public class RotaryReturnTests
         double mid = job.Timeline[0].Start + job.Timeline[0].PassSeconds * 0.4;
         var head = RunTracker.At(job, mid).Head!.Value;
         double u = RotaryReturn.UAt(job, mid)!.Value;
-        Assert.Equal(-(head.Y - 35), u, 6);
-        Assert.InRange(Math.Abs(u), 0, 15.0001);
+        Assert.Equal(-(head.Y - 94.25), u, 6);
+        Assert.InRange(Math.Abs(u), 44.2499, 74.2501);
         // The machine's own progress gives the same answer at the same point.
         Assert.Equal(u, RotaryReturn.UAtFraction(job, mid / job.Timeline[^1].End)!.Value, 6);
         // A flat job has no rotary to turn back.

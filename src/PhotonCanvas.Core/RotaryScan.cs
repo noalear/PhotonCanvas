@@ -116,6 +116,41 @@ public sealed record RotaryScan
     }
 
     /// <summary>
+    /// How the off-centre changes along the part (Kyle, 2026-11-09: a chuck that sags makes the part wobble more the
+    /// further out it is). Each place's off-centre (<see cref="FitRound"/>) as a sideways step, fitted as a straight
+    /// line along X: a part sitting crooked in the chuck (or a sagging chuck) steps further off the further along,
+    /// one merely off-centre in the jaws steps off the same everywhere. Null with fewer than two places fitted.
+    /// </summary>
+    public AxisRunout? Runout()
+    {
+        var p = Enumerable.Range(0, Xs.Length).Select(i => (X: Xs[i], F: FitRound(i))).Where(q => q.F is not null)
+            .Select(q => (q.X, B: q.F!.Value.Offset * Math.Cos(q.F.Value.HighDeg * Math.PI / 180), C: q.F.Value.Offset * Math.Sin(q.F.Value.HighDeg * Math.PI / 180)))
+            .ToList();
+        if (p.Count < 2) return null;
+        double mx = p.Average(q => q.X), sxx = p.Sum(q => (q.X - mx) * (q.X - mx));
+        if (sxx < 1e-9) return null;
+        double mb = p.Average(q => q.B), mc = p.Average(q => q.C);
+        double kb = p.Sum(q => (q.X - mx) * (q.B - mb)) / sxx, kc = p.Sum(q => (q.X - mx) * (q.C - mc)) / sxx;
+        double x0 = p.Min(q => q.X), x1 = p.Max(q => q.X);
+        (double Off, double Deg) At(double x)
+        {
+            double b = mb + kb * (x - mx), c = mc + kc * (x - mx);
+            return (Math.Sqrt(b * b + c * c), (Math.Atan2(c, b) * 180 / Math.PI + 360) % 360);
+        }
+        var (o0, d0) = At(x0);
+        var (o1, d1) = At(x1);
+        double per100 = Math.Sqrt(kb * kb + kc * kc) * 100;
+        double tiltDeg = (Math.Atan2(kc, kb) * 180 / Math.PI + 360) % 360;
+        // How far the places sit from the straight line: how much to trust it.
+        double rms = Math.Sqrt(p.Average(q =>
+        {
+            double eb = q.B - (mb + kb * (q.X - mx)), ec = q.C - (mc + kc * (q.X - mx));
+            return eb * eb + ec * ec;
+        }));
+        return new AxisRunout(x0, o0, d0, x1, o1, d1, per100, tiltDeg, rms, p.Count);
+    }
+
+    /// <summary>
     /// The axis height, if this was a round rod <paramref name="diameterMm"/> across: the average top height
     /// is the axis plus the radius (less a hair for a rod held off-centre). Null if too little was read.
     /// </summary>
@@ -315,6 +350,24 @@ public sealed record RotaryScan
 /// <param name="Swing">Highest minus lowest reading (mm): how much the top rises and falls as it turns.</param>
 /// <param name="RmsMm">How far the readings sit from the round fit (mm): big for a part that isn't round.</param>
 public readonly record struct RoundFit(double Mean, double Offset, double HighDeg, double Swing, double RmsMm);
+
+/// <summary>How a part sits on the rotary's axis along its length (see <see cref="RotaryScan.Runout"/>).</summary>
+/// <param name="FromX">The first place fitted (mm along the axis).</param>
+/// <param name="FromOffset">How far off the axis the part is there (mm).</param>
+/// <param name="FromHighDeg">The angle turned at which its high side is on top there.</param>
+/// <param name="ToX">The last place fitted.</param>
+/// <param name="ToOffset">How far off the axis it is there.</param>
+/// <param name="ToHighDeg">Its high side there.</param>
+/// <param name="PerHundredMm">How much further off the axis it steps every 100 mm along (mm): its tilt.</param>
+/// <param name="TiltHighDeg">The angle at which the side it tilts towards is on top.</param>
+/// <param name="RmsMm">How far the places sit from a straight tilt (mm): a bent part, or misreadings.</param>
+/// <param name="Places">How many places it's worked out from.</param>
+public readonly record struct AxisRunout(double FromX, double FromOffset, double FromHighDeg, double ToX, double ToOffset, double ToHighDeg,
+    double PerHundredMm, double TiltHighDeg, double RmsMm, int Places)
+{
+    /// <summary>The off-centre changes along it by more than the readings' own scatter: it's crooked, not just off-centre.</summary>
+    public bool Tilted => PerHundredMm * (ToX - FromX) / 100 > Math.Max(0.15, 2 * RmsMm);
+}
 
 /// <summary>What to scan: the angles to stop at and the places along the axis to measure at each.</summary>
 /// <param name="FromDeg">First angle (degrees turned from where the part is now).</param>

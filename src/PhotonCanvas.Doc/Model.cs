@@ -506,7 +506,7 @@ public sealed record Guide(bool Vertical, double At)
 {
     /// <summary>
     /// A line across (not <see cref="Vertical"/>) marking what faces the laser when a rotary job
-    /// starts: design Y = <see cref="At"/> is under the laser at the start, instead of the middle of the design.
+    /// starts: design Y = <see cref="At"/> is under the laser at the start, instead of the middle of the page.
     /// </summary>
     public bool RotaryStart { get; init; }
 }

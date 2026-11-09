@@ -51,10 +51,21 @@ public static class DotFinder
             if (v > max) max = v;
         }
         double mean = sum / diff.Length;
+        // The spot is where the most got brighter over a patch, not the single brightest pixel: a glint of the pointer
+        // off shiny metal (the chuck, the rotary's frame) is a few pixels as bright as the spot, and won over it in
+        // Kyle's calibration (2026-11-09), so half the calibrated places recorded the glint instead.
+        int peak = PatchPeak(diff, w, h);
+        // Its brightest pixel, close by.
+        {
+            int px0 = peak % w, py0 = peak / w;
+            for (int y = Math.Max(0, py0 - PatchRadius); y <= Math.Min(h - 1, py0 + PatchRadius); y++)
+                for (int x = Math.Max(0, px0 - PatchRadius); x <= Math.Min(w - 1, px0 + PatchRadius); x++)
+                    if (diff[y * w + x] > diff[peak]) peak = y * w + x;
+        }
+        max = diff[peak];
         // A spot stands well clear of flickers too: the pointer reads about 200 on a part with the lights on, while
         // where it can't be seen, flickers (the red dot under the head, which stays on) read 25–100 (Kyle's log).
         if (max < MinStrength || max < mean * 8) return null;
-        int peak = Array.IndexOf(diff, max);
 
         // The bright patch joined to the peak (over a third of it), however long it runs.
         float cut = max * 0.35f;
@@ -94,6 +105,42 @@ public static class DotFinder
         double angle = 0.5 * Math.Atan2(2 * vxy, vxx - vyy);
         var along = new Vec2(Math.Cos(angle), Math.Sin(angle));
         return new PointerSpot(new Vec2(cx, cy), max, along, Math.Sqrt(l1 / l2), 4 * Math.Sqrt(l1));
+    }
+
+    /// <summary>Half the side of the square the brightening is summed over to find the spot (pixels).</summary>
+    public const int PatchRadius = 12;
+
+    /// <summary>The pixel whose square of side 2·<see cref="PatchRadius"/>+1 got the most brighter in all.</summary>
+    static int PatchPeak(float[] v, int w, int h)
+    {
+        int r = PatchRadius;
+        // Sums along each row, then down each column (a box blur without dividing).
+        var rows = new float[v.Length];
+        for (int y = 0; y < h; y++)
+        {
+            int o = y * w;
+            float acc = 0;
+            for (int x = 0; x < Math.Min(w, r + 1); x++) acc += v[o + x];
+            for (int x = 0; x < w; x++)
+            {
+                rows[o + x] = acc;
+                if (x + r + 1 < w) acc += v[o + x + r + 1];
+                if (x - r >= 0) acc -= v[o + x - r];
+            }
+        }
+        float best = -1;
+        int at = 0;
+        var col = new float[w];
+        for (int y = 0; y < Math.Min(h, r + 1); y++)
+            for (int x = 0; x < w; x++) col[x] += rows[y * w + x];
+        for (int y = 0; y < h; y++)
+        {
+            for (int x = 0; x < w; x++)
+                if (col[x] > best) { best = col[x]; at = y * w + x; }
+            if (y + r + 1 < h) for (int x = 0; x < w; x++) col[x] += rows[(y + r + 1) * w + x];
+            if (y - r >= 0) for (int x = 0; x < w; x++) col[x] -= rows[(y - r) * w + x];
+        }
+        return at;
     }
 }
 
@@ -204,6 +251,90 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
         return depth;
     }
 
+    /// <summary>
+    /// <see cref="Seen"/> without spots that can't be the pointer's: ones seen in the same place for aims far apart (a
+    /// glint off something shiny stays put in the picture while the real spot moves about 24 px a mm of aim), then any
+    /// far from the smooth map through the rest. Kyle's calibration (2026-11-09) had the glint for 16 of 33 aims, and
+    /// the map through them spoiled every track, so even good photos read as outside the calibration.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<Vec2?>> Good => _good ??= Clean();
+    IReadOnlyList<IReadOnlyList<Vec2?>>? _good;
+
+    /// <summary>Spots for aims at least this far apart (mm) can't be this close in the picture (px).</summary>
+    const double ApartMm = 12, SamePlacePx = 80;
+
+    /// <summary>How far from the smooth map through the other aims a spot may be (px; the spot moves about 10 px a mm of height).</summary>
+    const double OffMapPx = 40;
+
+    IReadOnlyList<IReadOnlyList<Vec2?>> Clean()
+    {
+        var good = Seen.Select(r => r.ToArray()).ToArray();
+        for (int d = 0; d < Depths.Count; d++)
+        {
+            var at = Enumerable.Range(0, Aims.Count).Where(i => d < Seen[i].Count && Seen[i][d] is not null).ToList();
+            // How far the spot moves in the picture for a mm of aim, from most pairs (about 24 px on the F2 Ultra's
+            // close-up camera): two aims well apart whose spots are much closer than that saw the same glint.
+            var ratios = new List<double>();
+            foreach (int i in at)
+                foreach (int j in at)
+                    if (j > i && Aims[i].Dist(Aims[j]) >= ApartMm) ratios.Add(Seen[i][d]!.Value.Dist(Seen[j][d]!.Value) / Aims[i].Dist(Aims[j]));
+            ratios.Sort();
+            double same = ratios.Count == 0 ? 0 : Math.Min(SamePlacePx, 0.25 * ratios[ratios.Count / 2] * ApartMm);
+            foreach (int i in at)
+                if (at.Any(j => j != i && Aims[i].Dist(Aims[j]) >= ApartMm && Seen[i][d]!.Value.Dist(Seen[j][d]!.Value) < same))
+                    good[i][d] = null;
+            // Then the worst left out, one at a time, while it's well off the map through the others.
+            while (true)
+            {
+                var left = Enumerable.Range(0, Aims.Count).Where(i => d < good[i].Length && good[i][d] is not null).ToList();
+                if (left.Count < 7) break;
+                int worst = -1;
+                double worstOff = OffMapPx;
+                foreach (int i in left)
+                {
+                    var others = left.Where(j => j != i).ToList();
+                    if (Map(others, d, good) is not { } f) continue;
+                    double off = f(Aims[i]).Dist(good[i][d]!.Value);
+                    if (off > worstOff) { worstOff = off; worst = i; }
+                }
+                if (worst < 0) break;
+                good[worst][d] = null;
+            }
+        }
+        return good;
+    }
+
+    /// <summary>The smooth map from aim to picture at depth <paramref name="d"/> through <paramref name="have"/> (quadratic with six or more, else straight).</summary>
+    Func<Vec2, Vec2>? Map(List<int> have, int d, Vec2?[][] spots)
+    {
+        if (have.Count < 3) return null;
+        bool quad = have.Count >= 6;
+        double[] Terms(Vec2 a) => quad ? [1, a.X, a.Y, a.X * a.X, a.X * a.Y, a.Y * a.Y] : [1, a.X, a.Y];
+        int n = quad ? 6 : 3;
+        var c = new Vec2(have.Average(i => Aims[i].X), have.Average(i => Aims[i].Y));
+        double sc = Math.Max(1, have.Max(i => Aims[i].Dist(c)));
+        Vec2 Norm(Vec2 a) => (a - c) / sc;
+        var m = new double[n, n];
+        var vx = new double[n];
+        var vy = new double[n];
+        foreach (var i in have)
+        {
+            var t = Terms(Norm(Aims[i]));
+            var p = spots[i][d]!.Value;
+            for (int r = 0; r < n; r++)
+            {
+                vx[r] += t[r] * p.X; vy[r] += t[r] * p.Y;
+                for (int k = 0; k < n; k++) m[r, k] += t[r] * t[k];
+            }
+        }
+        if (LeastSquares.Solve(m, vx) is not { } cx || LeastSquares.Solve(m, vy) is not { } cy) return null;
+        return a =>
+        {
+            var ta = Terms(Norm(a));
+            return new Vec2(ta.Select((v, k) => v * cx[k]).Sum(), ta.Select((v, k) => v * cy[k]).Sum());
+        };
+    }
+
     static double TrackSpacing(List<Vec2?> track)
     {
         var d = new List<double>();
@@ -221,7 +352,7 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
         var o = new List<Vec2?>();
         for (int d = 0; d < Depths.Count; d++)
         {
-            var have = Enumerable.Range(0, Aims.Count).Where(i => Seen[i][d] is not null).ToList();
+            var have = Enumerable.Range(0, Aims.Count).Where(i => Good[i][d] is not null).ToList();
             if (have.Count < 3) { o.Add(null); continue; }
             bool quad = have.Count >= 6;
             double[] Terms(Vec2 a) => quad ? [1, a.X, a.Y, a.X * a.X, a.X * a.Y, a.Y * a.Y] : [1, a.X, a.Y];
@@ -236,7 +367,7 @@ public sealed record PointerCalibration(IReadOnlyList<double> Depths, IReadOnlyL
             foreach (var i in have)
             {
                 var t = Terms(Norm(Aims[i]));
-                var p = Seen[i][d]!.Value;
+                var p = Good[i][d]!.Value;
                 for (int r = 0; r < n; r++)
                 {
                     vx[r] += t[r] * p.X; vy[r] += t[r] * p.Y;

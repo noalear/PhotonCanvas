@@ -426,6 +426,11 @@ public sealed class RotaryScanWindow : Window
             var f = worst.f!.Value;
             lines.Add($"It rises and falls up to {f.Swing:0.##} mm as it turns (at X {s.Xs[worst.i]:0.#}). As if round, it sits {f.Offset:0.##} mm off the axis there, high side at {f.HighDeg:0}°" +
                       (f.RmsMm > 0.3 ? $"; it isn't round (±{f.RmsMm:0.##} mm from round)." : "."));
+            if (s.Runout() is { } ro)
+                lines.Add(ro.Tilted
+                    ? $"Along it: {ro.FromOffset:0.##} mm off the axis at X {ro.FromX:0.#} and {ro.ToOffset:0.##} mm at X {ro.ToX:0.#}, so it's crooked on the axis: {ro.PerHundredMm:0.##} mm further off every 100 mm, leaning to the side that's on top at {ro.TiltHighDeg:0}° (the part is tilted in the chuck, or the chuck sags)." +
+                      (ro.RmsMm > 0.2 ? $" Not a straight lean (±{ro.RmsMm:0.##} mm): the part may be bent, or some places misread." : "")
+                    : $"Along it: about {(ro.FromOffset + ro.ToOffset) / 2:0.##} mm off the axis all the way from X {ro.FromX:0.#} to {ro.ToX:0.#}, so it's straight on the axis, just off-centre in the jaws.");
         }
         if (axis is { } ax)
         {
@@ -485,10 +490,9 @@ public sealed class RotaryScanWindow : Window
         _x1.Value = (decimal)Math.Clamp(Math.Round(b.MaxX, 1), 0, 220);
         if (WorkModes.From(_settings) is WorkMode.Rotary)
         {
-            // What faces the laser at the start of a job: the rotary start line, or the middle of the whole design.
-            var all = _doc.State.Bounds(_doc.State.Shapes.Select(s => s.Id).ToHashSet());
+            // What faces the laser at the start of a job: the rotary start line, or the middle of the page.
             double circ = Math.PI * Math.Max(1, _settings.RotaryDiameterMm);
-            double origin = WorkModes.RotaryOrigin(_doc.State, all, circ);
+            double origin = WorkModes.RotaryOrigin(_doc.State, Math.Round(Math.Min(circ, WorkModes.MaxCircumferenceMm), 2));
             double from = (b.MinY - origin) / circ * 360, to = (b.MaxY - origin) / circ * 360;
             if (to - from >= 350) { from = 0; to = 360; }
             _from.Value = (decimal)Math.Round(from, 1);
@@ -619,8 +623,11 @@ public sealed class RotaryScanWindow : Window
             await client.ReturnToIdleAsync();
             await Task.Delay(300, cts.Token);
             var cal = await new SurfaceProbe(client).CalibrateAsync(board, aims, progress, cts.Token);
-            int found = cal.Seen.Sum(r => r.Count(p => p is not null)), all = aims.Count * cal.Depths.Count;
-            _status.Text = $"Calibrated: the pointer was seen in {found} of {all} photos. Put the part back, focus on its top, and scan.";
+            int seen = cal.Seen.Sum(r => r.Count(p => p is not null)), found = cal.Good.Sum(r => r.Count(p => p is not null)), all = aims.Count * cal.Depths.Count;
+            _status.Text = $"Calibrated: the pointer was seen in {found} of {all} photos." +
+                (seen > found ? $" {seen - found} more showed a glint or something else bright instead and are left out." : "") +
+                (found < all * 2 / 3 ? " That's few: move anything shiny (the chuck's jaws, metal) away from the strip, or cover it with tape, and calibrate again." : "") +
+                " Put the part back and scan.";
         }
         catch (OperationCanceledException) { _status.Text = "Stopped: the old calibration is kept."; }
         catch (Exception e) when (e is DeviceException or InvalidOperationException or IOException or FormatException or ArgumentOutOfRangeException)

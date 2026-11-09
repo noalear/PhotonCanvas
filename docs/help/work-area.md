@@ -52,15 +52,16 @@ to the mode's size and the view fits it; the status bar says the mode. **Cancel*
 - The work area becomes the field's width (220 mm) × once round the object. The window shows
   "Once round": π × the diameter. Only the first 375 mm can be used (xTool Studio's limit).
 - Design X runs along the object (the galvo), design Y goes round it (the attachment turns it). The
-  middle row of the design faces the laser at the start, unless the page has a **rotary start
+  middle row of the page faces the laser at the start (where the object is now), so moving a design
+  up or down the page moves it round the object, unless the page has a **rotary start
   line**: an orange guide across the page labelled "Rotary start: faces the laser". Then that line
   faces the laser at the start, whatever is drawn. Pages made for the rotary (a stacked model's
   finishing page) have one; drag it like any guide, or drop it on the ruler to remove it.
 - The camera photo on the canvas is a photo of the bed, so on the rotary it's shown at its real size
-  with the laser line on the row that faces the laser (the rotary start line, or the middle of the
-  design), and cut off at the edges of the work area. Directly round that row, what you see under
-  the design is what's under it on the part now; further round the page it's the part's far side, which
-  the photo can't show.
+  with the laser line on the row that faces the laser (the middle of the page, or the rotary start
+  line), and cut off at the edges of the work area. It stays put when you move a design. Near that row,
+  what you see under the design is what's under it on the part now, so put the design over the object
+  in the photo; further up or down the page is further round the object, which the photo can't show.
 - A line drawn all the way round the object (from one edge of the area to the other, at the same
   place across) is cut once round and then **2 mm further**, over where it started. Otherwise the
   start and end meet at the one spot where the rotary is speeding up and slowing down, and a single
@@ -179,6 +180,11 @@ How it measures:
   along the line), and auto-focus on it: the focus is taken as the board's height. It takes about five
   minutes and replaces the saved calibration, which [Curved surface](#curved-surface) uses too (its
   calibrated area shows there). The head goes back to the board's focus afterwards.
+  The spot is found as the patch that got brightest, so a glint of the pointer off shiny metal (the
+  chuck's jaws) isn't taken for it. A spot seen in the same place in the picture for aims far apart
+  can't be the pointer (the real spot moves about 24 px for every mm the aim moves), so it's left out
+  of the calibration, as is any spot far off the smooth pattern of the rest. The status line says how
+  many were left out; if that's many, cover the shiny part with tape or move it away and calibrate again.
   The pointer hops from place to place and stays on each for about half a second while it's
   photographed. If fewer than half the places are read, the status line says where the photos are
   (see [Measure it with the pointer](#measure-it-with-the-pointer)).
@@ -190,7 +196,7 @@ How it measures:
 | **Measure with** | Pointer and close-up camera, The machine's auto-focus | Pointer | How the top is measured (above). |
 | **From X (mm)** / **To X (mm)** | 0 to 220 | 95 / 125 | Where along the rotary's axis to measure (the work area's X). Pointer only. |
 | **Places along it** | 1 to 60 | 7 | How many places between them, at every step. |
-| **Use the selection** | | | Sets the X range to the selected shapes (all of them if none is selected) and, on a rotary page, the angles to how far round they reach from the job's start (the rotary start line, or the middle of the design). This is how to say which area needs scanning. |
+| **Use the selection** | | | Sets the X range to the selected shapes (all of them if none is selected) and, on a rotary page, the angles to how far round they reach from the job's start (the rotary start line, or the middle of the page). This is how to say which area needs scanning. |
 | **How many stops** | 2 to 360 | 4 | How many times it stops to measure on the way round. It's a count, not an angle: 4 over a whole turn is every 90°, 8 is every 45°. The line under the box shows the step and the angles. Choosing a **Stock** sets it to see every side: 4 for a rod or **As scanned**, 8 for a square or rectangular bar (each face and corner), 12 for a hexagon. |
 | **From (°)** / **To (°)** | −3600 to 3600 | 0 / 360 | The span of the turn, from where the part is now. Positive is the way a design runs down the page. 0 to 360 is a whole turn (360 itself isn't measured again). |
 | **Whole turn, every side** | | | Sets 0° to 360° and the stops for the stock chosen. |
@@ -247,6 +253,11 @@ What it shows:
   turns, and, fitting it as a round part, how far off the axis it sits and which angle its high side
   is at. With the axis height: the nearest and furthest the surface comes to the axis, so the circle
   it needs to turn in and the biggest round it could be cut to.
+- With two or more places read over a whole turn, how the part sits along its length. If it's further
+  off the axis at one end than the other, it's crooked on the axis (tilted in the chuck, or the chuck
+  sags): the words give how far off it is at each end, how much further off it steps every 100 mm,
+  and the angle of the side it leans to. If it's the same all along, it's straight on the axis, just
+  off-centre in the jaws.
 
 > **Note:** The angle at a point is the turn that brings it to the top, counted the way a rotary job
 > turns the part, so it lines up with a rotary page: a point at angle θ sits θ/360 of the way round

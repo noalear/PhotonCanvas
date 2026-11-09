@@ -59,6 +59,41 @@ public class RotaryScanTests
         Assert.Equal("3 angles, every 22.5°: -22.5, 0, 22.5°", new RotaryScanPlan(-22.5, 22.5, 3, [110], 110, "pointer").AnglesText());
     }
 
+    /// <summary>A round rod (radius 10, axis at 50) whose centre is off the axis by <paramref name="off"/>(x), towards the side on top at <paramref name="highDeg"/>.</summary>
+    static RotaryScan Rod(Func<double, double> off, double highDeg, int stops = 8)
+    {
+        double[] xs = [90, 110, 130, 150, 170];
+        var angles = Enumerable.Range(0, stops).Select(i => 360.0 * i / stops).ToArray();
+        return new RotaryScan
+        {
+            AnglesDeg = angles,
+            Xs = xs,
+            Heights = [.. angles.Select(a => xs.Select(x =>
+            {
+                double e = off(x), t = (a - highDeg) * Math.PI / 180;
+                // Top of the circle: its centre is e·cos t above the axis and e·sin t to the side.
+                double side = e * Math.Sin(t);
+                return (double?)(50 + e * Math.Cos(t) + Math.Sqrt(100 - side * side));
+            }).ToArray())],
+        };
+    }
+
+    [Fact]
+    public void ACrookedPartIsToldFromAnOffCentreOne()
+    {
+        // Kyle, 2026-11-09: the chuck sags, so the part wobbles more the further out it is.
+        var crooked = Rod(x => 0.2 + (x - 90) * 0.01, 60).Runout()!.Value;
+        Assert.True(crooked.Tilted);
+        Assert.Equal(1, crooked.PerHundredMm, 1);
+        Assert.Equal(0.2, crooked.FromOffset, 1);
+        Assert.Equal(1.0, crooked.ToOffset, 1);
+        Assert.Equal(60, crooked.TiltHighDeg, 0);
+        var offCentre = Rod(_ => 0.5, 200).Runout()!.Value;
+        Assert.False(offCentre.Tilted);
+        Assert.Equal(0.5, offCentre.FromOffset, 1);
+        Assert.Equal(200, offCentre.FromHighDeg, 0);
+    }
+
     [Fact]
     public void AWholeTurnStopsAtEverySideOfTheStock()
     {
@@ -75,18 +110,31 @@ public class RotaryScanTests
     [Fact]
     public void OnTheRotaryThePageIsPutOnTheBedWithItsStartRowOnTheLaserLine()
     {
-        // Kyle, 2026-11-09: a design over the rod on the canvas (page Y 41–59) is at bed Y 101–119 with the line at 110.
+        // Kyle, 2026-11-09: on a 32 mm rod the page's middle row (Y 50.27) is on the laser line (Y 110), so a design at
+        // page Y 41–59 is over the rod at bed Y 101–119; moving the design doesn't move that (the photo stays put).
         var s = new AppSettings { OwnsCustomRotary = true, WorkMode = "Rotary", RotaryAttachment = WorkModes.CustomRotary, RotaryDiameterMm = 32, RotaryLineMm = 110 };
+        double mid = Math.Round(Math.PI * 32, 2) / 2;
         var d = DocState.New();
         d = Ops.AddShapes(d, [new PathShape { LayerId = d.Layers[0].Id, Geometry = PathGeometry.Rect(60, 41, 60, 18) }]);
-        Assert.Equal(60, WorkModes.BedShift(s, d)!.Value, 6);
-        // A rotary start line faces the laser instead of the design's middle.
+        Assert.Equal(110 - mid, WorkModes.BedShift(s, d)!.Value, 6);
+        var moved = Ops.AddShapes(DocState.New(), [new PathShape { LayerId = d.Layers[0].Id, Geometry = PathGeometry.Rect(60, 5, 60, 18) }]);
+        Assert.Equal(110 - mid, WorkModes.BedShift(s, moved)!.Value, 6);
+        // A rotary start line faces the laser instead.
         var withStart = d with { Guides = [new Guide(false, 30) { RotaryStart = true }] };
         Assert.Equal(80, WorkModes.BedShift(s, withStart)!.Value, 6);
-        // An empty page: its middle.
-        Assert.Equal(110 - Math.PI * 32 / 2, WorkModes.BedShift(s, DocState.New())!.Value, 6);
         // The flat bed is the bed.
         Assert.Null(WorkModes.BedShift(new AppSettings(), d));
+    }
+
+    [Fact]
+    public void ARotaryJobStartsWithThePageMiddleUnderTheLaser()
+    {
+        // A design moved down the page is turned further round, as the canvas shows it.
+        double circ = 100;
+        var s = DocState.New();
+        s = Ops.AddShapes(s, [new PathShape { LayerId = s.Layers[0].Id, Geometry = PathGeometry.Rect(60, 70, 10, 10) }]);
+        var job = JobBuilder.Build(s, new JobOptions { Machine = MachineProfile.F2Ultra with { FieldH = circ }, Mode = new WorkMode.Rotary(1, 1, circ) });
+        Assert.Equal(50, Assert.IsType<WorkMode.Rotary>(job.Job.Mode).OriginY, 6);
     }
 
     [Fact]

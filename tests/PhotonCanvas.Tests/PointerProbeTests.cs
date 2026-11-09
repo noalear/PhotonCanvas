@@ -40,6 +40,22 @@ public class PointerProbeTests
         Assert.Null(DotFinder.Find(Photo(null, 3), Photo(null, 4)));
     }
 
+    [Fact]
+    public void AGlintAsBrightAsTheDotDoesntWin()
+    {
+        // Kyle's photos (2026-11-09): a few pixels of the pointer glinting off the chuck were as bright as the spot.
+        var on = Photo(new Vec2(60.3, 70.6), 1);
+        for (int y = 10; y < 12; y++)
+            for (int x = 20; x < 23; x++)
+            {
+                int k = (y * on.Width + x) * 4;
+                on.Rgba[k] = on.Rgba[k + 1] = on.Rgba[k + 2] = 255;
+            }
+        var found = DotFinder.Find(on, Photo(null, 2));
+        Assert.NotNull(found);
+        Assert.True(found!.Value.Centre.Dist(new Vec2(60.3, 70.6)) < 0.5);
+    }
+
     /// <summary>A photo of the bare surface with, optionally, a blue line <paramref name="len"/> px long running along <paramref name="dir"/>.</summary>
     static RasterImage LinePhoto(Vec2? mid, Vec2 dir, double len, int seed, double brighten = 0)
     {
