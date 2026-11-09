@@ -54,7 +54,7 @@ public sealed partial class CanvasView
         var visible = _doc.State.Layers.Where(l => l.Visible).Select(l => l.Id).ToHashSet();
         foreach (var s in _doc.State.Shapes)
         {
-            if (exclude.Contains(s.Id) || !visible.Contains(s.LayerId)) continue;
+            if (exclude.Contains(s.Id) || !s.Visible || !visible.Contains(s.LayerId)) continue;
             var b = s.Bounds;
             if (b.IsEmpty) continue;
             foreach (var x in new[] { b.MinX, b.Center.X, b.MaxX }) _snapX.Add(new(x, b.MinY, b.MaxY));

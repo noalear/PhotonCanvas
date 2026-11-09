@@ -10,7 +10,7 @@ namespace PhotonCanvas.App;
 /// <summary>
 /// Measuring a curved piece with the red pointer and the close-up camera in the head. Only runs
 /// when asked (a button): the head moves up and down and the pointer is aimed with the mirrors,
-/// but the cutting laser is never fired. Fill lights are turned off while photographing and put back.
+/// but the cutting laser is never fired. Fill lights are turned on while photographing and put back.
 /// </summary>
 public sealed class SurfaceProbe(DeviceClient client)
 {
@@ -25,7 +25,7 @@ public sealed class SurfaceProbe(DeviceClient client)
     public static readonly Rect2 CalibrationSquare = new(95, 95, 125, 125);
 
     /// <summary>About how long one pointer photo takes (aim, light, photograph), for time estimates.</summary>
-    public const double SecondsPerPhoto = 0.5;
+    public const double SecondsPerPhoto = 1.1;
 
     /// <summary>The board thickness and date of the saved calibration, when it has them (older files don't).</summary>
     public static (double? BoardMm, DateTime? When)? CalibrationInfo()
@@ -85,12 +85,12 @@ public sealed class SurfaceProbe(DeviceClient client)
             {
                 progress.Report($"Head to {depths[d]:+0;-0;0} mm from the board ({d + 1} of {depths.Length})…");
                 await client.MoveFocusAsync(boardMm + depths[d], ZOffset, cancellationToken: ct);
-                var off = await PhotoAsync(null, ct);
+                var off = await PhotoAsync(null, ct, $"cal {depths[d]:+0;-0;0} off");
                 for (int i = 0; i < aims.Count; i++)
                 {
                     ct.ThrowIfCancellationRequested();
                     progress.Report($"Height step {d + 1} of {depths.Length}: point {i + 1} of {aims.Count}");
-                    var on = await PhotoAsync(aims[i], ct);
+                    var on = await PhotoAsync(aims[i], ct, $"cal {depths[d]:+0;-0;0} X{N(aims[i].X)} Y{N(aims[i].Y)}");
                     seen[i][d] = DotFinder.Find(on, off)?.Centre;
                 }
             }
@@ -125,14 +125,24 @@ public sealed class SurfaceProbe(DeviceClient client)
         var heights = new List<double?>();
         progress?.Report($"Head to focus at {focusMm:0.#} mm…");
         await client.MoveFocusAsync(focusMm, ZOffset, cancellationToken: ct);
-        var off = await PhotoAsync(null, ct);
+        var off = await PhotoAsync(null, ct, $"head {N(focusMm)} off");
+        int read = 0;
         for (int i = 0; i < aims.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
             progress?.Report($"Point {i + 1} of {aims.Count} (head at {focusMm:0.#} mm)");
-            var on = await PhotoAsync(aims[i], ct);
-            heights.Add(DotFinder.Find(on, off) is { } dot && cal.Depth(aims[i], dot) is { } depth ? focusMm - depth : null);
+            var on = await PhotoAsync(aims[i], ct, $"head {N(focusMm)} X{N(aims[i].X)} Y{N(aims[i].Y)}");
+            var dot = DotFinder.Find(on, off);
+            double? h = dot is { } d && cal.Depth(aims[i], d) is { } depth ? focusMm - depth : null;
+            heights.Add(h);
+            if (h is not null) read++;
+            AppLog.Write("probe", $"Head {N(focusMm)} mm, X{N(aims[i].X)} Y{N(aims[i].Y)}: " + (dot is not { } s
+                ? "no spot seen."
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"spot at {s.Centre.X:0},{s.Centre.Y:0} px, strength {s.Strength:0}, {s.LengthPx:0} px long ({s.Elongation:0.0}:1) → ") +
+                  (h is { } v ? $"{N(v)} mm." : "outside the calibration.")));
         }
+        AppLog.Write("probe", $"Head {N(focusMm)} mm: {read} of {aims.Count} read. Photos in {PhotosDir}");
         return heights;
     }
 
@@ -142,22 +152,56 @@ public sealed class SurfaceProbe(DeviceClient client)
     /// </summary>
     public Task RunAsync(Func<Task> run, CancellationToken ct) => Session(run, ct);
 
-    /// <summary>A close-up photo with the pointer aimed at <paramref name="aim"/> (or off, for null).</summary>
-    async Task<RasterImage> PhotoAsync(Vec2? aim, CancellationToken ct)
+    /// <summary>
+    /// A close-up photo with the pointer aimed at <paramref name="aim"/> (or off, for null). The pointer is off while
+    /// the mirrors move (on, it streaks a line across the part) and held still on the spot long enough for the camera
+    /// to see it: Kyle's scans (2026-11-09) read too little with the old 0.12 s.
+    /// </summary>
+    async Task<RasterImage> PhotoAsync(Vec2? aim, CancellationToken ct, string? name = null)
     {
+        await client.SetPointerPowerAsync(0, ct);
         if (aim is { } a)
         {
             await client.SendCommandAsync(string.Create(CultureInfo.InvariantCulture, $"G0X{a.X:0.###}Y{a.Y:0.###}F60000"), ct);
+            await Task.Delay(MoveMs, ct);
             await client.SetPointerPowerAsync(100, ct);
-            await Task.Delay(120, ct); // let the mirrors and the camera settle
         }
-        else
-        {
-            await client.SetPointerPowerAsync(0, ct);
-            await Task.Delay(80, ct);
-        }
+        await Task.Delay(SeeMs, ct);
         var jpg = await client.SnapshotAsync(CloseUp, ct);
+        if (name is not null) KeepPhoto(name, jpg);
         return RasterImage.Decode(jpg);
+    }
+
+    /// <summary>Waits (ms): for the mirrors after a move, and for the camera to show a change of the pointer.</summary>
+    const int MoveMs = 200, SeeMs = 400;
+
+    /// <summary>The last measurement's photos, for checking what the camera saw when points aren't read.</summary>
+    public static string PhotosDir => Path.Combine(AppIdentity.DataDir, "pointer-photos");
+
+    int _kept;
+
+    void KeepPhoto(string name, byte[] jpg)
+    {
+        if (_kept >= 300) return;
+        try
+        {
+            Directory.CreateDirectory(PhotosDir);
+            File.WriteAllBytes(Path.Combine(PhotosDir, $"{++_kept:000} {name}.jpg"), jpg);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    static string N(double v) => v.ToString("0.#", CultureInfo.InvariantCulture);
+
+    void ClearPhotos()
+    {
+        _kept = 0;
+        try
+        {
+            if (Directory.Exists(PhotosDir))
+                foreach (var f in Directory.GetFiles(PhotosDir, "*.jpg")) File.Delete(f);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
     /// <summary>The fill lights (percent) while measuring, at least: on, so the close-up camera can see.</summary>
@@ -176,6 +220,8 @@ public sealed class SurfaceProbe(DeviceClient client)
             // The close-up camera needs light to see the part (Kyle, 2026-11-08: "make sure the light's on"). The spot is
             // found from the difference between photos with the pointer on and off, so steady light doesn't hide it.
             await client.SetFillLightsAsync(Math.Max(lights.Front, MeasureLight), Math.Max(lights.Back, MeasureLight), ct);
+            ClearPhotos();
+            await Task.Delay(1500, ct); // the camera's exposure settles after the lights change
             await run();
         }
         finally

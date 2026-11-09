@@ -85,7 +85,7 @@ turns. `Esc` in any other tool brings you back to it.
   - from left to right (a blue box): selects the shapes entirely inside it;
   - from right to left (a green, dashed box): also selects the shapes it touches.
   - Hold `Shift` to add them to what's already selected. Groups come along whole.
-- Shapes on a hidden or locked layer, and locked shapes, can't be picked on the canvas.
+- Shapes on a hidden or locked layer, and hidden or locked shapes, can't be picked on the canvas.
 - When everything selected is on one layer, that layer becomes the active layer and its settings
   come up in **Layer settings**.
 
@@ -379,6 +379,12 @@ marked when the job runs, and other shapes still snap to it.
 A whole layer can be locked or hidden in the Layers panel: its shapes can't be picked either.
 See [Arranging](arrange.md) and [Layers](layers.md).
 
+A single shape can be hidden too, or have its own output turned off so it stays on the work area,
+faded, as a guide that's never sent: right-click → **Hide** or **Output off (keep as a guide)**, or
+the switches on its row in the Layers panel (see
+[A shape's own switches](layers.md#a-shapes-own-switches)). A hidden shape is shown again from its
+row.
+
 ## The right-click menu
 
 With the Select or Edit points tool, right-click a shape: it's selected (with its group; hold
@@ -387,7 +393,8 @@ do with the selection opens. Items that don't apply are greyed.
 
 - **Cut**, **Copy**, **Paste**, **Duplicate**, **Delete it** (or **Delete these 3**…)
 - **Group**, **Ungroup**, **Combine into one shape (compound)**, **Break apart**,
-  **Convert text to paths**, **Lock** (or **Unlock**), **Use as material outline**,
+  **Convert text to paths**, **Lock** (or **Unlock**), **Hide** (or **Show**), **Output off (keep
+  as a guide)** (or **Output on (send to the laser)**), **Use as material outline**,
   **Put on the mask layer (never burned)**
 - **Shape operations**: **Offset…**, **Round corners…**, **Text on path**
   (or **Straighten text**), **Copy along path…**, **Tidy lines…**, **Weld (union)**,

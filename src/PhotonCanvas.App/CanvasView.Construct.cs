@@ -268,7 +268,7 @@ public sealed partial class CanvasView
         double circleD = tol, lineD = tol, boxArea = double.PositiveInfinity;
         foreach (var s in _doc.State.Shapes)
         {
-            if (!visible.Contains(s.LayerId) || !s.Bounds.Inflate(tol).Contains(w) || FeaturesOf(s) is not { } f) continue;
+            if (!s.Visible || !visible.Contains(s.LayerId) || !s.Bounds.Inflate(tol).Contains(w) || FeaturesOf(s) is not { } f) continue;
             double onLines = double.PositiveInfinity;
             foreach (var l in f.Lines)
                 for (int i = 0; i + 1 < l.Count; i++)

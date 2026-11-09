@@ -681,7 +681,7 @@ public sealed class Job
         switch (Mode)
         {
             case WorkMode.Rotary r:
-                if (p.X < 0 || p.X > Machine.FieldW || Math.Abs(p.Y - r.OriginY) > r.CircumferenceMm / 2 + 1e-6)
+                if (p.X < 0 || p.X > Machine.FieldW || Math.Abs(p.Y - r.OriginY) > r.CircumferenceMm / 2 + RotarySeamSlackMm + 1e-6)
                     throw new OutsideWorkAreaException(p.X, p.Y, Machine.FieldW, r.CircumferenceMm, ctx + " (the rotary's area: the field across, once round the object)");
                 return;
             case WorkMode.Conveyor c:
@@ -934,6 +934,9 @@ public sealed class Job
 
     /// <summary>Furthest one turning job may move the rotary (mm round the object: a few turns of the largest object).</summary>
     public const double MaxTurnMm = 2000;
+
+    /// <summary>How far past once round a rotary path may reach (mm): a line all the way round carries on past its start.</summary>
+    public const double RotarySeamSlackMm = 10;
 
     /// <summary>
     /// A job that only turns the rotary by <paramref name="uMm"/> (U, mm round the object, the same

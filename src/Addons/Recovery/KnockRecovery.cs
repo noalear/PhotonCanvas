@@ -77,7 +77,7 @@ public static class KnockRecovery
         var o = new List<MarkedShape>();
         foreach (var shape in s.Shapes)
         {
-            if (!owners.Contains(shape.LayerId)) continue;
+            if (!shape.Sent || !owners.Contains(shape.LayerId)) continue;
             var lines = LinesOf(shape);
             if (lines.Count > 0) o.Add(new MarkedShape(shape.Id, Label(shape), lines));
         }

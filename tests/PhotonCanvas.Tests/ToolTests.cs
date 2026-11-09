@@ -365,6 +365,63 @@ public class RotaryReturnTests
         Assert.DoesNotContain(slowJob.Warnings, w => w.Contains("10 turns a second"));
     }
 
+    static List<double> Us(string motion) =>
+        [.. motion.Split('\n').Where(l => l.StartsWith("G1") || l.StartsWith("G0X"))
+            .Select(l => System.Text.RegularExpressions.Regex.Match(l, @"U(-?[0-9.]+)"))
+            .Where(m => m.Success).Select(m => double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture))];
+
+    [Fact]
+    public void ALineAllTheWayRoundCarriesOnPastItsStart()
+    {
+        // Kyle (2026-11-09): burning through a rod with one line round it left a short stretch at the seam.
+        double circ = Math.PI * 32.7;
+        var rot = new WorkMode.Rotary(32 / circ, 1, circ);
+        var machine = M with { FieldH = Math.Round(circ, 2) };
+        var s = DocState.New();
+        var cut = Layer.Default(1, LayerMode.Cut) with { Laser = LaserSettings.Blue(90, 10) };
+        s = Ops.AddLayer(s, cut);
+        double h = Math.Round(circ, 2);
+        s = Ops.AddShapes(s, [new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Line(new(50, 0), new(50, h)) }]);
+        var job = JobBuilder.Build(s, new JobOptions { Machine = machine, Mode = rot });
+        var u = Us(job.Motion);
+        // Once round, then 2 mm more over where it started.
+        Assert.Equal(h + RotarySeam.OverlapMm, u.Max() - u.Min(), 2);
+        // Where it starts on the object is unchanged (the design's middle faces the laser).
+        Assert.Equal(h / 2, job.Job.Mode is WorkMode.Rotary r ? r.OriginY : 0, 2);
+        // The cut layer's overcut, when longer, is used instead.
+        var longer = Ops.UpdateLayers(s, new HashSet<Guid> { cut.Id }, l => l with { OvercutMm = 5 });
+        var u5 = Us(JobBuilder.Build(longer, new JobOptions { Machine = machine, Mode = rot }).Motion);
+        Assert.Equal(h + 5, u5.Max() - u5.Min(), 2);
+        // A line a little short of round still closes: it carries on to the start and past it.
+        var shortOne = Ops.AddShapes(DocState.New() is var d ? Ops.AddLayer(d, cut) : d,
+            [new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Line(new(50, 0.5), new(50, h)) }]);
+        var us = Us(JobBuilder.Build(shortOne, new JobOptions { Machine = machine, Mode = rot }).Motion);
+        Assert.Equal(h + RotarySeam.OverlapMm, us.Max() - us.Min(), 2);
+        // A line part way round, and the same line on the flat bed, are left as drawn.
+        var half = Ops.AddShapes(Ops.AddLayer(DocState.New(), cut), [new PathShape { LayerId = cut.Id, Geometry = PathGeometry.Line(new(50, 10), new(50, 60)) }]);
+        var uh = Us(JobBuilder.Build(half, new JobOptions { Machine = machine, Mode = rot }).Motion);
+        Assert.Equal(50, uh.Max() - uh.Min(), 2);
+        Assert.DoesNotContain(JobBuilder.Build(s, new JobOptions()).Motion.Split('\n'), l => l.Contains($"Y{h + RotarySeam.OverlapMm:0.###}"));
+    }
+
+    [Fact]
+    public void CarryingOnFollowsThePathsOwnStart()
+    {
+        // A wavy band round the object: the carry-on retraces its first stretch, once round on.
+        var pts = new List<Vec2> { new(10, 0), new(11, 1), new(12, 2), new(10, 100) };
+        Assert.True(RotarySeam.GoesRound(pts, 100));
+        Assert.False(RotarySeam.GoesRound(pts, 120));
+        var o = RotarySeam.CarryOn(pts, 100, Math.Sqrt(2) * 1.5);
+        // It ends right over its start, so it goes straight on along its first stretch.
+        Assert.Equal(new Vec2(10, 100), o[3]);
+        Assert.Equal(new Vec2(11, 101), o[4]);
+        Assert.Equal(11.5, o[^1].X, 6);
+        Assert.Equal(101.5, o[^1].Y, 6);
+        // Drawn the other way (down the page), it carries on downwards.
+        var down = RotarySeam.CarryOn([new(10, 100), new(10, 0)], 100, 2);
+        Assert.Equal(-2, down[^1].Y, 6);
+    }
+
     [Fact]
     public void MaterialOutlinesAreNeverSentEvenThroughASubLayer()
     {

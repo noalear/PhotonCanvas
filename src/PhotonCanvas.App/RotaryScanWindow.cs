@@ -501,7 +501,10 @@ public sealed class RotaryScanWindow : Window
             SaveLast(scan);
             Show(scan);
             _status.Text = $"Done: read {scan.Read} of {scan.Total} points, and turned back to where it started." +
-                           (scan.Read < scan.Total ? " Gaps are filled from the readings either side." : "");
+                           (scan.Read < scan.Total ? " Gaps are filled from the readings either side." : "") +
+                           (Pointer && scan.Read < scan.Total / 2
+                               ? $" Fewer than half were read: the close-up photos are in {SurfaceProbe.PhotosDir}, and the log says what was seen at each point."
+                               : "");
         }
         catch (RotaryScanStopped e)
         {
@@ -600,7 +603,11 @@ public sealed class RotaryScanWindow : Window
     {
         if (_scan is null || _scan.Read == 0) { _status.Text = "Scan a round rod first."; return; }
         if (!_scan.WholeTurn) { _status.Text = "Scan the rod over a whole turn (0 to 360°) for this."; return; }
-        if (_scan.AxisFromRod((double)(_rod.Value ?? 20)) is not { } ax) { _status.Text = "Too little was read to work it out."; return; }
+        if (_scan.AxisFromRod((double)(_rod.Value ?? 20)) is not { } ax) {
+            _status.Text = $"Too little was read to work it out: it needs one place along the rod read at three or more angles, and only {_scan.Read} of {_scan.Total} readings came back. " +
+                           "Check the rod is under the laser line where the close-up camera was calibrated, and that the head was focused on its top before scanning.";
+            return;
+        }
         _axisKnown.IsChecked = true;
         _axis.Value = (decimal)Math.Clamp(Math.Round(ax, 2), -200, 200);
         SaveFields();

@@ -21,6 +21,12 @@ remind you if it has shapes.
 <!-- target: panel:Layers -->
 Click the padlock. Its shapes can't be picked or moved on the work area, but they are still sent.
 
+## One shape at a time
+<!-- target: panel:Layers -->
+Open a layer's list with the arrow (▸): every shape's row has its own lightning, eye and padlock.
+Turn one shape's lightning off to keep it as a faded guide while the rest of its layer is marked;
+the eye hides just that shape. They're faint while on, so the ones you've turned off stand out.
+
 ## One layer at a time
 <!-- target: panel:Layers -->
 Right-click a card and choose **Show only this layer** to hide all the others. **Show all layers**

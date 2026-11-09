@@ -1330,6 +1330,8 @@ public partial class MainWindow : Window
             Do("Break apart", BreakApart, compound, "Ctrl+Shift+K"),
             Do("Convert text to paths", ConvertToPaths, anyText, "Ctrl+Shift+C"),
             Do(shapes.Any(s => s.Locked) ? "Unlock" : "Lock", () => LockSel(!shapes.Any(s => s.Locked), shapes.Select(s => s.Id).ToHashSet())),
+            Do(shapes.Any(s => !s.Visible) ? "Show" : "Hide", () => ShapeFlagsSel(shapes.Select(s => s.Id).ToHashSet(), visible: shapes.Any(s => !s.Visible))),
+            Do(shapes.Any(s => !s.Output) ? "Output on (send to the laser)" : "Output off (keep as a guide)", () => ShapeFlagsSel(shapes.Select(s => s.Id).ToHashSet(), output: shapes.Any(s => !s.Output))),
             Do("Use as material outline", MaterialSel, paths.Any(p => p is not TextShape && p.Geometry.Subpaths.Any(sp => sp.Closed))),
             Do("Put on the mask layer (never burned)", MaskLayerSel, paths.Count > 0 && (MaskLayer.Layer(_doc.State) is not { } maskLayer || paths.Any(p => p.LayerId != maskLayer.Id))),
             Sub("Shape operations",
@@ -2078,6 +2080,19 @@ public partial class MainWindow : Window
         _doc.Commit(locked ? "Lock" : only is null ? "Unlock all" : "Unlock", s with { Shapes = System.Collections.Immutable.ImmutableList.CreateRange(shapes) }, locked ? [] : ids);
     }
 
+    /// <summary>Show or hide shapes, or turn their own output on or off (hidden ones leave the selection).</summary>
+    void ShapeFlagsSel(IReadOnlySet<Guid> ids, bool? visible = null, bool? output = null)
+    {
+        var next = Ops.SetShapeFlags(_doc.State, ids, visible: visible, output: output);
+        if (ReferenceEquals(next, _doc.State)) return;
+        string label = visible is { } v ? (v ? "Show" : "Hide") : output == true ? "Output on" : "Output off";
+        _doc.Commit(label, next, visible == false ? _doc.Selection.Where(id => !ids.Contains(id)).ToList() : null);
+        if (visible == false)
+            StatusText.Text = ids.Count == 1 ? "Hidden: it isn't drawn or sent. Show it again from its row in the Layers panel." : $"{ids.Count} shapes hidden: they aren't drawn or sent. Show them again from the Layers panel.";
+        else if (output == false)
+            StatusText.Text = ids.Count == 1 ? "Output off: it stays on the work area, faded, but isn't sent." : $"Output off for {ids.Count} shapes: they stay on the work area, faded, but aren't sent.";
+    }
+
     HistoryWindow? _history;
 
     void ShowHistory()
@@ -2193,7 +2208,7 @@ public partial class MainWindow : Window
     {
         if (!_settings.QuickProcessing || _quickRunning || !_machine.IsConnected || _machine.Mode is not ("P_IDLE" or "P_WORK_DONE" or "P_FINISH" or "")) return;
         if (_settings.ActiveSetup().Kind != MachineKind.XTool) return;
-        var output = JobBuilder.OutputLayers(_doc.State).SelectMany(l => _doc.State.ShapesFor(l)).ToList();
+        var output = JobBuilder.OutputLayers(_doc.State).SelectMany(l => _doc.State.SentFor(l)).ToList();
         if (output.Count == 0) return;
         _quickRunning = true;
         try

@@ -377,7 +377,7 @@ public sealed class LayerByLayerWindow : Window
     public LayerByLayerWindow(Document doc, JobBar job)
     {
         _job = job;
-        _layers = [.. JobBuilder.OutputLayers(doc.State).Where(l => l.ParentId is null && doc.State.ShapesFor(l).Any())];
+        _layers = [.. JobBuilder.OutputLayers(doc.State).Where(l => l.ParentId is null && doc.State.SentFor(l).Any())];
         Title = "Layer by layer";
         Width = 420;
         Height = 520;
@@ -462,7 +462,7 @@ public sealed class SectionsWindow : Window
 
     void Plan()
     {
-        var all = _doc.State.Bounds(JobBuilder.OutputLayers(_doc.State).SelectMany(l => _doc.State.ShapesOn(l.Id)).Select(s => s.Id));
+        var all = _doc.State.Bounds(JobBuilder.OutputLayers(_doc.State).SelectMany(l => _doc.State.ShapesOn(l.Id)).Where(s => s.Sent).Select(s => s.Id));
         _sections = Section.Plan(all, (double)(_w.Value ?? 200), (double)(_h.Value ?? 200), MachineProfile.F2Ultra);
         _info.Text = all.IsEmpty ? "Nothing to mark." : $"The design is {all.Width:0.#} × {all.Height:0.#} mm: {_sections.Count} section{(_sections.Count == 1 ? "" : "s")}.";
         _list.Children.Clear();

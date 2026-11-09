@@ -185,7 +185,7 @@ public static class JobBuilder
     /// </summary>
     public static IEnumerable<(Shape A, Shape B)> StackedShapes(DocState s)
     {
-        var shapes = OutputLayers(s).SelectMany(l => s.ShapesOn(l.Id)).Where(sh => !sh.Bounds.IsEmpty).ToList();
+        var shapes = OutputLayers(s).SelectMany(l => s.ShapesOn(l.Id)).Where(sh => sh.Sent && !sh.Bounds.IsEmpty).ToList();
         static (long, long, long, long) Key(Rect2 b) =>
             ((long)Math.Round(b.MinX * 20), (long)Math.Round(b.MinY * 20), (long)Math.Round(b.MaxX * 20), (long)Math.Round(b.MaxY * 20));
         foreach (var g in shapes.GroupBy(sh => Key(sh.Bounds)).Where(g => g.Count() > 1))
@@ -218,6 +218,17 @@ public static class JobBuilder
     {
         JobException.CheckRange("pause after each path", opt.PathPauseS, 0, Job.MaxPathPauseS, "s");
         var warnings = new List<string>();
+        // Shapes hidden on their own, or with their own output off, aren't sent (a hidden one is said, as a hidden layer is).
+        foreach (var owner in OutputLayers(s).Where(l => opt.OnlyLayer is not { } only || l.Id == only || l.ParentId == only).Select(l => s.Owner(l.Id)).Distinct())
+        {
+            int hiddenHere = s.ShapesOn(owner).Count(x => !x.Visible && x.Output);
+            if (hiddenHere > 0 && s.FindLayer(owner) is { } l)
+                warnings.Add(hiddenHere == 1
+                    ? $"A shape on layer \"{l.Name}\" is hidden, so it will not be processed."
+                    : $"{hiddenHere} shapes on layer \"{l.Name}\" are hidden, so they will not be processed.");
+        }
+        var whole = s;
+        s = s.WithoutHeldBack();
         // Add-ons' steps (Extensions.JobHooks): a changed copy of the design, and their own checks.
         if (Extensions.JobHooks.All.Count > 0)
         {
@@ -591,6 +602,9 @@ public static class JobBuilder
                             bounds = bounds.Union(Rect2.Bounds(p.Points));
                             continue;
                         }
+                        // All the way round the object: on past the start, so the seam is cut through.
+                        if (opt.Mode is WorkMode.Rotary round && !p.Closed && RotarySeam.GoesRound(p.Points, round.CircumferenceMm))
+                            pl = Polyline.Open(RotarySeam.CarryOn(p.Points, round.CircumferenceMm, Math.Min(Math.Max(RotarySeam.OverlapMm, layer.OvercutMm), RotarySeam.MaxOverlapMm)));
                         if (wobble) pl = Polyline.Open(Wobble.Expand(pl.EmittedPoints(), layer.WobbleDiameterMm, layer.WobbleSpacingMm));
                         int bm = blocks.Count, sm = steps.Count;
                         blocks.Add(new VectorBlock(pl, layer.Laser) { Drop = drop, FocusOffsetMm = layer.FocusOffsetMm });
@@ -657,8 +671,10 @@ public static class JobBuilder
         if (blocks.Count == 0)
             throw new JobException(leftOut.Count > 0
                 ? $"Nothing would be done. {string.Join(" ", leftOut)}"
-                : s.Shapes.Count == 0
+                : whole.Shapes.Count == 0
                 ? "There is nothing on the canvas to process."
+                : OutputLayers(whole).Any(l => whole.ShapesFor(l).Any()) && !OutputLayers(s).Any(l => s.ShapesFor(l).Any())
+                ? "Every shape on the layers being sent is hidden or has its own output off. Turn one back on in the Layers panel (open a layer's list with ▸)."
                 : "No shapes are on an enabled, visible layer.");
 
         var mode = opt.Mode switch
@@ -668,6 +684,13 @@ public static class JobBuilder
             WorkMode.Rotary r => r with { OriginY = s.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical)?.At ?? (bounds.MinY + bounds.MaxY) / 2 },
             _ => opt.Mode,
         };
+        // The design must fit once round (the job's own check allows a little more, for lines carried on past their start).
+        if (mode is WorkMode.Rotary fit && !bounds.IsEmpty)
+        {
+            double far = Math.Abs(bounds.MinY - fit.OriginY) > Math.Abs(bounds.MaxY - fit.OriginY) ? bounds.MinY : bounds.MaxY;
+            if (Math.Abs(far - fit.OriginY) > fit.CircumferenceMm / 2 + 1e-6)
+                throw new OutsideWorkAreaException(bounds.MinX, far, opt.Machine.FieldW, fit.CircumferenceMm, " (the rotary's area: the field across, once round the object)");
+        }
         if (mode is WorkMode.Rotary rot && blocks.Any(b => b is not DotBlock && b.Laser.FValue > Job.RotaryFeedCap(rot)))
             warnings.Add($"On the rotary, moves that turn it are held to 10 turns a second ({Job.RotaryFeedCap(rot) / 60.0:0.#} mm/s round this object), so faster layers run at that speed.");
         if (mode is WorkMode.Conveyor)
@@ -942,7 +965,7 @@ public static class JobBuilder
     /// </summary>
     public static string? LeftOutOn(DocState s, Layer layer)
     {
-        var on = s.ShapesFor(layer).ToList();
+        var on = s.SentFor(layer).ToList();
         if (layer.Mode == LayerMode.Image)
         {
             int paths = on.OfType<PathShape>().Count();
