@@ -163,6 +163,9 @@ How it measures:
   the heights the last angle read (a little either side), often in one height. Places that couldn't be
   read at the first angle don't make later angles search wider.
   Only places the close-up camera can see are read: the window says the area it was calibrated over.
+  The pointer hops from place to place and stays on each for about half a second while it's
+  photographed. If fewer than half the places are read, the status line says where the photos are
+  (see [Measure it with the pointer](#measure-it-with-the-pointer)).
 - **The machine's auto-focus**: one reading an angle, wherever the machine focuses (the middle of the
   field), but it reaches any height. Put the part's axis under the middle of the field.
 
@@ -325,7 +328,7 @@ knocked.
    3 mm. It must be right: any error in it is added to every height measured later.
 3. Click **Calibrate…** and **Start**. The head moves up and down, 8 mm either side of
    its focus on the board, in nine steps of 2 mm. At each step the pointer is aimed at 25 points over
-   the middle 30 × 30 mm of the bed and photographed. The laser isn't fired. About two minutes.
+   the middle 30 × 30 mm of the bed and photographed. The laser isn't fired. About four minutes.
 
 It fails if the dot was seen in fewer than a third of the photos: check the close-up camera sees the
 area, and that the board isn't shiny. The calibration is saved with the board thickness and date.
@@ -358,9 +361,14 @@ plus 3 mm round it.
 
 - **Measure** checks the machine is idle, moves the head to the focus height, turns the fill lights
   on (to at least 50%, so the close-up camera can see the part), and for each point aims the pointer and photographs it with the close-up camera (each photo is
-  compared with one with the pointer off, so only the dot is left). The lights and pointer are put
+  compared with one with the pointer off, so only the dot is left). The pointer is turned off while
+  it moves to the next point, then held still on it for about half a second while it's photographed,
+  so you see it hop from spot to spot rather than streak across. The lights and pointer are put
   back afterwards. The status line says how many points were read: a point can't be read when the dot
   isn't seen, or the surface there is more than 8 mm from the focus.
+- When points aren't read, look in the [data folder](machine.md#the-data-folder): the **pointer-photos**
+  folder has the newest measurement's photos, and the day's diary in **logs** says for each point
+  whether a spot was seen, where, and how long it was.
 - **Stop** stops measuring.
 - Points more than 0.6 mm from the smooth surface through the other points are shown red and left
   out of the fit. **Measure the red points again** measures just those (the button only shows when there are some).
