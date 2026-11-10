@@ -1,12 +1,13 @@
 # Borders
 
-An add-on (Settings → Add-ons → **Border and moulding maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Import → Generate → Borders**, and **Edit border…** is on the right-click menu of a border it made.
+An add-on (Settings → Add-ons → **Border and moulding maker**): on when PhotonCanvas is installed, and can be turned off. Its button is **Import → Generate → Borders**, and **Edit border…** is on the right-click menu of a border it made. **Machine → Work area → Wrap a pattern** opens it on a round part in the rotary (see [Round a part on the rotary](#round-a-part-on-the-rotary)).
 
 **Borders** makes carved borders: picture and mirror frames, cabinet and drawer edges, furniture
 trim and ornament bands. Pick one of the ready-made designs (egg and dart, dentils, rope, Greek key,
 acanthus, bead and reel, reeding, ogees, coves and dozens more), say what it goes round and how big
 it is, and it is drawn to fit: whole repeats along every side, mitred corners, a motif in the
-middle of each side. You see it lit as carved wood, gilt or metal. Then it goes in the design as a
+middle of each side. It can also go round a pen, a tool handle or a table leg turning in the rotary,
+as rings, flutes or a spiral. You see it lit as carved wood, gilt or metal. Then it goes in the design as a
 depth map (a greyscale picture, white the surface and black the deepest) on its own Picture layer
 set to **Depth slices (relief)**, ready to carve.
 
@@ -83,7 +84,7 @@ front and Linen chest.
 
 | Setting | What it does |
 |---|---|
-| **Goes round** | **A frame** (a rectangle), **An oval or circle**, or **A strip** (a straight length for an edge, a shelf front or trim). |
+| **Goes round** | **A frame** (a rectangle), **An oval or circle**, **A strip** (a straight length for an edge, a shelf front or trim), or **A round part on the rotary** (see [Round a part on the rotary](#round-a-part-on-the-rotary)). |
 | **Size is** | Frames and ovals: whether **Width (mm)** and **Height (mm)** are **The outside** of the frame or **The opening** inside it (the picture or mirror it holds; the border is added round it). |
 | **Width (mm)**, **Height (mm)** | The frame's size, 10–3000 mm (180 × 220 to start). The same width and height make a circle. |
 | **Corners** | Frames only. **Mitred**: the sides meet on the diagonal, as a frame's four sticks do, and the pattern turns the corner on the mitre. **Corner blocks**: a square in each corner with a carved rosette, the sides running between them. **Rounded**: the whole border bends round the corners. |
@@ -100,6 +101,54 @@ front and Linen chest.
 
 The repeats are always fitted to a whole number along each side, so the pattern never ends half
 way through a motif; the summary says how many fit and how far apart they are.
+
+## Round a part on the rotary
+
+Choose **A round part on the rotary** under **Goes round** (or click **Wrap a pattern** on the
+**Machine** tab, in the **Work area** group, which opens the maker that way) to wrap the border round
+a round part held in the rotary: a pen, a tool or knife handle, a chair spindle, a table leg. The
+pattern is made to go once round the part exactly, with a whole number of repeats, so where it meets
+itself round the back there's no seam.
+
+![A double rope spiral round a 40 mm table leg, seen on the part](images/window-borders-rotary.png)
+
+| Setting | What it does |
+|---|---|
+| **Part Ø (mm)** | The part's diameter where the border goes. The pattern goes once round exactly this size. **Use Work mode's** puts in the **Object Ø** that **Machine → Work mode → Rotary** is set to (the button shows when Work mode is the rotary). Opening the maker with **Wrap a pattern** starts with it. |
+| **Wraps** | **Round it (rings)**: the border goes round the part, its width along the part. **Along it (flutes)**: copies of the border run along the part side by side, all the way round, like the flutes or reeds on a column. **A spiral along it**: the border winds along the part, like a barley twist or a rope. |
+| **Rings** | Round it: how many rings along the part, all the same. |
+| **Gap (mm)** | Round it: the plain space between one ring and the next, along the part. |
+| **Copies round** | Along it: how many copies side by side round the part. Each is made just wide enough that they go round without a gap, so **Border width** follows it (the summary says how wide). |
+| **Starts** | A spiral: how many spirals wind side by side. 1 is a single twist, 2 a double barley twist. The more starts (and the wider the border), the steeper it winds: the summary says how far along the part it goes in one turn. |
+| **Length (mm)** (on a part) | Along it and a spiral: how far along the part the pattern runs. |
+| **Mirrored pair (inner edges meet in the middle)** | Each copy is the design and its mirror image side by side, so it's the same both ways across: a frame moulding becomes a collar, an edge a bead, and flutes meet edge to edge. |
+| **Turned round (the outer edge on the other side)** | The design turned round across. With **Mirrored pair**, the outer edges meet in the middle instead. |
+| **Twists the other way (left-handed)** | A spiral winds the other way, like a left-hand thread. |
+| **A whole motif facing the laser at the start** | Rings: a whole motif sits on the row that faces the laser when the job starts. |
+
+**On the part** (above the picture) shows the border round the part from above, as the laser sees
+it: drag up and down to turn the part, scroll to zoom. Untick it to see the part unrolled, as the
+depth map is made: along the part across, once round down. The dashed line across it is the row
+that faces the laser when the job starts.
+
+![Three rope rings round a 20 mm pen, unrolled: the dashed line faces the laser at the start](images/window-borders-rotary-flat.png)
+
+**Put in the design** puts the depth map in once round the part, centred on the rotary start line
+(if the design has none, one is put half way round, where the job starts anyway), in the middle of
+the laser's field across. Its layer is called **Rotary wrap ·** and the design's name, in **Depth
+slices (relief)** mode, with the lines running along the part (0°) and no turn between slices, so the
+rotary steps round between lines rather than turning back and forth. There are no cut lines round a
+part.
+
+Before you send it, set **Machine → Work mode** to **Rotary** with **Object Ø** the same as **Part Ø**.
+The job's checks say if Work mode isn't the rotary, if **Object Ø** is set to another size (the
+pattern would stop short of meeting itself round the back, or run over), or if the picture has been
+stretched round the part. The summary warns of the same while you make it, and if the pattern is
+longer along the part than the laser reaches across.
+
+> **Note:** Wrapping round a part has been checked on screen and in tests, but not carved on the
+> machine yet. Try a short ring on a scrap dowel of the same size first, and check where the pattern
+> meets itself round the back.
 
 ## Bands
 
@@ -191,3 +240,4 @@ added ("Frame - top side.png").
 ## Tutorials
 
 - [Carve a picture frame](tutorial:draw-border-frame)
+- [Wrap a pattern round a pen or table leg](tutorial:wrap-rotary-pattern)

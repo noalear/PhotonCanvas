@@ -165,6 +165,22 @@ public enum BorderLayout
     Frame,
     /// <summary>An oval or a circle all the way round.</summary>
     Oval,
+    /// <summary>
+    /// Wrapped round a round part turning in the rotary (a pen, a tool handle, a table leg): the picture is the
+    /// part unrolled, its length along the axis by once round, and the pattern meets itself where it joins.
+    /// </summary>
+    Rotary,
+}
+
+/// <summary>Which way a border wraps round a rotary part.</summary>
+public enum WrapWay
+{
+    /// <summary>Rings: the border goes round the part, its width along the axis.</summary>
+    Round,
+    /// <summary>Flutes: copies of the border run along the part, side by side all the way round.</summary>
+    Along,
+    /// <summary>A spiral (one or more starts) winding along the part, as a barley twist or rope does.</summary>
+    Spiral,
 }
 
 /// <summary>How a rectangular frame's corners are made.</summary>
@@ -231,11 +247,39 @@ public sealed record BorderSpec
     /// <summary>A strip longer than this is made in pieces that carry on from each other (mm); 0 = one piece.</summary>
     public double MaxPieceMm { get; init; }
 
-    /// <summary>The design at the width and depth asked for.</summary>
-    public BorderDesign Sized() => Design.Scaled(WidthMm, DepthMm);
+    // ---- round a rotary part ----
 
-    /// <summary>The border's width across, as it will be made (mm).</summary>
-    public double BorderWidth => WidthMm > 0 ? WidthMm : Design.WidthMm;
+    /// <summary>The round part's diameter (mm): the pattern goes once round it at this size (Machine → Work mode's Object Ø).</summary>
+    public double PartDiameterMm { get; init; } = 25;
+    public WrapWay Wrap { get; init; } = WrapWay.Round;
+    /// <summary>How many: rings along the part (<see cref="WrapWay.Round"/>), copies side by side round it (<see cref="WrapWay.Along"/>), or starts of a spiral.</summary>
+    public int WrapCopies { get; init; } = 1;
+    /// <summary>The gap between rings along the part (mm).</summary>
+    public double WrapGapMm { get; init; } = 5;
+    /// <summary>How far along the part the flutes or the spiral run (mm).</summary>
+    public double WrapLengthMm { get; init; } = 100;
+    /// <summary>Each copy is the design and its mirror image side by side, their inner edges meeting in the middle.</summary>
+    public bool WrapMirrored { get; init; }
+    /// <summary>Turned round across: the design's outer edge on the other side.</summary>
+    public bool WrapTurned { get; init; }
+    /// <summary>The spiral winds the other way (left-handed, as a left-hand thread).</summary>
+    public bool WrapLeftHand { get; init; }
+
+    /// <summary>Once round the part (mm).</summary>
+    [JsonIgnore]
+    public double PartCircumferenceMm => Math.PI * PartDiameterMm;
+
+    /// <summary>Copies wrapped side by side round the part: each one's width is fitted to go round a whole number of times.</summary>
+    [JsonIgnore]
+    bool WidthFitted => Layout == BorderLayout.Rotary && Wrap == WrapWay.Along;
+
+    /// <summary>The design at the width and depth asked for.</summary>
+    public BorderDesign Sized() => Design.Scaled(WidthFitted ? BorderWidth : WidthMm, DepthMm);
+
+    /// <summary>The border's width across, as it will be made (mm). Flutes round a rotary part are fitted to go round.</summary>
+    public double BorderWidth => WidthFitted
+        ? PartCircumferenceMm / Math.Max(1, WrapCopies) / (WrapMirrored ? 2 : 1)
+        : WidthMm > 0 ? WidthMm : Design.WidthMm;
 
     /// <summary>A frame's outside size (mm).</summary>
     public (double W, double H) Outside()
@@ -260,11 +304,36 @@ public sealed record BorderSpec
                 if (!(LengthMm >= 5)) return "Make the strip at least 5 mm long.";
                 if (MitredEnds && LengthMm < 2 * w + 1) return $"With mitred ends the strip must be longer than twice its width ({2 * w:0.#} mm).";
                 break;
+            case BorderLayout.Rotary:
+                return RotaryProblem();
             default:
                 var (ow, oh) = Outside();
                 if (!(ow >= 5 && oh >= 5)) return "Give the frame a width and a height.";
                 if (Math.Min(ow, oh) < 2 * w + 1) return $"The border ({w:0.#} mm) is too wide for a frame that size: it needs more than {2 * w:0.#} mm each way.";
                 break;
+        }
+        return null;
+    }
+
+    /// <summary>What's wrong with the rotary settings, or null.</summary>
+    string? RotaryProblem()
+    {
+        if (!(PartDiameterMm >= 2)) return "Give the part's diameter: at least 2 mm.";
+        double c = PartCircumferenceMm, most = PhotonCanvas.Doc.WorkModes.MaxCircumferenceMm;
+        if (c > most + 1e-9) return $"The rotary goes up to {most:0} mm round (Ø {most / Math.PI:0.#} mm).";
+        if (WrapCopies < 1 || WrapCopies > 60) return Wrap switch
+        {
+            WrapWay.Round => "Make 1 to 60 rings.",
+            WrapWay.Along => "Fit 1 to 60 copies round the part.",
+            _ => "A spiral has 1 to 60 starts.",
+        };
+        if (Wrap != WrapWay.Round && !(WrapLengthMm >= 5)) return "Make it at least 5 mm long along the part.";
+        if (Wrap == WrapWay.Round && !(WrapGapMm >= 0)) return "The gap between rings can't be less than 0.";
+        if (Wrap == WrapWay.Spiral)
+        {
+            double across = WrapCopies * BorderWidth * (WrapMirrored ? 2 : 1);
+            if (across > 0.95 * c)
+                return $"Too wide to spiral: {WrapCopies} × {BorderWidth * (WrapMirrored ? 2 : 1):0.#} mm across is more than once round the part ({c:0.#} mm). Use fewer starts or a narrower border (or Along the part).";
         }
         return null;
     }

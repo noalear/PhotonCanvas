@@ -30,9 +30,21 @@ public static class BorderOutput
     {
         double ppm = PixelsPerMm(plan.Spec, p);
         int cols = Math.Max(1, (int)Math.Round(p.WidthMm * ppm)), rows = Math.Max(1, (int)Math.Round(p.HeightMm * ppm));
-        double mmPerPx = Math.Max(p.WidthMm / cols, p.HeightMm / rows);
-        var h = plan.Render(p, 0, 0, mmPerPx, cols, rows, ct);
-        if (plan.Spec.SoftenMm > 0) BorderPlan.Soften(h, cols, rows, plan.Spec.SoftenMm / mmPerPx);
+        float[] h;
+        double mmPerPx;
+        bool rotary = plan.Spec.Layout == BorderLayout.Rotary;
+        if (rotary)
+        {
+            // Rows exactly once round, so the last one meets the first round the back of the part.
+            h = plan.Render(p, 0, 0, p.WidthMm / cols, p.HeightMm / rows, cols, rows, ct);
+            mmPerPx = (p.WidthMm / cols + p.HeightMm / rows) / 2;
+        }
+        else
+        {
+            mmPerPx = Math.Max(p.WidthMm / cols, p.HeightMm / rows);
+            h = plan.Render(p, 0, 0, mmPerPx, cols, rows, ct);
+        }
+        if (plan.Spec.SoftenMm > 0) BorderPlan.Soften(h, cols, rows, plan.Spec.SoftenMm / mmPerPx, wrapRows: rotary);
         ct.ThrowIfCancellationRequested();
         return BorderPlan.DepthMap(h, cols, rows, plan.Top, plan.Lowest);
     }
@@ -46,6 +58,7 @@ public static class BorderOutput
         MachineProfile machine, Vec2? at = null, Layer? layer = null)
     {
         var spec = plan.Spec;
+        bool rotary = spec.Layout == BorderLayout.Rotary;
         if (layer is null)
         {
             var l = Layer.Default(state.Layers.Count, LayerMode.Image) with
@@ -53,15 +66,27 @@ public static class BorderOutput
                 Name = $"Border · {spec.Design.Name}", ImageMode = ImageEngraveMode.Slices,
                 Dpi = Math.Clamp(Math.Round(Math.Clamp(spec.PixelsPerMm, 4, 20) * 25.4), 100, 508), LinesPerCm = 200, AngleStepDeg = 37,
             };
+            // On the rotary the lines run along the part and it turns a step between them: a slant or a
+            // turn each slice would turn it back and forth all the time.
+            if (rotary) l = l with { Name = $"Rotary wrap · {spec.Design.Name}", FillAngleDeg = 0, AngleStepDeg = 0, TurnEachRun = false };
             state = Ops.AddLayer(state, l);
             layer = l;
         }
         // Pieces one under another, 5 mm apart.
         const double Gap = 5;
         double totalW = maps.Max(m => m.Piece.WidthMm), totalH = maps.Sum(m => m.Piece.HeightMm) + Gap * (maps.Count - 1);
-        Vec2 origin = at ?? (totalW <= machine.FieldW && totalH <= machine.FieldH
-            ? new Vec2((machine.FieldW - totalW) / 2, (machine.FieldH - totalH) / 2)
-            : new Vec2(5, 5));
+        Vec2 origin;
+        if (rotary)
+        {
+            // Once round, centred on the row that faces the laser at the start (so it fits the rotary's area exactly).
+            double y0;
+            (state, y0) = RotaryRows(state, plan.SizeH);
+            origin = new Vec2(at?.X ?? (totalW <= machine.FieldW ? (machine.FieldW - totalW) / 2 : 0), y0);
+        }
+        else
+            origin = at ?? (totalW <= machine.FieldW && totalH <= machine.FieldH
+                ? new Vec2((machine.FieldW - totalW) / 2, (machine.FieldH - totalH) / 2)
+                : new Vec2(5, 5));
         string set = Guid.NewGuid().ToString("N");
         string json = spec.ToJson();
         var shapes = new List<Shape>();
@@ -70,13 +95,14 @@ public static class BorderOutput
         foreach (var (piece, map) in maps)
         {
             var move = Affine.Translate(origin.X, y);
-            string name = maps.Count == 1 ? $"Border · {spec.Design.Name}" : $"Border · {spec.Design.Name} · {piece.Name.ToLowerInvariant()}";
+            string name = rotary ? $"Rotary wrap · {spec.Design.Name}"
+                : maps.Count == 1 ? $"Border · {spec.Design.Name}" : $"Border · {spec.Design.Name} · {piece.Name.ToLowerInvariant()}";
             shapes.Add(new ImageShape
             {
                 Name = name, LayerId = layer.Id, Source = ImageSource.FromEncoded(map.EncodePng()),
                 SizeMm = new Vec2(piece.WidthMm, piece.HeightMm), Transform = move,
             }.WithAddonData(SpecKey, json).WithAddonData(SetKey, set));
-            if (spec.CutLines)
+            if (spec.CutLines && !rotary)
             {
                 if (cut is null) (state, cut) = CutLayer(state);
                 var lines = plan.CutLines(piece);
@@ -89,6 +115,19 @@ public static class BorderOutput
         var ids = shapes.Select(s => s.Id).ToList();
         if (ids.Count > 1) state = Ops.Group(state, ids.ToHashSet()).State;
         return (state, ids, layer.Id);
+    }
+
+    /// <summary>
+    /// Where a wrap goes on the page: once round (<paramref name="circumference"/>) with the row that faces the laser
+    /// at the start in its middle. That's the rotary start line if the page has one; else one is put at half way
+    /// round, where the job would start anyway, so the picture lands exactly on the rotary's area (and not a
+    /// rounding of the page's height off it). The design and the top row of the picture (Y).
+    /// </summary>
+    public static (DocState State, double Top) RotaryRows(DocState state, double circumference)
+    {
+        if (state.Guides.FirstOrDefault(g => g.RotaryStart && !g.Vertical) is { } start)
+            return (state, start.At - circumference / 2);
+        return (state with { Guides = state.Guides.Add(new Guide(false, circumference / 2) { RotaryStart = true }) }, 0);
     }
 
     /// <summary>The design's Cut layer (the first one that's shown and not locked), or a new one.</summary>
