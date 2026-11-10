@@ -683,7 +683,7 @@ public static class JobBuilder
         {
             for (end = start + 1; end < blocks.Count && blockLayer[end].Id == blockLayer[start].Id; end++) { }
             // Passes written out one block each (heat order, step-down) count once.
-            times.Add(new(blockLayer[start].Id, blocks.Skip(start).Take(end - start).Sum(Job.BlockSeconds), Math.Max(1, blocks.Skip(start).Take(end - start).Max(b => b.Laser.Passes))));
+            times.Add(new(blockLayer[start].Id, blocks.Skip(start).Take(end - start).Sum(b => Job.BlockSeconds(b, opt.Mode)), Math.Max(1, blocks.Skip(start).Take(end - start).Max(b => b.Laser.Passes))));
         }
 
         if (blocks.Count == 0)
@@ -932,7 +932,7 @@ public static class JobBuilder
         warnings.Add($"Spread the heat: {reordered:N0} of {units.Count:N0} parts reordered (each layer, or each separate shape on an engrave or picture layer), " +
                      $"each starting on {metal} at most about +{plan.PeakC:0} °C warmer than at the start (estimated, on a {plan.CellMm:0.##} mm grid)" +
                      (plan.WaitS > 0.05 ? $", {Hours(plan.WaitS)} of waits added to let it cool." : ", no waits needed."));
-        double work = blocks.Sum(Job.AllPassesSeconds) - plan.WaitS;
+        double work = blocks.Sum(b => Job.AllPassesSeconds(b)) - plan.WaitS;
         if (plan.OneUnitC > h.LimitC)
             warnings.Add($"Spread the heat: the cut \"{hottest}\" warms the {metal} about +{plan.OneUnitC:0} °C on its own, more than the +{h.LimitC:0} °C allowed. " +
                          "No order can fix that, so the job waits until each spot it cuts is nearly cold. A heat sink helps most: tape or clamp the plate to a metal block (and say so under How it's held). Or lower the power, go faster, or allow more warming.");
@@ -949,7 +949,7 @@ public static class JobBuilder
         var spans = new List<BuiltJob.RunSpan>();
         // The machine takes a moment to start before anything is marked.
         double t = Job.StartS;
-        var sec = job.Blocks.Select(Job.BlockSeconds).ToList();
+        var sec = job.Blocks.Select(b => Job.BlockSeconds(b, job.Mode)).ToList();
         if (job.PassMode is PassMode.Rounds r)
         {
             int rounds = job.Rounds;
@@ -958,7 +958,7 @@ public static class JobBuilder
                 for (int i = 0; i < job.Blocks.Count; i++)
                 {
                     if (job.Blocks[i].Laser.Passes < round) continue;
-                    double d = Job.PassSeconds(job.Blocks[i], round);
+                    double d = Job.PassSeconds(job.Blocks[i], round, job.Mode);
                     spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d));
                     t += d;
                 }
@@ -972,7 +972,7 @@ public static class JobBuilder
         else
             for (int i = 0; i < job.Blocks.Count; i++)
             {
-                double d = Job.AllPassesSeconds(job.Blocks[i]);
+                double d = Job.AllPassesSeconds(job.Blocks[i], job.Mode);
                 spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, sec[i]));
                 t += d;
             }

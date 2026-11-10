@@ -92,3 +92,33 @@ public class OutsideAreaTests
         Assert.Equal([edge.Id], e.ShapeIds);
     }
 }
+
+/// <summary>Kyle, 2026-11-10: a rotary carve estimated at 38.6 min ran 54.5: the part turning between lines wasn't counted.</summary>
+public class RotaryEstimateTests
+{
+    static DocState Square(LayerMode mode)
+    {
+        var s = DocState.New();
+        var layer = Layer.Default(1, mode) with { LinesPerCm = 100, FillAngleDeg = 0 };
+        s = Ops.AddLayer(s, layer);
+        return Ops.AddShapes(s, [new PathShape { LayerId = layer.Id, Geometry = PathGeometry.Rect(100, 40, 40, 20) }]);
+    }
+
+    [Fact]
+    public void On_the_rotary_each_line_adds_the_turn_to_the_next()
+    {
+        var s = Square(LayerMode.Fill);
+        double circ = Math.PI * 32.6;
+        var rotary = new JobOptions { Mode = new WorkMode.Rotary(32 / circ, 1, circ), Machine = MachineProfile.F2Ultra with { FieldH = Math.Round(circ, 2) } };
+        var flat = JobBuilder.Build(s, new JobOptions());
+        var round = JobBuilder.Build(s, rotary);
+        var fill = Assert.IsType<FillBlock>(Assert.Single(round.Job.Blocks));
+        int lines = Job.FillLines(fill).Count;
+        Assert.InRange(lines, 190, 210);
+        // About 32 ms a line more (and the 20 mm round at the layer's speed, not the galvo's jump).
+        Assert.InRange(round.EstimateS - flat.EstimateS, (lines - 1) * Job.RotaryStepS, (lines - 1) * Job.RotaryStepS + 1);
+        // The layer times and the run's timeline add up to it, so progress follows.
+        Assert.Equal(round.EstimateS, Job.StartS + round.LayerTimes.Sum(t => t.TotalSeconds), 6);
+        Assert.Equal(round.EstimateS, round.Timeline[^1].End, 6);
+    }
+}
