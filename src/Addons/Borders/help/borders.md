@@ -75,7 +75,7 @@ Gadrooned, Twisted gadroons, Egg and dart crown, Meander frieze, Acanthus frieze
 Billet, Dogtooth, Laurel garland, Wave frieze, Ribbon and reed, Bamboo edge, Barley twist, Shelf
 front and Linen chest.
 
-**Ornament bands** (39): one for each ornament in the [list of ornaments](#ornaments).
+**Ornament bands** (40): one for each ornament in the [list of ornaments](#ornaments).
 
 ## Size
 
@@ -141,11 +141,11 @@ hollow), **Bead** (a half-round standing up), **Cushion** (a broad, low rounded 
 | Kind | Ornaments |
 |---|---|
 | Classical | **Egg and dart**, **Dentils**, **Bead and reel**, **Pearls**, **Leaf and dart**, **Water leaf**, **Palmette**, **Acanthus**, **Laurel**, **Rosettes**, **Fluted frieze**, **Gadroons**, **Twisted gadroons** |
-| Keys and scrolls | **Greek key**, **Meander**, **Wave scroll**, **Guilloche** |
+| Keys and scrolls | **Greek key**, **Meander**, **Wave scroll** (a wavy stem with spirals curling off it), **Vitruvian scroll** (waves breaking into spirals, the running dog), **Guilloche** |
 | Twists and weaves | **Rope**, **Barley twist**, **Plait**, **Basketweave**, **Ribbon and stick**, **Bamboo** |
 | Medieval | **Billet**, **Dogtooth**, **Nailhead**, **Interlaced arches**, **Quatrefoils**, **Chevron** |
-| Natural and folk | **Shells**, **Ivy vine**, **Fish scale**, **Hearts**, **Stars**, **Lozenges**, **Herringbone** |
-| Textures | **Ripple**, **Waves**, **Hammered** |
+| Natural and folk | **Shells**, **Ivy vine**, **Fish scale** (rows of scales, each lying over the next), **Hearts**, **Stars**, **Lozenges**, **Herringbone** |
+| Textures | **Ripple**, **Waves**, **Hammered** (overlapping hammer marks, scattered over a long repeat so it joins round a frame without a seam) |
 
 All of them are drawn as original art for this program; the name under **Ornament** says what each
 one is when you pick it.
