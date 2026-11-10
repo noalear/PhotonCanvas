@@ -30,6 +30,15 @@ public sealed class BorderView : Control
     CancellationTokenSource? _cancel;
     int _generation;
     IReadOnlyList<double> _splits = [];
+    bool _onPart;
+    double _turnMm;
+
+    bool Rotary => _plan?.Spec.Layout == BorderLayout.Rotary;
+    /// <summary>Seeing a rotary wrap round the part, as the laser sees it from above (else it's shown unrolled).</summary>
+    bool ShowingPart => _onPart && Rotary;
+    /// <summary>The size of what's shown (mm): the border's box, or the part's length by its Ø.</summary>
+    double WorldW => _plan?.SizeW ?? 1;
+    double WorldH => _plan is null ? 1 : ShowingPart ? _plan.Spec.PartDiameterMm : _plan.SizeH;
 
     public BorderView()
     {
@@ -41,8 +50,9 @@ public sealed class BorderView : Control
     /// <summary>Shows a border (or, with none, why there's nothing to show). Keeps the view where it was unless it was fitted.</summary>
     public void Show(BorderPlan? plan, string? message = null)
     {
-        bool sizeChanged = plan is null || _plan is null || Math.Abs(plan.SizeW - _plan.SizeW) > 1e-6 || Math.Abs(plan.SizeH - _plan.SizeH) > 1e-6;
+        double w = WorldW, h = WorldH;
         _plan = plan;
+        bool sizeChanged = plan is null || Math.Abs(WorldW - w) > 1e-6 || Math.Abs(WorldH - h) > 1e-6;
         _message = message;
         _splits = plan is null ? [] : plan.Pieces().Where(p => !p.IsSide && p.From > 0).Select(p => p.From).ToList();
         if (plan is null) { Drop(); InvalidateVisual(); return; }
@@ -56,13 +66,20 @@ public sealed class BorderView : Control
         set { if (_look == value) return; _look = value; Schedule(); }
     }
 
+    /// <summary>A rotary wrap is shown round the part (true) or unrolled. Dragging up and down turns the part.</summary>
+    public bool OnThePart
+    {
+        get => _onPart;
+        set { if (_onPart == value) return; _onPart = value; _turnMm = 0; Drop(); Fit(); }
+    }
+
     /// <summary>Back to seeing the whole border.</summary>
     public void Fit()
     {
         _fitted = true;
         if (_plan is null || Bounds.Width < 10 || Bounds.Height < 10) return;
-        _scale = Math.Min((Bounds.Width - 24) / _plan.SizeW, (Bounds.Height - 24) / _plan.SizeH);
-        _centre = new Point(_plan.SizeW / 2, _plan.SizeH / 2);
+        _scale = Math.Min((Bounds.Width - 24) / WorldW, (Bounds.Height - 24) / WorldH);
+        _centre = new Point(WorldW / 2, WorldH / 2);
         Schedule();
         InvalidateVisual();
     }
@@ -94,17 +111,20 @@ public sealed class BorderView : Control
         // What's in view, cut to the border's own box.
         var tl = ToWorld(new Point(0, 0));
         var br = ToWorld(new Point(Bounds.Width, Bounds.Height));
-        double x0 = Math.Max(0, tl.X), y0 = Math.Max(0, tl.Y), x1 = Math.Min(plan.SizeW, br.X), y1 = Math.Min(plan.SizeH, br.Y);
+        double x0 = Math.Max(0, tl.X), y0 = Math.Max(0, tl.Y), x1 = Math.Min(WorldW, br.X), y1 = Math.Min(WorldH, br.Y);
         if (x1 <= x0 || y1 <= y0) return;
         double mmPerPx = 1 / (_scale * dpr);
         int cols = Math.Clamp((int)Math.Ceiling((x1 - x0) / mmPerPx), 1, 4000), rows = Math.Clamp((int)Math.Ceiling((y1 - y0) / mmPerPx), 1, 4000);
         mmPerPx = Math.Max((x1 - x0) / cols, (y1 - y0) / rows);
         var look = _look;
         var whole = new BorderPiece("", -1, 0, plan.SizeW, plan.SizeH);
+        bool part = ShowingPart;
+        double turn = _turnMm;
         try
         {
             var bmp = await Task.Run(() =>
             {
+                if (part) return CameraImaging.ToAvaloniaRgba(Shading.ShadeOnPart(plan, x0, y0, mmPerPx, cols, rows, look, turn, cancel.Token));
                 var h = plan.Render(whole, x0, y0, mmPerPx, cols, rows, cancel.Token);
                 if (plan.Spec.SoftenMm > 0) BorderPlan.Soften(h, cols, rows, plan.Spec.SoftenMm / mmPerPx);
                 cancel.Token.ThrowIfCancellationRequested();
@@ -144,7 +164,13 @@ public sealed class BorderView : Control
         base.OnPointerMoved(e);
         if (_dragFrom is not { } from || !(_scale > 0)) return;
         var p = e.GetPosition(this);
-        _centre -= (p - from) / _scale;
+        if (ShowingPart)
+        {
+            // Along the part it moves; up and down it turns, the surface following the pointer.
+            _centre -= new Point((p.X - from.X) / _scale, 0);
+            _turnMm -= (p.Y - from.Y) / _scale;
+        }
+        else _centre -= (p - from) / _scale;
         _dragFrom = p;
         _fitted = false;
         InvalidateVisual();
@@ -166,7 +192,7 @@ public sealed class BorderView : Control
         if (_plan is null || !(_scale > 0)) return;
         var p = e.GetPosition(this);
         var before = ToWorld(p);
-        double fit = Math.Min((Bounds.Width - 24) / _plan.SizeW, (Bounds.Height - 24) / _plan.SizeH);
+        double fit = Math.Min((Bounds.Width - 24) / WorldW, (Bounds.Height - 24) / WorldH);
         _scale = Math.Clamp(_scale * Math.Pow(1.25, e.Delta.Y), Math.Max(0.05, fit * 0.5), 200);
         var after = ToWorld(p);
         _centre += before - after;
@@ -194,6 +220,12 @@ public sealed class BorderView : Control
             var a = ToScreen(_bitmapWorld.X, _bitmapWorld.Y);
             var b = ToScreen(_bitmapWorld.Right, _bitmapWorld.Bottom);
             ctx.DrawImage(bmp, new Rect(bmp.Size), new Rect(a, b));
+        }
+        // Round a rotary part, unrolled: the row that faces the laser when the job starts.
+        if (Rotary && !ShowingPart)
+        {
+            var pen = new Pen(UiKit.Brush("Accent"), 1.2, new DashStyle([6, 4], 0));
+            ctx.DrawLine(pen, ToScreen(-2, _plan.SizeH / 2), ToScreen(_plan.SizeW + 2, _plan.SizeH / 2));
         }
         // Where a long strip is split into pieces.
         if (_splits.Count > 0)

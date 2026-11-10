@@ -39,7 +39,7 @@ public sealed class BordersWindow : Window
     CancellationTokenSource? _thumbCancel;
 
     // Size
-    readonly ComboBox _shape = Combo("A frame", "An oval or circle", "A strip");
+    readonly ComboBox _shape = Combo("A frame", "An oval or circle", "A strip", "A round part on the rotary");
     readonly ComboBox _sizeIs = Combo("The outside", "The opening");
     readonly NumericUpDown _fw = Number(10, 3000, 5, "0.#"), _fh = Number(10, 3000, 5, "0.#");
     readonly ComboBox _corners = Combo("Mitred", "Corner blocks", "Rounded");
@@ -52,6 +52,18 @@ public sealed class BordersWindow : Window
     readonly CheckBox _motifCorners = new() { Content = "A motif on each corner" };
     readonly CheckBox _centre = new() { Content = "A whole motif in the middle of each side", IsChecked = true };
     Control _frameRows = null!, _stripRows = null!, _radiusRow = null!, _cornerRow = null!, _middleRow = null!;
+
+    // Round a rotary part
+    readonly NumericUpDown _partD = Number(2, 119, 0.5m, "0.##");
+    readonly Button _useWorkMode = Button("Use Work mode's", tip: "The Object Ø Machine → Work mode → Rotary is set to.");
+    readonly ComboBox _wrap = Combo("Round it (rings)", "Along it (flutes)", "A spiral along it");
+    readonly NumericUpDown _rings = Number(1, 60, 1, "0"), _round = Number(1, 60, 1, "0"), _starts = Number(1, 60, 1, "0");
+    readonly NumericUpDown _gap = Number(0, 500, 1, "0.#"), _wrapLength = Number(5, 1000, 5, "0.#");
+    readonly CheckBox _mirrored = new() { Content = "Mirrored pair (inner edges meet in the middle)" };
+    readonly CheckBox _turned = new() { Content = "Turned round (the outer edge on the other side)" };
+    readonly CheckBox _leftHand = new() { Content = "Twists the other way (left-handed)" };
+    readonly double? _workModeD;
+    Control _rotaryRows = null!, _ringsRow = null!, _roundRow = null!, _startsRow = null!, _gapRow = null!, _wrapLengthRow = null!, _widthRow = null!;
 
     // Bands
     readonly ProfileView _profile = new();
@@ -71,6 +83,8 @@ public sealed class BordersWindow : Window
     // Preview and results
     readonly BorderView _view = new();
     readonly ComboBox _look = Combo("Wood", "Gilt", "Metal", "Depth map");
+    readonly CheckBox _onPart = new() { Content = "On the part", IsChecked = true };
+    readonly TextBlock _viewHint = Muted("Scroll to zoom, drag to move");
     readonly TextBlock _summary = new() { TextWrapping = TextWrapping.Wrap };
     readonly TextBlock _warning = new() { TextWrapping = TextWrapping.Wrap, Foreground = Brush("Warn") };
     readonly TextBlock _busy = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } };
@@ -86,10 +100,13 @@ public sealed class BordersWindow : Window
     /// <summary>The layer the border was put on (null = it wasn't put in the design).</summary>
     public Guid? MadeOnLayer { get; private set; }
 
+    /// <param name="workModeDiameterMm">The Object Ø Machine → Work mode is set to, when it's the rotary (else null).</param>
+    /// <param name="rotary">Open on a border round a rotary part (Machine → Work area → Wrap a pattern).</param>
     public BordersWindow(Document doc, MachineProfile machine, string? dataFolder, Action<string>? status = null,
-        (BorderSpec Spec, HashSet<Guid> Ids, Vec2 TopLeft, Guid LayerId)? editing = null)
+        (BorderSpec Spec, HashSet<Guid> Ids, Vec2 TopLeft, Guid LayerId)? editing = null, double? workModeDiameterMm = null, bool rotary = false)
     {
         _doc = doc;
+        _workModeD = workModeDiameterMm;
         _machine = machine;
         _dataFolder = dataFolder;
         _status = status;
@@ -104,6 +121,18 @@ public sealed class BordersWindow : Window
         Background = Brush("Bg1");
 
         var spec = editing?.Spec ?? LastUsed.Load(dataFolder) ?? new BorderSpec();
+        if (editing is null && rotary)
+        {
+            // Wrapping round a part: an ornament band suits it better than a whole frame moulding.
+            spec = spec with
+            {
+                Layout = BorderLayout.Rotary,
+                PartDiameterMm = workModeDiameterMm ?? spec.PartDiameterMm,
+                Design = spec.Layout == BorderLayout.Rotary || spec.Design.Category != BorderPresets.Frames ? spec.Design : BorderPresets.All.First(d => d.Name == "Rope"),
+                WidthMm = spec.Layout == BorderLayout.Rotary ? spec.WidthMm : 0,
+                DepthMm = spec.Layout == BorderLayout.Rotary ? spec.DepthMm : 0,
+            };
+        }
         _design = spec.Design;
 
         var tabs = new TabControl
@@ -125,10 +154,13 @@ public sealed class BordersWindow : Window
         bar.Children.Add(new TextBlock { Text = "Show as", VerticalAlignment = VerticalAlignment.Center, Classes = { "muted" } });
         Grid.SetColumn(_look, 1);
         bar.Children.Add(_look);
-        var hint = Muted("Scroll to zoom, drag to move");
+        var hint = _viewHint;
         hint.VerticalAlignment = VerticalAlignment.Center;
-        Grid.SetColumn(hint, 2);
-        bar.Children.Add(hint);
+        _onPart.VerticalAlignment = VerticalAlignment.Center;
+        ToolTip.SetTip(_onPart, "See the border round the part, from above as the laser sees it (drag up and down to turn it). Off: the part unrolled, as the depth map is made; the dashed line faces the laser at the start.");
+        var mid = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12, Children = { _onPart, hint } };
+        Grid.SetColumn(mid, 2);
+        bar.Children.Add(mid);
         Grid.SetColumn(fit, 3);
         bar.Children.Add(fit);
 
@@ -170,6 +202,7 @@ public sealed class BordersWindow : Window
 
         Load(spec);
         Hook();
+        _view.OnThePart = _onPart.IsChecked == true;
         // The list fills when the category changes; it may already be the one wanted.
         int cat = Math.Max(0, BorderPresets.Categories.ToList().IndexOf(_design.Category));
         if (_category.SelectedIndex == cat) FillGallery(); else _category.SelectedIndex = cat;
@@ -243,6 +276,33 @@ public sealed class BordersWindow : Window
                 F("Longest piece", _maxPiece, "A strip longer than this is made in pieces that carry on from each other, to carve one after the other (mm). 0 = one piece."),
             },
         };
+        _useWorkMode.IsVisible = _workModeD is not null;
+        _useWorkMode.Click += (_, _) => { if (_workModeD is { } d) _partD.Value = (decimal)Math.Round(d, 2); };
+        _ringsRow = F("Rings", _rings, "How many rings along the part.");
+        _gapRow = F("Gap (mm)", _gap, "The plain space between one ring and the next, along the part.");
+        _roundRow = F("Copies round", _round, "How many copies side by side all the way round. Each is made as wide as fits, so they meet without a gap.");
+        _startsRow = F("Starts", _starts, "How many spirals wind round side by side: 1 is a single twist, 2 a double barley twist, and so on.");
+        _wrapLengthRow = F("Length (mm)", _wrapLength, "How far along the part the flutes or the spiral run.");
+        _rotaryRows = new StackPanel
+        {
+            Spacing = 8,
+            Children =
+            {
+                F("Part Ø (mm)", Row(_partD, _useWorkMode), "The part's diameter where the border goes. The pattern is made to go once round exactly this size, so it meets itself round the back: set Machine → Work mode's Object Ø to the same."),
+                F("Wraps", _wrap, "Round it: rings, the border's width along the part. Along it: copies running the length of the part side by side all the way round, like flutes. A spiral: the border winds along the part, like a barley twist or a rope."),
+                _ringsRow,
+                _gapRow,
+                _roundRow,
+                _startsRow,
+                _wrapLengthRow,
+                _mirrored,
+                _turned,
+                _leftHand,
+            },
+        };
+        ToolTip.SetTip(_mirrored, "Each copy is the design and its mirror image side by side, so it's the same both ways across: a frame moulding becomes a collar, an edge a bead.");
+        ToolTip.SetTip(_turned, "The design turned round across: its outer edge on the other side (with Mirrored pair, the outer edges meet in the middle instead).");
+        ToolTip.SetTip(_leftHand, "The spiral winds the other way, like a left-hand thread.");
         ToolTip.SetTip(_mitredEnds, "Cut both ends at 45° (the outer edge longest), to meet another strip at a corner.");
         ToolTip.SetTip(_four, "Make the frame as four sticks with mitred ends, each its own picture, to carve one at a time and glue up.");
         ToolTip.SetTip(_motifCorners, "Put a motif right on each corner (or each end of a strip). Off: the gap between two motifs sits there.");
@@ -252,14 +312,15 @@ public sealed class BordersWindow : Window
             Spacing = 8,
             Children =
             {
-                F("Goes round", _shape, "A frame (a rectangle), an oval or circle, or a straight strip for an edge or trim."),
+                F("Goes round", _shape, "A frame (a rectangle), an oval or circle, a straight strip for an edge or trim, or a round part turning in the rotary (a pen, a handle, a table leg)."),
+                _rotaryRows,
                 _frameRows,
                 _cornerRow,
                 _radiusRow,
                 _four,
                 _middleRow,
                 _stripRows,
-                F("Border width", _width, "How wide the border is across (mm). Every band is made wider or narrower in proportion."),
+                (_widthRow = F("Border width", _width, "How wide the border is across (mm). Every band is made wider or narrower in proportion.")),
                 F("Depth", _depth, "How deep the deepest part is carved below the surface (mm). Every height is scaled to suit."),
                 _motifCorners,
                 _centre,
@@ -335,7 +396,7 @@ public sealed class BordersWindow : Window
     {
         _loading = true;
         _design = s.Design;
-        _shape.SelectedIndex = s.Layout switch { BorderLayout.Oval => 1, BorderLayout.Strip => 2, _ => 0 };
+        _shape.SelectedIndex = s.Layout switch { BorderLayout.Oval => 1, BorderLayout.Strip => 2, BorderLayout.Rotary => 3, _ => 0 };
         _sizeIs.SelectedIndex = s.SizeIsOpening ? 1 : 0;
         _fw.Value = (decimal)s.FrameWidthMm;
         _fh.Value = (decimal)s.FrameHeightMm;
@@ -353,6 +414,15 @@ public sealed class BordersWindow : Window
         _ppm.Value = (decimal)s.PixelsPerMm;
         _soften.Value = (decimal)s.SoftenMm;
         _cutLines.IsChecked = s.CutLines;
+        _partD.Value = (decimal)Math.Clamp(Math.Round(s.PartDiameterMm, 2), 2, 119);
+        _wrap.SelectedIndex = (int)s.Wrap;
+        _rings.Value = _round.Value = _starts.Value = Math.Clamp(s.WrapCopies, 1, 60);
+        _gap.Value = (decimal)Math.Max(0, s.WrapGapMm);
+        _wrapLength.Value = (decimal)Math.Clamp(s.WrapLengthMm, 5, 1000);
+        _mirrored.IsChecked = s.WrapMirrored;
+        _turned.IsChecked = s.WrapTurned;
+        _leftHand.IsChecked = s.WrapLeftHand;
+        if (s.Layout == BorderLayout.Rotary && s.Wrap == WrapWay.Along) _width.Value = (decimal)Math.Round(s.Design.WidthMm, 2);
         _band = 0;
         _loading = false;
         ShowBands();
@@ -364,10 +434,20 @@ public sealed class BordersWindow : Window
     /// <summary>The design at the Border width and Depth set on the Size tab: the bands as they'll be made.</summary>
     BorderDesign Real() => Spec().Sized();
 
+    WrapWay Way => (WrapWay)Math.Max(0, _wrap.SelectedIndex);
+
     BorderSpec Spec() => new()
     {
         Design = _design,
-        Layout = _shape.SelectedIndex switch { 1 => BorderLayout.Oval, 2 => BorderLayout.Strip, _ => BorderLayout.Frame },
+        Layout = _shape.SelectedIndex switch { 1 => BorderLayout.Oval, 2 => BorderLayout.Strip, 3 => BorderLayout.Rotary, _ => BorderLayout.Frame },
+        PartDiameterMm = V(_partD, 25),
+        Wrap = Way,
+        WrapCopies = (int)V(Way switch { WrapWay.Along => _round, WrapWay.Spiral => _starts, _ => _rings }, 1),
+        WrapGapMm = V(_gap, 0),
+        WrapLengthMm = V(_wrapLength, 100),
+        WrapMirrored = _mirrored.IsChecked == true,
+        WrapTurned = _turned.IsChecked == true,
+        WrapLeftHand = _leftHand.IsChecked == true,
         WidthMm = V(_width, _design.WidthMm),
         DepthMm = V(_depth, _design.DepthMm),
         LengthMm = V(_length, 300),
@@ -389,13 +469,21 @@ public sealed class BordersWindow : Window
 
     void Hook()
     {
-        foreach (var n in new[] { _fw, _fh, _radius, _length, _maxPiece, _width, _depth, _ppm, _soften })
+        foreach (var n in new[] { _fw, _fh, _radius, _length, _maxPiece, _width, _depth, _ppm, _soften, _gap, _wrapLength })
             n.ValueChanged += (_, _) => Changed();
+        // These change how wide flutes round a part come out, so the bands are shown again.
+        foreach (var n in new[] { _partD, _rings, _round, _starts })
+            n.ValueChanged += (_, _) => { Changed(); if (!_loading && _shape.SelectedIndex == 3 && Way == WrapWay.Along) ShowBands(); };
+        foreach (var c in new[] { _mirrored, _turned, _leftHand })
+            c.IsCheckedChanged += (_, _) => { Changed(); if (!_loading && _shape.SelectedIndex == 3 && Way == WrapWay.Along) ShowBands(); };
+        _wrap.SelectionChanged += (_, _) => { ShowRows(); Changed(); if (!_loading) ShowBands(); };
+        _onPart.IsCheckedChanged += (_, _) => { _view.OnThePart = _onPart.IsChecked == true; ShowRows(); };
         // The bands are shown at the border's width and depth.
         foreach (var n in new[] { _width, _depth })
             n.ValueChanged += (_, _) => { if (!_loading) ShowBands(); };
-        foreach (var c in new[] { _shape, _sizeIs, _corners, _middle })
+        foreach (var c in new[] { _sizeIs, _corners, _middle })
             c.SelectionChanged += (_, _) => { ShowRows(); Changed(); };
+        _shape.SelectionChanged += (_, _) => { ShowRows(); Changed(); if (!_loading) ShowBands(); };
         foreach (var c in new[] { _four, _mitredEnds, _motifCorners, _centre, _cutLines })
             c.IsCheckedChanged += (_, _) => Changed();
         _look.SelectionChanged += (_, _) => _view.Look = (PreviewLook)Math.Max(0, _look.SelectedIndex);
@@ -418,15 +506,29 @@ public sealed class BordersWindow : Window
     void ShowRows()
     {
         int shape = _shape.SelectedIndex;
-        _frameRows.IsVisible = shape != 2;
+        bool rotary = shape == 3;
+        var way = Way;
+        _frameRows.IsVisible = shape is 0 or 1;
         _cornerRow.IsVisible = shape == 0;
         _radiusRow.IsVisible = shape == 0 && _corners.SelectedIndex == 2;
         _four.IsVisible = shape == 0 && _corners.SelectedIndex == 0;
-        _middleRow.IsVisible = shape != 2;
+        _middleRow.IsVisible = shape is 0 or 1;
         _stripRows.IsVisible = shape == 2;
-        _motifCorners.Content = shape == 2 ? "A motif on each end" : "A motif on each corner";
-        _motifCorners.IsVisible = shape == 2 || (shape == 0 && _corners.SelectedIndex == 0);
-        _centre.Content = shape == 2 ? "A whole motif in the middle" : shape == 0 && _corners.SelectedIndex != 2 ? "A whole motif in the middle of each side" : "A whole motif at the top, bottom and sides";
+        _rotaryRows.IsVisible = rotary;
+        _ringsRow.IsVisible = _gapRow.IsVisible = way == WrapWay.Round;
+        _roundRow.IsVisible = way == WrapWay.Along;
+        _startsRow.IsVisible = _leftHand.IsVisible = way == WrapWay.Spiral;
+        _wrapLengthRow.IsVisible = way != WrapWay.Round;
+        // Flutes are made as wide as fits round the part.
+        _widthRow.IsEnabled = !(rotary && way == WrapWay.Along);
+        _cutLines.IsVisible = !rotary;
+        _onPart.IsVisible = rotary;
+        _viewHint.Text = rotary && _onPart.IsChecked == true ? "Drag up and down to turn it, scroll to zoom" : "Scroll to zoom, drag to move";
+        _motifCorners.Content = shape == 2 || rotary ? "A motif on each end" : "A motif on each corner";
+        _motifCorners.IsVisible = shape == 2 || (shape == 0 && _corners.SelectedIndex == 0) || (rotary && way == WrapWay.Along);
+        _centre.Content = rotary ? (way == WrapWay.Round ? "A whole motif facing the laser at the start" : "A whole motif in the middle")
+            : shape == 2 ? "A whole motif in the middle" : shape == 0 && _corners.SelectedIndex != 2 ? "A whole motif in the middle of each side" : "A whole motif at the top, bottom and sides";
+        _centre.IsVisible = !(rotary && way == WrapWay.Spiral);
     }
 
     void Changed()
@@ -513,14 +615,17 @@ public sealed class BordersWindow : Window
     void Pick()
     {
         if (_loading || _gallery.SelectedItem is not Grid { Tag: BorderDesign d }) return;
-        bool wasFrame = _shape.SelectedIndex != 2;
+        bool wasFrame = _shape.SelectedIndex is 0 or 1;
         _loading = true;
         _design = d;
         _width.Value = (decimal)Math.Round(d.WidthMm, 2);
         _depth.Value = (decimal)Math.Round(d.DepthMm, 2);
-        // Frames go round; edges are strips. Bands and your own keep what you had.
-        if (d.Category == BorderPresets.Frames && !wasFrame) _shape.SelectedIndex = 0;
-        if (d.Category == BorderPresets.Edges && wasFrame) _shape.SelectedIndex = 2;
+        // Frames go round; edges are strips. Bands and your own keep what you had, and so does a rotary part.
+        if (_shape.SelectedIndex != 3)
+        {
+            if (d.Category == BorderPresets.Frames && !wasFrame) _shape.SelectedIndex = 0;
+            if (d.Category == BorderPresets.Edges && wasFrame) _shape.SelectedIndex = 2;
+        }
         _loading = false;
         _about.Text = d.About;
         _myName.Text = d.Category == BorderPresets.MyDesigns ? d.Name : "";
@@ -655,7 +760,7 @@ public sealed class BordersWindow : Window
         string name = _design.Category == BorderPresets.MyDesigns || _design.Name.EndsWith(" (changed)") ? _design.Name : _design.Name + " (changed)";
         _design = _design with { Bands = bands, Name = name };
         _loading = true;
-        _width.Value = (decimal)Math.Round(Math.Max(1, _design.WidthMm), 2);
+        if (!(_shape.SelectedIndex == 3 && Way == WrapWay.Along)) _width.Value = (decimal)Math.Round(Math.Max(1, _design.WidthMm), 2);
         _depth.Value = (decimal)Math.Round(Math.Max(0.05, _design.DepthMm), 2);
         _loading = false;
         if (_myName.Text is null or "") _myName.Text = name.Replace(" (changed)", " (mine)");
@@ -692,6 +797,9 @@ public sealed class BordersWindow : Window
         string depth = $"carved up to {plan.Top - plan.Lowest:0.##} mm deep";
         switch (s.Layout)
         {
+            case BorderLayout.Rotary:
+                lines.Add(RotarySummary(plan, depth));
+                break;
             case BorderLayout.Strip:
                 lines.Add($"{plan.Design.Name}: a strip {plan.SizeW:0.#} mm long and {plan.Width:0.#} mm wide, {depth}.");
                 break;
@@ -709,6 +817,13 @@ public sealed class BordersWindow : Window
                 lines.Add(runs[0].Repeats == runs[1].Repeats
                     ? $"{name}: {runs[0].Repeats} on each side, {runs[0].PitchMm:0.#} mm apart."
                     : $"{name}: {runs[0].Repeats} along the top and bottom ({runs[0].PitchMm:0.#} mm apart), {runs[1].Repeats} down each side ({runs[1].PitchMm:0.#} mm).");
+            else if (s.Layout == BorderLayout.Rotary)
+                lines.Add(s.Wrap switch
+                {
+                    WrapWay.Along => $"{name}: {runs[0].Repeats} along each copy, {runs[0].PitchMm:0.#} mm apart.",
+                    WrapWay.Spiral => $"{name}: {runs[0].Repeats} each time round, {runs[0].PitchMm:0.#} mm apart along the spiral, so it carries on unbroken.",
+                    _ => $"{name}: {runs[0].Repeats} round the part, {runs[0].PitchMm:0.#} mm apart, meeting itself round the back.",
+                });
             else
                 lines.Add($"{name}: {runs[0].Repeats} {(s.Layout == BorderLayout.Strip ? "along it" : "all the way round")}, {runs[0].PitchMm:0.#} mm apart.");
         }
@@ -722,6 +837,21 @@ public sealed class BordersWindow : Window
         return string.Join("\n", lines);
     }
 
+    /// <summary>What a rotary wrap is, in a sentence.</summary>
+    static string RotarySummary(BorderPlan plan, string depth)
+    {
+        var s = plan.Spec;
+        int k = Math.Max(1, s.WrapCopies);
+        string part = $"a Ø {s.PartDiameterMm:0.##} mm part ({plan.SizeH:0.#} mm round)";
+        string pair = s.WrapMirrored ? " (the design and its mirror image)" : "";
+        return s.Wrap switch
+        {
+            WrapWay.Along => $"{plan.Design.Name}: {k} cop{(k == 1 ? "y" : "ies")}{pair} side by side round {part}, each {plan.Width * (s.WrapMirrored ? 2 : 1):0.##} mm wide to fit, {plan.SizeW:0.#} mm along it, {depth}.",
+            WrapWay.Spiral => $"{plan.Design.Name}: a {(k == 1 ? "single" : $"{k}-start")} {(s.WrapLeftHand ? "left" : "right")}-handed spiral{pair} round {part}, {plan.Width * (s.WrapMirrored ? 2 : 1):0.#} mm across each band, one turn every {plan.SpiralLeadMm:0.#} mm along it ({Math.Atan2(plan.SizeH, plan.SpiralLeadMm) * 180 / Math.PI:0}° to the part's length), {plan.SizeW:0.#} mm long, {depth}.",
+            _ => $"{plan.Design.Name}: {(k == 1 ? "a ring" : $"{k} rings")}{pair} round {part}, {plan.Width * (s.WrapMirrored ? 2 : 1):0.#} mm wide{(k > 1 ? $" with {s.WrapGapMm:0.#} mm between" : "")}, {plan.SizeW:0.#} mm along it, {depth}.",
+        } + " The picture is the part unrolled, once round: it goes in the design centred on the rotary start line.";
+    }
+
     string Warnings(BorderPlan plan)
     {
         var s = plan.Spec;
@@ -729,6 +859,16 @@ public sealed class BordersWindow : Window
         double fw = _machine.FieldW, fh = _machine.FieldH;
         var pieces = plan.Pieces();
         bool fits = pieces.All(p => (p.WidthMm <= fw && p.HeightMm <= fh) || (p.WidthMm <= fh && p.HeightMm <= fw));
+        if (s.Layout == BorderLayout.Rotary)
+        {
+            fits = true;
+            if (plan.SizeW > fw)
+                w.Add($"It's {plan.SizeW:0} mm along the part, more than the laser reaches across ({fw:0} mm): make it shorter (or fewer rings).");
+            if (_workModeD is not { } wd)
+                w.Add($"Machine → Work mode isn't the rotary: set it to Rotary with Object Ø {s.PartDiameterMm:0.##} mm before you send it.");
+            else if (Math.Abs(Math.PI * wd - plan.SizeH) > RotaryWrapCheck.ToleranceMm)
+                w.Add($"Machine → Work mode's Object Ø is {wd:0.##} mm, but this is made for Ø {s.PartDiameterMm:0.##} mm: click Use Work mode's (or change Object Ø), or the pattern won't meet itself round the back.");
+        }
         if (!fits)
         {
             string fix = s.Layout switch
@@ -785,7 +925,9 @@ public sealed class BordersWindow : Window
         _doc.Commit(_editing is null ? "Border" : "Change border", next, ids);
         MadeOnLayer = layerId;
         LastUsed.Store(_dataFolder, plan.Spec);
-        _status?.Invoke($"Border: {plan.Design.Name}, {plan.SizeW:0.#} × {plan.SizeH:0.#} mm, on the layer \"{next.Layers.First(l => l.Id == layerId).Name}\" (depth slices).");
+        _status?.Invoke(plan.Spec.Layout == BorderLayout.Rotary
+            ? $"Rotary wrap: {plan.Design.Name}, {plan.SizeW:0.#} mm along a Ø {plan.Spec.PartDiameterMm:0.##} mm part, on the layer \"{next.Layers.First(l => l.Id == layerId).Name}\" (depth slices). Machine → Work mode: Rotary, Object Ø {plan.Spec.PartDiameterMm:0.##} mm."
+            : $"Border: {plan.Design.Name}, {plan.SizeW:0.#} × {plan.SizeH:0.#} mm, on the layer \"{next.Layers.First(l => l.Id == layerId).Name}\" (depth slices).");
         Close();
     }
 

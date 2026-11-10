@@ -23,12 +23,6 @@ public static class Shading
         if (look == PreviewLook.DepthMap) return BorderPlan.DepthMap(h, cols, rows, top, lowest);
         var px = new byte[cols * rows * 4];
         double range = Math.Max(1e-9, top - lowest);
-        // Light from the top left and a little in front.
-        double lx = -0.55, ly = -0.65, lz = 0.9, ln = Math.Sqrt(lx * lx + ly * ly + lz * lz);
-        lx /= ln; ly /= ln; lz /= ln;
-        // Half way between the light and the eye (straight above), for the shine.
-        double hx = lx, hy = ly, hz = lz + 1, hn = Math.Sqrt(hx * hx + hy * hy + hz * hz);
-        hx /= hn; hy /= hn; hz /= hn;
         Parallel.For(0, rows, r =>
         {
             for (int c = 0; c < cols; c++)
@@ -45,34 +39,92 @@ public static class Shading
                 double dx = (Z(c + 1, r) - Z(c - 1, r)) / (2 * mmPerPx), dy = (Z(c, r + 1) - Z(c, r - 1)) / (2 * mmPerPx);
                 double nx = -dx, ny = -dy, nz = 1, nn = Math.Sqrt(nx * nx + ny * ny + 1);
                 nx /= nn; ny /= nn; nz /= nn;
-                double diffuse = Math.Max(0, nx * lx + ny * ly + nz * lz);
-                double spec = Math.Pow(Math.Max(0, nx * hx + ny * hy + nz * hz), 24);
-                double depth = Math.Clamp((top - z) / range, 0, 1);
-                double rr2, gg, bb;
-                switch (look)
-                {
-                    case PreviewLook.Gilt:
-                        {
-                            double k = 0.28 + 0.78 * diffuse - 0.12 * depth;
-                            rr2 = 214 * k + 255 * 0.55 * spec; gg = 170 * k + 235 * 0.55 * spec; bb = 84 * k + 170 * 0.5 * spec;
-                            break;
-                        }
-                    case PreviewLook.Metal:
-                        {
-                            double k = 0.3 + 0.7 * diffuse - 0.2 * depth;
-                            rr2 = 176 * k + 255 * 0.45 * spec; gg = 181 * k + 255 * 0.45 * spec; bb = 188 * k + 255 * 0.45 * spec;
-                            break;
-                        }
-                    default:
-                        {
-                            // Laser-carved wood: pale at the surface, browner the deeper it's burned.
-                            double k = 0.42 + 0.68 * diffuse;
-                            double w = Math.Pow(depth, 0.7);
-                            rr2 = Carve.Lerp(232, 150, w) * k; gg = Carve.Lerp(200, 98, w) * k; bb = Carve.Lerp(152, 56, w) * k;
-                            break;
-                        }
-                }
+                var (rr2, gg, bb) = Colour(look, nx, ny, nz, (top - z) / range);
                 px[o] = (byte)Math.Clamp(rr2, 0, 255);
+                px[o + 1] = (byte)Math.Clamp(gg, 0, 255);
+                px[o + 2] = (byte)Math.Clamp(bb, 0, 255);
+                px[o + 3] = 255;
+            }
+        });
+        return new RasterImage(cols, rows, px);
+    }
+
+    // Light from the top left and a little in front, and half way between it and the eye (straight above) for the shine.
+    static readonly (double X, double Y, double Z) Light = Unit(-0.55, -0.65, 0.9), Half = Unit(-0.55 / L0, -0.65 / L0, 0.9 / L0 + 1);
+    static double L0 => Math.Sqrt(0.55 * 0.55 + 0.65 * 0.65 + 0.9 * 0.9);
+
+    static (double, double, double) Unit(double x, double y, double z)
+    {
+        double n = Math.Sqrt(x * x + y * y + z * z);
+        return (x / n, y / n, z / n);
+    }
+
+    /// <summary>The colour of a spot facing (<paramref name="nx"/>, <paramref name="ny"/>, <paramref name="nz"/>), <paramref name="depth"/> of the way down (0 the surface, 1 the deepest).</summary>
+    static (double R, double G, double B) Colour(PreviewLook look, double nx, double ny, double nz, double depth)
+    {
+        double diffuse = Math.Max(0, nx * Light.X + ny * Light.Y + nz * Light.Z);
+        double spec = Math.Pow(Math.Max(0, nx * Half.X + ny * Half.Y + nz * Half.Z), 24);
+        depth = Math.Clamp(depth, 0, 1);
+        switch (look)
+        {
+            case PreviewLook.Gilt:
+                {
+                    double k = 0.28 + 0.78 * diffuse - 0.12 * depth;
+                    return (214 * k + 255 * 0.55 * spec, 170 * k + 235 * 0.55 * spec, 84 * k + 170 * 0.5 * spec);
+                }
+            case PreviewLook.Metal:
+                {
+                    double k = 0.3 + 0.7 * diffuse - 0.2 * depth;
+                    return (176 * k + 255 * 0.45 * spec, 181 * k + 255 * 0.45 * spec, 188 * k + 255 * 0.45 * spec);
+                }
+            case PreviewLook.DepthMap:
+                {
+                    double g = 255 * (1 - depth);
+                    return (g, g, g);
+                }
+            default:
+                {
+                    // Laser-carved wood: pale at the surface, browner the deeper it's burned.
+                    double k = 0.42 + 0.68 * diffuse;
+                    double w = Math.Pow(depth, 0.7);
+                    return (Carve.Lerp(232, 150, w) * k, Carve.Lerp(200, 98, w) * k, Carve.Lerp(152, 56, w) * k);
+                }
+        }
+    }
+
+    /// <summary>
+    /// A border wrapped round a rotary part, seen from above as the laser sees it: <paramref name="cols"/> × <paramref name="rows"/>
+    /// pixels of <paramref name="mmPerPx"/>, the first one's corner at <paramref name="x0"/> along the part and <paramref name="v0"/>
+    /// across it (0 = its far edge, the part's Ø the near one). The row that faces the laser at the start is in the middle,
+    /// unless the part is turned <paramref name="turnMm"/> round (mm on its surface). Plain where the border isn't carved.
+    /// </summary>
+    public static RasterImage ShadeOnPart(BorderPlan plan, double x0, double v0, double mmPerPx, int cols, int rows, PreviewLook look, double turnMm, CancellationToken ct = default)
+    {
+        var px = new byte[cols * rows * 4];
+        double r0 = plan.Spec.PartDiameterMm / 2, c = plan.SizeH, top = plan.Top;
+        double range = Math.Max(1e-9, top - plan.Lowest), e = Math.Max(0.02, mmPerPx * 0.7);
+        double H(double x, double y)
+        {
+            double h = plan.HeightAt(Math.Clamp(x, 0, plan.SizeW), y - Math.Floor(y / c) * c);
+            return double.IsNaN(h) ? top : h;
+        }
+        Parallel.For(0, rows, new ParallelOptions { CancellationToken = ct }, r =>
+        {
+            double v = v0 + (r + 0.5) * mmPerPx - r0;
+            if (Math.Abs(v) >= r0) return;
+            double phi = Math.Asin(v / r0), sin = v / r0, cos = Math.Cos(phi);
+            double y = c / 2 + turnMm + r0 * phi;
+            for (int col = 0; col < cols; col++)
+            {
+                double x = x0 + (col + 0.5) * mmPerPx;
+                if (x < 0 || x > plan.SizeW) continue;
+                double h = H(x, y);
+                double hx = (H(x + e, y) - h) / e, hs = (H(x, y + e) - h) / e;
+                // The round surface's own slope, tipped by the carving's slopes along and round it.
+                double nx = -hx, ny = sin - hs * cos, nz = cos + hs * sin, n = Math.Sqrt(nx * nx + ny * ny + nz * nz);
+                var (rr, gg, bb) = Colour(look, nx / n, ny / n, nz / n, (top - h) / range);
+                int o = (r * cols + col) * 4;
+                px[o] = (byte)Math.Clamp(rr, 0, 255);
                 px[o + 1] = (byte)Math.Clamp(gg, 0, 255);
                 px[o + 2] = (byte)Math.Clamp(bb, 0, 255);
                 px[o + 3] = 255;
