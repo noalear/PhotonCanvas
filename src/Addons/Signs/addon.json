@@ -1,0 +1,10 @@
+{
+  "id": "signs",
+  "name": "Carved sign maker",
+  "version": "1.0.0",
+  "description": "House signs, name plaques and door signs: your words V-carved, sunk or raised on a rectangle, oval, arched or round sign, framed with a carved border from the border maker, with screw holes if you want them, made into a depth map to carve.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["borders"],
+  "onByDefault": true
+}
