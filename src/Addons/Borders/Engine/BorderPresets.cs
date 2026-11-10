@@ -137,7 +137,7 @@ public static class BorderPresets
         D(Edges, "Laurel garland", "Bay leaves wrapped round a torus.",
             B(2, 1.6), B(12, 2.6, Bead, 1.2, Laurel, 0.9), B(2, 1.6)),
         D(Edges, "Wave frieze", "A Vitruvian scroll between fillets.",
-            B(2, 2.0), B(14, 2.0, Flat, 0, WaveScroll, 1.2), B(2, 2.0)),
+            B(2, 2.0), B(14, 2.0, Flat, 0, Vitruvian, 1.2), B(2, 2.0)),
         D(Edges, "Ribbon and reed", "A ribbon wound round a rod.",
             B(2, 1.0), B(12, 2.4, Flat, 0, RibbonAndStick, 1.6), B(2, 1.0)),
         D(Edges, "Bamboo edge", "A bamboo cane along the edge.",

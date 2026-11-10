@@ -30,7 +30,8 @@ public static class Ornaments
         new(Ornament.BarleyTwist, "Barley twist", "Two deep strands twisting round, as on a barley-twist leg.", 1.6),
         new(Ornament.GreekKey, "Greek key", "Square spirals hooked off a running line: the key pattern.", 8.0 / 7.0),
         new(Ornament.Fret, "Meander", "One line folding back on itself: the simple Greek fret.", 1.6),
-        new(Ornament.WaveScroll, "Wave scroll", "Waves curling over into spirals: the Vitruvian scroll or running dog.", 1.4),
+        new(Ornament.WaveScroll, "Wave scroll", "A wavy stem curling off into spirals above and below it: a running scroll.", 1.5),
+        new(Ornament.Vitruvian, "Vitruvian scroll", "Waves rising from a base and breaking forward into spirals: the running dog.", 1.3),
         new(Ornament.Guilloche, "Guilloche", "Two strands weaving over and under round a row of studs.", 2.0),
         new(Ornament.Plait, "Plait", "Strands woven over and under, as Celtic knotwork does (2 to 5 strands).", 1.5, true),
         new(Ornament.Acanthus, "Acanthus", "Upright lobed acanthus leaves with a smaller leaf between.", 0.8),
@@ -50,7 +51,7 @@ public static class Ornaments
         new(Ornament.TwistedGadroon, "Twisted gadroons", "Gadroons swept into slanting S curves.", 0.45),
         new(Ornament.FlutesAcross, "Fluted frieze", "Short hollow flutes side by side across the band.", 0.4),
         new(Ornament.Arcade, "Interlaced arches", "Round arches on columns overlapping into pointed ones: a Romanesque arcade.", 1.0),
-        new(Ornament.FishScale, "Fish scale", "Overlapping round scales in rows (imbrication).", 0.7),
+        new(Ornament.FishScale, "Fish scale", "Overlapping round scales in rows, each row lying over the next (imbrication).", 1.0),
         new(Ornament.IvyVine, "Ivy vine", "A winding stem with ivy leaves and curling tendrils.", 2.0),
         new(Ornament.Lozenge, "Lozenges", "Faceted diamonds on a bar.", 1.3),
         new(Ornament.Bamboo, "Bamboo", "A bamboo cane with its rings.", 4.0),
@@ -60,7 +61,7 @@ public static class Ornaments
         new(Ornament.Stars, "Stars", "A row of faceted five-pointed stars.", 1.0),
         new(Ornament.Ripple, "Ripple", "Fine wavy ridges across the band: a Dutch ripple moulding.", 0.16),
         new(Ornament.Waves, "Waves", "Wavy lines running along the band.", 1.6, true),
-        new(Ornament.Hammered, "Hammered", "A hand-hammered texture of shallow dimples.", 1.0),
+        new(Ornament.Hammered, "Hammered", "A hand-hammered texture of shallow, overlapping dimples.", 6.0),
     ];
 
     static readonly Dictionary<Ornament, OrnamentInfo> ByKind = All.ToDictionary(o => o.Kind);
@@ -86,7 +87,8 @@ public static class Ornaments
             Ornament.BarleyTwist => Rope(u, v, s, 1.25, 0.15, 0.35),
             Ornament.GreekKey => Key(u, v, s, GreekKeyPath, 8, 7),
             Ornament.Fret => Key(u, v, s, FretPath, 8, 5),
-            Ornament.WaveScroll => WaveScroll(u, v, s),
+            Ornament.WaveScroll => RunningScroll(u, v, s),
+            Ornament.Vitruvian => Vitruvian(u, v, s),
             Ornament.Guilloche => Guilloche(u, v, s),
             Ornament.Plait => Plait(u, v, s),
             Ornament.Acanthus => Acanthus(x, y, s),
@@ -204,62 +206,105 @@ public static class Ornaments
         return Pillow(best - half, 0.45 * half);
     }
 
-    static double WaveScroll(double u, double v, in OrnamentScale s)
+    /// <summary>
+    /// The Vitruvian scroll (running dog), two-tone as it's carved: the "water" is a base along the
+    /// inner side and, rising from it, a tongue that climbs the wave's long back, goes over the crest
+    /// and curls forward into a tightening spiral. The carved background is the other tongue, curling
+    /// in from the trough under the crest. The water stands up with rounded edges.
+    /// </summary>
+    static double Vitruvian(double u, double v, in OrnamentScale s)
     {
-        double P = s.P, W = s.W;
-        double x = Frac(u) * P, y = v * W;
-        double best = double.MaxValue, body = double.MaxValue;
-        Span<double> pts = stackalloc double[WaveCurve.Length];
-        Span<double> poly = stackalloc double[WaveBody.Length];
+        double P = s.P, H = s.W;
+        double x = Centred(u) * P, y = v * H;
+        double curls = double.MaxValue;
         for (int shift = -1; shift <= 1; shift++)
-        {
-            for (int i = 0; i < WaveCurve.Length; i += 2) { pts[i] = (WaveCurve[i] + shift) * P; pts[i + 1] = WaveCurve[i + 1] * W; }
-            for (int i = 0; i < WaveBody.Length; i += 2) { poly[i] = (WaveBody[i] + shift) * P; poly[i + 1] = WaveBody[i + 1] * W; }
-            best = Math.Min(best, Polyline(x, y, pts));
-            body = Math.Min(body, Polygon(x, y, poly));
-        }
-        double half = 0.075 * Math.Min(P, W);
-        double line = Pillow(best - half, 0.6 * half);
-        double fill = Pillow(body, 0.08 * W) * 0.9;
-        double baseline = Pillow(0.88 * W - y, 0.04 * W);
-        return Math.Max(Math.Max(line, fill), baseline);
+            curls = Math.Min(curls, WaveCurl(x - shift * P, y, H));
+        // Blended into the base, so each wave sweeps up out of it and the troughs are rounded.
+        double water = SoftMin(WaveBase * H - y, curls, 0.14 * H);
+        return Pillow(water, 0.05 * H);
     }
 
-    static readonly double[] WaveCurve = MakeWaveCurve(out WaveBody);
-    static readonly double[] WaveBody;
+    const double WaveBase = 0.8;
 
-    /// <summary>One wave in unit squares (x along, y down): its back rising from the base line, curling over into a spiral.</summary>
-    static double[] MakeWaveCurve(out double[] body)
+    /// <summary>
+    /// The curling tongue of one wave (its spiral centred just right of x = 0), a signed distance roughly
+    /// in mm: it rises thick out of the base on the left, climbs over the crest and curls in, thinning.
+    /// </summary>
+    static double WaveCurl(double x, double y, double H)
     {
-        var curve = new List<double>();
-        var fill = new List<double> { -0.02, 0.92 };
-        double cx = 0.62, cy = 0.47, r0 = 0.33;
-        double t0 = -Math.PI * 0.62, turns = 1.3;
-        // The back of the wave: a smooth rise from the base line to the start of the curl.
-        double sx = cx + r0 * Math.Cos(t0), sy = cy + r0 * Math.Sin(t0) * 1.05;
-        for (int i = 0; i <= 16; i++)
+        const double Cx = 0.12, Cy = 0.45, Lean = 0.12, Back = 1.7;
+        const double R0 = 0.41, Gap = 0.24, Turns = 1.35, Start = 0.6 * Math.PI, Flare = 0.2;
+        const double End = Start + Turns * 2 * Math.PI;
+        // Into the spiral's own frame: leaning forward at the crest, its back drawn out long to the left.
+        double ly = y / H - Cy, lx = x / H - Cx + Lean * ly;
+        if (lx < 0) lx /= 1 + (Back - 1) * Smooth(0, 0.45, -lx);
+        double r = Math.Sqrt(lx * lx + ly * ly), a = Math.Atan2(ly, lx);
+        double best = double.MaxValue;
+        // Each turn of the arm that passes this way: its middle runs in by Gap a turn, and it flares
+        // out and thickens where it rises out of the base.
+        for (int k = (int)Math.Ceiling((Start - a) / (2 * Math.PI)); ; k++)
         {
-            double t = i / 16.0;
-            // A quadratic curve from (0, 0.9) through a control point to the curl's start.
-            double ax = 0.0, ay = 0.9, bx = 0.22, by = 0.82, x = (1 - t) * (1 - t) * ax + 2 * (1 - t) * t * bx + t * t * sx;
-            double y = (1 - t) * (1 - t) * ay + 2 * (1 - t) * t * by + t * t * sy;
-            curve.Add(x); curve.Add(y);
-            fill.Add(x); fill.Add(y);
+            double phi = a + 2 * Math.PI * k;
+            if (phi > End) break;
+            double t = (phi - Start) / (End - Start), f = Sat(1 - (phi - Start) / (Math.PI / 2));
+            double rc = R0 - Gap * (phi - Start) / (2 * Math.PI) + Flare * f * f;
+            double half = Gap * (0.27 - 0.08 * t) + 0.04 * f;
+            best = Math.Min(best, Math.Abs(r - rc) - half);
         }
-        // The curl: over the top and round, getting tighter.
-        int n = 60;
-        for (int i = 1; i <= n; i++)
+        // A round end in the middle of the curl.
+        double re = R0 - Gap * Turns, ex = lx - re * Math.Cos(End), ey = ly - re * Math.Sin(End);
+        best = Math.Min(best, Math.Sqrt(ex * ex + ey * ey) - Gap * 0.19);
+        return best * H;
+    }
+
+    /// <summary>
+    /// A running scroll: a stem waving along the middle of the band, and in each hollow of the wave a
+    /// tendril peeling off it and curling into a spiral, above and below in turn, ending in a small boss.
+    /// </summary>
+    static double RunningScroll(double u, double v, in OrnamentScale s)
+    {
+        double P = s.P, H = s.W;
+        double f = Frac(u), y = v / 1.0;
+        const double A = 0.15, Half = 0.045;
+        // The stem, a sine wave (its distance across, allowing for its slope).
+        double slope = A * 2 * Math.PI * Math.Cos(2 * Math.PI * f) * H / P;
+        double stem = (Math.Abs(y - (0.5 + A * Math.Sin(2 * Math.PI * f))) / Math.Sqrt(1 + slope * slope) - Half) * H;
+        // The tendrils: the one above the stem's low point, and the same turned round under its high point.
+        double curls = double.MaxValue;
+        for (int shift = -1; shift <= 1; shift++)
         {
-            double k = i / (double)n, t = t0 + k * turns * 2 * Math.PI;
-            double r = r0 * (1 - 0.72 * k);
-            double x = cx + r * Math.Cos(t), y = cy + r * Math.Sin(t) * 1.05;
-            curve.Add(x); curve.Add(y);
-            if (t < Math.PI * 0.5) { fill.Add(x); fill.Add(y); }
+            double x = (f + shift) * P / H;
+            curls = Math.Min(curls, Tendril(x - 0.25 * P / H, y - (0.5 + A)));
+            curls = Math.Min(curls, Tendril(0.75 * P / H - x, 0.5 - A - y));
         }
-        fill.Add(cx + 0.06); fill.Add(0.8);
-        fill.Add(0.9); fill.Add(0.92);
-        body = [.. fill];
-        return [.. curve];
+        double d = Math.Min(stem, curls * H);
+        return Pillow(d, 0.05 * H);
+    }
+
+    /// <summary>
+    /// One tendril of the running scroll, in band widths, from the stem's low point at (0, 0): it leaves
+    /// the stem going forward, rises and curls back over into a tightening spiral. A signed distance.
+    /// </summary>
+    static double Tendril(double x, double y)
+    {
+        const double R0 = 0.32, Gap = 0.13, Turns = 1.6, Start = Math.PI / 2;
+        const double End = Start - Turns * 2 * Math.PI;
+        // Its spiral is centred R0 above where it leaves the stem, turning anticlockwise as seen.
+        double lx = x, ly = y + R0;
+        double r = Math.Sqrt(lx * lx + ly * ly), a = Math.Atan2(ly, lx);
+        double best = double.MaxValue;
+        for (int k = (int)Math.Floor((Start - a) / (2 * Math.PI)); ; k--)
+        {
+            double phi = a + 2 * Math.PI * k;
+            if (phi > Start) continue;
+            if (phi < End) break;
+            double t = (Start - phi) / (Start - End);
+            double rc = R0 - Gap * (Start - phi) / (2 * Math.PI), half = 0.045 - 0.012 * t;
+            best = Math.Min(best, Math.Abs(r - rc) - half);
+        }
+        // A small round boss where it ends.
+        double re = R0 - Gap * Turns, ex = lx - re * Math.Cos(End), ey = ly - re * Math.Sin(End);
+        return Math.Min(best, Math.Sqrt(ex * ex + ey * ey) - 0.06);
     }
 
     /// <summary>
@@ -582,25 +627,31 @@ public static class Ornaments
         return Pillow(best - half, 0.6 * half);
     }
 
+    /// <summary>
+    /// Fish scales (imbrication): rows of round-ended scales, each row lying over the one below it like
+    /// shingles. Each scale rises from where it comes out from under the row above to its own rounded
+    /// edge, which stands proud of the scales below.
+    /// </summary>
     static double FishScale(double u, double v, in OrnamentScale s)
     {
-        double R = s.P / 2;
-        double y = v * s.W;
-        int rows = Math.Max(1, (int)Math.Round(s.W / (R * 1.1)));
+        double R = s.P / 2, y = v * s.W;
+        int rows = Math.Max(2, (int)Math.Round(s.W / (0.6 * R)));
         double rowH = s.W / rows;
-        // The lower row lies over the one above; each scale is round at the bottom.
-        for (int row = rows - 1; row >= -1; row--)
+        int first = (int)Math.Floor((y - R) / rowH);
+        // The highest row whose scale covers this point is on top.
+        for (int row = first; row <= first + 3 + (int)Math.Ceiling(2 * R / rowH); row++)
         {
-            double cy = row * rowH;
-            double x = Centred(u + (row % 2 == 0 ? 0 : 0.5)) * s.P;
-            double d = Math.Sqrt(x * x + (y - cy) * (y - cy));
-            if (y >= cy - 0.01 && d < R)
-            {
-                double edge = Pillow(d - R, 0.35 * R);
-                return 0.25 + 0.75 * edge * Smooth(cy - 0.2 * R, cy + 0.9 * R, y) * 0.6 + 0.4 * edge;
-            }
+            double cy = (row + 0.5) * rowH - 0.35 * R;
+            double x = Centred(u + (((row % 2) + 2) % 2 == 0 ? 0 : 0.5)) * s.P;
+            double dy = y - cy, d = Math.Sqrt(x * x + dy * dy);
+            if (d >= R) continue;
+            // Low where it comes out from under the row above, highest just inside its edge, domed across.
+            double rise = Sat((dy - (R - 2 * rowH)) / (2 * rowH));
+            double lip = Pillow(d - R, 0.12 * R);
+            double across = 1 - 0.15 * (x / R) * (x / R);
+            return (0.12 + 0.88 * Math.Pow(rise, 1.3)) * Lerp(0.8, 1, lip) * across;
         }
-        return 0;
+        return 0.12;
     }
 
     static double IvyVine(double u, double v, in OrnamentScale s)
@@ -734,24 +785,31 @@ public static class Ornaments
         return best;
     }
 
+    /// <summary>
+    /// Hand-hammered: shallow round hammer marks of different sizes and depths, overlapping so they meet
+    /// in soft ridges. They're scattered over a long repeat (several band widths) that wraps round, so
+    /// sides, mitres and loops join without a seam and the repeat is hard to see.
+    /// </summary>
     static double Hammered(double u, double v, in OrnamentScale s)
     {
-        // Dimples on a jittered grid, wrapping round every repeat so mitres and loops join.
-        int nx = Math.Max(1, (int)Math.Round(4 * s.P / s.W)), ny = 4;
-        double gx = Frac(u) * nx, gy = v * ny;
+        const int Rows = 6;
+        int cols = Math.Max(3, (int)Math.Round(Rows * s.P / s.W));
+        double cw = s.P / cols, ch = s.W / Rows;
+        double gx = Frac(u) * cols, gy = v * Rows;
         int ix = (int)Math.Floor(gx), iy = (int)Math.Floor(gy);
-        double best = double.MaxValue;
-        for (int j = -1; j <= 1; j++)
-            for (int i = -1; i <= 1; i++)
+        double deepest = 0;
+        for (int j = -2; j <= 2; j++)
+            for (int i = -3; i <= 2; i++)
             {
-                int cx = ix + i, cy = iy + j;
-                int wx = ((cx % nx) + nx) % nx;
-                double px = cx + 0.15 + 0.7 * Hash(wx, cy, 7), py = cy + 0.15 + 0.7 * Hash(wx, cy, 13);
-                double dx = (gx - px) * s.P / nx, dy = (gy - py) * s.W / ny;
-                best = Math.Min(best, Math.Sqrt(dx * dx + dy * dy));
+                int cx = ix + i, cy = iy + j, wx = ((cx % cols) + cols) % cols;
+                // Each cell's mark: anywhere in its cell (rows staggered), its own size and depth.
+                double px = cx + 0.5 * (cy & 1) + Hash(wx, cy, 7), py = cy + Hash(wx, cy, 13);
+                double r = 1.0 + 0.6 * Hash(wx, cy, 29), depth = 0.7 + 0.3 * Hash(wx, cy, 41);
+                double dx = (gx - px) * cw, dy = (gy - py) * ch, rr = r * Math.Min(cw, ch);
+                double k = (dx * dx + dy * dy) / (rr * rr);
+                // Added as a soft maximum, so where marks meet the ridge between them is rounded.
+                if (k < 1) { double c = depth * (1 - k); deepest += c * c * c * c; }
             }
-        double cell = Math.Min(s.P / nx, s.W / ny);
-        double k = Math.Min(1, best / (0.7 * cell));
-        return 0.35 + 0.65 * k * k;
+        return 1 - Math.Min(1, Math.Pow(deepest, 0.25));
     }
 }

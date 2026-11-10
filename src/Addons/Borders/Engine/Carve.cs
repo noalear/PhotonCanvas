@@ -16,6 +16,13 @@ static class Carve
 
     public static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
+    /// <summary>The smaller of two distances, blended over <paramref name="k"/> mm where they meet (a fillet between two shapes).</summary>
+    public static double SoftMin(double a, double b, double k)
+    {
+        double h = Math.Max(k - Math.Abs(a - b), 0) / Math.Max(1e-9, k);
+        return Math.Min(a, b) - h * h * k / 4;
+    }
+
     /// <summary>x wrapped into [-0.5, 0.5): the position within a repeat, centred on the motif.</summary>
     public static double Centred(double u) => u - Math.Floor(u + 0.5);
 

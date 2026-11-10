@@ -52,6 +52,7 @@ public enum Ornament
     GreekKey,
     Fret,
     WaveScroll,
+    Vitruvian,
     Guilloche,
     Plait,
     Acanthus,
