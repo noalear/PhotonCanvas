@@ -101,6 +101,19 @@ static class BordersShots
         w.Close();
         settle(200);
 
+        // Round a rotary part: a double rope spiral up a table leg, seen on the part, on the Size tab.
+        BorderDesign Band(string name) => BorderPresets.BandDesigns.First(d => d.Name == name);
+        w = Open(new BorderSpec { Design = Band("Rope"), Layout = BorderLayout.Rotary, PartDiameterMm = 40, Wrap = WrapWay.Spiral, WrapCopies = 2, WidthMm = 14, WrapLengthMm = 150 }, 1, 0);
+        Save(w, "window-borders-rotary");
+        // Three rope rings round a pen, unrolled.
+        F<CheckBox>(w, "_onPart").IsChecked = false;
+        typeof(BordersWindow).GetMethod("Load", Any)!.Invoke(w, [new BorderSpec { Design = Band("Rope"), Layout = BorderLayout.Rotary, PartDiameterMm = 20, Wrap = WrapWay.Round, WrapCopies = 3, WidthMm = 8, WrapGapMm = 6 }]);
+        settle(300);
+        Redraw(w);
+        Save(w, "window-borders-rotary-flat");
+        w.Close();
+        settle(200);
+
         // Put in the design: the frame on its own depth-slices layer.
         doc.Reset(DocState.New(), null);
         var plan = new BorderPlan(gilt);

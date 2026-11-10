@@ -41,6 +41,12 @@ public sealed class BorderPlan
     readonly double _middle;            // NaN = left alone
     readonly double _blockCarve;
     readonly double[]? _ovalTable;      // arc length along the oval at each step of its angle
+    readonly double _copyW;             // round a rotary part: one copy across (the design, and its mirror image if asked)
+    readonly double _period;            // rings: a ring and its gap along the axis; flutes: a copy round the part
+    readonly double _hyp;               // spiral: once round the part along the spiral (√(lead² + C²))
+
+    /// <summary>A spiral round a rotary part: how far along the part it goes in one turn (mm); else 0.</summary>
+    public double SpiralLeadMm { get; }
 
     /// <summary>One run of the border: a side, or the whole way round a loop.</summary>
     sealed record Segment(string Name, double Length, double[] Pitch, int[] Repeats, double Phase, double Anchor);
@@ -70,6 +76,41 @@ public sealed class BorderPlan
                 _ovalTable = OvalTable(SizeW / 2, SizeH / 2);
                 _segs = [Loop("Oval", _ovalTable[^1], 0)];
                 break;
+            case BorderLayout.Rotary:
+                {
+                    // The part unrolled: X along its axis, Y once round. Every run fits a whole number of repeats,
+                    // so where the picture's top and bottom meet round the back the pattern carries straight on.
+                    double c = spec.PartCircumferenceMm;
+                    int k = Math.Max(1, spec.WrapCopies);
+                    _copyW = B * (spec.WrapMirrored ? 2 : 1);
+                    SizeH = c;
+                    switch (spec.Wrap)
+                    {
+                        case WrapWay.Along:
+                            SizeW = spec.WrapLengthMm;
+                            _period = c / k;
+                            _segs = [Straight("Along", SizeW, phase)];
+                            break;
+                        case WrapWay.Spiral:
+                            {
+                                // Unrolled, a spiral is a straight band at a slant. Once round the part (0, C) has to land
+                                // on the same pattern: across the band that's all the starts' widths, which sets the slant,
+                                // and along it the run's length, which every repeat is fitted to.
+                                SizeW = spec.WrapLengthMm;
+                                double across = k * _copyW;
+                                SpiralLeadMm = across * c / Math.Sqrt(Math.Max(1e-9, c * c - across * across));
+                                _hyp = Math.Sqrt(SpiralLeadMm * SpiralLeadMm + c * c);
+                                _segs = [Straight("Spiral", c * c / _hyp, phase)];
+                                break;
+                            }
+                        default:
+                            _period = _copyW + Math.Max(0, spec.WrapGapMm);
+                            SizeW = k * _copyW + (k - 1) * Math.Max(0, spec.WrapGapMm);
+                            _segs = [Straight("Round", c, phase)];
+                            break;
+                    }
+                    break;
+                }
             default:
                 (SizeW, SizeH) = spec.Outside();
                 switch (spec.Corners)
@@ -208,6 +249,8 @@ public sealed class BorderPlan
                 return BandHeight(0, x, Math.Clamp(y, 0, B));
             case BorderLayout.Oval:
                 return OvalHeight(x, y);
+            case BorderLayout.Rotary:
+                return WrapHeight(x, y);
         }
         double W = SizeW, H = SizeH;
         switch (Spec.Corners)
@@ -261,6 +304,42 @@ public sealed class BorderPlan
         if (tt == W - x) return BandHeight(0, lw + q + (y - R), tt);
         if (tt == H - y) return BandHeight(0, lw + 2 * q + lh + (W - R - x), tt);
         return BandHeight(0, 2 * lw + 3 * q + lh + (H - R - y), tt);
+    }
+
+    // ---- round a rotary part ----
+
+    static double Mod(double a, double m) => a - Math.Floor(a / m) * m;
+
+    /// <summary>The height at <paramref name="x"/> along the part and <paramref name="y"/> round it (mm on the unrolled part).</summary>
+    double WrapHeight(double x, double y)
+    {
+        double c = SizeH, s, t;
+        switch (Spec.Wrap)
+        {
+            case WrapWay.Along:
+                s = x;
+                t = Mod(y, _period);
+                break;
+            case WrapWay.Spiral:
+                {
+                    double yy = Spec.WrapLeftHand ? -y : y, lead = SpiralLeadMm;
+                    s = Mod((x * lead + yy * c) / _hyp, _segs[0].Length);
+                    t = Mod((x * c - yy * lead) / _hyp, _copyW);
+                    break;
+                }
+            default:
+                {
+                    double i = Math.Floor(x / _period);
+                    t = x - i * _period;
+                    if (t > _copyW + 1e-9) return double.NaN;
+                    s = y;
+                    break;
+                }
+        }
+        double w = Width;
+        if (Spec.WrapMirrored && t > w) t = 2 * w - t;
+        if (Spec.WrapTurned) t = w - t;
+        return BandHeight(0, s, Math.Clamp(t, 0, w));
     }
 
     // ---- the oval ----
@@ -330,6 +409,8 @@ public sealed class BorderPlan
     {
         if (Spec.Layout == BorderLayout.Frame && Spec.Corners == CornerStyle.Mitred && Spec.FourPieces)
             return [new("Top side", 0, 0, SizeW, Width), new("Right side", 1, 0, SizeH, Width), new("Bottom side", 2, 0, SizeW, Width), new("Left side", 3, 0, SizeH, Width)];
+        if (Spec.Layout == BorderLayout.Rotary)
+            return [new("Wrap", -1, 0, SizeW, SizeH)];
         if (Spec.Layout == BorderLayout.Strip && Spec.MaxPieceMm > 0 && SizeW > Spec.MaxPieceMm + 1e-6)
         {
             int n = (int)Math.Ceiling(SizeW / Spec.MaxPieceMm - 1e-9);
@@ -356,15 +437,19 @@ public sealed class BorderPlan
     /// The heights of a window onto piece <paramref name="p"/>: <paramref name="cols"/> × <paramref name="rows"/>
     /// pixels of <paramref name="mmPerPx"/>, the first one's corner at (<paramref name="x0"/>, <paramref name="y0"/>).
     /// </summary>
-    public float[] Render(BorderPiece p, double x0, double y0, double mmPerPx, int cols, int rows, CancellationToken ct = default)
+    public float[] Render(BorderPiece p, double x0, double y0, double mmPerPx, int cols, int rows, CancellationToken ct = default) =>
+        Render(p, x0, y0, mmPerPx, mmPerPx, cols, rows, ct);
+
+    /// <summary>The same with pixels <paramref name="mmPerPxX"/> wide and <paramref name="mmPerPxY"/> high (a picture that must fill its size exactly).</summary>
+    public float[] Render(BorderPiece p, double x0, double y0, double mmPerPxX, double mmPerPxY, int cols, int rows, CancellationToken ct = default)
     {
         var h = new float[cols * rows];
         var opts = new ParallelOptions { CancellationToken = ct };
         Parallel.For(0, rows, opts, r =>
         {
-            double y = y0 + (r + 0.5) * mmPerPx;
+            double y = y0 + (r + 0.5) * mmPerPxY;
             for (int c = 0; c < cols; c++)
-                h[r * cols + c] = (float)HeightAt(p, x0 + (c + 0.5) * mmPerPx, y);
+                h[r * cols + c] = (float)HeightAt(p, x0 + (c + 0.5) * mmPerPxX, y);
         });
         return h;
     }
@@ -373,6 +458,7 @@ public sealed class BorderPlan
     public List<List<Vec2>> CutLines(BorderPiece p)
     {
         double B = Width;
+        if (Spec.Layout == BorderLayout.Rotary) return [];
         if (p.IsSide)
             return [[new(0, 0), new(p.WidthMm, 0), new(p.WidthMm - B, B), new(B, B)]];
         if (Spec.Layout == BorderLayout.Strip)
@@ -437,7 +523,7 @@ public sealed class BorderPlan
     // ---- pictures ----
 
     /// <summary>Blurs heights by <paramref name="sigmaPx"/> pixels, leaving the see-through (NaN) ones alone.</summary>
-    public static void Soften(float[] h, int cols, int rows, double sigmaPx)
+    public static void Soften(float[] h, int cols, int rows, double sigmaPx, bool wrapRows = false)
     {
         if (!(sigmaPx >= 0.3)) return;
         int rad = Math.Max(1, (int)Math.Ceiling(sigmaPx * 2.5));
@@ -458,6 +544,8 @@ public sealed class BorderPlan
                     for (int j = -rad; j <= rad; j++)
                     {
                         int q = i + j;
+                        // Round a rotary part the top row carries on from the bottom one.
+                        if (wrapRows && !horizontal) q = ((q % len) + len) % len;
                         if (q < 0 || q >= len) continue;
                         float val = src[horizontal ? l * cols + q : q * cols + l];
                         if (float.IsNaN(val)) continue;
