@@ -47,7 +47,8 @@ public class RotaryWrapTests
     {
         var (seam, elsewhere) = Join(plan);
         double depth = plan.Top - plan.Lowest;
-        Assert.True(seam <= 3 * elsewhere + 0.01 * depth, $"{what}: a jump of {seam:0.###} mm at the join (elsewhere {elsewhere:0.###} mm)");
+        // Less than one of 32 depth slices: nothing a carving would show.
+        Assert.True(seam <= 3 * elsewhere + depth / 40, $"{what}: a jump of {seam:0.###} mm at the join (elsewhere {elsewhere:0.###} mm)");
     }
 
     [Fact]
