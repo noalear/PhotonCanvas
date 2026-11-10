@@ -1,0 +1,10 @@
+{
+  "id": "inlay",
+  "name": "Inlay and marquetry",
+  "version": "1.0.0",
+  "description": "Turn a design into pieces of different woods that fit together: a pocket or holes for them, every piece cut with the kerf and a fit gap allowed for, and a fit test to find the gap.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}

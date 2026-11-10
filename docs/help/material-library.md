@@ -97,7 +97,7 @@ Picking a material for a picture layer also brings in that material's tone corre
 tested picture recipe nearest the layer's power, speed and resolution. A layer whose material has
 been deleted from the library shows it as *not in your library*.
 
-Other tools read the library too: **Inlay** offers your etch-rate and cut recipes, **Exact depth**
+Other tools read the library too: **Inlay and marquetry** offers your etch-rate and cut recipes, **Exact depth**
 starts from the nearest etch rate, the **Bevel test** offers your cut recipes, and stacked slices
 take their cut settings, kerf, slot fit and etch depth from it (3D models and stacked
 slices). **Picture → Colour on metal** (an add-on) uses the palettes.
