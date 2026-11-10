@@ -971,6 +971,12 @@ public sealed class Job
     /// moving at the speed would take 474–1058 µs). Only 80 mm/s has been timed.
     /// </summary>
     const double DotStepS = 0.00041;
+    /// <summary>
+    /// On the rotary, each time the part turns between one line and the next (a fill's or a picture's rows): the
+    /// rotary has to start and stop, where the galvo's step is next to nothing. Kyle's DIY rotary, 2026-11-09: a
+    /// Carve to model job of 29,561 lines 0.1 mm apart ran 3,271 s against 2,315 s estimated, 32 ms a line more.
+    /// </summary>
+    public const double RotaryStepS = 0.032;
 
     /// <summary>
     /// Duration in seconds, from the moves and the times measured on the machine (the start, each
@@ -978,36 +984,47 @@ public sealed class Job
     /// </summary>
     public double EstimateSeconds()
     {
-        double work = StartS + Blocks.Sum(AllPassesSeconds);
+        double work = StartS + Blocks.Sum(b => AllPassesSeconds(b, Mode));
         return PassMode is PassMode.Rounds r ? work + r.DelayS * Math.Max(0, Rounds - 1) : work;
     }
 
     /// <summary>Every pass of a block (a picture turned per pass has a different layout each pass).</summary>
-    public static double AllPassesSeconds(Block b)
+    /// <param name="mode">The work mode (null: the flat bed): on the rotary, turning between lines takes time of its own.</param>
+    public static double AllPassesSeconds(Block b, WorkMode? mode = null)
     {
-        if (b is not DotBlock { PassBlocks: { Count: > 0 } pb }) return BlockSeconds(b) * b.Laser.Passes;
-        var each = pb.Select(BlockSeconds).ToArray();
+        if (b is not DotBlock { PassBlocks: { Count: > 0 } pb }) return BlockSeconds(b, mode) * b.Laser.Passes;
+        var each = pb.Select(x => BlockSeconds(x, mode)).ToArray();
         return Enumerable.Range(0, Math.Max(1, b.Laser.Passes)).Sum(p => each[p % each.Length]);
     }
 
     /// <summary>Pass <paramref name="pass"/> (from 1) of a block.</summary>
-    public static double PassSeconds(Block b, int pass) => BlockSeconds(b is DotBlock d ? d.ForPass(pass) : b);
+    public static double PassSeconds(Block b, int pass, WorkMode? mode = null) => BlockSeconds(b is DotBlock d ? d.ForPass(pass) : b, mode);
 
-    /// <summary>A fill: its line pieces at the speed, jumps between them, and the time each piece costs.</summary>
-    static double FillSeconds(FillBlock f)
+    /// <summary>
+    /// A fill: its line pieces at the speed, jumps between them, and the time each piece costs. On the rotary a move
+    /// that goes round (design Y) turns the part, at the layer's speed, starting and stopping (<see cref="RotaryStepS"/>).
+    /// </summary>
+    static double FillSeconds(FillBlock f, bool rotary)
     {
         var segs = FillLines(f);
         double s = 0;
         for (int i = 0; i < segs.Count; i++)
         {
             s += (segs[i].Start.Dist(segs[i].End) + 2 * f.OverscanMm) / f.Laser.Speed + FillPieceS + f.LineDwellMs / 1000.0;
-            if (i > 0) s += Math.Max(0, segs[i - 1].End.Dist(segs[i].Start) - 2 * f.OverscanMm) / Jump;
+            if (i == 0) continue;
+            var from = segs[i - 1].End;
+            var to = segs[i].Start;
+            double round = Math.Abs(to.Y - from.Y);
+            if (rotary && round > 1e-6)
+                s += RotaryStepS + round / Math.Max(1, f.Laser.Speed) + Math.Max(0, Math.Abs(to.X - from.X) - 2 * f.OverscanMm) / Jump;
+            else
+                s += Math.Max(0, from.Dist(to) - 2 * f.OverscanMm) / Jump;
         }
         return s;
     }
 
     /// <summary>A picture: each dot's duration and step, and jumps over the blank stretches of each row.</summary>
-    static double DotSeconds(DotBlock d)
+    static double DotSeconds(DotBlock d, bool rotary)
     {
         double pitch = 25.4 / d.Dpi;
         int w = d.Bitmap.Width;
@@ -1025,12 +1042,23 @@ public sealed class Job
         }
         return on * (d.DotUs * 1e-6 + DotStepS) + gaps / Jump
             // One way: the head goes back across each row.
-            + (d.Unidirectional ? d.Bitmap.Height * w * pitch / Jump : 0);
+            + (d.Unidirectional ? d.Bitmap.Height * w * pitch / Jump : 0)
+            // On the rotary the part turns to each row with something on it.
+            + (rotary ? RowsWithDots(d) * RotaryStepS : 0);
+    }
+
+    static int RowsWithDots(DotBlock d)
+    {
+        int w = d.Bitmap.Width, n = 0;
+        for (int r = 0; r < d.Bitmap.Height; r++)
+            if (Array.IndexOf(d.Bitmap.Bits, true, r * w, w) >= 0) n++;
+        return n;
     }
 
     /// <summary>Time for one pass of a block, in seconds (same model as <see cref="EstimateSeconds"/>).</summary>
-    public static double BlockSeconds(Block b)
+    public static double BlockSeconds(Block b, WorkMode? mode = null)
     {
+        bool rotary = mode is WorkMode.Rotary;
         return b.PauseAfterS + b switch
         {
             VectorBlock v => v.Path.Length / v.Laser.Speed + (v.Path.Points.Count > 0 ? 0.002 : 0) + 20 / Jump,
@@ -1038,10 +1066,10 @@ public sealed class Job
             BandedVectorBlock bv => bv.Pieces.Sum(p => PathLength(p.Points) / bv.Laser.Speed + 10 / Jump)
                 + bv.Pieces.Select(p => p.HeadZ).Distinct().Count() * 0.25,
             BandedFillBlock bf => bf.Bands.Sum(x => x.Segments.Sum(s => s.Start.Dist(s.End) / bf.Laser.Speed + 10 / bf.Fill.LinesPerCm / bf.Laser.Speed) + 0.25),
-            FillBlock f => FillSeconds(f),
+            FillBlock f => FillSeconds(f, rotary),
             LoopsBlock l => l.Length / l.Laser.Speed + l.Loops.Count * (0.0005 + 5 / Jump),
             PointsBlock p => p.Points.Count * p.DotUs * 1e-6 + Enumerable.Range(1, Math.Max(0, p.Points.Count - 1)).Sum(i => p.Points[i - 1].Dist(p.Points[i])) / Math.Max(1, p.Laser.Speed),
-            DotBlock d => DotSeconds(d),
+            DotBlock d => DotSeconds(d, rotary),
             _ => 0,
         };
     }
