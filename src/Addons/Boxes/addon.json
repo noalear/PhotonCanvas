@@ -1,0 +1,10 @@
+{
+  "id": "boxes",
+  "name": "Box and joinery maker",
+  "version": "1.0.0",
+  "description": "Boxes that slot together: finger-jointed boxes with lift-off, sliding or pin-hinged lids and dividers, rounded boxes whose corners bend on a living hinge, and boxes whose lid bends over the back; a carved border on the lid; and dovetail, jigsaw or finger joins to cut a panel bigger than the bed in pieces.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": ["borders"],
+  "onByDefault": true
+}
