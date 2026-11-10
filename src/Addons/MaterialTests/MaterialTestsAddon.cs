@@ -7,8 +7,8 @@ namespace PhotonCanvas.Addon.MaterialTests;
 
 /// <summary>
 /// Materials & Tests → Tests: etch rate, cut test (kerf and slot fit), exact depth, tone, line, bevel and
-/// graphene tests, and Inlay (built on the etch and cut results). A burned test opens its results
-/// when the job finishes.
+/// graphene tests. A burned test opens its results when the job finishes. (Inlay, built on the etch and
+/// cut results, is the Inlay and marquetry add-on.)
 /// </summary>
 public sealed class MaterialTestsAddon : IAddon
 {
@@ -48,12 +48,6 @@ public sealed class MaterialTestsAddon : IAddon
             Tip = "Hide the rows pictures are burned in: the same grey patch burned with a picture layer's settings and with one change each (spread, direction, closer lines), side by side",
             Order = 1,
         });
-        Add(new RibbonButton("Tests", "Use your results", "Inlay", "IcLayers", () => _ = host.Guard(Inlay))
-        {
-            Tip = "The selected shapes as an inlay: a pocket engraved as deep as the veneer (from your etch test) and the piece cut to fit (with your cut test's kerf)",
-            Enabled = () => SelectedPaths().Count > 0,
-            Order = 1,
-        });
         Add(new RibbonButton("Tests", "Machine checks", "Bevel test", "IcMeasure", () => _ = host.Guard(() => Bevel(PhotonCanvas.Doc.Bevel.InDesign(Doc.State))))
         {
             Tip = "How much the galvo's beam slants away from the middle of the field: four bars cut through a board and measured with calipers. Needed for bevelled edges",
@@ -78,7 +72,6 @@ public sealed class MaterialTestsAddon : IAddon
 
     Document Doc => _host.Document;
     bool HasEtch() => Doc.State.Layers.Any(l => EtchTest.PassesOf(l) is not null);
-    List<PathShape> SelectedPaths() => Doc.State.Shapes.Where(s => Doc.Selection.Contains(s.Id)).OfType<PathShape>().ToList();
 
     /// <summary>The Tests group goes just after Materials.</summary>
     void Add(RibbonButton b) => _host.AddRibbonButton(b);
@@ -131,8 +124,6 @@ public sealed class MaterialTestsAddon : IAddon
         var m = _host.MachinePanel;
         return Show(new LineTestWindow(Doc, _host.Machine, () => _host.Photo, m.UpdatePhotoAsync, results, m.CloseUpBedPhotoAsync, m.CloseUpSees, () => m.Lights, m.SetLights));
     }
-
-    Task Inlay() => Show(new InlayWindow(Doc, _host.Library, SelectedPaths()));
 
     Task Bevel(bool results) => Show(new BevelTestWindow(Doc, _host.Library, _host.AppSettings, _host.Machine, results));
 
