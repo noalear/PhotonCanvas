@@ -1,0 +1,10 @@
+{
+  "id": "borders",
+  "name": "Border and moulding maker",
+  "version": "1.0.0",
+  "description": "Carved borders for picture frames, cabinet edges and furniture trim: egg and dart, dentils, rope, Greek key, acanthus and dozens more, on mouldings like ogees, coves and beads, sized to your frame or strip with mitred corners, and made into a depth map to carve as a relief.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
