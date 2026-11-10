@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>signs</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The border maker draws the frames round the signs (addon.json "requires" it): compile against it, never copy it. -->
+    <ProjectReference Include="..\Borders\PhotonCanvas.Addon.Borders.csproj" Private="false" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>
