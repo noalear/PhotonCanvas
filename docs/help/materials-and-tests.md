@@ -11,8 +11,9 @@ All of them are on the **Materials & Tests** tab: **Library** opens the material
 
 The **Test grid** and **Record results** are part of the program. The other tests come with add-ons
 that are on unless you turn them off in Settings → Add-ons: the **Material tests** add-on (Etch
-rate, Cut test, Exact depth, Tone test, Line test, Inlay, Bevel test, Graphene test), the **Recipe
-tuner** add-on and the **Colour on metal** add-on (Colour test, Measure colours). Each has its own
+rate, Cut test, Exact depth, Tone test, Line test, Bevel test, Graphene test), the **Recipe
+tuner** add-on, the **Colour on metal** add-on (Colour test, Measure colours) and the **Inlay and
+marquetry** add-on. Each has its own
 page under **Add-ons** in the contents, with the details and tutorials.
 
 Calibration done once for the machine rather than per material is on **Machine → Calibrate**: the
@@ -35,7 +36,7 @@ The list is in groups:
 | Find the settings | **Test grid**, **Record results** (rate a burned test grid), **Cut test**, **Etch rate**, **Recipe tuner** |
 | Pictures | **Tone test**, **Line test** |
 | Colour on metal | **Colour test**, **Measure colours** (read a burned colour test) |
-| Use your results | **Exact depth**, **Inlay** |
+| Use your results | **Exact depth**, **Inlay and marquetry** |
 | Machine checks | **Bevel test** |
 | Experimental | **Graphene test** |
 
@@ -63,8 +64,8 @@ on.
 | How much does the galvo's beam slant? | **Bevel test** | The beam's pivot heights | In the program's settings |
 | Does the diode make conductive graphene here? | **Graphene test** | The setting with the lowest resistance | An engrave recipe |
 
-**Inlay** isn't a test: it makes a pocket and a matching piece from the etch-rate and cut-test
-results. **Quick on lid close** isn't a test either: it focuses, places and loads a job when you
+**Inlay and marquetry** isn't a test: it cuts pieces of different woods that fit together, and a
+pocket or holes for them, from the etch-rate and kerf results (it has a fit test of its own). **Quick on lid close** isn't a test either: it focuses, places and loads a job when you
 close the lid.
 
 ## In what order

@@ -1,6 +1,6 @@
 # Material tests
 
-This add-on adds most of the tests to the Tests window (**Tests** on the **Materials & Tests** tab): tests that each answer one question about a material (how deep a pass goes, what cuts through, what kerf, how pictures come out) and save the answer with it in the library, plus **Inlay**, which is built on those answers. A burned test opens its results by itself when the job finishes. How the tests work in general, the test grid and Record results are explained in
+This add-on adds most of the tests to the Tests window (**Tests** on the **Materials & Tests** tab): tests that each answer one question about a material (how deep a pass goes, what cuts through, what kerf, how pictures come out) and save the answer with it in the library (the **Inlay and marquetry** add-on puts those answers to use). A burned test opens its results by itself when the job finishes. How the tests work in general, the test grid and Record results are explained in
 [Materials and tests](materials-and-tests.md).
 
 | Button | Answers |
@@ -10,7 +10,6 @@ This add-on adds most of the tests to the Tests window (**Tests** on the **Mater
 | **Exact depth** | Engraving the selection to a measured depth ([Exact depth](#exact-depth)) |
 | **Tone test** | Pictures that come out as they look ([Tone test](#tone-test)) |
 | **Line test** | Hiding the rows pictures are burned in ([Line test](#line-test)) |
-| **Inlay** | A pocket and a piece cut to fit it ([Inlay](#inlay)) |
 | **Bevel test** | How far the beam slants at the field's edges ([Bevel test](#bevel-test)) |
 | **Graphene test** | Conductive carbon in cork or wood ([Graphene test](#graphene-test-experimental)) |
 
@@ -21,7 +20,7 @@ How deep one pass of a setting goes. **Etch rate** burns a ladder of small fille
 same setting, the first 1 pass, the next 2, then 3, and so on. The first circle that goes right
 through gives the material's thickness ÷ passes. Depths you measure on the shallower ones show how
 much it slows down deeper (it usually does: the floor drops out of focus, and smoke and char build
-up). The result goes into the library, where **Inlay**, **Exact depth** and stacked slices shaped to
+up). The result goes into the library, where inlays, **Exact depth** and stacked slices shaped to
 their slopes (3D models and stacked slices) use it.
 
 ### Making the etch test
@@ -91,7 +90,7 @@ Not yet tried on the machine: whether the through-hole shows clearly enough to p
 Finds the cut: a grid of small squares at different speeds across and more passes (or power) down.
 The squares that drop out, or push out with a finger without tearing, were cut right through, and
 the quickest of them is your cut setting. At that setting a second test then measures the kerf and
-the slot fit. Both go into the library, where **Inlay**, the **Bevel test** and the stacked-slice
+the slot fit. Both go into the library, where inlays, the **Bevel test** and the stacked-slice
 tools (3D models and stacked slices) use them.
 
 ### Making the cut test
@@ -372,39 +371,6 @@ From line tests on 2.75 mm basswood in October 2026 (greyscale, 400 dpi at 60 %,
 
 ▶ [Hide the rows in pictures](tutorial:mat-line-test)
 
-## Inlay
-<!-- windows: InlayWindow -->
-
-Makes an inlay from the selected closed shapes: a pocket engraved into the board as deep as the
-veneer, and the piece cut from the veneer to fit, so it sits flush. Select the shapes, then
-**Inlay** (it's off until a shape is selected).
-
-![Inlay, with an example cut recipe chosen](images/window-laser-inlay.png)
-
-| Setting | Range | Default | What it does |
-|---|---|---|---|
-| **Veneer (mm)** | 0.1–10 | 0.6 | The thickness of what goes in: the pocket goes this deep. |
-| **Gap each side (mm)** | 0–1 | 0.05 | Room round the piece for glue and the wood moving. 0.03–0.08 mm is snug. |
-| **Engrave with** | **Default engrave settings**, or a recipe with an etch rate | The first etch recipe | The pocket's settings. |
-| **Depth a pass (mm)** | 0.01–2 | 0.15 | Filled in from the etch recipe. Without one it's a guess, and the piece may sit proud or sunk. |
-| **Cut with** | **Default cut settings**, or a cut recipe | The first cut recipe | The veneer's settings. |
-| **Kerf (mm)** | 0–1 | 0.1 | Filled in from the cut recipe, so the piece comes out the drawn size. |
-
-The line under them says how many passes the pocket takes and how deep that comes out.
-
-**Make the pocket and the piece** adds:
-
-- On this page, on the board: an **Inlay · pocket** layer (filled) with the shapes joined and grown by
-  the gap. Its passes are the veneer's thickness ÷ depth a pass, rounded up, each turned by the
-  recipe's turn per pass, or 37° if it has none, so the floor comes out flat.
-- On a new page **Inlay piece**, in the same place: an **Inlay · piece** cut layer with the shapes at
-  their drawn size and the kerf set.
-
-Your original shapes stay as they were. Burn the pocket, put the veneer in, switch to the **Inlay
-piece** page and cut. Not yet tried on the machine.
-
-▶ [Make an inlay](tutorial:mat-inlay)
-
 ## Bevel test
 <!-- windows: BevelTestWindow -->
 
@@ -486,6 +452,5 @@ goes under *Cork & rubber*.
 - [Engrave to an exact depth](tutorial:mat-exact-depth)
 - [Match pictures to the material](tutorial:mat-tone-test)
 - [Hide the rows in pictures](tutorial:mat-line-test)
-- [Make an inlay](tutorial:mat-inlay)
 - [Measure the beam's slant](tutorial:mat-bevel-test)
 - [Try laser-induced graphene](tutorial:mat-graphene-test)
