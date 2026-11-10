@@ -56,6 +56,63 @@ public class BordersTests
         }
     }
 
+    [Theory]
+    [InlineData(Ornament.Hammered)]
+    [InlineData(Ornament.FishScale)]
+    [InlineData(Ornament.WaveScroll)]
+    [InlineData(Ornament.Vitruvian)]
+    public void AnOrnamentJoinsSeamlesslyFromOneRepeatToTheNext(Ornament o)
+    {
+        var s = new OrnamentScale(14 * Ornaments.Info(o).Aspect, 14, 3);
+        for (double v = 0.02; v < 1; v += 0.07)
+            for (double u = -0.5; u < 0.5; u += 0.031)
+                Assert.Equal(Ornaments.Height(o, u, v, s), Ornaments.Height(o, u + 1, v, s), 9);
+    }
+
+    [Fact]
+    public void TheHammeredTextureRepeatsOnlyOverSeveralBandWidths()
+    {
+        Assert.True(Ornaments.Info(Ornament.Hammered).Aspect >= 4);
+        // Within a repeat it doesn't repeat itself: a quarter of the way along it's different.
+        var s = new OrnamentScale(14 * Ornaments.Info(Ornament.Hammered).Aspect, 14, 3);
+        double diff = 0;
+        for (double v = 0.05; v < 1; v += 0.1)
+            for (double u = 0; u < 0.25; u += 0.01)
+                diff += Math.Abs(Ornaments.Height(Ornament.Hammered, u, v, s) - Ornaments.Height(Ornament.Hammered, u + 0.25, v, s));
+        Assert.True(diff > 1, $"difference {diff}");
+    }
+
+    [Fact]
+    public void FishScalesLieOverTheRowBelow()
+    {
+        // Going down the band: each scale rises toward its rounded edge, then drops to the scale below it.
+        var s = new OrnamentScale(14, 14, 3);
+        foreach (double u in new[] { 0.0, 0.25, 0.5 })
+        {
+            var down = Enumerable.Range(0, 400).Select(i => Ornaments.Height(Ornament.FishScale, u, i / 399.0, s)).ToList();
+            int rises = 0, drops = 0;
+            for (int i = 1; i < down.Count; i++)
+            {
+                if (down[i] < down[i - 1] - 0.2) drops++;
+                if (down[i] > down[i - 1] + 1e-6) rises++;
+            }
+            Assert.True(drops >= 1, $"u {u}: {drops} edges");
+            Assert.True(rises > 200, $"u {u}: rises {rises} of 400 steps");
+        }
+    }
+
+    [Fact]
+    public void TheWaveScrollAndTheVitruvianScrollAreDifferent()
+    {
+        Assert.Equal(Ornament.Vitruvian, Design("Wave frieze").Bands.Single(b => b.Ornament != Ornament.None).Ornament);
+        var a = new OrnamentScale(20, 14, 3);
+        double diff = 0;
+        for (double v = 0.05; v < 1; v += 0.1)
+            for (double u = 0; u < 1; u += 0.05)
+                diff += Math.Abs(Ornaments.Height(Ornament.WaveScroll, u, v, a) - Ornaments.Height(Ornament.Vitruvian, u, v, a));
+        Assert.True(diff > 20, $"difference {diff}");
+    }
+
     [Fact]
     public void ScalingADesignGivesTheWidthAndDepthAsked()
     {
