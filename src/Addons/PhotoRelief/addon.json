@@ -1,0 +1,10 @@
+{
+  "id": "photorelief",
+  "name": "Photo to relief",
+  "version": "1.0.0",
+  "description": "Turn a photo or portrait into a carved relief: the subject raised and rounded off its background, its shading turned into gentle depth, on an oval, round or square plaque with a rim if you like, made into a depth map to carve.",
+  "category": "Picture",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
