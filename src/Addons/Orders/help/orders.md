@@ -246,7 +246,9 @@ How the sheets are made:
 The message says what was made, and any piece that's bigger than the sheet or whose fields are
 empty for its order.
 
-![A sheet of name keyrings made from the sample orders, each numbered on the Order labels layer, with the coasters' sheet in the next page tab](images/orders-sheet.png) The lines put on a sheet show **On a sheet** with the sheet's name. `Ctrl+Z`
+![A sheet of name keyrings made from the sample orders, each numbered on the Order labels layer, with the coasters' sheet in the next page tab](images/orders-sheet.png)
+
+The lines put on a sheet show **On a sheet** with the sheet's name. `Ctrl+Z`
 takes the sheets away again.
 
 Before you burn, look at each sheet (the page tabs switch between them), check the layers' settings
