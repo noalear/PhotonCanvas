@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AddonId>orders</AddonId>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Sample orders and a sample design, to try it all without a shop (Orders → Try sample orders). -->
+    <EmbeddedResource Include="samples\*.csv" LogicalName="samples.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
