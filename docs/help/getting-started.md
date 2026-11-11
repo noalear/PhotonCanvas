@@ -46,8 +46,8 @@ including its own .NET runtime, so nothing else has to be installed.
 
 <!-- windows: WelcomeWindow -->
 
-The first time PhotonCanvas starts, the **Welcome to PhotonCanvas** window walks you through five
-short steps. **Next** moves on, **Back** goes back; "Step 1 of 5" at the bottom says where you are.
+The first time PhotonCanvas starts, the **Welcome to PhotonCanvas** window walks you through six
+short steps. **Next** moves on, **Back** goes back; "Step 1 of 6" at the bottom says where you are.
 
 1. **Welcome.** What the program is.
 2. **Safety and terms.** The safety notice and the disclaimer (below). Tick
@@ -62,13 +62,23 @@ short steps. **Next** moves on, **Back** goes back; "Step 1 of 5" at the bottom 
    your own, Conveyor feeder) and the specialist features to show (Colour on metal, Diffraction gratings, G-code
    console). Features you don't tick stay out of the ribbon. You can change this any time in
    Settings → Equipment; see [The machine and settings](machine.md).
-5. **How a job works.** Draw or import, choose what each layer does, find the right settings,
+5. **Calibrate the camera.** Lines the camera picture up with where the laser marks, for the
+   machine you picked in step 4, so you can place designs on a photo of your material. A box says
+   what that machine needs: on the F2 Ultra the marks are burned with the blue diode over
+   220 × 220 mm (one calibration does for both lasers); on the F2 Ultra UV with the UV laser over
+   200 × 200 mm (do xTool's own lens and camera setup in xTool Studio first). **Connect** connects
+   to the machine, then lay a scrap sheet over the whole area and click **Calibrate camera…**: the
+   calibration window takes you through focusing, burning the marks, the photo and saving (see
+   [Calibrate the camera](camera.md#calibrate-the-camera)). The step then says "✓ The camera is
+   calibrated for this machine." You can skip it and calibrate later with Machine →
+   **Calibrate camera**.
+6. **How a job works.** Draw or import, choose what each layer does, find the right settings,
    then send it. **Start designing** closes the window.
 
 ![The Getting started window, opened from the Help menu](images/window-getting-started.png)
 
 Help → **Getting started** opens the same window again at any time, without the safety and
-equipment steps (three steps: Welcome, Connect your laser, How a job works).
+equipment steps (four steps: Welcome, Connect your laser, Calibrate the camera, How a job works).
 
 ### The safety notice
 

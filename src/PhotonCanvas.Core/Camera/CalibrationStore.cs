@@ -13,6 +13,19 @@ public static class CalibrationStore
     public static string DefaultPath =>
         Path.Combine(AppIdentity.DataDir, "camera.json");
 
+    /// <summary>
+    /// The calibration file for one machine: each machine's camera sits differently, so each has its own.
+    /// The F2 Ultra keeps <c>camera.json</c> (as before); another model uses <c>camera-&lt;device code&gt;.json</c>.
+    /// </summary>
+    public static string PathFor(MachineSetup machine) =>
+        machine.Id == MachineSetup.F2Ultra.Id ? DefaultPath : Path.Combine(AppIdentity.DataDir, $"camera-{FileKey(machine)}.json");
+
+    static string FileKey(MachineSetup m)
+    {
+        var key = string.IsNullOrWhiteSpace(m.DeviceCode) ? m.Id.ToString("N") : m.DeviceCode;
+        return new string([.. key.ToLowerInvariant().Select(c => char.IsAsciiLetterOrDigit(c) ? c : '-')]);
+    }
+
     public static List<CameraCalibration> Load(string path)
     {
         var o = new List<CameraCalibration>();

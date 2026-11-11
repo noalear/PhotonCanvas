@@ -396,7 +396,7 @@ Shortcuts to windows explained elsewhere:
 ### Help
 
 **Help guide** (this guide; `F1` in any window opens its page), **Tutorials**,
-**Getting started** (a short tour, and the connection setup), **Keyboard shortcuts**,
+**Getting started** (a short tour, the connection setup and camera calibration), **Keyboard shortcuts**,
 **Safety and disclaimer** and **About PhotonCanvas** (version, licence, credits).
 
 ## Device settings

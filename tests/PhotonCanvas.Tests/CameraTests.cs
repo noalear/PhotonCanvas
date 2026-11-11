@@ -244,6 +244,21 @@ public class CameraTests
         }
         finally { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
     }
+
+    [Fact]
+    public void EachMachineKeepsItsOwnCameraCalibration()
+    {
+        // The F2 Ultra keeps the file it always had; the UV (and its Class 1 model, with another camera) its own.
+        Assert.Equal(CalibrationStore.DefaultPath, CalibrationStore.PathFor(MachineSetup.F2Ultra));
+        var uv = MachineSetup.ForDeviceCode("GS009-CLASS-4")!;
+        var c1 = MachineSetup.ForDeviceCode("GS009-CLASS-1")!;
+        Assert.Equal("camera-gs009-class-4.json", Path.GetFileName(CalibrationStore.PathFor(uv)));
+        Assert.Equal(Path.GetDirectoryName(CalibrationStore.DefaultPath), Path.GetDirectoryName(CalibrationStore.PathFor(uv)));
+        Assert.NotEqual(CalibrationStore.PathFor(uv), CalibrationStore.PathFor(c1));
+        // A machine with no device code (a GRBL one) is named by its id.
+        var grbl = new MachineSetup { Name = "My diode" };
+        Assert.Equal($"camera-{grbl.Id:N}.json", Path.GetFileName(CalibrationStore.PathFor(grbl)));
+    }
 }
 
 public class ShapeFitTests

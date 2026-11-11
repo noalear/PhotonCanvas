@@ -177,7 +177,12 @@ about 5 minutes and a scrap sheet, once for each material height you use. Checke
 machine.
 
 It also opens from **Calibrate camera…** (the machine status menu at the right end of the ribbon,
-and Settings → Machine), and from **Show** in the machine panel while the camera isn't calibrated.
+and Settings → Machine), from **Show** in the machine panel while the camera isn't calibrated, and
+from the **Calibrate the camera** step of the welcome window (and Help → Getting started).
+
+Each machine keeps its own calibration: its camera sits differently. The marks fit the machine in
+use (Settings → Machines): 220 × 220 mm burned with the blue diode on the F2 Ultra, 200 × 200 mm
+burned with the UV laser on the F2 Ultra UV (not yet tried on a UV).
 
 The photo is on the left (scroll to zoom, right- or middle-drag to move it about); the five steps
 are on the right.
@@ -247,7 +252,9 @@ nearest mark. After the fourth, PhotonCanvas finds all the others.
 - **Show straightened check**: the photo straightened as it will lie on the work area. Every mark
   should sit inside its green ring.
 - **Save calibration**: saves it for that distance, replacing one within 0.25 mm. Calibrations are
-  kept in `camera.json` in the PhotonCanvas data folder (`%USERPROFILE%\PhotonCanvas`).
+  kept in the PhotonCanvas data folder (`%USERPROFILE%\PhotonCanvas`): `camera.json` for the F2
+  Ultra, `camera-<model code>.json` for another machine (`camera-gs009-class-4.json` for the
+  F2 Ultra UV). Switching machines in Settings → Machines switches to that machine's calibrations.
 
 > **Tip:** Calibrate at two or three heights you use (thin card and your usual board, say).
 > Heights between them, and a little beyond, are then worked out.
