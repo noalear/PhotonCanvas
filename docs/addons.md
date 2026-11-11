@@ -142,6 +142,7 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `AddCanvasOverlay(ICanvasOverlay)` | Drawing on the canvas: `UnderShapes` (over the camera picture, world mm), `OverShapes` (world mm), or `Screen` (pixels). Keep it fast. |
 | `AddToSlot(slot, make)` | Your panel inside a window's named slot (below). |
 | `AddJobHook(IJobHook)` | A step in making the job (below). |
+| `AddDocRule(IDocRule)` | A rule the design is kept to on every edit (below). |
 | `Publish<T>(service)` / `Find<T>()` | Offer an interface to other add-ons / use one another add-on offers (list it under `requires`). |
 
 ### Window slots
@@ -157,6 +158,16 @@ A window with a slot calls `AddonSlots.Fill(slot, panel, window, data, changed)`
 
 Ask the add-ons thread for a new slot when you need one in a program window; add slots of your own
 to your own windows the same way.
+
+### Design rules (`PhotonCanvas.Doc.Extensions.IDocRule`)
+
+`DocState Apply(DocState before, DocState after)` runs on every edit (`Document.Commit`, and each
+step of a drag through `UpdateEdit`), before text fields are filled in, and its result is what the
+edit makes, in the same undo step. Use it for shapes that follow other shapes: the device array's
+copies follow its first device, and editing or turning off a copy changes the array. It runs very
+often, so look for your notes first and return `after` itself (the same object) when there's
+nothing to do. Undo and redo put back what a rule made; they don't run the rules again. A rule that
+throws is skipped for that edit and logged.
 
 ### Job hooks (`PhotonCanvas.Doc.Extensions.IJobHook`)
 

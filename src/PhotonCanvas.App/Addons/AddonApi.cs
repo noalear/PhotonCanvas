@@ -178,6 +178,13 @@ public interface IAddonHost
     IDisposable AddJobHook(IJobHook hook);
 
     /// <summary>
+    /// A rule the design is kept to on every edit (see <see cref="IDocRule"/>): e.g. copies that follow the
+    /// shape they copy. It joins the edit's undo step. Keep it quick and return the design itself when
+    /// nothing needs changing; a rule that throws is skipped for that edit and logged.
+    /// </summary>
+    IDisposable AddDocRule(IDocRule rule);
+
+    /// <summary>
     /// Offer something to other add-ons (looked up by type with <see cref="Find{T}"/>). Add-ons that
     /// use it list this one under "requires" in addon.json, so it starts first and stops last.
     /// </summary>
