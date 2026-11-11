@@ -628,6 +628,47 @@ static class MoreShots
             }
             reset();
         }
+
+        // --- Device array (an add-on): a tag with a guide outline and a numbered serial, on a 4 × 3 tray with two pockets off.
+        {
+            reset();
+            var ds = DocState.New() with { Vars = new VariableData { Serial = 1 } };
+            var tagL = Layer.Default(0, LayerMode.Fill) with { Name = "Mark" };
+            ds = ds with { Layers = [tagL] };
+            var tag = new PathShape { Name = "Tag outline", LayerId = tagL.Id, Geometry = PathGeometry.RoundRect(20, 30, 36, 20, 4, 4) }.WithOutput(false);
+            var serial = TextShape.Create("SN {serial:0000}", new TextStyle("Arial", 6, Bold: true), tagL.Id, Affine.Translate(25, 37));
+            ds = Ops.AddShapes(ds, [tag, serial]);
+            doc.Reset(ds, null);
+            doc.Select([tag.Id, serial.Id]);
+            canvas.FitRect(new Rect2(5, 15, 190, 105));
+            settle(500);
+            var daCommands = (IEnumerable<HotCommand>)typeof(MainWindow).GetField("_addonCommands", Any)!.GetValue(w)!;
+            daCommands.FirstOrDefault(c => c.Id == "devicearray.open")?.Run();
+            settle(1500);
+            if (w.OwnedWindows.FirstOrDefault(x => x.GetType().Name == "DeviceArrayWindow") is { } da)
+            {
+                F<NumericUpDown>(da, "_cols").Value = 4;
+                F<NumericUpDown>(da, "_rows").Value = 3;
+                F<NumericUpDown>(da, "_pitchX").Value = 42;
+                F<NumericUpDown>(da, "_pitchY").Value = 26;
+                settle(300);
+                var specField = da.GetType().GetField("_spec", Any)!;
+                var cellType = da.GetType().Assembly.GetType("PhotonCanvas.Addon.DeviceArray.Cell")!;
+                var with = specField.FieldType.GetMethod("With")!;
+                object sp = specField.GetValue(da)!;
+                foreach (var (c, r) in new[] { (2, 0), (1, 2) }) sp = with.Invoke(sp, [Activator.CreateInstance(cellType, c, r), false])!;
+                specField.SetValue(da, sp);
+                da.GetType().GetMethod("Preview", Any)!.Invoke(da, null);
+                settle(900);
+                AddonShot(da.CaptureRenderedFrame(), "DeviceArray", "window-device-array");
+                Click(da.GetVisualDescendants().OfType<Avalonia.Controls.Button>().First(b => b.Content as string == "Make the array"));
+                settle(800);
+                canvas.FitRect(new Rect2(5, 15, 190, 105));
+                settle(800);
+                AddonShot(shot(canvas), "DeviceArray", "canvas-device-array");
+            }
+            reset();
+        }
     }
 
     // A box from corner to corner (for the booklet's animal).

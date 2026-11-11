@@ -84,6 +84,8 @@ public sealed class Document
     {
         if (_editBase is not null) throw new InvalidOperationException("an interactive edit is in progress");
         if (ReferenceEquals(next, State) && select is null) return;
+        // Add-ons' rules (copies that follow what they copy), in the same undo step.
+        next = Extensions.DocRules.Apply(State, next);
         // Text and codes with fields show their current values.
         if (!ReferenceEquals(next, State)) next = VariableText.Refresh(next, DateTime.Now);
         if (!ReferenceEquals(next, State))
@@ -117,7 +119,7 @@ public sealed class Document
     public void UpdateEdit(DocState next)
     {
         if (_editBase is null) throw new InvalidOperationException("no edit in progress");
-        State = next;
+        State = Extensions.DocRules.Apply(State, next);
         Changed?.Invoke(true);
     }
 
