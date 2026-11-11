@@ -293,6 +293,7 @@ static class DocsSim
         if (only is null or "more" or "signs") { Reset(); SignsShots.Run(w, doc, canvas.Machine, Settle); }
         if (only is null or "more" or "inlay") { Reset(); InlayShots.Run(w, doc, canvas.Machine, Settle); }
         if (only is null or "more" or "surfaces") { Reset(); SurfacesShots.Run(w, doc, F<MachinePanel>("_machine"), Settle); }
+        if (only is null or "more" or "orders") { Reset(); OrdersShots.Run(w, Settle); }
         if (only is null or "more" or "productionlog") { Reset(); ProductionLogShots.Run(w, doc, Settle); }
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "images-index.txt"), Index.ToString());
         Console.WriteLine(Index.ToString());

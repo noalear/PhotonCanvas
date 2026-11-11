@@ -1,0 +1,10 @@
+{
+  "id": "orders",
+  "name": "Orders to sheet",
+  "version": "1.0.0",
+  "description": "Bring in Etsy and Shopify orders (CSV export or straight from the shop) and turn them into ready-to-burn sheets with each customer's text, plus proofs and a packing list.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
