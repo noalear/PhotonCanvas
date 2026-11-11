@@ -287,6 +287,12 @@ public sealed record FillBlock(IReadOnlyList<IReadOnlyList<Vec2>> Polygons, Lase
     /// </summary>
     public PowerField? PowerScale { get; init; }
 
+    /// <summary>
+    /// The scan lines given directly, in order (marks moved onto an object, <see cref="SurfaceWrap"/>): used
+    /// instead of working them out from <see cref="Polygons"/> or <see cref="Mask"/>. Null = worked out.
+    /// </summary>
+    public IReadOnlyList<Job.FillSegment>? Lines { get; init; }
+
     /// <summary>The block as run on pass <paramref name="pass"/> (1-based): turned by <see cref="AngleStepDeg"/> per earlier pass.</summary>
     public FillBlock ForPass(int pass) => AngleStepDeg == 0 || pass <= 1 ? this : this with { AngleDeg = AngleDeg + (pass - 1) * AngleStepDeg, AngleStepDeg = 0 };
 
@@ -496,8 +502,23 @@ public sealed class Job
     /// <summary>Curved surfaces: how far apart the head's heights are (mm). xTool Studio uses 0.2.</summary>
     public double BandMm { get; init; } = 0.2;
 
+    /// <summary>
+    /// Curved surfaces: the share of each layer's speed to go at over a bed point (0–1; 1 = as set), so a
+    /// surface that slopes away from the beam gets as much light per mm² as its top (<see cref="WrapZone.EvenOut"/>).
+    /// Dots are held on longer instead. Null = full speed everywhere.
+    /// </summary>
+    public Func<Vec2, double>? SpeedShare { get; init; }
+
     /// <summary>The blocks as they're written: split into height bands on a curved surface.</summary>
-    public IReadOnlyList<Block> OutputBlocks() => SurfaceHeight is { } h && Flat ? SurfaceBanding.Apply(Blocks, h, BandMm) : Blocks;
+    public IReadOnlyList<Block> OutputBlocks() => SurfaceHeight is { } h && Flat ? SurfaceBanding.Apply(Blocks, h, BandMm, SpeedShare) : Blocks;
+
+    /// <summary>The F word for a stretch at <paramref name="at"/>: the layer's speed, slowed where <see cref="SpeedShare"/> says.</summary>
+    long FeedAt(LaserSettings l, Vec2 at)
+    {
+        if (SpeedShare is not { } share) return l.FValue;
+        double k = share(at);
+        return !double.IsFinite(k) || k >= 1 ? l.FValue : Math.Max(1, (long)Math.Round(l.FValue * Math.Max(WrapZone.SlowestShare, k), MidpointRounding.AwayFromZero));
+    }
 
     /// <summary>The head's travel (machine Z, mm).</summary>
     public const double MinHeadZ = 6, MaxHeadZ = 156;
@@ -602,19 +623,19 @@ public sealed class Job
                     foreach (var p in b.Polygons.SelectMany(x => x))
                     {
                         if (!p.IsFinite) throw new JobException("A fill coordinate is not a valid number.");
-                        // Cut to a section: only the lines (checked below) need to be in the work area.
-                        if (b.ClipRect is null) CheckPoint(p, ctx, i);
+                        // Cut to a section, or lines given directly: only the lines (checked below) need to be in the work area.
+                        if (b.ClipRect is null && b.Lines is null) CheckPoint(p, ctx, i);
                     }
                     // Turned per pass, each pass has its own lines and run-ups: check every angle used.
                     var passFills = Enumerable.Range(1, Math.Max(1, b.Laser.Passes)).Select(b.ForPass)
                         .DistinctBy(f => Math.Round(((f.AngleDeg % 360) + 360) % 360, 6)).Take(360).ToList();
-                    if (b.ClipRect is not null)
+                    if (b.ClipRect is not null || b.Lines is not null)
                         foreach (var seg in passFills.SelectMany(FillLines))
                         {
                             CheckPoint(seg.Start, ctx, i);
                             CheckPoint(seg.End, ctx, i);
                         }
-                    if (b.Mask is { } mask && b.ClipRect is null)
+                    if (b.Mask is { } mask && b.ClipRect is null && b.Lines is null)
                     {
                         if (!mask.Valid || !(mask.CellMm > 0) || !mask.Origin.IsFinite)
                             throw new JobException("A depth slice's cells don't match its size.");
@@ -1134,8 +1155,9 @@ public sealed class Job
                 z = piece.HeadZ;
             }
             body.Add($"G0{Pos(piece.Points[0], Trim3)}F180000");
+            long feed = FeedAt(l, piece.Points[piece.Points.Count / 2]);
             for (int i = 1; i < piece.Points.Count; i++)
-                body.Add($"G1{Pos(piece.Points[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{l.FValue}" : ""));
+                body.Add($"G1{Pos(piece.Points[i], Trim3)}" + (i == 1 ? $"S{l.SValue}F{feed}" : ""));
         }
         if (z is null) return [];
         var v = new List<string> { $"# {tag} VECTOR HEAD", "# motion_start" };
@@ -1159,9 +1181,13 @@ public sealed class Job
             if (segs.Count == 0) continue;
             body.Add($"G1 Z{Trim3(z)} F600 S0");
             // F is modal: back to the burn speed, or the band's lines would run at the head's 10 mm/s.
-            body.Add($"G1F{l.FValue}S0");
+            long feed = FeedAt(l, Vec2.Lerp(segs[0].Start, segs[0].End, 0.5));
+            body.Add($"G1F{feed}S0");
             foreach (var seg in segs)
             {
+                // Slower where the surface slopes away (each line's own share).
+                long want = FeedAt(l, Vec2.Lerp(seg.Start, seg.End, 0.5));
+                if (want != feed) { body.Add($"G1F{want}S0"); feed = want; }
                 body.Add(first ? $"G0{Pos(seg.Start, Fixed3)}" : $"G1{Pos(seg.Start, Fixed3)}S0");
                 first = false;
                 BurnTo(body, seg.Start, seg.End, s, b.PowerScale, p => Pos(p, Fixed3));
@@ -1365,6 +1391,7 @@ public sealed class Job
 
     static List<FillSegment> MakeFillLines(FillBlock b)
     {
+        if (b.Lines is { } given) return [.. given];
         var lines = MakeFullLines(b);
         if (b.Spread > 1) lines = SpreadOut(lines, b.Spread, b.Scatter);
         if (b.ReverseOrder)

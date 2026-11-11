@@ -245,6 +245,7 @@ public static class DocFile
             },
         };
         if (SpreadJson(s.Spread) is { } spread) root["spreadHeat"] = spread;
+        if (SurfacesJson(s.Surfaces) is { } surfaces) root["surfaces"] = surfaces;
         if (s.AddonData.Count > 0) root["addonData"] = AddonJson(s.AddonData);
         // DocState.LayerPower is never saved: job hooks set it only on the copy a job is built from.
         return root;
@@ -524,7 +525,7 @@ public static class DocFile
             if (notes.Count > 0) all = [.. all.Select(sh => notes.TryGetValue(sh.Id, out var d) ? sh.WithAddonData(d) : sh)];
             var guides = (root["guides"]?.AsArray() ?? []).OfType<JsonNode>()
                 .Select(g => new Guide(g["vertical"]?.GetValue<bool>() ?? true, g["at"]?.GetValue<double>() ?? 0) { RotaryStart = g["rotaryStart"]?.GetValue<bool>() ?? false }).ToImmutableList();
-            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Spread = SpreadFrom(root["spreadHeat"]), AddonData = AddonFrom(root["addonData"]) };
+            return new DocState(layers.ToImmutable(), all) { Vars = vars, Guides = guides, Curve = CurveFrom(root["curve"]), Surfaces = SurfacesFrom(root["surfaces"]), Spread = SpreadFrom(root["spreadHeat"]), AddonData = AddonFrom(root["addonData"]) };
         }
         catch (Exception e) when (e is InvalidOperationException or FormatException or KeyNotFoundException or NullReferenceException)
         {
@@ -555,6 +556,64 @@ public static class DocFile
             ["axisPoint"] = new JsonArray(c.AxisPoint.X, c.AxisPoint.Y),
             ["topMm"] = c.TopMm,
             ["diameterMm"] = c.DiameterMm,
+        };
+    }
+
+    static JsonNode? SurfacesJson(MarkSurfaces m)
+    {
+        if (m.Items.IsEmpty && m.OtherMm is null) return null;
+        var o = new JsonObject
+        {
+            ["items"] = new JsonArray([.. m.Items.Select(x => (JsonNode)new JsonObject
+            {
+                ["id"] = x.Id.ToString(),
+                ["name"] = x.Name,
+                ["kind"] = x.Kind.ToString(),
+                ["centre"] = new JsonArray(x.Centre.X, x.Centre.Y),
+                ["axisDeg"] = x.AxisDeg,
+                ["lengthMm"] = x.LengthMm,
+                ["diameterMm"] = x.DiameterMm,
+                ["widthMm"] = x.WidthMm,
+                ["topMm"] = x.TopMm,
+                ["reachDeg"] = x.ReachDeg,
+                ["wrap"] = x.Wrap,
+                ["evenOut"] = x.EvenOut,
+            })]),
+            ["bandMm"] = m.BandMm,
+        };
+        if (m.OtherMm is { } other) o["otherMm"] = other;
+        return o;
+    }
+
+    static MarkSurfaces SurfacesFrom(JsonNode? n)
+    {
+        if (n is not JsonObject o) return new();
+        static double D(JsonObject x, string k, double d) => x[k] is JsonValue v && v.TryGetValue<double>(out var r) && double.IsFinite(r) ? r : d;
+        var items = new List<MarkSurface>();
+        foreach (var x in (o["items"] as JsonArray ?? []).OfType<JsonObject>())
+        {
+            var def = new MarkSurface();
+            items.Add(new MarkSurface
+            {
+                Id = Guid.TryParse(x["id"]?.GetValue<string>(), out var id) ? id : Guid.NewGuid(),
+                Name = x["name"] is JsonValue nv && nv.TryGetValue<string>(out var name) ? name : def.Name,
+                Kind = Enum.TryParse<MarkSurfaceKind>(x["kind"]?.GetValue<string>(), out var k) ? k : MarkSurfaceKind.Round,
+                Centre = x["centre"] is JsonArray { Count: 2 } c ? new Vec2(c[0]!.GetValue<double>(), c[1]!.GetValue<double>()) : def.Centre,
+                AxisDeg = D(x, "axisDeg", def.AxisDeg),
+                LengthMm = D(x, "lengthMm", def.LengthMm),
+                DiameterMm = D(x, "diameterMm", def.DiameterMm),
+                WidthMm = D(x, "widthMm", def.WidthMm),
+                TopMm = D(x, "topMm", def.TopMm),
+                ReachDeg = D(x, "reachDeg", def.ReachDeg),
+                Wrap = x["wrap"] is JsonValue wv && wv.TryGetValue<bool>(out var w) ? w : true,
+                EvenOut = x["evenOut"] is JsonValue ev && ev.TryGetValue<bool>(out var e) ? e : true,
+            });
+        }
+        return new MarkSurfaces
+        {
+            Items = [.. items],
+            OtherMm = o["otherMm"] is JsonValue ov && ov.TryGetValue<double>(out var other) && double.IsFinite(other) ? other : null,
+            BandMm = D(o, "bandMm", 0.2),
         };
     }
 

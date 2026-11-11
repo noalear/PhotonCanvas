@@ -1,4 +1,4 @@
-# Work area: rotary, curved, layer by layer, sections, pieces
+# Work area: rotary, curved, surfaces, layer by layer, sections, pieces
 
 The **Work area** group on the **Machine** tab changes where and how a job is marked: on a rotary
 attachment or the conveyor instead of the flat bed, on a curved piece, one layer at a time, one
@@ -8,6 +8,7 @@ section at a time for a design bigger than the bed, or across several pieces tha
 |---|---|
 | **Work mode** | Flat bed, rotary attachment or conveyor, and their settings. Hidden unless you have an attachment. |
 | **Curved surface** | Mark on a curved piece: the head follows it in height steps. |
+| **Surfaces** | Mark on objects lying on the bed (pens, dowels, bottles, raised flat pieces): marks drawn on one are wrapped round it and focused on it. |
 | **Scan the part** | On the rotary: turn the part a step at a time and measure its top at each step, for a model of its shape. Shows only in the rotary work mode. |
 | **Layer by layer** | Mark one layer at a time, with a stop between to change the screen, colour or material. |
 | **Sections** | Mark a design bigger than the work area, moving the material between sections. |
@@ -434,6 +435,99 @@ pointer.
 | **Top height** | 1 to 150 mm | 50 | The height of the top above the bed, as you'd focus on it. |
 | **Diameter** | 2 to 400 mm | 80 | For slats: across the flats. |
 
+## Surfaces
+
+<!-- windows: SurfacesWindow -->
+
+**Surfaces** is for marking on objects that lie on the flat bed: a pen, a dowel, a bottle or tube on its
+side, or a flat piece at its own height (a box lid, a block in a jig). You type in each object's size
+and where it lies, and it shows on the canvas as a purple rectangle. Anything you draw inside that
+rectangle is marked on that object; everything else is marked as usual. You can have as many as you
+like (a row of pens in a jig, each its own surface).
+
+![Two pens on the canvas, each a purple rectangle with its top line dotted and a mark drawn on it](images/surfaces-on-canvas.png)
+
+> **Warning:** Experimental, not yet tried on the machine. Every job with marks on a surface says so
+> in the job bar. Try it on a spare pen first.
+
+For each mark on a surface the job does three things:
+
+- **Focus**: the head's height is set for the object's surface under the mark, stepping down in
+  height bands as the surface curves away (the same way as [Curved surface](#curved-surface)).
+- **Wrap** (round objects): the rectangle on the canvas is the object's top unrolled. A distance
+  across it on the canvas is the same distance round the surface, measured from the top line, so a
+  10 mm logo comes out 10 mm round the pen, not squashed at the sides. Seen from above, a mark *s* mm
+  round from the top lands *r* × sin(*s* / *r*) from the top line (*r* is the radius): the job moves
+  every line, fill line and dot there.
+- **Even out** (round objects): where the surface slopes away, the beam's spot spreads over more of
+  it and each mm² gets less light, so marks come out lighter towards the sides. The job slows down
+  there by the cosine of the slope (half speed 60° round), and pictures' dots are held on longer by
+  the same share, so the mark is as dark as on the top. It never goes slower than a quarter of the
+  layer's speed.
+
+### Setting up a pen
+
+1. Measure the pen with calipers where the mark goes (pens taper), and lay it on the bed, straight
+   left to right or front to back. A V-groove jig or tape keeps it from rolling.
+2. Open **Surfaces** on the **Machine** tab and click **Add a round object**. If shapes are selected,
+   the new surface is placed on them.
+3. Set **Diameter (mm)**, **Lies**, and **Top height (mm)**: for a pen lying straight on the bed,
+   **Lying on the bed: top = diameter** sets it; or auto-focus on the pen's top in the machine panel
+   and click **Use the focus height now**.
+4. Put the surface where the pen is: **Middle X (mm)** and **Middle Y (mm)** are the middle of its
+   rectangle, on the pen's top line. Turn on the camera picture on the canvas to line it up with the
+   real pen.
+5. Click **Apply**, then draw or move what goes on the pen inside its rectangle on the canvas.
+
+### The window
+
+![The Surfaces window: two pens, and where their marks land seen from above](images/window-machine-surfaces.png)
+
+The left side is the bed from above: each surface's rectangle on the canvas dashed, where its marks
+really land filled, and the design twice, faint as drawn and orange where it will be marked
+(squeezed towards a round object's top line as it wraps round it). For a round object, the corner
+shows it end on, with the part of it that marks can reach.
+
+- **Add a round object**, **Add a flat piece**: a new surface (named Pen 1, Pen 2… or Piece 1…), on
+  the selection if anything is selected, lying along its longer side.
+- **Copy**: another one the same, beside it with a 2 mm gap (the next pen in a row). Copy the marks
+  across too, with Duplicate or a grid array at the same spacing.
+- **Remove**: what was drawn on it is then marked flat, at the height of everything else.
+- **Apply** keeps the surfaces with the design (saved with it; `Ctrl+Z` undoes it). **Cancel** closes
+  without changing anything. The head never moves from this window.
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| **Name** | | Pen 1 | What it's called in the job bar's messages and on the canvas. |
+| **What it is** | Round, Flat at its own height | | Round: wrapped round, focused and evened out. Flat: only focused, at its top height. |
+| **Lies** | Left to right (along X), Front to back (along Y) | Left to right | Which way its length runs on the bed. |
+| **Middle X (mm)**, **Middle Y (mm)** | −100 to 320 | the selection's middle, else 110 | The middle of its rectangle on the canvas. On a round object it's on the top line. **Centre it on the selection** moves it there. |
+| **Length (mm)** | 1 to 400 | 60 | How much of its length takes marks. |
+| **Diameter (mm)** | 1 to 300 | 10 | Round: its diameter where the marks go. |
+| **Reach round (°)** | 5 to 85 | 60 | Round: how far round from the top, each way, marks may go. It sets how wide the rectangle is (a 10 mm pen at 60°: 10.5 mm). Past about 60° the surface turns away from the beam and marks come out fainter and wider, even slowed down: the job bar warns. On the canvas the part past 45° is shaded. |
+| **Wrap the design round it** | on/off | on | Round: off drops the design straight down onto it instead (the rectangle is then what's seen from above). |
+| **Even out the slopes (slow down where it curves away)** | on/off | on | Round: the slow-down above. |
+| **Width (mm)** | 1 to 400 | 30 | Flat: how wide it is across. |
+| **Top height (mm)** | 0 to 150 | 10 | How high its top is above the bed, as you'd focus on it. |
+| **Everything else is at (mm)** | 0 to 150, or not set | not set | The focus height for marks that aren't on any surface. A job with such marks stops and asks when it isn't set. |
+| **Height steps (mm)** | 0.05 to 1 | 0.2 | How far the head moves between heights on a round object. |
+
+### How a job with surfaces is marked
+
+- Nothing on any surface: the job is as it would be without them.
+- A mark that runs off a surface's edge: only the part inside its rectangle is put on the object, and
+  the job bar says so.
+- Fills on a round object: lines that run along it stay straight and are each marked at one height.
+  Lines that run round it are cut up at every height step, which is slower and shows joins: the job
+  bar says which scan angle runs along it (0° for one lying left to right, 90° front to back).
+- Pictures are burned in straight rows (no scan angle, crosshatch or turning per pass).
+- A Cut or Score layer's **Step down/pass** is left out, as on a curved surface.
+- Two surfaces whose rectangles overlap stop the job: move one apart.
+- With **Curved surface** on as well, marks off every surface follow the curved surface.
+- Surfaces work on the flat bed only: with the rotary or conveyor, or marking in **Sections**, they're
+  left out (Sections stops and says so).
+- The job's preview and frame show where the marks really land (seen from above), not as drawn.
+
 ## Layer by layer
 
 <!-- windows: LayerByLayerWindow -->
@@ -501,5 +595,6 @@ numbers and spreadsheet rows only move on after the last section.
 - [Calibrate the pointer](tutorial:area-calibrate-pointer)
 - [Scan a part in the rotary](tutorial:area-rotary-scan)
 - [Mark on a curved piece](tutorial:area-curved-surface)
+- [Mark on a pen or other object](tutorial:area-surfaces)
 - [Mark one layer at a time](tutorial:area-layer-by-layer)
 - [Mark a design bigger than the bed](tutorial:area-sections)

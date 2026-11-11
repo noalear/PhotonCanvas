@@ -17,7 +17,7 @@
 - [Materials and tests](materials-and-tests.md)
   - [Material library](material-library.md)
 - [Running a job](running-jobs.md)
-- [Work area: rotary, curved, layer by layer, sections, pieces](work-area.md)
+- [Work area: rotary, curved, surfaces, layer by layer, sections, pieces](work-area.md)
 - [Add-ons](addons.md)
 - [The machine and settings](machine.md)
 - [Troubleshooting](troubleshooting.md)

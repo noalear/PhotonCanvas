@@ -14,8 +14,12 @@ public static class SurfaceBanding
     /// <summary>Paths are cut into pieces at most this long, so a piece doesn't span bands.</summary>
     const double SampleMm = 0.5;
 
-    /// <summary>The blocks split into bands. Lines of one layer (same settings) share one block.</summary>
-    public static List<Block> Apply(IReadOnlyList<Block> blocks, Func<Vec2, double> height, double bandMm)
+    /// <summary>
+    /// The blocks split into bands. Lines of one layer (same settings) share one block. With
+    /// <paramref name="speedShare"/> (surfaces that slope away), dots are held on longer where it's below 1:
+    /// each band's dots are split again by how long they're held.
+    /// </summary>
+    public static List<Block> Apply(IReadOnlyList<Block> blocks, Func<Vec2, double> height, double bandMm, Func<Vec2, double>? speedShare = null)
     {
         bandMm = Math.Clamp(bandMm, 0.02, 5);
         var o = new List<Block>();
@@ -55,10 +59,10 @@ public static class SurfaceBanding
                     Add([BandFill(f, Z, bandMm)], f.PauseAfterS);
                     break;
                 case PointsBlock p:
-                    Add(Bands(p.Points, Z, bandMm).Select(g => (Block)(p with { Points = g.Items, HeadZ = g.HeadZ })), p.PauseAfterS);
+                    Add(Bands(p.Points, Z, bandMm).SelectMany(g => g.Items.GroupBy(x => DotUsAt(p.DotUs, x, speedShare)).Select(h => (Block)(p with { Points = [.. h], HeadZ = g.HeadZ, DotUs = h.Key }))), p.PauseAfterS);
                     break;
                 case DotBlock d:
-                    Add(BandDots(d, Z, bandMm), d.PauseAfterS);
+                    Add(BandDots(d, Z, bandMm, speedShare), d.PauseAfterS);
                     break;
                 default:
                     o.Add(b);
@@ -188,27 +192,42 @@ public static class SurfaceBanding
             new(s.Y, s.X0 + (s.X1 - s.X0) * t0, s.X0 + (s.X1 - s.X0) * t1, Vec2.Lerp(s.Start, s.End, t0), Vec2.Lerp(s.Start, s.End, t1));
     }
 
-    /// <summary>A picture split into one picture per band (each pixel where its surface is), each with its head height.</summary>
-    static IEnumerable<DotBlock> BandDots(DotBlock d, Func<Vec2, double> z, double band)
+    /// <summary>
+    /// How long a dot is held on at <paramref name="at"/>: longer where the surface slopes away (the share of
+    /// speed there, see <see cref="Job.SpeedShare"/>), in whole 10 µs, at most 100 ms.
+    /// </summary>
+    public static int DotUsAt(int dotUs, Vec2 at, Func<Vec2, double>? speedShare)
     {
-        double pitch = 25.4 / d.Dpi;
+        if (speedShare is null) return dotUs;
+        double k = speedShare(at);
+        if (!double.IsFinite(k) || k >= 1) return dotUs;
+        double held = dotUs / Math.Max(WrapZone.SlowestShare, k);
+        return (int)Math.Clamp(Math.Round(held / 10, MidpointRounding.AwayFromZero) * 10, 10, 100_000);
+    }
+
+    /// <summary>A picture split into one picture per band (each pixel where its surface is), each with its head height.</summary>
+    static IEnumerable<DotBlock> BandDots(DotBlock d, Func<Vec2, double> z, double band, Func<Vec2, double>? speedShare)
+    {
         int w = d.Bitmap.Width, h = d.Bitmap.Height;
         var zs = new double[w * h];
+        var us = new int[w * h];
         var on = new List<int>();
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
             {
                 int i = y * w + x;
                 if (!d.Bitmap.Bits[i]) continue;
-                zs[i] = z(new Vec2(d.Origin.X + x * pitch, d.Origin.Y + y * pitch));
+                var at = d.At(x, y);
+                zs[i] = z(at);
+                us[i] = DotUsAt(d.DotUs, at, speedShare);
                 on.Add(i);
             }
         var (top, level) = Levels(on.Select(i => zs[i]), band);
-        foreach (var g in on.GroupBy(i => level(zs[i])).OrderBy(g => g.Key))
+        foreach (var g in on.GroupBy(i => (Level: level(zs[i]), Us: us[i])).OrderBy(g => g.Key.Level).ThenBy(g => g.Key.Us))
         {
             var bmp = new Bitmap(w, h);
             foreach (var i in g) bmp.Bits[i] = true;
-            yield return d with { Bitmap = bmp, HeadZ = top - g.Key * band };
+            yield return d with { Bitmap = bmp, HeadZ = top - g.Key.Level * band, DotUs = g.Key.Us, PassBlocks = null };
         }
     }
 }
