@@ -231,6 +231,25 @@ public sealed class AddonHost : IAddonHost
 
     public IDisposable AddJobHook(IJobHook hook) => Keep(JobHooks.Add(hook));
 
+    public IDisposable AddDocRule(IDocRule rule) => Keep(DocRules.Add(new SafeRule(rule, Manifest.Id)));
+
+    /// <summary>A rule that logs what it throws (once per kind of failure) and leaves the edit as it was.</summary>
+    sealed class SafeRule(IDocRule inner, string addon) : IDocRule
+    {
+        string? _last;
+        public string Name => inner.Name;
+        public DocState Apply(DocState before, DocState after)
+        {
+            try { return inner.Apply(before, after) ?? after; }
+            catch (Exception e)
+            {
+                if (_last != e.Message) AppLog.Error($"Add-on {addon}: {inner.Name}", e);
+                _last = e.Message;
+                return after;
+            }
+        }
+    }
+
     public IDisposable Publish<T>(T service) where T : class
     {
         if (_manager.Services.TryGetValue(typeof(T), out var had) && had.Owner != Manifest.Id)
