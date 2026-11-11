@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using PhotonCanvas.Device;
+using PhotonCanvas.Core;
 using static PhotonCanvas.App.UiKit;
 
 namespace PhotonCanvas.App;
@@ -44,9 +45,13 @@ public sealed class DeviceSettingsWindow : Window
     // Keep the last job
     readonly TextBox _keepName = new() { MaxLength = 15, Watermark = "e.g. Coaster1", Width = 200 };
 
-    public DeviceSettingsWindow(DeviceClient client)
+    public DeviceSettingsWindow(DeviceClient client, MachineProfile? machine = null)
     {
         _c = client;
+        machine ??= MachineProfile.F2Ultra;
+        // The F2 Ultra UV: no MOPA overheat alarm, and its galvo timing is kept per lens (not yet supported).
+        bool uv = machine.Uv is not null;
+        _overheat.IsVisible = !uv && machine.HasMopa;
         Title = "Device settings";
         Width = 740;
         Height = 640;
@@ -59,7 +64,7 @@ public sealed class DeviceSettingsWindow : Window
         rename.Click += async (_, _) => await Do("Renamed.", () => _c.SetDeviceNameAsync(_name.Text ?? ""));
         Wire(_flame, "flameAlarm", on => on, "Turn the flame alarm off?", FlameOffWarning);
         Wire(_moved, "workingMode", on => on ? "NORMAL" : "HANDLE", "Keep running when moved?", MovedOffWarning);
-        Wire(_lidStops, "gapCheck", on => on, "Keep running with the lid open?", LidStopOffWarning);
+        Wire(_lidStops, "gapCheck", on => on, "Keep running with the lid open?", LidStopOffWarning.Replace("455 nm blue and 1064 nm infrared", machine.Wavelengths, StringComparison.Ordinal));
         Wire(_overheat, "laserTempAlarmEnable", on => on, "Turn the overheat alarm off?", OverheatOffWarning);
         Wire(_beep, "beepEnable", on => on, null, null);
         Wire(_purifierBeep, "purifierBeepEnable", on => on, null, null);
@@ -118,7 +123,8 @@ public sealed class DeviceSettingsWindow : Window
                 Page("Exhaust & sleep",
                     Field("Exhaust run-on (s)", _runOn, tip: "How long the exhaust or purifier keeps running after a job, to clear the smoke."),
                     _purifierBeep, _sleep),
-                Page("Galvo timing",
+                uv ? Page("Galvo timing",
+                    Hint("The F2 Ultra UV keeps its galvo timing for each of its two lenses, which PhotonCanvas can't set yet. Change it in xTool Studio if you need to.")) : Page("Galvo timing",
                     Hint("Delays that line the laser up with the mirrors' movement: raise the on delay if lines start with a dot or gap, the off delay if they end with a blob, the corner delay if corners round off. " +
                          "Values are shown as xTool Studio shows them. Change them a little at a time and burn a test between changes."),
                     timingGrid,

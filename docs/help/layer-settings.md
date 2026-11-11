@@ -54,6 +54,14 @@ Choosing **MOPA** shows **Pulse width** and **Frequency**. The card adds " · MO
 moved by the offset measured with **Align lasers** (Machine → Calibrate), so both lasers land in the
 same place (see [Camera](camera.md)).
 
+The switch only shows on a machine with both lasers. On the **xTool F2 Ultra UV** (Settings →
+Machines, or Settings → Equipment) there is one laser: the switch gives way to **UV laser · 355 nm**,
+and every layer, blue or MOPA, is marked with it at the layer's power, speed, passes and
+**Frequency** (40 to 150 kHz; xTool Studio starts at 40). Pulse width, **Highly reflective** and
+the cleanup frequency don't apply and are hidden. The layer keeps its settings, so a design moves
+back to the F2 Ultra unchanged. Not yet tried on a real F2 Ultra UV: start with a small test at low
+power.
+
 ## Power, speed and passes
 
 | Setting | Range | What it does |

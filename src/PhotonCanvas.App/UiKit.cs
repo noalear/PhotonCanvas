@@ -51,6 +51,16 @@ public static class UiKit
     }
 
     /// <summary>Label on the left, editor on the right, optional hint underneath.</summary>
+    /// <summary>
+    /// A diode/MOPA choice, shown only where the machine has both to choose from: on the F2 Ultra UV (and
+    /// machines without a known MOPA) it's hidden and the work runs on the machine's own laser.
+    /// </summary>
+    public static Control LaserChoice(Control row, PhotonCanvas.Core.MachineProfile machine)
+    {
+        row.IsVisible = machine.Uv is null && machine.HasMopa;
+        return row;
+    }
+
     public static Control Field(string label, Control editor, TextBlock? hint = null, string? tip = null)
     {
         var grid = new Grid { ColumnDefinitions = new("110,*") };

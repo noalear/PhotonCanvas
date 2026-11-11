@@ -16,7 +16,7 @@ namespace PhotonCanvas.App;
 public sealed class MaterialTestWindow : Window
 {
     static readonly TestParam[] Params = [TestParam.Power, TestParam.Speed, TestParam.LineInterval, TestParam.Focus, TestParam.Frequency, TestParam.PulseWidth, TestParam.Passes];
-    static readonly string[] ParamNames = ["Power %", "Speed mm/s", "Line gap mm", "Focus mm", "Frequency kHz (MOPA)", "Pulse width ns (MOPA)", "Passes"];
+    static readonly string[] ParamNames = ["Power %", "Speed mm/s", "Line gap mm", "Focus mm", "Frequency kHz (MOPA, UV)", "Pulse width ns (MOPA)", "Passes"];
 
     readonly ComboBox _preset = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Power × speed", "Focus: find the sharpest height", "Line spacing: how close the fill lines go", "Any two settings", "One square at chosen settings" } };
     readonly ComboBox _mode = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Engrave (filled squares)", "Score (outlines)", "Cut (outlines)" }, SelectedIndex = 0 };
@@ -31,6 +31,10 @@ public sealed class MaterialTestWindow : Window
     readonly Control _axisRows, _powerRow, _speedRow, _gapRow, _focusRow, _freqRow, _pulseRow, _passesRow;
     readonly TextBlock _summary = Hint(), _about = new() { TextWrapping = TextWrapping.Wrap };
     readonly MachineProfile _machine = MachineProfile.F2Ultra;
+    /// <summary>The machine in use: on the F2 Ultra UV there's no laser to choose and the frequency is the UV's.</summary>
+    readonly MachineProfile _active;
+    readonly Control _lightRow;
+    bool Uv => _active.Uv is not null;
     readonly DocState _state;
     readonly string _font;
     bool _setting;
@@ -38,10 +42,14 @@ public sealed class MaterialTestWindow : Window
     /// <summary>The options chosen, or null if cancelled.</summary>
     public MaterialTestOptions? Result { get; private set; }
 
-    public MaterialTestWindow(DocState state, string font)
+    public MaterialTestWindow(DocState state, string font, MachineProfile? machine = null)
     {
         _state = state;
         _font = font;
+        _active = machine ?? MachineProfile.F2Ultra;
+        _lightRow = Field("Laser", _light);
+        _lightRow.IsVisible = !Uv && _active.HasMopa;
+        if (_active.Uv is { } uv) { _freq.Minimum = uv.MinKhz; _freq.Maximum = uv.MaxKhz; }
         Title = "Test grid";
         Width = 520;
         SizeToContent = SizeToContent.Height;
@@ -97,7 +105,7 @@ public sealed class MaterialTestWindow : Window
                 {
                     _about,
                     Field("Test", _preset),
-                    Field("Laser", _light),
+                    _lightRow,
                     Field("Squares", _mode),
                     _axisRows,
                     new TextBlock { Text = "THE REST", Classes = { "h" } },
@@ -125,7 +133,7 @@ public sealed class MaterialTestWindow : Window
         Children = { new TextBlock { Text = label, Classes = { "muted" }, FontSize = 12 }, editor },
     };
 
-    bool Red => _light.SelectedIndex == 1;
+    bool Red => _light.SelectedIndex == 1 && !Uv && _active.HasMopa;
 
     /// <summary>Starting values for the chosen kind of test and laser.</summary>
     void Preset()
@@ -157,7 +165,7 @@ public sealed class MaterialTestWindow : Window
             Set(_aMin, o.AcrossMin); Set(_aMax, o.AcrossMax); Set(_aSteps, o.AcrossSteps);
             Set(_dMin, o.DownMin); Set(_dMax, o.DownMax); Set(_dSteps, o.DownSteps);
             Set(_power, o.Power); Set(_speed, o.Speed); Set(_gap, 10 / o.LinesPerCm); Set(_focus, o.FocusMm);
-            Set(_freq, o.FrequencyKhz); Set(_passes, o.Passes); Set(_cell, o.CellMm);
+            Set(_freq, _active.Uv?.DefaultKhz ?? o.FrequencyKhz); Set(_passes, o.Passes); Set(_cell, o.CellMm);
             _pulse.SelectedIndex = _machine.Mopa.ToList().FindIndex(m => m.PulseWidthNs == o.PulseWidthNs);
             if (_pulse.SelectedIndex < 0) _pulse.SelectedIndex = _machine.Mopa.Count - 1;
             if (_preset.SelectedIndex is 1 or 2) _mode.SelectedIndex = 0;
@@ -181,7 +189,7 @@ public sealed class MaterialTestWindow : Window
             TestParam.Speed => (Red ? 200.0 : 50.0, Red ? 2000.0 : 400.0, 5),
             TestParam.LineInterval => (0.01, 0.1, 10),
             TestParam.Focus => (-3.0, 3.0, 13),
-            TestParam.Frequency => (50.0, 500.0, 6),
+            TestParam.Frequency => _active.Uv is { } uv ? (uv.MinKhz, uv.MaxKhz, 6) : (50.0, 500.0, 6),
             TestParam.PulseWidth => (2.0, 500.0, 6),
             _ => (1.0, 5.0, 5),
         };
@@ -229,14 +237,15 @@ public sealed class MaterialTestWindow : Window
         _speedRow.IsVisible = !Swept(TestParam.Speed);
         _gapRow.IsVisible = o.Mode == LayerMode.Fill && !Swept(TestParam.LineInterval);
         _focusRow.IsVisible = !Swept(TestParam.Focus);
-        _freqRow.IsVisible = Red && !Swept(TestParam.Frequency);
+        _freqRow.IsVisible = (Red || Uv) && !Swept(TestParam.Frequency);
         _pulseRow.IsVisible = Red && !Swept(TestParam.PulseWidth);
         _passesRow.IsVisible = !Swept(TestParam.Passes);
         var b = MaterialTest.Bounds(_state, o);
         int n = MaterialTest.Values(o.Across, o.AcrossMin, o.AcrossMax, o.AcrossSteps, _machine).Count * MaterialTest.Values(o.Down, o.DownMin, o.DownMax, o.DownSteps, _machine).Count;
-        bool fits = b.MaxX <= _machine.FieldW && b.MaxY <= _machine.FieldH;
+        bool fits = b.MaxX <= _active.FieldW && b.MaxY <= _active.FieldH;
         string warn = o.Across == o.Down ? " ⚠ Across and down are the same setting: pick two different ones." : "";
-        if (!Red && (Swept(TestParam.Frequency) || Swept(TestParam.PulseWidth))) warn += " ⚠ Frequency and pulse width are MOPA settings: the diode ignores them.";
+        if (Uv && Swept(TestParam.PulseWidth)) warn += " ⚠ Pulse width is a MOPA setting: the UV laser ignores it.";
+        else if (!Red && !Uv && (Swept(TestParam.Frequency) || Swept(TestParam.PulseWidth))) warn += " ⚠ Frequency and pulse width are MOPA settings: the diode ignores them.";
         if (o.Mode != LayerMode.Fill && Swept(TestParam.LineInterval)) warn += " ⚠ Line gap only matters for engraved (filled) squares.";
         _summary.Text = $"{n} squares, about {b.MaxX - b.MinX:0} × {b.MaxY - b.MinY:0} mm, placed at the top-left of the work area." +
                         (fits ? "" : " ⚠ That's bigger than the work area: use fewer steps or smaller squares.") + warn;

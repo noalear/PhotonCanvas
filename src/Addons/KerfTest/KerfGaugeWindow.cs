@@ -92,7 +92,7 @@ public sealed class KerfGaugeWindow : Window
                            "Each 0.01 mm of kerf moves the key about 0.2 mm, so a photo reads it finely. Saved on the material, the kerf and fit are used by the box generator, slices, dowel pins and inlays.",
                 },
                 Field("Cut with", _source, tip: "The cut settings to measure: a cut recipe from your library (the result goes back onto it), or a cut layer in this design. Use settings that cut right through cleanly."),
-                Row(Labelled("Laser", _light), Labelled("Power (%)", _power), Labelled("Speed (mm/s)", _speed), Labelled("Passes", _passes)),
+                Row(UiKit.LaserChoice(Labelled("Laser", _light), host.Machine), Labelled("Power (%)", _power), Labelled("Speed (mm/s)", _speed), Labelled("Passes", _passes)),
                 Field("Thickness (mm)", _thick, tip: "What the sheet is sold as. The bottom slot is drawn around it, and the reading says what it really is. Under 1.5 mm there's only the top slot."),
                 _inCloseUp,
                 _plan,

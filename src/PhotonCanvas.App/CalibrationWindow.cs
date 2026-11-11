@@ -26,7 +26,10 @@ public sealed class CalibrationWindow : Window
     readonly ComboBox _markStyle = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = new[] { "Dots", "Crosshairs" } };
     readonly ComboBox _markSize = new() { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = SizeChoices.Select(s => $"{s:0.#} mm").ToList() };
     static readonly double[] SizeChoices = [1, 2, 4];
-    readonly MachineProfile _profile = MachineProfile.F2Ultra;
+    /// <summary>The flat bed of the machine in use (the F2 Ultra, or another xTool such as the F2 Ultra UV).</summary>
+    readonly MachineProfile _profile;
+    /// <summary>"blue diode", or "UV laser" on the F2 Ultra UV (which burns the marks with its one laser).</summary>
+    string LaserName => _profile.Uv is not null ? "UV laser" : "blue diode";
     readonly IReadOnlyList<Vec2> _grid;
 
     readonly PhotoView _photo = new();
@@ -65,6 +68,7 @@ public sealed class CalibrationWindow : Window
     {
         _machine = machine;
         _settings = settings;
+        _profile = settings.ActiveSetup() is { Kind: MachineKind.XTool } x ? x.Profile : MachineProfile.F2Ultra;
         _markStyle.SelectedIndex = settings.CalibMarkStyle == MarkStyle.Cross ? 1 : 0;
         int sizeIdx = Array.FindIndex(SizeChoices, s => Math.Abs(s - settings.CalibMarkSizeMm) < 1e-9);
         _markSize.SelectedIndex = sizeIdx >= 0 ? sizeIdx : 1;
@@ -123,7 +127,7 @@ public sealed class CalibrationWindow : Window
             Children =
             {
                 Card("1 · Focus on the material",
-                    Hint("Lay a flat scrap sheet (wood or card) over the whole 220 × 220 mm area first, then focus on it. Out of focus, the marks come out faint or wide and the camera is calibrated for the wrong height."),
+                    Hint($"Lay a flat scrap sheet (wood or card) over the whole {_profile.FieldW:0} × {_profile.FieldH:0} mm area first, then focus on it. Out of focus, the marks come out faint or wide and the camera is calibrated for the wrong height."),
                     autoFocus,
                     Field("Or its height", _typedFocus, tip: "Material thickness (mm), when auto-focus can't see it."),
                     moveFocus,
@@ -132,7 +136,7 @@ public sealed class CalibrationWindow : Window
                     Hint("PhotonCanvas burns 25 marks in a grid over the whole area, plus one small dot beside the top-left mark and two beside the top-right mark."),
                     Field("Marks", _markStyle, tip: "Dots are easiest to spot; crosshairs make the centre easiest to judge by eye. Either way PhotonCanvas finds the exact centre itself."),
                     Field("Mark size", _markSize, Hint("Smaller marks are easier to judge but fainter. Use the same choice when you take the photo."), "Dot diameter, or crosshair width."),
-                    Field("Power", _power, tip: "Blue diode power for the dots."),
+                    Field("Power", _power, tip: "Laser power for the dots (the blue diode, or the UV laser on the F2 Ultra UV)."),
                     Field("Speed", _speed, tip: "Slower = darker marks."),
                     send, _burnState),
                 Card("3 · Photo", Row(take, open), _photoState),
@@ -204,7 +208,7 @@ public sealed class CalibrationWindow : Window
             var motion = job.Render();
             var corners = new Vec2[] { new(5, 5), new(215, 5), new(215, 215), new(5, 215), new(5, 5) };
             var preview = _grid.Select(p => (IReadOnlyList<Vec2>)Geom.Arc(p.X, p.Y, 2, 2, 0, 360, 0.5)).ToList();
-            xf = XfPackage.Build(new() { Motion = motion, Border = job.Border(corners), PreviewJpeg = XfPackage.PreviewJpeg(preview), Light = "blue", EstimatedSeconds = job.EstimateSeconds() });
+            xf = XfPackage.Build(new() { Motion = motion, Border = job.Border(corners), PreviewJpeg = XfPackage.PreviewJpeg(preview), Light = _profile.OnThisMachine(laser).Light.Wire(), EstimatedSeconds = job.EstimateSeconds() });
         }
         catch (JobException e)
         {
@@ -219,7 +223,7 @@ public sealed class CalibrationWindow : Window
             return;
         var dist = _machine.Distance is { } d ? $"Machine focus distance: {d:0.0} mm.\n" : "";
         if (!await Dialogs.Confirm(this, "Burn calibration marks",
-                $"25 {(Spec.Style == MarkStyle.Cross ? "crosshairs" : "dots")} ({Spec.SizeMm:0.#} mm) plus 3 orientation dots across the whole 220 × 220 mm area, blue diode {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
+                $"25 {(Spec.Style == MarkStyle.Cross ? "crosshairs" : "dots")} ({Spec.SizeMm:0.#} mm) plus 3 orientation dots across the whole {_profile.FieldW:0} × {_profile.FieldH:0} mm area, {LaserName} {laser.Power:0.#}% at {laser.Speed:0.#} mm/s.\n{dist}\n" +
                 "Make sure scrap material covers the whole area. After upload the machine waits; nothing fires until you press its start button." +
                 (_machine.Mode == "P_WORK" ? "\n\nA job that's loaded on the machine but not started will be replaced." : ""),
                 "Upload", "Cancel")) return;

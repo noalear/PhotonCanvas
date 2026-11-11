@@ -108,7 +108,7 @@ public sealed class MachinePanel : UserControl
         _deviceSettings.IsEnabled = false;
         _deviceSettings.Click += async (_, _) =>
         {
-            if (_client is { } dc && Owner is { } w) { await new DeviceSettingsWindow(dc).ShowDialog(w); await RefreshBeeper(); }
+            if (_client is { } dc && Owner is { } w) { await new DeviceSettingsWindow(dc, WorkModes.Area(_settings)).ShowDialog(w); await RefreshBeeper(); }
         };
         _frontLight.ValueChanged += async (_, _) => await LightsChanged();
         _backLight.ValueChanged += async (_, _) => await LightsChanged();
@@ -1204,6 +1204,9 @@ public sealed class MachinePanel : UserControl
         finally { _focus.IsEnabled = IsConnected; IsBusyFocusing = false; Changed(); }
     }
 
+    /// <summary>The lid-open warning, with the wavelengths of the machine in use.</summary>
+    public static string LidOpenWarningFor(MachineProfile m) => LidOpenWarning.Replace("455 nm blue and 1064 nm infrared", m.Wavelengths, StringComparison.Ordinal);
+
     public const string LidOpenWarning =
         "With this on, the machine will run with its lid open. The lid is what blocks the laser's light, smoke and sparks. " +
         "With it open:\n\n" +
@@ -1257,7 +1260,7 @@ public sealed class MachinePanel : UserControl
     {
         if (_updatingLid || _client is not { } c || _lidOpen.IsChecked is not bool on) return;
         if (on && Owner is { } owner &&
-            !await Dialogs.Confirm(owner, "Allow starting with the lid open?", LidOpenWarning, "I understand, allow it", "Keep it off"))
+            !await Dialogs.Confirm(owner, "Allow starting with the lid open?", LidOpenWarningFor(WorkModes.Area(_settings)), "I understand, allow it", "Keep it off"))
         {
             await RefreshLid();
             return;

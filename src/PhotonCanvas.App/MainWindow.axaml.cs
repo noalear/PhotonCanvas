@@ -734,8 +734,8 @@ public partial class MainWindow : Window
         var cal = laser.Group("Calibrate");
         cal.Large("Calibrate camera", "IcCalibrate", () => _ = Guard(_machine.CalibrateAsync), "Calibrate the camera so its picture lines up with where the laser marks (once per material height)");
         cal.Small("Close-up position", "IcZoomIn", () => _ = Guard(() => ShowCloseUpCalibration(CloseUpCalibrationWindow.InDesign(_doc.State))), "Teach PhotonCanvas exactly where the close-up camera looks (ten small dots, once per focus height): tone and line tests are then read from sharp close-up photos");
-        cal.Small("Align lasers", "IcAlignLasers", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)),
-            "Line the two lasers up with each other: the blue (diode) laser is the one the camera is calibrated to, so the MOPA (fiber) is measured against it. Both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match");
+        _ribbon.ShowWhen(cal.Small("Align lasers", "IcAlignLasers", () => _ = Guard(() => new LaserAlignWindow(_doc, _machine, _settings, LaserAlignWindow.InDesign(_doc.State)).ShowDialog(this)),
+            "Line the two lasers up with each other: the blue (diode) laser is the one the camera is calibrated to, so the MOPA (fiber) is measured against it. Both burn a grid of dots, the close-up camera measures how far apart they land, and MOPA work is moved to match"), () => Canvas.Machine is { HasDiode: true, HasMopa: true }) /* two lasers to line up */;
         var machine = laser.Group("Settings");
         machine.Large("Machine settings", "IcSettings", () => _ = Guard(() => ShowSettings("Machine")), "Machine connection, camera calibration, lights, options and its event log");
         _ribbon.ShowWhen(machine.Small("Console", "IcConsole", ShowConsole, "G-code console and macros: send commands straight to the machine (advanced)"), () => _settings.ShowConsole);
@@ -2548,7 +2548,7 @@ public partial class MainWindow : Window
 
     async Task AddMaterialTest()
     {
-        var w = new MaterialTestWindow(_doc.State, _settings.TextFont);
+        var w = new MaterialTestWindow(_doc.State, _settings.TextFont, Canvas.Machine);
         await w.ShowDialog(this);
         if (w.Result is not { } o) return;
         var (state, added) = MaterialTest.Add(_doc.State, o);

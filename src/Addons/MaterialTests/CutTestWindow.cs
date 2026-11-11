@@ -104,7 +104,7 @@ public sealed class CutTestWindow : Window
                     TextWrapping = TextWrapping.Wrap,
                     Text = "This cuts a grid of little squares, each with different settings. Afterwards, the squares that fell out (or push out with a finger) were cut right through. The quickest of those is your cut setting.",
                 },
-                Field("Laser", _light),
+                LaserChoice(Field("Laser", _light), machine),
                 new Border { Background = Brush("Bg0"), CornerRadius = new(8), Padding = new(10), Child = _preview },
                 Explained("Across: speed", "Each column is cut at a different speed. Slower cuts deeper.",
                     Row(Labelled("Slowest (mm/s)", _sMin), Labelled("Fastest (mm/s)", _sMax), Labelled("How many speeds", _sSteps)), _speedList),

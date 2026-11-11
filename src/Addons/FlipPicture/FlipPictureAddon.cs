@@ -20,6 +20,7 @@ public sealed class FlipPictureAddon : IAddon
             Large = true,
             Tip = "Two to four pictures in one polished stainless plate, each seen from its own tilt (MOPA): select 2–4 pictures",
             Enabled = () => SelectedPictures().Count is >= 2 and <= FlipOptions.MaxViews,
+            Visible = () => host.Machine.HasMopa, // made with the MOPA's pulses: not on the F2 Ultra UV
             Order = 15,
         });
         host.AddCommand(new AddonCommand("flip-picture.open", "Pictures", "Flip picture…", "", Open));

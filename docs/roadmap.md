@@ -153,6 +153,7 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [x] Movable, dockable panels (LightBurn): layers, selection and layer settings move between the sides, float in their own windows or fold to their titles; kept between runs (View → Reset panels)
 - [x] Mac and Linux builds (LightBurn): `tools/publish.sh`; built and packaged, not yet run on a Mac or Linux machine
 - [x] User-defined machines (Settings → Machines): GRBL machines added and described (bed, laser, speeds, power scale, origin, port, air assist), with a Full Spectrum 5th Gen Hobby 20×12 starting point; jobs written as GRBL 1.1 laser-mode G-code and streamed over USB (character-counting flow control), with home, unlock, frame, pause, stop and Save G-code. Not yet run on a real GRBL machine
+- [x] F2 Ultra UV basics: picked in first-start setup (Settings → Equipment), every layer marked with its UV laser (`G22` + 40–150 kHz), MOPA- and diode-only tools hidden, 355 nm in the safety warnings. Untested on a real UV; lenses, UV galvo timing, UV presets and inside-glass engraving still to do
 - [x] Other xTool machines (Settings → Machines): F2 Ultra (Single), F1 Ultra, F2, F1 Lite and F2 Ultra UV with their work areas and G-code tags (same protocol and G-code as the F2 Ultra); fiber settings only where the limits are known; a connected machine of another model is pointed out. Untested on those machines
 
 ### Material library and tests

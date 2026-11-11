@@ -174,9 +174,9 @@ can still be switched to outlines afterwards.
 
 | Setting | Choices or range | What it does |
 |---|---|---|
-| **Laser** | **Blue diode (wood, leather, acrylic, paper…)**, **MOPA (metals, some plastics)** | Changing it reloads the test's starting values for that laser. |
+| **Laser** | **Blue diode (wood, leather, acrylic, paper…)**, **MOPA (metals, some plastics)** | Changing it reloads the test's starting values for that laser. Only shown on a machine with both: on the F2 Ultra UV the test runs on its UV laser, with **Frequency kHz (MOPA, UV)** at 40 to 150 kHz (the laser choice in the Cut test, Etch rate and Kerf gauge is hidden there too). |
 | **Squares** | **Engrave (filled squares)**, **Score (outlines)**, **Cut (outlines)** | The mode of every square's layer. |
-| **Across**, **Down** | Power %, Speed mm/s, Line gap mm, Focus mm, Frequency kHz (MOPA), Pulse width ns (MOPA), Passes | The two settings that change, each with **from**, **to** and **steps** (1–20): evenly spaced values, rounded. |
+| **Across**, **Down** | Power %, Speed mm/s, Line gap mm, Focus mm, Frequency kHz (MOPA, UV), Pulse width ns (MOPA), Passes | The two settings that change, each with **from**, **to** and **steps** (1–20): evenly spaced values, rounded. |
 | **THE REST** | | The settings that stay the same; a box hides while its setting is swept. **Power %** 1–100, **Speed mm/s** 2–15000, **Line gap mm** 0.001–10 (filled squares only; 0.1 mm = 100 lines per cm), **Focus mm** −10 to +10, **Pulse width** and **kHz** (MOPA only), **Passes** 1–100. |
 | **Square size (mm)** | 3–30, default 10 | Under 8 mm the gaps are 2 mm and the labels 2.5 mm high, otherwise 3 mm. |
 

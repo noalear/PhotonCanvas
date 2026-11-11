@@ -60,6 +60,7 @@ public partial class MainWindow : IAddonServices
     {
         bool changed = !ReferenceEquals(Canvas.Machine, m);
         Canvas.Machine = m;
+        _layers.Uv = m.Uv is not null;
         if (changed) _machineChanged?.Invoke();
     }
 

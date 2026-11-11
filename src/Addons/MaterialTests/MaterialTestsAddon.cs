@@ -56,6 +56,7 @@ public sealed class MaterialTestsAddon : IAddon
         Add(new RibbonButton("Tests", "Experimental", "Graphene test", "IcBolt", () => _ = host.Guard(() => Graphene(GrapheneTestWindow.InDesign(Doc.State))))
         {
             Tip = "Experimental: laser-induced graphene (conductive carbon burned into cork or wood). Strips at different power and speed, measured with a multimeter",
+            Visible = () => host.Machine.HasDiode, // burned with the blue diode
             Order = 0,
         });
 

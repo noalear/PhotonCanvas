@@ -29,7 +29,14 @@ public sealed class EquipmentPanel : UserControl
         return n;
     }
 
-    /// <summary>Something was ticked or unticked.</summary>
+    /// <summary>What the chosen machine has, in a line.</summary>
+    public static string Describe(PhotonCanvas.Core.MachineSetup m) =>
+        m.Id == PhotonCanvas.Core.MachineSetup.F2Ultra.Id ? "40 W blue diode and 60 W MOPA fiber laser, 220 × 220 mm."
+        : m.Kind == PhotonCanvas.Core.MachineKind.Grbl ? $"{m.Laser} {m.PowerW:0.#} W, {m.BedW:0} × {m.BedH:0} mm, over USB."
+        : m.Profile.Uv is { } uv ? $"{uv.Watts:0} W UV laser (355 nm), {m.BedW:0} × {m.BedH:0} mm. Tools that need the blue diode or the MOPA are hidden. Not yet tried on a real F2 Ultra UV: start with a small test at low power."
+        : $"{m.Laser}, {m.BedW:0} × {m.BedH:0} mm." + (m.Profile.HasMopa ? "" : " Tools that need the MOPA are hidden.") + " Not yet tried on this model.";
+
+    /// <summary>Something was ticked or unticked, or the machine changed.</summary>
     public event Action? Changed;
 
     public EquipmentPanel(AppSettings settings)
@@ -41,13 +48,49 @@ public sealed class EquipmentPanel : UserControl
             c.IsCheckedChanged += (_, _) => { set(c.IsChecked == true); settings.Save(); Changed?.Invoke(); };
             return c;
         }
+        // The machine: the xTool models built in (GRBL machines are added and picked in Settings → Machines).
+        // Choosing one with fewer lasers (the F2 Ultra UV) takes the tools that need the others out of the ribbon.
+        var models = new[] { PhotonCanvas.Core.MachineSetup.F2Ultra }.Concat(PhotonCanvas.Core.MachineSetup.XToolFamily).ToList();
+        var active = settings.ActiveSetup();
+        var model = new ComboBox { ItemsSource = models.Select(m => m.Name).ToList(), HorizontalAlignment = HorizontalAlignment.Stretch };
+        ToolTip.SetTip(model, "Which xTool laser you have: it sets the work area, the lasers you can choose and the tools shown. Also in Settings → Machines.");
+        var about = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var colour = Box("Colour on metal", settings.ShowColourOnMetal, v => settings.ShowColourOnMetal = v, "Colour tests, measuring colours with the close-up camera, and colour pictures on stainless or titanium (MOPA).");
+        var gratings = Box("Diffraction gratings", settings.ShowDiffraction, v => settings.ShowDiffraction = v, "Rainbow shimmer pictures and the depth-map almost-hologram on polished stainless (MOPA).");
+        void ShowModel(PhotonCanvas.Core.MachineSetup m)
+        {
+            about.Text = Describe(m);
+            colour.IsVisible = gratings.IsVisible = m.Profile.HasMopa; // MOPA features: only with a MOPA
+        }
+        Control machineRow;
+        if (active.Kind == PhotonCanvas.Core.MachineKind.Grbl)
+        {
+            machineRow = new TextBlock { Text = $"{active.Name} (GRBL). Change it in Settings → Machines.", TextWrapping = TextWrapping.Wrap };
+            ShowModel(active);
+        }
+        else
+        {
+            model.SelectedIndex = Math.Max(0, models.FindIndex(m => m.Id == active.Id));
+            ShowModel(models[model.SelectedIndex]);
+            model.SelectionChanged += (_, _) =>
+            {
+                if (model.SelectedIndex < 0) return;
+                var m = models[model.SelectedIndex];
+                settings.ActiveMachine = m.Id == PhotonCanvas.Core.MachineSetup.F2Ultra.Id ? null : m.Id;
+                settings.Save();
+                ShowModel(m);
+                Changed?.Invoke();
+            };
+            machineRow = model;
+        }
         Content = new StackPanel
         {
             Spacing = 8,
             Children =
             {
                 new TextBlock { Text = "YOUR MACHINE", Classes = { "h" } },
-                new TextBlock { Text = "xTool F2 Ultra: 40 W blue diode and 60 W MOPA fiber laser, 220 × 220 mm.", TextWrapping = TextWrapping.Wrap },
+                machineRow,
+                about,
                 new TextBlock { Text = "ATTACHMENTS", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
                 Box("RA2 Pro rotary (rollers and chuck)", settings.OwnsRa2, v => settings.OwnsRa2 = v, "For marking round things: cups, tumblers, rings."),
                 Box("RA3 rotary (rollers and chuck)", settings.OwnsRa3, v => settings.OwnsRa3 = v, "The newer rotary."),
@@ -55,8 +98,8 @@ public sealed class EquipmentPanel : UserControl
                 Box("Conveyor feeder", settings.OwnsConveyor, v => settings.OwnsConveyor = v, "Feeds long pieces through, up to 610 mm."),
                 Hint("Only the attachments you have show up under Machine → Work mode. With none, the Work mode button is hidden and jobs are always on the flat bed."),
                 new TextBlock { Text = "FEATURES TO SHOW", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
-                Box("Colour on metal", settings.ShowColourOnMetal, v => settings.ShowColourOnMetal = v, "Colour tests, measuring colours with the close-up camera, and colour pictures on stainless or titanium (MOPA)."),
-                Box("Diffraction gratings", settings.ShowDiffraction, v => settings.ShowDiffraction = v, "Rainbow shimmer pictures and the depth-map almost-hologram on polished stainless (MOPA)."),
+                colour,
+                gratings,
                 Box("G-code console", settings.ShowConsole, v => settings.ShowConsole = v, "Send commands straight to the machine, and keep macros (advanced)."),
                 Hint("Hiding a feature only takes it out of the ribbon: nothing is lost, and ticking it again brings it back."),
                 new TextBlock { Text = "EXTRACTION", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
@@ -87,7 +130,7 @@ public sealed class EquipmentWindow : Window
             Spacing = 12,
             Children =
             {
-                new TextBlock { Text = "What do you have? Tick any attachments, so the features that need them appear. You can change this any time in Settings → Equipment.", TextWrapping = TextWrapping.Wrap },
+                new TextBlock { Text = "What do you have? Pick your machine and tick any attachments, so the features that need them appear. You can change this any time in Settings → Equipment.", TextWrapping = TextWrapping.Wrap },
                 new EquipmentPanel(settings),
                 done,
             },

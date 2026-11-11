@@ -75,6 +75,8 @@ public sealed record MachineSetup
         XTool("xTool F2", "GS006", "GS006", 115, "Diode + infrared", 15),
         XTool("xTool F1 Lite", "GS005", "F1", 115, "Diode", 10),
         XTool("xTool F2 Ultra UV", "GS009-CLASS-4", "GS009-4", 200, "UV", 5),
+        // The Class 1 version: the same UV laser and G-code in xTool Studio's own files (no lens choice, no inside-glass engraving).
+        XTool("xTool F2 Ultra UV (Class 1)", "GS009-CLASS-1", "GS009-4", 200, "UV", 5),
     ];
 
     static MachineSetup XTool(string name, string code, string tag, double field, string laser, double watts, bool mopa = false) => new()
@@ -104,6 +106,8 @@ public sealed record MachineSetup
         {
             DeviceCode = DeviceCode, GcodeTag = GcodeTag, FieldW = BedW, FieldH = BedH,
             Mopa = MopaKnown ? MachineProfile.F2UltraMopa : [],
+            HasDiode = Laser.Contains("Diode", StringComparison.Ordinal),
+            Uv = Laser == "UV" ? UvLaser.F2UltraUv : null,
         })
         : new MachineProfile
     {

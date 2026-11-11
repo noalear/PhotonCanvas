@@ -23,7 +23,7 @@ public sealed class WelcomeWindow : Window
 
     public static readonly string SafetyText =
         "Lasers are dangerous. A laser cutter can blind you, start fires and release toxic fumes.\n\n" +
-        "• Never look at the beam or its reflections. Keep the lid closed while it runs, or wear safety glasses rated for this laser's wavelengths (455 nm and 1064 nm).\n" +
+        "• Never look at the beam or its reflections. Keep the lid closed while it runs, or wear safety glasses rated for this laser's wavelengths (455 nm and 1064 nm on the F2 Ultra, 355 nm on the F2 Ultra UV).\n" +
         "• Never leave the machine running unattended. Keep a fire extinguisher nearby.\n" +
         "• Only cut materials you know are safe. PVC, vinyl and many other plastics release poisonous gas. Always ventilate.\n" +
         "• Check every job before pressing start: the preview is a guide, not a guarantee.";
@@ -72,7 +72,7 @@ public sealed class WelcomeWindow : Window
                 Children =
                 {
                     Title2("Your equipment"),
-                    Para("Tick any attachments you have, so the features that need them appear. You can change this any time in Settings → Equipment."),
+                    Para("Pick your machine and tick any attachments you have, so the features that need them appear (and those it can't use stay hidden). You can change this any time in Settings → Equipment."),
                     new EquipmentPanel(equipment),
                 },
             });

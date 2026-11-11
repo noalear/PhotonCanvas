@@ -88,7 +88,9 @@ public sealed class MachinesPanel : UserControl
                     new TextBlock
                     {
                         Text = m.Kind == MachineKind.XTool
-                            ? $"Built in · over Wi-Fi · {m.Laser} · {m.BedW:0} × {m.BedH:0} mm" + (m.Untested ? " · untested: same protocol and G-code as the F2 Ultra" + (m.MopaKnown ? "" : ", fiber settings not yet known") : "")
+                            ? $"Built in · over Wi-Fi · {m.Laser} · {m.BedW:0} × {m.BedH:0} mm" + (m.Untested ? m.Profile.Uv is { } uv
+                                ? $" · untested: same protocol as the F2 Ultra, every layer on the UV laser ({uv.MinKhz}–{uv.MaxKhz} kHz); diode and MOPA tools hidden"
+                                : " · untested: same protocol and G-code as the F2 Ultra" + (m.MopaKnown ? "" : ", fiber settings not yet known") : "")
                             : $"GRBL over USB{(m.Port.Length > 0 ? $" ({m.Port})" : "")} · {m.Laser} {m.PowerW:0.#} W · {m.BedW:0.#} × {m.BedH:0.#} mm",
                         Classes = { "muted" }, FontSize = 12, TextWrapping = TextWrapping.Wrap,
                     },

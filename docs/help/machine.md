@@ -171,7 +171,8 @@ and what's happening. See [Finding and connecting](#finding-and-connecting).
 - **Device settings…**: the machine's own stored settings (see [Device settings](#device-settings)).
 
 > **Safety:** With the lid open, laser light, smoke and sparks escape. Everyone in the room needs
-> safety glasses rated for 455 nm and 1064 nm. Never leave the machine running unattended.
+> safety glasses rated for 455 nm and 1064 nm (355 nm on the F2 Ultra UV). Never leave the machine
+> running unattended.
 
 **WORK AREA CAMERA**: **Camera on work area** (the overview camera under your design),
 **Opacity** (how strongly it shows, 15–100%, 85% to begin with), **Update photo**,
@@ -209,6 +210,13 @@ it: the F2 Ultra over the network, a GRBL machine over USB.
   their work areas. They use the same protocol and G-code as the F2 Ultra but are untested: none
   has been tried on a real machine. MOPA settings are allowed only where the limits are known
   (the F2 Ultra and F2 Ultra (Single)).
+- **xTool F2 Ultra UV** (and **xTool F2 Ultra UV (Class 1)**, the same laser) has one 5 W, 355 nm UV laser and a 200 × 200 mm work area. Every layer is
+  marked with it (`G22` with the layer's frequency, 40 to 150 kHz, as xTool Studio does for this
+  model). Tools that need the blue diode or the MOPA leave the ribbon while it's chosen: Colour on
+  metal, Diffraction, Flip picture, the Graphene test and Align lasers; and so do the laser switch in
+  layer settings and tests, the MOPA overheat alarm and Import from xTool Studio in the library. Its
+  galvo timing is kept for each of its two lenses, which PhotonCanvas can't set yet, and inside-glass
+  engraving isn't supported.
 - Your GRBL machines, each with **Edit**.
 
 Click the round button beside one to use it. The work area and the job change at once.
@@ -270,6 +278,12 @@ once: in the welcome window at the first start, or in **Your equipment** at the 
 updating from a version that didn't ask. Change it here any time.
 
 ![Settings, Equipment page](images/window-settings--equipment.png)
+
+**YOUR MACHINE**: which xTool laser you have, picked from the list (the same choice as the
+[Machines page](#machines-page)), with what it has underneath. It sets the work area, the lasers
+layers can use and the tools shown: on the **xTool F2 Ultra UV** the tools that need the blue diode
+or the MOPA are hidden, and **Colour on metal** and **Diffraction gratings** below go too. A GRBL
+machine is named here and changed on the Machines page.
 
 **ATTACHMENTS**: **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
 **Conveyor feeder**. Only the ones ticked show up under **Machine → Work mode**; with none ticked,
@@ -431,7 +445,8 @@ it off** or **Keep it on**.
 ### Galvo timing tab
 
 Delays that line the laser up with the mirrors' movement, for each laser: **Diode (blue)** and
-**MOPA (red)**. The rows are **Laser on delay**, **Laser off delay**, **End-of-line delay**,
+**MOPA (red)**. On the F2 Ultra UV the tab only says that its timing is kept for each lens, which
+PhotonCanvas can't set yet (use xTool Studio for it). The rows are **Laser on delay**, **Laser off delay**, **End-of-line delay**,
 **Corner delay**, **Jump delay**, **Jump distance delay** and **Dot settle delay**.
 
 - Raise the **Laser on delay** if lines start with a dot or a gap, the **Laser off delay** if they

@@ -139,6 +139,10 @@ setting and window, with pictures; `F1` in any window opens its page. **Tutorial
 you through each feature a step at a time, pointing at each control as you go. Both are the
 Markdown files in [`docs/help`](docs/help) (readable here on GitHub too).
 
+**Quick start for the F2 Ultra UV.** [`docs/quick-start-f2-ultra-uv.pdf`](docs/quick-start-f2-ultra-uv.pdf) takes a
+new F2 Ultra UV owner from install to a first mark, with updating and safety (its source is
+[`docs/quick-start`](docs/quick-start)). UV support is untested on a real machine.
+
 ## DepthCharge
 
 PhotonCanvas can turn a picture into a relief depthmap with **DepthCharge**, a separate

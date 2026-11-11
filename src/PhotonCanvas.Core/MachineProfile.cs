@@ -30,6 +30,15 @@ public readonly record struct MopaLimit(int PulseWidthNs, int DefaultKhz, int Ma
 }
 
 /// <summary>
+/// The F2 Ultra UV's 355 nm laser, from xTool Studio's own UV model (GS009): marked with <c>G22</c> and a
+/// frequency (<c>G0Q</c>) in this range, no pulse width. Untested on a real machine.
+/// </summary>
+public sealed record UvLaser(int MinKhz = 40, int MaxKhz = 150, int DefaultKhz = 40, double Watts = 5)
+{
+    public static readonly UvLaser F2UltraUv = new();
+}
+
+/// <summary>
 /// Per-model machine limits: from xTool's published specifications, measurements on the user's
 /// machine, and (the MOPA table) the user's own xTool Studio at run time.
 /// </summary>
@@ -49,6 +58,25 @@ public sealed record MachineProfile
     /// <summary>Highest Z the head may be sent to.</summary>
     public required double ZMax { get; init; }
     public required IReadOnlyList<MopaLimit> Mopa { get; init; }
+
+    /// <summary>Has the 455 nm blue diode (false on the F2 Ultra UV and the fiber-only F2 Ultra).</summary>
+    public bool HasDiode { get; init; } = true;
+    /// <summary>Has a MOPA fiber laser whose limits are known, so MOPA settings and tools are offered.</summary>
+    public bool HasMopa => Mopa.Count > 0;
+    /// <summary>The UV laser, on the F2 Ultra UV (its only laser). Null elsewhere.</summary>
+    public UvLaser? Uv { get; init; }
+
+    /// <summary>
+    /// The settings as this machine runs them: on a UV machine every layer, blue or MOPA, goes to its UV
+    /// laser with the layer's power, speed, passes and frequency (the pulse width is dropped). Elsewhere unchanged.
+    /// </summary>
+    public LaserSettings OnThisMachine(LaserSettings l) => Uv is null || l.Light == LightSource.Uv ? l : l with { Light = LightSource.Uv };
+
+    /// <summary>The wavelengths safety glasses must be rated for, as written in the warnings.</summary>
+    public string Wavelengths => Uv is not null ? "355 nm ultraviolet"
+        : HasDiode && HasMopa ? "455 nm blue and 1064 nm infrared"
+        : HasMopa ? "1064 nm infrared"
+        : "455 nm blue";
 
     public MopaLimit? MopaLimitFor(int pulseWidthNs)
     {

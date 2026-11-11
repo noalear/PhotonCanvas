@@ -6,11 +6,16 @@ public enum LightSource
     Blue,
     /// <summary>1064 nm MOPA fiber (<c>G22</c>), with pulse width and frequency.</summary>
     Red,
+    /// <summary>
+    /// 355 nm UV (the F2 Ultra UV's only laser: <c>G22</c> with a frequency, no pulse width). Never stored
+    /// on a layer: a job for a UV machine runs every layer on it (<see cref="MachineProfile.OnThisMachine"/>).
+    /// </summary>
+    Uv,
 }
 
 public static class LightSourceExt
 {
-    public static string Wire(this LightSource l) => l == LightSource.Red ? "red" : "blue";
+    public static string Wire(this LightSource l) => l switch { LightSource.Red => "red", LightSource.Uv => "uv", _ => "blue" };
 }
 
 /// <summary>Power, speed and passes for one piece of work.</summary>
@@ -51,6 +56,14 @@ public sealed record LaserSettings
         JobException.CheckRange("power", Power, 0, 100, "%");
         JobException.CheckRange("speed", Speed, m.MinSpeed, m.MaxSpeed, "mm/s");
         JobException.CheckRange("passes", Passes, 1, 10_000, "");
+        // A UV machine runs every layer on its UV laser: only the frequency matters, in the UV's range.
+        if (m.Uv is { } uv)
+        {
+            JobException.CheckRange("UV frequency", FrequencyKhz, uv.MinKhz, uv.MaxKhz, "kHz");
+            return;
+        }
+        if (Light == LightSource.Uv)
+            throw new JobException("This layer is set for a UV laser, but the machine in use has none. Choose the F2 Ultra UV in Settings → Machines, or set the layer to another laser.");
         if (Light == LightSource.Red)
         {
             var lim = m.MopaLimitFor(PulseWidthNs)

@@ -767,7 +767,7 @@ public static class JobBuilder
             blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
         }
         // The MOPA lined up with the blue laser: its work moved back by how far off it lands.
-        if (opt.MopaOffset.Length > 1e-6)
+        if (opt.MopaOffset.Length > 1e-6 && opt.Machine.HasDiode && opt.Machine.HasMopa) // only where both lasers are there to line up
         {
             var everywhere = new Rect2(-1e6, -1e6, 1e6, 1e6);
             blocks = [.. blocks.SelectMany(b => b.Laser.Light == LightSource.Red ? Sections.Cut(b, everywhere, -opt.MopaOffset) : [b])];
@@ -800,7 +800,7 @@ public static class JobBuilder
         Vec2[] frame = [bounds.TopLeft, new(bounds.MaxX, bounds.MinY), bounds.BottomRight, new(bounds.MinX, bounds.MaxY), bounds.TopLeft];
         var border = job.Border(frame);
 
-        var lights = blocks.Select(b => b.Laser.Light).Distinct().ToList();
+        var lights = job.Blocks.Select(b => b.Laser.Light).Distinct().ToList();
         var light = lights.Count > 1 ? "mixed" : lights[0].Wire();
         var prms = new JsonArray();
         foreach (var l in layers.Where(l => s.ShapesFor(l).Any()))
@@ -813,7 +813,7 @@ public static class JobBuilder
                     LayerMode.Image => "BITMAP_ENGRAVING",
                     _ => "VECTOR_CUTTING",
                 },
-                ["processingLightSource"] = l.Laser.Light.Wire(),
+                ["processingLightSource"] = opt.Machine.OnThisMachine(l.Laser).Light.Wire(),
                 ["power"] = l.Laser.Power,
                 ["speed"] = l.Laser.Speed,
                 ["repeat"] = l.Laser.Passes,

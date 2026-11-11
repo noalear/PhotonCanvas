@@ -75,7 +75,7 @@ public sealed class EtchTestWindow : Window
             Children =
             {
                 Hint("One setting, burned into small circles: 1 pass, 2 passes, 3 … Burn it, then on the next tab click the first circle that went right through."),
-                Field("Laser", _light), Field("Power %", _power), Field("Speed mm/s", _speed), Field("Lines per cm", _lpcm),
+                LaserChoice(Field("Laser", _light), machine), Field("Power %", _power), Field("Speed mm/s", _speed), Field("Lines per cm", _lpcm),
                 Field("Turn per pass °", _turn, tip: "Turning the fill lines each pass keeps a deep floor even. Use what you'll use for real."),
                 Field("First circle", _first, tip: "Passes on the first circle."), Field("Each next +", _step, tip: "Passes added on each next circle."), Field("Circles", _count), Field("Circle Ø (mm)", _dia),
                 _plan,
