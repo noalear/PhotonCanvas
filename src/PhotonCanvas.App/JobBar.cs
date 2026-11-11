@@ -1003,6 +1003,9 @@ public sealed class JobBar : UserControl
     /// <summary>A job this bar sent finished on the machine (not cancelled): the design it came from, by file.</summary>
     public event Action<string?>? RunFinished;
 
+    /// <summary>A job was uploaded from this bar (it waits for the machine's start button): what it was made from.</summary>
+    public event Action<Addons.UploadedJob>? Sent;
+
     /// <summary>A job started running on the machine (any job, also one started there): its name.</summary>
     public event Action<string>? RunStarted;
 
@@ -1019,6 +1022,7 @@ public sealed class JobBar : UserControl
         // Dates and times as of now (fields are otherwise filled in when the design changes).
         var fresh = VariableText.Refresh(_doc.State, DateTime.Now);
         if (!ReferenceEquals(fresh, _doc.State)) _doc.Commit("Update date and time", fresh);
+        var builtFrom = _doc.State; // what the job is made of (for add-ons, e.g. a production log)
         BuiltJob job;
         _preparing = true;
         _dots = 0;
@@ -1085,6 +1089,10 @@ public sealed class JobBar : UserControl
                 // Layer by layer: the piece is done after its last layer, not each one.
                 || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.SentFor(l).Any()).LastOrDefault()?.Id != onlyOne;
             _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
+            string? part = _section is { } sec ? sec.Label
+                : _onlyLayer is { } only && _doc.State.Layers.FirstOrDefault(l => l.Id == only) is { } ol ? $"layer {ol.Name}" : null;
+            Sent?.Invoke(new Addons.UploadedJob(job, builtFrom, _doc.FilePath, LastSent.Value.SentAt, part, !_sentMidSections,
+                _settings.ActiveSetup().Name is { Length: > 0 } setup ? setup : "Machine"));
         }
         catch (DeviceException e)
         {
