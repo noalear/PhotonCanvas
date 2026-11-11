@@ -62,6 +62,14 @@ public sealed class LayersPanel : UserControl
     public ImmutableHashSet<Guid> SelectedLayers => _selected;
     public event Action? SelectionChanged;
 
+    /// <summary>The machine in use is the F2 Ultra UV (set by the main window): layer cards don't name a laser.</summary>
+    public bool Uv
+    {
+        get => _uv;
+        set { if (_uv == value) return; _uv = value; Rebuild(); }
+    }
+    bool _uv;
+
     public LayersPanel(Document doc)
     {
         _doc = doc;
@@ -272,7 +280,7 @@ public sealed class LayersPanel : UserControl
             Background = new SolidColorBrush(Color.Parse(modeColour), 0.2),
             Child = new TextBlock { Text = modeText, FontSize = 10, FontWeight = FontWeight.Bold, Foreground = new SolidColorBrush(Color.Parse(modeColour)), LetterSpacing = 0.5 },
         };
-        string light = l.Laser.Light == Core.LightSource.Red ? " · MOPA" : "";
+        string light = Uv ? "" : l.Laser.Light == Core.LightSource.Red ? " · MOPA" : ""; // the F2 Ultra UV runs every layer on its one laser
         string passes = l.Laser.Passes > 1 ? $" ×{l.Laser.Passes}" : "";
         string detail = l.Mode == LayerMode.Image ? $"{l.Laser.Power:0.#}% · {l.Dpi:0} dpi{light}" : $"{l.Laser.Power:0.#}% · {l.Laser.Speed:0.#} mm/s{passes}{light}";
         // The details take what the time leaves and trim there (a time in hours is wider).

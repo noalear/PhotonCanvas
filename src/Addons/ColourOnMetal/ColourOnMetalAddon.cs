@@ -14,8 +14,8 @@ public sealed class ColourOnMetalAddon : IAddon
     public void Start(IAddonHost host)
     {
         _host = host;
-        // Settings → Equipment can still hide them on machines without a MOPA.
-        bool Shown() => host.AppSettings.ShowColourOnMetal;
+        // Only with a MOPA (not on the F2 Ultra UV, say); Settings → Equipment can hide them too.
+        bool Shown() => host.AppSettings.ShowColourOnMetal && host.Machine.HasMopa;
         host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Colour on metal", "IcPalette", () =>
         {
             if (host.SelectedPicture is { } im) _ = host.Guard(() => MakePicture(im));

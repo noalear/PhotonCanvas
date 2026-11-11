@@ -84,6 +84,8 @@ public sealed class MaterialLibraryWindow : Window
         export.Click += async (_, _) => await Export();
         var xtool = Button("Import from xTool Studio…", tip: "xTool's tested F2 Ultra settings and your own from xTool Studio, read from its folder on this computer (read only; nothing is sent).");
         xtool.Click += async (_, _) => await ImportXTool();
+        // xTool's presets are read for the F2 Ultra; its numbers would be wrong on the F2 Ultra UV's one laser.
+        xtool.IsVisible = WorkModes.Area(settings).Uv is null;
         var author = new TextBox { Text = settings.LibraryAuthor ?? "", Watermark = "Your name (shown to people you share with)" };
         author.LostFocus += (_, _) => { _settings.LibraryAuthor = string.IsNullOrWhiteSpace(author.Text) ? null : author.Text.Trim(); _settings.Save(); };
 

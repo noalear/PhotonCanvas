@@ -199,7 +199,8 @@ means it didn't find the material: check the material is under the head and try 
 
 The marks are 25 in a 5 × 5 grid, 10 mm in from the edges of the work area (50 mm apart), plus small
 orientation dots: one beside the top-left mark and two beside the top-right mark. They're burned as
-lines with the blue diode, so they land exactly where cuts land.
+lines with the blue diode, so they land exactly where cuts land (with the UV laser on the F2 Ultra
+UV, across its 200 × 200 mm area; not yet tried there).
 
 | Setting | Choices | Default | What it does |
 |---|---|---|---|

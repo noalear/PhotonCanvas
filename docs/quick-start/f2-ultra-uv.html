@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PhotonCanvas quick start: xTool F2 Ultra UV</title>
+<!--
+  Source of docs/quick-start-f2-ultra-uv.pdf. The pictures in images/ come from
+  `dotnet run --project tools/HelpShots -c Release -- quickstart <folder>` (then cropped).
+  To make the PDF again, print this page to US Letter with backgrounds on, for example with
+  Playwright's Chromium: page.pdf({ format: 'Letter', printBackground: true }).
+-->
+<style>
+  @page { size: Letter; margin: 0.6in 0.65in 0.7in; }
+  :root { --ink: #1b1f27; --muted: #5a6270; --line: #d9dde4; --accent: #2f5fb3; --warn-bg: #fff4e0; --warn: #a35a00; --uv: #6a3fb5; --uv-bg: #f3eefc; --soft: #f5f7fa; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: Inter, "DejaVu Sans", sans-serif; color: var(--ink); font-size: 9.8pt; line-height: 1.42; margin: 0; background: #fff; }
+  h1 { font-size: 26pt; line-height: 1.1; margin: 0 0 6pt; letter-spacing: -0.02em; }
+  h2 { font-size: 15pt; margin: 20pt 0 6pt; padding-top: 4pt; border-top: 2px solid var(--ink); break-after: avoid; }
+  h2 .n { color: var(--uv); margin-right: 6pt; }
+  h3 { font-size: 11pt; margin: 12pt 0 4pt; break-after: avoid; }
+  p { margin: 0 0 6pt; }
+  ol, ul { margin: 0 0 6pt; padding-left: 18pt; }
+  li { margin-bottom: 3pt; }
+  b, strong { font-weight: 600; }
+  .ui { font-weight: 600; }
+  code { font-family: "JetBrains Mono", "DejaVu Sans Mono", monospace; font-size: 8.8pt; background: var(--soft); padding: 0 3pt; border-radius: 3px; }
+  .cover { padding: 6pt 0 10pt; border-bottom: 1px solid var(--line); margin-bottom: 10pt; }
+  .kicker { color: var(--uv); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; font-size: 9pt; margin-bottom: 4pt; }
+  .lead { font-size: 11.5pt; color: var(--muted); max-width: 6.2in; }
+  .box { border-radius: 6px; padding: 8pt 10pt; margin: 8pt 0; break-inside: avoid; }
+  .box p:last-child, .box ul:last-child, .box ol:last-child { margin-bottom: 0; }
+  .box .t { font-weight: 700; display: block; margin-bottom: 3pt; }
+  .warn { background: var(--warn-bg); border-left: 4px solid var(--warn); }
+  .warn .t { color: var(--warn); }
+  .uvbox { background: var(--uv-bg); border-left: 4px solid var(--uv); }
+  .uvbox .t { color: var(--uv); }
+  .tip { background: var(--soft); border-left: 4px solid var(--accent); }
+  .tip .t { color: var(--accent); }
+  figure { margin: 8pt 0 10pt; break-inside: avoid; }
+  figure img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 4px; }
+  figcaption { font-size: 8.6pt; color: var(--muted); margin-top: 3pt; }
+  .row { display: flex; gap: 14pt; align-items: flex-start; }
+  .row > .text { flex: 1 1 0; min-width: 0; }
+  .row > figure { flex: 0 0 auto; margin-top: 0; }
+  .toc { columns: 2; column-gap: 24pt; margin: 6pt 0 0; padding-left: 18pt; }
+  .toc li { break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 8pt; font-size: 9.2pt; break-inside: auto; }
+  th, td { text-align: left; vertical-align: top; padding: 4pt 6pt; border-bottom: 1px solid var(--line); }
+  th { background: var(--soft); font-weight: 600; }
+  tr { break-inside: avoid; }
+  .check { list-style: none; padding-left: 0; }
+  .check li::before { content: "☐"; margin-right: 6pt; color: var(--muted); }
+  .page-break { break-before: page; }
+  .small { font-size: 8.8pt; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="kicker">PhotonCanvas quick start</div>
+  <h1>Setting up PhotonCanvas with an xTool F2&nbsp;Ultra&nbsp;UV</h1>
+  <p class="lead">From unpacking the program to your first marked square: installing, connecting, calibrating, the first job, keeping the program up to date, and staying safe with a 355&nbsp;nm UV laser.</p>
+</div>
+
+<div class="box uvbox">
+  <span class="t">Read this first: UV support is new and untested</span>
+  <p>PhotonCanvas was built on the F2 Ultra (blue diode and MOPA fiber). Support for the F2 Ultra UV was added from xTool's own published description of how the UV takes jobs, but <b>nobody has run PhotonCanvas on a real F2 Ultra UV yet</b>. Every step here is written from the program as it is; where a step hasn't been tried on a UV, it says so. Start small, at low power, on scrap, and stay with the machine.</p>
+  <p>You need a PhotonCanvas version newer than 0.1.113 (the <b>?</b> at the top right → <span class="ui">About PhotonCanvas</span> shows yours). Older versions list the UV but can't drive it properly.</p>
+</div>
+
+<h3>In this guide</h3>
+<ol class="toc">
+  <li>Before you start</li>
+  <li>Safety with a UV laser</li>
+  <li>Install PhotonCanvas</li>
+  <li>The first start: welcome window</li>
+  <li>Connect to the machine</li>
+  <li>Calibrate</li>
+  <li>Your first job</li>
+  <li>Install an update</li>
+  <li>What doesn't work on the UV yet</li>
+  <li>If something goes wrong</li>
+</ol>
+
+<h2><span class="n">1</span>Before you start</h2>
+<p>Have these ready:</p>
+<ul class="check">
+  <li>The F2 Ultra UV unpacked and set up following xTool's own instructions (lens fitted, power, network). Do xTool's first-time setup in <b>xTool Studio</b> first, including any firmware update it offers and its own lens and camera setup.</li>
+  <li><b>xTool Studio installed on the same Windows computer.</b> PhotonCanvas reads its connection keys from it (step 3 of the welcome window). You keep it installed afterwards.</li>
+  <li>The computer and the machine on the same Wi-Fi or wired network, or joined by the USB cable.</li>
+  <li>The PhotonCanvas program: <code>PhotonCanvas-win-x64.zip</code> (from whoever gave you PhotonCanvas).</li>
+  <li>Safety glasses rated for <b>355 nm</b> (see the next section).</li>
+  <li>Scrap material to test on: card, plywood, plastic you know is safe, or anodized aluminium. Not PVC or vinyl.</li>
+</ul>
+
+<h2><span class="n">2</span>Safety with a UV laser</h2>
+<div class="box warn">
+  <span class="t">The F2 Ultra UV is a 5 W, 355 nm ultraviolet laser</span>
+  <ul>
+    <li><b>The beam is near-invisible.</b> The glow you see on the material is not the beam. Never look at the work area while the laser is on with the lid open.</li>
+    <li><b>Keep the lid closed</b> while it runs. If you must watch with the lid open, wear safety glasses rated for 355 nm. Glasses for the blue diode or fiber lasers (455 nm, 1064 nm) do <b>not</b> protect against UV.</li>
+    <li>In Settings → Machine, leave <span class="ui">Allow starting with the lid open</span> <b>unticked</b>.</li>
+    <li><b>Never leave a job running unattended.</b> Keep a fire extinguisher nearby.</li>
+    <li><b>Ventilate.</b> Run the exhaust or purifier. Never laser PVC, vinyl or materials you aren't sure about: many plastics give off poisonous gas.</li>
+    <li><b>Check every job before pressing start.</b> The preview is a guide, not a guarantee, and on the UV the program itself is untested.</li>
+    <li>To stop at once: <span class="ui">Stop</span> in PhotonCanvas's job bar, or on the machine a short press of its button pauses and a long press while paused cancels. Know where the machine's power switch is.</li>
+  </ul>
+</div>
+<p class="small">PhotonCanvas is free, independent hobby software, not made, endorsed or supported by xTool or Makeblock. It comes with no warranty, and using it may not be covered by your machine's warranty.</p>
+
+<h2><span class="n">3</span>Install PhotonCanvas</h2>
+<p>There is no installer. The program is a folder that carries everything it needs.</p>
+<ol>
+  <li>Unzip <code>PhotonCanvas-win-x64.zip</code> into a folder you can write to, for example <code>C:\Users\&lt;you&gt;\Apps\PhotonCanvas</code>. Avoid <code>Program Files</code>: updates need to write into the folder.</li>
+  <li>Open the <code>PhotonCanvas</code> folder and run <code>PhotonCanvas.exe</code>. If Windows SmartScreen warns about an unknown program, choose <span class="ui">More info → Run anyway</span>.</li>
+  <li>If Windows Firewall asks, <b>allow</b> PhotonCanvas on private networks. It needs this to find the machine.</li>
+</ol>
+<p>Your own settings, connection keys, materials and calibration are kept in <code>C:\Users\&lt;you&gt;\PhotonCanvas</code>, separate from the program, so updating or moving the program loses nothing.</p>
+<div class="box tip">
+  <span class="t">Opening PhotonCanvas connects to the laser</span>
+  <p>After the first start, PhotonCanvas looks for the machine and connects by itself every time it opens. Connecting never fires the laser or starts a job.</p>
+</div>
+
+<h2><span class="n">4</span>The first start: welcome window</h2>
+<p>The first time PhotonCanvas opens, the <span class="ui">Welcome to PhotonCanvas</span> window takes you through five short steps. <span class="ui">Next</span> moves on and <span class="ui">Back</span> goes back.</p>
+
+<div class="row">
+  <div class="text">
+    <h3>Step 1 · Welcome</h3>
+    <p>What the program is. Click <span class="ui">Next</span>.</p>
+    <h3>Step 2 · Safety and terms</h3>
+    <p>Read the safety notice and the disclaimer, tick <span class="ui">I have read this, I understand the risks, and I accept these terms.</span> and click <span class="ui">Accept and continue</span>. If you close the window without accepting, the program closes.</p>
+  </div>
+  <figure style="width: 2.45in"><img src="images/welcome-safety.png" alt="Safety and terms step"><figcaption>Step 2: the safety notice names 355 nm for the UV.</figcaption></figure>
+</div>
+
+<div class="row">
+  <div class="text">
+    <h3>Step 3 · Connect your laser</h3>
+    <p>xTool machines expect three connection codes. They don't come with PhotonCanvas; it finds them in your copy of xTool Studio.</p>
+    <ol>
+      <li>Click <span class="ui">Set up connection keys…</span></li>
+      <li>Click <span class="ui">Find them in my xTool Studio</span>. The keys are read in a few seconds. (You can also choose xTool Studio's program file yourself, or paste the keys.)</li>
+      <li>The step then says <span class="ui">✓ Connection keys are set up.</span></li>
+    </ol>
+    <p>You can skip this and do it later in Settings → Connection.</p>
+  </div>
+  <figure style="width: 2.45in"><img src="images/welcome-keys.png" alt="Connect your laser step"><figcaption>Step 3: one-time connection keys.</figcaption></figure>
+</div>
+
+<div class="row">
+  <div class="text">
+    <h3>Step 4 · Your equipment: choose the F2 Ultra UV</h3>
+    <p><b>This is the most important step for a UV owner.</b> Under <span class="ui">YOUR MACHINE</span>, open the list and choose <span class="ui">xTool F2 Ultra UV</span> (or <span class="ui">xTool F2 Ultra UV (Class 1)</span> if you have the enclosed Class 1 model; both take jobs the same way).</p>
+    <p>With the UV chosen, PhotonCanvas:</p>
+    <ul>
+      <li>sets the work area to <b>200 × 200 mm</b>;</li>
+      <li>sends every layer to the UV laser, with a frequency of 40 to 150 kHz;</li>
+      <li>hides the tools that need the blue diode or the MOPA fiber laser (colour on metal, diffraction gratings, flip pictures, laser alignment, the diode/MOPA switch, overheat and galvo-timing settings, and the xTool material presets).</li>
+    </ul>
+    <p>Tick an attachment only if you have one. Leave the extraction numbers as they are unless you know your fan settings.</p>
+    <h3>Step 5 · How a job works</h3>
+    <p>A short summary. Click <span class="ui">Start designing</span>.</p>
+  </div>
+  <figure style="width: 2.45in"><img src="images/welcome-equipment.png" alt="Your equipment step with the F2 Ultra UV chosen"><figcaption>Step 4 with the F2 Ultra UV chosen.</figcaption></figure>
+</div>
+
+<p>You can change the machine later in Settings → <span class="ui">Equipment</span> (the same list) or Settings → <span class="ui">Machines</span>.</p>
+
+<h2><span class="n">5</span>Connect to the machine</h2>
+<ol>
+  <li>Turn the F2 Ultra UV on and wait for it to finish starting up.</li>
+  <li>Look at the right end of the ribbon. PhotonCanvas tries to connect by itself; if it shows <span class="ui">Not connected</span>, click <span class="ui">Connect</span>.</li>
+  <li><b>The first time, the machine may ask you to allow this computer:</b> press the button on the machine when it lights up or beeps.</li>
+  <li>When connected, the status shows the machine's name and state instead of <span class="ui">Not connected</span>, and the <span class="ui">Auto-focus</span> button appears beside it.</li>
+</ol>
+<figure style="width: 2.4in"><img src="images/machine-panel.png" alt="Connection status at the right end of the ribbon"><figcaption>The connection status at the right end of the ribbon, before connecting.</figcaption></figure>
+
+<div class="row">
+  <div class="text">
+    <h3>If it doesn't find the machine</h3>
+    <p>Open Settings (the gear at the top right, or Machine → <span class="ui">Machine settings</span>) and go to the <span class="ui">Machine</span> page:</p>
+    <ul>
+      <li><span class="ui">Find machines</span> searches the network again.</li>
+      <li>Or type the machine's IP address (xTool Studio or your router shows it) and click <span class="ui">Connect</span>.</li>
+      <li>Keep <span class="ui">Connect automatically when the program starts</span> ticked.</li>
+      <li>If it says the connection keys are missing, click <span class="ui">Set up connection keys…</span> (step 3 above).</li>
+    </ul>
+    <p>Close xTool Studio while PhotonCanvas is connected: if another program is connected, the machine can refuse PhotonCanvas.</p>
+    <div class="box uvbox"><span class="t">Untested on the UV</span><p>The UV uses the same connection protocol and keys as the F2 Ultra according to xTool's own software, but this hasn't been tried.</p></div>
+  </div>
+  <figure style="width: 2.9in"><img src="images/settings-machine.png" alt="Settings, Machine page"><figcaption>Settings → Machine: connection, status, auto-focus.</figcaption></figure>
+</div>
+
+<div class="row">
+  <div class="text">
+    <h3>Check the machine choice</h3>
+    <p>Settings → <span class="ui">Machines</span> lists every machine PhotonCanvas knows. Make sure <span class="ui">xTool F2 Ultra UV</span> is the one selected. If the F2 Ultra is selected instead, jobs would be written for the blue diode, which the UV doesn't have.</p>
+    <p>Another quick check: in the layer settings panel, a UV layer says <span class="ui">UV laser · 355 nm</span> and has a <span class="ui">Frequency</span> box, with no diode/MOPA switch.</p>
+  </div>
+  <figure style="width: 3.1in"><img src="images/settings-machines.png" alt="Settings, Machines page with the F2 Ultra UV selected"><figcaption>Settings → Machines with the F2 Ultra UV selected.</figcaption></figure>
+</div>
+
+<h2><span class="n">6</span>Calibrate</h2>
+<p>Do these in order. The first is done in xTool Studio; the rest in PhotonCanvas.</p>
+
+<h3>6.1 xTool's own UV setup (in xTool Studio)</h3>
+<p>The F2 Ultra UV's lens and galvo calibration, its small-lens height calibration and firmware updates are xTool's, and PhotonCanvas doesn't do them. Do them in xTool Studio as xTool's manual describes, then close xTool Studio before connecting PhotonCanvas. The calibration is kept on the machine, so PhotonCanvas uses it too.</p>
+<div class="box tip"><span class="t">Use the standard lens</span><p>PhotonCanvas works with the UV's standard 200 × 200 mm field. It can't choose the small lens yet, so keep the standard lens fitted.</p></div>
+
+<h3>6.2 Focus</h3>
+<p>Every job needs the material in focus. Put the material under the head, then click <span class="ui">Auto-focus</span> at the right end of the ribbon (or on Settings → Machine). The machine measures the material and moves to the right height. Out of focus, marks come out faint or wide.</p>
+
+<div class="row">
+  <div class="text">
+    <h3>6.3 Calibrate the camera</h3>
+    <p>This lines up the camera picture with where the laser actually marks, so you can place designs on the photo of your material. Machine → <span class="ui">Calibrate camera</span> opens a window with five steps:</p>
+    <ol>
+      <li><b>Focus on the material.</b> Lay a flat scrap (card or thin wood) over the whole 200 × 200 mm area and click <span class="ui">Auto-focus on the material</span>.</li>
+      <li><b>Burn marks.</b> PhotonCanvas burns 25 small marks in a grid over the whole area (plus three small dots that show which way round it is). Keep the suggested power and speed for a first try; on the UV they're burned with the UV laser at its default frequency. Close the lid and press the machine's start button.</li>
+      <li><b>Photo.</b> Take a photo of the marks with the machine's camera.</li>
+      <li><b>Locate the marks.</b> PhotonCanvas finds them in the photo; follow the window's instructions for any it can't find.</li>
+      <li><b>Check and save.</b> PhotonCanvas works out the correction; save it.</li>
+    </ol>
+    <p>Repeat only if you move the camera or the photo stops lining up.</p>
+    <div class="box uvbox"><span class="t">Untested on the UV</span><p>If the marks are too faint to find, raise the power a little and burn them again on a fresh scrap.</p></div>
+  </div>
+  <figure style="width: 2.2in"><img src="images/calibration-steps.png" alt="Calibrate camera window, steps 1 and 2"><figcaption>Calibrate camera, steps 1 and 2.</figcaption></figure>
+</div>
+
+<div class="row">
+  <div class="text">
+    <h3>6.4 Find the right settings with a test grid</h3>
+    <p>Each material needs its own power, speed and frequency. A test grid burns a set of small squares, each with different numbers, so you can pick the one you like.</p>
+    <ol>
+      <li>Materials &amp; Tests → Tests → <span class="ui">Test grid</span>.</li>
+      <li>Choose <span class="ui">Power × speed</span>. The UV starts at <b>40 kHz</b> in <span class="ui">kHz</span>.</li>
+      <li>Click <span class="ui">Add to design</span>. The squares are added at the top-left of the work area, each on its own labelled layer.</li>
+      <li>Send it like any job (section 7), then read the best square's numbers off its layer name.</li>
+    </ol>
+    <p>Once you have power and speed, run a second grid: choose <span class="ui">Any two settings</span> and put <span class="ui">Frequency kHz (MOPA, UV)</span> across (40 to 150 kHz): a higher frequency puts the pulses closer together for smoother, gentler marks.</p>
+    <p>Keep what works in Materials &amp; Tests → <span class="ui">Library</span>. xTool's own material presets are for the diode and MOPA, so they're hidden on the UV.</p>
+  </div>
+  <figure style="width: 2.6in"><img src="images/test-grid-uv.png" alt="Test grid window set for the UV"><figcaption>The test grid on the UV: 25 squares, 40 kHz.</figcaption></figure>
+</div>
+
+<h2><span class="n">7</span>Your first job</h2>
+<p>A 30 mm square outline with "UV" engraved inside it, on scrap card or wood. The numbers below are a cautious <b>starting guess</b>, not a tested UV recipe: use your test grid results once you have them.</p>
+
+<figure><img src="images/workspace-uv-top.png" alt="PhotonCanvas with a 30 mm square and the letters UV on two layers"><figcaption>The first job: a square on a Score layer, the letters on an Engrave layer, and the UV layer settings on the right.</figcaption></figure>
+
+<div class="row">
+  <div class="text">
+    <ol>
+      <li><b>Connect</b> (section 5). The status at the right end of the ribbon must show the machine.</li>
+      <li><b>Draw the square.</b> On the <span class="ui">Home</span> tab, click the rectangle and drag on the work area. In the <span class="ui">Selection</span> panel on the right, type <b>30</b> in <span class="ui">W</span> (with <span class="ui">Keep proportions</span> ticked, <span class="ui">H</span> follows), then click <span class="ui">Centre in work area</span>. The grid square is the UV's 200 × 200 mm area; nothing outside it can be sent.</li>
+      <li><b>Choose what the laser does.</b> Each shape sits on a layer (the <span class="ui">Layers</span> panel on the left). Select the layer and, in <span class="ui">Layer settings</span>, click <span class="ui">Score</span>: it marks along the outline without cutting.</li>
+      <li><b>Set the numbers:</b> <span class="ui">Power %</span> 40, <span class="ui">Speed mm/s</span> 500, <span class="ui">Passes</span> 1, <span class="ui">Frequency</span> 40. The panel should say <span class="ui">UV laser · 355 nm</span>.</li>
+      <li><b>Add the text</b> (optional). Click <span class="ui">Text</span>, click inside the square where the text should start, and type <b>UV</b> (the typing goes into the text box in the Selection panel). Add a new layer (<span class="ui">Add layer</span>, the <b>+</b> in the Layers panel), set it to <span class="ui">Engrave</span> at 30%, 1000 mm/s and 40 kHz, and move the text onto it with the <span class="ui">Layer</span> box in the Selection panel.</li>
+    </ol>
+  </div>
+  <figure style="width: 2.2in"><img src="images/layer-settings-uv.png" alt="Layer settings on the UV"><figcaption>Layer settings on the UV: no diode/MOPA switch, a Frequency box from 40 to 150 kHz.</figcaption></figure>
+</div>
+
+<ol start="6">
+  <li><b>Place the material and focus.</b> Lay the scrap in the middle of the bed and click <span class="ui">Auto-focus</span>.</li>
+  <li><b>Frame.</b> Click <span class="ui">Frame</span> (in the job bar under the work area, or Machine → <span class="ui">Frame</span>). The first time, confirm with <span class="ui">Start framing</span>. The head traces round the job with a faint pointer, over and over. Move the material until the outline sits where you want it, then click <span class="ui">Stop framing</span>.</li>
+  <li><b>Ship It.</b> Click <span class="ui">Ship It</span> (job bar, or Machine → <span class="ui">Ship It</span>). A summary lists each layer as <i>UV 40 kHz</i> with its power and speed, the size, the time and anything worth checking. Read it, then click <span class="ui">Ship It</span> in it to upload. Uploading never starts the laser.</li>
+  <li><b>Start.</b> The job bar says <span class="ui">Uploaded. Press the start button on the machine to begin</span>. Close the lid, put on your glasses if you'll be near the machine, and press the machine's start button.</li>
+  <li><b>Watch it.</b> The job bar follows the job. <span class="ui">Pause</span> and <span class="ui">Stop</span> are there while it runs. Stay with the machine until it finishes.</li>
+</ol>
+
+<figure><img src="images/ribbon-machine.png" alt="The Machine ribbon tab"><figcaption>The Machine tab: Frame and Ship It on the left (they light up once connected), Calibrate camera in the middle, Machine settings on the right.</figcaption></figure>
+
+<div class="box tip">
+  <span class="t">If the mark is too light or too dark</span>
+  <p>Too light or patchy: focus again, then raise the power or lower the speed a step. Too dark or melted: lower the power or raise the speed, or try a higher frequency. Change one thing at a time, and use a test grid (6.4) to find good numbers quickly.</p>
+</div>
+
+<h2><span class="n">8</span>Install an update</h2>
+<p>New versions are published from time to time. Updating never touches your settings, keys, calibration or designs.</p>
+
+<div class="row">
+  <div class="text">
+    <h3>Automatic updates (recommended)</h3>
+    <p>PhotonCanvas's updates are published in a private GitHub repository, so the program needs a <b>GitHub access key</b> to see them. Ask the person who gave you PhotonCanvas for one (a read-only key for this program only), then:</p>
+    <ol>
+      <li>Open Settings → <span class="ui">Updates</span>.</li>
+      <li>Paste the key into <span class="ui">GITHUB ACCESS KEY</span> and click <span class="ui">Save key</span>. It's kept on this computer only.</li>
+      <li>Leave <span class="ui">Check for a new version at start</span> and <span class="ui">Put new versions in by themselves</span> ticked.</li>
+    </ol>
+    <p>From then on, new versions download in the background and go in the next time you close PhotonCanvas (or straight away with the restart button at the bottom of the window). <span class="ui">Check now</span> looks at once.</p>
+    <p>With <span class="ui">Put new versions in by themselves</span> unticked, a window tells you about a new version at start, with <span class="ui">Download</span>, <span class="ui">Skip this version</span> and <span class="ui">Later</span>.</p>
+  </div>
+  <figure style="width: 3.1in"><img src="images/settings-updates.png" alt="Settings, Updates page"><figcaption>Settings → Updates, with the place for the GitHub access key.</figcaption></figure>
+</div>
+
+<h3>Updating by hand</h3>
+<ol>
+  <li>Get the new <code>PhotonCanvas-win-x64.zip</code>.</li>
+  <li>Close PhotonCanvas.</li>
+  <li>Unzip it over your existing PhotonCanvas folder, replacing the old files (or into a fresh folder, and delete the old one).</li>
+  <li>Start PhotonCanvas. The <b>?</b> at the top right → <span class="ui">About PhotonCanvas</span> shows the new version.</li>
+</ol>
+<p>Nothing of yours is in the program folder (it's all in <code>C:\Users\&lt;you&gt;\PhotonCanvas</code>), so nothing is lost.</p>
+
+<h2><span class="n">9</span>What doesn't work on the UV yet</h2>
+<p>PhotonCanvas covers flat marking, engraving and pictures on the UV. These things are not supported yet:</p>
+<table>
+  <tr><th style="width: 36%">Feature</th><th>On the F2 Ultra UV today</th></tr>
+  <tr><td>Running on a real UV</td><td>Not tried yet. Everything UV is written from xTool's published job format.</td></tr>
+  <tr><td>Small lens and its height calibration</td><td>Not supported. Keep the standard 200 × 200 mm lens fitted; do lens setup in xTool Studio.</td></tr>
+  <tr><td>Inner engraving in glass or crystal (subsurface)</td><td>Not supported.</td></tr>
+  <tr><td>Galvo timing (per-lens delays)</td><td>Hidden on the UV; the machine's own settings from xTool Studio are used.</td></tr>
+  <tr><td>Riser, glass platform, sphere and cylinder modes</td><td>Not supported. The rotary attachments are written for the F2 Ultra and haven't been tried on the UV.</td></tr>
+  <tr><td>Colour on metal, diffraction gratings, flip pictures</td><td>Hidden: they need the MOPA fiber laser.</td></tr>
+  <tr><td>Align lasers, graphene tests</td><td>Hidden: they need the blue diode (and MOPA).</td></tr>
+  <tr><td>xTool material presets</td><td>Hidden: they're for the diode and MOPA. Your own Library entries still work.</td></tr>
+  <tr><td>Camera calibration</td><td>Available, but not yet tried on the UV's camera.</td></tr>
+</table>
+<p>Designs made for an F2 Ultra open fine: when the UV is chosen, every layer runs on the UV laser and its MOPA pulse width is ignored. A frequency outside 40 to 150 kHz is refused when you send the job, with a message saying so.</p>
+
+<h2><span class="n">10</span>If something goes wrong</h2>
+<table>
+  <tr><th style="width: 36%">What you see</th><th>What to do</th></tr>
+  <tr><td>Status stays <span class="ui">Not connected</span></td><td>Check the machine is on and on the same network (or USB). Close xTool Studio. Allow PhotonCanvas through Windows Firewall. Settings → Machine → <span class="ui">Find machines</span>, or type the IP address.</td></tr>
+  <tr><td>"Connection keys" message</td><td>Settings → Machine → <span class="ui">Set up connection keys…</span> → <span class="ui">Find them in my xTool Studio</span>. xTool Studio must be installed.</td></tr>
+  <tr><td>Work area is 220 × 220 mm, or layers show a diode/MOPA switch</td><td>The F2 Ultra is chosen, not the UV. Settings → Machines → <span class="ui">xTool F2 Ultra UV</span>.</td></tr>
+  <tr><td>"UV frequency" error when sending</td><td>Set the layer's Frequency between 40 and 150 kHz.</td></tr>
+  <tr><td>Something is outside the work area</td><td>The UV's area is 200 × 200 mm. Move or shrink the design until it's inside the grid.</td></tr>
+  <tr><td>Uploaded, but nothing happens</td><td>That's by design: press the start button on the machine, with the lid closed.</td></tr>
+  <tr><td>Marks faint, wide or uneven</td><td>Auto-focus again. Check the material lies flat. Then adjust power and speed with a test grid.</td></tr>
+  <tr><td>Camera picture doesn't line up</td><td>Machine → <span class="ui">Calibrate camera</span> again (6.3).</td></tr>
+  <tr><td>Anything else</td><td>The <b>?</b> at the top right → <span class="ui">Help guide</span> (or F1) opens the full guide that comes with the program. Tell the person who gave you PhotonCanvas what happened, especially anything UV-specific: you're among the first to use it on a UV.</td></tr>
+</table>
+
+</body>
+</html>

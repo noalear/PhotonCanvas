@@ -558,8 +558,20 @@ public sealed class Job
     public Job(MachineProfile machine, IReadOnlyList<Block> blocks)
     {
         Machine = machine;
-        Blocks = blocks;
+        Blocks = machine.Uv is null ? blocks : [.. blocks.Select(b => OnThisMachine(machine, b))];
         Preamble = blocks.Any(b => b is VectorBlock) ? Preamble.Cut : Preamble.Engrave;
+    }
+
+    /// <summary>A block (and its per-pass variants) with its laser as the machine runs it (UV: every block on the UV laser).</summary>
+    static Block OnThisMachine(MachineProfile m, Block b)
+    {
+        var mapped = b with { Laser = m.OnThisMachine(b.Laser) };
+        return mapped switch
+        {
+            DotBlock { PassBlocks: { Count: > 0 } pb } d => d with { PassBlocks = [.. pb.Select(x => x with { Laser = m.OnThisMachine(x.Laser) })] },
+            BandedFillBlock bf => bf with { Fill = bf.Fill with { Laser = m.OnThisMachine(bf.Fill.Laser) } },
+            _ => mapped,
+        };
     }
 
     /// <summary>How many whole-job rounds run (the most passes of any block).</summary>
@@ -1114,13 +1126,15 @@ public sealed class Job
 
     static List<string> SourceLines(LaserSettings l, bool vector)
     {
-        var v = new List<string> { "G4P1", l.Light == LightSource.Red ? "G22" : "G21" };
+        var v = new List<string> { "G4P1", l.Light is LightSource.Red or LightSource.Uv ? "G22" : "G21" };
         if (vector) v.Add("G90");
         if (l.Light == LightSource.Red)
         {
             v.Add($"G0H{l.PulseWidthNs}");
             v.Add($"G0Q{l.FrequencyKhz}");
         }
+        else if (l.Light == LightSource.Uv)
+            v.Add($"G0Q{l.FrequencyKhz}"); // the UV has a frequency but no pulse width (as xTool Studio writes for the F2 Ultra UV)
         v.AddRange(["", "G4P1"]);
         return v;
     }

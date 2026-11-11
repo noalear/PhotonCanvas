@@ -22,6 +22,8 @@ public sealed class LayerEditor : UserControl
     readonly LayersPanel _layers;
     readonly AppSettings _settings;
     readonly MachineProfile _machine = MachineProfile.F2Ultra;
+    /// <summary>The machine in use (Settings → Machines): which lasers there are to set.</summary>
+    MachineProfile Active => WorkModes.Area(_settings);
     bool _updating;
 
     readonly TextBlock _several = new() { Classes = { "hint" }, IsVisible = false };
@@ -29,6 +31,8 @@ public sealed class LayerEditor : UserControl
     readonly Border _swatch = new() { Width = 4, Height = 14, CornerRadius = new(2), Margin = new(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
     readonly Segmented _mode = new(("Cut", "IcCut"), ("Score", "IcLine"), ("Engrave", "IcPreview"), ("Picture", "IcImage"));
     readonly Segmented _light = new(("Diode · blue", null), ("MOPA", null));
+    /// <summary>On the F2 Ultra UV, in place of the laser switch: its one laser.</summary>
+    readonly TextBlock _uvNote = new() { Text = "UV laser · 355 nm", FontWeight = FontWeight.SemiBold, TextWrapping = TextWrapping.Wrap };
     readonly NumericUpDown _power = Num(0, 100, 1, "0.#"), _speed = Num(2, 15000, 5, "0.#"), _passes = Num(1, 10000, 1, "0");
     readonly NumericUpDown _lpcm = Number(1, (decimal)FillBlock.MaxLinesPerCm, 10, "0.#");
     readonly NumericUpDown _dpi = Number(50, 1000, 10, "0");
@@ -292,7 +296,7 @@ public sealed class LayerEditor : UserControl
             },
         };
         _pulseRow = Field("Pulse width", _pulse, tip: "MOPA only. How long each laser pulse lasts. Short pulses mark crisply; long pulses put in more heat.");
-        _freqRow = Field("Frequency", _freq, _freqHint, "MOPA only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
+        _freqRow = Field("Frequency", _freq, _freqHint, "MOPA and UV only. Pulses per second (kHz). Higher = pulses overlap more, smoother lines, less energy per pulse.");
         var focusRow = Field("Focus offset (mm)", _focusOff, tip: "Move the focus for this layer: + = deeper into the material (the head goes lower), − = above it (a softer, wider beam). 0 = at the surface. The head goes back afterwards.");
         _orderRow = Field("Order", _order, tip: "Least travel: holes and insides first, then the nearest next. As drawn: the order you drew or imported them. Back to front: from the top of the work area down, so smoke drifts over what's finished. " +
                                                  "Spread the heat: for thin sheet metal that warps. The sheet's warming is worked out as the job runs and every pass of every path is cut where it's coolest, far from the last cut; long paths are cut in short pieces at different times; the job waits only when the whole sheet is too warm.");
@@ -342,6 +346,7 @@ public sealed class LayerEditor : UserControl
                 _several,
                 _mode,
                 _light,
+                _uvNote,
                 trio,
                 _pulseRow,
                 _freqRow,
@@ -454,6 +459,8 @@ public sealed class LayerEditor : UserControl
         _freq.ValueChanged += (_, _) => EditLayers("Frequency", l =>
         {
             int f = (int)_freq.Value!.Value;
+            // The F2 Ultra UV: its own range, whatever the layer was set for.
+            if (Active.Uv is { } uv) return l with { Laser = l.Laser with { FrequencyKhz = Math.Clamp(f, uv.MinKhz, uv.MaxKhz) } };
             // Out of the range the source is protected from (long pulses): up to full power.
             return l with { Laser = l.Laser with { FrequencyKhz = _machine.MopaLimitFor(l.Laser.PulseWidthNs) is { } lim ? lim.Safe(f, l.Reflective) : f } };
         }, _freq.Value.HasValue, "freq");
@@ -587,8 +594,16 @@ public sealed class LayerEditor : UserControl
         _imageExtras.IsVisible = anyImage;
         _sliceExtras.IsVisible = anySlices;
         _cleanRows.IsVisible = anySlices && ls.Any(l => l.Slices.CleanupEvery > 0);
-        _cleanFreqRow.IsVisible = anyRed;
-        _pulseRow.IsVisible = _freqRow.IsVisible = anyRed;
+        // The machine's lasers: the switch only where there's a MOPA to switch to; the F2 Ultra UV has one laser
+        // with a frequency and no pulse width, and none of the MOPA's protections.
+        var active = Active;
+        bool uv = active.Uv is not null;
+        _light.IsVisible = !uv && active.HasMopa;
+        _uvNote.IsVisible = uv;
+        _reflective.IsVisible = !uv && active.HasMopa;
+        _cleanFreqRow.IsVisible = anyRed && !uv;
+        _pulseRow.IsVisible = anyRed && !uv;
+        _freqRow.IsVisible = anyRed || uv;
         _moreNothing.IsVisible = false;
         _fillStyle.SelectedIndex = Same(l => l.FillStyle) is { } fs ? (int)fs : -1;
         Num(_angleStep, Same(l => l.AngleStepDeg));
@@ -640,9 +655,10 @@ public sealed class LayerEditor : UserControl
         var pw = Same(l => l.Laser.PulseWidthNs);
         _pulse.SelectedIndex = pw is { } p ? _machine.Mopa.ToList().FindIndex(x => x.PulseWidthNs == p) : -1;
         _pulse.PlaceholderText = pw is null ? "mixed" : "";
+        var lim = pw is { } pv && Active.Uv is null ? _machine.MopaLimitFor(pv) : null;
+        _freq.Minimum = Active.Uv?.MinKhz ?? 1;
+        _freq.Maximum = Active.Uv?.MaxKhz ?? lim?.MaxKhz ?? 4000;
         Num(_freq, Same(l => (double)l.Laser.FrequencyKhz));
-        var lim = pw is { } pv ? _machine.MopaLimitFor(pv) : null;
-        _freq.Maximum = lim?.MaxKhz ?? 4000;
 
         // Plain-language hints with the exact values sent.
         int passes = Same(l => l.Laser.Passes) ?? 2;
@@ -655,7 +671,8 @@ public sealed class LayerEditor : UserControl
             ? $"Lines {10 / lp:0.###} mm apart." + (lp > 1000 ? " Very fine: much longer jobs and more heat (thin sheet can warp)." : "")
             : "";
         _reflective.IsChecked = Same(l => l.Reflective);
-        _freqHint.Text = lim is not { } lm ? "" : FrequencyHint(lm, Same(l => l.Laser.FrequencyKhz), ls.Any(l => l.Reflective));
+        _freqHint.Text = Active.Uv is { } uvl ? $"UV: {uvl.MinKhz} to {uvl.MaxKhz} kHz (xTool Studio starts at {uvl.DefaultKhz}). Higher puts the pulses closer together for smoother, gentler marks."
+            : lim is not { } lm ? "" : FrequencyHint(lm, Same(l => l.Laser.FrequencyKhz), ls.Any(l => l.Reflective));
         _freqHint.Foreground = lim is { } lw && Same(l => l.Laser.FrequencyKhz) is { } fw && fw < lw.DefaultKhz ? Brush("Warn") : Brush("TextMuted");
     }
 

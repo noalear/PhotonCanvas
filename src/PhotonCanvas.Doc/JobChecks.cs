@@ -12,8 +12,9 @@ public static class JobSettings
         PassDelayS = Math.Clamp(s.PassDelayS, 0, 3600),
         PathPauseS = Math.Clamp(s.PathPauseS, 0, Job.MaxPathPauseS),
         // GRBL machines: their one laser's power (the F2 Ultra's 40 W blue and 60 W MOPA are the defaults).
-        BlueWatts = s.ActiveSetup() is { Kind: MachineKind.Grbl } g1 ? g1.PowerW : 40,
-        RedWatts = s.ActiveSetup() is { Kind: MachineKind.Grbl } g2 ? g2.PowerW : 60,
+        // The F2 Ultra UV runs everything on its 5 W UV laser.
+        BlueWatts = s.ActiveSetup() is { Kind: MachineKind.Grbl } g1 ? g1.PowerW : WorkModes.Area(s).Uv is { } u1 ? u1.Watts : 40,
+        RedWatts = s.ActiveSetup() is { Kind: MachineKind.Grbl } g2 ? g2.PowerW : WorkModes.Area(s).Uv is { } u2 ? u2.Watts : 60,
         Mode = WorkModes.From(s),
         Machine = WorkModes.Area(s),
         FanGear = s.FanGear,
@@ -39,9 +40,10 @@ public static class JobChecks
     {
         var lines = new List<string>();
         var sent = JobBuilder.OutputLayers(state).Where(l => state.SentFor(l).Any()).ToList();
-        static string Line(Layer l)
+        bool uv = opt.Machine.Uv is not null;
+        string Line(Layer l)
         {
-            var src = l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
+            var src = uv ? $"UV {l.Laser.FrequencyKhz} kHz" : l.Laser.Light == LightSource.Red ? $"MOPA {l.Laser.PulseWidthNs} ns {l.Laser.FrequencyKhz} kHz" : "diode";
             return $"• {l.Name}: {l.Mode}, {l.Laser.Power:0.#}% at {l.Laser.Speed:0.#} mm/s × {l.Laser.Passes} ({src})";
         }
         if (sent.Count <= 8)
@@ -51,7 +53,8 @@ public static class JobChecks
             // Many layers (a test grid): the ranges say more than 50 lines would.
             static string Range(IEnumerable<double> v, string unit) { var a = v.Min(); var b = v.Max(); return a == b ? $"{a:0.#}{unit}" : $"{a:0.#}–{b:0.#}{unit}"; }
             lines.Add($"{sent.Count} layers: power {Range(sent.Select(l => l.Laser.Power), "%")}, speed {Range(sent.Select(l => l.Laser.Speed), " mm/s")}" +
-                      (sent.Any(l => l.Laser.Light == LightSource.Red)
+                      (uv ? $", UV at {Range(sent.Select(l => (double)l.Laser.FrequencyKhz), " kHz")}"
+                       : sent.Any(l => l.Laser.Light == LightSource.Red)
                           ? $", MOPA {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.PulseWidthNs), " ns")} at {Range(sent.Where(l => l.Laser.Light == LightSource.Red).Select(l => (double)l.Laser.FrequencyKhz), " kHz")}"
                           : "") + ".");
             lines.Add($"First: {Line(sent[0])[2..]}");

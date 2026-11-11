@@ -19,8 +19,8 @@ public sealed class DiffractionAddon : IAddon
             Tip = "Turn the picture into tiny diffraction gratings (MOPA on polished stainless): it shimmers with rainbow colours as it tilts",
             Large = true,
             Enabled = () => host.SelectedPicture is not null,
-            // Settings → Equipment can still hide it for machines without a MOPA.
-            Visible = () => host.AppSettings.ShowDiffraction,
+            // Only with a MOPA; Settings → Equipment can hide it too.
+            Visible = () => host.AppSettings.ShowDiffraction && host.Machine.HasMopa,
             Order = 14,
         });
     }
