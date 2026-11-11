@@ -26,7 +26,7 @@ public sealed class BoxesAddon : IAddon
         {
             Large = true,
             Tip = "Boxes that slot together: finger-jointed with lift-off, sliding or hinged lids and dividers, rounded with bent corners, or with a lid that bends over the back",
-            Order = 15,
+            Order = 16,
         });
         host.AddRibbonButton(new RibbonButton("Home", "Cut lines", "Split with joints", SplitIcon, OpenSplit)
         {

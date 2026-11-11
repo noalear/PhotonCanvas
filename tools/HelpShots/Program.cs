@@ -10,6 +10,9 @@
 //       Starts every tutorial (or the ones named) and steps through it as a user would, clicking what
 //       each step says to click. Prints each step whose target can't be found. Steps that need a
 //       connected machine, a camera photo, a 3D model or a burned test are expected in that list.
+//   dotnet run --project tools/HelpShots -- ribbon [folder]
+//       A picture of every ribbon tab at a 1920 px window (and the Machine tab with a rotary in use),
+//       to check the layout for gaps and lone buttons. Not for the guide.
 //
 // Nothing here touches the real data folder or a machine: each run uses a fresh scratch folder.
 
@@ -62,12 +65,15 @@ switch (what)
     case "guide":
         HelpSim.Run(images, Pump, "shots");
         break;
+    case "ribbon":
+        RibbonShots.Run(rest.FirstOrDefault() ?? Path.Combine(Path.GetTempPath(), "photoncanvas-ribbon"), Pump);
+        break;
     case "walk":
         if (rest.Count > 0) Environment.SetEnvironmentVariable("HELP_WALK_ONLY", string.Join(",", rest));
         HelpSim.Run(Path.Combine(Path.GetTempPath(), "photoncanvas-helpshots-walk"), Pump, "walk");
         break;
     default:
-        Console.WriteLine("Usage: dotnet run --project tools/HelpShots -- shots [main|windows|extra|more|mechanism] [--keep-new] | guide | walk [ids]");
+        Console.WriteLine("Usage: dotnet run --project tools/HelpShots -- shots [main|windows|extra|more|mechanism] [--keep-new] | guide | walk [ids] | ribbon [folder]");
         return 1;
 }
 return 0;

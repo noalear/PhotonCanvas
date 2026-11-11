@@ -21,7 +21,7 @@ public sealed class TimeLapseAddon : IAddon
         {
             Tip = $"Take a camera photo every {s.TimeLapseSeconds:0} s while a job runs and make a video of it (needs ffmpeg for the video; otherwise the photos are kept). Saved in Pictures.",
             Checked = () => s.TimeLapse,
-            Order = 21,
+            Order = 25,
         });
         host.JobStarted += name =>
         {

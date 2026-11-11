@@ -34,7 +34,7 @@ public sealed class ProductionLogAddon : IAddon
         host.AddRibbonButton(new RibbonButton("Machine", "Job", "Production log", Icon, Open)
         {
             Tip = "Every job sent to the machine: when, how it ended, the serial numbers and rows it marked, and its settings. Carry on serial marking where it stopped.",
-            Order = 30,
+            Order = 21,
         });
         host.AddCommand(new AddonCommand("production-log.open", "Job", "Production log…", "", Open));
     }

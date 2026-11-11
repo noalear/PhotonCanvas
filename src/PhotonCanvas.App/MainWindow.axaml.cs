@@ -600,7 +600,7 @@ public partial class MainWindow : Window
         outline.Small("Tidy lines", "IcTidy", () => _ = Guard(TidyPaths), "Tidy lines: repair imported drawings by joining ends that nearly meet, closing nearly-closed shapes and deleting lines lying on top of each other");
         outline.Small("Text on path", "IcTextPath", TextOnPath, "Text on path: select a text and a line or shape, and the words follow it (select the text alone to straighten it again)", () => SelectedPaths().Any(p => p is TextShape));
         outline.Small("Text to paths", "IcToPaths", ConvertToPaths, "Text to paths: turn text into ordinary shapes whose points you can edit; the words can't be retyped after (Ctrl+Shift+C)", () => _doc.State.Shapes.Any(s => _doc.Selection.Contains(s.Id) && s is TextShape));
-        var moreOutline = outline.Small("More…", "IcMore", () => { }, "Extend lines, remove overlapping lines, tangent circles, drop and 3D shadows, clear guides");
+        var moreOutline = outline.KeepLast(outline.Small("More…", "IcMore", () => { }, "Extend lines, remove overlapping lines, tangent circles, drop and 3D shadows, clear guides"));
         moreOutline.Flyout = new MenuFlyout
         {
             Items =

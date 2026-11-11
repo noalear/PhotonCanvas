@@ -16,7 +16,7 @@ public sealed class CmykSplitAddon : IAddon
         {
             Tip = TipText,
             Enabled = () => host.SelectedPicture is not null,
-            Order = 16,
+            Order = 19,
         });
     }
 
