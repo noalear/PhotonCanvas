@@ -121,6 +121,7 @@ remove your own buttons. `Start` and `Stop` run on the UI thread.
 | `IsConnected` | Is a laser connected. |
 | `FocusDistanceMm`, `CameraCalibratedFor(d)`, `PhotographAreaAsync(area, mmPerPx, d)` | The measured focus distance; is the overview camera calibrated there; a fresh straightened photo of part of the bed (pointers off, nothing moves). |
 | `LastSentJob` | The last `BuiltJob` sent from this session, and when. |
+| `JobSent` | A job this session uploaded to the machine (it waits for the start button): an `UploadedJob` with the `BuiltJob`, the design (`DocState`) exactly as it was built from with its fields filled in, its file, the time, which part was sent (`Part`, e.g. "section 2 of 4") and whether it completes the run (`CompletesRun`), and the machine's name. The production log keeps its record from it. |
 | `JobStarted`, `JobEnded` | A job started running on the machine (its name), and stopped (true = finished). Any job, also one started from the machine. |
 | `JobFinished` | A job sent from this session finished on the machine (argument: the design file it came from). Tests open their results from it. |
 | `MachinePanel` | The program's machine connection itself, for what the members above don't cover (close-up camera placement, the red pointer, measuring). It can move the head and fire: only from a button that plainly says so. Its members may change between versions. |

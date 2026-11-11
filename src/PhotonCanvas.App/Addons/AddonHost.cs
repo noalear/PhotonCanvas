@@ -40,6 +40,7 @@ public interface IAddonServices
     event Action? MachineChanged;
     event Action? PhotoChanged;
     event Action<string?>? JobFinished;
+    event Action<UploadedJob>? JobSent;
     event Action<string>? JobStarted;
     event Action<bool>? JobEnded;
     MachinePanel MachinePanel { get; }
@@ -138,6 +139,11 @@ public sealed class AddonHost : IAddonHost
     public event Action<string?>? JobFinished
     {
         add => Hook(value, h => _s.JobFinished += h, h => _s.JobFinished -= h);
+        remove => Unhook(value);
+    }
+    public event Action<UploadedJob>? JobSent
+    {
+        add => Hook(value, h => _s.JobSent += h, h => _s.JobSent -= h);
         remove => Unhook(value);
     }
     public event Action<string>? JobStarted

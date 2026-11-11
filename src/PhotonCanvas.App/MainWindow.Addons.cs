@@ -32,6 +32,7 @@ public partial class MainWindow : IAddonServices
         _doc.Changed += _ => _documentChanged?.Invoke();
         _machine.PhotoChanged += _ => _photoChanged?.Invoke();
         _job.RunFinished += from => _jobFinished?.Invoke(from);
+        _job.Sent += sent => _jobSent?.Invoke(sent);
         _job.RunStarted += name => _jobStarted?.Invoke(name);
         _job.RunEnded += finished => _jobEnded?.Invoke(finished);
         // Add-ons coming and going change buttons and the panels' add-on parts.
@@ -136,6 +137,8 @@ public partial class MainWindow : IAddonServices
     event Action? IAddonServices.PhotoChanged { add => _photoChanged += value; remove => _photoChanged -= value; }
     Action<string?>? _jobFinished;
     event Action<string?>? IAddonServices.JobFinished { add => _jobFinished += value; remove => _jobFinished -= value; }
+    Action<UploadedJob>? _jobSent;
+    event Action<UploadedJob>? IAddonServices.JobSent { add => _jobSent += value; remove => _jobSent -= value; }
     Action<string>? _jobStarted;
     Action<bool>? _jobEnded;
     event Action<string>? IAddonServices.JobStarted { add => _jobStarted += value; remove => _jobStarted -= value; }

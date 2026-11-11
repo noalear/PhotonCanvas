@@ -114,6 +114,12 @@ public interface IAddonHost
     /// </summary>
     event Action<string?>? JobFinished;
 
+    /// <summary>
+    /// A job this session uploaded to the machine (it waits there for the start button): the job, the
+    /// design exactly as it was built from, and where it came from. Raised once per upload, before it runs.
+    /// </summary>
+    event Action<UploadedJob>? JobSent;
+
     /// <summary>A job started running on the machine (also one started from the machine itself). The argument is a name for it (the design's file name, or "Job").</summary>
     event Action<string>? JobStarted;
 
@@ -193,6 +199,16 @@ public interface IAddonHost
     /// <summary>A service another add-on published (null if that add-on isn't on).</summary>
     T? Find<T>() where T : class;
 }
+
+/// <summary>
+/// A job uploaded to the machine from this session (see <see cref="IAddonHost.JobSent"/>).
+/// <paramref name="State"/> is the design as it was built from, with its fields filled in for this run.
+/// </summary>
+/// <param name="DesignFile">The design's file (null = not saved yet).</param>
+/// <param name="Part">When only part of the design was sent: which ("section 2 of 4", "layer Engrave"); null = all of it.</param>
+/// <param name="CompletesRun">False when more parts of the same run are still to come (the fields move on only after the last part).</param>
+/// <param name="Machine">The name of the machine it went to.</param>
+public sealed record UploadedJob(BuiltJob Job, DocState State, string? DesignFile, DateTimeOffset SentAt, string? Part, bool CompletesRun, string Machine);
 
 /// <summary>
 /// A ribbon button. <paramref name="Tab"/> and <paramref name="Group"/> are names as shown ("Home",
