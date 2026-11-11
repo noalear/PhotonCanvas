@@ -292,6 +292,7 @@ static class DocsSim
         if (only is null or "more" or "photorelief") { Reset(); PhotoReliefShots.Run(w, doc, canvas.Machine, Settle); }
         if (only is null or "more" or "signs") { Reset(); SignsShots.Run(w, doc, canvas.Machine, Settle); }
         if (only is null or "more" or "inlay") { Reset(); InlayShots.Run(w, doc, canvas.Machine, Settle); }
+        if (only is null or "more" or "orders") { Reset(); OrdersShots.Run(w, Settle); }
         File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "images-index.txt"), Index.ToString());
         Console.WriteLine(Index.ToString());
     }
