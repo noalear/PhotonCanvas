@@ -1,0 +1,10 @@
+{
+  "id": "devicearray",
+  "name": "Device array",
+  "version": "1.0.0",
+  "description": "Mark the same design on a tray of parts: a matrix of devices at a set X/Y pitch, by count or over an area, each with its own serial number or spreadsheet row, and any device turned off without changing the others.",
+  "category": "Make",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
