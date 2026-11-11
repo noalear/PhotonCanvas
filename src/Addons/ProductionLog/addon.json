@@ -1,0 +1,10 @@
+{
+  "id": "production-log",
+  "name": "Production log",
+  "version": "1.0.0",
+  "description": "A record of every job sent to the machine: when, how it ended, the serial numbers, spreadsheet rows and text it marked, and its settings. Warns before a serial is marked twice and carries on where the last run stopped.",
+  "category": "Laser",
+  "apiVersion": 1,
+  "requires": [],
+  "onByDefault": true
+}
