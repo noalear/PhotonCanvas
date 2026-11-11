@@ -362,10 +362,13 @@ public static class JobBuilder
                 }
                 // Scan angle, crosshatch and turning per pass: flat bed only (the rotary and conveyor
                 // step along one axis, a curved surface is banded in rows).
-                bool straight = opt.Mode is not WorkMode.Flat || s.Curve.On;
+                bool onObjects = opt.Mode is WorkMode.Flat && !s.Surfaces.Items.IsEmpty && !s.Curve.On;
+                bool straight = opt.Mode is not WorkMode.Flat || s.Curve.On || onObjects;
                 bool wantsTurn = layer.FillAngleDeg % 360 != 0 || layer.Crosshatch || (layer.AngleStepDeg != 0 && layer.Laser.Passes > 1);
                 if (straight && wantsTurn && images.Count > 0)
-                    warnings.Add($"Layer \"{layer.Name}\": scan angle, crosshatch and turning per pass only work on the flat bed, so its pictures are burned in straight rows.");
+                    warnings.Add(onObjects
+                        ? $"Layer \"{layer.Name}\": with surfaces (Machine → Surfaces), pictures are burned in straight rows, so its scan angle, crosshatch and turning per pass are left out."
+                        : $"Layer \"{layer.Name}\": scan angle, crosshatch and turning per pass only work on the flat bed, so its pictures are burned in straight rows.");
                 double firstAngle = straight ? 0 : layer.FillAngleDeg + layer.RunTurnDeg;
                 double[] angles = !straight && layer.Crosshatch ? [firstAngle, firstAngle + layer.CrossAngleDeg] : [firstAngle];
                 bool perPass = !straight && layer.AngleStepDeg != 0 && layer.Laser.Passes > 1;
@@ -655,6 +658,9 @@ public static class JobBuilder
         if ((opt.Spread ?? s.Spread) is { On: true } spread && blocks.Count > 0)
             SpreadTheHeat(spread, opt, blocks, steps, blockSteps, blockLayer, warnings);
 
+        // Marks drawn on objects (Machine → Surfaces): moved to where they land on each one, seen from above.
+        var wrap = WrapOntoSurfaces(s, opt, blocks, steps, ref bounds, warnings);
+
         if (opt.Section is { } sec)
         {
             // One section of a bigger design: every block cut to it and moved into the work area.
@@ -725,6 +731,7 @@ public static class JobBuilder
                 : "Conveyor: experimental. The commands come from xTool Studio's own templates but haven't been run on your machine yet. Try a small test on scrap first.");
         // A curved piece: the head steps through height bands that follow it.
         Surface? surface = null;
+        Func<Vec2, double>? height = null;
         if (s.Curve.On && s.Curve.Build() is null)
             warnings.Add("Curved surface is on, but it needs at least 3 measured heights (or a typed shape): marked as flat.");
         if (s.Curve.On && s.Curve.Build() is { } built)
@@ -734,16 +741,30 @@ public static class JobBuilder
             else
             {
                 surface = built;
+                height = built.HeightAt;
                 warnings.Add($"Curved surface: the head follows it in {s.Curve.BandMm:0.##} mm steps. Experimental: try it on scrap first.");
                 if (!s.Curve.Typed && !s.Curve.Area.IsEmpty && !s.Curve.Area.Inflate(1).Contains(bounds.TopLeft) | !s.Curve.Area.Inflate(1).Contains(bounds.BottomRight))
                     warnings.Add("Parts of the design are outside the measured area: the heights there are guessed. Measure a bigger area to be sure.");
-                if (blocks.OfType<VectorBlock>().Any(v => v.Drop is not null))
-                    warnings.Add("Step-down on Cut and Score layers is left out on a curved surface (the head's height follows the surface instead).");
-                // Each band's fill lines are marked as they are: no pause before a line, no run-ups, the same angle every pass.
-                if (blocks.OfType<FillBlock>().Any(f => f.LineDwellMs > 0 || f.OverscanMm > 0 || (f.AngleStepDeg != 0 && f.Laser.Passes > 1)))
-                    warnings.Add("On a curved surface, fills leave out the pause before each line, overscan and turning per pass.");
-                blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
             }
+        }
+        double bandMm = s.Curve.BandMm;
+        if (wrap is not null)
+        {
+            // Off the objects: on the curved surface when that's on, else at the height set for everything else.
+            Func<Vec2, double>? other = height ?? (s.Surfaces.OtherMm is { } o ? _ => o : null);
+            if (wrap.AnyElsewhere && other is null)
+                throw new JobException("Part of the design isn't on a surface, so the job doesn't know how high it is: in Machine → Surfaces, set \"Everything else is\" to its height (the focus height of the material under it), or move it onto a surface.");
+            height = p => wrap.HeightAt(p) ?? other!(p);
+            bandMm = surface is null ? s.Surfaces.BandMm : Math.Min(s.Surfaces.BandMm, s.Curve.BandMm);
+        }
+        if (height is not null)
+        {
+            if (blocks.OfType<VectorBlock>().Any(v => v.Drop is not null))
+                warnings.Add("Step-down on Cut and Score layers is left out on a curved surface (the head's height follows the surface instead).");
+            // Each band's fill lines are marked as they are: no pause before a line, no run-ups, the same angle every pass.
+            if (blocks.OfType<FillBlock>().Any(f => f.LineDwellMs > 0 || f.OverscanMm > 0 || (f.AngleStepDeg != 0 && f.Laser.Passes > 1)))
+                warnings.Add("On a curved surface, fills leave out the pause before each line, overscan and turning per pass.");
+            blocks = [.. blocks.Select(b => b is VectorBlock { Drop: not null } v ? v with { Drop = null } : b)];
         }
         // The MOPA lined up with the blue laser: its work moved back by how far off it lands.
         if (opt.MopaOffset.Length > 1e-6)
@@ -766,8 +787,9 @@ public static class JobBuilder
             FocusLimitOverrideMm = opt.FocusLimitMm,
             FanGear = opt.FanGear,
             PurifierSpeed = opt.PurifierSpeed,
-            SurfaceHeight = surface is null ? null : surface.HeightAt,
-            BandMm = s.Curve.BandMm,
+            SurfaceHeight = height,
+            BandMm = bandMm,
+            SpeedShare = wrap is null ? null : wrap.SpeedAt,
         };
         GcodeText motion;
         try { motion = job.RenderText(); }
@@ -805,7 +827,7 @@ public static class JobBuilder
             PreviewJpeg = XfPackage.PreviewJpeg(steps.Select(st => (IReadOnlyList<Vec2>)(st.Closed ? [.. st.Points, st.Points[0]] : st.Points))),
             Light = light,
             Params = prms,
-            Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => surface is not null ? "CURVE_PROCESS" : "LASER_PLANE" },
+            Mode = mode switch { WorkMode.Rotary => "LASER_CYLINDER", WorkMode.Conveyor => "CONVEYOR_EXTENSION", _ => height is not null ? "CURVE_PROCESS" : "LASER_PLANE" },
             Axis = mode is WorkMode.Flat ? "" : "U",
             Created = now ?? DateTimeOffset.Now,
             EstimatedSeconds = estimate,
@@ -818,6 +840,58 @@ public static class JobBuilder
             Timeline = Timeline(job, blockSteps),
             Paths = steps.Count - heatExtraSteps,
         };
+    }
+
+    /// <summary>
+    /// Marks drawn on objects (<see cref="DocState.Surfaces"/>): every block moved to where it lands on the bed
+    /// (wrapped round a round object), the steps and bounds with them, and what the job bar should say. Null when
+    /// nothing is drawn on an object (the job is as it was).
+    /// </summary>
+    static SurfaceWrap? WrapOntoSurfaces(DocState s, JobOptions opt, List<Block> blocks, List<BuiltJob.Step> steps, ref Rect2 bounds, List<string> warnings)
+    {
+        if (s.Surfaces.Items.IsEmpty || blocks.Count == 0) return null;
+        var wrap = s.Surfaces.Wrap();
+        var moved = blocks.Select(wrap.Apply).ToList();
+        if (wrap.Used.Count == 0) return null;
+        if (opt.Mode is not WorkMode.Flat)
+        {
+            warnings.Add("Surfaces (Machine → Surfaces) only work on the flat bed: with the rotary or conveyor they're left out, and the design is marked as drawn.");
+            return null;
+        }
+        if (opt.Section is not null)
+            throw new JobException("Surfaces can't be marked in sections: turn Sections off to mark the design in one go.");
+        if (wrap.Overlap() is { } both)
+            throw new JobException($"The surfaces \"{both.A.Name}\" and \"{both.B.Name}\" overlap on the canvas, so a mark between them could be on either. Move one apart in Machine → Surfaces.");
+        for (int i = 0; i < blocks.Count; i++) blocks[i] = moved[i];
+        // The preview, the frame and the timeline show where the marks really land (seen from above).
+        var shown = new SurfaceWrap(wrap.Zones);
+        for (int i = 0; i < steps.Count; i++)
+        {
+            var st = steps[i];
+            if (st.Points.Count == 0) continue;
+            var pts = shown.MapPath(st.Closed ? [.. st.Points, st.Points[0]] : st.Points);
+            if (st.Closed) pts.RemoveAt(pts.Count - 1);
+            steps[i] = st with { Points = pts };
+        }
+        var pointsNow = steps.SelectMany(st => st.Points).ToList();
+        if (pointsNow.Count > 0) bounds = Rect2.Bounds(pointsNow);
+        foreach (var (z, deg) in wrap.Used)
+        {
+            var item = s.Surfaces.Items.First(x => x.Name == z.Name && x.Centre == z.Centre);
+            warnings.Add(z.Round
+                ? $"Surfaces: marked on \"{z.Name}\" ({item.Summary}), reaching {deg:0}° round from its top" +
+                  (z.Wrap ? ", wrapped round it" : ", dropped straight down onto it") +
+                  (z.EvenOut && deg > 5 ? $", slowed to {Math.Max(WrapZone.SlowestShare, Math.Cos(deg * Math.PI / 180)) * 100:0}% of the speed where it slopes away furthest" : "") +
+                  $". The head follows it in {s.Surfaces.BandMm:0.##} mm steps. Experimental: try it on scrap first."
+                : $"Surfaces: marked on \"{z.Name}\" ({item.Summary}), focused on its top. Experimental: try it on scrap first.");
+            if (z.Round && deg > MarkSurface.DefaultReachDeg + 0.5)
+                warnings.Add($"Marks on \"{z.Name}\" reach {deg:0}° round from its top. Past about 60° the surface turns away from the beam: marks come out fainter and wider there, even slowed down.");
+        }
+        foreach (var z in wrap.RunsOff)
+            warnings.Add($"Part of the design runs off the edge of \"{z.Name}\": only what's inside its outline on the canvas is put on it, the rest is marked where it's drawn.");
+        foreach (var z in wrap.FillAcross)
+            warnings.Add($"Fill lines on \"{z.Name}\" run round it, so each is cut up at every height step. Set the layer's scan angle to {(Math.Abs(Math.Cos(z.AxisDeg * Math.PI / 180)) > 0.5 ? 0 : 90)}° so they run along it: faster, with no joins.");
+        return wrap;
     }
 
     /// <summary>Engrave and picture layers with more separate parts than this are spread as one part.</summary>

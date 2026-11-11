@@ -479,6 +479,7 @@ public sealed partial class CanvasView : Control
 
         if (_doc is { } doc)
         {
+            DrawSurfaces(ctx, doc);
             var world = Matrix.CreateScale(_scale, _scale) * Matrix.CreateTranslation(_offset.X, _offset.Y);
             using (ctx.PushTransform(world))
             {

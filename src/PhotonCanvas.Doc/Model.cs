@@ -520,6 +520,8 @@ public sealed record DocState(ImmutableList<Layer> Layers, ImmutableList<Shape> 
     public ImmutableList<Guide> Guides { get; init; } = [];
     /// <summary>The curved piece the design is marked on (off by default).</summary>
     public CurvedSurface Curve { get; init; } = new();
+    /// <summary>Objects on the bed that marks go onto: pens, dowels, raised flat pieces (Machine → Surfaces).</summary>
+    public MarkSurfaces Surfaces { get; init; } = new();
     /// <summary>Spread the heat across the job's layers and objects (off by default).</summary>
     public SpreadHeat Spread { get; init; } = new();
     /// <summary>Add-ons' own notes on the project, by key (start each key with the add-on's id). Kept while the add-on isn't installed.</summary>

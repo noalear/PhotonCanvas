@@ -54,6 +54,7 @@ public static class Sections
                     Mask = f.Mask?.Shifted(shift),
                     PowerScale = f.PowerScale?.Shifted(shift),
                     ClipRect = Move(inside, shift),
+                    Lines = f.Lines?.Where(l => inside.Contains(l.Start) && inside.Contains(l.End)).Select(l => l with { Start = l.Start + shift, End = l.End + shift }).ToList(),
                 };
                 break;
             case LoopsBlock l:
