@@ -21,7 +21,7 @@ public sealed class TopoAddon : IAddon
         host.AddRibbonButton(new RibbonButton("Import", "3D & maps", "Topo map", Icon, Open)
         {
             Tip = "Any place on Earth as a stacked contour map: find it, choose the area and how many layers, and cut the layers (numbered, with where the next one sits marked) to glue up",
-            Order = 13,
+            Order = 12,
         });
         host.AddCommand(new AddonCommand("topo.open", "File", "Topo map…", "", Open));
         // Old tiles go when the folder grows big (in the background: it's only tidying).

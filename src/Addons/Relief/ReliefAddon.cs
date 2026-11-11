@@ -17,13 +17,13 @@ public sealed class ReliefAddon : IAddon
         {
             Tip = "A 3D model (STL) as a depth map, on a depth-slices layer",
             Large = true,
-            Order = 12,
+            Order = 13,
         });
         host.AddRibbonButton(new RibbonButton("Picture", "Effects", "Relief preview", "IcEye", Preview)
         {
             Tip = "See a depth map as the lit relief it will carve",
             Enabled = () => host.SelectedPicture is not null,
-            Order = 12,
+            Order = 18,
         });
         host.AddCommand(new AddonCommand("picture.stl", "Shapes", "3D model relief…", "", () => _ = host.Guard(AddModel)));
     }

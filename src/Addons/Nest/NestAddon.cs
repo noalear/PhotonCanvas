@@ -15,6 +15,8 @@ public sealed class NestAddon : IAddon
             Tip = "Pack copies or parts onto the work area or a piece, as tightly as they fit (Ctrl+Alt+N)",
             Large = true,
             Enabled = () => host.Document.Selection.Count > 0,
+            // After the small Repeat buttons (Device array among them), so they share their columns.
+            Order = 20,
         });
         host.AddCommand(new AddonCommand("shape.nest", "Shapes", "Nest…", "Ctrl+Alt+N", Open));
         host.AddContextMenuItem(new ContextMenuEntry("Nest on material…", Open) { Visible = () => host.Document.Selection.Count > 0, Gesture = "Ctrl+Alt+N" });

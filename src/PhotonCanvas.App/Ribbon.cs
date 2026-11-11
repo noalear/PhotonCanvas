@@ -207,6 +207,10 @@ public sealed class Ribbon : UserControl
             c.IsVisible = v;
             changed = true;
         }
+        // Small buttons are stacked again when some were shown or hidden: only the ones showing take a place.
+        foreach (var t in _tabs)
+            foreach (var g in t.Groups)
+                if (g.Repack()) changed = true;
         // An add-on's group goes when none of its buttons are showing (they may hide themselves).
         foreach (var t in _tabs)
             foreach (var g in t.Groups)
@@ -361,10 +365,8 @@ public sealed class Ribbon : UserControl
             Select(tab);
         }
         var group = tab.GroupFor(groupTitle, groupAfter);
-        group.Break();
         var c = add(group);
-        group.Break();
-        group.PlaceExtra(order);
+        group.PlaceExtra(c, order);
         Remeasure(tab);
         return new Addons.AddonUndo(() =>
         {
@@ -512,17 +514,38 @@ public sealed class RibbonGroup
 {
     readonly Ribbon _ribbon;
     readonly StackPanel _items = new() { Orientation = Orientation.Horizontal, Spacing = 1, VerticalAlignment = VerticalAlignment.Top };
-    StackPanel? _column;
     internal Control Root { get; }
+
+    enum Kind { Large, Small, Block }
+
+    /// <summary>
+    /// One button (or grid, or custom control) of the group. <see cref="Order"/> is set for an add-on's
+    /// (they go after the program's own, by order and then arrival); <see cref="NewColumn"/> when the
+    /// program asked for a fresh column of small buttons before it (<see cref="Break"/>).
+    /// </summary>
+    sealed class Entry(Control control, Kind kind, bool newColumn)
+    {
+        public Control Control { get; } = control;
+        public Kind Kind { get; } = kind;
+        public bool NewColumn { get; } = newColumn;
+        public int? Order { get; set; }
+        public int Arrived { get; set; }
+        /// <summary>Stays after the add-ons' buttons too (a "More…" menu ends its group).</summary>
+        public bool Last { get; set; }
+    }
+
+    readonly List<Entry> _entries = [];
+    readonly List<StackPanel> _columns = [];
+    bool _breakNext;
+    string _packed = "";
 
     readonly RibbonTab _tab;
     internal string Title { get; }
     /// <summary>Made for an add-on (taken away again when it's empty).</summary>
     internal bool Extra { get; set; }
-    internal bool IsEmpty => _items.Children.Count == 0;
+    internal bool IsEmpty => _entries.Count == 0;
     /// <summary>Is any of its buttons showing.</summary>
-    internal bool AnyShown => _items.Children.Any(Shown);
-    static bool Shown(Control c) => c.IsVisible && (c is not StackPanel p || p.Children.Any(Shown));
+    internal bool AnyShown => _entries.Any(e => e.Control.IsVisible);
     readonly List<TextBlock> _smallLabels = [];
     readonly List<(Control Button, TextBlock Label)> _largeLabels = [];
 
@@ -605,25 +628,95 @@ public sealed class RibbonGroup
 
     void AddLarge(Control b)
     {
-        _column = null;
         b.MinWidth = 44;
         if (b is TemplatedControl tc) tc.Padding = new(3, 3);
         b.Height = 62;
         b.VerticalAlignment = VerticalAlignment.Top;
-        _items.Children.Add(b);
+        Add(b, Kind.Large);
     }
 
     void AddSmall(Control b)
     {
-        if (_column is null || _column.Children.Count >= 3)
-        {
-            _column = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Top };
-            _items.Children.Add(_column);
-        }
         b.Height = 21;
         b.HorizontalAlignment = HorizontalAlignment.Stretch;
         if (b is ContentControl cc) cc.HorizontalContentAlignment = HorizontalAlignment.Left;
-        _column.Children.Add(b);
+        Add(b, Kind.Small);
+    }
+
+    void Add(Control c, Kind kind)
+    {
+        _entries.Add(new Entry(c, kind, kind == Kind.Small && _breakNext));
+        _breakNext = false;
+        Pack();
+    }
+
+    /// <summary>Which buttons are showing (one 1 or 0 each), to tell when they must be stacked again.</summary>
+    string Shape() => string.Create(_entries.Count, _entries, (span, es) => { for (int i = 0; i < span.Length; i++) span[i] = es[i].Control.IsVisible ? '1' : '0'; });
+
+    /// <summary>Pack again if buttons have been shown or hidden since the last time (true if it did).</summary>
+    internal bool Repack()
+    {
+        if (Shape() == _packed) return false;
+        Pack();
+        return true;
+    }
+
+    /// <summary>
+    /// Lay the buttons out: big ones side by side, small ones stacked in columns of up to three, the
+    /// program's and the add-ons' alike. A run of small buttons (between big ones, or where the program
+    /// asked for a <see cref="Break"/>) is spread evenly over as few columns as hold it: 4 go 2 + 2 and
+    /// 7 go 3 + 2 + 2, so no button is left alone in a column of its own. Hidden buttons don't take a
+    /// place, so nothing leaves a gap (Scan the part only shows with the rotary, for one).
+    /// </summary>
+    void Pack()
+    {
+        foreach (var col in _columns) col.Children.Clear();
+        _columns.Clear();
+        _items.Children.Clear();
+        var own = _entries.Where(e => e.Order is null && !e.Last);
+        var extras = _entries.Where(e => e.Order is not null).OrderBy(e => e.Order).ThenBy(e => e.Arrived);
+        var last = _entries.Where(e => e.Order is null && e.Last);
+        var run = new List<Entry>();
+        foreach (var e in own.Concat(extras).Concat(last))
+        {
+            if (e.Kind == Kind.Small && !(e.NewColumn && run.Count > 0))
+            {
+                run.Add(e);
+                continue;
+            }
+            PackRun(run);
+            if (e.Kind == Kind.Small) run.Add(e);
+            else _items.Children.Add(e.Control);
+        }
+        PackRun(run);
+        foreach (var col in _columns) col.IsVisible = col.Children.Any(c => c.IsVisible);
+        _packed = Shape();
+    }
+
+    /// <summary>Stack a run of small buttons into evenly filled columns (the first ones take any extra), then empty it.</summary>
+    void PackRun(List<Entry> run)
+    {
+        if (run.Count == 0) return;
+        int shown = run.Count(e => e.Control.IsVisible);
+        int columns = Math.Max(1, (shown + 2) / 3);
+        StackPanel? column = null;
+        int index = -1, inColumn = 0, size = 0;
+        foreach (var e in run)
+        {
+            bool visible = e.Control.IsVisible;
+            if (column is null || (visible && inColumn >= size))
+            {
+                index++;
+                size = shown / columns + (index < shown % columns ? 1 : 0);
+                column = new StackPanel { Spacing = 1, VerticalAlignment = VerticalAlignment.Top };
+                _columns.Add(column);
+                _items.Children.Add(column);
+                inColumn = 0;
+            }
+            column.Children.Add(e.Control);
+            if (visible) inColumn++;
+        }
+        run.Clear();
     }
 
     public Button Large(string label, string icon, Action action, string? tip = null, Func<bool>? enabled = null)
@@ -669,7 +762,6 @@ public sealed class RibbonGroup
     /// <summary>A grid of icon-only buttons, <paramref name="perRow"/> to a row (align, distribute…).</summary>
     public void Icons(int perRow, params (string Icon, string Tip, Action Action, Func<bool>? Enabled)[] buttons)
     {
-        _column = null;
         var grid = new UniformGrid { Columns = perRow, VerticalAlignment = VerticalAlignment.Top };
         foreach (var (icon, tip, action, enabled) in buttons)
         {
@@ -683,38 +775,45 @@ public sealed class RibbonGroup
             grid.Children.Add(Setup(b, tip, enabled));
             _ribbon.Register(_tab.Name, tip, b);
         }
-        _items.Children.Add(grid);
+        Add(grid, Kind.Block);
     }
 
     /// <summary>Any control (a slider, a number box), stacked like a small button.</summary>
     public T Custom<T>(T c, Func<bool>? enabled = null) where T : Control
     {
-        _column = null;
         c.VerticalAlignment = VerticalAlignment.Top;
-        _items.Children.Add(c);
+        Add(c, Kind.Block);
         _ribbon.Track(c, enabled);
         return c;
     }
 
     /// <summary>Start a new column of small buttons.</summary>
-    public void Break() => _column = null;
+    public void Break() => _breakNext = true;
 
-    readonly List<(Control Item, int Order, int Arrived)> _extras = [];
+    /// <summary>Keep this button at the end of the group, after any add-on's (the group's "More…" menu).</summary>
+    public T KeepLast<T>(T c) where T : Control
+    {
+        if (_entries.FirstOrDefault(e => e.Control == c) is { } entry)
+        {
+            entry.Last = true;
+            Pack();
+        }
+        return c;
+    }
+
     int _arrivals;
 
     /// <summary>
-    /// The item just added (an add-on's button, alone in its column) goes among the other add-ons'
-    /// items by <paramref name="order"/>, then by arrival, after the program's own: so the order
-    /// doesn't depend on which add-on started first.
+    /// An add-on's button just added goes among the other add-ons' by <paramref name="order"/>, then by
+    /// arrival, after the program's own: so the order doesn't depend on which add-on started first.
+    /// Small ones fill up the group's last column before starting a new one.
     /// </summary>
-    internal void PlaceExtra(int order)
+    internal void PlaceExtra(Control c, int order)
     {
-        if (_items.Children.Count == 0) return;
-        _extras.RemoveAll(x => x.Item.Parent != _items);
-        _extras.Add((_items.Children[^1], order, _arrivals++));
-        var sorted = _extras.OrderBy(x => x.Order).ThenBy(x => x.Arrived).Select(x => x.Item).ToList();
-        foreach (var x in sorted) _items.Children.Remove(x);
-        _items.Children.AddRange(sorted);
+        if (_entries.FirstOrDefault(e => e.Control == c) is not { } entry) return;
+        entry.Order = order;
+        entry.Arrived = _arrivals++;
+        Pack();
     }
 
     static bool Within(StyledElement e, Control c)
@@ -730,14 +829,8 @@ public sealed class RibbonGroup
         // left here would keep the add-on (its button's click and Checked) in memory.
         _smallLabels.RemoveAll(l => Within(l, c));
         _largeLabels.RemoveAll(x => x.Button == c);
-        if (c.Parent is StackPanel column && column != _items)
-        {
-            column.Children.Remove(c);
-            if (column.Children.Count == 0) _items.Children.Remove(column);
-        }
-        else _items.Children.Remove(c);
-        _column = null;
-        // Its click handler belongs to the add-on: don't keep it until the next add-on button arrives.
-        _extras.RemoveAll(x => x.Item.Parent != _items);
+        // Its click handler belongs to the add-on: nothing here may keep hold of it.
+        _entries.RemoveAll(e => e.Control == c);
+        Pack();
     }
 }
