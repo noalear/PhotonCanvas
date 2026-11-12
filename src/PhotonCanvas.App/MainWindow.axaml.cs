@@ -7,6 +7,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PhotonCanvas.Core;
+using PhotonCanvas.Core.Camera;
 using PhotonCanvas.Device;
 using PhotonCanvas.Doc;
 using PhotonCanvas.Doc.Geometry;
@@ -161,7 +162,7 @@ public partial class MainWindow : Window
             Canvas.Focus();
             if (ConnectOnOpen && _settings.AcceptedTermsVersion < WelcomeWindow.TermsVersion)
             {
-                var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys, _settings);
+                var welcome = new WelcomeWindow(firstRun: true, _machine.SetUpKeys, () => _machine.HasKeys, _settings, CameraSetup());
                 await welcome.ShowDialog(this);
                 if (!welcome.Accepted)
                 {
@@ -2437,7 +2438,18 @@ public partial class MainWindow : Window
         await w.ShowDialog(this);
     }
 
-    Task ShowGettingStarted() => new WelcomeWindow(firstRun: false, _machine.SetUpKeys, () => _machine.HasKeys).ShowDialog(this);
+    Task ShowGettingStarted() => new WelcomeWindow(firstRun: false, _machine.SetUpKeys, () => _machine.HasKeys, camera: CameraSetup()).ShowDialog(this);
+
+    /// <summary>
+    /// The welcome window's camera step, for the machine picked on its equipment step: that pick is
+    /// put in use before calibrating, so the marks fit its work area and the calibration is kept for it.
+    /// </summary>
+    WelcomeWindow.CameraSetup CameraSetup() => new(
+        () => _settings.ActiveSetup(),
+        () => _machine.IsConnected,
+        () => _machine.ConnectNowAsync(),
+        owner => { ApplyEquipment(); return _machine.CalibrateOver(owner); },
+        () => CalibrationStore.Load(CalibrationStore.PathFor(_settings.ActiveSetup())).Count > 0);
 
     Task ShowSafety() => Dialogs.Message(this, "Safety and disclaimer", WelcomeWindow.SafetyText + "\n\n" + WelcomeWindow.DisclaimerText);
 

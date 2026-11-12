@@ -57,15 +57,23 @@ static class QuickStartShots
         Settle(300);
 
         // The welcome window: safety, connection keys and "Your equipment" with the UV picked.
-        var welcome = new WelcomeWindow(firstRun: true, () => Task.FromResult(false), () => false, settings);
+        // Its camera step as it shows before connecting (nothing here reaches a machine).
+        var camera = new WelcomeWindow.CameraSetup(() => settings.ActiveSetup(), () => false, () => Task.CompletedTask, _ => Task.CompletedTask, () => false);
+        var welcome = new WelcomeWindow(firstRun: true, () => Task.FromResult(false), () => false, settings, camera);
         welcome.Show(w);
         var go = typeof(WelcomeWindow).GetMethod("Go", Any)!;
-        foreach (var (page, name) in new[] { (1, "welcome-safety"), (2, "welcome-keys"), (3, "welcome-equipment") })
+        foreach (var (page, name) in new[] { (1, "welcome-safety"), (2, "welcome-keys"), (3, "welcome-equipment"), (4, "welcome-camera") })
         {
             go.Invoke(welcome, [page]);
             Settle(500);
             Save(welcome.CaptureRenderedFrame(), name);
         }
+        // The same step for the F2 Ultra (blue diode and MOPA), then back to the UV.
+        settings.ActiveMachine = MachineSetup.F2Ultra.Id;
+        go.Invoke(welcome, [4]);
+        Settle(500);
+        Save(welcome.CaptureRenderedFrame(), "welcome-camera-f2-ultra");
+        settings.ActiveMachine = uv.Id;
         welcome.Close();
         Settle(200);
 

@@ -318,7 +318,7 @@ The **?** at the top right opens the help menu:
 |---|---|
 | **Help guide** (`F1`) | This guide. `F1` in any other window opens the guide at the page about that window. See [Welcome](index.md). |
 | **Tutorials** | The list of tutorials: short guided walks through each feature. See [Welcome](index.md). |
-| **Getting started** | The short tour shown at the first start, with the connection setup. See [The first start](getting-started.md#the-first-start). |
+| **Getting started** | The short tour shown at the first start, with the connection setup and camera calibration. See [The first start](getting-started.md#the-first-start). |
 | **Keyboard shortcuts** | Every shortcut on one page, with **Change shortcuts…** to change them. See [Keyboard shortcuts](keyboard-shortcuts.md). |
 | **Safety and disclaimer** | The safety notice and the disclaimer you accepted at the first start. |
 | **About PhotonCanvas** | The version, the licence (free to use, all rights reserved) and credits. |

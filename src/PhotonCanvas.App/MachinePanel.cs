@@ -58,7 +58,9 @@ public sealed class MachinePanel : UserControl
     readonly Button _keysButton = Button("Set up connection keys…", tip: "One-time setup: reads the codes xTool machines expect from your own xTool Studio.");
 
     // Camera on the work area
-    List<CameraCalibration> _calibrations = CalibrationStore.Load(CalibrationStore.DefaultPath);
+    List<CameraCalibration> _calibrations = [];
+    /// <summary>The camera calibration file of the machine in use (each machine has its own).</summary>
+    string CalibrationPath => CalibrationStore.PathFor(_settings.ActiveSetup());
     readonly ToggleSwitch _onCanvas = new() { OnContent = "Camera on work area", OffContent = "Camera on work area" };
     readonly Slider _opacity = new() { Minimum = 0.15, Maximum = 1, SmallChange = 0.05, LargeChange = 0.1 };
     readonly TextBlock _calState = Hint();
@@ -94,6 +96,7 @@ public sealed class MachinePanel : UserControl
     public MachinePanel(AppSettings settings)
     {
         _settings = settings;
+        _calibrations = CalibrationStore.Load(CalibrationPath);
         _ip.Text = settings.LastMachineIp;
         _autoConnect.IsChecked = settings.AutoConnect;
         _autoConnect.IsCheckedChanged += (_, _) => { _settings.AutoConnect = _autoConnect.IsChecked == true; _settings.Save(); };
@@ -226,6 +229,17 @@ public sealed class MachinePanel : UserControl
     }
 
     public bool HasCalibration => _calibrations.Count > 0;
+
+    /// <summary>
+    /// The machine in use changed (Settings → Machines or Equipment): its own camera calibration is
+    /// loaded, and the camera picture is taken off the work area if that machine isn't calibrated.
+    /// </summary>
+    public void MachineChanged()
+    {
+        _calibrations = CalibrationStore.Load(CalibrationPath);
+        UpdateCalState();
+        if (_calibrations.Count == 0 && _onCanvas.IsChecked == true) _onCanvas.IsChecked = false;
+    }
 
     /// <summary>The calibrated camera picture under the design.</summary>
     public bool CameraOnWorkArea
@@ -390,6 +404,9 @@ public sealed class MachinePanel : UserControl
     /// <summary>Open camera calibration.</summary>
     public Task CalibrateAsync() => OpenCalibration();
 
+    /// <summary>Open camera calibration over another window (the welcome window's camera step).</summary>
+    public Task CalibrateOver(Window owner) => OpenCalibration(owner);
+
     static Control LightRow(string label, Slider s, TextBlock value)
     {
         var g = new Grid { ColumnDefinitions = new("60,*,44") };
@@ -551,14 +568,14 @@ public sealed class MachinePanel : UserControl
         _calState.Foreground = choice is { Exact: false } && Distance is not null ? Brush("Warn") : Brush("TextMuted");
     }
 
-    async Task OpenCalibration()
+    async Task OpenCalibration(Window? over = null)
     {
-        if (Owner is not { } owner) return;
+        if ((over ?? Owner) is not { } owner) return;
         var w = new CalibrationWindow(this, _settings, Distance);
         w.Saved += cal =>
         {
             _calibrations = CalibrationStore.With(_calibrations, cal);
-            try { CalibrationStore.Save(CalibrationStore.DefaultPath, _calibrations); }
+            try { CalibrationStore.Save(CalibrationPath, _calibrations); }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException) { Log($"Couldn't save the calibration: {e.Message}"); }
             UpdateCalState();
             Log($"Camera calibrated at {cal.DistanceMm:0.#} mm (average error {cal.RmsMm:0.00} mm).");

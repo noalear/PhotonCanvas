@@ -123,7 +123,7 @@
 </div>
 
 <h2><span class="n">4</span>The first start: welcome window</h2>
-<p>The first time PhotonCanvas opens, the <span class="ui">Welcome to PhotonCanvas</span> window takes you through five short steps. <span class="ui">Next</span> moves on and <span class="ui">Back</span> goes back.</p>
+<p>The first time PhotonCanvas opens, the <span class="ui">Welcome to PhotonCanvas</span> window takes you through six short steps. <span class="ui">Next</span> moves on and <span class="ui">Back</span> goes back.</p>
 
 <div class="row">
   <div class="text">
@@ -160,10 +160,25 @@
       <li>hides the tools that need the blue diode or the MOPA fiber laser (colour on metal, diffraction gratings, flip pictures, laser alignment, the diode/MOPA switch, overheat and galvo-timing settings, and the xTool material presets).</li>
     </ul>
     <p>Tick an attachment only if you have one. Leave the extraction numbers as they are unless you know your fan settings.</p>
-    <h3>Step 5 · How a job works</h3>
-    <p>A short summary. Click <span class="ui">Start designing</span>.</p>
   </div>
   <figure style="width: 2.45in"><img src="images/welcome-equipment.png" alt="Your equipment step with the F2 Ultra UV chosen"><figcaption>Step 4 with the F2 Ultra UV chosen.</figcaption></figure>
+</div>
+
+<div class="row">
+  <div class="text">
+    <h3>Step 5 · Calibrate the camera</h3>
+    <p>This step lines up the camera picture with where the UV laser marks, for the machine you picked in step 4. The box at the top says what the UV needs: the marks are burned with the UV laser over the whole 200 × 200 mm area.</p>
+    <ol>
+      <li>Make sure you've done xTool's own lens and camera setup in xTool Studio (section 1), then close xTool Studio.</li>
+      <li>Turn the machine on and click <span class="ui">Connect</span>. The first time, the machine may ask you to press its button.</li>
+      <li>Lay a flat scrap sheet over the whole 200 × 200 mm area.</li>
+      <li>Click <span class="ui">Calibrate camera…</span>. Its window takes you through focusing, burning the marks, the photo and saving: section 6.3 describes each part.</li>
+    </ol>
+    <p>The step then says <span class="ui">✓ The camera is calibrated for this machine.</span> Not ready yet? Click <span class="ui">Next</span> to skip it, and calibrate later with Machine → <span class="ui">Calibrate camera</span>.</p>
+    <h3>Step 6 · How a job works</h3>
+    <p>A short summary. Click <span class="ui">Start designing</span>.</p>
+  </div>
+  <figure style="width: 2.45in"><img src="images/welcome-camera.png" alt="Calibrate the camera step for the F2 Ultra UV"><figcaption>Step 5 for the F2 Ultra UV, before connecting.</figcaption></figure>
 </div>
 
 <p>You can change the machine later in Settings → <span class="ui">Equipment</span> (the same list) or Settings → <span class="ui">Machines</span>.</p>
@@ -223,7 +238,7 @@
       <li><b>Locate the marks.</b> PhotonCanvas finds them in the photo; follow the window's instructions for any it can't find.</li>
       <li><b>Check and save.</b> PhotonCanvas works out the correction; save it.</li>
     </ol>
-    <p>Repeat only if you move the camera or the photo stops lining up.</p>
+    <p>If you did this in step 5 of the welcome window, there's nothing more to do. Repeat only if you move the camera or the photo stops lining up. The calibration is kept for the F2 Ultra UV only: another machine in Settings → Machines has its own.</p>
     <div class="box uvbox"><span class="t">Untested on the UV</span><p>If the marks are too faint to find, raise the power a little and burn them again on a fresh scrap.</p></div>
   </div>
   <figure style="width: 2.2in"><img src="images/calibration-steps.png" alt="Calibrate camera window, steps 1 and 2"><figcaption>Calibrate camera, steps 1 and 2.</figcaption></figure>

@@ -11,11 +11,19 @@ namespace PhotonCanvas.App;
 
 /// <summary>
 /// First run: what this is, the safety notice and disclaimer (must be
-/// accepted), the connection keys, and how a job goes from drawing to laser.
-/// Also opened later from the help menu (Getting started) (without the acceptance step).
+/// accepted), the connection keys, your equipment, calibrating the camera for the machine
+/// picked, and how a job goes from drawing to laser.
+/// Also opened later from the help menu (Getting started) (without the acceptance and equipment steps).
 /// </summary>
 public sealed class WelcomeWindow : Window
 {
+    /// <summary>
+    /// What the camera step needs from the program: the machine in use, whether it is connected,
+    /// connecting to it, opening camera calibration over this window, and whether that machine's
+    /// camera is calibrated.
+    /// </summary>
+    public sealed record CameraSetup(Func<MachineSetup> Machine, Func<bool> Connected, Func<Task> Connect, Func<Window, Task> Calibrate, Func<bool> Calibrated);
+
     /// <summary>Bump when the notice changes so it is shown (and accepted) again.</summary>
     public const int TermsVersion = 1;
 
@@ -45,14 +53,16 @@ public sealed class WelcomeWindow : Window
     readonly CheckBox _accept = new() { Content = "I have read this, I understand the risks, and I accept these terms." };
     readonly TextBlock _keysState = new() { TextWrapping = TextWrapping.Wrap };
     readonly List<Func<Control>> _pages = [];
+    readonly CameraSetup? _camera;
     int _index;
 
     /// <summary>True when the user accepted the safety notice and terms.</summary>
     public bool Accepted { get; private set; }
 
-    public WelcomeWindow(bool firstRun, Func<Task<bool>> setUpKeys, Func<bool> hasKeys, AppSettings? equipment = null)
+    public WelcomeWindow(bool firstRun, Func<Task<bool>> setUpKeys, Func<bool> hasKeys, AppSettings? equipment = null, CameraSetup? camera = null)
     {
         _firstRun = firstRun;
+        _camera = camera;
         _setUpKeys = setUpKeys;
         _hasKeys = hasKeys;
         Title = firstRun ? $"Welcome to {Product}" : "Getting started";
@@ -76,6 +86,7 @@ public sealed class WelcomeWindow : Window
                     new EquipmentPanel(equipment),
                 },
             });
+        if (camera is not null) _pages.Add(CameraPage);
         _pages.Add(HowPage);
 
         _accept.IsCheckedChanged += (_, _) => UpdateButtons();
@@ -193,6 +204,106 @@ public sealed class WelcomeWindow : Window
                 setUp,
                 _keysState,
                 Para("Once that's done, PhotonCanvas finds and connects to the laser automatically. The first time, the machine may ask you to press its button to allow this computer."),
+            },
+        };
+    }
+
+    /// <summary>
+    /// Camera calibration, explained for the machine picked on the equipment step: the F2 Ultra burns
+    /// the marks with its blue diode over 220 × 220 mm, the F2 Ultra UV with its UV laser over
+    /// 200 × 200 mm. Connect, lay a scrap, then the calibration window does the rest.
+    /// </summary>
+    Control CameraPage()
+    {
+        var cam = _camera!;
+        var setup = cam.Machine();
+        var connState = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
+        var calState = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        var connect = new Button { Content = "Connect", HorizontalAlignment = HorizontalAlignment.Left };
+        var calibrate = new Button { Content = "Calibrate camera…", Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Left };
+        void Refresh()
+        {
+            bool on = cam.Connected(), done = cam.Calibrated();
+            connState.Text = on ? "✓ Connected." : "Not connected yet.";
+            connState.Foreground = on ? Brush("Ok") : Brush("TextMain");
+            connect.IsVisible = !on;
+            calibrate.Content = done ? "Calibrate again…" : "Calibrate camera…";
+            calState.Text = done
+                ? "✓ The camera is calibrated for this machine."
+                : "Not calibrated yet. You can skip this and do it later: Machine → Calibrate camera.";
+            calState.Foreground = done ? Brush("Ok") : Brush("TextMuted");
+        }
+        connect.Click += async (_, _) =>
+        {
+            connect.IsEnabled = false;
+            connState.Text = "Connecting…";
+            try { await cam.Connect(); }
+            finally { connect.IsEnabled = true; Refresh(); }
+        };
+        calibrate.Click += async (_, _) =>
+        {
+            calibrate.IsEnabled = false;
+            try { await cam.Calibrate(this); }
+            finally { calibrate.IsEnabled = true; Refresh(); }
+        };
+        Refresh();
+
+        if (setup.Kind != MachineKind.XTool)
+            return new StackPanel
+            {
+                Spacing = 10,
+                Children =
+                {
+                    Title2("Calibrate the camera"),
+                    Para($"{setup.Name} has no camera {Product} can use, so there is nothing to calibrate. Click Next."),
+                },
+            };
+
+        var profile = setup.Profile;
+        bool uv = profile.Uv is not null;
+        string area = $"{profile.FieldW:0} × {profile.FieldH:0} mm";
+        string forMachine = uv
+            ? $"On the {setup.Name} the marks are burned with the UV laser over the whole {area} area. Plain card, plywood or anodized aluminium show UV marks well. " +
+              "Do xTool's own lens and camera setup in xTool Studio first, and wear glasses rated for 355 nm if you watch with the lid open. " +
+              "Not yet tried on a real F2 Ultra UV: if the marks come out too faint to find, raise the power a little and burn them again on fresh scrap."
+            : profile.HasDiode
+                ? $"On the {setup.Name} the marks are burned with the blue diode at low power over the whole {area} area. Plain card or thin plywood shows them clearly. " +
+                  "One calibration does for both lasers; if the MOPA's marks land slightly off the diode's, Machine → Align lasers lines the two up."
+                : $"On the {setup.Name} the marks are burned over the whole {area} area. Plain card or thin plywood shows them clearly." +
+                  (setup.Untested ? " Not yet tried on this model." : "");
+
+        static Control Step(string n, string text, params Control[] more)
+        {
+            var body = new StackPanel { Spacing = 6, Children = { new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap } } };
+            foreach (var c in more) body.Children.Add(c);
+            return new Grid
+            {
+                ColumnDefinitions = new("30,*"),
+                Children =
+                {
+                    new TextBlock { Text = n + ".", FontWeight = FontWeight.SemiBold },
+                    Col1(body),
+                },
+            };
+        }
+
+        return new StackPanel
+        {
+            Spacing = 10,
+            Children =
+            {
+                Title2("Calibrate the camera"),
+                Para("The camera's picture lets you place designs right on your material. Calibrating lines that picture up with where the laser actually marks. " +
+                     "It takes about five minutes and one scrap sheet, and is kept for this machine."),
+                new Border
+                {
+                    Classes = { "card" },
+                    Child = new StackPanel { Spacing = 6, Children = { new TextBlock { Text = ("For your " + setup.Name).ToUpperInvariant(), Classes = { "h" } }, Para(forMachine) } },
+                },
+                Step("1", "Turn the machine on and connect to it.", new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { connect, connState } }),
+                Step("2", $"Lay a flat scrap sheet over the whole {area} area."),
+                Step("3", "Click Calibrate camera. Its window takes you through focusing, burning the marks (close the lid and press the machine's start button), taking a photo and saving.", calibrate),
+                calState,
             },
         };
     }
