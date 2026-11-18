@@ -28,7 +28,7 @@ Other things can appear on the work area: the camera picture under the design an
 camera's view (see [Camera](camera.md)), the area the close-up camera sees while a tone or line
 test is in the design (a dashed green box), the section being marked (see
 [Work area](work-area.md)), and a running job: what's done in green, what's being marked in amber
-and the laser as a red dot (see [Running a job](running-jobs.md)).
+and the laser as a red dot with the trail it leaves (see [Running a job](running-jobs.md)).
 
 ### Processing order
 

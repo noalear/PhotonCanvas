@@ -14,8 +14,9 @@ Click **Preview run** on the **Machine** tab.
 
 ## Play it
 <!-- target: button:Play -->
-Click **Play**. Marked paths turn green, the one being marked amber, and a dot shows where the
-laser is.
+Click **Play**. Marked paths turn green, the one being marked amber, and a red dot shows where the
+laser is, moving the way the job's G-code does: along each cut, line by line across a fill. It's a
+ring while the laser is off (between lines, or waiting after a path).
 
 ## Speed and time
 <!-- target: window:Run preview -->

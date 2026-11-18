@@ -322,9 +322,18 @@ Once the machine has the job, **Ship It** gives way to the job's state and two b
   carries on when it's paused; a long press while it's paused cancels it.
 - The time left comes from the machine's own progress once it's past 2%, else from the estimate
   and what past jobs taught it.
-- On the work area, paths already marked turn green, the one being marked amber, and a dot shows
-  where the laser is. The machine only reports how long it's been running, so this is worked out
-  from the time, not read from the machine.
+- On the work area, paths already marked turn green, the one being marked amber, and a red dot shows
+  where the laser is, with a short trail of what it has just marked. On fills and pictures a red
+  line shows the line being scanned. The dot is a hollow ring while the laser is off: jumping
+  between lines, on a run-up, or waiting after a path (a pause after each path, or a cool-down when
+  spreading the heat), when it sits where the path ended and that path shows green.
+- The machine only reports how long it's been running, so the dot is worked out from the time,
+  not read from the machine. It follows the job's own G-code, the same moves the machine gets:
+  each pass of a multi-pass cut, wobble, step-down, a fill's lines in the order they're burned
+  (spread out, one way or both ways, crosshatched, turned each pass, with their overscan), offset
+  fills going round, and a picture row by row. The time is counted from when the machine says it
+  started, which is what the estimate is measured against; if the job takes longer or shorter than
+  estimated, the dot drifts by that much.
 - The timeline fills up as the job goes.
 - A job loaded by xTool Studio, the phone app or another computer is shown too: *Loaded: a job that
   wasn't sent from this program*. **Stop** cancels it.
@@ -365,7 +374,8 @@ to check the order of a long job, or to see when a part will be done.
 - Drag the slider to any moment of the job, or click **Play** (**Pause** stops it).
 - The speed: **×1**, **×5**, **×20** (the default) or **×100**.
 - *0 s of 4:19* says where you are.
-- Marked paths turn green, the one being marked amber, and a dot shows where the laser is.
+- Marked paths turn green, the one being marked amber, and a red dot shows where the laser is
+  (a ring while it's off), following the job's G-code, with the trail it has just left.
 
 It plays the job as it was when you opened the window, by the time estimate (no acceleration).
 After changing the design, close it and open it again. Closing it clears the marks.

@@ -802,15 +802,27 @@ public sealed class JobBar : UserControl
         ShowCaption();
     }
 
-    /// <summary>Seconds the laser has been working: the machine's own count when it gives one, carried forward smoothly between reports.</summary>
+    /// <summary>
+    /// Seconds the laser has been working: our own clock from when the machine said it started, less pauses. That's
+    /// what the time estimate is measured against (the job history times jobs the same way). The machine's own count
+    /// is whole seconds and runs up to 1.5 s behind (Kyle's logs, 2026-11-18), which kept the laser marker behind the
+    /// laser; it's used only when it's well ahead of ours, i.e. this program joined a job already running.
+    /// </summary>
     double RunningSeconds()
     {
         if (_startedAt is not { } start) return 0;
         double paused = _pausedFor + (_pausedAt is { } p ? (DateTime.Now - p).TotalSeconds : 0);
+        double own = (DateTime.Now - start).TotalSeconds - paused;
         if (_machineElapsed is { } m)
-            return m + (_pausedAt is null ? (DateTime.Now - _machineElapsedAt).TotalSeconds : 0);
-        return (DateTime.Now - start).TotalSeconds - paused;
+        {
+            double machine = m + 0.5 + (_pausedAt is null ? (DateTime.Now - _machineElapsedAt).TotalSeconds : 0);
+            if (machine > own + JoinedLateS) return machine;
+        }
+        return own;
     }
+
+    /// <summary>The machine's count this far ahead of ours means the job was already running when we first saw it.</summary>
+    const double JoinedLateS = 5;
 
     /// <summary>
     /// A rotary job of ours ended part way: the object is left turned (the job's end, which turns it

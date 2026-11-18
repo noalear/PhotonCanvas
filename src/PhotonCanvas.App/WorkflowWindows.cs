@@ -153,7 +153,7 @@ public sealed class RunPreviewWindow : Window
             Spacing = 8,
             Children =
             {
-                Hint("Where the laser will be at each moment of the job (by the time estimate): marked paths turn green, the one being marked amber."),
+                Hint("Where the laser will be at each moment of the job (by the time estimate), following the job's own G-code: marked paths turn green, the one being marked amber, the laser a red dot (a ring while it's off) with the trail it leaves."),
                 _time,
                 new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, Children = { _play, _speed, _at } },
             },
@@ -163,7 +163,10 @@ public sealed class RunPreviewWindow : Window
 
     void ShowTime()
     {
-        _canvas.ShowRun(_job, RunTracker.At(_job, _time.Value));
+        var m = RunTracker.At(_job, _time.Value);
+        _canvas.ShowRun(_job, m);
         _at.Text = $"{Clock(_time.Value)} of {Clock(_time.Maximum)}";
+        // A big block is read in the background: look again shortly for the laser's exact place.
+        if (!m.Exact && !_timer.IsEnabled) DispatcherTimer.RunOnce(() => { if (IsVisible) ShowTime(); }, TimeSpan.FromMilliseconds(150));
     }
 }

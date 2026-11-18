@@ -21,7 +21,7 @@ public static class RotaryReturn
     public static double? UAt(BuiltJob job, double seconds)
     {
         if (job.Job.Mode is not WorkMode.Rotary r) return null;
-        var m = RunTracker.At(job, seconds);
+        var m = RunTracker.At(job, seconds, wait: true);
         if (m.Fraction >= 1) return 0;
         double? y = m.Head?.Y ?? (m.Sweep is { } s ? (s.A.Y + s.B.Y) / 2 : null);
         // Between paths (or in a pause): where the last finished path ended.
