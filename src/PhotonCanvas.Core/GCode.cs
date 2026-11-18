@@ -994,6 +994,14 @@ public sealed class Job
     // Timings measured on the F2 Ultra against the job history (Oct 2026).
     /// <summary>Moves with the laser off: galvo jumps, and the moves between a fill's or a picture's pieces (mm/s).</summary>
     const double Jump = 3000;
+    /// <summary>The galvo's jump speed (mm/s), for <see cref="MotionTrace"/>.</summary>
+    internal const double JumpMmS = Jump;
+    /// <summary>What the laser going on costs (s), for <see cref="MotionTrace"/>: <see cref="FillPieceS"/>.</summary>
+    internal const double LaserOnSeconds = FillPieceS;
+    /// <summary>A dot's step (s), for <see cref="MotionTrace"/>: <see cref="DotStepS"/>.</summary>
+    internal const double DotStepSeconds = DotStepS;
+    /// <summary>The head moving to a curved surface's next band (s), as <see cref="BlockSeconds"/> counts it.</summary>
+    internal const double HeadMoveSeconds = 0.25;
     /// <summary>Starting a job: the smallest jobs took about this much longer than their moves.</summary>
     public const double StartS = 1.5;
     /// <summary>Each piece of a fill line: the laser going on and off at its ends (3.2 ms over two fills of 5000 pieces, 2.9 without the start).</summary>
@@ -1213,6 +1221,26 @@ public sealed class Job
         v.AddRange(BitmapTail(tag));
         return v;
     }
+
+    /// <summary>
+    /// The motion lines block <paramref name="index"/> writes for pass <paramref name="pass"/> (from 1), as they are
+    /// in the motion file, one pass only (no pass loop, focus moves or pauses: the run's timeline has those). On a
+    /// curved surface, the block's height bands one after another. For following a running job.
+    /// </summary>
+    public List<string> BlockMotion(int index, int pass)
+    {
+        var b = Blocks[index];
+        b = b switch { FillBlock f => f.ForPass(pass), DotBlock d => d.ForPass(pass), _ => b };
+        var tag = Machine.GcodeTag;
+        IReadOnlyList<Block> parts = SurfaceHeight is { } h && Flat ? SurfaceBanding.Apply([b], h, BandMm, SpeedShare) : [b];
+        var o = new List<string>();
+        foreach (var part in parts) o.AddRange(RenderBlock(part, tag, 1));
+        return o;
+    }
+
+    /// <summary>The block's timed moves, read from <see cref="BlockMotion"/> (design mm; <paramref name="shift"/> added).</summary>
+    public MotionTrace BlockTrace(int index, int pass, Vec2 start, Vec2 shift = default) =>
+        MotionTrace.Read(BlockMotion(index, pass), Mode, Machine.FieldW, start - shift, shift);
 
     List<string> RenderBlock(Block block, string tag, int passes) => block switch
     {

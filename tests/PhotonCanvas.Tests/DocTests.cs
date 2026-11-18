@@ -525,7 +525,8 @@ public class RunTrackerTests
         Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
         var filling = RunTracker.At(job, job.Timeline[0].Start + job.Timeline[0].PassSeconds / 2);
         Assert.NotNull(filling.Sweep);
-        Assert.Null(filling.Head);
+        // The laser's on the line being scanned, on the fill's own G-code.
+        Assert.NotNull(filling.Head);
         Assert.True(RunTracker.At(job, job.Timeline[2].Start + 1).Pausing);
     }
 }
@@ -544,7 +545,7 @@ public class RunTrackerAngleTests
         var (a, b) = m.Sweep!.Value;
         // Lines scanned at 90° run up and down, and the scan moves across: a vertical line midway.
         Assert.Equal(a.X, b.X, 6);
-        Assert.Equal(20, a.X, 1);
+        Assert.InRange(a.X, 19.5, 20.5); // the line the laser is on at that moment (lines are 0.1 mm apart)
         Assert.Equal(20, Math.Abs(a.Y - b.Y), 6);
     }
 }

@@ -125,10 +125,21 @@ public sealed record BuiltJob(
     public sealed record RunSpan(double Start, double End, int FirstStep, int StepCount, double PassSeconds)
     {
         public bool IsPause => StepCount == 0;
+        /// <summary>The block it runs (index into the job's blocks); −1 for a pause.</summary>
+        public int Block { get; init; } = -1;
+        /// <summary>The pass it starts with (from 1): a round's number, or 1 when the block runs its own passes here.</summary>
+        public int Pass { get; init; } = 1;
+        /// <summary>How many passes it runs one after another (each <see cref="PassSeconds"/> long).</summary>
+        public int Passes { get; init; } = 1;
+        /// <summary>The wait at the end of each pass, laser off (a pause after the path, or a cool-down when spreading the heat): part of <see cref="PassSeconds"/>.</summary>
+        public double WaitS { get; init; }
     }
 
     /// <summary>The whole run, in order (for showing where the laser is while it runs).</summary>
     public IReadOnlyList<RunSpan> Timeline { get; init; } = [];
+
+    /// <summary>How far the MOPA's blocks were moved back to line up with the blue laser (they're drawn this much further on).</summary>
+    public Vec2 MopaShift { get; init; }
 }
 
 /// <summary>What framing traces.</summary>
@@ -838,6 +849,7 @@ public static class JobBuilder
             LeftOut = leftOut,
             RoundDelayS = opt.WholeJobPasses ? opt.PassDelayS : null,
             Timeline = Timeline(job, blockSteps),
+            MopaShift = opt.MopaOffset.Length > 1e-6 && opt.Machine.HasDiode && opt.Machine.HasMopa ? opt.MopaOffset : default,
             Paths = steps.Count - heatExtraSteps,
         };
     }
@@ -1033,7 +1045,7 @@ public static class JobBuilder
                 {
                     if (job.Blocks[i].Laser.Passes < round) continue;
                     double d = Job.PassSeconds(job.Blocks[i], round, job.Mode);
-                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d));
+                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d) { Block = i, Pass = round, WaitS = Math.Min(d, job.Blocks[i].PauseAfterS) });
                     t += d;
                 }
                 if (round < rounds && r.DelayS > 0)
@@ -1046,9 +1058,23 @@ public static class JobBuilder
         else
             for (int i = 0; i < job.Blocks.Count; i++)
             {
-                double d = Job.AllPassesSeconds(job.Blocks[i], job.Mode);
-                spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, sec[i]));
-                t += d;
+                var b = job.Blocks[i];
+                int passes = Math.Max(1, b.Laser.Passes);
+                double wait = Math.Min(sec[i], b.PauseAfterS);
+                if (b is DotBlock { PassBlocks.Count: > 1 })
+                    // A picture turned per pass is laid out again each pass, each its own length.
+                    for (int p = 1; p <= passes; p++)
+                    {
+                        double d = Job.PassSeconds(b, p, job.Mode);
+                        spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d) { Block = i, Pass = p, WaitS = Math.Min(d, b.PauseAfterS) });
+                        t += d;
+                    }
+                else
+                {
+                    double d = Job.AllPassesSeconds(b, job.Mode);
+                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d / passes) { Block = i, Passes = passes, WaitS = Math.Min(d / passes, b.PauseAfterS) });
+                    t += d;
+                }
             }
         return spans;
     }

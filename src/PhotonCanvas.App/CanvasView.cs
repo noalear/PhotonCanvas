@@ -600,7 +600,7 @@ public sealed partial class CanvasView : Control
 
     static readonly Color DoneColor = Color.Parse("#4FAF83"), NowColor = Color.Parse("#E8B04A"), LaserColor = Color.Parse("#FF4D3D");
 
-    /// <summary>Marked paths in green, the one being marked in amber, the laser as a red dot (or a red scan line on fills).</summary>
+    /// <summary>Marked paths in green, the one being marked in amber, the laser as a red dot (a ring while it's off) with the trail it just left, and on fills the line being scanned.</summary>
     void DrawRun(DrawingContext ctx, BuiltJob job, RunMarker m)
     {
         double px = 1 / _scale;
@@ -627,6 +627,27 @@ public sealed partial class CanvasView : Control
             if (i >= job.Steps.Count || job.Steps[i].Points.Count == 0) continue;
             ctx.DrawGeometry(null, nowPen, Path(job.Steps[i]));
         }
+        if (m.Trail.Count > 0)
+        {
+            // What the laser has just marked, the way it ran: the lines of a fill, a picture's rows, the cut behind it.
+            var g = new StreamGeometry();
+            using (var c = g.Open())
+            {
+                Vec2? last = null;
+                foreach (var (a, b) in m.Trail)
+                {
+                    if (last is not { } l || l.Dist(a) > 1e-6)
+                    {
+                        if (last is not null) c.EndFigure(false);
+                        c.BeginFigure(P(a), false);
+                    }
+                    c.LineTo(P(b));
+                    last = b;
+                }
+                c.EndFigure(false);
+            }
+            ctx.DrawGeometry(null, new Pen(new SolidColorBrush(LaserColor, 0.55), 1.6 * px, lineCap: PenLineCap.Round), g);
+        }
         if (m.Sweep is { } sw)
         {
             ctx.DrawLine(new Pen(new SolidColorBrush(LaserColor, 0.3), 7 * px), P(sw.A), P(sw.B));
@@ -635,9 +656,15 @@ public sealed partial class CanvasView : Control
         if (m.Head is { } h)
         {
             var c = P(h);
-            ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.18), null, c, 14 * px, 14 * px);
-            ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.4), null, c, 7 * px, 7 * px);
-            ctx.DrawEllipse(new SolidColorBrush(LaserColor), new Pen(Brushes.White, 1.2 * px), c, 3.5 * px, 3.5 * px);
+            if (m.LaserOn)
+            {
+                ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.18), null, c, 14 * px, 14 * px);
+                ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.4), null, c, 7 * px, 7 * px);
+                ctx.DrawEllipse(new SolidColorBrush(LaserColor), new Pen(Brushes.White, 1.2 * px), c, 3.5 * px, 3.5 * px);
+            }
+            else
+                // Laser off (moving between lines, a run-up, a cool-down wait): a ring where it is.
+                ctx.DrawEllipse(new SolidColorBrush(LaserColor, 0.15), new Pen(new SolidColorBrush(LaserColor), 1.6 * px), c, 5 * px, 5 * px);
         }
     }
 
