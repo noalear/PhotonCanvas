@@ -194,6 +194,75 @@ public class CutExtrasTests
         Assert.Contains(JobBuilder.Build(open, new()).Warnings, w => w.Contains("open path"));
     }
 
+    /// <summary>A rounded slot drawn as four separate pieces (two lines, two arcs), the way a DXF often comes in.</summary>
+    static Func<Guid, Shape>[] SlotPieces(double x, double y)
+    {
+        Vec2 a = new(x, y), b = new(x + 20, y), c = new(x + 20, y + 6), d = new(x, y + 6);
+        PathShape Piece(Guid id, Vec2 from, params Seg[] segs) => new() { LayerId = id, Geometry = new PathGeometry([new Subpath(from, [.. segs], false)]) };
+        return
+        [
+            id => Piece(id, a, Seg.Line(b)),
+            id => Piece(id, c, Seg.Cubic(new(x + 24, y + 6), new(x + 24, y), b)), // drawn the other way round
+            id => Piece(id, c, Seg.Line(d)),
+            id => Piece(id, d, Seg.Cubic(new(x - 4, y + 6), new(x - 4, y), a)),
+        ];
+    }
+
+    [Fact]
+    public void PiecesThatMeetAreCutAsOneLine()
+    {
+        // No stopping and starting again at every joint: one closed outline, so the kerf applies too.
+        var (s, _) = Doc(l => l with { KerfMm = 0.2 }, SlotPieces(10, 10));
+        var job = JobBuilder.Build(s, new JobOptions());
+        var cut = Assert.Single(Vectors(job));
+        var pts = cut.Path.EmittedPoints();
+        Assert.True(pts[0].Dist(pts[^1]) < 1e-6);
+        Assert.Equal(9.9, cut.Path.Bounds.MinY, 3);
+        Assert.Equal(16.1, cut.Path.Bounds.MaxY, 3);
+        Assert.DoesNotContain(job.Warnings, w => w.Contains("open path"));
+
+        // Without a kerf too, and on a score layer.
+        var (score, _) = Doc(l => l with { Mode = LayerMode.Score }, SlotPieces(10, 10));
+        Assert.Single(Vectors(JobBuilder.Build(score, new JobOptions())));
+
+        // Pieces that don't meet stay apart.
+        var (apart, _) = Doc(l => l, id => new PathShape { LayerId = id, Geometry = PathGeometry.Line(new(10, 10), new(20, 10)) },
+            id => new PathShape { LayerId = id, Geometry = PathGeometry.Line(new(20.5, 10), new(30, 10)) });
+        Assert.Equal(2, Vectors(JobBuilder.Build(apart, new JobOptions())).Count);
+    }
+
+    [Fact]
+    public void JoiningPiecesKeepsEveryPointAndOpenEnds()
+    {
+        // A zigzag in three pieces, the middle one backwards, and a closed square that isn't touched.
+        var square = new Subpath(new(50, 50), [Seg.Line(new(60, 50)), Seg.Line(new(60, 60)), Seg.Line(new(50, 60))], true);
+        List<Subpath> subs =
+        [
+            new(new(0, 0), [Seg.Line(new(10, 0))], false),
+            square,
+            new(new(10, 10.01), [Seg.Line(new(10, 0.005))], false),
+            new(new(10, 10), [Seg.Line(new(20, 10))], false),
+        ];
+        var (joined, n, closed) = PathTools.JoinTouching(subs, 0.02);
+        Assert.Equal(2, n);
+        Assert.Equal(0, closed);
+        Assert.Equal(2, joined.Count);
+        var line = joined[0];
+        Assert.False(line.Closed);
+        Assert.Equal(new Vec2(0, 0), line.Start);
+        Assert.Equal(new Vec2(20, 10), line.End);
+        Assert.Equal(3, line.Segs.Length);
+        Assert.Same(square, joined[1]);
+
+        // Lots of pieces stay quick (ends are found through a grid, not by trying every pair).
+        var many = Enumerable.Range(0, 20000).Select(i => new Subpath(new(i * 0.1, 0), [Seg.Line(new((i + 1) * 0.1, 0))], false)).Reverse().ToList();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var (one, _, _) = PathTools.JoinTouching(many, 0.02);
+        Assert.Single(one);
+        Assert.Equal(20000, one[0].Segs.Length);
+        Assert.True(sw.Elapsed.TotalSeconds < 5);
+    }
+
     [Fact]
     public void ScoreLayersGetKerfButNoTabs()
     {

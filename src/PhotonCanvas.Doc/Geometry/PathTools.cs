@@ -173,6 +173,92 @@ public static class PathTools
         return new CleanupResult(result, joined, closed, dupes, tiny);
     }
 
+    /// <summary>
+    /// For cutting: open pieces whose ends meet (within <paramref name="tol"/> mm) become one
+    /// continuous line, so the laser doesn't stop and start again at every joint of a drawing
+    /// that came in as separate lines and arcs. A line that comes back to its own start is
+    /// closed. Closed subpaths are left as they are; nothing is moved, only joined. A joined line
+    /// takes the place of its first piece. Fast for many pieces (ends found through a grid).
+    /// </summary>
+    public static (List<Subpath> Subpaths, int Joined, int Closed) JoinTouching(IReadOnlyList<Subpath> subs, double tol)
+    {
+        int joined = 0, closed = 0;
+        var open = new List<int>();
+        for (int i = 0; i < subs.Count; i++)
+            if (!subs[i].Closed && !subs[i].Segs.IsEmpty) open.Add(i);
+        if (open.Count == 0) return ([.. subs], 0, 0);
+
+        // Every open piece's two ends, in a grid of cells as big as the tolerance.
+        double cell = Math.Max(tol, 1e-6);
+        var grid = new Dictionary<(long, long), List<int>>();
+        (long, long) Key(Vec2 p) => ((long)Math.Floor(p.X / cell), (long)Math.Floor(p.Y / cell));
+        foreach (var i in open)
+            foreach (var end in new[] { subs[i].Start, subs[i].End })
+            {
+                var k = Key(end);
+                if (!grid.TryGetValue(k, out var list)) grid[k] = list = [];
+                if (!list.Contains(i)) list.Add(i);
+            }
+        var used = new bool[subs.Count];
+        // The first unused open piece with an end at p (lowest index, so the result never depends on the grid).
+        int Touching(Vec2 p)
+        {
+            var (cx, cy) = Key(p);
+            int best = -1;
+            for (long x = cx - 1; x <= cx + 1; x++)
+                for (long y = cy - 1; y <= cy + 1; y++)
+                    if (grid.TryGetValue((x, y), out var list))
+                        foreach (var j in list)
+                            if (!used[j] && (best < 0 || j < best) && (subs[j].Start.Dist(p) <= tol || subs[j].End.Dist(p) <= tol)) best = j;
+            return best;
+        }
+        var result = new List<Subpath>(subs.Count);
+        for (int i = 0; i < subs.Count; i++)
+        {
+            if (used[i]) continue;
+            used[i] = true;
+            if (subs[i].Closed || subs[i].Segs.IsEmpty) { result.Add(subs[i]); continue; }
+            // The pieces in order, each the right way round: built into one line at the end.
+            var ahead = new List<Subpath> { subs[i] };
+            var behind = new List<Subpath>(); // in reverse order, before the first piece
+            Vec2 start = subs[i].Start, end = subs[i].End;
+            int segCount = subs[i].Segs.Length;
+            bool Loops() => segCount >= 2 && end.Dist(start) <= tol;
+            // On from its end, then back from its start, until nothing more meets it or it comes round.
+            while (!Loops() && Touching(end) is var j and >= 0)
+            {
+                used[j] = true;
+                var piece = subs[j].Start.Dist(end) <= tol ? subs[j] : Reverse(subs[j]);
+                ahead.Add(piece);
+                end = piece.End;
+                segCount += piece.Segs.Length;
+                joined++;
+            }
+            while (!Loops() && Touching(start) is var j and >= 0)
+            {
+                used[j] = true;
+                var piece = subs[j].End.Dist(start) <= tol ? subs[j] : Reverse(subs[j]);
+                behind.Add(piece);
+                start = piece.Start;
+                segCount += piece.Segs.Length;
+                joined++;
+            }
+            var segs = ImmutableArray.CreateBuilder<Seg>(segCount);
+            for (int k = behind.Count - 1; k >= 0; k--) segs.AddRange(behind[k].Segs);
+            foreach (var piece in ahead) segs.AddRange(piece.Segs);
+            bool loops = Loops();
+            if (loops)
+            {
+                // Closed exactly on its start (the last piece ends where the first began).
+                closed++;
+                var last = segs[^1];
+                segs[^1] = last with { To = start, C1 = last.Kind == SegKind.Line ? start : last.C1, C2 = last.Kind == SegKind.Line ? start : last.C2 };
+            }
+            result.Add(new Subpath(start, segs.MoveToImmutable(), loops));
+        }
+        return (result, joined, closed);
+    }
+
     static (Subpath, int) DropTiny(Subpath sp)
     {
         var b = ImmutableArray.CreateBuilder<Seg>();
