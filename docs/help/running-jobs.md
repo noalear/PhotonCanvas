@@ -5,8 +5,11 @@ the order it runs in, how long it takes and anything worth knowing first. It's r
 a second after every change to the design or its settings, so it's never out of date.
 
 Sending a job only uploads it. PhotonCanvas never starts it by itself: nothing moves or fires until
-you press the start button on the machine (or start it from the phone, only if you've turned on
-**Allow starting jobs from the phone** in Remote access, from the Phone remote add-on).
+you press the start button on the machine. Two more ways are off to begin with, and each warns you
+before you turn it on: **Start** in the job bar, once you've turned on **Allow starting jobs from
+this computer** in Settings → Machine (see [Starting from this computer](#starting-from-this-computer)),
+and the phone, once you've turned on **Allow starting jobs from the phone** in Remote access (from
+the Phone remote add-on).
 
 ![The job bar: Ship It, Frame, the passes and pauses, the timeline, Checks, Order, Export and the estimate](images/job-bar.png)
 
@@ -62,7 +65,7 @@ sender instead (see [Sending to a GRBL machine](machine.md#sending-to-a-grbl-mac
    then *Uploaded. Press the start button on the machine to begin (long-press while paused to
    cancel).* The job is named after the design's file (*Untitled* if it isn't saved).
 6. The machine says the job is loaded, and the job bar shows **Loaded – press start**. Press the
-   start button on the machine to run it.
+   start button on the machine to run it (or **Start** in the job bar, if you've allowed that).
 
 ### The confirmation window
 
@@ -86,7 +89,9 @@ sender instead (see [Sending to a GRBL machine](machine.md#sending-to-a-grbl-mac
 - *ⓘ A job is already loaded on the machine and not started. It will be replaced by this one.*
   and whose it is, when there's one.
 - *After upload the machine waits. Nothing moves or fires until you press its start button (or start
-  it from the phone, if you've allowed that in Remote access).*
+  it from the phone, if you've allowed that in Remote access).* With starting from this computer
+  allowed: *… until you press its start button, or Start in the job bar (you've allowed that in
+  Settings → Machine).*
 
 **Ship It** uploads; **Cancel** doesn't.
 
@@ -313,7 +318,7 @@ Once the machine has the job, **Ship It** gives way to the job's state and two b
 
 | State | Pause | Stop | Caption |
 |---|---|---|---|
-| **Loaded – press start** | greyed | cancels the loaded job | Whose job it is (*Loaded: "Coaster", sent from this computer at 14:05.*), *Press the start button on the machine, or Stop to cancel it.* and about how long it takes once started. |
+| **Loaded – press start** | greyed (**Start** in its place, if allowed) | cancels the loaded job | Whose job it is (*Loaded: "Coaster", sent from this computer at 14:05.*), *Press the start button on the machine, or Stop to cancel it.* and about how long it takes once started. |
 | **Running** | **Pause** | cancels the job | *Elapsed 1:02 · about 3:20 left* |
 | **Paused** | **Continue** | cancels the job | the elapsed time, which stops counting while paused |
 
@@ -339,6 +344,33 @@ Once the machine has the job, **Ship It** gives way to the job's state and two b
   wasn't sent from this program*. **Stop** cancels it.
 
 The cameras are dark while a job runs, because the machine turns its lights off.
+
+## Starting from this computer
+
+Off to begin with: a job only starts from the machine's own button. If you'd rather start it from
+the computer (the machine is out of reach, say), turn on **Allow starting jobs from this computer**
+on the **Machine** page of Settings (the **STATUS** card). It asks first, **Allow starting jobs from
+this computer?**, with what's at stake; **I understand, allow it** turns it on, **Keep it off**
+doesn't. It's kept on this computer, not on the machine, and stays on until you untick it.
+
+With it on, a loaded job shows **Start** in place of **Pause**, and the caption says *Press Start
+here or the start button on the machine, or Stop to cancel it.* Every click asks again, **Start
+"Coaster" now?**, with whose job it is and *The laser will fire. Is the material in place, the lid
+as you want it, and nothing in the way?* **Start job** starts it (`Enter` doesn't: it has to be
+clicked); **Cancel** leaves it waiting.
+
+- Only a job that's loaded and waiting is started, and only the one the question was about: if the
+  machine has moved on meanwhile (another job, cancelled at the machine), nothing is sent and the
+  caption says *Not started: the machine no longer has that job waiting.*
+- If the machine doesn't start (its lid or safety sensors, say), the caption says what it reports
+  instead: *The machine didn't start: it reports "…". Press its button to start, or try again.*
+- A job sent from somewhere else (xTool Studio, the phone, another computer) can be started too.
+  The question says whose it is.
+- **Pause**, **Continue**, **Stop** and the machine's button work as before.
+
+> **Safety:** Starting from here fires the laser without anyone at the machine. Look at the machine
+> yourself before each start. The machine blanks its cameras while a job runs, so a fire can start
+> unseen: keep its flame alarm on and stay where you can reach it. Keep children and pets away.
 
 ## When it finishes
 

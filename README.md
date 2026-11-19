@@ -65,7 +65,9 @@ straight to the machine over your own network.
 
 Jobs are uploaded with `autoStart: 0`: the desktop app never starts a job by itself, and
 nothing moves or fires until the job is started. That is the machine's start button, or, only if
-you turn on **Allow starting jobs from the phone** (off by default, in Remote access), the
+you turn on **Allow starting jobs from this computer** (off by default, in Settings → Machine, after
+a safety warning), **Start** in the job bar, which asks again before every start, or, only if you
+turn on **Allow starting jobs from the phone** (off by default, in Remote access), the
 [phone remote](docs/help/remote.md), which starts a job already loaded on the machine and only
 after you've looked at a picture of the bed taken in the last 2 minutes.
 

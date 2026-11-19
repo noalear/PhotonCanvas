@@ -17,8 +17,9 @@ namespace PhotonCanvas.App;
 /// <summary>
 /// Connection to the F2 Ultra: find, connect, status, lid-open setting, live
 /// camera (snapshot polling; this firmware has no video stream) and an event
-/// log. Nothing here moves the head or fires the laser; jobs only start from
-/// the machine's own button.
+/// log. Nothing here moves the head or fires the laser by itself; jobs start from
+/// the machine's own button, or from the job bar's Start once the user has allowed
+/// that (<see cref="DesktopStartAllowed"/>) and confirmed the start.
 /// </summary>
 public sealed class MachinePanel : UserControl
 {
@@ -39,6 +40,9 @@ public sealed class MachinePanel : UserControl
     readonly TextBlock _distance = Hint();
     readonly CheckBox _lidOpen = new() { Content = "Allow starting with the lid open", IsEnabled = false };
     readonly CheckBox _beeper = new() { Content = "Beeper on", IsEnabled = false };
+    // Kept on this computer (app settings), so it works whether or not the machine is connected.
+    readonly CheckBox _desktopStart = new() { Content = "Allow starting jobs from this computer" };
+    bool _settingDesktopStart;
     readonly Button _deviceSettings = Button("Device settings…", tip: "Settings stored on the machine: name, alarms, exhaust run-on, sleep, galvo timing, Wi-Fi, interlocks, keeping a job on it.");
     readonly Button _focus = new() { Content = "Auto-focus", IsEnabled = false, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Center };
     readonly TextBlock _focusState = Hint();
@@ -108,6 +112,9 @@ public sealed class MachinePanel : UserControl
         _ip.KeyDown += async (_, e) => { if (e.Key == Avalonia.Input.Key.Enter && !IsConnected) await ToggleConnect(); };
         _lidOpen.IsCheckedChanged += async (_, _) => await SetLidOpen();
         _beeper.IsCheckedChanged += async (_, _) => await SetBeeper();
+        _desktopStart.IsChecked = _settings.AllowDesktopStart;
+        _desktopStart.IsCheckedChanged += async (_, _) => await SetDesktopStart();
+        ToolTip.SetTip(_desktopStart, "Off to begin with. When on, the job bar has a Start button for a job loaded on the machine; every start asks first. Kept on this computer, not the machine.");
         _deviceSettings.IsEnabled = false;
         _deviceSettings.Click += async (_, _) =>
         {
@@ -169,7 +176,7 @@ public sealed class MachinePanel : UserControl
                 Children =
                 {
                     Card("Connection", _keysState, _keysButton, _ip, _found, Row(_find, _connect), _autoConnect, _connState, _info),
-                    Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _beeper, _deviceSettings),
+                    Card("Status", _mode, _distance, _focus, _focusState, _lidOpen, _desktopStart, _beeper, _deviceSettings),
                     Card("Work area camera", _onCanvas, Field("Opacity", _opacity), Row(refresh, calibrate), _calState),
                     Card("Camera lights", LightRow("Front", _frontLight, _frontText), LightRow("Back", _backLight, _backText),
                         Hint("Brightness of the machine's fill lights for the cameras. Saved on the machine.")),
@@ -1118,6 +1125,10 @@ public sealed class MachinePanel : UserControl
             : "Loaded: a job that wasn't sent from this program (e.g. xTool Studio, the phone app, or another computer).";
     }
 
+    /// <summary>The name of the loaded job when it was sent from this computer, else null.</summary>
+    public string? LoadedJobName() =>
+        LoadedTaskId is { Length: > 0 } id ? _settings.SentJobs.FirstOrDefault(j => j.TaskId == id)?.Name : null;
+
     void DescribeEvent(DeviceEvent ev)
     {
         if (ev.Type == "MODE_CHANGE")
@@ -1271,6 +1282,45 @@ public sealed class MachinePanel : UserControl
             else { await c.DropInterruptedJobAsync(); Log("Interrupted job forgotten."); }
         }
         catch (DeviceException e) { AppLog.Write("power-resume", e.Message); }
+    }
+
+    /// <summary>The Start button in the job bar was allowed or taken away (Settings → Machine).</summary>
+    public event Action? DesktopStartChanged;
+
+    /// <summary>Starting jobs from this computer is on.</summary>
+    public bool DesktopStartAllowed => _settings.AllowDesktopStart;
+
+    async Task SetDesktopStart()
+    {
+        if (_settingDesktopStart || _desktopStart.IsChecked is not bool on || on == _settings.AllowDesktopStart) return;
+        if (on && (Owner is not { } owner ||
+            !await Dialogs.Confirm(owner, "Allow starting jobs from this computer?", DesktopStart.Warning, "I understand, allow it", "Keep it off", yesIsDefault: false)))
+        {
+            _settingDesktopStart = true;
+            _desktopStart.IsChecked = false;
+            _settingDesktopStart = false;
+            return;
+        }
+        _settings.AllowDesktopStart = on;
+        _settings.Save();
+        Log(on ? "Starting jobs from this computer allowed (Start in the job bar)." : "Starting jobs from this computer turned off: jobs start from the machine's button.");
+        DesktopStartChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Start the job that's loaded and waiting for the machine's button. The laser fires. Only when
+    /// <see cref="DesktopStartAllowed"/>; the caller has asked the user. Returns the mode afterwards
+    /// (<c>P_WORKING</c> once it has started).
+    /// </summary>
+    public async Task<string> StartLoadedJobAsync()
+    {
+        if (!_settings.AllowDesktopStart)
+            throw new DeviceException(DeviceException.BusyCode, "Starting jobs from this computer is turned off (Settings → Machine). Press the machine's button to start.");
+        if (_client is not { } c || !c.IsConnected) throw new DeviceException(DeviceException.NotConnectedCode, "Not connected to a machine.");
+        Log("Starting the loaded job from this computer.");
+        string after = await c.StartLoadedJobAsync();
+        Log(after == "P_WORKING" ? "Job started from this computer." : $"The machine didn't start: it reports {Describe(after)}.");
+        return after;
     }
 
     async Task SetLidOpen()

@@ -57,10 +57,11 @@ public static class Dialogs
     }
 
     /// <summary>Yes/no. Returns true for the affirmative button.</summary>
-    public static async Task<bool> Confirm(Window owner, string title, string message, string yes = "OK", string no = "Cancel")
+    /// <param name="yesIsDefault">False: Enter doesn't answer yes (for ones that fire the laser); it has to be clicked.</param>
+    public static async Task<bool> Confirm(Window owner, string title, string message, string yes = "OK", string no = "Cancel", bool yesIsDefault = true)
     {
         bool result = false;
-        var y = new Button { Content = yes, IsDefault = true, Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 90 };
+        var y = new Button { Content = yes, IsDefault = yesIsDefault, Classes = { "primary" }, HorizontalAlignment = HorizontalAlignment.Right, MinWidth = 90 };
         var n = new Button { Content = no, IsCancel = true, MinWidth = 90 };
         var w = Shell(title, new StackPanel { Children = { Body(message), Buttons(n, y) } });
         y.Click += (_, _) => { result = true; w.Close(); };
