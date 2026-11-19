@@ -5,8 +5,8 @@ account, no cloud. This page covers connecting, the machine panel at the right e
 the **Settings** window page by page, the machine's own stored settings, the G-code console and
 where PhotonCanvas keeps its files.
 
-Nothing on this page starts a job. Jobs only start from the machine's button (see
-[Running a job](running-jobs.md)). A few things here do move the head or fire the laser, and say
+Nothing on this page starts a job. Jobs start from the machine's button, or from **Start** in the
+job bar once you've allowed that here (see [Running a job](running-jobs.md#starting-from-this-computer)). A few things here do move the head or fire the laser, and say
 so: auto-focus, moving the focus height, homing the Z axis and the console.
 
 ## Connecting
@@ -166,6 +166,11 @@ and what's happening. See [Finding and connecting](#finding-and-connecting).
   processing"). When on, the start button works with the lid up. Turning it on asks first,
   **Allow starting with the lid open?**, with what's at stake; **I understand, allow it** turns it
   on, **Keep it off** doesn't. It stays on until you turn it off.
+- **Allow starting jobs from this computer**: off to begin with. When on, the job bar shows
+  **Start** for a job that's loaded and waiting, and every start asks first. Turning it on asks,
+  **Allow starting jobs from this computer?**, with what's at stake; **I understand, allow it**
+  turns it on, **Keep it off** doesn't. Kept on this computer (not on the machine), so it can be
+  set while not connected. See [Starting from this computer](running-jobs.md#starting-from-this-computer).
 - **Beeper on**: the machine's beeps for button presses and jobs. Stored on the machine; the
   firmware has on and off, no volume.
 - **Device settings…**: the machine's own stored settings (see [Device settings](#device-settings)).

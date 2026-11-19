@@ -66,6 +66,9 @@ public sealed class JobBar : UserControl
     readonly TextBlock _runState = new() { FontWeight = FontWeight.SemiBold, FontSize = 12.5 };
     readonly Button _pause = new() { Content = "Pause", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center };
     readonly Button _stop = new() { Content = "Stop", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center };
+    // Starts a loaded job from here: only shown once allowed in Settings → Machine (off to begin with), and every start asks first.
+    readonly Button _start = new() { Content = "Start", Width = 75, HorizontalContentAlignment = HorizontalAlignment.Center, Classes = { "primary" }, IsVisible = false };
+    bool _starting;
     DateTime? _startedAt;
     double? _sentEstimate;
     double _pausedFor;
@@ -156,10 +159,12 @@ public sealed class JobBar : UserControl
         ToolTip.SetTip(_pause, "Pause or continue. The machine's button also pauses (short press) and cancels (long press while paused).");
         _pause.Click += async (_, _) => await PauseOrResume();
         _stop.Click += async (_, _) => await StopJob();
+        ToolTip.SetTip(_start, "Start the loaded job from here: the laser fires. Asks first. Turned on in Settings → Machine (Allow starting jobs from this computer).");
+        _start.Click += async (_, _) => await StartJob();
         _runPanel = new StackPanel
         {
             Width = 158, Spacing = 4, IsVisible = false, VerticalAlignment = VerticalAlignment.Center,
-            Children = { _runState, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _pause, _stop } } },
+            Children = { _runState, new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Children = { _pause, _start, _stop } } },
         };
         var sendArea = new Panel { Children = { _send, _runPanel }, VerticalAlignment = VerticalAlignment.Center };
 
@@ -331,6 +336,11 @@ public sealed class JobBar : UserControl
         _machine.ConnectionChanged += UpdateSend;
         _machine.ModeChanged += OnModeChanged;
         _machine.LoadedJobChanged += () => { if (_machine.Mode == "P_WORK") ShowLoaded(); };
+        _machine.DesktopStartChanged += () =>
+        {
+            UpdateStartButton();
+            if (_machine.Mode == "P_WORK") ShowLoaded();
+        };
         _runTimer.Tick += async (_, _) => await TickRun();
         _follow.Tick += (_, _) => Follow();
         _doc.Changed += content => { if (content) Schedule(); else if (!_doc.InEdit) ShowTimeline(); };
@@ -681,6 +691,7 @@ public sealed class JobBar : UserControl
     {
         _send.IsEnabled = CanSend;
         UpdateFrameButton();
+        UpdateStartButton();
         if (!_sending)
             _sendState = !_machine.IsConnected && _settings.ActiveSetup().Kind != MachineKind.Grbl ? "Connect the machine (right end of the ribbon) to send or frame."
                 : _job is null ? "Fix the problem in Checks to send." : "Ready to send.";
@@ -690,8 +701,62 @@ public sealed class JobBar : UserControl
     void ShowLoaded()
     {
         _runState.Text = "Loaded – press start";
-        _runTimes = (_machine.LoadedJobDescription() is { } who ? $"{who} " : "") + "Press the start button on the machine, or Stop to cancel it.";
+        _runTimes = (_machine.LoadedJobDescription() is { } who ? $"{who} " : "") + (_machine.DesktopStartAllowed
+            ? "Press Start here or the start button on the machine, or Stop to cancel it."
+            : "Press the start button on the machine, or Stop to cancel it.");
         ShowCaption();
+    }
+
+    /// <summary>How a loaded job gets started, for the Ship It confirmation.</summary>
+    string HowItStarts() => _machine.DesktopStartAllowed
+        ? "After upload the machine waits. Nothing moves or fires until you press its start button, or Start in the job bar (you've allowed that in Settings → Machine)."
+        : "After upload the machine waits. Nothing moves or fires until you press its start button (or start it from the phone, if you've allowed that in Remote access).";
+
+    /// <summary>Start in place of Pause while a job is loaded and waiting, when starting from here is allowed.</summary>
+    void UpdateStartButton()
+    {
+        bool show = _machine.DesktopStartAllowed && _machine.IsConnected && !_machine.IsFraming && _machine.Mode == "P_WORK";
+        _start.IsVisible = show;
+        _pause.IsVisible = !show;
+        _start.IsEnabled = show && !_starting;
+    }
+
+    /// <summary>
+    /// Start the loaded job from here, after asking. The laser fires. Only while it's allowed (Settings →
+    /// Machine), and only the job the question was about: if the machine has moved on, nothing is sent.
+    /// </summary>
+    async Task StartJob()
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner || _starting) return;
+        if (!_machine.DesktopStartAllowed || _machine.Mode != "P_WORK") { UpdateStartButton(); return; }
+        _starting = true;
+        UpdateStartButton();
+        try
+        {
+            string? task = _machine.LoadedTaskId;
+            if (!await Dialogs.Confirm(owner, DesktopStart.ConfirmTitle(_machine.LoadedJobName()), DesktopStart.ConfirmText(_machine.LoadedJobDescription()),
+                    "Start job", "Cancel", yesIsDefault: false))
+                return;
+            // The question may have been open a while: start only the same job, still waiting, still allowed.
+            if (!_machine.DesktopStartAllowed || _machine.Mode != "P_WORK" || _machine.LoadedTaskId != task)
+            {
+                _runTimes = "Not started: the machine no longer has that job waiting.";
+                ShowCaption();
+                return;
+            }
+            string after = await _machine.StartLoadedJobAsync();
+            if (after != "P_WORKING")
+            {
+                _runTimes = $"The machine didn't start: it reports \"{DeviceClient.DescribeMode(after)}\". Press its button to start, or try again.";
+                ShowCaption();
+            }
+        }
+        catch (DeviceException e) { _runTimes = e.Message; ShowCaption(); }
+        finally
+        {
+            _starting = false;
+            UpdateStartButton();
+        }
     }
 
     void ShowRunning(bool on)
@@ -704,6 +769,7 @@ public sealed class JobBar : UserControl
 
     void OnModeChanged(string mode)
     {
+        UpdateStartButton();
         if (_machine.IsFraming)
         {
             ShowRunning(false); // framing isn't a job
@@ -1078,7 +1144,7 @@ public sealed class JobBar : UserControl
         if (_machine.Mode == "P_WORK")
             sb.AppendLine($"ⓘ A job is already loaded on the machine and not started. It will be replaced by this one. ({_machine.LoadedJobDescription() ?? "Loaded by an unknown program."})");
         sb.AppendLine();
-        sb.Append("After upload the machine waits. Nothing moves or fires until you press its start button (or start it from the phone, if you've allowed that in Remote access).");
+        sb.Append(HowItStarts());
         if ((!quick || job.Warnings.Count > 0) && !await Dialogs.Confirm(owner, "Ship it to the machine?", sb.ToString(), "Ship It", "Cancel")) return;
 
         _sending = true;
@@ -1100,7 +1166,9 @@ public sealed class JobBar : UserControl
             _sentMidSections = _section is { } s && s.Index < s.Count - 1
                 // Layer by layer: the piece is done after its last layer, not each one.
                 || _onlyLayer is { } onlyOne && JobBuilder.OutputLayers(_doc.State).Where(l => l.ParentId is null && _doc.State.SentFor(l).Any()).LastOrDefault()?.Id != onlyOne;
-            _sendState = "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
+            _sendState = _machine.DesktopStartAllowed
+                ? "Uploaded. Press Start here or the start button on the machine to begin (long-press while paused to cancel)."
+                : "Uploaded. Press the start button on the machine to begin (long-press while paused to cancel).";
             string? part = _section is { } sec ? sec.Label
                 : _onlyLayer is { } only && _doc.State.Layers.FirstOrDefault(l => l.Id == only) is { } ol ? $"layer {ol.Name}" : null;
             Sent?.Invoke(new Addons.UploadedJob(job, builtFrom, _doc.FilePath, LastSent.Value.SentAt, part, !_sentMidSections,
