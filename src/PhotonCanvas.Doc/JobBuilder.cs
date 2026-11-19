@@ -153,6 +153,9 @@ public enum FrameShape
 
 public static class JobBuilder
 {
+    /// <summary>Ends of cut and score pieces this close (mm) are one joint: the pieces are cut as one continuous line.</summary>
+    public const double JoinTolMm = 0.02;
+
     /// <summary>
     /// G-code for framing <paramref name="job"/>: the same border format as inside the job
     /// package (which is what xTool Studio frames with), around the rectangle or the outline.
@@ -510,9 +513,12 @@ public static class JobBuilder
             }
             else
             {
+                // Pieces that meet end to end (a drawing that came in as separate lines and arcs) are cut as one
+                // line: the laser goes on through each joint instead of stopping and starting again there.
+                var subs = PathTools.JoinTouching([.. shapes.SelectMany(sh => sh.World.Subpaths).Where(sp => !sp.Segs.IsEmpty)], JoinTolMm).Subpaths;
                 var paths = layer.KerfMm != 0
-                    ? ApplyKerf(shapes, layer, opt.Tolerance, warnings)
-                    : shapes.SelectMany(sh => sh.World.Flatten(opt.Tolerance)).Where(f => f.Points.Count >= 2).ToList();
+                    ? ApplyKerf(subs, layer, opt.Tolerance, warnings)
+                    : subs.Select(sp => new FlatPath(sp.Flatten(opt.Tolerance), sp.Closed)).Where(f => f.Points.Count >= 2).ToList();
                 if (layer.RemoveOverlaps && layer.KerfMm != 0)
                     warnings.Add($"Layer \"{layer.Name}\": Cut shared edges once has nothing to do with a kerf set: the kerf moves each part's outline out by half of it, so shapes side by side no longer share an edge.");
                 else if (layer.RemoveOverlaps)
@@ -1508,9 +1514,8 @@ public static class JobBuilder
     /// those at odd depth (holes) shrink, whether a hole is part of a compound
     /// shape or a separate shape on the layer. Open paths are cut unchanged.
     /// </summary>
-    static List<FlatPath> ApplyKerf(List<PathShape> shapes, Layer layer, double tol, List<string> warnings)
+    static List<FlatPath> ApplyKerf(List<Subpath> subs, Layer layer, double tol, List<string> warnings)
     {
-        var subs = shapes.SelectMany(sh => sh.World.Subpaths).Where(sp => !sp.Segs.IsEmpty).ToList();
         var flat = subs.Select(sp => new FlatPath(sp.Flatten(tol), sp.Closed)).ToList();
         var depth = Depths(flat);
         double half = layer.KerfMm / 2;

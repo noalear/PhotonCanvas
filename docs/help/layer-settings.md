@@ -318,6 +318,9 @@ so they stay true too. Which outline is a part and which is a hole is worked out
 inside each other, not from the direction they were drawn. A negative kerf moves them the other
 way.
 
+- Pieces whose ends meet (a drawing that came in as separate lines and arcs) are joined when the job
+  is made, so a shape drawn in pieces gets the kerf like any closed outline. Your design isn't
+  changed.
 - Open paths are cut as drawn; the checks say how many.
 - An outline narrower than the kerf disappears; the checks say how many were left out.
 - Materials & Tests → Tests → **Cut test** measures the kerf of your material and saves it with it (see

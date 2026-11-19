@@ -4,8 +4,8 @@
 <!-- page: editing-shapes.md#tidy-lines -->
 <!-- order: 110 -->
 Drawings from CAD programs often arrive as separate lines and arcs that only touch: shapes that
-look closed but aren't, so they can't be engraved and get no kerf or tabs. Tidy lines joins them
-up.
+look closed but aren't, so they can't be filled. (A cut joins pieces whose ends meet by itself, but
+the drawing stays in pieces.) Tidy lines joins them up for good, ends that are a little apart too.
 
 ## Import the drawing
 <!-- target: ribbon:Import/Import -->

@@ -217,6 +217,19 @@ Select the drawing and use **Home → Tidy lines**: it joins ends that nearly me
 nearly-closed shapes and deletes lines lying on top of each other. It asks how close ends must be
 to join (0.05 mm to begin with). See [Editing shapes](editing-shapes.md).
 
+## Ticking at the start and end of cuts
+
+A galvo laser ticks or clinks a little wherever a cut starts and stops: the mirrors jump to the
+next cut and stop hard, and the beam starts again on fresh material. Cutting metal at full power
+with the MOPA makes it louder.
+
+- Pieces of a cut or score layer whose ends meet (within 0.02 mm) are cut as one continuous line,
+  so a shape that came in as separate lines and arcs no longer stops and starts again at every
+  joint. Ends further apart than that still stop there: use **Home → Tidy lines** to join them
+  (see [An imported drawing is in many tiny pieces](#an-imported-drawing-is-in-many-tiny-pieces)).
+- With **Step down/pass** and passes over the whole job, the head moves down a little before
+  each pass, and the focus motor clicks once as it does.
+
 ## Thin sheet warps
 
 Thin metal and plastic sheet warps when the heat of many cuts builds up in one place. Set the cut
