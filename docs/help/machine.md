@@ -303,12 +303,15 @@ machine is named here and changed on the Machines page.
 | **G-code console** (on) | **Machine → Console** (see [The G-code console](#the-g-code-console)). |
 
 **EXTRACTION**: sent at the start of every job, as xTool Studio does it. Experimental: these are
-xTool Studio's commands with the numbers changed, not yet heard on the machine. Check the fan sounds
-right on the first job.
+xTool Studio's commands with the numbers changed. xTool Studio sends the fan gear only for xTool's
+inline duct fans (the SafetyPro IF2 and the older duct fan) and has no speed setting for the F2
+Ultra's own exhaust fan, so that fan may keep running at full speed whatever the gear. To find out,
+use **Machine → Fan test** (the Exhaust fan test add-on): it runs a laser-off job
+that steps the fan through the gears.
 
 | Setting | Range | Default | Effect |
 |---|---|---|---|
-| **Exhaust fan gear** | 1–4 | 3 | The exhaust fan's speed (and an xTool duct fan's): 1 lowest, 4 highest. xTool Studio sends 3. |
+| **Exhaust fan gear** | 1–4 | 3 | An xTool inline duct fan's speed (`M9064 B…`): 1 lowest, 4 highest. xTool Studio sends 3. The F2 Ultra's own fan may ignore it. |
 | **Purifier speed (%)** | 10–100, steps of 10 | 50 | An xTool purifier's speed. xTool Studio sends 50%. |
 
 ### Appearance
