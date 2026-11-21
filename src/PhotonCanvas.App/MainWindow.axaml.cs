@@ -154,6 +154,7 @@ public partial class MainWindow : Window
             if (!ReferenceEquals(old, b)) old?.Dispose();
         };
         AddHandler(KeyDownEvent, OnWindowKeyDown, RoutingStrategies.Tunnel);
+        ClickThroughTips.Install();
         Canvas.ContextRequested += (_, e) => { e.Handled = true; OpenCanvasMenu(); };
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);

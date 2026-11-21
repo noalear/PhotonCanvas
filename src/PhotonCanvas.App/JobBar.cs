@@ -152,15 +152,15 @@ public sealed class JobBar : UserControl
         _sendIcon.Data = Icon("IcSend");
         _shipDots.Tick += (_, _) => _sendText.Text = "Shipping it" + new string('.', _dots = (_dots + 1) % 6);
         ToolTip.SetTip(_send, "Uploads the job. Nothing moves or fires until you press the start button on the machine.");
-        _send.Click += async (_, _) => await Send();
+        _send.Click += async (_, _) => { CloseLists(); await Send(); };
         _stop.Background = Brush("Danger");
         _stop.Foreground = Brushes.White;
         ToolTip.SetTip(_stop, "Cancel the job now. It can't be resumed.");
         ToolTip.SetTip(_pause, "Pause or continue. The machine's button also pauses (short press) and cancels (long press while paused).");
-        _pause.Click += async (_, _) => await PauseOrResume();
-        _stop.Click += async (_, _) => await StopJob();
+        _pause.Click += async (_, _) => { CloseLists(); await PauseOrResume(); };
+        _stop.Click += async (_, _) => { CloseLists(); await StopJob(); };
         ToolTip.SetTip(_start, "Start the loaded job from here: the laser fires. Asks first. Turned on in Settings → Machine (Allow starting jobs from this computer).");
-        _start.Click += async (_, _) => await StartJob();
+        _start.Click += async (_, _) => { CloseLists(); await StartJob(); };
         _runPanel = new StackPanel
         {
             Width = 158, Spacing = 4, IsVisible = false, VerticalAlignment = VerticalAlignment.Center,
@@ -304,6 +304,11 @@ public sealed class JobBar : UserControl
         };
         ToolTip.SetTip(_rotaryBack, "A rotary job was stopped part way, so the object is still turned. Click to turn it back to where that job started.");
         UpdateRotaryBack();
+        // A list left open above the bar (checks, export, frame or heat settings) mustn't eat the click on Ship It,
+        // Start, Pause or Stop: that click goes straight to the button, which closes the list (CloseLists). Elsewhere
+        // a click outside a list only closes it, as before.
+        _lists = [_frame.Flyout, _checks.Flyout, more.Flyout, _heat.Flyout, _rotaryBack.Flyout];
+        foreach (var list in _lists.OfType<PopupFlyoutBase>()) list.OverlayInputPassThroughElement = sendArea;
         var chips = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, Margin = new(8, 0, 0, 0), Children = { _rotaryBack, _checks, _order, _heat, more } };
         foreach (var c in new Control[] { _rotaryBack, _checks, _order, _heat, more }) { c.Height = 24; ((TemplatedControl)c).Padding = new(8, 0); }
 
@@ -466,6 +471,14 @@ public sealed class JobBar : UserControl
     {
         try { return await build; }
         catch (Exception e) when (e is JobException or OperationCanceledException) { return null; }
+    }
+
+    FlyoutBase?[] _lists = [];
+
+    /// <summary>Close the bar's lists (Ship It, Start, Pause or Stop was clicked while one was open).</summary>
+    void CloseLists()
+    {
+        foreach (var list in _lists) list?.Hide();
     }
 
     /// <summary>Ready (or given up): the button back to "Ship It".</summary>
