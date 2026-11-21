@@ -991,6 +991,38 @@ public sealed class Job
         return string.Join("\n", lines);
     }
 
+    /// <summary>Most steps a fan test job may have, and the longest wait (s) of each.</summary>
+    public const int MaxFanSteps = 12;
+    public const double MaxFanStepSeconds = 120;
+
+    /// <summary>
+    /// A job that only runs the exhaust fan: the usual start (with <see cref="FanGear"/>), then each
+    /// step's fan commands and a wait, then the usual end. The laser stays off (nothing but
+    /// <see cref="FanCommands.IsFanOnly"/> lines and waits is added) and the head doesn't move. Flat work mode only.
+    /// </summary>
+    public string FanTest(IReadOnlyList<FanStep> steps)
+    {
+        if (Mode is not WorkMode.Flat) throw new JobException("The fan test runs in the flat work mode.");
+        if (steps.Count is 0 or > MaxFanSteps) throw new JobException($"A fan test has 1 to {MaxFanSteps} steps.");
+        var lines = Header();
+        lines.Add("# exhaust fan test, laser off");
+        foreach (var s in steps)
+        {
+            if (!double.IsFinite(s.Seconds) || s.Seconds < 1 || s.Seconds > MaxFanStepSeconds)
+                throw new JobException($"Each fan test step waits 1 to {MaxFanStepSeconds:0} s.");
+            if (s.Note.Length > 0) lines.Add($"# {s.Note.ReplaceLineEndings(" ")}");
+            foreach (var c in s.Commands)
+            {
+                if (!FanCommands.IsFanOnly(c)) throw new JobException($"\"{c}\" is not a fan command.");
+                lines.Add(c);
+            }
+            lines.AddRange(Dwell(s.Seconds));
+        }
+        lines.AddRange(["# MUST", ""]);
+        lines.AddRange(Tail(Machine.GcodeTag, true));
+        return string.Join("\n", lines);
+    }
+
     // Timings measured on the F2 Ultra against the job history (Oct 2026).
     /// <summary>Moves with the laser off: galvo jumps, and the moves between a fill's or a picture's pieces (mm/s).</summary>
     const double Jump = 3000;

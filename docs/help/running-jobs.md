@@ -419,7 +419,8 @@ After changing the design, close it and open it again. Closing it clears the mar
 
 - **Exhaust fan gear** and **Purifier speed (%)**, from
   [Settings → Equipment](machine.md#equipment), go at the start of every job, as xTool Studio
-  does it. Experimental: not yet heard on the machine.
+  does it. Experimental: the gear is the command xTool's inline duct fans take, and the F2 Ultra's
+  own fan may ignore it. **Machine → Fan test** finds out.
 - The MOPA offset: once the MOPA laser has been lined up with the blue one
   (**Machine → Align lasers**, see [Camera](camera.md)), every MOPA layer's work is moved by the
   measured difference, so it lands where the design says.

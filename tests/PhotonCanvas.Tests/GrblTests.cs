@@ -94,6 +94,56 @@ public class FanHeaderTests
         Assert.Contains("G198 P76 \"M9039 V80\"", quieter);
         Assert.DoesNotContain("M9064 B3", quieter);
     }
+
+    [Fact]
+    public void FanCommandsTakeXToolsForms()
+    {
+        Assert.Equal("M9064 B2", FanCommands.Gear(FanTarget.Machine, FanControl.Auto, 2));
+        Assert.Equal("M9064 A1", FanCommands.Gear(FanTarget.Machine, FanControl.Manual, 1));
+        Assert.Equal("G198 P70 \"M9064 A4\"", FanCommands.Gear(FanTarget.DuctFanPort, FanControl.Manual, 4));
+        Assert.Equal("G198 P78 \"M9064 A2 C3\"", FanCommands.Gear(FanTarget.InlineFanPort, FanControl.Manual, 2));
+        Assert.Equal("G198 P78 \"M9064 A0 C2\"", FanCommands.Gear(FanTarget.InlineFanPort, FanControl.Manual, 0));
+        Assert.Equal("G198 P78 \"M9064 B3 C4\"", FanCommands.Gear(FanTarget.InlineFanPort, FanControl.Auto, 3));
+        Assert.Throws<ArgumentOutOfRangeException>(() => FanCommands.Gear(FanTarget.Machine, FanControl.Auto, 5));
+        foreach (var t in Enum.GetValues<FanTarget>())
+            foreach (var c in Enum.GetValues<FanControl>())
+                for (int g = 0; g <= FanCommands.MaxGear; g++)
+                    Assert.True(FanCommands.IsFanOnly(FanCommands.Gear(t, c, g)));
+    }
+
+    [Theory]
+    [InlineData("G0 X10 Y10")]
+    [InlineData("M4 S500")]
+    [InlineData("M9064 B3\nG1 X5 S900")]
+    [InlineData("M9064 B5")]
+    [InlineData("G198 P76 \"M9064 B3\"")]
+    [InlineData("G198 P70 \"M9064 B3\" G1 S1000")]
+    [InlineData("m9064 b3")]
+    [InlineData("")]
+    public void OnlyFanCommandsPassTheFanCheck(string line) => Assert.False(FanCommands.IsFanOnly(line));
+
+    [Fact]
+    public void AFanTestJobOnlyRunsTheFan()
+    {
+        var job = new Job(MachineProfile.F2Ultra, []) { Created = "x", FanGear = 1 };
+        var steps = Enumerable.Range(1, 4).Select(g => new FanStep(FanCommands.Everywhere(FanControl.Auto, g), 15, $"gear {g}")).ToList();
+        var g = job.FanTest(steps).Split('\n');
+        Assert.Contains("M9064 B1", g); // the header's gear
+        Assert.Contains("# gear 4", g);
+        Assert.Contains("G198 P78 \"M9064 B4 C4\"", g);
+        Assert.Equal(4, g.Count(l => l == "G4P15000"));
+        // Nothing turns the laser up or moves anything beyond what every job's start and end do.
+        Assert.DoesNotContain(g, l => System.Text.RegularExpressions.Regex.IsMatch(l, @"^(G1|G0)\b.*S[1-9]"));
+        Assert.DoesNotContain(g, l => l.StartsWith("G1 X") || l.StartsWith("G1X") || l.StartsWith("G0U") || l.StartsWith("G0 Z"));
+        Assert.EndsWith("M6 P1", string.Join("\n", g).TrimEnd());
+
+        Assert.Throws<JobException>(() => job.FanTest([new FanStep(["G0 X10 Y10"], 5)]));
+        Assert.Throws<JobException>(() => job.FanTest([new FanStep(["M9064 B2"], 0.5)]));
+        Assert.Throws<JobException>(() => job.FanTest([new FanStep(["M9064 B2"], Job.MaxFanStepSeconds + 1)]));
+        Assert.Throws<JobException>(() => job.FanTest([]));
+        var rotary = new Job(MachineProfile.F2Ultra, []) { Mode = new WorkMode.Rotary(1, 1, 100) };
+        Assert.Throws<JobException>(() => rotary.FanTest(steps));
+    }
 }
 
 public class XToolFamilyTests

@@ -176,7 +176,8 @@ list is complete, but we stay offline, so only offline equivalents would be buil
 - [ ] Firmware updates from a file (xTool; downloading them is *online*)
 - [x] Wi-Fi setup (scan, join) and finding the machine over a USB or Ethernet cable (xTool)
 - [x] Interlock status (lid, safety key, exhaust fan, emergency stop) and alarm messages for the emergency stop, flame, tilt and overheating (xTool)
-- [x] Exhaust fan gear and purifier speed per job (Settings → Equipment → Extraction): the M9064 B… and M9039 V… commands xTool Studio puts at the start of each job, with the numbers set (xTool). Experimental: not yet heard on the machine
+- [x] Exhaust fan gear and purifier speed per job (Settings → Equipment → Extraction): the M9064 B… and M9039 V… commands xTool Studio puts at the start of each job, with the numbers set (xTool). Experimental: xTool only sends the gear for its inline duct fans; the F2 Ultra's own fan may ignore it
+- [ ] Quieter exhaust fan on the F2 Ultra: find a command it follows with the Exhaust fan test add-on (Machine → Fan test, 2026-11-21), then set it per job
 
 ### New ideas nobody else has (researched 2026-10-19)
 

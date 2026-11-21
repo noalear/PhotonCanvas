@@ -77,6 +77,27 @@ M536 U0
 M6 P1
 ```
 
+### What the accessory lines are for (from reading xTool Studio, 2026-11-21)
+
+Each line of the preamble is written by xTool Studio for one kind of xTool accessory; `G198 P<n> "…"`
+passes the quoted command on to the accessory on port `n`. The meanings (not yet confirmed on the machine):
+
+| Line | Accessory | Meaning |
+|---|---|---|
+| `G198 P84 "M9033 V…"` | backpack purifier | its speed (%), from the material; `V0` at the end of the job |
+| `G198 P85 "M9401 D2 V…"` | AP2 Mini purifier | automatic (`D2`) at a level from the material (`D1 L…` = a manual level); `V0` at the end |
+| `M9064 B…` and `G198 P70 "M9064 B…"` | the older inline duct fan | gear 1–4 (3 normally, 4 on some machines, one lower in its quiet mode), from the material; `B0` at the end |
+| `G198 P78 "M9064 B…"` | SafetyPro IF2 inline fan | the same gear |
+| `M9039 C…` and `G198 P69 "M9039 C…"` | large purifier | its gear (2 normally); `C0` at the end |
+| `G198 P76 "M9039 V…"` | AP2 purifier | its speed (%), 50 normally |
+| `G198 P76 "M9043 H… I… J… K… L… M…"` | AP2 purifier | how fast each of its six filters wears for this job's material and processing (wood 1, cuts 11, plastics more): the filter-life count, not flame sensitivity |
+
+In `M9064`, `B` is the automatic mode at that gear and `A` a manual gear; the IF2 also takes `C3`
+(manual), `C2` (off) or `C4` (automatic) after it. xTool Studio has no speed setting for the F2 Ultra's
+own exhaust fan (only its run-on time, the stored `purifierTimeout`). The **Exhaust fan test** add-on
+(Machine → Fan test) tries whether the F2 Ultra's fan follows `M9064`, and the stored `smokeFanSpeed`
+(10–100 %) that xTool's P2S uses for its built-in fan.
+
 **Coordinates** are absolute, in mm, inside the 220×220 field. The square drawn at canvas x=100, y=100 appears as X100 Y100, so canvas coordinates map 1:1.
 
 For red, the only differences are `G22`, `G0H200` (pulse width in ns) and `G0Q65` (MOPA frequency in kHz) right after `G90`. S and F are scaled the same way for both lasers.
@@ -109,7 +130,7 @@ G1X100.000S900                 burn line 2 right→left (zigzag = bitmapScanMode
 - **Line count:** a 20 mm square gets exactly 200 lines. The last line is at Y+19.9, not Y+20.
 - **Overscan:** `overDist: 0`, so lines start and stop exactly at the shape edge. Overscan presumably extends each X line beyond the edge with S0.
 - **Coordinates** are written with 3 decimals here, unlike vector moves.
-- **Preamble difference:** fill jobs end the preamble with `G198 P76 "M9043 H1 I1 J1 K1 L1 M1"`, where vector cuts use `H11 … M11`. **Not air assist** (the user has none). It may be a flame-sensor sensitivity setting per processing type (?). We copy it as-is: H11 for cuts, H1 for fills and bitmaps.
+- **Preamble difference:** fill jobs end the preamble with `G198 P76 "M9043 H1 I1 J1 K1 L1 M1"`, where vector cuts use `H11 … M11`. **Not air assist** (the user has none). It is the AP2 purifier's filter-wear rate for the job (see the accessory lines above). We copy it as-is: H11 for cuts, H1 for fills and bitmaps.
 
 ## Bitmap engraving, dot mode (verified)
 
