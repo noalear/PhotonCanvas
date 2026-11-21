@@ -282,6 +282,46 @@ public class StepDownTests
     }
 
     [Fact]
+    public void FineStepDownFollowsTheRunningTotal()
+    {
+        // Kyle, 2026-11-20: 0.011 mm per pass over 370 passes (4 mm cast aluminum). Each head move lands on the
+        // 0.01 mm grid, but taken from the rounded running total, so the focus keeps up with the cut instead of
+        // every step rounding the same way.
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(370)) { Drop = new StepDown(0, 0.011) };
+        var job = new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.PerBlock() };
+        var z = ZMoves(job.Render());
+        Assert.All(z, m => Assert.Equal(Math.Round(m, 2), m, 9));
+        double down = 0;
+        for (int i = 0; i < z.Count - 1; i++)
+        {
+            down -= z[i];
+            Assert.True(Math.Abs(down - 0.011 * (i + 1)) <= 0.005 + 1e-9, $"after {i + 1} steps the head is {down} mm down");
+        }
+        Assert.Equal(4.06, z[^1], 9); // 369 steps of 0.011, back up at the end
+        Assert.Equal(0, z.Sum(), 9);
+        Assert.Equal(z.Sum(m => Job.HeadMoveSeconds(m)), job.HeadMoves().Total, 6);
+    }
+
+    [Fact]
+    public void StepsTooSmallToMoveAreSavedUp()
+    {
+        // 0.004 mm a pass: the head only moves once a whole 0.01 mm has built up (each move costs ~3 s).
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(6)) { Drop = new StepDown(0, 0.004) };
+        var job = new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.PerBlock() };
+        Assert.Equal([-0.01, -0.01, 0.02], ZMoves(job.Render()));
+        Assert.Equal(3, job.HeadMoves().Inside.Sum() / Job.HeadMoveS, 1);
+    }
+
+    [Fact]
+    public void WholeJobRoundsFollowTheRunningTotalToo()
+    {
+        var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(5)) { Drop = new StepDown(0, 0.012) };
+        var g = new Job(MachineProfile.F2Ultra, [cut]) { PassMode = new PassMode.Rounds(0) }.Render();
+        // Depths 0, 0.012, 0.024, 0.036, 0.048 → 0, 0.01, 0.02, 0.04, 0.05.
+        Assert.Equal([-0.01, -0.01, -0.02, -0.01, 0.05], ZMoves(g));
+    }
+
+    [Fact]
     public void RefusesToDriveTheHeadTooFar()
     {
         var cut = new VectorBlock(Square(), LaserSettings.Blue(70, 40).WithPasses(30)) { Drop = new StepDown(0, 0.5) };
