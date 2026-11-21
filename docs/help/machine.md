@@ -293,6 +293,8 @@ machine is named here and changed on the Machines page.
 **ATTACHMENTS**: **RA2 Pro rotary (rollers and chuck)**, **RA3 rotary (rollers and chuck)**,
 **Conveyor feeder**. Only the ones ticked show up under **Machine → Work mode**; with none ticked,
 **Work mode** is hidden and jobs are always on the flat bed (see [Work area](work-area.md)).
+**xTool inline fan (SafetyPro IF2 or duct fan)** and **xTool purifier** bring up their speed settings
+under **EXTRACTION**.
 
 **FEATURES TO SHOW**: untick what you don't use. It only comes out of the ribbon; nothing is lost.
 
@@ -302,17 +304,18 @@ machine is named here and changed on the Machines page.
 | **Diffraction gratings** (on) | **Picture → Diffraction** (while the Diffraction pictures add-on is on). |
 | **G-code console** (on) | **Machine → Console** (see [The G-code console](#the-g-code-console)). |
 
-**EXTRACTION**: sent at the start of every job, as xTool Studio does it. Experimental: these are
-xTool Studio's commands with the numbers changed. xTool Studio sends the fan gear only for xTool's
-inline duct fans (the SafetyPro IF2 and the older duct fan) and has no speed setting for the F2
-Ultra's own exhaust fan, so that fan may keep running at full speed whatever the gear. To find out,
-use **Machine → Fan test** (the Exhaust fan test add-on): it runs a laser-off job
-that steps the fan through the gears.
+**EXTRACTION** (only with an xTool inline fan or purifier ticked): sent at the start of every job, as
+xTool Studio does it, with your numbers. Experimental. Without them ticked, jobs send xTool Studio's
+own numbers (gear 3, 50%).
+
+The F2 Ultra's built-in exhaust fan has no speed control: it runs at full speed during each job and
+for the run-on time after it (**Device settings → Exhaust & sleep**). It ignores the fan gear, in a
+job or sent on its own, and has no stored speed setting (tried on the machine, November 2026).
 
 | Setting | Range | Default | Effect |
 |---|---|---|---|
-| **Exhaust fan gear** | 1–4 | 3 | An xTool inline duct fan's speed (`M9064 B…`): 1 lowest, 4 highest. xTool Studio sends 3. The F2 Ultra's own fan may ignore it. |
-| **Purifier speed (%)** | 10–100, steps of 10 | 50 | An xTool purifier's speed. xTool Studio sends 50%. |
+| **Inline fan gear** | 1–4 | 3 | The xTool inline fan's speed (`M9064 B…`): 1 lowest, 4 highest. xTool Studio sends 3. Shown with **xTool inline fan** ticked. |
+| **Purifier speed (%)** | 10–100, steps of 10 | 50 | The xTool purifier's speed. xTool Studio sends 50%. Shown with **xTool purifier** ticked. |
 
 ### Appearance
 

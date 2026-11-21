@@ -84,9 +84,15 @@ public sealed class AppSettings
     /// <summary>The galvo's pivot heights (mm), measured with the bevel test: for slopes across (edges running down the field) and down (edges running across).</summary>
     public double? BevelPivotAcross { get; set; }
     public double? BevelPivotDown { get; set; }
-    /// <summary>Exhaust fan gear (1–4) and purifier speed (%) sent with each job (3 and 50 are what xTool Studio sends).</summary>
+    /// <summary>
+    /// Exhaust fan gear (1–4) and purifier speed (%) sent with each job (3 and 50 are what xTool Studio sends),
+    /// used only with <see cref="OwnsInlineFan"/> / <see cref="OwnsPurifier"/>: otherwise jobs send xTool Studio's numbers.
+    /// </summary>
     public int FanGear { get; set; } = 3;
     public int PurifierSpeed { get; set; } = 50;
+    /// <summary>The gear and speed jobs actually send: the user's only for an inline fan or purifier they have.</summary>
+    public int JobFanGear => OwnsInlineFan ? FanGear : 3;
+    public int JobPurifierSpeed => OwnsPurifier ? PurifierSpeed : 50;
 
     /// <summary>At start (and every few hours while open), ask GitHub whether a newer version has been published (nothing about you is sent).</summary>
     public bool CheckForUpdates { get; set; } = true;
@@ -188,6 +194,13 @@ public sealed class AppSettings
     public bool OwnsConveyor { get; set; }
     /// <summary>A rotary of the user's own (homemade, or another make) on the machine's rotary port, with its own scale.</summary>
     public bool OwnsCustomRotary { get; set; }
+    /// <summary>
+    /// An xTool inline duct fan (SafetyPro IF2, or the older duct fan): the only fans the job's gear reaches.
+    /// The F2 Ultra's built-in exhaust fan ignores it (Kyle's fan test, 2026-11-21), so the gear and the fan test hide without one.
+    /// </summary>
+    public bool OwnsInlineFan { get; set; }
+    /// <summary>An xTool purifier, whose speed jobs set.</summary>
+    public bool OwnsPurifier { get; set; }
     /// <summary>Colour tests, measuring colours and colour pictures on metal.</summary>
     public bool ShowColourOnMetal { get; set; } = true;
     /// <summary>Diffraction gratings, shimmer pictures and the depth-map almost-hologram.</summary>

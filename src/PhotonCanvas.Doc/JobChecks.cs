@@ -17,9 +17,9 @@ public static class JobSettings
         RedWatts = s.ActiveSetup() is { Kind: MachineKind.Grbl } g2 ? g2.PowerW : WorkModes.Area(s).Uv is { } u2 ? u2.Watts : 60,
         Mode = WorkModes.From(s),
         Machine = WorkModes.Area(s),
-        FanGear = s.FanGear,
+        FanGear = s.JobFanGear,
         MopaOffset = new Vec2(s.MopaOffsetX, s.MopaOffsetY),
-        PurifierSpeed = s.PurifierSpeed,
+        PurifierSpeed = s.JobPurifierSpeed,
     };
 }
 

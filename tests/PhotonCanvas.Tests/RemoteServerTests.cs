@@ -207,7 +207,7 @@ public class RemoteServerTests
     [Fact]
     public void TheSavedSettingsGiveTheJobBarsOptions()
     {
-        var s = new AppSettings { WholeJobPasses = false, PassDelayS = 5000, PathPauseS = 2, FanGear = 4, PurifierSpeed = 80, MopaOffsetX = 0.1, MopaOffsetY = -0.2 };
+        var s = new AppSettings { WholeJobPasses = false, PassDelayS = 5000, PathPauseS = 2, FanGear = 4, PurifierSpeed = 80, OwnsInlineFan = true, OwnsPurifier = true, MopaOffsetX = 0.1, MopaOffsetY = -0.2 };
         var o = JobSettings.From(s);
         Assert.False(o.WholeJobPasses);
         Assert.Equal(3600, o.PassDelayS); // the job bar's limit
@@ -215,6 +215,9 @@ public class RemoteServerTests
         Assert.Equal(4, o.FanGear);
         Assert.Equal(80, o.PurifierSpeed);
         Assert.Equal(new Vec2(0.1, -0.2), o.MopaOffset);
+        // Without an inline fan or purifier, jobs send xTool Studio's own numbers whatever is saved.
+        var plain = JobSettings.From(new AppSettings { FanGear = 1, PurifierSpeed = 80 });
+        Assert.Equal((3, 50), (plain.FanGear, plain.PurifierSpeed));
         Assert.Equal((40.0, 60.0), (o.BlueWatts, o.RedWatts));
         Assert.IsType<WorkMode.Flat>(o.Mode);
         Assert.Equal(MachineProfile.F2Ultra, o.Machine);

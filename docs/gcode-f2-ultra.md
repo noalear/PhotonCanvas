@@ -94,9 +94,10 @@ passes the quoted command on to the accessory on port `n`. The meanings (not yet
 
 In `M9064`, `B` is the automatic mode at that gear and `A` a manual gear; the IF2 also takes `C3`
 (manual), `C2` (off) or `C4` (automatic) after it. xTool Studio has no speed setting for the F2 Ultra's
-own exhaust fan (only its run-on time, the stored `purifierTimeout`). The **Exhaust fan test** add-on
-(Machine → Fan test) tries whether the F2 Ultra's fan follows `M9064`, and the stored `smokeFanSpeed`
-(10–100 %) that xTool's P2S uses for its built-in fan.
+own exhaust fan (only its run-on time, the stored `purifierTimeout`). **Tried on Kyle's F2 Ultra
+(2026-11-21, with the Exhaust fan test add-on):** the built-in fan ignores `M9064` (A and B, gears 1–4,
+in a job and through `/v1/cnc/cmd`, also with `C3`/`C4`), and writing the stored `smokeFanSpeed` that
+xTool's P2S uses is refused (error 1). Its fan has no speed control; it runs flat out during jobs.
 
 **Coordinates** are absolute, in mm, inside the 220×220 field. The square drawn at canvas x=100, y=100 appears as X100 Y100, so canvas coordinates map 1:1.
 

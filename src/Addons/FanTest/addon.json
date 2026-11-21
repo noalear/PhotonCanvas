@@ -1,8 +1,8 @@
 {
   "id": "fantest",
   "name": "Exhaust fan test",
-  "version": "1.0.0",
-  "description": "Find out which command, if any, sets your exhaust fan's speed: read what the machine reports, send fan-only commands, and run a laser-off job that steps the fan through its gears.",
+  "version": "1.1.0",
+  "description": "Check an xTool inline fan's speed commands (shown with an inline fan ticked in Settings → Equipment): read what the machine reports, send fan-only commands, and run a laser-off job that steps the fan through its gears.",
   "category": "Laser",
   "apiVersion": 1,
   "requires": [],
