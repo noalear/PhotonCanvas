@@ -13,7 +13,7 @@ namespace PhotonCanvas.Doc;
 /// <param name="Head">The laser's position.</param>
 /// <param name="Sweep">The line being scanned, on a fill or picture.</param>
 /// <param name="Fraction">How far through the whole job (0–1).</param>
-/// <param name="Pausing">Waiting with the laser off: between rounds, or after a path (a pause after each path, or a cool-down when spreading the heat).</param>
+/// <param name="Pausing">Waiting with the laser off: between rounds, the head moving up or down, or after a path (a pause after each path, or a cool-down when spreading the heat).</param>
 public sealed record RunMarker(IReadOnlySet<int> Done, IReadOnlyList<int> Current, Vec2? Head, (Vec2 A, Vec2 B)? Sweep, double Fraction, bool Pausing)
 {
     /// <summary>Whether the laser is on where <see cref="Head"/> is (off on a jump, a run-up, or a wait).</summary>
@@ -55,7 +55,18 @@ public static class RunTracker
         if (t < spans[0].Start) return new(done, [], null, null, t / total, false) { Exact = true };
 
         var span = spans[si];
-        if (span.IsPause) return new(done, [], null, null, t / total, true) { Exact = true };
+        if (span.IsPause)
+        {
+            // Between rounds, or the head moving up or down: the laser off where the last path ended.
+            Vec2? rest = null;
+            for (int k = si - 1; k >= 0 && rest is null; k--)
+                if (!spans[k].IsPause)
+                    rest = spans[k].Block >= 0 && Traces.Get(job, spans[k].Block, spans[k].Pass + spans[k].Passes - 1, false) is { Count: > 0 } prev
+                        ? prev.End
+                        : EndOf(Enumerable.Range(spans[k].FirstStep, spans[k].StepCount).Select(i => job.Steps[i]).ToList());
+            if (si + 1 < spans.Count) Traces.Prefetch(job, spans, si);
+            return new(done, [], rest, null, t / total, true) { Exact = true };
+        }
         var current = Enumerable.Range(span.FirstStep, span.StepCount).ToList();
 
         // Which pass of the stretch, and how far into it; a wait at the end of each pass marks nothing.

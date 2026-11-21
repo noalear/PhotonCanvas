@@ -131,6 +131,8 @@ public sealed record BuiltJob(
         public int Pass { get; init; } = 1;
         /// <summary>How many passes it runs one after another (each <see cref="PassSeconds"/> long).</summary>
         public int Passes { get; init; } = 1;
+        /// <summary>A pause while the head moves up or down (a focus offset, stepping down between rounds).</summary>
+        public bool HeadMove { get; init; }
         /// <summary>The wait at the end of each pass, laser off (a pause after the path, or a cool-down when spreading the heat): part of <see cref="PassSeconds"/>.</summary>
         public double WaitS { get; init; }
     }
@@ -1042,6 +1044,16 @@ public static class JobBuilder
         // The machine takes a moment to start before anything is marked.
         double t = Job.StartS;
         var sec = job.Blocks.Select(b => Job.BlockSeconds(b, job.Mode)).ToList();
+        // The head moving up or down (a focus offset, stepping down): the laser off, nothing marked.
+        var head = job.HeadMoves();
+        void Head(int block, int pass)
+        {
+            if (head.Before.GetValueOrDefault((block, pass)) is > 0 and var h)
+            {
+                spans.Add(new(t, t + h, 0, 0, h) { HeadMove = true });
+                t += h;
+            }
+        }
         if (job.PassMode is PassMode.Rounds r)
         {
             int rounds = job.Rounds;
@@ -1050,6 +1062,7 @@ public static class JobBuilder
                 for (int i = 0; i < job.Blocks.Count; i++)
                 {
                     if (job.Blocks[i].Laser.Passes < round) continue;
+                    Head(i, round);
                     double d = Job.PassSeconds(job.Blocks[i], round, job.Mode);
                     spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d) { Block = i, Pass = round, WaitS = Math.Min(d, job.Blocks[i].PauseAfterS) });
                     t += d;
@@ -1066,7 +1079,9 @@ public static class JobBuilder
             {
                 var b = job.Blocks[i];
                 int passes = Math.Max(1, b.Laser.Passes);
-                double wait = Math.Min(sec[i], b.PauseAfterS);
+                Head(i, 1);
+                // Moves between its own passes (step-down written out, or before each pass after a pause): after each pass, with the wait.
+                double between = head.Inside[i] + Enumerable.Range(2, Math.Max(0, passes - 1)).Sum(p => head.Before.GetValueOrDefault((i, p)));
                 if (b is DotBlock { PassBlocks.Count: > 1 })
                     // A picture turned per pass is laid out again each pass, each its own length.
                     for (int p = 1; p <= passes; p++)
@@ -1077,11 +1092,13 @@ public static class JobBuilder
                     }
                 else
                 {
-                    double d = Job.AllPassesSeconds(b, job.Mode);
-                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, d / passes) { Block = i, Passes = passes, WaitS = Math.Min(d / passes, b.PauseAfterS) });
+                    double d = Job.AllPassesSeconds(b, job.Mode) + between;
+                    double each = d / passes;
+                    spans.Add(new(t, t + d, blockSteps[i].First, blockSteps[i].Count, each) { Block = i, Passes = passes, WaitS = Math.Min(each, b.PauseAfterS + between / passes) });
                     t += d;
                 }
             }
+        if (head.AtEnd > 0) spans.Add(new(t, t + head.AtEnd, 0, 0, head.AtEnd) { HeadMove = true });
         return spans;
     }
 
