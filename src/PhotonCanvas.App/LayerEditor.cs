@@ -70,7 +70,7 @@ public sealed class LayerEditor : UserControl
     readonly Expander _more = new() { Header = "More settings", HorizontalAlignment = HorizontalAlignment.Stretch, Padding = new(8, 6) };
     readonly NumericUpDown _kerf = Number(-1, 1, 0.01m, "0.###"), _tabs = Number(0, 100, 1, "0"), _tabWidth = Number(0.1m, 10, 0.1m, "0.##");
     readonly NumericUpDown _overcut = Number(0, 10, 0.1m, "0.##"), _leadIn = Number(0, 10, 0.5m, "0.##");
-    readonly NumericUpDown _stepDown = Number(0, 2, 0.1m, "0.##"), _stepFirst = Number(0, 2, 0.05m, "0.##");
+    readonly NumericUpDown _stepDown = Number(0, 2, 0.01m, "0.###"), _stepFirst = Number(0, 2, 0.05m, "0.###");
     readonly CheckBox _wobble = new() { Content = "Wobble" };
     readonly NumericUpDown _wobbleD = Number(0.01m, 5, 0.01m, "0.###"), _wobbleS = Number(0.005m, 5, 0.005m, "0.###");
     readonly Control _wobbleRows;

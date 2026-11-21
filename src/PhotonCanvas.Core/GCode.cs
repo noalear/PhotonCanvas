@@ -750,7 +750,7 @@ public sealed class Job
                     throw new JobException($"The curved surface needs the head at {z:0.#} mm, outside its travel ({MinHeadZ:0}–{MaxHeadZ:0} mm). Check the measured heights.");
         var tag = Machine.GcodeTag;
         var lines = new GcodeText(Header());
-        double focus = 0; // how far the head is lowered now (mm)
+        long focus = 0; // how far the head is lowered now, in hundredths of a mm (see HundredthsMm)
         double? headZ = null; // curved surfaces: where the head is now
         // A step-down cut written one pass at a time: the head goes to that pass's depth here and
         // stays there for the next path at the same depth, instead of going back up after each one.
@@ -767,9 +767,9 @@ public sealed class Job
                 else if (b is BandedVectorBlock or BandedFillBlock) headZ = HeadHeights(b).LastOrDefault();
                 return;
             }
-            double want = b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0);
-            if (Math.Abs(want - focus) < 1e-6) return;
-            lines.AddRange(ZMoveAny(-(want - focus)));
+            long want = HundredthsMm(b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0));
+            if (want == focus) return;
+            lines.AddRange(ZMoveAny(-(want - focus) / 100.0));
             lines.AddRange(["# MUST", ""]);
             focus = want;
         }
@@ -834,10 +834,10 @@ public sealed class Job
                 }
                 break;
         }
-        if (!FollowsSurface && Math.Abs(focus) > 1e-6)
+        if (!FollowsSurface && focus != 0)
         {
             // Back to the focus the job started at.
-            lines.AddRange(ZMoveAny(focus));
+            lines.AddRange(ZMoveAny(focus / 100.0));
             lines.AddRange(["# MUST", ""]);
         }
         var tail = Tail(tag, Flat);
@@ -1080,13 +1080,13 @@ public sealed class Job
         var before = new Dictionary<(int, int), double>();
         var inside = new double[Blocks.Count];
         if (FollowsSurface) return new(before, inside, 0);
-        double focus = 0;
+        long focus = 0; // hundredths of a mm, as RenderText
         void Focus(int i, int key, int? pass)
         {
             var b = Blocks[i];
-            double want = b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0);
-            if (Math.Abs(want - focus) < 1e-6) return;
-            before[(i, key)] = before.GetValueOrDefault((i, key)) + HeadMoveSeconds(want - focus);
+            long want = HundredthsMm(b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0));
+            if (want == focus) return;
+            before[(i, key)] = before.GetValueOrDefault((i, key)) + HeadMoveSeconds((want - focus) / 100.0);
             focus = want;
         }
         switch (PassMode)
@@ -1107,9 +1107,13 @@ public sealed class Job
                     {
                         // Written out pass after pass inside the block, down before each and back up at the end.
                         double s = 0;
-                        if (drop.FirstMm > 0) s += HeadMoveSeconds(drop.FirstMm);
-                        if (drop.PerPassMm > 0) s += (passes - 1) * HeadMoveSeconds(drop.PerPassMm);
-                        if (drop.DepthFor(passes) > 0) s += HeadMoveSeconds(drop.DepthFor(passes));
+                        long at = 0;
+                        foreach (long depth in SteppedDepths(drop, passes))
+                        {
+                            if (depth != at) s += HeadMoveSeconds((depth - at) / 100.0);
+                            at = depth;
+                        }
+                        if (at > 0) s += HeadMoveSeconds(at / 100.0);
                         inside[i] = s;
                     }
                 }
@@ -1120,7 +1124,7 @@ public sealed class Job
                         if (Blocks[i].Laser.Passes >= round) Focus(i, round, round);
                 break;
         }
-        return new(before, inside, Math.Abs(focus) > 1e-6 ? HeadMoveSeconds(focus) : 0);
+        return new(before, inside, focus != 0 ? HeadMoveSeconds(focus / 100.0) : 0);
     }
 
     /// <summary>
@@ -1384,6 +1388,25 @@ public sealed class Job
     static string[] ZMove(double mm) => ["G102", "G91", $"G0Z{Trim3(mm)}F600", "G90", "G103", "G0F180000"];
 
     /// <summary>
+    /// A head height in whole hundredths of a mm. Head moves inside a job are written on this 0.01 mm
+    /// grid (as xTool Studio writes them), with each move taken from the rounded running total rather
+    /// than rounded on its own, so a fine step-down such as 0.011 mm per pass comes out right on
+    /// average (moves of 0.01 and the odd 0.02) instead of every step being rounded the same way and
+    /// the focus drifting off over hundreds of passes. Steps that round to no move are skipped,
+    /// which also saves the ~3 s each head move takes (see <see cref="HeadMoveS"/>).
+    /// </summary>
+    public static long HundredthsMm(double mm) => (long)Math.Round(mm * 100, MidpointRounding.AwayFromZero);
+
+    /// <summary>How far the head is lowered for each pass of a step-down cut written out pass after pass, in hundredths of a mm (index 0 = pass 1).</summary>
+    public static long[] SteppedDepths(StepDown drop, int passes)
+    {
+        var d = new long[Math.Max(1, passes)];
+        if (passes > 1)
+            for (int p = 1; p <= passes; p++) d[p - 1] = HundredthsMm(drop.DepthFor(p));
+        return d;
+    }
+
+    /// <summary>
     /// A cut with step-down. With <paramref name="passes"/> &gt; 1 (per-path passes) the passes are
     /// written out one after another, the head lowered before each and raised by the total at the
     /// end, exactly like xTool Studio. With one pass (whole-job rounds, or a pause after each pass)
@@ -1403,18 +1426,17 @@ public sealed class Job
         v.AddRange(SourceLines(l, true));
         v.AddRange(["M523P40", "", ""]);
         v.Add($"# blockConfig={{\"powerFactor\":{JsRounded(l.Power / 100, 6)},\"isVector\":true,\"crossDot\":false}}");
-        double first = passes > 1 ? drop.FirstMm : 0;
-        if (first > 0) v.AddRange(ZMoveAny(-first));
-        v.AddRange(["# MUST", path[0]]);
-        v.AddRange(path);
-        for (int p = 2; p <= passes; p++)
+        var depths = SteppedDepths(drop, passes);
+        long at = 0;
+        for (int p = 1; p <= passes; p++)
         {
-            if (drop.PerPassMm > 0) v.AddRange(ZMoveAny(-drop.PerPassMm));
+            if (depths[p - 1] != at) v.AddRange(ZMoveAny(-(depths[p - 1] - at) / 100.0));
+            at = depths[p - 1];
+            if (p == 1) v.AddRange(["# MUST", path[0]]);
             v.AddRange(path);
         }
         v.AddRange(["", $"# {tag} VECTOR TAIL", "# motion_end"]);
-        double back = passes > 1 ? drop.DepthFor(passes) : 0;
-        if (back > 0) v.AddRange([.. ZMoveAny(back), "# MUST"]);
+        if (at > 0) v.AddRange([.. ZMoveAny(at / 100.0), "# MUST"]);
         return v;
     }
 
