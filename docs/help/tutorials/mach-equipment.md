@@ -25,5 +25,6 @@ Untick features you don't use, like the **G-code console**. They leave the ribbo
 
 ## Extraction
 <!-- target: field:Exhaust fan gear -->
-The exhaust fan gear (1–4) and **Purifier speed (%)** go with every job. Experimental: check the
-fan sounds right on the first job.
+The exhaust fan gear (1–4) and **Purifier speed (%)** go with every job. Experimental: the gear is
+what xTool's inline duct fans take, and the F2 Ultra's own fan may ignore it. **Machine → Fan test**
+checks with the laser off.

@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Exhaust fan test (docs/addons.md): finds which command, if any, sets the exhaust fan's speed. Fan commands only. -->
+  <PropertyGroup>
+    <AddonId>fantest</AddonId>
+  </PropertyGroup>
+</Project>

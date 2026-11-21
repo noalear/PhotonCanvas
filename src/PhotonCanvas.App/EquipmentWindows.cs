@@ -103,9 +103,9 @@ public sealed class EquipmentPanel : UserControl
                 Box("G-code console", settings.ShowConsole, v => settings.ShowConsole = v, "Send commands straight to the machine, and keep macros (advanced)."),
                 Hint("Hiding a feature only takes it out of the ribbon: nothing is lost, and ticking it again brings it back."),
                 new TextBlock { Text = "EXTRACTION", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
-                Field("Exhaust fan gear", Gear(settings), tip: "Sent with each job to the exhaust fan (and an xTool duct fan): 1 lowest, 4 highest. xTool Studio sends 3."),
+                Field("Exhaust fan gear", Gear(settings), tip: "Sent with each job: 1 lowest, 4 highest. xTool Studio sends 3. It's the command xTool's inline duct fans (IF2) take; the F2 Ultra's own fan may ignore it. Machine → Fan test finds out."),
                 Field("Purifier speed (%)", Speed(settings), tip: "Sent with each job to an xTool purifier. xTool Studio sends 50%."),
-                Hint("Experimental: these are the commands xTool Studio puts at the start of every job, with the numbers changed. Check the fan sounds right on the first job."),
+                Hint("Experimental: these are the commands xTool Studio puts at the start of every job, with the numbers changed. xTool Studio only sends the fan gear for its inline duct fans and has no speed setting for the F2 Ultra's own fan, so that one may stay at full speed. Machine → Fan test tries it with the laser off."),
             },
         };
     }
