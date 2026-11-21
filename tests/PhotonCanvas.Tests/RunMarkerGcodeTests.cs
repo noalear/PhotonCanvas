@@ -200,6 +200,58 @@ public class RunMarkerGcodeTests
         Assert.Equal(new Vec2(10, 40), c.To(1)); // the galvo's X is its parked line, not a design X
     }
 
+    [Fact]
+    public void SteppingDownBetweenRoundsTakesItsTimeAndTheDotWaits()
+    {
+        // Kyle's box, 2026-11-20: 20 rounds stepping down 0.1 mm ran 63 s over, about 3.2 s at each head move.
+        var cut = Layer.Default(0, LayerMode.Cut) with { Laser = LaserSettings.Blue(70, 20).WithPasses(4), StepDownMm = 0.1 };
+        var job = JobBuilder.Build(One(cut, Rect(10, 10, 10, 10), Rect(30, 10, 10, 10)), new JobOptions { WholeJobPasses = true, PassDelayS = 5 });
+        var moves = job.Timeline.Where(t => t.HeadMove).ToList();
+        // Down before rounds 2, 3 and 4, back up at the end.
+        Assert.Equal(4, moves.Count);
+        Assert.Equal(Job.HeadMoveSeconds(0.1), moves[0].End - moves[0].Start, 6);
+        Assert.Equal(Job.HeadMoveSeconds(0.3), moves[^1].End - moves[^1].Start, 6);
+        Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
+        double plain = Job.StartS + job.Job.Blocks.Sum(b => Job.AllPassesSeconds(b)) + 3 * 5;
+        Assert.Equal(plain + 3 * Job.HeadMoveSeconds(0.1) + Job.HeadMoveSeconds(0.3), job.EstimateS, 6);
+        // The head moves after the pause between rounds, before round 2's first path.
+        int k = job.Timeline.ToList().IndexOf(moves[0]);
+        Assert.True(job.Timeline[k - 1].IsPause && !job.Timeline[k - 1].HeadMove);
+        Assert.Equal(2, job.Timeline[k + 1].Pass);
+        // While it moves the laser is off where the last path of round 1 ended.
+        var m = RunTracker.At(job, (moves[0].Start + moves[0].End) / 2, wait: true);
+        Assert.True(m.Pausing);
+        Assert.False(m.LaserOn);
+        Assert.Empty(m.Current);
+        Assert.NotNull(m.Head);
+        Assert.True(DistToPath(m.Head!.Value, job.Steps[job.Timeline[k - 2].FirstStep]) < 0.01);
+    }
+
+    [Fact]
+    public void OnePassWithoutStepDownHasNoHeadMoves()
+    {
+        var cut = Layer.Default(0, LayerMode.Cut) with { Laser = LaserSettings.Blue(70, 20) };
+        var job = JobBuilder.Build(One(cut, Rect(10, 10, 10, 10)), new JobOptions());
+        Assert.DoesNotContain(job.Timeline, t => t.HeadMove);
+        Assert.Equal(0, job.Job.HeadMoves().Total);
+    }
+
+    [Fact]
+    public void StepDownInsideAPathsOwnPassesIsCountedToo()
+    {
+        var cut = Layer.Default(0, LayerMode.Cut) with { Laser = LaserSettings.Blue(70, 20).WithPasses(3), StepDownMm = 0.2 };
+        var job = JobBuilder.Build(One(cut, Rect(10, 10, 10, 10)), new JobOptions { WholeJobPasses = false });
+        // The file moves the head three times: down, down, and back up.
+        Assert.Equal(3, job.Motion.Split('\n').Count(l => l.StartsWith("G0Z")));
+        // Down 0.2 before passes 2 and 3, back up 0.4 at the end: in the block's own span, after its passes.
+        double inside = 2 * Job.HeadMoveSeconds(0.2) + Job.HeadMoveSeconds(0.4);
+        Assert.Equal(inside, job.Job.HeadMoves().Total, 6);
+        Assert.Equal(job.EstimateS, job.Timeline[^1].End, 6);
+        var span = job.Timeline.Single(t => t.Block == 0);
+        Assert.Equal(3, span.Passes);
+        Assert.Equal(inside / 3, span.WaitS, 6);
+    }
+
     static double DistToPath(Vec2 p, BuiltJob.Step st)
     {
         var pts = st.Closed ? [.. st.Points, st.Points[0]] : st.Points;

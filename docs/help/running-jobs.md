@@ -224,13 +224,15 @@ it (October 2026, within about 2 % on the jobs it was checked against):
 | Lines (cut, score) | Their length at the layer's speed. |
 | Fills | Each line piece at the speed, plus 2.9 ms for the laser to go on and off. The gaps between pieces are jumped at 3000 mm/s, so a fill of many small shapes (text) costs more than its area suggests. |
 | Pictures | Each dot burned: its **Dot time µs** plus 0.41 ms. Blank stretches are jumped. Timed at 80 mm/s from 300 to 670 dpi, the time didn't follow the speed: the number of dots and their time decide it. |
+| The head moving up or down | 3.2 s each time, plus the move at 10 mm/s: a focus offset, each step down between passes, and back up at the end. Timed on a 20-pass step-down cut (November 2026), which ran a minute over before this was counted. |
 
 PhotonCanvas learns from finished jobs. After each finished job estimated at more than 10
-seconds, it divides the real time by the estimate, keeps that between 0.5 and 4 (half to four
-times as long), and mixes it into a running correction: 40 % this job, 60 % the correction so far.
-That correction is used for the time left while a job runs and for the laser's position on the
-work area, not for the estimate itself. It
-started again from nothing when the estimate changed (October 2026).
+seconds, it divides the real time by the estimate and mixes it into a running correction: 40 %
+this job, 60 % the correction so far. A job that took less than 0.6 or more than 1.8 times its
+estimate is left out: that's a run that wasn't what it looked like, not the estimate being a
+little out. The correction is used for the time left while a job runs and for the laser's position
+on the work area, not for the estimate itself. It started again from nothing when the estimate
+changed (October 2026, and November 2026 when the head's moves were added).
 
 The estimate also goes to the machine with the job, rounded to the second, in the same place
 xTool Studio puts its own, so the machine's screen can show how long the job takes and count it
@@ -338,7 +340,8 @@ Once the machine has the job, **Ship It** gives way to the job's state and two b
   (spread out, one way or both ways, crosshatched, turned each pass, with their overscan), offset
   fills going round, and a picture row by row. The time is counted from when the machine says it
   started, which is what the estimate is measured against; if the job takes longer or shorter than
-  estimated, the dot drifts by that much.
+  estimated, the dot drifts by that much. While the head steps down between passes, the dot waits
+  as a ring where the last path ended.
 - The timeline fills up as the job goes.
 - A job loaded by xTool Studio, the phone app or another computer is shown too: *Loaded: a job that
   wasn't sent from this program*. **Stop** cancels it.

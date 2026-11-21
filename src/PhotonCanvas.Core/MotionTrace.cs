@@ -205,7 +205,7 @@ public sealed class MotionTrace
             {
                 // The head moving up or down (focus, step-down, a curved surface's bands).
                 double feed = Math.Max(1, (g == 0 ? g0Feed : g1Feed) / 60);
-                double moveS = relative ? Math.Abs(dz) / feed : zNow is { } zn ? Math.Abs(dz - zn) / feed : Job.HeadMoveSeconds;
+                double moveS = relative ? Math.Abs(dz) / feed : zNow is { } zn ? Math.Abs(dz - zn) / feed : Job.BandMoveSeconds;
                 if (!relative) zNow = dz;
                 Add(pos, moveS, false);
                 lastLit = false;

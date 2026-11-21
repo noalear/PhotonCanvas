@@ -1033,7 +1033,7 @@ public sealed class Job
     /// <summary>A dot's step (s), for <see cref="MotionTrace"/>: <see cref="DotStepS"/>.</summary>
     internal const double DotStepSeconds = DotStepS;
     /// <summary>The head moving to a curved surface's next band (s), as <see cref="BlockSeconds"/> counts it.</summary>
-    internal const double HeadMoveSeconds = 0.25;
+    internal const double BandMoveSeconds = 0.25;
     /// <summary>Starting a job: the smallest jobs took about this much longer than their moves.</summary>
     public const double StartS = 1.5;
     /// <summary>Each piece of a fill line: the laser going on and off at its ends (3.2 ms over two fills of 5000 pieces, 2.9 without the start).</summary>
@@ -1052,12 +1052,84 @@ public sealed class Job
     public const double RotaryStepS = 0.032;
 
     /// <summary>
+    /// The head moving up or down inside a job (a focus offset, stepping down between passes), on top of the move
+    /// itself at 10 mm/s. Kyle's F2 Ultra, 2026-11-19/20: a 20-round step-down wobble cut ran 63 s over its estimate
+    /// (another 67 s), about 3.2 s at each of its 20 head moves (19 steps down and back up at the end), while a
+    /// one-pass cut of the same shapes, with no step-down, came in 0.4 s over. The machine's own elapsed count
+    /// leaves about 0.6 s of each out.
+    /// </summary>
+    public const double HeadMoveS = 3.2;
+
+    /// <summary>Seconds for one move of the head by <paramref name="mm"/> inside a job.</summary>
+    public static double HeadMoveSeconds(double mm) => HeadMoveS + Math.Abs(mm) / 10;
+
+    /// <summary>
+    /// When the head moves up or down in the run (flat bed; a curved surface's bands are counted with their blocks):
+    /// seconds of it before a block's pass (key: block index and the pass, from 1; a block that runs its own passes
+    /// has its moves before pass 1 and <paramref name="Inside"/>), inside a block's own passes (step-down written
+    /// out pass after pass), and at the end (back to where the job started).
+    /// </summary>
+    public sealed record HeadMovePlan(IReadOnlyDictionary<(int Block, int Pass), double> Before, IReadOnlyList<double> Inside, double AtEnd)
+    {
+        public double Total => Before.Values.Sum() + Inside.Sum() + AtEnd;
+    }
+
+    /// <summary>The head's moves, the same way <see cref="RenderText"/> writes them.</summary>
+    public HeadMovePlan HeadMoves()
+    {
+        var before = new Dictionary<(int, int), double>();
+        var inside = new double[Blocks.Count];
+        if (FollowsSurface) return new(before, inside, 0);
+        double focus = 0;
+        void Focus(int i, int key, int? pass)
+        {
+            var b = Blocks[i];
+            double want = b.FocusOffsetMm + (b is VectorBlock { Drop: { } d } && pass is { } p ? d.DepthFor(p) : 0);
+            if (Math.Abs(want - focus) < 1e-6) return;
+            before[(i, key)] = before.GetValueOrDefault((i, key)) + HeadMoveSeconds(want - focus);
+            focus = want;
+        }
+        switch (PassMode)
+        {
+            case PassMode.PerBlock:
+                for (int i = 0; i < Blocks.Count; i++)
+                {
+                    var b = Blocks[i];
+                    int passes = Math.Max(1, b.Laser.Passes);
+                    bool onePass = b is VectorBlock { Drop: not null } && (b.PauseAfterS > 0 || b.Laser.Passes <= 1);
+                    Focus(i, 1, onePass ? 1 : null);
+                    if (b is FillBlock { AngleStepDeg: not 0 } || b is DotBlock { PassBlocks.Count: > 1 }) continue;
+                    if (b.PauseAfterS > 0)
+                    {
+                        if (onePass) for (int p = 2; p <= passes; p++) Focus(i, p, p);
+                    }
+                    else if (b is VectorBlock { Drop: { } drop } vb && passes > 1 && vb.Path.Points.Count >= 2)
+                    {
+                        // Written out pass after pass inside the block, down before each and back up at the end.
+                        double s = 0;
+                        if (drop.FirstMm > 0) s += HeadMoveSeconds(drop.FirstMm);
+                        if (drop.PerPassMm > 0) s += (passes - 1) * HeadMoveSeconds(drop.PerPassMm);
+                        if (drop.DepthFor(passes) > 0) s += HeadMoveSeconds(drop.DepthFor(passes));
+                        inside[i] = s;
+                    }
+                }
+                break;
+            case PassMode.Rounds:
+                for (int round = 1; round <= Rounds; round++)
+                    for (int i = 0; i < Blocks.Count; i++)
+                        if (Blocks[i].Laser.Passes >= round) Focus(i, round, round);
+                break;
+        }
+        return new(before, inside, Math.Abs(focus) > 1e-6 ? HeadMoveSeconds(focus) : 0);
+    }
+
+    /// <summary>
     /// Duration in seconds, from the moves and the times measured on the machine (the start, each
-    /// fill piece, each dot). Good for comparing settings and showing progress.
+    /// fill piece, each dot, each move of the head). Good for comparing settings and showing progress.
     /// </summary>
     public double EstimateSeconds()
     {
-        double work = StartS + Blocks.Sum(b => AllPassesSeconds(b, Mode));
+        double work = StartS + Blocks.Sum(b => AllPassesSeconds(b, Mode)) + HeadMoves().Total;
         return PassMode is PassMode.Rounds r ? work + r.DelayS * Math.Max(0, Rounds - 1) : work;
     }
 

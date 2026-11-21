@@ -933,7 +933,10 @@ public sealed class JobBar : UserControl
     void LearnTiming(double tookSeconds)
     {
         if (OwnJob is not { EstimateS: > 10 } job) return;
-        double ratio = Math.Clamp(tookSeconds / job.EstimateS, 0.5, 4);
+        double ratio = tookSeconds / job.EstimateS;
+        // Far off isn't the estimate being a little out but a run that wasn't what it looks like (a job "finished"
+        // 3 s in, 2026-11-19, from an out-of-date status check): learning from it threw the timing off for days.
+        if (ratio is < 0.6 or > 1.8) return;
         _settings.JobTimeScale = Math.Round(TimeScale() * 0.6 + ratio * 0.4, 3);
         _settings.Save();
     }
@@ -941,7 +944,8 @@ public sealed class JobBar : UserControl
     /// <summary>What's been learned, started again at 1 when the estimate itself changed.</summary>
     double TimeScale()
     {
-        const int Model = 2;
+        // 3: the head's moves inside a job are counted (2026-11-21); what was learned before is started again.
+        const int Model = 3;
         if (_settings.JobTimeModel != Model)
         {
             _settings.JobTimeScale = 1;

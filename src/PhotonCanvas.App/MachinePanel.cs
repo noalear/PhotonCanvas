@@ -1036,6 +1036,9 @@ public sealed class MachinePanel : UserControl
         if (c is not null) _ = Task.Run(async () => await c.DisposeAsync());
     }
 
+    /// <summary>Mode changes the machine has pushed: a status check that started before the latest one is out of date.</summary>
+    int _modeEvents;
+
     void StartPolling()
     {
         _poll?.Cancel();
@@ -1046,11 +1049,20 @@ public sealed class MachinePanel : UserControl
             {
                 try
                 {
+                    int seen = Volatile.Read(ref _modeEvents);
                     var state = await c.GetRuntimeStateAsync(cts.Token);
                     double? dist = null;
                     try { dist = await c.GetHeadZAsync(cts.Token) - _machine.ZOffset; }
                     catch (DeviceException) { }
-                    Ui(() => { LoadedTaskId = state.TaskId; ShowStatus(state.Mode, dist); });
+                    Ui(() =>
+                    {
+                        // A mode the machine pushed while this check was on its way is newer than the check's answer:
+                        // applying the old answer flipped a finished job back to running for a moment (a 3 s "finished"
+                        // job in the history on 2026-11-19, which upset the learned timing) or ended a job just started.
+                        if (Volatile.Read(ref _modeEvents) != seen) return;
+                        LoadedTaskId = state.TaskId;
+                        ShowStatus(state.Mode, dist);
+                    });
                 }
                 catch (DeviceException) { }
                 catch (OperationCanceledException) { break; }
@@ -1133,6 +1145,7 @@ public sealed class MachinePanel : UserControl
     {
         if (ev.Type == "MODE_CHANGE")
         {
+            Interlocked.Increment(ref _modeEvents);
             if (ev.Info is System.Text.Json.Nodes.JsonObject mo && mo["taskId"]?.ToString() is { Length: > 0 } tid)
                 LoadedTaskId = tid;
             if (ModeOf(ev) is { Length: > 0 } mode && mode != Mode)
