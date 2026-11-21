@@ -16,7 +16,7 @@ public enum FanTarget { Machine, DuctFanPort, InlineFanPort }
 /// (off) to 4 (fastest), automatic (<c>B</c>) or manual (<c>A</c>). On the IF2 (port 78) a manual
 /// gear carries <c>C3</c> (<c>C2</c> for off) and an automatic one <c>C4</c>. These only touch fans:
 /// <see cref="IsFanOnly"/> is the check the fan test uses before sending anything.
-/// Which of them the F2 Ultra's own exhaust fan obeys is not known yet (2026-11-21).
+/// The F2 Ultra's own built-in exhaust fan obeys none of them (Kyle's fan test, 2026-11-21).
 /// </summary>
 public static partial class FanCommands
 {
@@ -46,7 +46,7 @@ public static partial class FanCommands
     [GeneratedRegex("""^(M9064 [AB][0-4]( C[234])?|G198 P(70|78) "M9064 [AB][0-4]( C[234])?")$""")]
     private static partial Regex FanLine();
 
-    /// <summary>The machine's stored fan speed setting (%), as xTool's P2S keeps it. Whether the F2 Ultra uses it is what the fan test finds out.</summary>
+    /// <summary>The machine's stored fan speed setting (%), as xTool's P2S keeps it. The F2 Ultra refuses it (error 1, 2026-11-21).</summary>
     public const string SpeedConfigKey = "smokeFanSpeed";
     public const int MinSpeedPct = 10, MaxSpeedPct = 100;
 

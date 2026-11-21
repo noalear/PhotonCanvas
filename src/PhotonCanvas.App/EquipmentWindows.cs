@@ -55,6 +55,18 @@ public sealed class EquipmentPanel : UserControl
         var model = new ComboBox { ItemsSource = models.Select(m => m.Name).ToList(), HorizontalAlignment = HorizontalAlignment.Stretch };
         ToolTip.SetTip(model, "Which xTool laser you have: it sets the work area, the lasers you can choose and the tools shown. Also in Settings → Machines.");
         var about = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        // The fan gear and purifier speed only reach xTool's add-on fans and purifiers: shown only for those.
+        var fanGear = Field("Inline fan gear", Gear(settings), tip: "Sent with each job to the xTool inline fan: 1 lowest, 4 highest. xTool Studio sends 3.");
+        var purifier = Field("Purifier speed (%)", Speed(settings), tip: "Sent with each job to the xTool purifier. xTool Studio sends 50%.");
+        var extraction = new TextBlock { Text = "EXTRACTION", Classes = { "h" }, Margin = new(0, 8, 0, 0) };
+        var extractionHint = Hint("Sent at the start of every job, as xTool Studio does it, with your numbers. Experimental. The F2 Ultra's built-in exhaust fan has no speed control: it always runs at full speed.");
+        void ShowExtraction()
+        {
+            fanGear.IsVisible = settings.OwnsInlineFan;
+            purifier.IsVisible = settings.OwnsPurifier;
+            extraction.IsVisible = extractionHint.IsVisible = settings.OwnsInlineFan || settings.OwnsPurifier;
+        }
+        ShowExtraction();
         var colour = Box("Colour on metal", settings.ShowColourOnMetal, v => settings.ShowColourOnMetal = v, "Colour tests, measuring colours with the close-up camera, and colour pictures on stainless or titanium (MOPA).");
         var gratings = Box("Diffraction gratings", settings.ShowDiffraction, v => settings.ShowDiffraction = v, "Rainbow shimmer pictures and the depth-map almost-hologram on polished stainless (MOPA).");
         void ShowModel(PhotonCanvas.Core.MachineSetup m)
@@ -96,16 +108,18 @@ public sealed class EquipmentPanel : UserControl
                 Box("RA3 rotary (rollers and chuck)", settings.OwnsRa3, v => settings.OwnsRa3 = v, "The newer rotary."),
                 Box("My own rotary (homemade or another make)", settings.OwnsCustomRotary, v => settings.OwnsCustomRotary = v, "A rotary on the machine's rotary port with its own scale: set it under Machine → Work mode, and correct it from a test turn."),
                 Box("Conveyor feeder", settings.OwnsConveyor, v => settings.OwnsConveyor = v, "Feeds long pieces through, up to 610 mm."),
+                Box("xTool inline fan (SafetyPro IF2 or duct fan)", settings.OwnsInlineFan, v => { settings.OwnsInlineFan = v; ShowExtraction(); }, "An xTool fan in the exhaust duct: jobs set its speed (Extraction, below), and Machine → Fan test tries its commands. Not the F2 Ultra's built-in fan, which has no speed control."),
+                Box("xTool purifier", settings.OwnsPurifier, v => { settings.OwnsPurifier = v; ShowExtraction(); }, "An xTool fume purifier: jobs set its speed (Extraction, below)."),
                 Hint("Only the attachments you have show up under Machine → Work mode. With none, the Work mode button is hidden and jobs are always on the flat bed."),
                 new TextBlock { Text = "FEATURES TO SHOW", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
                 colour,
                 gratings,
                 Box("G-code console", settings.ShowConsole, v => settings.ShowConsole = v, "Send commands straight to the machine, and keep macros (advanced)."),
                 Hint("Hiding a feature only takes it out of the ribbon: nothing is lost, and ticking it again brings it back."),
-                new TextBlock { Text = "EXTRACTION", Classes = { "h" }, Margin = new(0, 8, 0, 0) },
-                Field("Exhaust fan gear", Gear(settings), tip: "Sent with each job: 1 lowest, 4 highest. xTool Studio sends 3. It's the command xTool's inline duct fans (IF2) take; the F2 Ultra's own fan may ignore it. Machine → Fan test finds out."),
-                Field("Purifier speed (%)", Speed(settings), tip: "Sent with each job to an xTool purifier. xTool Studio sends 50%."),
-                Hint("Experimental: these are the commands xTool Studio puts at the start of every job, with the numbers changed. xTool Studio only sends the fan gear for its inline duct fans and has no speed setting for the F2 Ultra's own fan, so that one may stay at full speed. Machine → Fan test tries it with the laser off."),
+                extraction,
+                fanGear,
+                purifier,
+                extractionHint,
             },
         };
     }

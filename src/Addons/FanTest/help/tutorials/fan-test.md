@@ -1,15 +1,15 @@
 # Test the exhaust fan's speed
 <!-- category: Machine and settings -->
-<!-- summary: Find out which command, if any, makes the exhaust fan run slower and quieter. -->
+<!-- summary: Check that an xTool inline fan follows the speed jobs send. -->
 <!-- page: fan-test.md -->
 <!-- order: 95 -->
-The fan test tries the ways the exhaust fan's speed might be set, one at a time. Only fan
+The fan test tries the ways an xTool inline fan's speed is set, one at a time. Only fan
 commands are sent: the laser stays off and the head doesn't move. You need the machine connected
 (**Connect** at the right end of the ribbon).
 
 ## Open the fan test
 <!-- target: ribbon:Machine/Fan test -->
-Click **Fan test** in the Machine tab's Settings group.
+Click **Fan test** in the Machine tab's Settings group. It shows once **xTool inline fan** is ticked in Settings → Equipment.
 
 ## Read what the machine says
 <!-- target: button:Read the fan's state -->

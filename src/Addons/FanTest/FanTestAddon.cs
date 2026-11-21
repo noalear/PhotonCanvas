@@ -22,6 +22,8 @@ public sealed class FanTestAddon : IAddon
         {
             Tip = "Find out which command, if any, makes the exhaust fan quieter: read what the machine reports, send fan-only commands, run a laser-off job that steps the fan through its gears",
             Order = 30,
+            // Only for an xTool inline fan: the F2 Ultra's built-in fan follows none of these (Kyle's test, 2026-11-21).
+            Visible = () => host.AppSettings.OwnsInlineFan,
         });
     }
 
